@@ -291,7 +291,7 @@ func (ap *Provider) loginUser(config *apiv3.AzureADConfig, azureCredential *apiv
 func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	principal, err := client.GetUser(principalID)
 	if err != nil {
-		return apiv3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
+		return apiv3.Principal{}, &common.NonTransientError{Err: httperror.NewAPIError(httperror.NotFound, err.Error())}
 	}
 	principal.Me = common.SamePrincipal(token.GetUserPrincipal(), principal)
 	return principal, nil
@@ -300,7 +300,7 @@ func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID str
 func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	principal, err := client.GetGroup(id)
 	if err != nil {
-		return apiv3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
+		return apiv3.Principal{}, &common.NonTransientError{Err: httperror.NewAPIError(httperror.NotFound, err.Error())}
 	}
 	principal.MemberOf = ap.userMGR.IsMemberOf(token, principal)
 	return principal, nil

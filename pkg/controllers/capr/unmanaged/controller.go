@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/taints"
@@ -22,12 +24,14 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/kv"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	apilabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
@@ -37,12 +41,18 @@ import (
 
 const UnmanagedMachineKind = "CustomMachine"
 
+var (
+	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+)
+
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
 		kubeconfigManager: kubeconfigManager,
 		unmanagedMachine:  clients.RKE.CustomMachine(),
 		rkeClusterCache:   clients.RKE.RKECluster().Cache(),
 		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
+		mgmtNodeClient:    clients.Mgmt.Node(),
+		mgmtNodeCache:     clients.Mgmt.Node().Cache(),
 		clusterCache:      clients.Provisioning.Cluster().Cache(),
 		capiClusterCache:  clients.CAPI.Cluster().Cache(),
 		machineCache:      clients.CAPI.Machine().Cache(),
@@ -53,8 +63,13 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 				clients.Mgmt.Cluster(),
 				clients.Provisioning.Cluster(),
 				clients.RKE.CustomMachine(),
+				clients.RKE.RKEBootstrap(),
 				clients.CAPI.Machine(),
-				clients.RKE.RKEBootstrap()),
+				clients.RBAC.Role(),
+				clients.RBAC.RoleBinding(),
+				clients.Core.ServiceAccount(),
+				clients.Core.Secret(),
+			),
 	}
 	clients.RKE.CustomMachine().OnRemove(ctx, "unmanaged-machine", h.onUnmanagedMachineOnRemove)
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-health", h.onUnmanagedMachineChange)
@@ -104,10 +119,12 @@ type handler struct {
 	unmanagedMachine  rkecontroller.CustomMachineController
 	rkeClusterCache   rkecontroller.RKEClusterCache
 	mgmtClusterCache  mgmtcontroller.ClusterCache
+	mgmtNodeClient    mgmtcontroller.NodeClient
+	mgmtNodeCache     mgmtcontroller.NodeCache
 	capiClusterCache  capicontrollers.ClusterCache
 	machineCache      capicontrollers.MachineCache
 	machineClient     capicontrollers.MachineClient
-	clusterCache      rocontrollers.ClusterCache
+	clusterCache      provcontrollers.ClusterCache
 	secrets           corecontrollers.SecretClient
 	apply             apply.Apply
 }
@@ -115,7 +132,7 @@ type handler struct {
 func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID string) (string, error) {
 	_, err := h.machineCache.Get(cluster.Namespace, machineName)
 	if apierror.IsNotFound(err) {
-		machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
+		machines, err := h.machineCache.List(cluster.Namespace, apilabels.SelectorFromSet(map[string]string{
 			capr.MachineIDLabel: machineID,
 		}))
 		if len(machines) != 1 || err != nil || machines[0].Spec.ClusterName != cluster.Name {
@@ -146,6 +163,10 @@ func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secre
 		return secret, nil
 	}
 
+	if mgmtNameRegexp.MatchString(secret.Namespace) {
+		return h.createMachinePlanForImported(secret, data)
+	}
+
 	capiCluster, err := h.getCAPICluster(secret)
 	if err != nil {
 		return secret, err
@@ -172,6 +193,141 @@ func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secre
 		secret.Labels[capr.MachineNamespaceLabel] = capiCluster.Namespace
 		secret.Labels[capr.MachineNameLabel] = machineName
 
+		return h.secrets.Update(secret)
+	}
+
+	return secret, nil
+}
+
+func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.Object) (*corev1.Secret, error) {
+	labels := map[string]string{}
+	annotations := map[string]string{}
+
+	if data.Bool("role-control-plane") {
+		labels[capr.ControlPlaneRoleLabel] = "true"
+	}
+
+	if data.Bool("role-etcd") {
+		labels[capr.EtcdRoleLabel] = "true"
+	}
+
+	if data.Bool("role-worker") {
+		labels[capr.WorkerRoleLabel] = "true"
+	}
+
+	var machine *apimgmtv3.Node
+
+	if val := data.String("node-name"); val != "" {
+		labels[capr.NodeNameLabel] = val
+
+		machines, err := h.mgmtNodeCache.List(secret.Namespace, apilabels.SelectorFromSet(map[string]string{"management.cattle.io/nodename": val}))
+		if err != nil {
+			return nil, err
+		}
+		if len(machines) != 1 {
+			return nil, fmt.Errorf("expected exactly one machine, but got %d", len(machines))
+		}
+
+		machine = machines[0].DeepCopy()
+		if machine.Labels == nil {
+			machine.Labels = map[string]string{}
+		}
+		machine.Labels[capr.MachineIDLabel] = data.String("id")
+
+		machine, err = h.mgmtNodeClient.Update(machine)
+		if err != nil {
+			return nil, err
+		}
+
+		labels[capr.MachineIDLabel] = data.String("id")
+		labels[capr.MachineNamespaceLabel] = machine.Namespace
+		labels[capr.MachineNameLabel] = machine.Name
+		labels[capr.ClusterNameLabel] = machine.Namespace
+	} else {
+		return nil, fmt.Errorf("node name not found in secret")
+	}
+
+	if address := data.String("address"); address != "" {
+		annotations[capr.AddressAnnotation] = address
+	}
+
+	if internalAddress := data.String("internal-address"); internalAddress != "" {
+		annotations[capr.InternalAddressAnnotation] = internalAddress
+	}
+
+	planSecretName := name.SafeConcatName(secret.Name, "machine", "plan")
+
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      planSecretName,
+			Namespace: secret.Namespace,
+			Labels: map[string]string{
+				capr.RoleLabel:             capr.RolePlan,
+				capr.PlanSecret:            planSecretName,
+				capr.MachineIDLabel:        data.String("id"),
+				capr.MachineNamespaceLabel: machine.Namespace,
+				capr.MachineNameLabel:      machine.Name,
+				capr.ClusterNameLabel:      machine.Namespace,
+			},
+		},
+	}
+	planSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        planSecretName,
+			Namespace:   secret.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Type: capr.SecretTypeMachinePlan,
+	}
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      planSecretName,
+			Namespace: secret.Namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"watch", "get", "update", "list"},
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				ResourceNames: []string{planSecretName},
+			},
+		},
+	}
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      planSecretName,
+			Namespace: secret.Namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     planSecretName,
+		},
+	}
+
+	objs := []runtime.Object{sa, planSecret, role, roleBinding}
+
+	err := h.apply.WithOwner(secret).ApplyObjects(objs...)
+	if err != nil {
+		return secret, err
+	}
+
+	if secret.Labels[capr.MachineNameLabel] != machine.Name {
+		secret = secret.DeepCopy()
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+
+		secret.Labels[capr.MachineNamespaceLabel] = machine.Namespace
+		secret.Labels[capr.MachineNameLabel] = machine.Name
 		return h.secrets.Update(secret)
 	}
 

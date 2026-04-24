@@ -6,6 +6,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ import (
 const (
 	grbGrIndex                 = "mgmt-auth-grb-gr-idex"
 	grNsIndex                  = "mgmt-auth-gr-ns-index"
+	grDownstreamNSIndex        = rbac.GRDownstreamNSIndex
 	grSafeConcatIndex          = "mgmt-auth-gr-concat-index"
 	grbSafeConcatIndex         = "mgmt-auth-grb-concat-index"
 	grbEnqueuer                = "mgmt-auth-gr-enqueue"
@@ -43,6 +45,15 @@ type globalRBACEnqueuer struct {
 func grNsIndexer(gr *v3.GlobalRole) ([]string, error) {
 	result := []string{}
 	for ns := range gr.NamespacedRules {
+		result = append(result, ns)
+	}
+	return result, nil
+}
+
+// grDownstreamNSIndexer indexes GlobalRoles by the namespaces in InheritedNamespacedRules
+func grDownstreamNSIndexer(gr *v3.GlobalRole) ([]string, error) {
+	result := []string{}
+	for ns := range gr.InheritedNamespacedRules {
 		result = append(result, ns)
 	}
 	return result, nil

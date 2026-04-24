@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -49,7 +48,7 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 		}
 		token := parts[1]
 
-		provider := mux.Vars(r)["provider"]
+		provider := r.PathValue("provider")
 
 		if provider == local.Name {
 			// We don't suppport the "local" provider for SCIM as it's not intended

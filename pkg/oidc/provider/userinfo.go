@@ -88,23 +88,25 @@ func (h *userInfoHandler) userInfoEndpoint(w http.ResponseWriter, r *http.Reques
 		response.UserName = user.DisplayName
 	}
 
-	attribs, err := h.userAttributeLister.Get(userId)
-	if err != nil && !apierrors.IsNotFound(err) {
-		oidcerror.WriteError(oidcerror.ServerError, fmt.Sprintf("can't get user attributes: %v", err), http.StatusInternalServerError, w)
-		return
-	}
-	var groups []string
-	if attribs != nil {
-		for _, gps := range attribs.GroupPrincipals {
-			for _, principal := range gps.Items {
-				name := strings.TrimPrefix(principal.Name, "local://")
-				groups = append(groups, name)
+	if slices.Contains(scopes, "groups") {
+		attribs, err := h.userAttributeLister.Get(userId)
+		if err != nil && !apierrors.IsNotFound(err) {
+			oidcerror.WriteError(oidcerror.ServerError, fmt.Sprintf("can't get user attributes: %v", err), http.StatusInternalServerError, w)
+			return
+		}
+		var groups []string
+		if attribs != nil {
+			for _, gps := range attribs.GroupPrincipals {
+				for _, principal := range gps.Items {
+					name := strings.TrimPrefix(principal.Name, "local://")
+					groups = append(groups, name)
+				}
 			}
 		}
-	}
 
-	if groups != nil {
-		response.Groups = groups
+		if groups != nil {
+			response.Groups = groups
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

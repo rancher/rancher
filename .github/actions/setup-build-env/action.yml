@@ -15,6 +15,12 @@ outputs:
   HELM_VERSION: 
     description: "HELM_VERSION from package/Dockerfile.installer"
     value: ${{ steps.vars.outputs.HELM_VERSION }}
+  HELM_HASH_amd64: 
+    description: "HELM_HASH_amd64 from package/Dockerfile.installer"
+    value: ${{ steps.vars.outputs.HELM_HASH_amd64 }}
+  HELM_HASH_arm64: 
+    description: "HELM_HASH_arm64 from package/Dockerfile.installer"
+    value: ${{ steps.vars.outputs.HELM_HASH_arm64 }}
   CATTLE_HELM_VERSION: 
     description: "CATTLE_HELM_VERSION from package/Dockerfile"
     value: ${{ steps.vars.outputs.CATTLE_HELM_VERSION }}
@@ -22,7 +28,7 @@ outputs:
     description: "GO_VERSION from package/Dockerfile"
     value: ${{ steps.vars.outputs.GO_VERSION }}
   HELM_UNITTEST_VERSION: 
-    description: "HELM_UNITTEST_VERSION from Dockerfile.dapper"
+    description: "HELM_UNITTEST_VERSION from Dockerfile.runtime"
     value: ${{ steps.vars.outputs.HELM_UNITTEST_VERSION }}
   CATTLE_RANCHER_WEBHOOK_VERSION: 
     description: "CATTLE_RANCHER_WEBHOOK_VERSION from scripts/export-config"
@@ -44,14 +50,18 @@ runs:
   steps:
     - id: vars
       shell: bash
+      env:
+        RANCHER_PATH: ${{ inputs.rancher_path }}
       run: |
-        cd ${{ inputs.rancher_path }}
+        cd "${RANCHER_PATH}" || exit
         source scripts/export-config
         CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
         CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
         HELM_VERSION=$(grep -m1 'ENV HELM_VERSION=' package/Dockerfile.installer | cut -d '=' -f2)
+        HELM_HASH_amd64=$(grep -m1 'ENV HELM_HASH_amd64=' package/Dockerfile.installer | cut -d '=' -f2)
+        HELM_HASH_arm64=$(grep -m1 'ENV HELM_HASH_arm64=' package/Dockerfile.installer | cut -d '=' -f2)
         GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
-        HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.dapper | cut -d '=' -f2)
+        HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.runtime | cut -d '=' -f2)
         CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
         CATTLE_REMOTEDIALER_PROXY_VERSION=$CATTLE_REMOTEDIALER_PROXY_VERSION
         CATTLE_RANCHER_TURTLES_VERSION=$CATTLE_RANCHER_TURTLES_VERSION
@@ -69,6 +79,14 @@ runs:
         fi
         if [[ -z "$HELM_VERSION" ]]; then
           echo "HELM_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$HELM_HASH_amd64" ]]; then
+          echo "HELM_HASH_amd64 not found"
+          exit 1
+        fi
+        if [[ -z "$HELM_HASH_arm64" ]]; then
+          echo "HELM_HASH_arm64 not found"
           exit 1
         fi
         if [[ -z "$CATTLE_HELM_VERSION" ]]; then
@@ -106,6 +124,8 @@ runs:
         echo "CATTLE_KDM_BRANCH=$CATTLE_KDM_BRANCH" >> $GITHUB_OUTPUT
         echo "CATTLE_K3S_VERSION=$CATTLE_K3S_VERSION" >> $GITHUB_OUTPUT 
         echo "HELM_VERSION=$HELM_VERSION" >> $GITHUB_OUTPUT 
+        echo "HELM_HASH_amd64=$HELM_HASH_amd64" >> $GITHUB_OUTPUT 
+        echo "HELM_HASH_arm64=$HELM_HASH_arm64" >> $GITHUB_OUTPUT 
 
         echo "GO_VERSION=$GO_VERSION" >> $GITHUB_OUTPUT 
         echo "HELM_UNITTEST_VERSION=$HELM_UNITTEST_VERSION" >> $GITHUB_OUTPUT
@@ -115,4 +135,3 @@ runs:
         echo "CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION" >> $GITHUB_OUTPUT 
         echo "CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION" >> $GITHUB_OUTPUT 
         echo "CATTLE_HELM_VERSION=$CATTLE_HELM_VERSION" >> $GITHUB_OUTPUT
-

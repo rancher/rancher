@@ -58,7 +58,7 @@ The following are examples of files that often refer to newly added configuratio
 - [build-agent](../scripts/build-agent)
 - [quick](../dev-scripts/quick)
 - [Dockerfile](../package/Dockerfile)
-- [Dockerfile.agent](../package/Dockerfile.agent)
+- [Dockerfile.runtime](../Dockerfile.runtime)
 - [pkg/settings/setting.go](../pkg/settings/setting.go)
 
 ### The build.yaml file

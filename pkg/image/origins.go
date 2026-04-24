@@ -13,7 +13,7 @@ import (
 // no longer used by Rancher. The keys of this map should
 // mirror the images listed in rancher-images.txt.
 // Some net-new images may be resolved via the check-origins script
-// (dapper check-origins).
+// (`make check-origins`).
 
 // images should be double-checked and confirmed
 // by the team which owns the image.
@@ -32,7 +32,7 @@ var OriginMap = map[string]string{
 	"appco-redis":                                             "https://github.com/redis/redis",
 	"appco-thanos":                                            "https://github.com/thanos-io/thanos",
 	"aks-operator":                                            "https://github.com/rancher/aks-operator",
-	"azureserviceoperator":                                    "https://github.com/rancher-sandbox/azure-service-operator",
+	"azureserviceoperator":                                    "https://github.com/rancher/azure-service-operator",
 	"backup-restore-operator":                                 "https://github.com/rancher/backup-restore-operator",
 	"cnideploy":                                               "https://github.com/containernetworking/plugins",
 	"coreos-kube-state-metrics":                               "https://github.com/kubernetes/kube-state-metrics",
@@ -40,12 +40,12 @@ var OriginMap = map[string]string{
 	"coreos-prometheus-operator":                              "https://github.com/prometheus-operator/prometheus-operator",
 	"cluster-api-controller":                                  "https://github.com/rancher-sandbox/cluster-api",
 	"cluster-api-addon-provider-fleet":                        "https://github.com/rancher/cluster-api-addon-provider-fleet",
-	"cluster-api-aws-controller":                              "https://github.com/rancher-sandbox/cluster-api-provider-aws",
-	"cluster-api-azure-controller":                            "https://github.com/rancher-sandbox/cluster-api-provider-azure",
-	"cluster-api-gcp-controller":                              "https://github.com/rancher-sandbox/cluster-api-provider-gcp",
+	"cluster-api-aws-controller":                              "https://github.com/rancher/cluster-api-provider-aws",
+	"cluster-api-azure-controller":                            "https://github.com/rancher/cluster-api-provider-azure",
+	"cluster-api-gcp-controller":                              "https://github.com/rancher/cluster-api-provider-gcp",
 	"cluster-api-provider-rke2-bootstrap":                     "https://github.com/rancher/cluster-api-provider-rke2",
 	"cluster-api-provider-rke2-controlplane":                  "https://github.com/rancher/cluster-api-provider-rke2",
-	"cluster-api-vsphere-controller":                          "https://github.com/rancher-sandbox/cluster-api-provider-vsphere",
+	"cluster-api-vsphere-controller":                          "https://github.com/rancher/cluster-api-provider-vsphere",
 	"eks-operator":                                            "https://github.com/rancher/eks-operator",
 	"externalip-webhook":                                      "https://github.com/rancher/externalip-webhook",
 	"fleet":                                                   "https://github.com/rancher/fleet",
@@ -171,6 +171,7 @@ var OriginMap = map[string]string{
 	"mirrored-jetstack-cert-manager-controller":               "https://github.com/cert-manager/cert-manager",
 	"mirrored-jimmidyson-configmap-reload":                    "https://github.com/jimmidyson/configmap-reload",
 	"mirrored-jkroepke-kube-webhook-certgen":                  "https://github.com/jkroepke/kube-webhook-certgen",
+	"kube-webhook-certgen":                                    "https://github.com/rancher/ingress-nginx",
 	"mirrored-k8scsi-csi-node-driver-registrar":               "https://github.com/kubernetes-csi/node-driver-registrar",
 	"mirrored-k8scsi-csi-resizer":                             "https://github.com/kubernetes-csi/external-resizer",
 	"mirrored-k8scsi-livenessprobe":                           "https://github.com/kubernetes-csi/livenessprobe",
@@ -328,7 +329,7 @@ func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages
 		return fmt.Errorf("could not create %s file: %w", imageOriginFileName, err)
 	}
 
-	originsFile.Chmod(0755)
+	originsFile.Chmod(0o755)
 	originsFile.WriteString(fileContents)
 	return originsFile.Close()
 }

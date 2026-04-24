@@ -1,12 +1,16 @@
 package planner
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash"
+	"io"
 	"net"
 	"path"
 	"slices"
@@ -14,13 +18,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/rancher/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/data/management"
-	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
@@ -426,7 +431,7 @@ func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry
 		return nil, fmt.Errorf("machine state secret for machine %s/%s not found", entry.Machine.Namespace, entry.Machine.Name)
 	}
 
-	driverConfig, err := nodeconfig.ExtractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
+	driverConfig, err := extractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
 	if err != nil {
 		return nil, fmt.Errorf("error getting machine state JSON for machine %s/%s: %w", entry.Machine.Namespace, entry.Machine.Name, err)
 	}
@@ -835,4 +840,47 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	})
 
 	return nodePlan, config, joinedServer, nil
+}
+
+func extractConfigJSON(extractedConfig string) (map[string]interface{}, error) {
+	result := map[string]interface{}{}
+
+	configBytes, err := base64.StdEncoding.DecodeString(extractedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error reinitializing config (base64.DecodeString): %v", err)
+	}
+
+	gzipReader, err := gzip.NewReader(bytes.NewReader(configBytes))
+	if err != nil {
+		return nil, err
+	}
+	tarReader := tar.NewReader(gzipReader)
+
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if err == io.EOF {
+				return result, nil
+			}
+			return nil, fmt.Errorf("error reinitializing config (tarRead.Next): %v", err)
+		}
+
+		info := header.FileInfo()
+		if info.IsDir() {
+			continue
+		}
+
+		filename := header.Name
+		if strings.Contains(filename, "/machines/") && strings.HasSuffix(filename, "/config.json") {
+			buf := &bytes.Buffer{}
+			_, err = io.Copy(buf, tarReader)
+			if err != nil {
+				return nil, fmt.Errorf("error reinitializing config (Copy): %v", err)
+			}
+
+			if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+				return nil, errors.Wrap(err, "failed to read config.json")
+			}
+		}
+	}
 }

@@ -472,6 +472,40 @@ func TestAuthEndpoint(t *testing.T) {
 			wantHttpCode: http.StatusBadRequest,
 			wantError:    `{"error":"invalid_request","error_description":"missing redirect_uri"}`,
 		},
+		"redirect uri same as host uri": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid&redirect_uri=https://rancher.com",
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Times(0)
+			},
+			wantHttpCode: http.StatusBadRequest,
+			wantError:    `{"error":"invalid_request","error_description":"redirect_uri can't be the same as the host uri"}`,
+		},
 		"oidc client not registered": {
 			mockSetup: func(m mockParams) {
 				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
@@ -551,6 +585,32 @@ func TestAuthEndpoint(t *testing.T) {
 			},
 			wantHttpCode: http.StatusBadRequest,
 			wantError:    `{"error":"invalid_request","error_description":"redirect_uri is not registered"}`,
+		},
+		"invalid redirect url": {
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{Name: fakeTokenName},
+					Token:      fakeTokenValue,
+					UserID:     fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{ObjectMeta: metav1.ObjectMeta{Name: fakeUserID}}, nil)
+			},
+			req: func() *http.Request {
+				return &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid&redirect_uri=%3A%2F%2F",
+					},
+					Method: http.MethodGet,
+					Header: map[string][]string{
+						"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+					},
+				}
+
+			},
+			wantHttpCode: http.StatusBadRequest,
+			wantError:    `{"error":"invalid_request","error_description":"invalid redirect_uri"}`,
 		},
 	}
 

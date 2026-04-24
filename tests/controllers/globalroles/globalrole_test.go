@@ -71,7 +71,12 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 		crd.CRD{
 			SchemaObject: v3.GlobalRoleBinding{},
 			NonNamespace: true,
-		})
+		},
+		crd.CRD{
+			SchemaObject: v3.Cluster{},
+			NonNamespace: true,
+		},
+	)
 
 	// Create wrangler context
 	wranglerContext, err := wrangler.NewContext(s.ctx, nil, restCfg)
@@ -97,7 +102,8 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 			Group:   "management.cattle.io",
 			Version: "v3",
 			Kind:    "GlobalRole",
-		})
+		},
+	)
 
 	// Start caches
 	common.StartWranglerCaches(s.ctx, s.T(), s.managementContext.Wrangler,
@@ -130,7 +136,13 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 			Group:   "",
 			Version: "v1",
 			Kind:    "Namespace",
-		})
+		},
+		schema.GroupVersionKind{
+			Group:   "management.cattle.io",
+			Version: "v3",
+			Kind:    "Cluster",
+		},
+	)
 }
 
 func (s *GlobalRoleTestSuite) TearDownSuite() {

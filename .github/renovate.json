@@ -8,8 +8,7 @@
     "release/v2.13",
     "release/v2.12",
     "release/v2.11",
-    "release/v2.10",
-    "release/v2.9"
+    "release/v2.10"
   ],
   "ignoreDeps": [
     "go.qase.io/client"
@@ -48,14 +47,6 @@
       ],
       "extends": [
         "github>rancher/renovate-config//rancher-2.10#release"
-      ]
-    },
-    {
-      "matchBaseBranches": [
-        "release/v2.9"
-      ],
-      "extends": [
-        "github>rancher/renovate-config//rancher-2.9#release"
       ]
     }
   ]

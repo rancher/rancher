@@ -72,7 +72,16 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 	if cluster.Labels == nil {
 		cluster.Labels = map[string]string{}
 	}
-	cluster.Labels[ProviderKey] = provider
-	cluster.Status.Provider = provider
-	return h.clusters.Update(cluster)
+	if cluster.Labels[ProviderKey] != provider {
+		cluster.Labels[ProviderKey] = provider
+		cluster, err = h.clusters.Update(cluster)
+		if err != nil {
+			return cluster, err
+		}
+	}
+	if cluster.Status.Provider != provider {
+		cluster.Status.Provider = provider
+		return h.clusters.UpdateStatus(cluster)
+	}
+	return cluster, nil
 }

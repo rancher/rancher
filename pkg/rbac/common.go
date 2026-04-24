@@ -47,11 +47,14 @@ const (
 	clusterManagementPlaneSuffix        = "cluster-mgmt"
 	projectManagementPlaneSuffix        = "project-mgmt"
 	ClusterAdminRoleName                = "cluster-admin"
+	HelmProvisioningReaderRole          = "cattle-helm-provisioning-reader"
 	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
 	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
 	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
 	AggregationManagementFeatureLabel   = "management.cattle.io/roletemplate-aggregation-mgmt"
 	AggregationFeatureLabel             = "management.cattle.io/roletemplate-aggregation"
+	// GRDownstreamNSIndex is the cache index name for looking up GlobalRoles by the namespaces in InheritedNamespacedRules.
+	GRDownstreamNSIndex = "mgmt-auth-gr-downstream-ns-index"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -359,32 +362,31 @@ func IsAdminGlobalRole(gr *v3.GlobalRole) bool {
 // CreateOrUpdateResource creates or updates the given non-namespaced resource
 //   - obj is the resource to create or update.
 //   - client is the Wrangler client to use to get/create/update resource.
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
-//     T is an updated version of the resource.
-func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
-	kind := obj.GetObjectKind().GroupVersionKind().Kind
+//   - areResourcesTheSame is a func that compares two resources and returns true if they are equal, and false otherwise.
+func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](desiredObj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) bool) error {
+	kind := desiredObj.GetObjectKind().GroupVersionKind().Kind
 	// attempt to get the resource
-	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
+	existingObject, err := client.Get(desiredObj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get %s %s: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to get %s %s: %w", kind, desiredObj.GetName(), err)
 		}
-		logrus.Infof("%s %s is being created", kind, obj.GetName())
+		logrus.Infof("%s %s is being created", kind, desiredObj.GetName())
 		// resource doesn't exist, create it
-		_, err = client.Create(obj)
+		_, err = client.Create(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to create %s %s: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to create %s %s: %w", kind, desiredObj.GetName(), err)
 		}
 		return nil
 	}
 
 	// check that the existing resource is the same as the one we want
-	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
-		logrus.Infof("%s %s needs to be updated", kind, obj.GetName())
+	if !areResourcesTheSame(existingObject, desiredObj) {
+		logrus.Infof("%s %s needs to be updated", kind, desiredObj.GetName())
 		// if it has changed, update it to the correct version
-		_, err := client.Update(updatedResource)
+		_, err := client.Update(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to update %s %s: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to update %s %s: %w", kind, desiredObj.GetName(), err)
 		}
 	}
 	return nil
@@ -393,74 +395,67 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 // CreateOrUpdateNamespacedResource creates or updates the given namespaced resource.
 //   - obj is the resource to create or update.
 //   - client is the Wrangler client to use to get/create/update resource.
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
-//     T is an updated version of the resource.
-func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
-	kind := obj.GetObjectKind().GroupVersionKind().Kind
-	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
+//   - areResourcesTheSame is a func that compares two resources and returns true if they are equal, and false otherwise.
+func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](desiredObj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) bool) (T, error) {
+	var returnObj T
+	kind := desiredObj.GetObjectKind().GroupVersionKind().Kind
+	existingObj, err := client.Get(desiredObj.GetNamespace(), desiredObj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return returnObj, fmt.Errorf("failed to get %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
-		logrus.Infof("%s %s is being created in namespace %s", kind, obj.GetName(), obj.GetNamespace())
+		logrus.Infof("%s %s is being created in namespace %s", kind, desiredObj.GetName(), desiredObj.GetNamespace())
 		// resource doesn't exist, create it
-		_, err = client.Create(obj)
+		returnObj, err = client.Create(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to create %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return returnObj, fmt.Errorf("failed to create %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
-		return nil
+		return returnObj, nil
 	}
 
 	// check that the existing resource is the same as the one we want
-	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
-		logrus.Infof("%s %s in namespace %s needs to be updated", kind, obj.GetName(), obj.GetNamespace())
+	if !areResourcesTheSame(existingObj, desiredObj) {
+		logrus.Infof("%s %s in namespace %s needs to be updated", kind, desiredObj.GetName(), desiredObj.GetNamespace())
 		// if it has changed, update it to the correct version
-		_, err := client.Update(updatedResource)
+		returnObj, err = client.Update(desiredObj)
 		if err != nil {
-			return fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return returnObj, fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
+		return returnObj, nil
 	}
-	return nil
+	// if the resource was not updated, return the existing version since this was a no-op
+	return existingObj, nil
 }
 
 // AreClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.
-// If not, it also updates the current ClusterRole fields to match the desired ClusterRole.
 // The fields it checks are:
 //
 //   - Rules or AggregationRule
 //   - Cluster role owner label
 //   - Aggregation label
-func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1.ClusterRole) {
-	same := true
-
+func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) bool {
 	if wantedCR.AggregationRule == nil {
 		if currentCR.AggregationRule != nil {
-			same = false
-			currentCR.AggregationRule = nil
+			return false
 		}
 		if !equality.Semantic.DeepEqual(currentCR.Rules, wantedCR.Rules) {
-			same = false
-			currentCR.Rules = wantedCR.Rules
+			return false
 		}
 	} else {
 		if !equality.Semantic.DeepEqual(currentCR.AggregationRule, wantedCR.AggregationRule) {
-			same = false
-			currentCR.AggregationRule = wantedCR.AggregationRule
+			return false
 		}
 		if len(currentCR.Rules) > 0 {
-			same = false
-			currentCR.Rules = nil
+			return false
 		}
 	}
-	if got, want := currentCR.Labels[ClusterRoleOwnerLabel], wantedCR.Labels[ClusterRoleOwnerLabel]; got != want {
-		same = false
-		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, ClusterRoleOwnerLabel, want)
+	if currentCR.Labels[ClusterRoleOwnerLabel] != wantedCR.Labels[ClusterRoleOwnerLabel] {
+		return false
 	}
-	if got, want := currentCR.Labels[AggregationLabel], wantedCR.Labels[AggregationLabel]; got != want {
-		same = false
-		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, AggregationLabel, want)
+	if currentCR.Labels[AggregationLabel] != wantedCR.Labels[AggregationLabel] {
+		return false
 	}
-	return same, currentCR
+	return true
 }
 
 // DeleteResource deletes a non namespaced resource

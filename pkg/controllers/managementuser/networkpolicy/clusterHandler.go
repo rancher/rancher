@@ -69,7 +69,7 @@ func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object,
 
 	cluster.Status.AppliedEnableNetworkPolicy = toEnable
 
-	_, err = ch.clusters.Update(cluster)
+	_, err = ch.clusters.UpdateStatus(cluster)
 	if err != nil {
 		return nil, err
 	}

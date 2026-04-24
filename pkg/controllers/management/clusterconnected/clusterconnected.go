@@ -121,20 +121,22 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 		return fmt.Errorf("cluster cannot be nil")
 	}
 	for i := 0; i < 3; i++ {
-		cluster = cluster.DeepCopy()
-		Connected.SetStatusBool(cluster, connected)
-		if !connected && v3.ClusterConditionProvisioned.IsTrue(cluster) {
-			v3.ClusterConditionReady.False(cluster)
-			v3.ClusterConditionReady.Reason(cluster, "Disconnected")
-			v3.ClusterConditionReady.Message(cluster, "Cluster agent is not connected")
+		latestCluster, err := c.clusters.Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		Connected.SetStatusBool(latestCluster, connected)
+		if !connected && v3.ClusterConditionProvisioned.IsTrue(latestCluster) {
+			// For v2prov clusters, only update Ready when the condition is not being managed by the provisioner.
+			if !latestCluster.Status.ReadyReconciling {
+				v3.ClusterConditionReady.False(latestCluster)
+				v3.ClusterConditionReady.Reason(latestCluster, "Disconnected")
+				v3.ClusterConditionReady.Message(latestCluster, "Cluster agent is not connected")
+			}
 		}
 		logrus.Tracef("[clusterConnectedCondition] update cluster %v", cluster.Name)
-		_, err := c.clusters.Update(cluster)
+		_, err = c.clusters.UpdateStatus(latestCluster)
 		if apierror.IsConflict(err) {
-			cluster, err = c.clusters.Get(cluster.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
 			continue
 		}
 		return err

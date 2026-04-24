@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
@@ -150,7 +149,7 @@ func TestV1AuthTokenStoreGet(t *testing.T) {
 	}
 
 	r := httptest.NewRequest(http.MethodGet, "/v1-public/authtokens/"+tokenID, nil)
-	r = mux.SetURLVars(r, map[string]string{"id": tokenID})
+	r.SetPathValue("id", tokenID)
 	w := httptest.NewRecorder()
 
 	store.Get(w, r)
@@ -177,7 +176,7 @@ func TestV1AuthTokenStoreDelete(t *testing.T) {
 	}
 
 	r := httptest.NewRequest(http.MethodDelete, "/v1-public/authtokens/"+tokenID, nil)
-	r = mux.SetURLVars(r, map[string]string{"id": tokenID})
+	r.SetPathValue("id", tokenID)
 	w := httptest.NewRecorder()
 
 	store.Delete(w, r)

@@ -1,0 +1,95 @@
+name: '{{ .k3s.manifest }}'
+pipelineid: '{{ .k3s.pipelineid }}'
+
+sources:
+  rancher-go-mod-k8s:
+    name: 'Get K8s version in go.mod'
+    kind: golang/gomod
+    scmid: 'default'
+    spec:
+      module: 'k8s.io/kubernetes'
+
+  k3s-release:
+    name: 'Get latest upstream K3s patch version for {{ source "rancher-go-mod-k8s" }}'
+    kind: githubrelease
+    disablesourceinput: true
+    dependson:
+      - 'rancher-go-mod-k8s'
+    spec:
+      owner: '{{ .repos.k3s.owner }}'
+      repository: '{{ .repos.k3s.repo }}'
+      key: tagname
+      typefilter:
+        release: true
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: regex
+        pattern: '^{{ source "rancher-go-mod-k8s" }}\+k3s[0-9]+$'
+
+  k3s-image-release:
+    name: 'Transform {{ source "k3s-release" }} into image version tag'
+    kind: shell
+    dependson:
+      - 'k3s-release'
+    spec:
+      command: 'echo {{ source "k3s-release" }}'
+    transformers:
+      - replacer:
+          from: '+'
+          to: '-'
+
+conditions:
+  docker:
+    name: 'Confirm that image rancher/k3s:{{ source "k3s-image-release" }} is available'
+    kind: dockerimage
+    sourceid: 'k3s-image-release'
+    spec:
+      image: "rancher/k3s"
+
+  check-dockerfile-k3s-cattle-version:
+    name: 'Check if ENV CATTLE_K3S_VERSION is set in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'Dockerfile.runtime'
+        - 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_K3S_VERSION[=\s]\S+'
+
+  check-dockerfile-k3s-image:
+    name: 'Check if rancher/k3s image is set in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'Dockerfile.runtime'
+        - 'package/Dockerfile'
+      matchpattern: 'COPY[\s\t]+--from=rancher/k3s:\S+'
+
+targets:
+  update-dockerfile-k3s-cattle-version:
+    name: 'Update ENV CATTLE_K3S_VERSION to {{ source "k3s-release" }} in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'Dockerfile.runtime'
+        - 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_K3S_VERSION[=\s]+\S+'
+      replacepattern: 'ENV CATTLE_K3S_VERSION={{ source "k3s-release" }}'
+
+  update-dockerfile-k3s-image-version:
+    name: 'Update rancher/k3s image to {{ source "k3s-image-release" }} in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'Dockerfile.runtime'
+        - 'package/Dockerfile'
+      matchpattern: 'COPY[\s\t]+--from=rancher/k3s:\S+'
+      replacepattern: 'COPY --from=rancher/k3s:{{ source "k3s-image-release" }}'

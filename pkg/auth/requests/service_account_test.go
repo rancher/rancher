@@ -7,7 +7,6 @@ import (
 	"time"
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/mux"
 	v3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -286,7 +285,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 			}
 			currentContext := req.Context()
 			req = req.WithContext(k8sRequest.WithUser(currentContext, startUserInfo))
-			req = mux.SetURLVars(req, map[string]string{"clusterID": test.clusterID})
+			req.SetPathValue("clusterID", test.clusterID)
 			user, isAuthenticated, err := auth.Authenticate(req.WithContext(req.Context()))
 
 			if test.expectedError {

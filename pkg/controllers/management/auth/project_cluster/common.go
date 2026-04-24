@@ -113,8 +113,8 @@ func createProjectMembershipRoles(project *apisv3.Project, roleController crbacv
 		},
 	}
 	for _, role := range []*rbacv1.Role{memberRole, ownerRole} {
-		if err := rbac.CreateOrUpdateNamespacedResource(role, roleController, func(currentRole, wantedRole *rbacv1.Role) (bool, *rbacv1.Role) {
-			return !equality.Semantic.DeepEqual(currentRole.Rules, wantedRole.Rules), wantedRole
+		if _, err := rbac.CreateOrUpdateNamespacedResource(role, roleController, func(currentRole, wantedRole *rbacv1.Role) bool {
+			return equality.Semantic.DeepEqual(currentRole.Rules, wantedRole.Rules)
 		}); err != nil {
 			return err
 		}

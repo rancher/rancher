@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/dynamiclistener"
 	"github.com/rancher/dynamiclistener/cert"
+	"github.com/rancher/dynamiclistener/factory"
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	"github.com/rancher/lasso/pkg/metrics"
@@ -128,6 +129,12 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	if len(hostIPs) > 0 {
 		serverOptions.TLSListenerConfig = dynamiclistener.Config{
 			SANs: hostIPs,
+		}
+	}
+
+	if clusterIP != "" {
+		if err := ensureInternalCertSANs(core.Core().V1().Secret(), clusterIP); err != nil {
+			return err
 		}
 	}
 
@@ -439,4 +446,47 @@ func readPEM(path string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+// ensureInternalCertSANs checks whether the existing tls-rancher-internal secret
+// has clusterIP recorded in its dynamiclistener SAN annotations. If not, the
+// secret is deleted so that dynamiclistener will regenerate it with the correct
+// SANs when the internal listener starts.
+//
+// Static (user-provided) secrets are never deleted.
+// A NotFound error on delete is silently ignored (another HA pod beat us to it).
+// A no-op when clusterIP is already present — safe on stable upgrades.
+func ensureInternalCertSANs(secrets corev1controllers.SecretController, clusterIP string) error {
+	if clusterIP == "" {
+		return nil
+	}
+
+	secret, err := secrets.Get(namespace.System, "tls-rancher-internal", metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		// No pre-existing secret — dynamiclistener will create a fresh one with correct SANs.
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed checking tls-rancher-internal for SAN mismatch: %w", err)
+	}
+
+	// Never touch user-provided (static) certificates.
+	if factory.IsStatic(secret) {
+		return nil
+	}
+
+	// If the clusterIP is already recorded in the SAN annotations, nothing to do.
+	if !factory.NeedsUpdate(0, secret, clusterIP) {
+		return nil
+	}
+
+	// The secret exists but does not include clusterIP — delete it so dynamiclistener
+	// regenerates it with the correct SANs before the internal listener starts.
+	logrus.Infof("tls: tls-rancher-internal certificate does not include ClusterIP %s, deleting to force regeneration", clusterIP)
+	err = secrets.Delete(namespace.System, "tls-rancher-internal", &metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		// Another HA pod already deleted it — that's fine.
+		return nil
+	}
+	return err
 }

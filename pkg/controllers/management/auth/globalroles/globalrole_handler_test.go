@@ -7,13 +7,17 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // using a subset of condition, because we don't need to check LastTransitionTime or Message
@@ -357,11 +361,11 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(nil, nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
-			wantError:  false,
+			wantError:  true,
 			conditions: []reducedCondition{
 				{
 					reason: NamespacedRuleRoleExists,
-					status: metav1.ConditionTrue,
+					status: metav1.ConditionFalse,
 				},
 			},
 		},
@@ -370,7 +374,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			setupControllers: func(c controllers) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error")).Times(2)
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -386,7 +391,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			setupControllers: func(c controllers) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(2)
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).Return(nil, errRoleNotFound)
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(nil, errRoleNotFound)
 				c.rController.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("error")).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
@@ -403,7 +409,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			setupControllers: func(c controllers) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(4)
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).Return(nil, errRoleNotFound)
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(nil, errRoleNotFound)
 				c.rController.EXPECT().Create(gomock.Any()).Return(nil, errRoleAlreadyExists).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
@@ -416,47 +423,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 		},
 		{
-			// It's possible that a user can create the role in the middle of the reconcile
-			// In that case, the first attempt to get the role fails. Then the reconcile function attempts to
-			// create the role and finds that it already exists. It gets the new role and checks that it is valid
-			name: "role gets created mid reconcile",
-			setupControllers: func(c controllers) {
-				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
-				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
-				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
-				gomock.InOrder(
-					c.rCache.EXPECT().Get("namespace1", gomock.Any()).Return(nil, errRoleNotFound),
-					c.rCache.EXPECT().Get("namespace1", gomock.Any()).Return(role1.DeepCopy(), nil),
-				)
-				c.rCache.EXPECT().Get("namespace2", gomock.Any()).Return(&rbacv1.Role{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "namespacedRulesGR-namespace2",
-						Namespace: "namespace2",
-						Labels:    map[string]string{grOwnerLabel: "badGR"},
-					},
-					Rules: []rbacv1.PolicyRule{
-						adminPodPolicyRule,
-						readPodPolicyRule,
-					},
-				}, nil)
-				c.rController.EXPECT().Create(role1.DeepCopy()).Return(nil, errRoleAlreadyExists)
-				c.rController.EXPECT().Update(gomock.Any()).Return(nil, nil)
-			},
-			globalRole: namespacedRulesGR.DeepCopy(),
-			wantError:  false,
-			conditions: []reducedCondition{
-				{
-					reason: NamespacedRuleRoleExists,
-					status: metav1.ConditionTrue,
-				},
-			},
-		},
-		{
 			name: "create roles successfully",
 			setupControllers: func(c controllers) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(2)
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).Return(nil, errRoleNotFound)
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(nil, errRoleNotFound)
 				c.rController.EXPECT().Create(role1.DeepCopy()).Return(role1.DeepCopy(), nil)
 				c.rController.EXPECT().Create(role2.DeepCopy()).Return(role2.DeepCopy(), nil)
 			},
@@ -474,7 +446,6 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			setupControllers: func(c controllers) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get(gomock.Any()).Return(terminatingNamespace, nil).Times(2)
-				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -491,7 +462,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
 				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, fmt.Errorf("error"))
-				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound)
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).Return(nil, errRoleNotFound)
 				c.rController.EXPECT().Create(role1.DeepCopy()).Return(role1.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
@@ -509,14 +480,14 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
 				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").DoAndReturn(func(_ string, _ string) (*rbacv1.Role, error) {
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).DoAndReturn(func(_ string, _ string, _ metav1.GetOptions) (*rbacv1.Role, error) {
 					role := role1.DeepCopy()
 					role.Labels = map[string]string{grOwnerLabel: "badGR"}
 					role.Rules = append(role.Rules, adminPodPolicyRule)
 					return role, nil
 				})
 				c.rController.EXPECT().Update(role1.DeepCopy()).Return(nil, nil)
-				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(nil, errRoleNotFound)
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(nil, errRoleNotFound)
 				c.rController.EXPECT().Create(role2.DeepCopy()).Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
@@ -534,8 +505,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
 				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").Return(role1.DeepCopy(), nil)
-				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(role2.DeepCopy(), nil)
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).Return(role1.DeepCopy(), nil)
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -552,14 +523,14 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
 				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").DoAndReturn(func(_ string, _ string) (*rbacv1.Role, error) {
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).DoAndReturn(func(_ string, _ string, _ metav1.GetOptions) (*rbacv1.Role, error) {
 					role := role1.DeepCopy()
 					role.Labels = map[string]string{grOwnerLabel: "badGR"}
 					role.Rules = append(role.Rules, adminPodPolicyRule)
 					return role, nil
 				})
 				c.rController.EXPECT().Update(role1.DeepCopy()).Return(nil, fmt.Errorf("error"))
-				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(role2.DeepCopy(), nil)
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -576,14 +547,14 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error"))
 				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
 				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
-				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").Return(role1.DeepCopy(), nil)
-				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(role2.DeepCopy(), nil)
+				c.rController.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1", metav1.GetOptions{}).Return(role1.DeepCopy(), nil)
+				c.rController.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2", metav1.GetOptions{}).Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToListRoles,
+					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -720,6 +691,412 @@ func TestUpdateStatus(t *testing.T) {
 			if test.wantSummary != "" {
 				require.NotNil(t, updatedGR)
 				require.Equal(t, test.wantSummary, updatedGR.Status.Summary)
+			}
+		})
+	}
+}
+
+func TestValidateNamespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		namespace      string
+		context        string
+		setupCache     func(*fake.MockNonNamespacedCacheInterface[*corev1.Namespace])
+		wantShouldSkip bool
+		wantError      bool
+	}{
+		{
+			name:      "namespace exists and is active",
+			namespace: "test-ns",
+			context:   "local cluster",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				cache.EXPECT().Get("test-ns").Return(ns, nil)
+			},
+			wantShouldSkip: false,
+			wantError:      false,
+		},
+		{
+			name:      "namespace not found",
+			namespace: "missing-ns",
+			context:   "cluster1",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				cache.EXPECT().Get("missing-ns").Return(nil, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "missing-ns"))
+			},
+			wantShouldSkip: true,
+			wantError:      false,
+		},
+		{
+			name:      "namespace is nil",
+			namespace: "nil-ns",
+			context:   "cluster2",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				cache.EXPECT().Get("nil-ns").Return(nil, nil)
+			},
+			wantShouldSkip: false,
+			wantError:      true,
+		},
+		{
+			name:      "namespace is terminating",
+			namespace: "terminating-ns",
+			context:   "cluster3",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "terminating-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+				}
+				cache.EXPECT().Get("terminating-ns").Return(ns, nil)
+			},
+			wantShouldSkip: true,
+			wantError:      false,
+		},
+		{
+			name:      "error getting namespace",
+			namespace: "error-ns",
+			context:   "cluster4",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				cache.EXPECT().Get("error-ns").Return(nil, fmt.Errorf("cache error"))
+			},
+			wantShouldSkip: false,
+			wantError:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			cache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+
+			tt.setupCache(cache)
+
+			gotShouldSkip, err := validateNamespace(cache, tt.namespace, tt.context)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wantShouldSkip, gotShouldSkip)
+		})
+	}
+}
+
+func TestCreateOwnerLabelSelector(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		ownerLabel string
+		wantError  bool
+		checkFunc  func(t *testing.T, selector labels.Selector)
+	}{
+		{
+			name:       "creates valid selector",
+			ownerLabel: "test-owner",
+			wantError:  false,
+			checkFunc: func(t *testing.T, selector labels.Selector) {
+				require.NotNil(t, selector)
+				// Test that the selector matches a label set with the correct owner
+				matches := selector.Matches(labels.Set{grOwnerLabel: "test-owner"})
+				assert.True(t, matches, "selector should match correct owner label")
+				// Test that it doesn't match a different owner
+				matches = selector.Matches(labels.Set{grOwnerLabel: "different-owner"})
+				assert.False(t, matches, "selector should not match different owner label")
+			},
+		},
+		{
+			name:       "empty owner label creates valid selector",
+			ownerLabel: "",
+			wantError:  false,
+			checkFunc: func(t *testing.T, selector labels.Selector) {
+				require.NotNil(t, selector)
+				matches := selector.Matches(labels.Set{grOwnerLabel: ""})
+				assert.True(t, matches)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			selector, err := createOwnerLabelSelector(tt.ownerLabel)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if tt.checkFunc != nil {
+					tt.checkFunc(t, selector)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteRolesByUID(t *testing.T) {
+	t.Parallel()
+
+	uid1 := types.UID("uid-1")
+	uid2 := types.UID("uid-2")
+	uid3 := types.UID("uid-3")
+
+	tests := []struct {
+		name        string
+		roles       []*rbacv1.Role
+		validUIDs   sets.Set[types.UID]
+		setupClient func(*fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList])
+		wantError   bool
+	}{
+		{
+			name: "deletes roles not in valid UIDs",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
+			},
+			validUIDs: sets.New(uid1),
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns2", "role2", gomock.Any()).Return(nil)
+			},
+			wantError: false,
+		},
+		{
+			name: "keeps roles in valid UIDs",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
+			},
+			validUIDs: sets.New(uid1, uid2),
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				// No deletions expected
+			},
+			wantError: false,
+		},
+		{
+			name: "handles deletion errors",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+			},
+			validUIDs: sets.New[types.UID](),
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(fmt.Errorf("delete error"))
+			},
+			wantError: true,
+		},
+		{
+			name: "ignores NotFound errors",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+			},
+			validUIDs: sets.New[types.UID](),
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(apierrors.NewNotFound(schema.GroupResource{}, "role1"))
+			},
+			wantError: false,
+		},
+		{
+			name: "deletes multiple invalid roles",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role3", Namespace: "ns3", UID: uid3}},
+			},
+			validUIDs: sets.New(uid2),
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(nil)
+				client.EXPECT().Delete("ns3", "role3", gomock.Any()).Return(nil)
+			},
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			client := fake.NewMockClientInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+
+			tt.setupClient(client)
+
+			err := deleteRolesByUID(tt.roles, tt.validUIDs, client)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestReconcileInheritedRoleInNamespace(t *testing.T) {
+	t.Parallel()
+
+	testRule := rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	}
+
+	tests := []struct {
+		name            string
+		clusterName     string
+		namespace       string
+		rules           []rbacv1.PolicyRule
+		globalRoleName  string
+		safeGRName      string
+		setupMocks      func(*fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], *fake.MockNonNamespacedCacheInterface[*corev1.Namespace])
+		expectedRoleUID *types.UID
+		wantError       bool
+	}{
+		{
+			name:           "creates new role when namespace exists",
+			clusterName:    "cluster1",
+			namespace:      "test-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				nsCache.EXPECT().Get("test-ns").Return(ns, nil)
+				roleClient.EXPECT().Get("test-ns", "test-gr-test-ns", metav1.GetOptions{}).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "role"))
+				newUID := types.UID("new-uid")
+				roleClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(role *rbacv1.Role) (*rbacv1.Role, error) {
+					role.UID = newUID
+					return role, nil
+				})
+			},
+			wantError: false,
+		},
+		{
+			name:           "skips when namespace not found",
+			clusterName:    "cluster1",
+			namespace:      "missing-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				nsCache.EXPECT().Get("missing-ns").Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "missing-ns"))
+			},
+			wantError: false,
+		},
+		{
+			name:           "skips when namespace is terminating",
+			clusterName:    "cluster1",
+			namespace:      "terminating-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "terminating-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+				}
+				nsCache.EXPECT().Get("terminating-ns").Return(ns, nil)
+			},
+			wantError: false,
+		},
+		{
+			name:           "updates role when rules differ",
+			clusterName:    "cluster1",
+			namespace:      "test-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				existingRole := &rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-gr-test-ns",
+						Namespace: "test-ns",
+						UID:       types.UID("existing-uid"),
+						Labels:    map[string]string{grOwnerLabel: "test-gr"},
+					},
+					Rules: []rbacv1.PolicyRule{
+						{Verbs: []string{"create"}, APIGroups: []string{""}, Resources: []string{"secrets"}},
+					},
+				}
+				nsCache.EXPECT().Get("test-ns").Return(ns, nil)
+				roleClient.EXPECT().Get("test-ns", "test-gr-test-ns", metav1.GetOptions{}).Return(existingRole, nil)
+				roleClient.EXPECT().Update(gomock.Any()).Return(existingRole, nil)
+			},
+			wantError: false,
+		},
+		{
+			name:           "no update when role is correct",
+			clusterName:    "cluster1",
+			namespace:      "test-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				existingRole := &rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-gr-test-ns",
+						Namespace: "test-ns",
+						UID:       types.UID("existing-uid"),
+						Labels:    map[string]string{grOwnerLabel: "test-gr"},
+					},
+					Rules: []rbacv1.PolicyRule{testRule},
+				}
+				nsCache.EXPECT().Get("test-ns").Return(ns, nil)
+				roleClient.EXPECT().Get("test-ns", "test-gr-test-ns", metav1.GetOptions{}).Return(existingRole, nil)
+			},
+			wantError: false,
+		},
+		{
+			name:           "returns error on namespace get failure",
+			clusterName:    "cluster1",
+			namespace:      "error-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				nsCache.EXPECT().Get("error-ns").Return(nil, fmt.Errorf("cache error"))
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			roleClient := fake.NewMockClientInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+
+			tt.setupMocks(roleClient, nsCache)
+
+			gr := &globalRoleLifecycle{}
+			_, err := gr.reconcileInheritedRoleInNamespace(
+				tt.clusterName,
+				tt.namespace,
+				tt.rules,
+				tt.globalRoleName,
+				roleClient,
+				nsCache,
+			)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}

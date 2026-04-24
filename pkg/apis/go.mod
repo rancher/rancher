@@ -5,33 +5,33 @@ go 1.25.0
 toolchain go1.25.8
 
 replace (
-	k8s.io/api => k8s.io/api v0.35.1
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.35.1
-	k8s.io/apimachinery => k8s.io/apimachinery v0.35.1
-	k8s.io/apiserver => k8s.io/apiserver v0.35.1
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.35.1
+	k8s.io/api => k8s.io/api v0.35.3
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.35.3
+	k8s.io/apimachinery => k8s.io/apimachinery v0.35.3
+	k8s.io/apiserver => k8s.io/apiserver v0.35.3
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.35.3
 	k8s.io/client-go => k8s.io/client-go v0.35.1
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.35.1
-	k8s.io/component-base => k8s.io/component-base v0.35.1
-	k8s.io/component-helpers => k8s.io/component-helpers v0.35.1
-	k8s.io/controller-manager => k8s.io/controller-manager v0.35.1
-	k8s.io/cri-api => k8s.io/cri-api v0.35.1
-	k8s.io/cri-client => k8s.io/cri-client v0.35.1
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.35.1
-	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.35.1
-	k8s.io/endpointslice => k8s.io/endpointslice v0.35.1
-	k8s.io/externaljwt => k8s.io/externaljwt v0.35.1
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.35.1
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.35.1
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.35.1
-	k8s.io/kubectl => k8s.io/kubectl v0.35.1
-	k8s.io/kubelet => k8s.io/kubelet v0.35.1
-	k8s.io/kubernetes => k8s.io/kubernetes v1.35.1
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.35.3
+	k8s.io/component-base => k8s.io/component-base v0.35.3
+	k8s.io/component-helpers => k8s.io/component-helpers v0.35.3
+	k8s.io/controller-manager => k8s.io/controller-manager v0.35.3
+	k8s.io/cri-api => k8s.io/cri-api v0.35.3
+	k8s.io/cri-client => k8s.io/cri-client v0.35.3
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.35.3
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.35.3
+	k8s.io/endpointslice => k8s.io/endpointslice v0.35.3
+	k8s.io/externaljwt => k8s.io/externaljwt v0.35.3
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.35.3
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.35.3
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.35.3
+	k8s.io/kubectl => k8s.io/kubectl v0.35.3
+	k8s.io/kubelet => k8s.io/kubelet v0.35.3
+	k8s.io/kubernetes => k8s.io/kubernetes v1.35.3
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.35.1
-	k8s.io/metrics => k8s.io/metrics v0.35.1
-	k8s.io/mount-utils => k8s.io/mount-utils v0.35.1
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.35.1
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.35.1
+	k8s.io/metrics => k8s.io/metrics v0.35.3
+	k8s.io/mount-utils => k8s.io/mount-utils v0.35.3
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.35.3
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.35.3
 )
 
 require (
@@ -40,13 +40,13 @@ require (
 	github.com/rancher/eks-operator v1.14.0-rc.5
 	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
 	github.com/rancher/gke-operator v1.14.0-rc.3
-	github.com/rancher/norman v0.9.0
+	github.com/rancher/norman v0.9.1
 	github.com/rancher/rke v1.8.0
-	github.com/rancher/wrangler/v3 v3.5.0-rc.2
+	github.com/rancher/wrangler/v3 v3.6.0-rc.1
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
-	k8s.io/api v0.35.1
-	k8s.io/apimachinery v0.35.1
+	k8s.io/api v0.35.3
+	k8s.io/apimachinery v0.35.3
 	sigs.k8s.io/cluster-api v1.12.2
 )
 
@@ -85,12 +85,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/term v0.40.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/term v0.41.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
@@ -98,9 +98,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.35.1 // indirect
-	k8s.io/apiserver v0.35.1 // indirect
+	k8s.io/apiserver v0.35.3 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.35.1 // indirect
+	k8s.io/component-base v0.35.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	k8s.io/kubernetes v1.35.0 // indirect

@@ -10,16 +10,42 @@ ARG VERSION
 ENV CHART_VERSION=${VERSION}
 
 # set up helm 3
+# renovate: datasource=github-release-attachments depName=helm/helm
 ENV HELM_VERSION=v3.20.0
-RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O - | \
-    tar -xz --strip-components=1 -C /usr/bin && \
+# renovate: datasource=github-release-attachments depName=helm/helm digestVersion=v3.20.0
+ENV HELM_HASH_amd64=dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286
+# renovate: datasource=github-release-attachments depName=helm/helm digestVersion=v3.20.0
+ENV HELM_HASH_arm64=bfb14953295d5324d47ab55f3dfba6da28d46c848978c8fbf412d4271bdc29f1
+
+RUN if [ "${BUILDARCH}" = "amd64" ]; then \
+        HELM_HASH="${HELM_HASH_amd64}"; \
+    elif [ "${BUILDARCH}" = "arm64" ]; then \
+        HELM_HASH="${HELM_HASH_arm64}"; \
+    fi; \
+    wget "https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz" -O /tmp/helm.tar.gz && \
+    echo "${HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/helm.tar.gz --strip-components=1 -C /usr/bin && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
     chown root:root /usr/bin/helm_v3 && \
-    chmod +x /usr/bin/helm_v3
+    chmod +x /usr/bin/helm_v3 && \
+    rm -f /tmp/helm.tar.gz
 
+# renovate: datasource=github-release-attachments depName=mikefarah/yq
 ENV YQ_VERSION=v4.44.2
-RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O - | \
-        tar xz && mv yq_linux_${BUILDARCH} /usr/bin/yq
+# renovate: datasource=github-release-attachments depName=mikefarah/yq digestVersion=v4.44.2
+ENV YQ_HASH_amd64=e4c2570249e3993e33ffa44e592b5eee8545bd807bfbeb596c2986d86cb6c85c
+# renovate: datasource=github-release-attachments depName=mikefarah/yq digestVersion=v4.44.2
+ENV YQ_HASH_arm64=79c22d98b2ff517cb8b1c20499350cbc1e8c753483c8f72a37a299e6e9872a98
+
+RUN if [ "${BUILDARCH}" = "amd64" ]; then \
+        YQ_HASH="${YQ_HASH_amd64}"; \
+    elif [ "${BUILDARCH}" = "arm64" ]; then \
+        YQ_HASH="${YQ_HASH_arm64}"; \
+    fi; \
+    wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O /tmp/yq.tar.gz && \
+    echo "${YQ_HASH}  /tmp/yq.tar.gz" | sha256sum -c - && \
+    tar xzf /tmp/yq.tar.gz && mv yq_linux_${BUILDARCH} /usr/bin/yq && \
+    rm -f /tmp/yq.tar.gz
 
 WORKDIR /src
 COPY .git/ /src/.git/

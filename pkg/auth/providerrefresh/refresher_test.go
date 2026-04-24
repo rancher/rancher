@@ -652,6 +652,40 @@ func TestGetPrincipalIDForProvider(t *testing.T) {
 	}
 }
 
+func TestTriggerUserRefreshSkipsAnnotatedUser(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	attribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: userID,
+			Annotations: map[string]string{
+				common.ProviderRefreshErrorAnnotation: "user not found",
+			},
+		},
+	}
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return attribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	assert.Empty(t, r.userAttributes.(*fakes.UserAttributeInterfaceMock).UpdateCalls(),
+		"Update should not be called for annotated user attribute")
+}
+
 type mockLocalProvider struct {
 	canAccess   bool
 	disabled    bool

@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/steve/pkg/podimpersonation"
@@ -1180,7 +1181,8 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 		SecretsToCreate: []*corev1.Secret{
 			secret,
 		},
-		ImageOverride: imageOverride,
+		ImageOverride:     imageOverride,
+		ExtraClusterRoles: []string{rbac.HelmProvisioningReaderRole},
 	}
 }
 

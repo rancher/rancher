@@ -19,7 +19,7 @@ type fakeTokenManager struct {
 	deleteTokenByNameFunc func(name string) (int, error)
 }
 
-func (m *fakeTokenManager) GetToken(token string) (*v3.Token, int, error) {
+func (m *fakeTokenManager) GetToken(token string) (accessor.TokenAccessor, int, error) {
 	if m.getTokenFunc == nil {
 		return nil, http.StatusNotFound, nil
 	}
