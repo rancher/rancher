@@ -85,7 +85,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
 
 				return mock
 			},
@@ -114,8 +114,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateGroup(req, "user", "impGroup").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateGroup(req, "user", nil, "impGroup").Return(true, nil)
 
 				return mock
 			},
@@ -145,8 +145,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"foo":            {"bar"},
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
@@ -197,8 +197,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"foo":            {"bar"},
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
@@ -271,7 +271,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", nil, "system:serviceaccount:default:test").Return(true, nil)
 
 				return mock
 			},
@@ -294,7 +294,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(false, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(false, nil)
 
 				return mock
 			},
@@ -317,8 +317,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateGroup(req, "user", "impGroup").Return(false, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateGroup(req, "user", nil, "impGroup").Return(false, nil)
 
 				return mock
 			},
@@ -341,8 +341,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{"foo": {"bar"}}).Return(false, nil)
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{"foo": {"bar"}}).Return(false, nil)
 
 				return mock
 			},
@@ -365,8 +365,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
 
@@ -406,8 +406,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
 
@@ -471,8 +471,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww", "kubeconfig-u-otherxyzab"},
 				}).Return(true, nil)
 
@@ -506,7 +506,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(false, nil)
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", nil, "system:serviceaccount:default:test").Return(false, nil)
 
 				return mock
 			},
@@ -528,7 +528,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -551,8 +551,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateGroup(req, "user", "impGroup").Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateGroup(req, "user", nil, "impGroup").Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -575,8 +575,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{"foo": {"bar"}}).Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{"foo": {"bar"}}).Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
@@ -599,8 +599,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateUser(req, "user", "impUser").Return(true, nil)
-				mock.EXPECT().UserCanImpersonateExtras(req, "user", map[string][]string{
+				mock.EXPECT().UserCanImpersonateUser(req, "user", nil, "impUser").Return(true, nil)
+				mock.EXPECT().UserCanImpersonateExtras(req, "user", nil, map[string][]string{
 					"requesttokenid": {"kubeconfig-u-user5zfww"},
 				}).Return(true, nil)
 
@@ -639,7 +639,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			},
 			sar: func(req *http.Request) sar.SubjectAccessReview {
 				mock := mocks.NewMockSubjectAccessReview(ctrl)
-				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", "system:serviceaccount:default:test").Return(false, errors.New("unexpected error"))
+				mock.EXPECT().UserCanImpersonateServiceAccount(req, "user", nil, "system:serviceaccount:default:test").Return(false, errors.New("unexpected error"))
 
 				return mock
 			},
