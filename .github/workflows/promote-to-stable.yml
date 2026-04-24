@@ -15,7 +15,7 @@ jobs:
   promote-docker-image:
     runs-on: ubuntu-latest
     container:
-      image: quay.io/skopeo/stable:v1.15
+      image: ghcr.io/rancher/ci-image/go1.26
     permissions:
       contents: read
       id-token: write
@@ -34,6 +34,8 @@ jobs:
         run: skopeo copy "docker://${REGISTRY}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:stable" --all
   promote-chart:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/rancher/ci-image/go1.26
     permissions:
       contents: read
       id-token: write
@@ -45,18 +47,6 @@ jobs:
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
-      - name: Install dependencies
-        env:
-          HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
-          HELM_HASH: ${{ steps.env.outputs.HELM_HASH_amd64 }}
-        run: |
-          set -ex
-          curl "${HELM_URL}" --output /tmp/helm.tar.gz && \
-          echo "${HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
-          tar xvzf /tmp/helm.tar.gz --strip-components=1 -C /tmp/ && \
-          sudo mv /tmp/helm /usr/bin/helm_v3 && \
-          sudo chmod +x /usr/bin/helm_v3 && \
-          rm -f /tmp/helm.tar.gz
       - name: Copy chart and build index
         run: ./scripts/chart/copy
       - name: Load Secrets from Vault
@@ -81,6 +71,8 @@ jobs:
   update-readme:
     needs: [promote-docker-image, promote-chart]
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/rancher/ci-image/go1.26
     permissions:
       contents: write
       pull-requests: write
