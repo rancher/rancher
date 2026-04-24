@@ -16,6 +16,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	extcommon "github.com/rancher/rancher/pkg/ext/common"
@@ -24,14 +25,12 @@ import (
 	kconfig "github.com/rancher/rancher/pkg/kubeconfig"
 	v3node "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	extapi "github.com/rancher/steve/pkg/ext"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -94,10 +93,22 @@ const (
 
 var gvr = ext.SchemeGroupVersion.WithResource(ext.KubeconfigResourceName)
 
-// tokenCreator abstracts [tokens.Manager].
+// tokenFetcher abstracts the ext token store operations needed by the kubeconfig store.
+type tokenFetcher interface {
+	Fetch(tokenID string) (accessor.TokenAccessor, error)
+	GetSecret(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+}
+
+// tokenCreator abstracts ext.Token creation for the kubeconfig store.
 type tokenCreator interface {
-	EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error)
-	EnsureToken(input user.TokenInput) (string, runtime.Object, error)
+	CreateToken(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error)
+}
+
+type extTokenCreator struct{ store *exttokens.SystemStore }
+
+func (e *extTokenCreator) CreateToken(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+	return e.store.Create(ctx, gvr.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
 }
 
 // +k8s:openapi-gen=false
@@ -112,8 +123,8 @@ type Store struct {
 	nsCache             v1.NamespaceCache
 	nsClient            v1.NamespaceClient
 	nodeCache           ctrlv3.NodeCache
-	tokenCache          ctrlv3.TokenCache
-	tokens              ctrlv3.TokenClient
+	tokenStore          tokenFetcher
+	v3Tokens            ctrlv3.TokenClient
 	userCache           ctrlv3.UserCache
 	tokenMgr            tokenCreator
 	getCACert           func() string
@@ -125,6 +136,7 @@ type Store struct {
 
 // New creates a new instance of [Store].
 func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
+	extTokenStore := exttokens.NewSystemFromWrangler(wranglerContext)
 	store := &Store{
 		mcmEnabled:      mcmEnabled,
 		configMapCache:  wranglerContext.Core.ConfigMap().Cache(),
@@ -132,10 +144,10 @@ func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authoriz
 		clusterCache:    wranglerContext.Mgmt.Cluster().Cache(),
 		nsCache:         wranglerContext.Core.Namespace().Cache(),
 		nsClient:        wranglerContext.Core.Namespace(),
-		tokenCache:      wranglerContext.Mgmt.Token().Cache(),
-		tokens:          wranglerContext.Mgmt.Token(),
+		tokenStore:      extTokenStore,
+		v3Tokens:        wranglerContext.Mgmt.Token(),
 		userCache:       wranglerContext.Mgmt.User().Cache(),
-		tokenMgr:        tokens.NewManager(wranglerContext),
+		tokenMgr:        &extTokenCreator{store: extTokenStore},
 		authorizer:      authorizer,
 		getCACert:       settings.CACerts.Get,
 		getDefaultTTL:   tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds,
@@ -236,7 +248,7 @@ func (s *Store) Create(
 		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("missing request token ID"))
 	}
 
-	authToken, err := s.tokenCache.Get(authTokenID)
+	authToken, err := s.tokenStore.Fetch(authTokenID)
 	if err != nil {
 		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
 	}
@@ -415,25 +427,9 @@ func (s *Store) Create(
 
 	var (
 		sharedTokenKey string
-		sharedToken    runtime.Object
 		ownerRefs      []metav1.OwnerReference
 		v1Config       string
 	)
-
-	ownerReferenceFrom := func(obj runtime.Object) (metav1.OwnerReference, error) {
-		objMeta, err := meta.Accessor(obj)
-		if err != nil {
-			return metav1.OwnerReference{}, err
-		}
-
-		ref := metav1.OwnerReference{
-			APIVersion: obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
-			Kind:       obj.GetObjectKind().GroupVersionKind().Kind,
-			Name:       objMeta.GetName(),
-			UID:        objMeta.GetUID(),
-		}
-		return ref, nil
-	}
 
 	caCert := kconfig.FormatCertString(base64.StdEncoding.EncodeToString([]byte(s.getCACert())))
 	data := kconfig.KubeConfig{
@@ -448,8 +444,8 @@ func (s *Store) Create(
 	err = func() error { // Deliberately use an anonymous function to capture the status and error conditions.
 		// Generate a shared token for the default and non-ACE clusters.
 		if !dryRun && generateToken {
-			input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-			sharedTokenKey, sharedToken, err = s.tokenMgr.EnsureToken(input)
+			extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, "")
+			sharedToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 			if err != nil {
 				conditions = append(conditions, metav1.Condition{
 					Type:               FailedToCreateTokenCond,
@@ -462,18 +458,19 @@ func (s *Store) Create(
 				return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
 			}
 
-			ownerRef, err := ownerReferenceFrom(sharedToken)
+			sharedTokenKey = sharedToken.Status.BearerToken
+			ownerRef, err := s.secretOwnerRef(sharedToken.Name)
 			if err != nil {
 				return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for shared token: %w", err))
 			}
 			ownerRefs = append(ownerRefs, ownerRef)
-			tokenIDs = append(tokenIDs, ownerRef.Name)
+			tokenIDs = append(tokenIDs, sharedToken.Name)
 
 			conditions = append(conditions, metav1.Condition{
 				Type:               TokenCreatedCond,
 				Status:             metav1.ConditionTrue,
 				Reason:             TokenCreatedCond,
-				Message:            ownerRef.Name,
+				Message:            sharedToken.Name,
 				LastTransitionTime: metav1.NewTime(time.Now()),
 			})
 		}
@@ -497,10 +494,7 @@ func (s *Store) Create(
 		})
 
 		for _, cluster := range clusters {
-			var (
-				tokenKey string
-				token    runtime.Object
-			)
+			var tokenKey string
 
 			clusterName := cluster.Name
 			if name := cluster.Spec.DisplayName; name != "" {
@@ -535,8 +529,8 @@ func (s *Store) Create(
 
 			// Generate a cluster-scoped token for the ACE cluster.
 			if !dryRun && generateToken {
-				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-				tokenKey, token, err = s.tokenMgr.EnsureClusterToken(cluster.Name, input)
+				extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, cluster.Name)
+				clusterToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 				if err != nil {
 					conditions = append(conditions, metav1.Condition{
 						Type:               FailedToCreateTokenCond,
@@ -549,18 +543,19 @@ func (s *Store) Create(
 					return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
 				}
 
-				ownerRef, err := ownerReferenceFrom(token)
+				tokenKey = clusterToken.Status.BearerToken
+				ownerRef, err := s.secretOwnerRef(clusterToken.Name)
 				if err != nil {
 					return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for token: %w", err))
 				}
 				ownerRefs = append(ownerRefs, ownerRef)
-				tokenIDs = append(tokenIDs, ownerRef.Name)
+				tokenIDs = append(tokenIDs, clusterToken.Name)
 
 				conditions = append(conditions, metav1.Condition{
 					Type:               TokenCreatedCond,
 					Status:             metav1.ConditionTrue,
 					Reason:             TokenCreatedCond,
-					Message:            ownerRef.Name,
+					Message:            clusterToken.Name,
 					LastTransitionTime: metav1.NewTime(time.Now()),
 				})
 			}
@@ -822,38 +817,47 @@ func first(values []string) string {
 	return ""
 }
 
-// createTokenInput is a helper that builds [user.TokenInput] for a kubeconfig token.
-func (s *Store) createTokenInput(kubeConfigID, userName string, authToken *apiv3.Token, ttl *int64) user.TokenInput {
-	return user.TokenInput{
-		TokenName:     "kubeconfig-" + userName,
-		Description:   "Kubeconfig token",
-		Kind:          "kubeconfig",
-		UserName:      userName,
-		AuthProvider:  authToken.AuthProvider,
-		TTL:           ttl,
-		Randomize:     true,
-		UserPrincipal: authToken.UserPrincipal,
-		Labels: map[string]string{
-			tokens.TokenKubeconfigIDLabel: kubeConfigID,
+// buildExtToken builds an [ext.Token] for a kubeconfig token.
+func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor, ttl int64, clusterID string) *ext.Token {
+	return &ext.Token{
+		Spec: ext.TokenSpec{
+			UserID:        userName,
+			UserPrincipal: toExtTokenPrincipal(authToken.GetUserPrincipal()),
+			Kind:          KindLabelValue,
+			Description:   "Kubeconfig token",
+			TTL:           ttl,
+			ClusterName:   clusterID,
 		},
 	}
 }
 
-// tokenSelector builds a label selector for kubeconfig tokens.
-func tokenSelector(isAdmin bool, userID, kubeconfigID string) (labels.Selector, error) {
-	set := labels.Set{
-		tokens.TokenKindLabel: KindLabelValue,
+// toExtTokenPrincipal converts a [apiv3.Principal] to an [ext.TokenPrincipal].
+func toExtTokenPrincipal(p apiv3.Principal) ext.TokenPrincipal {
+	return ext.TokenPrincipal{
+		Name:           p.Name,
+		DisplayName:    p.DisplayName,
+		LoginName:      p.LoginName,
+		ProfilePicture: p.ProfilePicture,
+		ProfileURL:     p.ProfileURL,
+		PrincipalType:  p.PrincipalType,
+		Provider:       p.Provider,
+		ExtraInfo:      p.ExtraInfo,
 	}
+}
 
-	if kubeconfigID != "" {
-		set = labels.Merge(set, labels.Set{tokens.TokenKubeconfigIDLabel: kubeconfigID})
+// secretOwnerRef returns a [metav1.OwnerReference] pointing to the backing v1/Secret for an ext token.
+// Kubernetes GC only follows native resource owner references; using the Secret ensures proper cleanup.
+func (s *Store) secretOwnerRef(tokenName string) (metav1.OwnerReference, error) {
+	secret, err := s.tokenStore.GetSecret(tokenName, &metav1.GetOptions{}, false)
+	if err != nil {
+		return metav1.OwnerReference{}, fmt.Errorf("error getting backing secret for token %s: %w", tokenName, err)
 	}
-
-	if !isAdmin {
-		set = labels.Merge(set, labels.Set{tokens.UserIDLabel: userID})
-	}
-
-	return set.AsSelector(), nil
+	return metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Name:       secret.Name,
+		UID:        secret.UID,
+	}, nil
 }
 
 // getConfigMap retrieves a ConfigMap by name, optionally using the cache.
@@ -1159,7 +1163,8 @@ func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOption
 
 	var ownedTokenCount int
 	for _, ref := range kubeconfig.OwnerReferences {
-		if ref.Kind == "Token" && ref.APIVersion == "management.cattle.io/v3" {
+		if (ref.Kind == "Secret" && ref.APIVersion == "v1") ||
+			(ref.Kind == "Token" && ref.APIVersion == "management.cattle.io/v3") {
 			ownedTokenCount++
 		}
 	}
@@ -1228,12 +1233,7 @@ func (s *Store) DeleteCollection(
 	}
 
 	for _, configMap := range configMapList.Items {
-		tokenSelector, err := tokenSelector(isAdmin, userInfo.GetName(), configMap.Name)
-		if err != nil {
-			return nil, apierrors.NewInternalError(err)
-		}
-
-		obj, _, err := s.delete(ctx, &configMap, tokenSelector, deleteValidation, options)
+		obj, _, err := s.delete(ctx, &configMap, deleteValidation, options)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting kubeconfig %s: %w", configMap.Name, err))
 		}
@@ -1273,19 +1273,13 @@ func (s *Store) Delete(
 		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
-	tokenSelector, err := tokenSelector(isAdmin, userInfo.GetName(), name)
-	if err != nil {
-		return nil, false, apierrors.NewInternalError(err)
-	}
-
-	return s.delete(ctx, configMap, tokenSelector, deleteValidation, options)
+	return s.delete(ctx, configMap, deleteValidation, options)
 }
 
 // delete a kubeconfig's configmap and associated tokens.
 func (s *Store) delete(
 	ctx context.Context,
 	configMap *corev1.ConfigMap,
-	tokenSelector labels.Selector,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions,
 ) (runtime.Object, bool, error) {
@@ -1302,14 +1296,6 @@ func (s *Store) delete(
 			}
 			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
 		}
-	}
-
-	tokenList, err := s.tokenCache.List(tokenSelector)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), configMap.Name)
-		}
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error listing tokens for kubeconfig %s: %w", configMap.Name, err))
 	}
 
 	if options.Preconditions != nil {
@@ -1340,19 +1326,20 @@ func (s *Store) delete(
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", configMap.Name, err))
 	}
 
-	var tokenNames []string
-	for _, token := range tokenList {
-		tokenNames = append(tokenNames, token.Name)
-	}
-
-	for _, tokenName := range tokenNames {
+	// Token IDs are tracked in status.tokens. Delete each token, falling back
+	// to the v3 token client for pre-migration kubeconfigs that reference v3 tokens.
+	for _, tokenName := range kubeconfig.Status.Tokens {
 		delOptions := &metav1.DeleteOptions{
 			GracePeriodSeconds: options.GracePeriodSeconds,
 			PropagationPolicy:  options.PropagationPolicy,
 			DryRun:             options.DryRun, // Pass through the dry run flag instead of handling it explicitly.
 		}
 
-		err := s.tokens.Delete(tokenName, delOptions)
+		err := s.tokenStore.Delete(tokenName, delOptions)
+		if apierrors.IsNotFound(err) {
+			// Not an ext token — try v3 token for backward compatibility.
+			err = s.v3Tokens.Delete(tokenName, delOptions)
+		}
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
 		}

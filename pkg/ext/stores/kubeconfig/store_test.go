@@ -22,9 +22,8 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
@@ -65,52 +64,66 @@ var commonAuthorizer = authorizer.AuthorizerFunc(func(ctx context.Context, a aut
 })
 
 type fakeTokenManager struct {
-	clusterTokens          []string
-	tokens                 []string
-	ensureClusterTokenFunc func(clusterID string, input user.TokenInput) (string, runtime.Object, error)
-	ensureTokenFunc        func(input user.TokenInput) (string, runtime.Object, error)
+	sharedTokenKeys  []string
+	clusterTokenKeys []string
+	createTokenFunc  func(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error)
 }
 
-func (f *fakeTokenManager) EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error) {
-	if f.ensureClusterTokenFunc != nil {
-		return f.ensureClusterTokenFunc(clusterID, input)
+func (f *fakeTokenManager) CreateToken(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+	if f.createTokenFunc != nil {
+		return f.createTokenFunc(ctx, token, userInfo)
 	}
-	tokenKey, token, err := f.Generate()
-	if err != nil {
-		return "", nil, err
-	}
-	f.clusterTokens = append(f.clusterTokens, tokenKey)
-	return tokenKey, token, nil
+	return f.generate(token)
 }
 
-func (f *fakeTokenManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
-	if f.ensureTokenFunc != nil {
-		return f.ensureTokenFunc(input)
-	}
-	tokenKey, token, err := f.Generate()
-	if err != nil {
-		return "", nil, err
-	}
-
-	f.tokens = append(f.tokens, tokenKey)
-	return tokenKey, token, nil
-}
-
-func (f *fakeTokenManager) Generate() (string, runtime.Object, error) {
+func (f *fakeTokenManager) generate(token *ext.Token) (*ext.Token, error) {
 	key, err := randomtoken.Generate()
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	name := names.SimpleNameGenerator.GenerateName("token-")
+	result := token.DeepCopy()
+	result.Name = name
+	result.UID = uuid.NewUUID()
+	result.Status.BearerToken = "ext/" + name + ":" + key
+	if token.Spec.ClusterName != "" {
+		f.clusterTokenKeys = append(f.clusterTokenKeys, result.Status.BearerToken)
+	} else {
+		f.sharedTokenKeys = append(f.sharedTokenKeys, result.Status.BearerToken)
+	}
+	return result, nil
+}
 
-	token := &v3.Token{
+type fakeTokenStore struct {
+	fetchFunc     func(tokenID string) (accessor.TokenAccessor, error)
+	getSecretFunc func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error)
+	deleteFunc    func(name string, options *metav1.DeleteOptions) error
+}
+
+func (f *fakeTokenStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
+	if f.fetchFunc != nil {
+		return f.fetchFunc(tokenID)
+	}
+	return nil, apierrors.NewNotFound(gvr.GroupResource(), tokenID)
+}
+
+func (f *fakeTokenStore) GetSecret(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
+	if f.getSecretFunc != nil {
+		return f.getSecretFunc(name, options, useCache)
+	}
+	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			UID:  uuid.NewUUID(),
 		},
-	}
+	}, nil
+}
 
-	return name + ":" + key, token, nil
+func (f *fakeTokenStore) Delete(name string, options *metav1.DeleteOptions) error {
+	if f.deleteFunc != nil {
+		return f.deleteFunc(name, options)
+	}
+	return nil
 }
 
 func TestIsUnique(t *testing.T) {
@@ -307,23 +320,19 @@ func TestStoreCreate(t *testing.T) {
 		}
 	}).AnyTimes()
 
-	tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
-	tokenCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Token, error) {
-		switch name {
-		case authTokenID:
-			return &v3.Token{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
-				UserID: userID,
-			}, nil
-		default:
-			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-		}
-	}).AnyTimes()
-	tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
-		return nil, nil
-	}).AnyTimes()
+	tokenStore := &fakeTokenStore{
+		fetchFunc: func(tokenID string) (accessor.TokenAccessor, error) {
+			switch tokenID {
+			case authTokenID:
+				return &v3.Token{
+					ObjectMeta: metav1.ObjectMeta{Name: tokenID},
+					UserID:     userID,
+				}, nil
+			default:
+				return nil, apierrors.NewNotFound(gvr.GroupResource(), tokenID)
+			}
+		},
+	}
 
 	clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
 	clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Cluster, error) {
@@ -427,7 +436,7 @@ func TestStoreCreate(t *testing.T) {
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
-			tokenCache:          tokenCache,
+			tokenStore:          tokenStore,
 			clusterCache:        clusterCache,
 			nodeCache:           nodeCache,
 			tokenMgr:            tokenManager,
@@ -533,10 +542,10 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream2", config.Contexts["downstream2-cp"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 2)
-		require.Len(t, tokenManager.tokens, 1)
-		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
-		require.Len(t, tokenManager.clusterTokens, 1)
-		assert.Equal(t, tokenManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
+		require.Len(t, tokenManager.sharedTokenKeys, 1)
+		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
+		require.Len(t, tokenManager.clusterTokenKeys, 1)
+		assert.Equal(t, tokenManager.clusterTokenKeys[0], config.AuthInfos["downstream2"].Token)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
@@ -564,7 +573,7 @@ func TestStoreCreate(t *testing.T) {
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
-			tokenCache:          tokenCache,
+			tokenStore:          tokenStore,
 			clusterCache:        clusterCache,
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
@@ -636,9 +645,9 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "rancher", config.Contexts["rancher"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 1)
-		require.Len(t, tokenManager.tokens, 1)
-		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos["rancher"].Token)
-		require.Len(t, tokenManager.clusterTokens, 0)
+		require.Len(t, tokenManager.sharedTokenKeys, 1)
+		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos["rancher"].Token)
+		require.Len(t, tokenManager.clusterTokenKeys, 0)
 
 		assert.Equal(t, "rancher", config.CurrentContext)
 	})
@@ -649,7 +658,7 @@ func TestStoreCreate(t *testing.T) {
 			mcmEnabled:          true,
 			authorizer:          commonAuthorizer,
 			userCache:           userCache,
-			tokenCache:          tokenCache,
+			tokenStore:          tokenStore,
 			clusterCache:        clusterCache,
 			nodeCache:           nodeCache,
 			tokenMgr:            tokenManager,
@@ -724,9 +733,9 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream2", config.Contexts["downstream2-cp"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 2)
-		require.Len(t, tokenManager.tokens, 0)
+		require.Len(t, tokenManager.sharedTokenKeys, 0)
 		assert.Equal(t, "", config.AuthInfos[defaultClusterName].Token)
-		require.Len(t, tokenManager.clusterTokens, 0)
+		require.Len(t, tokenManager.clusterTokenKeys, 0)
 		assert.Equal(t, "", config.AuthInfos["downstream2"].Token)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
@@ -769,7 +778,7 @@ func TestStoreCreate(t *testing.T) {
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
-			tokenCache:          tokenCache,
+			tokenStore:          tokenStore,
 			clusterCache:        clusterCache,
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
@@ -845,9 +854,9 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, defaultClusterName, config.Contexts["downstream1"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 1)
-		require.Len(t, tokenManager.tokens, 1)
-		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
-		require.Len(t, tokenManager.clusterTokens, 0)
+		require.Len(t, tokenManager.sharedTokenKeys, 1)
+		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
+		require.Len(t, tokenManager.clusterTokenKeys, 0)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
@@ -878,7 +887,7 @@ func TestStoreCreate(t *testing.T) {
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
-			tokenCache:          tokenCache,
+			tokenStore:          tokenStore,
 			clusterCache:        clusterCache,
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
@@ -953,8 +962,8 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 1)
-		require.Len(t, tokenManager.tokens, 1)
-		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
+		require.Len(t, tokenManager.sharedTokenKeys, 1)
+		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
 
 		assert.Equal(t, "local", config.CurrentContext)
 	})
@@ -962,7 +971,7 @@ func TestStoreCreate(t *testing.T) {
 		store := &Store{
 			authorizer: commonAuthorizer,
 			userCache:  userCache,
-			tokenCache: tokenCache,
+			tokenStore: tokenStore,
 			tokenMgr:   tokenManager,
 		}
 
@@ -986,7 +995,7 @@ func TestStoreCreate(t *testing.T) {
 		store := &Store{
 			authorizer: commonAuthorizer,
 			userCache:  userCache,
-			tokenCache: tokenCache,
+			tokenStore: tokenStore,
 			tokenMgr:   tokenManager,
 		}
 
@@ -1010,7 +1019,7 @@ func TestStoreCreate(t *testing.T) {
 		store := &Store{
 			authorizer: commonAuthorizer,
 			userCache:  userCache,
-			tokenCache: tokenCache,
+			tokenStore: tokenStore,
 			tokenMgr:   tokenManager,
 		}
 
@@ -1037,7 +1046,7 @@ func TestStoreCreate(t *testing.T) {
 		store := &Store{
 			authorizer:    commonAuthorizer,
 			userCache:     userCache,
-			tokenCache:    tokenCache,
+			tokenStore:    tokenStore,
 			tokenMgr:      tokenManager,
 			getDefaultTTL: getDefaultTTL,
 		}
@@ -1066,7 +1075,7 @@ func TestStoreCreate(t *testing.T) {
 		store := &Store{
 			authorizer:    commonAuthorizer,
 			userCache:     userCache,
-			tokenCache:    tokenCache,
+			tokenStore:    tokenStore,
 			tokenMgr:      tokenManager,
 			getDefaultTTL: getDefaultTTL,
 		}
@@ -2282,45 +2291,38 @@ func TestStoreDelete(t *testing.T) {
 			GracePeriodSeconds: ptr.To(int64(60)),
 		}
 
+		tokenID1 := "kubeconfig-" + adminID + "agc66"
+		tokenID2 := "kubeconfig-" + adminID + "d12fg"
+
+		// Inject token IDs into configMap status so delete() finds them.
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["` + tokenID1 + `","` + tokenID2 + `"]`
+
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
-			return configMap.DeepCopy(), nil
+			return cm, nil
 		}).Times(1)
 		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
 			assert.Equal(t, deleteOptions, options)
 			return nil
 		}).Times(1)
 
-		tokenID1 := "kubeconfig-" + adminID + "agc66"
-		tokenID2 := "kubeconfig-" + adminID + "d12fg"
-
-		tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
-		tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
-			set, err := labels.ConvertSelectorToLabelsMap(selector.String())
-			require.NoError(t, err)
-			assert.Equal(t, kubeconfigID, set.Get(tokens.TokenKubeconfigIDLabel))
-			assert.Equal(t, KindLabelValue, set.Get(tokens.TokenKindLabel))
-
-			return []*v3.Token{
-				{ObjectMeta: metav1.ObjectMeta{Name: tokenID1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: tokenID2}},
-			}, nil
-		}).AnyTimes()
-		tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
-		tokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
-			assert.Contains(t, []string{tokenID1, tokenID2}, name)
-			assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
-			assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
-			assert.Equal(t, deleteOptions.DryRun, options.DryRun)
-
-			return nil
-		}).Times(2)
+		var deletedTokens []string
+		extTokenStore := &fakeTokenStore{
+			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
+				deletedTokens = append(deletedTokens, name)
+				assert.Contains(t, []string{tokenID1, tokenID2}, name)
+				assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
+				assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
+				assert.Equal(t, deleteOptions.DryRun, options.DryRun)
+				return nil
+			},
+		}
 
 		store := &Store{
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
-			tokenCache:      tokenCache,
-			tokens:          tokenClient,
+			tokenStore:      extTokenStore,
 			userCache:       userCache,
 			tokenMgr:        tokenManager,
 		}
@@ -2338,6 +2340,7 @@ func TestStoreDelete(t *testing.T) {
 		assert.Equal(t, kubeconfigID, kubeconfig.Name)
 
 		assert.True(t, deleteValidationCalled)
+		assert.Len(t, deletedTokens, 2)
 	})
 	t.Run("user can't delete other user's kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -2434,6 +2437,13 @@ func TestStoreDeleteCollection(t *testing.T) {
 		}
 
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		tokenID1 := "kubeconfig-" + userID + "agc66"
+		tokenID2 := "kubeconfig-" + userID + "d12fg"
+
+		// Build configMap with StatusTokensField populated.
+		cmWithTokens := configMap.DeepCopy()
+		cmWithTokens.Data[StatusTokensField] = `["` + tokenID1 + `","` + tokenID2 + `"]`
+
 		configMapClient.EXPECT().List(namespace, gomock.Any()).DoAndReturn(func(namespace string, options metav1.ListOptions) (*corev1.ConfigMapList, error) {
 			labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
 			require.NoError(t, err)
@@ -2445,7 +2455,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 				ListMeta: metav1.ListMeta{
 					ResourceVersion: "1",
 				},
-				Items: []corev1.ConfigMap{*configMap.DeepCopy()},
+				Items: []corev1.ConfigMap{*cmWithTokens},
 			}, nil
 		}).Times(1)
 		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
@@ -2453,36 +2463,22 @@ func TestStoreDeleteCollection(t *testing.T) {
 			return nil
 		}).Times(1)
 
-		tokenID1 := "kubeconfig-" + userID + "agc66"
-		tokenID2 := "kubeconfig-" + userID + "d12fg"
-
-		tokenCache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
-		tokenCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*v3.Token, error) {
-			set, err := labels.ConvertSelectorToLabelsMap(selector.String())
-			require.NoError(t, err)
-			assert.Equal(t, kubeconfigID, set.Get(tokens.TokenKubeconfigIDLabel))
-			assert.Equal(t, KindLabelValue, set.Get(tokens.TokenKindLabel))
-
-			return []*v3.Token{
-				{ObjectMeta: metav1.ObjectMeta{Name: tokenID1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: tokenID2}},
-			}, nil
-		}).AnyTimes()
-		tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
-		tokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
-			assert.Contains(t, []string{tokenID1, tokenID2}, name)
-			assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
-			assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
-			assert.Equal(t, deleteOptions.DryRun, options.DryRun)
-
-			return nil
-		}).Times(2)
+		var deletedTokens []string
+		extTokenStore := &fakeTokenStore{
+			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
+				deletedTokens = append(deletedTokens, name)
+				assert.Contains(t, []string{tokenID1, tokenID2}, name)
+				assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
+				assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
+				assert.Equal(t, deleteOptions.DryRun, options.DryRun)
+				return nil
+			},
+		}
 
 		store := &Store{
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
-			tokenCache:      tokenCache,
-			tokens:          tokenClient,
+			tokenStore:      extTokenStore,
 			userCache:       userCache,
 			tokenMgr:        tokenManager,
 		}
@@ -2501,6 +2497,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 		assert.Equal(t, "1", list.ResourceVersion)
 
 		assert.Equal(t, deleteValidationCalledTimes, 1)
+		assert.Len(t, deletedTokens, 2)
 	})
 }
 
@@ -2516,8 +2513,8 @@ func TestPrintKubeconfig(t *testing.T) {
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: "management.cattle.io/v3",
-					Kind:       "Token",
+					APIVersion: "v1",
+					Kind:       "Secret",
 					Name:       "kubeconfig-u-w7drcd12fg",
 					UID:        uuid.NewUUID(),
 				},
