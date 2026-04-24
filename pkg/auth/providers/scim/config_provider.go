@@ -106,11 +106,21 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 	}
 
 	if v, ok := cm.Data["enabled"]; ok {
-		cfg.Enabled, _ = strconv.ParseBool(v)
+		enabled, err := strconv.ParseBool(v)
+		if err != nil {
+			logrus.Errorf("scim::getProviderConfig: invalid enabled value %q in configmap %s, using default", v, name)
+		} else {
+			cfg.Enabled = enabled
+		}
 	}
 
 	if v, ok := cm.Data["paused"]; ok {
-		cfg.Paused, _ = strconv.ParseBool(v)
+		paused, err := strconv.ParseBool(v)
+		if err != nil {
+			logrus.Errorf("scim::getProviderConfig: invalid paused value %q in configmap %s, using default", v, name)
+		} else {
+			cfg.Paused = paused
+		}
 	}
 
 	if v := cm.Data["userIdAttribute"]; v != "" {
