@@ -1,8 +1,6 @@
 package helmop
 
 import (
-	"fmt"
-	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	corev1 "k8s.io/api/core/v1"
 	"strings"
 	"testing"
@@ -22,7 +20,6 @@ type createPodTestCase struct {
 	expected      *corev1.Pod
 	failMsg       string
 	secretData    map[string][]byte
-	kustomize     bool
 	imageOverride string
 	tolerations   []corev1.Toleration
 }
@@ -42,29 +39,10 @@ func Test_Render(t *testing.T) {
 			commands: Commands{
 				Command{
 					Operation:   "upgrade",
-					ChartFile:   "test-chart-v1.1.0.tgz",
-					Chart:       []byte("test-chart"),
-					Kustomize:   true,
-					ReleaseName: "test1",
-				},
-			},
-			expected: map[string][]byte{
-				"operation000":          []byte(strings.Join([]string{"upgrade", "--post-renderer=/home/shell/kustomize.sh", "test1", "/home/shell/helm-run/test-chart-v1.1.0.tgz"}, "\x00")),
-				"kustomization000.yaml": []byte(fmt.Sprintf(kustomization, "000")),
-				"transform000.yaml":     []byte(fmt.Sprintf(transform, "test1")),
-				"test-chart-v1.1.0.tgz": []byte("test-chart"),
-			},
-			failMsg: "kustomize enabled test case failed",
-		},
-		{
-			commands: Commands{
-				Command{
-					Operation:   "upgrade",
 					ValuesFile:  "values-test-chart-v1.1.0.yaml",
 					Values:      []byte("{\"a\":\"a\"}"),
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test2",
 				},
 			},
@@ -81,7 +59,6 @@ func Test_Render(t *testing.T) {
 					Operation:   "upgrade",
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test3",
 				},
 			},
@@ -97,7 +74,6 @@ func Test_Render(t *testing.T) {
 					Operation:   "install",
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test4",
 				},
 			},
@@ -113,7 +89,6 @@ func Test_Render(t *testing.T) {
 					Operation:   "uninstall",
 					ChartFile:   "test-chart-v1.1.0.tgz",
 					Chart:       []byte("test-chart"),
-					Kustomize:   false,
 					ReleaseName: "test5",
 				},
 			},
@@ -122,39 +97,6 @@ func Test_Render(t *testing.T) {
 				"test-chart-v1.1.0.tgz": []byte("test-chart"),
 			},
 			failMsg: "uninstall test case failed",
-		},
-		{
-			commands: Commands{
-				Command{
-					Operation:   "upgrade",
-					ChartFile:   "test-chart-v1.1.0.tgz",
-					Chart:       []byte("test-chart"),
-					Kustomize:   true,
-					ReleaseName: "test6",
-					ArgObjects: []interface{}{types.ChartInstallAction{
-						OperationTolerations: []corev1.Toleration{
-							{
-								Key:      "foo",
-								Operator: "equals",
-								Value:    "bar",
-								Effect:   "NoSchedule",
-							},
-							{
-								Key:      "foo2",
-								Operator: "equals",
-								Value:    "bar2",
-								Effect:   "NoSchedule",
-							}},
-					}},
-				},
-			},
-			expected: map[string][]byte{
-				"operation000":          []byte(strings.Join([]string{"upgrade", "--post-renderer=/home/shell/kustomize.sh", "test6", "/home/shell/helm-run/test-chart-v1.1.0.tgz"}, "\x00")),
-				"kustomization000.yaml": []byte(fmt.Sprintf(kustomization, "000")),
-				"transform000.yaml":     []byte(fmt.Sprintf(transform, "test6")),
-				"test-chart-v1.1.0.tgz": []byte("test-chart"),
-			},
-			failMsg: "operation toleration test case failed",
 		},
 	}
 
@@ -262,7 +204,7 @@ func Test_CreatePod(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		actual, _ := testCase.operation.createPod(testCase.secretData, testCase.kustomize, testCase.imageOverride, testCase.tolerations)
+		actual, _ := testCase.operation.createPod(testCase.secretData, testCase.imageOverride, testCase.tolerations)
 		asserts.ElementsMatch(testCase.expected.Spec.Tolerations, actual.Spec.Tolerations, testCase.failMsg)
 	}
 }
