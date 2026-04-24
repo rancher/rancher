@@ -618,6 +618,7 @@ func (s *Provider) setRancherToken(w http.ResponseWriter, tokenMGR *tokens.Manag
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 	}
 	http.SetCookie(w, tokenCookie)
 

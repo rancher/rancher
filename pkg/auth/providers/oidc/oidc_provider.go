@@ -894,10 +894,13 @@ func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
 func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {
 	isSecure := req.URL.Scheme == "https"
 	pkceCookie := &http.Cookie{
-		Name:    pkceVerifierCookieName,
-		Value:   "",
-		Secure:  isSecure,
-		Expires: time.Now().Add(time.Second * -10),
+		Name:     pkceVerifierCookieName,
+		Value:    "",
+		Secure:   isSecure,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(time.Second * -10),
 	}
 
 	http.SetCookie(w, pkceCookie)
@@ -913,6 +916,7 @@ func SetPKCEVerifier(req *http.Request, w http.ResponseWriter, value string) {
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(time.Minute * 10),
 	}
 
@@ -927,6 +931,7 @@ func setIDToken(req *http.Request, w http.ResponseWriter, token string) {
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 	}
 	http.SetCookie(w, tokenCookie)
 }
