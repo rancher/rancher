@@ -145,8 +145,9 @@ spec:
                   Defaults is false. Enabling this is not recommended for production due to the security implications.
                 type: boolean
               refreshInterval:
-                description: RefreshInterval is the interval at which the Helm repository
-                  should be refreshed.
+                description: |-
+                  RefreshInterval is the interval, in seconds, at which the Helm repository should be refreshed.
+                  Default value is 1 hour. Using a negative value disables periodic updates completely.
                 type: integer
               serviceAccount:
                 description: |-
