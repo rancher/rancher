@@ -86,7 +86,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.26
     permissions:
       contents: read
       id-token: write
@@ -98,11 +98,6 @@ jobs:
       ARCH: amd64
       REGISTRY: "" # remove to set the registry at systemDefaultRegistry on the chart
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
