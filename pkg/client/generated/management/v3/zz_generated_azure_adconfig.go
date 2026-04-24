@@ -16,7 +16,10 @@ const (
 	AzureADConfigFieldGraphEndpoint         = "graphEndpoint"
 	AzureADConfigFieldGroupMembershipFilter = "groupMembershipFilter"
 	AzureADConfigFieldLabels                = "labels"
+	AzureADConfigFieldLogoutAllEnabled      = "logoutAllEnabled"
+	AzureADConfigFieldLogoutAllForced       = "logoutAllForced"
 	AzureADConfigFieldLogoutAllSupported    = "logoutAllSupported"
+	AzureADConfigFieldLogoutEndpoint        = "logoutEndpoint"
 	AzureADConfigFieldName                  = "name"
 	AzureADConfigFieldOwnerReferences       = "ownerReferences"
 	AzureADConfigFieldRancherURL            = "rancherUrl"
@@ -43,7 +46,10 @@ type AzureADConfig struct {
 	GraphEndpoint         string            `json:"graphEndpoint,omitempty" yaml:"graphEndpoint,omitempty"`
 	GroupMembershipFilter string            `json:"groupMembershipFilter,omitempty" yaml:"groupMembershipFilter,omitempty"`
 	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllEnabled      bool              `json:"logoutAllEnabled,omitempty" yaml:"logoutAllEnabled,omitempty"`
+	LogoutAllForced       bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported    bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
+	LogoutEndpoint        string            `json:"logoutEndpoint,omitempty" yaml:"logoutEndpoint,omitempty"`
 	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherURL            string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`
