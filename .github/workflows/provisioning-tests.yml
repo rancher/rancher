@@ -113,11 +113,8 @@ jobs:
     name: Convert test report to xml
     needs: [provisioning_tests]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.26
     steps:
-      - name: Install golang
-        run: |
-          zypper --non-interactive install golang
       - name: Fetch plaintext test output
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -138,7 +135,7 @@ jobs:
   event-file:
     name: Upload event file
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.26
     steps:
       - name: Upload GH Event File
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
