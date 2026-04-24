@@ -54,10 +54,19 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.36.0
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
 
-	github.com/rancher/aks-operator => github.com/rancher-teja/aks-operator v1.13.0-rc.1.0.20260422092428-0a8250c41d6f
-	github.com/rancher/ali-operator => github.com/rancher-teja/ali-operator v1.13.0-rc.1.0.20260422092428-0a8250c41d6f
-	github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260422052120-0d3c42580dd0
-	github.com/rancher/wrangler/v3 => github.com/rancher-teja/wrangler/v3 v3.6.0-rc.1.0.20260422041726-1ad245aff676
+	github.com/rancher/aks-operator => github.com/rancher-teja/aks-operator v1.13.0-rc.1.0.20260423111528-6a01d0f0f885
+	github.com/rancher/ali-operator => github.com/rancher-teja/ali-operator v1.13.0-rc.1.0.20260423115145-0fd357e607e7
+	github.com/rancher/eks-operator => github.com/rancher-teja/eks-operator v1.14.0-rc.1.0.20260423110630-56eb3869fd83
+	github.com/rancher/fleet/pkg/apis => github.com/rancher/fleet/pkg/apis v0.15.0-beta.4.0.20260424065906-b7daa22e23df
+	github.com/rancher/gke-operator => github.com/rancher-teja/gke-operator v1.14.0-rc.1.0.20260423112612-653f269fbae5
+	github.com/rancher/lasso => github.com/rancher-teja/lasso v0.2.9-0.20260423044910-f3dbd8f8eeaa
+	github.com/rancher/machine => github.com/rancher-teja/machine v0.15.1-0.20260423095219-e6d229233875
+	github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260423064226-5e6ff046a71a
+	github.com/rancher/remotedialer-proxy => github.com/rancher-teja/remotedialer-proxy v0.8.0-rc.2.0.20260424043854-0687013774b4
+	github.com/rancher/rke => github.com/rancher-teja/rke v1.8.14-0.20260423104215-3916aa7c88c6
+	github.com/rancher/shepherd => github.com/rancher-teja/shepherd v0.0.0-20260424070204-74a7a17856da
+	github.com/rancher/steve => github.com/rancher-teja/steve v0.8.8-0.20260423090300-032bed2ef682
+	github.com/rancher/wrangler/v3 => github.com/rancher-teja/wrangler/v3  v3.6.0-rc.1.0.20260423053950-42de455630a4
 )
 
 require github.com/rancher/rancher/pkg/apis v0.0.0
