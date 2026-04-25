@@ -8,7 +8,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Ensure runs git clone, clean DIRTY contents and fetch the latest commit
+// Ensure the repository is checked out at the provided commit reference.
+// Cloning/fetching and cleaning a dirty state is performed if necessary
 func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
 	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
