@@ -275,6 +275,10 @@ func TestInstaller_LinuxInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 			{Name: "CATTLE_SERVER", Value: overrideServer},
 			{Name: "CATTLE_AGENT_BINARY_BASE_URL", Value: overrideAssets},
 			{Name: "CATTLE_CA_CHECKSUM", Value: overrideCAChecksum},
+			// Non-CATTLE_ envvars must continue to render normally alongside
+			// the precedence-controlled CATTLE_* overrides.
+			{Name: "HTTP_PROXY", Value: "http://proxy.example.com:3128"},
+			{Name: "MyCustomVar", Value: "MyCustomValue"},
 		}, "", "/var/lib/rancher/rke2")
 	a.Nil(err)
 	a.NotNil(script)
@@ -290,6 +294,11 @@ func TestInstaller_LinuxInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 		"CATTLE_AGENT_BINARY_BASE_URL must be emitted once, with the user-provided value")
 	a.Equal(1, strings.Count(out, fmt.Sprintf("export CATTLE_CA_CHECKSUM='%s'", overrideCAChecksum)),
 		"CATTLE_CA_CHECKSUM must be emitted once, with the user-provided value")
+
+	// Non-CATTLE_ envvars must still pass through, rendered in the exported +
+	// single-quote escaped form alongside the precedence-controlled CATTLE_* overrides.
+	a.Contains(out, "export HTTP_PROXY='http://proxy.example.com:3128'")
+	a.Contains(out, "export MyCustomVar='MyCustomValue'")
 
 	// The values otherwise synthesized from global settings must not leak when the
 	// user has overridden them via agentEnvVars. The global server-url (and the binary
@@ -341,6 +350,10 @@ func TestInstaller_WindowsInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 			{Name: "CATTLE_SERVER", Value: overrideServer},
 			{Name: "CATTLE_AGENT_BINARY_BASE_URL", Value: overrideAssets},
 			{Name: "CATTLE_CA_CHECKSUM", Value: overrideCAChecksum},
+			// Non-CATTLE_ envvars must continue to render normally alongside
+			// the precedence-controlled CATTLE_* overrides.
+			{Name: "HTTP_PROXY", Value: "http://proxy.example.com:3128"},
+			{Name: "MyCustomVar", Value: "MyCustomValue"},
 		}, "", "/var/lib/rancher/rke2")
 	a.Nil(err)
 	a.NotNil(script)
@@ -356,6 +369,10 @@ func TestInstaller_WindowsInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 	a.Contains(out, fmt.Sprintf("$env:CATTLE_SERVER=\"%s\"", overrideServer))
 	a.Contains(out, fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"%s\"", overrideAssets))
 	a.Contains(out, fmt.Sprintf("$env:CATTLE_CA_CHECKSUM=\"%s\"", overrideCAChecksum))
+
+	// Non-CATTLE_ envvars must still pass through.
+	a.Contains(out, "$env:HTTP_PROXY=\"http://proxy.example.com:3128\"")
+	a.Contains(out, "$env:MyCustomVar=\"MyCustomValue\"")
 
 	a.NotContains(out, "rancher.global.example.com",
 		"global server-url must not leak into the script when the user has overridden CATTLE_SERVER")
