@@ -213,40 +213,6 @@ func NewClusterRoleTemplateBinding(namespace, name string, obj ClusterRoleTempla
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterTemplateList is a list of ClusterTemplate resources
-type ClusterTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterTemplate `json:"items"`
-}
-
-func NewClusterTemplate(namespace, name string, obj ClusterTemplate) *ClusterTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterTemplateRevisionList is a list of ClusterTemplateRevision resources
-type ClusterTemplateRevisionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterTemplateRevision `json:"items"`
-}
-
-func NewClusterTemplateRevision(namespace, name string, obj ClusterTemplateRevision) *ClusterTemplateRevision {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterTemplateRevision").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // CognitoProviderList is a list of CognitoProvider resources
 type CognitoProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -291,23 +257,6 @@ type DynamicSchemaList struct {
 
 func NewDynamicSchema(namespace, name string, obj DynamicSchema) *DynamicSchema {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("DynamicSchema").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// EtcdBackupList is a list of EtcdBackup resources
-type EtcdBackupList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []EtcdBackup `json:"items"`
-}
-
-func NewEtcdBackup(namespace, name string, obj EtcdBackup) *EtcdBackup {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("EtcdBackup").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
@@ -587,40 +536,6 @@ func NewNodeDriver(namespace, name string, obj NodeDriver) *NodeDriver {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodePoolList is a list of NodePool resources
-type NodePoolList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []NodePool `json:"items"`
-}
-
-func NewNodePool(namespace, name string, obj NodePool) *NodePool {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NodePool").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeTemplateList is a list of NodeTemplate resources
-type NodeTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []NodeTemplate `json:"items"`
-}
-
-func NewNodeTemplate(namespace, name string, obj NodeTemplate) *NodeTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NodeTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // OIDCClientList is a list of OIDCClient resources
 type OIDCClientList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -801,57 +716,6 @@ type RancherUserNotificationList struct {
 
 func NewRancherUserNotification(namespace, name string, obj RancherUserNotification) *RancherUserNotification {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RancherUserNotification").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RkeAddonList is a list of RkeAddon resources
-type RkeAddonList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []RkeAddon `json:"items"`
-}
-
-func NewRkeAddon(namespace, name string, obj RkeAddon) *RkeAddon {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RkeAddon").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RkeK8sServiceOptionList is a list of RkeK8sServiceOption resources
-type RkeK8sServiceOptionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []RkeK8sServiceOption `json:"items"`
-}
-
-func NewRkeK8sServiceOption(namespace, name string, obj RkeK8sServiceOption) *RkeK8sServiceOption {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RkeK8sServiceOption").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// RkeK8sSystemImageList is a list of RkeK8sSystemImage resources
-type RkeK8sSystemImageList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []RkeK8sSystemImage `json:"items"`
-}
-
-func NewRkeK8sSystemImage(namespace, name string, obj RkeK8sSystemImage) *RkeK8sSystemImage {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RkeK8sSystemImage").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

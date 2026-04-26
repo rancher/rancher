@@ -4,20 +4,14 @@ import requests
 import time
 import urllib3
 import yaml
-import subprocess
 import json
 import rancher
-from sys import platform
 from .common import random_str, wait_for_template_to_be_created
 from kubernetes.client import ApiClient, Configuration, CustomObjectsApi, \
     ApiextensionsV1Api
 from kubernetes.client.rest import ApiException
 from kubernetes.config.kube_config import KubeConfigLoader
 from rancher import ApiError
-from .cluster_common import \
-    generate_cluster_config, \
-    create_cluster, \
-    import_cluster
 
 
 # This stops ssl warnings for unsecure certs
@@ -69,21 +63,6 @@ class ProjectContext:
         self.client = client
 
 
-class DINDContext:
-    """Returns a DINDContext for a new RKE cluster for the default global
-    admin user."""
-
-    def __init__(
-        self, name, admin_mc, cluster, client, cluster_file, kube_file
-    ):
-        self.name = name
-        self.admin_mc = admin_mc
-        self.cluster = cluster
-        self.client = client
-        self.cluster_file = cluster_file
-        self.kube_file = kube_file
-
-
 @pytest.fixture(scope="session")
 def admin_mc():
     """Returns a ManagementContext for the default global admin user."""
@@ -100,7 +79,7 @@ def admin_mc():
     return ManagementContext(client, k8s_client, user=admin)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_cc(admin_mc):
     """Returns a ClusterContext for the local cluster for the default global
     admin user."""
@@ -129,7 +108,7 @@ def user_cluster_client(user, cluster):
                           token=user.client.token)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_pc_factory(admin_cc, remove_resource):
     """Returns a ProjectContext for a newly created project in the local
     cluster for the default global admin user. The project will be deleted
@@ -151,12 +130,12 @@ def admin_pc_factory(admin_cc, remove_resource):
     return _admin_pc
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_pc(admin_pc_factory):
     return admin_pc_factory()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_system_pc(admin_mc):
     """Returns a ProjectContext for the system project in the local cluster
     for the default global admin user."""
@@ -170,13 +149,13 @@ def admin_system_pc(admin_mc):
                                                       token=admin.token))
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def user_mc(user_factory):
     """Returns a ManagementContext for a newly created standard user"""
     return user_factory()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def user_factory(admin_mc, remove_resource):
     """Returns a factory for creating new users which a ManagementContext for
     a newly created standard user is returned.
@@ -208,13 +187,13 @@ def user_factory(admin_mc, remove_resource):
     return _create_user
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_cc_client(admin_cc):
     """Returns the client from the default admin's ClusterContext"""
     return admin_cc.client
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_pc_client(admin_pc):
     """Returns the client from the default admin's ProjectContext """
     return admin_pc.client
@@ -253,57 +232,6 @@ def set_server_version(client, version):
         return server_version.value == version
 
     wait_for(_wait_for_version)
-
-
-@pytest.fixture(scope="session")
-def dind_cc(request, admin_mc):
-    # verify platform is linux
-    if platform != 'linux':
-        raise Exception('rke dind only supported on linux')
-
-    def set_server_url(url):
-        admin_mc.client.update_by_id_setting(id='server-url', value=url)
-
-    original_url = admin_mc.client.by_id_setting('server-url').value
-
-    # make sure server-url is set to IP address for dind accessibility
-    set_server_url(SERVER_URL)
-
-    # revert server url to original when done
-    request.addfinalizer(lambda: set_server_url(original_url))
-
-    # create the cluster & import
-    name, config, cluster_file, kube_file = generate_cluster_config(request, 1)
-    create_cluster(cluster_file)
-    cluster = import_cluster(admin_mc, kube_file, cluster_name=name)
-
-    # delete cluster when done
-    request.addfinalizer(lambda: admin_mc.client.delete(cluster))
-
-    # wait for cluster to completely provision
-    wait_for_condition("Ready", "True", admin_mc.client, cluster, 120)
-    cluster, client = cluster_and_client(cluster.id, admin_mc.client)
-
-    # get ip address of cluster node
-    node_name = config['nodes'][0]['address']
-    node_inspect = subprocess.check_output('docker inspect rke-dind-' +
-                                           node_name, shell=True).decode()
-    node_json = json.loads(node_inspect)
-    node_ip = node_json[0]['NetworkSettings']['IPAddress']
-
-    # update cluster fqdn with node ip
-    admin_mc.client.update_by_id_cluster(
-        id=cluster.id,
-        name=cluster.name,
-        localClusterAuthEndpoint={
-            'enabled': True,
-            'fqdn': node_ip + ':6443',
-            'caCerts': cluster.caCert,
-        },
-    )
-    return DINDContext(
-        name, admin_mc, cluster, client, cluster_file, kube_file
-    )
 
 
 def wait_for(callback, timeout=DEFAULT_TIMEOUT, fail_handler=None):
@@ -353,7 +281,7 @@ def wait_until_available(client, obj, timeout=DEFAULT_TIMEOUT):
             raise Exception(msg)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def remove_resource(admin_mc, request):
     """Remove a resource after a test finishes even if the test fails."""
     client = admin_mc.client
@@ -373,7 +301,7 @@ def remove_resource(admin_mc, request):
     return _cleanup
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def remove_resouce_func(request):
     """Call the delete_func passing in the name of the resource. This is useful
     when dealing with the k8s clients for objects that don't exist in the
@@ -391,7 +319,7 @@ def remove_resouce_func(request):
     return _cleanup
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def raw_remove_custom_resource(admin_mc, request):
     """Remove a custom resource, using the k8s client, after a test finishes
     even if the test fails. This should only be used if remove_resource, which
@@ -549,59 +477,6 @@ def protect_response(r):
     if r.status_code >= 300:
         message = f'Server responded with {r.status_code}\nbody:\n{r.text}'
         raise ValueError(message)
-
-
-def create_kubeconfig(request, dind_cc, client):
-    # request cluster scoped kubeconfig, permissions may not be synced yet
-    def generateKubeconfig(max_attempts=5):
-        for attempt in range(1, max_attempts+1):
-            try:
-                # get cluster for client
-                cluster = client.by_id_cluster(dind_cc.cluster.id)
-                return cluster.generateKubeconfig()['config']
-            except ApiError as err:
-                if attempt == max_attempts:
-                    raise err
-            time.sleep(1)
-
-    cluster_kubeconfig = generateKubeconfig()
-
-    # write cluster scoped kubeconfig
-    cluster_kubeconfig_file = "kubeconfig-" + random_str() + ".yml"
-    f = open(cluster_kubeconfig_file, "w")
-    f.write(cluster_kubeconfig)
-    f.close()
-
-    # cleanup file when done
-    request.addfinalizer(lambda: os.remove(cluster_kubeconfig_file))
-
-    # extract token name
-    config = yaml.safe_load(cluster_kubeconfig)
-    token_name = config['users'][0]['user']['token'].split(':')[0]
-
-    # wait for token to sync
-    crd_client = CustomObjectsApi(
-        kubernetes_api_client(
-            dind_cc.admin_mc.client,
-            dind_cc.cluster.id
-        )
-    )
-
-    def cluster_token_available():
-        try:
-            return crd_client.get_namespaced_custom_object(
-                'cluster.cattle.io',
-                'v3',
-                'cattle-system',
-                'clusterauthtokens',
-                token_name
-            )
-        except ApiException:
-            return None
-
-    wait_for(cluster_token_available)
-
-    return cluster_kubeconfig_file
 
 
 def set_cluster_psp(admin_mc, value):

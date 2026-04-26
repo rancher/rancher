@@ -31,10 +31,7 @@ const (
 	NodeFieldName                 = "name"
 	NodeFieldNamespaceId          = "namespaceId"
 	NodeFieldNodeName             = "nodeName"
-	NodeFieldNodePlan             = "nodePlan"
-	NodeFieldNodePoolID           = "nodePoolId"
 	NodeFieldNodeTaints           = "nodeTaints"
-	NodeFieldNodeTemplateID       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldPodCidrs             = "podCidrs"
@@ -45,7 +42,6 @@ const (
 	NodeFieldRequestedHostname    = "requestedHostname"
 	NodeFieldRuntimeHandlers      = "runtimeHandlers"
 	NodeFieldScaledownTime        = "scaledownTime"
-	NodeFieldSshUser              = "sshUser"
 	NodeFieldState                = "state"
 	NodeFieldTaints               = "taints"
 	NodeFieldTransitioning        = "transitioning"
@@ -84,10 +80,7 @@ type Node struct {
 	Name                 string                    `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string                    `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeName             string                    `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
-	NodePlan             *NodePlan                 `json:"nodePlan,omitempty" yaml:"nodePlan,omitempty"`
-	NodePoolID           string                    `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
 	NodeTaints           []Taint                   `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
-	NodeTemplateID       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	PodCidrs             []string                  `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
@@ -98,7 +91,6 @@ type Node struct {
 	RequestedHostname    string                    `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`
 	RuntimeHandlers      []NodeRuntimeHandler      `json:"runtimeHandlers,omitempty" yaml:"runtimeHandlers,omitempty"`
 	ScaledownTime        string                    `json:"scaledownTime,omitempty" yaml:"scaledownTime,omitempty"`
-	SshUser              string                    `json:"sshUser,omitempty" yaml:"sshUser,omitempty"`
 	State                string                    `json:"state,omitempty" yaml:"state,omitempty"`
 	Taints               []Taint                   `json:"taints,omitempty" yaml:"taints,omitempty"`
 	Transitioning        string                    `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
