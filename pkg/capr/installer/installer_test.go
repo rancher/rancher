@@ -82,6 +82,10 @@ func TestInstaller_LinuxInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 			{Name: "CATTLE_SERVER", Value: overrideServer},
 			{Name: "CATTLE_AGENT_BINARY_BASE_URL", Value: overrideAssets},
 			{Name: "CATTLE_CA_CHECKSUM", Value: overrideCAChecksum},
+			// Non-CATTLE_ envvars must continue to render normally alongside
+			// the precedence-controlled CATTLE_* overrides.
+			{Name: "HTTP_PROXY", Value: "http://proxy.example.com:3128"},
+			{Name: "MyCustomVar", Value: "MyCustomValue"},
 		}, "", "/var/lib/rancher/rke2")
 	a.Nil(err)
 	a.NotNil(script)
@@ -98,6 +102,10 @@ func TestInstaller_LinuxInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 	a.Contains(out, fmt.Sprintf("CATTLE_SERVER=\"%s\"", overrideServer))
 	a.Contains(out, fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s\"", overrideAssets))
 	a.Contains(out, fmt.Sprintf("CATTLE_CA_CHECKSUM=\"%s\"", overrideCAChecksum))
+
+	// Non-CATTLE_ envvars must still pass through.
+	a.Contains(out, "HTTP_PROXY=\"http://proxy.example.com:3128\"")
+	a.Contains(out, "MyCustomVar=\"MyCustomValue\"")
 
 	a.NotContains(out, "rancher.global.example.com",
 		"global server-url must not leak into the script when the user has overridden CATTLE_SERVER")
@@ -143,6 +151,10 @@ func TestInstaller_WindowsInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 			{Name: "CATTLE_SERVER", Value: overrideServer},
 			{Name: "CATTLE_AGENT_BINARY_BASE_URL", Value: overrideAssets},
 			{Name: "CATTLE_CA_CHECKSUM", Value: overrideCAChecksum},
+			// Non-CATTLE_ envvars must continue to render normally alongside
+			// the precedence-controlled CATTLE_* overrides.
+			{Name: "HTTP_PROXY", Value: "http://proxy.example.com:3128"},
+			{Name: "MyCustomVar", Value: "MyCustomValue"},
 		}, "", "/var/lib/rancher/rke2")
 	a.Nil(err)
 	a.NotNil(script)
@@ -158,6 +170,10 @@ func TestInstaller_WindowsInstallScript_AgentEnvVarsPrecedence(t *testing.T) {
 	a.Contains(out, fmt.Sprintf("$env:CATTLE_SERVER=\"%s\"", overrideServer))
 	a.Contains(out, fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"%s\"", overrideAssets))
 	a.Contains(out, fmt.Sprintf("$env:CATTLE_CA_CHECKSUM=\"%s\"", overrideCAChecksum))
+
+	// Non-CATTLE_ envvars must still pass through.
+	a.Contains(out, "$env:HTTP_PROXY=\"http://proxy.example.com:3128\"")
+	a.Contains(out, "$env:MyCustomVar=\"MyCustomValue\"")
 
 	a.NotContains(out, "rancher.global.example.com",
 		"global server-url must not leak into the script when the user has overridden CATTLE_SERVER")
