@@ -24,6 +24,16 @@ spec:
         - path:
             type: PathPrefix
             value: /
+      {{- if eq (include "rancher.useExternalTls" .) "true" }}
+      filters:
+      - type: RequestHeaderModifier
+        requestHeaderModifier:
+          set:
+          - name: X-Forwarded-Proto
+            value: https
+          - name: X-Forwarded-Host
+            value: {{ .Values.hostname }}
+      {{- end }}
       backendRefs:
         - name: {{ include "rancher.fullname" . }}
           port: {{ ternary 443 80 .Values.service.disableHTTP }}
