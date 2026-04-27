@@ -21,7 +21,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.15
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.14
+ARG CATTLE_KDM_BRANCH=dev-v2.15
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -339,7 +339,7 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
 ENV CATTLE_UI_VERSION=2.14.0-alpha7
 ENV CATTLE_DASHBOARD_UI_VERSION=v2.14.0-alpha7
 
-ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
+ENV CATTLE_CLI_VERSION=v2.15.0-rc.2
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
