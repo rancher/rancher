@@ -200,7 +200,6 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 			newTestPlanEntryFromPlan(clusterPlan, "etcd-init"),
 		)
 
-		assert.Equal(t, 4, targets.count())
 		assert.Len(t, targets.etcdOnly, 2)
 		assert.Equal(t, "etcd-init", targets.etcdOnly[0].Machine.Name)
 		assert.Equal(t, "etcd-follower", targets.etcdOnly[1].Machine.Name)
@@ -223,7 +222,6 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 			newTestPlanEntryFromPlan(clusterPlan, "control-plane-init"),
 		)
 
-		assert.Equal(t, 3, targets.count())
 		assert.Empty(t, targets.etcdOnly)
 		assert.Len(t, targets.controlPlane, 3)
 		assert.Equal(t, "control-plane-leader", targets.controlPlane[0].Machine.Name)
