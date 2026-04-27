@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	RancherVersionDev                 = "2.14.99"
+	RancherVersionDev                 = "2.15.99"
 	DefaultMaxUIPluginFileSizeInBytes = 30 * 1024 * 1024 // 30MB
 	AgentTLSModeStrict                = "strict"
 	AgentTLSModeSystemStore           = "system-store"
@@ -95,7 +95,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.14")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.15")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
