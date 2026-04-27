@@ -28,10 +28,10 @@ then
   calc(){ awk "BEGIN { print "$*" }"; }
   version=`echo ${4}|cut -c2-5`
   conversion=$(calc $version*1)
-  if (( $(echo "$conversion >= 1.25" | bc -l) ))
+  if (( $(echo "$conversion >= 1.26" | bc -l) ))
   then
-    cat /tmp/cis_v125_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
-    cat /tmp/v125_policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
+    cat /tmp/cis_v126_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
+    cat /tmp/v126_policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
   else
     cat /tmp/cis_masterconfig.yaml >> /etc/rancher/k3s/config.yaml
     cat /tmp/policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml

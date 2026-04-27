@@ -13,7 +13,7 @@ jobs:
     runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
     env:
       GOLANG_CI_LINT_VERSION: v2.7.2
-      GOLANG_VERSION: '1.25'
+      GOLANG_VERSION: '1.26'
     steps:
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"

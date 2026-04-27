@@ -23,7 +23,7 @@ jobs:
 
       # https://github.com/golang/go/issues/75031
       - name: Set toolchain version
-        run: go env -w GOTOOLCHAIN=go1.25.4+auto
+        run: go env -w GOTOOLCHAIN=go1.26.4+auto
 
       - name: Run unit tests
         run: go test -cover -tags=test ./pkg/...
