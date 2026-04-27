@@ -3,7 +3,7 @@ remoteDialerProxyVersion: 109.0.0+up0.7.0
 # NOTE: CAPI controller version has to be updated in scripts/package-env
 turtlesVersion: 109.0.0+up0.26.0
 cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
-defaultShellVersion: rancher/shell:v0.8.0-rc.1
+defaultShellVersion: rancher/shell:v0.8.0-rc.2
 fleetVersion: 110.0.0+up0.16.0-alpha.5
 defaultSccOperatorImage: rancher/scc-operator:v0.4.0-rc.1
 # NOTE: when updating this version, you will also need to update the hardcoded
