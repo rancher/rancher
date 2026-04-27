@@ -266,17 +266,17 @@ func (p *RTBTestSuite) TestSystemProjectCannotBeDeleted() {
 	})
 	p.Require().NoError(err)
 
-	var systemProject *management.Project
+	var systemProject management.Project
 	for _, project := range projects.Data {
 		if project.Name == "System" {
-			systemProject = &project
+			systemProject = project
 			break
 		}
 	}
-	p.Require().NotNil(systemProject, "System project not found")
+	p.Require().NotNil(&systemProject, "System project not found")
 
 	// Attempting to delete the System project should return 405.
-	err = client.Management.Project.Delete(systemProject)
+	err = client.Management.Project.Delete(&systemProject)
 	p.Require().Error(err)
 
 	var apiErr *clientbase.APIError

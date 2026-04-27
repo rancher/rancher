@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"time"
 
 	"github.com/rancher/norman/types"
@@ -12,6 +14,7 @@ import (
 	extunstructured "github.com/rancher/shepherd/extensions/unstructured"
 	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/api/scheme"
+	"github.com/rancher/shepherd/pkg/clientbase"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	authzv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -254,16 +257,17 @@ func (p *RTBTestSuite) TestCannotCreateFeature() {
 		Name:  "testfeature",
 		Value: &trueVal,
 	})
-	p.Require().Error(err)
-	p.Require().ErrorContains(err, "405")
+	var apiErr *clientbase.APIError
+	p.Require().True(errors.As(err, &apiErr), "expected APIError, got: %v", err)
+	p.Require().Equal(http.StatusMethodNotAllowed, apiErr.StatusCode)
 
 	// Standard user should not be able to create features (405 Method Not Allowed).
 	_, err = userClient.Management.Feature.Create(&management.Feature{
 		Name:  "testfeature",
 		Value: &trueVal,
 	})
-	p.Require().Error(err)
-	p.Require().ErrorContains(err, "405")
+	p.Require().True(errors.As(err, &apiErr), "expected APIError, got: %v", err)
+	p.Require().Equal(http.StatusMethodNotAllowed, apiErr.StatusCode)
 }
 
 func (p *RTBTestSuite) TestCanListFeatures() {
@@ -286,7 +290,7 @@ func (p *RTBTestSuite) TestCanListFeatures() {
 }
 
 // ensureClusterRolesExist ensures the given ClusterRoles exist in the downstream cluster,
-// creating them if necessary. Returns a cleanup function that deletes only the ones it created.
+// creating them if necessary, and registers test cleanup to delete any created roles.
 func (p *RTBTestSuite) ensureClusterRolesExist(client *rancher.Client, names []string) {
 	dynamicClient, err := client.GetDownStreamClusterClient(p.downstreamClusterID)
 	p.Require().NoError(err)
@@ -566,6 +570,13 @@ func (p *RTBTestSuite) TestClusterCreateRoleLocked() {
 
 	rt, err := client.Management.RoleTemplate.ByID(lockedRole)
 	p.Require().NoError(err)
+
+	// Reset the locked state of the role after the test.
+	previousLocked := rt.Locked
+	p.T().Cleanup(func() {
+		_, _ = client.Management.RoleTemplate.Update(rt, map[string]any{"locked": previousLocked})
+	})
+
 	_, err = client.Management.RoleTemplate.Update(rt, map[string]any{"locked": true})
 	p.Require().NoError(err)
 
@@ -671,6 +682,13 @@ func (p *RTBTestSuite) TestProjectCreateRoleLocked() {
 
 	rt, err := client.Management.RoleTemplate.ByID(lockedRole)
 	p.Require().NoError(err)
+
+	// Reset the locked state of the role after the test.
+	previousLocked := rt.Locked
+	p.T().Cleanup(func() {
+		_, _ = client.Management.RoleTemplate.Update(rt, map[string]any{"locked": previousLocked})
+	})
+
 	_, err = client.Management.RoleTemplate.Update(rt, map[string]any{"locked": true})
 	p.Require().NoError(err)
 

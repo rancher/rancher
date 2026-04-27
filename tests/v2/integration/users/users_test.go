@@ -52,16 +52,16 @@ func (s *UserTestSuite) TestUserCantDeleteSelf() {
 	s.Require().NotEmpty(users.Data)
 
 	// Find the admin user (the one we're authenticated as)
-	var currentUser *management.User
+	var currentUser management.User
 	for _, user := range users.Data {
 		if user.Username == "admin" {
-			currentUser = &user
+			currentUser = user
 			break
 		}
 	}
-	s.Require().NotNil(currentUser, "admin user not found")
+	s.Require().NotNil(&currentUser, "admin user not found")
 
-	err = client.Management.User.Delete(currentUser)
+	err = client.Management.User.Delete(&currentUser)
 	s.Require().Error(err)
 
 	var apiErr *clientbase.APIError
@@ -76,18 +76,18 @@ func (s *UserTestSuite) TestUserCantDeactivateSelf() {
 	s.Require().NoError(err)
 	s.Require().NotEmpty(users.Data)
 
-	var currentUser *management.User
+	var currentUser management.User
 	for _, user := range users.Data {
 		if user.Username == "admin" {
-			currentUser = &user
+			currentUser = user
 			break
 		}
 	}
-	s.Require().NotNil(currentUser, "admin user not found")
+	s.Require().NotNil(&currentUser, "admin user not found")
 
 	enabled := false
 	currentUser.Enabled = &enabled
-	_, err = client.Management.User.Update(currentUser, map[string]any{
+	_, err = client.Management.User.Update(&currentUser, map[string]any{
 		"enabled": false,
 	})
 	s.Require().Error(err)
