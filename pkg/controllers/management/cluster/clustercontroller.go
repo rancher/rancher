@@ -197,7 +197,6 @@ func toCapabilities(k8sCapabilities *types.K8SCapabilities) v32.Capabilities {
 			ProtocolsSupported:   k8sCapabilities.L4LoadBalancer.ProtocolsSupported,
 			Provider:             k8sCapabilities.L4LoadBalancer.Provider,
 		},
-		NodePoolScalingSupported: k8sCapabilities.NodePoolScalingSupported,
-		NodePortRange:            k8sCapabilities.NodePortRange,
+		NodePortRange: k8sCapabilities.NodePortRange,
 	}
 }

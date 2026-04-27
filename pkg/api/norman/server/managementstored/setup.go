@@ -67,7 +67,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.GroupType,
 		client.KontainerDriverType,
 		client.NodeDriverType,
-		client.NodePoolType,
 		client.NodeType,
 		client.OIDCClientType,
 		client.PodSecurityAdmissionConfigurationTemplateType,
@@ -269,7 +268,6 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	actionWrapper := node.ActionWrapper{}
 	schema.ActionHandler = actionWrapper.ActionHandler
 
-	_ = schemas.Schema(&managementschema.Version, client.NodePoolType)
 	return nil
 }
 
