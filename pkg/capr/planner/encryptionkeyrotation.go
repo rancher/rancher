@@ -89,8 +89,8 @@ type encryptionKeyRotationRestartTargets struct {
 	controlPlane []*planEntry
 }
 
-func (restartTargets encryptionKeyRotationRestartTargets) count() int {
-	return len(restartTargets.etcdOnly) + len(restartTargets.controlPlane)
+func (restartTargets encryptionKeyRotationRestartTargets) onlyLeaderNeedsRestart() bool {
+	return len(restartTargets.etcdOnly) == 0 && len(restartTargets.controlPlane) == 1
 }
 
 func (p *Planner) setEncryptionKeyRotateState(status rkev1.RKEControlPlaneStatus, rotate *rkev1.RotateEncryptionKeys, phase rkev1.RotateEncryptionKeysPhase) (rkev1.RKEControlPlaneStatus, error) {
@@ -120,6 +120,8 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return status, fmt.Errorf("cannot pass nil parameters to rotateEncryptionKeys")
 	}
 
+	// If the spec was cleared, undo any rotation-owned pause/status before the main
+	// planner resumes normal reconciliation.
 	if controlPlane.Spec.RotateEncryptionKeys == nil {
 		if status.RotateEncryptionKeys != nil || status.RotateEncryptionKeysPhase != "" || status.RotateEncryptionKeysLeader != "" {
 			if err := p.pauseCAPICluster(controlPlane, false); err != nil {
@@ -129,6 +131,8 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return p.resetEncryptionKeyRotateState(status)
 	}
 
+	// Gate the flow before touching plans. Unsupported versions are marked failed so
+	// the requested generation does not keep requeueing forever.
 	if supported, err := encryptionKeyRotationSupported(controlPlane); err != nil {
 		status, err = p.encryptionKeyRotationFailed(status, err)
 		return p.encryptionKeyRotationHandleFailure(controlPlane, status, err)
@@ -145,6 +149,8 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return status, nil
 	}
 
+	// rotate-keys needs an initialized server and a valid join URL because the same
+	// plan generation may later restart other server nodes.
 	if !ptr.Deref(status.Initialization.ControlPlaneInitialized, false) {
 		// cluster is not yet initialized, so return nil for now.
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping encryption key rotation as cluster was not initialized", controlPlane.Namespace, controlPlane.Name)
@@ -161,11 +167,15 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return status, nil
 	}
 
+	// Starting a generation is a status transition only. The next reconcile elects
+	// the leader and writes the rotate-keys plan using the stored generation.
 	if encryptionKeyRotationShouldStart(controlPlane) {
 		logrus.Debugf("[planner] rkecluster %s/%s: starting/restarting encryption key rotation", controlPlane.Namespace, controlPlane.Name)
 		return p.setEncryptionKeyRotateState(status, controlPlane.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseRotate)
 	}
 
+	// Keep the same leader once chosen so requeues keep observing the same
+	// rotate-keys command output instead of moving the operation between servers.
 	leader, err := p.encryptionKeyRotationFindLeader(status, clusterPlan, initNode)
 	if err != nil {
 		status, err = p.encryptionKeyRotationFailed(status, err)
@@ -181,10 +191,14 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 
 	switch controlPlane.Status.RotateEncryptionKeysPhase {
 	case rkev1.RotateEncryptionKeysPhaseRotate:
+		// Pause CAPI while rotate-keys is active so unrelated rollout activity does
+		// not race with the encryption-key rotation plan.
 		if err := p.pauseCAPICluster(controlPlane, true); err != nil {
 			return status, errWaiting("pausing CAPI cluster")
 		}
 
+		// rotate-keys is the upstream combined flow. It may finish the reencrypt work
+		// after the CLI times out, so progress is decided from periodic status output.
 		rotationStatus, status, err := p.encryptionKeyRotationRotateKeysReconcile(controlPlane, status, tokensSecret, joinServer, leader)
 		if err != nil {
 			return p.encryptionKeyRotationHandleFailure(controlPlane, status, err)
@@ -194,7 +208,9 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		}
 
 		restartTargets := encryptionKeyRotationRestartTargetsForCluster(controlPlane, clusterPlan, leader, initNode)
-		if restartTargets.count() == 1 {
+		if restartTargets.onlyLeaderNeedsRestart() {
+			// Single-server rotations can finish as soon as the leader reports final
+			// stage and matching hashes because there are no follower servers to restart.
 			if !rotationStatus.HashesMatch {
 				return status, errWaitingf("waiting for encryption key rotation hashes to converge on leader [%s]", leader.Machine.Name)
 			}
@@ -207,6 +223,8 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 
 		return p.setEncryptionKeyRotateState(status, controlPlane.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePostRotateRestart)
 	case rkev1.RotateEncryptionKeysPhasePostRotateRestart:
+		// Multi-server rotations finish by restarting all remaining server nodes in
+		// topology order and checking convergence on control-plane nodes.
 		status, err = p.encryptionKeyRotationRestartNodes(controlPlane, status, tokensSecret, clusterPlan, leader, initNode, joinServer)
 		if err != nil {
 			return p.encryptionKeyRotationHandleFailure(controlPlane, status, err)
