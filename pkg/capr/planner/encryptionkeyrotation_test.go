@@ -1,7 +1,6 @@
 package planner
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -81,10 +79,7 @@ func Test_encryptionKeyRotationShouldStart(t *testing.T) {
 			RotateEncryptionKeysPhase: "legacy-phase",
 		})
 
-		shouldStart, err := encryptionKeyRotationShouldStart(controlPlane)
-
-		assert.NoError(t, err)
-		assert.True(t, shouldStart)
+		assert.True(t, encryptionKeyRotationShouldStart(controlPlane))
 	})
 
 	t.Run("does not restart known in-progress phase for same generation", func(t *testing.T) {
@@ -93,10 +88,16 @@ func Test_encryptionKeyRotationShouldStart(t *testing.T) {
 			RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
 		})
 
-		shouldStart, err := encryptionKeyRotationShouldStart(controlPlane)
+		assert.False(t, encryptionKeyRotationShouldStart(controlPlane))
+	})
 
-		assert.NoError(t, err)
-		assert.False(t, shouldStart)
+	t.Run("does not start new generation while previous generation is in progress", func(t *testing.T) {
+		controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 2}, rkev1.RKEControlPlaneStatus{
+			RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
+			RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
+		})
+
+		assert.False(t, encryptionKeyRotationShouldStart(controlPlane))
 	})
 }
 
@@ -237,7 +238,7 @@ func Test_encryptionKeyRotationSecretsEncryptInstruction(t *testing.T) {
 		RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
 	})
 
-	instruction, err := encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane, 0)
+	instruction, err := encryptionKeyRotationSecretsEncryptInstruction(controlPlane)
 	commandArguments := strings.Join(instruction.Args, " ")
 
 	assert.NoError(t, err)
@@ -248,7 +249,6 @@ func Test_encryptionKeyRotationSecretsEncryptInstruction(t *testing.T) {
 	assert.Contains(t, commandArguments, "2>&1")
 	assert.NotContains(t, commandArguments, "prepare")
 	assert.NotContains(t, commandArguments, "reencrypt")
-	assert.Contains(t, instruction.Env, encryptionKeyRotationRotateKeysRetryCountEnv(0))
 	assert.Contains(t, instruction.Env, "ENCRYPTION_KEY_ROTATION_GENERATION=3")
 }
 
@@ -309,9 +309,8 @@ func Test_encryptionKeyRotationRotateKeysPlan_pinsGenerationToActiveStatus(t *te
 	})
 	leaderEntry := newTestPlanEntry(newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"))
 
-	nodePlan, _, err := planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leaderEntry))
+	nodePlan, _, err := planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry)
 	assert.NoError(t, err)
-	assert.Contains(t, nodePlan.Instructions[0].Env, encryptionKeyRotationRotateKeysRetryCountEnv(0))
 	assert.Contains(t, nodePlan.PeriodicInstructions[0].Env, "ENCRYPTION_KEY_ROTATION_GENERATION=3")
 }
 
@@ -421,67 +420,6 @@ func Test_encryptionKeyRotationCommandTimedOut(t *testing.T) {
 	}
 }
 
-func Test_encryptionKeyRotationRotateKeysFailedWithRetryablePrecondition(t *testing.T) {
-	controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
-		RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
-		RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
-	})
-	leaderEntry := newTestPlanEntry(newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"))
-	nodePlan, _, err := newTestEncryptionKeyRotationPlanner().encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leaderEntry))
-	assert.NoError(t, err)
-
-	leaderEntry.Plan = &plan.Node{
-		Plan:   nodePlan,
-		Failed: true,
-		FailedOutput: map[string][]byte{
-			nodePlan.Instructions[0].Name: []byte("time=\"2026-04-09T15:16:16Z\" level=fatal msg=\"Error: see server log for details: secret-encrypt error ID 78467\"\n"),
-		},
-	}
-
-	assert.True(t, encryptionKeyRotationRotateKeysFailedWithRetryablePrecondition(leaderEntry, nodePlan.Instructions[0].Name))
-	assert.False(t, encryptionKeyRotationRotateKeysFailedWithRetryablePrecondition(leaderEntry, "other-instruction"))
-}
-
-func Test_encryptionKeyRotationRotateKeysPlan_preservesRetryCount(t *testing.T) {
-	planner := newTestEncryptionKeyRotationPlanner()
-	controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
-		RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
-		RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
-	})
-	leaderEntry := newTestPlanEntry(newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"))
-
-	retryPlan, _, err := planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, 2)
-	assert.NoError(t, err)
-	leaderEntry.Plan = &plan.Node{
-		Plan: retryPlan,
-	}
-
-	preservedPlan, _, err := planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leaderEntry))
-	assert.NoError(t, err)
-	assert.Equal(t, retryPlan.Instructions[0].Name, preservedPlan.Instructions[0].Name)
-	assert.Contains(t, preservedPlan.Instructions[0].Env, encryptionKeyRotationRotateKeysRetryCountEnv(2))
-}
-
-func Test_encryptionKeyRotationRotateKeysPlan_preservesLegacyRetryAttempt(t *testing.T) {
-	planner := newTestEncryptionKeyRotationPlanner()
-	controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
-		RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
-		RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
-	})
-	leaderEntry := newTestPlanEntry(newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"))
-
-	legacyPlan, _, err := planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leaderEntry))
-	assert.NoError(t, err)
-	legacyPlan.Instructions[0].Env = []string{encryptionKeyRotationAttemptEnvName + "=1-retry-retry"}
-	leaderEntry.Plan = &plan.Node{
-		Plan: legacyPlan,
-	}
-
-	preservedPlan, _, err := planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leaderEntry))
-	assert.NoError(t, err)
-	assert.Contains(t, preservedPlan.Instructions[0].Env, encryptionKeyRotationRotateKeysRetryCountEnv(2))
-}
-
 func Test_encryptionKeyRotationRestartPlan_pinsGenerationToActiveStatus(t *testing.T) {
 	planner := newTestEncryptionKeyRotationPlanner()
 	controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 4}, rkev1.RKEControlPlaneStatus{
@@ -504,7 +442,6 @@ func Test_encryptionKeyRotationRestartPlan_pinsGenerationToActiveStatus(t *testi
 func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 	testCases := []struct {
 		name         string
-		retryCount   int
 		periodicOut  string
 		periodicErr  string
 		savedOutput  string
@@ -540,24 +477,16 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 			expectWait:  true,
 		},
 		{
-			name:        "status timeout on periodic output waits for retry",
+			name:        "status timeout on periodic output waits",
 			savedOutput: "time=\"2026-04-08T23:15:39Z\" level=fatal msg=\"Error: see server log for details: Put \\\"https://127.0.0.1:9345/v1-rke2/encrypt/config\\\": net/http: timeout awaiting response headers (Client.Timeout exceeded while awaiting headers)\"\n",
 			periodicErr: "time=\"2026-04-08T23:22:01Z\" level=fatal msg=\"Error: see server log for details: Get \\\"https://127.0.0.1:9345/v1-rke2/encrypt/status\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\"\n",
 			planFailed:  true,
 			expectWait:  true,
 		},
 		{
-			name:        "retryable precondition waits for stable status before retry",
-			savedOutput: "time=\"2026-04-09T15:16:16Z\" level=fatal msg=\"Error: see server log for details: secret-encrypt error ID 78467\"\n",
-			periodicOut: "Current Rotation Stage: reencrypt_finished\nServer Encryption Hashes: hash mismatch\n",
-			planFailed:  true,
-			expectWait:  true,
-		},
-		{
-			name:         "retryable precondition stops retrying after max retries",
-			retryCount:   encryptionKeyRotationMaxRotateKeysRetries,
+			name:         "rotate-keys error ID marks status failed",
 			savedOutput:  "time=\"2026-04-09T15:16:16Z\" level=fatal msg=\"Error: see server log for details: secret-encrypt error ID 78467\"\n",
-			periodicOut:  "Current Rotation Stage: start\nServer Encryption Hashes: All hashes match\n",
+			periodicOut:  "Current Rotation Stage: reencrypt_finished\nServer Encryption Hashes: All hashes match\n",
 			planFailed:   true,
 			expectFailed: true,
 		},
@@ -576,10 +505,7 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 				RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
 			})
 			leaderEntry := newTestPlanEntry(newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"))
-			nodePlan, joinedServer, err := planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leaderEntry))
-			if testCase.retryCount > 0 {
-				nodePlan, joinedServer, err = planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, testCase.retryCount)
-			}
+			nodePlan, joinedServer, err := planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry)
 			assert.NoError(t, err)
 			assert.Empty(t, joinedServer)
 
@@ -636,7 +562,7 @@ func Test_rotateEncryptionKeys_marksDoneWhenSingleServerHasFinishedStatus(t *tes
 		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:    nodePlan,
@@ -677,7 +603,7 @@ func Test_rotateEncryptionKeys_movesToRestartPhaseWhenEtcdOnlyFollowersExist(t *
 		newTestEncryptionKeyRotationMachine("etcd-follower", true, false, false, true, "https://etcd-follower:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "control-plane-leader")
-	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://etcd-init:9345", leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://etcd-init:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["control-plane-leader"] = &plan.Node{
 		Plan:    nodePlan,
@@ -715,7 +641,7 @@ func Test_rotateEncryptionKeys_requeuesWhileLeaderStatusIncomplete(t *testing.T)
 		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:    nodePlan,
@@ -753,7 +679,7 @@ func Test_rotateEncryptionKeys_marksFailedWhenLeaderPlanFails(t *testing.T) {
 		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:   nodePlan,
@@ -787,7 +713,7 @@ func Test_rotateEncryptionKeys_requeuesWhenLeaderRotateKeysTimesOut(t *testing.T
 		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:   nodePlan,
@@ -804,74 +730,6 @@ func Test_rotateEncryptionKeys_requeuesWhenLeaderRotateKeysTimesOut(t *testing.T
 	}
 
 	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
-
-	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
-
-	assert.True(t, IsErrWaiting(err))
-	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseRotate, updatedStatus.RotateEncryptionKeysPhase)
-	assert.Equal(t, "server-1", updatedStatus.RotateEncryptionKeysLeader)
-}
-
-func Test_rotateEncryptionKeys_reissuesLeaderPlanAfterRetryableRotateKeysFailure(t *testing.T) {
-	mockPlanner := newMockPlanner(t, InfoFunctions{})
-	mockPlanner.planner.store.equalities = testPlannerEqualities()
-
-	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
-		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
-		RotateEncryptionKeysPhase:  rkev1.RotateEncryptionKeysPhaseRotate,
-		RotateEncryptionKeysLeader: "server-1",
-		Initialization: rkev1.RKEControlPlaneInitializationStatus{
-			ControlPlaneInitialized: ptr.To(true),
-		},
-	})
-	clusterPlan := newTestEncryptionKeyRotationPlan(
-		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
-	)
-	clusterPlan.Machines["server-1"].Spec.Bootstrap.ConfigRef = capi.ContractVersionedObjectReference{
-		Kind: capr.RKEBootstrapKind,
-		Name: "server-1-bootstrap",
-	}
-
-	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
-	assert.NoError(t, err)
-	nodePlanJSON, err := json.Marshal(nodePlan)
-	assert.NoError(t, err)
-	clusterPlan.Nodes["server-1"] = &plan.Node{
-		Plan:   nodePlan,
-		Failed: true,
-		InSync: true,
-		FailedOutput: map[string][]byte{
-			nodePlan.Instructions[0].Name: []byte("time=\"2026-04-09T15:16:16Z\" level=fatal msg=\"Error: see server log for details: secret-encrypt error ID 78467\"\n"),
-		},
-		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
-			encryptionKeyRotationSecretsEncryptStatusCommand: {
-				Stdout: []byte("Current Rotation Stage: reencrypt_finished\nServer Encryption Hashes: All hashes match\n"),
-			},
-		},
-	}
-
-	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
-	mockPlanner.secretClient.EXPECT().Get(controlPlane.Namespace, capr.PlanSecretFromBootstrapName("server-1-bootstrap"), metav1.GetOptions{}).Return(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      capr.PlanSecretFromBootstrapName("server-1-bootstrap"),
-			Namespace: controlPlane.Namespace,
-		},
-		Type: capr.SecretTypeMachinePlan,
-		Data: map[string][]byte{
-			"plan":            nodePlanJSON,
-			"failure-count":   []byte("1"),
-			"failed-checksum": []byte(PlanHash(nodePlanJSON)),
-		},
-	}, nil)
-	mockPlanner.secretClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-		var updatedPlan plan.NodePlan
-		err := json.Unmarshal(secret.Data["plan"], &updatedPlan)
-		assert.NoError(t, err)
-		assert.NotEqual(t, nodePlan.Instructions[0].Name, updatedPlan.Instructions[0].Name)
-		assert.Contains(t, updatedPlan.Instructions[0].Env, encryptionKeyRotationRotateKeysRetryCountEnv(1))
-		return secret, nil
-	})
 
 	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
@@ -931,7 +789,7 @@ func Test_encryptionKeyRotationRotateKeysReconcile_isIdempotentAcrossRepeatedCal
 		RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
 	})
 	leaderEntry := newTestPlanEntry(newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"))
-	nodePlan, _, err := planner.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leaderEntry))
+	nodePlan, _, err := planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leaderEntry)
 	assert.NoError(t, err)
 	leaderEntry.Plan = &plan.Node{
 		Plan:    nodePlan,

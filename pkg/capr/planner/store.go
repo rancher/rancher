@@ -248,17 +248,11 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	}
 
 	if len(output) > 0 {
-		gzipReader, err := gzip.NewReader(bytes.NewBuffer(output))
+		decodedOutput, err := readGzip(output)
 		if err != nil {
 			return nil, err
 		}
-		output, err = io.ReadAll(gzipReader)
-		if err != nil {
-			return nil, err
-		}
-		if err := gzipReader.Close(); err != nil {
-			return nil, err
-		}
+		output = decodedOutput
 		result.Output = map[string][]byte{}
 		if err := json.Unmarshal(output, &result.Output); err != nil {
 			return nil, err
@@ -266,17 +260,11 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	}
 
 	if len(failedOutput) > 0 {
-		gzipReader, err := gzip.NewReader(bytes.NewBuffer(failedOutput))
+		decodedFailedOutput, err := readGzip(failedOutput)
 		if err != nil {
 			return nil, err
 		}
-		failedOutput, err = io.ReadAll(gzipReader)
-		if err != nil {
-			return nil, err
-		}
-		if err := gzipReader.Close(); err != nil {
-			return nil, err
-		}
+		failedOutput = decodedFailedOutput
 		result.FailedOutput = map[string][]byte{}
 		if err := json.Unmarshal(failedOutput, &result.FailedOutput); err != nil {
 			return nil, err
@@ -284,17 +272,11 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	}
 
 	if len(appliedPeriodicOutput) > 0 {
-		gzipReader, err := gzip.NewReader(bytes.NewBuffer(appliedPeriodicOutput))
+		decodedPeriodicOutput, err := readGzip(appliedPeriodicOutput)
 		if err != nil {
 			return nil, err
 		}
-		output, err = io.ReadAll(gzipReader)
-		if err != nil {
-			return nil, err
-		}
-		if err := gzipReader.Close(); err != nil {
-			return nil, err
-		}
+		output = decodedPeriodicOutput
 		result.PeriodicOutput = map[string]plan.PeriodicInstructionOutput{}
 		if err := json.Unmarshal(output, &result.PeriodicOutput); err != nil {
 			return nil, err
@@ -303,6 +285,20 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 
 	result.InSync = bytes.Equal(planData, appliedPlanData)
 	return result, nil
+}
+
+func readGzip(data []byte) (_ []byte, err error) {
+	gzipReader, err := gzip.NewReader(bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := gzipReader.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
+
+	return io.ReadAll(gzipReader)
 }
 
 func ParseProbeStatuses(probeStatuses []byte) (*map[string]plan.ProbeStatus, bool, error) {
