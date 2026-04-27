@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -25,19 +24,13 @@ import (
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/namespace"
+	saml2 "github.com/russellhaering/gosaml2"
+	"github.com/russellhaering/gosaml2/types"
 	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
-
-type IDPMetadata struct {
-	XMLName           xml.Name                `xml:"urn:oasis:names:tc:SAML:2.0:metadata EntityDescriptor"`
-	ValidUntil        time.Time               `xml:"validUntil,attr"`
-	EntityID          string                  `xml:"entityID,attr"`
-	IDPSSODescriptors []saml.IDPSSODescriptor `xml:"IDPSSODescriptor"`
-	SPSSODescriptors  []saml.SPSSODescriptor  `xml:"SPSSODescriptor"`
-}
 
 var root *http.ServeMux
 var routeHandlers = make(map[string]http.HandlerFunc)
@@ -167,43 +160,57 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 	sloURL := *actURL
 	sloURL.Path = sloURL.Path + "/saml/slo"
 
-	sp := saml.ServiceProvider{
-		Key:             privKey,
-		Certificate:     cert,
-		MetadataURL:     metadataURL,
-		AcsURL:          acsURL,
-		SloURL:          sloURL,
-		EntityID:        configToSet.EntityID,
-		SignatureMethod: dsig.RSASHA256SignatureMethod,
+	// Parse the IDP metadata into a gosaml2 types.EntityDescriptor.
+	// The cacheDuration XML field (Duration type) is not present in the struct and
+	// will be silently ignored by the decoder, avoiding the parse error that the
+	// previous custom IDPMetadata struct worked around.
+	idpMetadata := &types.EntityDescriptor{}
+	if err := xml.NewDecoder(strings.NewReader(configToSet.IDPMetadataContent)).Decode(idpMetadata); err != nil {
+		return fmt.Errorf("SAML: cannot initialize saml SP, cannot decode IDP Metadata content from the config %v, error %v", configToSet, err)
 	}
 
-	// XML unmarshal throws an error for IdP Metadata cacheDuration field, as it's of type xml Duration. Using a separate struct for unmarshaling for now
-	idm := &IDPMetadata{}
-	if configToSet.IDPMetadataContent != "" {
-		sp.IDPMetadata = &saml.EntityDescriptor{}
-		if err := xml.NewDecoder(strings.NewReader(configToSet.IDPMetadataContent)).Decode(idm); err != nil {
-			return fmt.Errorf("SAML: cannot initialize saml SP, cannot decode IDP Metadata content from the config %v, error %v", configToSet, err)
-		}
+	idpSSOURL, idpSLOURL := extractIDPURLs(idpMetadata)
+	certStore, err := buildCertificateStore(idpMetadata)
+	if err != nil {
+		return err
+	}
+
+	// Determine NameID format. ADFS and OKTA require the unspecified format.
+	nameIDFormat := ""
+	if name == ADFSName || name == OKTAName {
+		nameIDFormat = "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"
+	}
+
+	sp := saml2.SAMLServiceProvider{
+		IdentityProviderSSOURL:      idpSSOURL,
+		IdentityProviderSLOURL:      idpSLOURL,
+		IdentityProviderIssuer:      idpMetadata.EntityID,
+		ServiceProviderIssuer:       configToSet.EntityID,
+		AssertionConsumerServiceURL: acsURL.String(),
+		ServiceProviderSLOURL:       sloURL.String(),
+		SignAuthnRequests:           true,
+		SignAuthnRequestsAlgorithm:  dsig.RSASHA256SignatureMethod,
+		AudienceURI:                 configToSet.EntityID,
+		IDPCertificateStore:         &certStore,
+		NameIdFormat:                nameIDFormat,
+		Clock:                       dsig.NewRealClock(),
+	}
+
+	if err := sp.SetSPKeyStore(&saml2.KeyStore{Signer: privKey, Cert: cert.Raw}); err != nil {
+		return fmt.Errorf("SAML: error setting SP key store: %v", err)
 	}
 
 	provider.sloEnabled = configToSet.LogoutAllEnabled
 	provider.sloForced = configToSet.LogoutAllForced
-
-	sp.IDPMetadata.XMLName = idm.XMLName
-	sp.IDPMetadata.ValidUntil = idm.ValidUntil
-	sp.IDPMetadata.EntityID = idm.EntityID
-	sp.IDPMetadata.SPSSODescriptors = idm.SPSSODescriptors
-	sp.IDPMetadata.IDPSSODescriptors = idm.IDPSSODescriptors
-	if name == ADFSName || name == OKTAName {
-		sp.AuthnNameIDFormat = saml.UnspecifiedNameIDFormat
-	}
-
 	provider.serviceProvider = &sp
+	provider.spKey = privKey
+	provider.metadataURL = metadataURL
+	provider.acsURL = acsURL
+	provider.sloURL = sloURL
 
 	cookieStore := ClientCookies{
-		ServiceProvider: &sp,
-		Name:            "token",
-		Domain:          actURL.Host,
+		Name:   "token",
+		Domain: actURL.Host,
 	}
 
 	provider.clientState = &cookieStore
@@ -244,6 +251,48 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 
 	appliedVersion = configToSet.ResourceVersion
 	return nil
+}
+
+// Extract the IDP SSO / SLO URLs from the metadata.
+func extractIDPURLs(idpMetadata *types.EntityDescriptor) (string, string) {
+	var idpSSOURL, idpSLOURL string
+
+	if idpMetadata.IDPSSODescriptor != nil {
+		if len(idpMetadata.IDPSSODescriptor.SingleSignOnServices) > 0 {
+			idpSSOURL = idpMetadata.IDPSSODescriptor.SingleSignOnServices[0].Location
+		}
+		if len(idpMetadata.IDPSSODescriptor.SingleLogoutServices) > 0 {
+			idpSLOURL = idpMetadata.IDPSSODescriptor.SingleLogoutServices[0].Location
+		}
+	}
+
+	return idpSSOURL, idpSLOURL
+}
+
+// buildCertificateStore extracts the x509 certificates from the IDP metadata and builds a
+// MemoryX509CertificateStore for gosaml2 to use when validating signatures on SAML responses.
+func buildCertificateStore(idm *types.EntityDescriptor) (dsig.MemoryX509CertificateStore, error) {
+	certStore := dsig.MemoryX509CertificateStore{Roots: []*x509.Certificate{}}
+	if idm.IDPSSODescriptor != nil {
+		for _, kd := range idm.IDPSSODescriptor.KeyDescriptors {
+			for idx, xcert := range kd.KeyInfo.X509Data.X509Certificates {
+				if xcert.Data == "" {
+					return dsig.MemoryX509CertificateStore{}, fmt.Errorf("SAML: IDP metadata certificate(%d) must not be empty", idx)
+				}
+				certData, err := base64.StdEncoding.DecodeString(xcert.Data)
+				if err != nil {
+					return dsig.MemoryX509CertificateStore{}, fmt.Errorf("SAML: error decoding IDP certificate(%d): %v", idx, err)
+				}
+				idpCert, err := x509.ParseCertificate(certData)
+				if err != nil {
+					return dsig.MemoryX509CertificateStore{}, fmt.Errorf("SAML: error parsing IDP certificate(%d): %v", idx, err)
+				}
+				certStore.Roots = append(certStore.Roots, idpCert)
+			}
+		}
+	}
+
+	return certStore, nil
 }
 
 func AuthHandler() http.Handler {
@@ -341,16 +390,9 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 	s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
 
 	r.ParseForm()
-	err := s.serviceProvider.ValidateLogoutResponseRequest(r)
+	_, err := s.serviceProvider.ValidateEncodedLogoutResponsePOST(r.FormValue("SAMLResponse"))
 	if err != nil {
 		log.Debugf("SAML [FinalizeSamlLogout]: response validation failed: %v", err)
-		if parseErr, ok := err.(*saml.InvalidResponseError); ok {
-			// Note: If access to the response itself is needed (debugging)
-			// just add `parseErr.Response` to the log statement.
-
-			log.Debugf("SAML NOW: %s\nSAML ERROR: %s",
-				parseErr.Now, parseErr.PrivateErr)
-		}
 
 		rURL, errParse := url.Parse(redirectURL)
 		if errParse != nil {
@@ -384,7 +426,7 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleSamlAssertion processes/handles the assertion obtained by the POST to /saml/acs from IdP
-func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertion *saml.Assertion) {
+func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertionInfo *saml2.AssertionInfo) {
 	var groupPrincipals []apiv3.Principal
 	var userPrincipal apiv3.Principal
 	var userID string
@@ -416,15 +458,15 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	samlData := make(map[string][]string)
 
-	for _, attributeStatement := range assertion.AttributeStatements {
-		for _, attr := range attributeStatement.Attributes {
-			attrName := attr.FriendlyName
-			if attrName == "" {
-				attrName = attr.Name
-			}
-			for _, value := range attr.Values {
-				samlData[attrName] = append(samlData[attrName], value.Value)
-			}
+	// assertionInfo.Values is keyed by attribute Name; the Attribute struct also
+	// carries FriendlyName which some IdPs set instead of Name.
+	for _, attr := range assertionInfo.Values {
+		attrName := attr.FriendlyName
+		if attrName == "" {
+			attrName = attr.Name
+		}
+		for _, value := range attr.Values {
+			samlData[attrName] = append(samlData[attrName], value.Value)
 		}
 	}
 
@@ -631,7 +673,7 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 		relayStateCookie := s.clientState.GetState(r, relayState)
 		jwtParser := newJWTParser()
 		token, err := jwtParser.Parse(relayStateCookie, func(t *jwt.Token) (any, error) {
-			secretBlock := x509.MarshalPKCS1PrivateKey(s.serviceProvider.Key)
+			secretBlock := x509.MarshalPKCS1PrivateKey(s.spKey)
 			return secretBlock, nil
 		})
 		if err != nil {
