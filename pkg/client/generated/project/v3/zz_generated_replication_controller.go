@@ -52,6 +52,7 @@ const (
 	ReplicationControllerFieldScale                         = "scale"
 	ReplicationControllerFieldScheduling                    = "scheduling"
 	ReplicationControllerFieldSchedulingGates               = "schedulingGates"
+	ReplicationControllerFieldSchedulingGroup               = "schedulingGroup"
 	ReplicationControllerFieldSeccompProfile                = "seccompProfile"
 	ReplicationControllerFieldSelector                      = "selector"
 	ReplicationControllerFieldServiceAccountName            = "serviceAccountName"
@@ -72,7 +73,6 @@ const (
 	ReplicationControllerFieldWorkloadAnnotations           = "workloadAnnotations"
 	ReplicationControllerFieldWorkloadLabels                = "workloadLabels"
 	ReplicationControllerFieldWorkloadMetrics               = "workloadMetrics"
-	ReplicationControllerFieldWorkloadRef                   = "workloadRef"
 )
 
 type ReplicationController struct {
@@ -123,6 +123,7 @@ type ReplicationController struct {
 	Scale                         *int64                         `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      map[string]string              `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -143,7 +144,6 @@ type ReplicationController struct {
 	WorkloadAnnotations           map[string]string              `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string              `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type ReplicationControllerCollection struct {

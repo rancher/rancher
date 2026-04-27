@@ -3,7 +3,6 @@ module github.com/rancher/rancher/pkg/apis
 go 1.26.0
 
 replace (
-
 	github.com/rancher/aks-operator => github.com/rancher-teja/aks-operator v1.13.0-rc.1.0.20260423111528-6a01d0f0f885
 	github.com/rancher/ali-operator => github.com/rancher-teja/ali-operator v1.13.0-rc.1.0.20260423115145-0fd357e607e7
 	github.com/rancher/eks-operator => github.com/rancher-teja/eks-operator v1.14.0-rc.1.0.20260423110630-56eb3869fd83

@@ -4,24 +4,16 @@ package mocks
 
 import (
 	context "context"
-
-	cache "k8s.io/client-go/tools/cache"
-
-	generic "github.com/rancher/wrangler/v3/pkg/generic"
-
-	management_cattle_iov3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	mock "github.com/stretchr/testify/mock"
-
-	rest "k8s.io/client-go/rest"
-
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-
 	time "time"
 
-	types "k8s.io/apimachinery/pkg/types"
-
+	management_cattle_iov3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	generic "github.com/rancher/wrangler/v3/pkg/generic"
+	mock "github.com/stretchr/testify/mock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	rest "k8s.io/client-go/rest"
+	cache "k8s.io/client-go/tools/cache"
 
 	watch "k8s.io/apimachinery/pkg/watch"
 )

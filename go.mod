@@ -66,9 +66,8 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.36.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.36.0
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
+	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.23.1-0.20260424122448-c8b4b9d61fbd
 )
-
-require github.com/rancher/rancher/pkg/apis v0.0.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.0
@@ -139,12 +138,13 @@ require (
 	github.com/rancher/machine v0.15.0-rancher142
 	github.com/rancher/muchang v0.1.0
 	github.com/rancher/norman v0.9.1
+	github.com/rancher/rancher/pkg/apis v0.0.0-20251107181200-efcbd5d43f4e
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.6.1-rc.1
 	github.com/rancher/remotedialer-proxy v0.7.0-rc.5
 	github.com/rancher/rke v1.8.0
-	github.com/rancher/shepherd v0.0.0-20260417171403-fce40497b62e
-	github.com/rancher/steve v0.9.5
+	github.com/rancher/shepherd v0.0.0-00010101000000-000000000000
+	github.com/rancher/steve v0.0.0-00010101000000-000000000000
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
 	github.com/rancher/wrangler/v3 v3.6.0-rc.1
 	github.com/robfig/cron v1.2.0
