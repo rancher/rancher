@@ -22,7 +22,7 @@ const (
 	rke2           = "rke2"
 	rke1           = "rke1"
 	devKDM         = "https://github.com/rancher/kontainer-driver-metadata/raw/dev-v2.6/data/data.json"
-	releaseKDM     = "https://releases.rancher.com/kontainer-driver-metadata/release-v2.6/data.json"
+	releaseKDM     = "https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/release-v2.6/data.json"
 )
 
 func TestGetExternalImages(t *testing.T) {

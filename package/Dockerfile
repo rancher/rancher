@@ -104,7 +104,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
 FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
-    curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
+    curl -sLf "https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
 
 FROM builder AS tini

@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	RancherVersionDev                 = "2.14.99"
+	RancherVersionDev                 = "2.15.99"
 	DefaultMaxUIPluginFileSizeInBytes = 30 * 1024 * 1024 // 30MB
 	AgentTLSModeStrict                = "strict"
 	AgentTLSModeSystemStore           = "system-store"
@@ -621,7 +621,7 @@ func GetEnvKey(key string) string {
 func getMetadataConfig() string {
 	branch := KDMBranch.Get()
 	data := map[string]interface{}{
-		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
+		"url":                      fmt.Sprintf("https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/%s/data.json", branch),
 		"refresh-interval-minutes": "1440",
 	}
 	ans, err := json.Marshal(data)
