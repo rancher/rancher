@@ -20,8 +20,9 @@ replace (
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	github.com/rancher/remotedialer-proxy => github.com/rancher-teja/remotedialer-proxy v0.8.0-rc.2.0.20260424043854-0687013774b4
 	github.com/rancher/rke => github.com/rancher-teja/rke v1.8.14-0.20260423104215-3916aa7c88c6
-	github.com/rancher/shepherd => github.com/rancher-teja/shepherd v0.0.0-20260424070204-74a7a17856da
+	github.com/rancher/shepherd => github.com/rancher-teja/shepherd v0.0.0-20260427063602-6c79cb670f82
 	github.com/rancher/steve => github.com/rancher-teja/steve v0.8.8-0.20260423090300-032bed2ef682
+	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/rancher-teja/system-upgrade-controller/pkg/apis v0.0.0-20260427062237-daa7c4ae1336
 	github.com/rancher/wrangler/v3 => github.com/rancher-teja/wrangler/v3 v3.6.0-rc.1.0.20260423053950-42de455630a4
 	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
