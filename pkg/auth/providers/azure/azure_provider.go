@@ -83,8 +83,7 @@ func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acce
 	}
 
 	if !cfg.LogoutAllEnabled {
-		logrus.Debugf("azure AD [logout-all]: provider not configured for SSO logout")
-		return fmt.Errorf("azure AD provider not configured for SSO logout")
+		return fmt.Errorf("azure AD [logout-all]: provider not configured for SSO logout")
 	}
 
 	endSessionEndpoint := cfg.LogoutEndpoint
@@ -130,11 +129,10 @@ func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acce
 func (ap *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	cfg, err := ap.getConfig()
 	if err != nil {
-		return fmt.Errorf("getting Azure AD config for Logout: %w", err)
+		return fmt.Errorf("azure AD [logout]: getting Azure AD config for Logout: %w", err)
 	}
 	if cfg.LogoutAllForced {
-		logrus.Debugf("azure AD [logout]: provider configured for forced SSO logout, rejecting regular logout")
-		return fmt.Errorf("azure AD provider configured for forced SSO logout, rejecting regular logout")
+		return fmt.Errorf("azure AD [logout]: provider configured for forced SSO logout, rejecting regular logout")
 	}
 	return nil
 }
