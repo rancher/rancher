@@ -60,7 +60,6 @@ func (p *CognitoProvider) Logout(w http.ResponseWriter, r *http.Request, token a
 		return fmt.Errorf("getting config for OIDC Logout: %w", err)
 	}
 	if oidcConfig.LogoutAllForced {
-		logrus.Debugf("CognitoProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
 		return fmt.Errorf("CognitoProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
 	}
 
@@ -76,7 +75,6 @@ func (p *CognitoProvider) LogoutAll(w http.ResponseWriter, r *http.Request, toke
 
 	providerName := token.GetAuthProvider()
 	if !oidcConfig.LogoutAllEnabled {
-		logrus.Debugf("CognitoProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 		return fmt.Errorf("CognitoProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 

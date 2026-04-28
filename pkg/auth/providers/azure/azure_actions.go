@@ -105,7 +105,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 		azureADConfig.ApplicationSecret = value
 	}
 	// Call provider
-	userPrincipal, groupPrincipals, providerToken, err := ap.loginUser(azureADConfig, azureLogin, true)
+	userPrincipal, groupPrincipals, providerToken, _, err := ap.loginUser(azureADConfig, azureLogin, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err

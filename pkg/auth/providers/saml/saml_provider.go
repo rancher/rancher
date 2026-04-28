@@ -115,12 +115,10 @@ func (s *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor
 
 	provider, ok := SamlProviders[providerName]
 	if !ok {
-		logrus.Debugf("SAML [logout]: Rancher provider resource `%v` not configured at all", providerName)
 		return fmt.Errorf("SAML [logout]: Rancher provider resource `%v` not configured at all", providerName)
 	}
 
 	if provider.sloForced {
-		logrus.Debugf("SAML [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
 		return fmt.Errorf("SAML [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
 	}
 
@@ -134,12 +132,10 @@ func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acces
 
 	provider, ok := SamlProviders[providerName]
 	if !ok {
-		logrus.Debugf("SAML [logout-all]: Rancher provider resource `%v` not configured at all", providerName)
 		return fmt.Errorf("SAML [logout-all]: Rancher provider resource `%v` not configured at all", providerName)
 	}
 
 	if !provider.sloEnabled {
-		logrus.Debugf("SAML [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 		return fmt.Errorf("SAML [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 
