@@ -98,7 +98,7 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
 
 RUN mkdir /usr/tmp && \
-    curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
+    curl -sLf https://github.com/k3s-io/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
 
 # Python related dependencies for the Integration/Validation tests.
 RUN zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel

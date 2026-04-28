@@ -139,7 +139,7 @@ func k3sImages(version string) ([]string, error) {
 		return nil, fmt.Errorf("invalid k3s version: %s", version)
 	}
 
-	url := fmt.Sprintf("https://github.com/rancher/k3s/releases/download/%s/k3s-images.txt", version)
+	url := fmt.Sprintf("https://github.com/k3s-io/k3s/releases/download/%s/k3s-images.txt", version)
 	body, err := fetcher(url)
 	if err != nil {
 		return nil, err
