@@ -87,6 +87,9 @@ func RegisterReposForFollowers(ctx context.Context,
 // EnsureRepositoryCheckout will fetch and/or initialize the necessary data to ensure the corresponding git repositories match commit in the status
 // .status.commit is only updated by the leader, but this needs to run in all replicas, including the leader despite being redundant, to ensure repositories are correctly initialized after a restart
 func (r *repoHandler) EnsureRepositoryCheckout(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
+	if repo == nil {
+		return nil, nil
+	}
 	if registry.IsOCI(repo.Spec.URL) {
 		return repo, nil
 	}
