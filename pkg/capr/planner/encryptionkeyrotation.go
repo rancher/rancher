@@ -207,7 +207,7 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 			return status, errWaitingf("waiting for encryption key rotation stage to finish on leader [%s]", leader.Machine.Name)
 		}
 
-		restartTargets := encryptionKeyRotationRestartTargetsForCluster(controlPlane, clusterPlan, leader, initNode)
+		restartTargets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
 		if restartTargets.onlyLeaderNeedsRestart() {
 			// Single-server rotations can finish as soon as the leader reports final
 			// stage and matching hashes because there are no follower servers to restart.
@@ -225,7 +225,7 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 	case rkev1.RotateEncryptionKeysPhasePostRotateRestart:
 		// Multi-server rotations finish by restarting all remaining server nodes in
 		// topology order and checking convergence on control-plane nodes.
-		status, err = p.encryptionKeyRotationRestartNodes(controlPlane, status, tokensSecret, clusterPlan, leader, initNode, joinServer)
+		status, err = p.encryptionKeyRotationRestartNodes(controlPlane, status, tokensSecret, clusterPlan, joinServer)
 		if err != nil {
 			return p.encryptionKeyRotationHandleFailure(controlPlane, status, err)
 		}
@@ -351,52 +351,23 @@ func encryptionKeyRotationIsSuitableControlPlane(entry *planEntry) bool {
 	return isControlPlane(entry) && isNotDeleting(entry) && entry.Machine.Status.NodeRef.IsDefined() && capr.Ready.IsTrue(entry.Machine)
 }
 
-// encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit selects follower control-plane
-// machines that should be restarted after the leader rotation finishes.
-func encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(controlPlane *rkev1.RKEControlPlane) roleFilter {
-	return func(entry *planEntry) bool {
-		return isControlPlaneAndNotInitNode(entry) &&
-			controlPlane.Status.RotateEncryptionKeysLeader != entry.Machine.Name
-	}
-}
-
-// encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit selects etcd-only
-// followers that should restart before control-plane nodes during post-rotate restart.
-func encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPlane *rkev1.RKEControlPlane) roleFilter {
-	return func(entry *planEntry) bool {
-		return isEtcd(entry) && !isControlPlane(entry) &&
-			controlPlane.Status.RotateEncryptionKeysLeader != entry.Machine.Name &&
-			!isInitNode(entry)
-	}
-}
-
 // encryptionKeyRotationRestartTargetsForCluster groups nodes for the restart phase.
 // Etcd-only nodes are restarted first but are not used for local status/hash checks.
 // Control-plane nodes are restarted after that and are used for convergence checks.
-func encryptionKeyRotationRestartTargetsForCluster(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, leader, initNode *planEntry) encryptionKeyRotationRestartTargets {
-	targets := encryptionKeyRotationRestartTargets{
-		controlPlane: []*planEntry{leader},
+func encryptionKeyRotationRestartTargetsForCluster(clusterPlan *plan.Plan) encryptionKeyRotationRestartTargets {
+	return encryptionKeyRotationRestartTargets{
+		etcdOnly: collect(clusterPlan, func(entry *planEntry) bool {
+			return isEtcd(entry) && !isControlPlane(entry)
+		}),
+		controlPlane: collect(clusterPlan, isControlPlane),
 	}
-
-	if initNode != nil && !isInitNode(leader) {
-		if isControlPlane(initNode) {
-			targets.controlPlane = append(targets.controlPlane, initNode)
-		} else if isEtcd(initNode) {
-			targets.etcdOnly = append(targets.etcdOnly, initNode)
-		}
-	}
-
-	targets.etcdOnly = append(targets.etcdOnly, collect(clusterPlan, encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPlane))...)
-	targets.controlPlane = append(targets.controlPlane, collect(clusterPlan, encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(controlPlane))...)
-
-	return targets
 }
 
 // encryptionKeyRotationRestartNodes restarts etcd-only nodes first and then control-plane nodes.
 // Only control-plane nodes are used for local secrets-encrypt status checks during convergence,
 // and the last control-plane node must also report matching hashes before the phase can finish.
-func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan, leader *planEntry, initNode *planEntry, joinServer string) (rkev1.RKEControlPlaneStatus, error) {
-	restartTargets := encryptionKeyRotationRestartTargetsForCluster(controlPlane, clusterPlan, leader, initNode)
+func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan, joinServer string) (rkev1.RKEControlPlaneStatus, error) {
+	restartTargets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
 
 	for _, entry := range restartTargets.etcdOnly {
 		_, updatedStatus, err := p.encryptionKeyRotationRestartService(controlPlane, status, tokensSecret, joinServer, entry)
