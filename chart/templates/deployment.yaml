@@ -173,6 +173,10 @@ spec:
         - name: RANCHER_NAMESPACES_OPTIONS
           value: {{ .Values.rancherNamespaces | mustToJson | quote }}
 {{- end }}
+{{- if and .Values.systemRegistryInheritsPullSecrets .Values.imagePullSecrets }}
+        - name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "{{ range $i, $v := .Values.imagePullSecrets }}{{- if $i }},{{ end }}{{ $v.name }}{{ end }}"
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
