@@ -53,7 +53,6 @@ import (
 const (
 	// helmDataPath contains the files such as values.yaml for a given chart and tar of the chart.
 	helmDataPath = "/home/shell/helm"
-	helmRunPath  = "/home/shell/helm-run"
 )
 
 var (
@@ -71,73 +70,6 @@ var (
 	podOptionsScheme = runtime.NewScheme()
 	podOptionsCodec  = runtime.NewParameterCodec(podOptionsScheme)
 )
-
-var kustomization = `apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-transformers:
-- /home/shell/helm-run/transform%s.yaml
-resources:
-- /home/shell/helm-run/all.yaml`
-
-var transform = `apiVersion: builtin
-kind: LabelTransformer
-metadata:
-  name: common-labels
-labels:
-  io.cattle.field/appId: %s
-fieldSpecs:
-- path: metadata/labels
-  create: true
-- path: spec/selector
-  create: true
-  version: v1
-  kind: ReplicationController
-- path: spec/template/metadata/labels
-  create: true
-  version: v1
-  kind: ReplicationController
-- path: spec/selector/matchLabels
-  create: true
-  kind: Deployment
-- path: spec/template/metadata/labels
-  create: true
-  kind: Deployment
-- path: spec/selector/matchLabels
-  create: true
-  kind: ReplicaSet
-- path: spec/template/metadata/labels
-  create: true
-  kind: ReplicaSet
-- path: spec/selector/matchLabels
-  create: true
-  kind: DaemonSet
-- path: spec/template/metadata/labels
-  create: true
-  kind: DaemonSet
-- path: spec/selector/matchLabels
-  create: true
-  group: apps
-  kind: StatefulSet
-- path: spec/template/metadata/labels
-  create: true
-  group: apps
-  kind: StatefulSet
-- path: spec/volumeClaimTemplates[]/metadata/labels
-  create: true
-  group: apps
-  kind: StatefulSet
-- path: spec/template/metadata/labels
-  create: true
-  group: batch
-  kind: Job
-- path: spec/jobTemplate/metadata/labels
-  create: true
-  group: batch
-  kind: CronJob
-- path: spec/jobTemplate/spec/template/metadata/labels
-  create: true
-  group: batch
-  kind: CronJob`
 
 func init() {
 	v1internal.AddToScheme(podOptionsScheme)
@@ -486,7 +418,6 @@ type Command struct {
 	Chart            []byte        // content of the chart file
 	ReleaseName      string        // name of the release
 	ReleaseNamespace string        // namespace of the release
-	Kustomize        bool          // flag to inform if it should use kustomize.sh
 }
 
 type Commands []Command
@@ -545,11 +476,6 @@ func (c Command) Render(index int) (map[string][]byte, error) {
 		data[c.ChartFile] = c.Chart
 	}
 
-	if c.Kustomize {
-		data[fmt.Sprintf("kustomization%s.yaml", fileNumID)] = []byte(fmt.Sprintf(kustomization, fileNumID))
-		data[fmt.Sprintf("transform%s.yaml", fileNumID)] = []byte(fmt.Sprintf(transform, c.ReleaseName))
-	}
-
 	return data, nil
 }
 
@@ -597,13 +523,6 @@ func (c Command) renderArgs() ([]string, error) {
 	}
 
 	runPath := helmDataPath
-	if c.Kustomize {
-		// Run path when using kustomize.sh will be different. Original cannot be used
-		// because write permissions are necessary and the helmDataPath cannot be
-		// written to due to it having a SecretVolumeSource.
-		runPath = helmRunPath
-		args = append(args, "--post-renderer=/home/shell/kustomize.sh")
-	}
 
 	if len(c.Values) > 0 {
 		args = append(args, "--values="+filepath.Join(runPath, c.ValuesFile))
@@ -712,27 +631,9 @@ func addAnnotations(data []byte, annotations map[string]string) ([]byte, error) 
 	return yaml.Marshal(chartData)
 }
 
-// enableKustomize returns whether kustomize should be used. If the helm operation is
-// an upgrade and the migrated annotation is present, true will be returned.
-func (s *Operations) enableKustomize(annotations map[string]string, upgrade bool) bool {
-	if !upgrade {
-		return false
-	}
-
-	if len(annotations) == 0 {
-		return false
-	}
-
-	if annotations["apps.cattle.io/migrated"] != "true" {
-		return false
-	}
-
-	return true
-}
-
-// getChartCommand gets the chart based on the input, inject the annotations into it
-// and then creates and return a Command containing the name of the values file, name of the chart file, the chart data
-// and if the command should use kustomize.sh
+// getChartCommand gets the chart based on the input, inject the annotations
+// into it and then creates and return a Command containing the name of the
+// values file, name of the chart file and the chart data
 func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, upgrade bool, annotations map[string]string, values map[string]interface{}) (Command, error) {
 	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion, true)
 	if err != nil {
@@ -756,7 +657,6 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 		ValuesFile: valuesFileName,
 		ChartFile:  chartFileName,
 		Chart:      chartData,
-		Kustomize:  s.enableKustomize(annotations, upgrade),
 	}
 
 	if len(values) > 0 {
@@ -854,15 +754,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
-	var kustomize bool
-	for _, cmd := range cmds {
-		if !cmd.Kustomize {
-			continue
-		}
-		kustomize = true
-		break
-	}
-	pod, podOptions := s.createPod(secretData, kustomize, imageOverride, status.Tolerations)
+	pod, podOptions := s.createPod(secretData, imageOverride, status.Tolerations)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
@@ -1021,9 +913,8 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 // createPod creates the struct of the pod for the operation to run in. It also mounts a secret with the secretdata provided.
 // If imageOverride is provided, it will override the default value of settings.FullShellImage.
 // The created pod has default tolerations and node selectors.
-// If the kustomize flag is true, the created pod is modified to be able to run the kustomize.sh script.
 // Returns a pod object and a pod options object representing the helm operation pod and it's options
-func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string, tolerations []corev1.Toleration) (*corev1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, imageOverride string, tolerations []corev1.Toleration) (*corev1.Pod, *podimpersonation.PodOptions) {
 	var (
 		f = false
 		t = true
@@ -1152,31 +1043,6 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 		},
 	}
 
-	// if kustomize is false then helmDataPath is an acceptable path for helm to run. If it is true,
-	// files are copied from helmDataPath to helmRunPath. This is because the kustomize.sh script
-	// needs write permissions but volumes using a SecretVolumeSource are readOnly. This can not be
-	// changed with the readOnly field or the defaultMode field.
-	// See: https://github.com/kubernetes/kubernetes/issues/62099.
-	if kustomize {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-			Name: "helm-run",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		})
-		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "helm-run",
-			MountPath: helmRunPath,
-		})
-		pod.Spec.Containers[0].Lifecycle = &corev1.Lifecycle{
-			PostStart: &corev1.LifecycleHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{"/bin/sh", "-c", fmt.Sprintf("cp -r %s/. %s", helmDataPath, helmRunPath)},
-				},
-			},
-		}
-		pod.Spec.Containers[0].WorkingDir = helmRunPath
-	}
 	return pod, &podimpersonation.PodOptions{
 		SecretsToCreate: []*corev1.Secret{
 			secret,
