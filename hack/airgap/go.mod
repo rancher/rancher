@@ -2,8 +2,6 @@ module github.com/rancher/rancher/airgap
 
 go 1.26.0
 
-toolchain go1.26.0
-
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.30 // CVE-2024-40635
 	github.com/docker/docker => github.com/docker/docker v28.3.3+incompatible // CVE-2025-54388

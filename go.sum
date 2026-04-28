@@ -612,8 +612,8 @@ github.com/rancher-teja/rke v1.8.14-0.20260423104215-3916aa7c88c6 h1:HJ+oMKaCTJH
 github.com/rancher-teja/rke v1.8.14-0.20260423104215-3916aa7c88c6/go.mod h1:XlSjWbpWzo+/efsGEsG3v6X3FGz+TAB9x9dLbBYjpBI=
 github.com/rancher-teja/shepherd v0.0.0-20260427063602-6c79cb670f82 h1:3/POed3VCFekdqbQESs53N6ijIAmpYWsUZtZBuRzVxs=
 github.com/rancher-teja/shepherd v0.0.0-20260427063602-6c79cb670f82/go.mod h1:vq0KFEyRJPvGyTlNk2Kc7vqNDVE313rqqhbBV3gCLQw=
-github.com/rancher-teja/steve v0.8.8-0.20260423090300-032bed2ef682 h1:DuDxtHuCqWS0KKen3MZzC+C/awJxKieRBFN6OFtWC/0=
-github.com/rancher-teja/steve v0.8.8-0.20260423090300-032bed2ef682/go.mod h1:1fzHXmQ1oc5HjX0HfJAlV5WS2sqsm2LzyqsWOCUPw30=
+github.com/rancher-teja/steve v0.8.8-0.20260429032412-1895b889c7a8 h1:zcoPzjywmQGOqHeOpCvtSEu1GfTrtqoKhvXifT4vTCY=
+github.com/rancher-teja/steve v0.8.8-0.20260429032412-1895b889c7a8/go.mod h1:1fzHXmQ1oc5HjX0HfJAlV5WS2sqsm2LzyqsWOCUPw30=
 github.com/rancher-teja/system-upgrade-controller/pkg/apis v0.0.0-20260427062237-daa7c4ae1336 h1:z0VNHzT1pEKgIAg2TsAnYHattJn4qXQHvbmNVyjwltI=
 github.com/rancher-teja/system-upgrade-controller/pkg/apis v0.0.0-20260427062237-daa7c4ae1336/go.mod h1:awu2RhMfRUiQy7NwpyW0MIfa73rhaVxbon8XjeT1eYk=
 github.com/rancher-teja/wrangler/v3 v3.6.0-rc.1.0.20260423053950-42de455630a4 h1:cIO5PoiDYA2P1LyDImBaRqvhSgCF8NuWIxlWgwjgrok=
@@ -926,7 +926,7 @@ google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 h1:
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9/go.mod h1:4Hqkh8ycfw05ld/3BWL7rJOSfebL2Q+DVDeRgYgxUU8=
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
 google.golang.org/grpc v1.23.0/go.mod h1:Y5yQAOtifL1yxbo5wqy6BxZv8vAUGQwXBOALyacEbxg=
-google.golang.org/grpc v1.26.1/go.mod h1:c3i+UQWmh7LiEpx4sFZnkU36qjEYZ0imhYfXVyQciAY=
+google.golang.org/grpc v1.25.1/go.mod h1:c3i+UQWmh7LiEpx4sFZnkU36qjEYZ0imhYfXVyQciAY=
 google.golang.org/grpc v1.31.0/go.mod h1:N36X2cJ7JwdamYAgDz+s+rVMFjt3numwzf/HckM8pak=
 google.golang.org/grpc v1.80.0 h1:Xr6m2WmWZLETvUNvIUmeD5OAagMw3FiKmMlTdViWsHM=
 google.golang.org/grpc v1.80.0/go.mod h1:ho/dLnxwi3EDJA4Zghp7k2Ec1+c2jqup0bFkw07bwF4=
