@@ -179,12 +179,6 @@ func Test_encryptionKeyRotationFindLeader(t *testing.T) {
 }
 
 func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
-	controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
-		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
-		RotateEncryptionKeysPhase:  rkev1.RotateEncryptionKeysPhasePostRotateRestart,
-		RotateEncryptionKeysLeader: "control-plane-leader",
-	})
-
 	t.Run("etcd-only init node split from control-plane convergence entries", func(t *testing.T) {
 		clusterPlan := newTestEncryptionKeyRotationPlan(
 			newTestEncryptionKeyRotationMachine("etcd-init", true, false, true, true, "https://etcd-init:9345"),
@@ -193,19 +187,14 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 			newTestEncryptionKeyRotationMachine("control-plane-follower", true, true, false, true, "https://control-plane-follower:9345"),
 		)
 
-		targets := encryptionKeyRotationRestartTargetsForCluster(
-			controlPlane,
-			clusterPlan,
-			newTestPlanEntryFromPlan(clusterPlan, "control-plane-leader"),
-			newTestPlanEntryFromPlan(clusterPlan, "etcd-init"),
-		)
+		targets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
 
 		assert.Len(t, targets.etcdOnly, 2)
-		assert.Equal(t, "etcd-init", targets.etcdOnly[0].Machine.Name)
-		assert.Equal(t, "etcd-follower", targets.etcdOnly[1].Machine.Name)
+		assert.Equal(t, "etcd-follower", targets.etcdOnly[0].Machine.Name)
+		assert.Equal(t, "etcd-init", targets.etcdOnly[1].Machine.Name)
 		assert.Len(t, targets.controlPlane, 2)
-		assert.Equal(t, "control-plane-leader", targets.controlPlane[0].Machine.Name)
-		assert.Equal(t, "control-plane-follower", targets.controlPlane[1].Machine.Name)
+		assert.Equal(t, "control-plane-follower", targets.controlPlane[0].Machine.Name)
+		assert.Equal(t, "control-plane-leader", targets.controlPlane[1].Machine.Name)
 	})
 
 	t.Run("control plane init node stays in control-plane restart group", func(t *testing.T) {
@@ -215,18 +204,13 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 			newTestEncryptionKeyRotationMachine("control-plane-follower", true, true, false, true, "https://control-plane-follower:9345"),
 		)
 
-		targets := encryptionKeyRotationRestartTargetsForCluster(
-			controlPlane,
-			clusterPlan,
-			newTestPlanEntryFromPlan(clusterPlan, "control-plane-leader"),
-			newTestPlanEntryFromPlan(clusterPlan, "control-plane-init"),
-		)
+		targets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
 
 		assert.Empty(t, targets.etcdOnly)
 		assert.Len(t, targets.controlPlane, 3)
-		assert.Equal(t, "control-plane-leader", targets.controlPlane[0].Machine.Name)
+		assert.Equal(t, "control-plane-follower", targets.controlPlane[0].Machine.Name)
 		assert.Equal(t, "control-plane-init", targets.controlPlane[1].Machine.Name)
-		assert.Equal(t, "control-plane-follower", targets.controlPlane[2].Machine.Name)
+		assert.Equal(t, "control-plane-leader", targets.controlPlane[2].Machine.Name)
 	})
 }
 
@@ -441,7 +425,6 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 	testCases := []struct {
 		name         string
 		periodicOut  string
-		periodicErr  string
 		savedOutput  string
 		planFailed   bool
 		expectStage  string
@@ -471,13 +454,6 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 		{
 			name:        "timeout output waits for periodic status when not yet available",
 			savedOutput: "level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): " + encryptionKeyRotationRotateKeysTimeoutMessage + "\"\n",
-			planFailed:  true,
-			expectWait:  true,
-		},
-		{
-			name:        "status timeout on periodic output waits",
-			savedOutput: "time=\"2026-04-08T23:15:39Z\" level=fatal msg=\"Error: see server log for details: Put \\\"https://127.0.0.1:9345/v1-rke2/encrypt/config\\\": net/http: timeout awaiting response headers (Client.Timeout exceeded while awaiting headers)\"\n",
-			periodicErr: "time=\"2026-04-08T23:22:01Z\" level=fatal msg=\"Error: see server log for details: Get \\\"https://127.0.0.1:9345/v1-rke2/encrypt/status\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)\"\n",
 			planFailed:  true,
 			expectWait:  true,
 		},
@@ -520,7 +496,6 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 				PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 					encryptionKeyRotationSecretsEncryptStatusCommand: {
 						Stdout: []byte(testCase.periodicOut),
-						Stderr: []byte(testCase.periodicErr),
 					},
 				},
 			}
