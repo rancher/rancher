@@ -267,13 +267,15 @@ func (p *RTBTestSuite) TestSystemProjectCannotBeDeleted() {
 	p.Require().NoError(err)
 
 	var systemProject management.Project
+	found := false
 	for _, project := range projects.Data {
 		if project.Name == "System" {
 			systemProject = project
+			found = true
 			break
 		}
 	}
-	p.Require().NotNil(&systemProject, "System project not found")
+	p.Require().True(found, "System project not found")
 
 	// Attempting to delete the System project should return 405.
 	err = client.Management.Project.Delete(&systemProject)
@@ -307,6 +309,7 @@ func (p *RTBTestSuite) TestSystemNamespacesDefaultServiceAccount() {
 	saList, err := dynamicClient.Resource(saGVR).Namespace("").List(context.TODO(), metav1.ListOptions{
 		FieldSelector: "metadata.name=default",
 	})
+	p.Require().NoError(err)
 
 	for _, sa := range saList.Items {
 		ns := sa.GetNamespace()

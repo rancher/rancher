@@ -326,20 +326,20 @@ func (p *RTBTestSuite) ensureClusterRolesExist(client *rancher.Client, names []s
 // Clears all clusterCreatorDefault flags, then sets them on the given role IDs.
 // Registers a cleanup to restore original defaults.
 func (p *RTBTestSuite) setClusterCreatorDefaults(client *rancher.Client, roleIDs []string) {
-	rollTemplates, err := client.Management.RoleTemplate.List(nil)
+	roleTemplates, err := client.Management.RoleTemplate.List(nil)
 	p.Require().NoError(err)
 
 	// Save original state for cleanup.
 	originals := map[string]bool{}
-	for _, rt := range rollTemplates.Data {
+	for _, rt := range roleTemplates.Data {
 		if rt.ClusterCreatorDefault {
 			originals[rt.ID] = true
 		}
 	}
 
 	// Clear all cluster creator defaults.
-	for i := range rollTemplates.Data {
-		rt := &rollTemplates.Data[i]
+	for i := range roleTemplates.Data {
+		rt := &roleTemplates.Data[i]
 		if rt.ClusterCreatorDefault {
 			_, err := client.Management.RoleTemplate.Update(rt, map[string]any{
 				"clusterCreatorDefault": false,
@@ -377,12 +377,6 @@ func (p *RTBTestSuite) setClusterCreatorDefaults(client *rancher.Client, roleIDs
 					"clusterCreatorDefault": true,
 				})
 			}
-			// Also unlock any roles we may have locked.
-			if rt.Locked && wantSet[rt.ID] {
-				_, _ = client.Management.RoleTemplate.Update(rt, map[string]any{
-					"locked": false,
-				})
-			}
 		}
 	})
 }
@@ -391,18 +385,18 @@ func (p *RTBTestSuite) setClusterCreatorDefaults(client *rancher.Client, roleIDs
 // Clears all projectCreatorDefault flags, then sets them on the given role IDs.
 // Registers a cleanup to restore original defaults.
 func (p *RTBTestSuite) setProjectCreatorDefaults(client *rancher.Client, roleIDs []string) {
-	rollTemplates, err := client.Management.RoleTemplate.List(nil)
+	roleTemplates, err := client.Management.RoleTemplate.List(nil)
 	p.Require().NoError(err)
 
 	originals := map[string]bool{}
-	for _, rt := range rollTemplates.Data {
+	for _, rt := range roleTemplates.Data {
 		if rt.ProjectCreatorDefault {
 			originals[rt.ID] = true
 		}
 	}
 
-	for i := range rollTemplates.Data {
-		rt := &rollTemplates.Data[i]
+	for i := range roleTemplates.Data {
+		rt := &roleTemplates.Data[i]
 		if rt.ProjectCreatorDefault {
 			_, err := client.Management.RoleTemplate.Update(rt, map[string]any{
 				"projectCreatorDefault": false,
@@ -436,11 +430,6 @@ func (p *RTBTestSuite) setProjectCreatorDefaults(client *rancher.Client, roleIDs
 			} else if !rt.ProjectCreatorDefault && originals[rt.ID] {
 				_, _ = client.Management.RoleTemplate.Update(rt, map[string]any{
 					"projectCreatorDefault": true,
-				})
-			}
-			if rt.Locked && wantSet[rt.ID] {
-				_, _ = client.Management.RoleTemplate.Update(rt, map[string]any{
-					"locked": false,
 				})
 			}
 		}
