@@ -13,6 +13,8 @@ on:
         type: choice
         options:
           - 'all'
+          - 'k3s'
+          - 'k8s'
           - 'harvester-docker-machine'
           - 'wins-system-agent'
 
@@ -25,7 +27,7 @@ jobs:
   updatecli:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/release/v2.14'
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -86,11 +88,19 @@ jobs:
             echo "Running updatecli on all targets"
             updatecli apply --clean --values updatecli/values.d/values.yaml \
                                     --config updatecli/updatecli.d/
+            updatecli apply         --values updatecli/values.d/values.yaml \
+                                    --config updatecli/extras/run-go-generate/
           elif [[ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]];
           then
             echo "Running updatecli on ${{ inputs.target }} target"
             updatecli apply --clean --values updatecli/values.d/values.yaml \
                                     --config "updatecli/updatecli.d/update-${{ inputs.target }}/"
+            if [[ "${{ inputs.target }}" = "k8s" ]];
+            then
+              updatecli apply       --values updatecli/values.d/values.yaml \
+                                    --config updatecli/extras/run-go-generate/
+
+            fi
           else
             echo "Invalid event name or target"
           fi

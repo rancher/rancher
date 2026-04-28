@@ -1,6 +1,3 @@
-config:
-  versions: 'updatecli/values.d/versions.yaml'
-
 scm:
   user: 'github-actions[bot]'
   email: '41898282+github-actions[bot]@users.noreply.github.com'
@@ -8,7 +5,7 @@ scm:
   token: 'UPDATECLI_GITHUB_TOKEN'
   owner: 'rancher'
   repo: 'rancher'
-  branch: 'main'
+  branch: 'release/v2.14'
   # This option allows for the commits to be signed (verified). However, the
   # GraphQL API doesn't allow the commits to be squashed. For the moment we
   # prefer to squash them in order to reduce the noise given the amount of
@@ -42,12 +39,19 @@ harvester_docker_machine:
     type: 'deps'
     scope: 'harvester-docker-machine'
 
-k8s_k3s:
-  manifest: 'Update K8s and K3s patch versions'
-  pipelineid: 'update-k8s-k3s-versions'
+k8s:
+  manifest: 'Update K8s patch versions'
+  pipelineid: 'update-k8s-versions'
   commitmessage:
     type: 'deps'
-    scope: 'k8s and k3s'
+    scope: 'k8s'
+
+k3s:
+  manifest: 'Update K3s patch versions'
+  pipelineid: 'update-k3s-versions'
+  commitmessage:
+    type: 'deps'
+    scope: 'k3s'
 
 wins_system_agent:
   manifest: 'Update Wins and System Agent patch versions'
