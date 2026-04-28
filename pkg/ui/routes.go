@@ -13,48 +13,37 @@ func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrat
 
 	router.Handle("/{$}", PreferredIndex())
 	router.Handle("/cacerts", cacerts.Handler(clusterRegistrationTokenCache))
-	router.Handle("/asset-manifest.json", ember.ServeAsset())
-	router.Handle("/crossdomain.xml", ember.ServeAsset())
 	router.Handle("/dashboard", http.RedirectHandler("/dashboard/", http.StatusFound))
-	router.Handle("/humans.txt", ember.ServeAsset())
-	router.Handle("/index.txt", ember.ServeAsset())
-	router.Handle("/robots.txt", ember.ServeAsset())
-	router.Handle("/VERSION.txt", ember.ServeAsset())
+	router.Handle("/humans.txt", vue.ServeAsset())
+	router.Handle("/robots.txt", vue.ServeAsset())
+	router.Handle("/VERSION.txt", vue.ServeAsset())
 	router.Handle("/favicon.png", vue.ServeFaviconDashboard())
 	router.Handle("/favicon.ico", vue.ServeFaviconDashboard())
 	router.HandleFunc("/verify-auth-azure", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Has("state") {
 			redirectAuth(w, r)
 		} else {
-			emberIndexUnlessAPI().ServeHTTP(w, r)
+			vueIndexUnlessAPI().ServeHTTP(w, r)
 		}
 	})
 	router.HandleFunc("/verify-auth", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Has("state") {
 			redirectAuth(w, r)
 		} else {
-			emberIndexUnlessAPI().ServeHTTP(w, r)
+			vueIndexUnlessAPI().ServeHTTP(w, r)
 		}
 	})
-	router.Handle("/api-ui/", ember.ServeAPIUI())
-	router.Handle("/assets/rancher-ui-driver-linode/", emberAlwaysOffline.ServeAsset())
-	router.Handle("/assets/", ember.IndexFileOnNotFound())
-	router.Handle("/assets", ember.IndexFileOnNotFound())
+	router.Handle("/api-ui/", vue.ServeAPIUI())
 	router.Handle("/dashboard/", vue.IndexFileOnNotFound())
-	router.Handle("/ember-fetch/", ember.ServeAsset())
-	router.Handle("/engines-dist/", ember.ServeAsset())
-	router.Handle("/static/", ember.ServeAsset())
-	router.Handle("/translations/", ember.IndexFileOnNotFound())
-	router.Handle("/translations", ember.IndexFileOnNotFound())
-	router.Handle("/", emberIndexUnlessAPI())
+	router.Handle("/", vueIndexUnlessAPI())
 
 	return router
 }
 
-func emberIndexUnlessAPI() http.Handler {
+func vueIndexUnlessAPI() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if parse.IsBrowser(req, true) {
-			emberIndex.ServeHTTP(rw, req)
+			vueIndex.ServeHTTP(rw, req)
 		} else {
 			http.NotFound(rw, req)
 		}
