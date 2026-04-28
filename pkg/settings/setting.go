@@ -333,12 +333,6 @@ var (
 	// The `dynamic` option will use remote assets for `-head` builds, otherwise the local assets for production builds.
 	UIOfflinePreferred = NewSetting("ui-offline-preferred", "dynamic")
 
-	// UIPath is the on-disk directory used as a staging area for node-driver
-	// binaries and the system-agent install/uninstall scripts (served under
-	// /assets/ to node agents). Retained for backwards compatibility with the
-	// ember UI's original filesystem layout.
-	UIPath = NewSetting("ui-path", "/usr/share/rancher/ui")
-
 	// UIPerformance experimental settings for UI functionality to improve the UX with large numbers of resources.
 	UIPerformance = NewSetting("ui-performance", "")
 

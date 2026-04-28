@@ -351,7 +351,7 @@ func getDriverDownloadURL(nd *mgmtv3.NodeDriver) (string, string, error) {
 		driverName = drivers.DockerMachineDriverPrefix + driverName
 	}
 
-	path := filepath.Join(settings.UIPath.Get(), "assets", driverName)
+	path := filepath.Join(settings.UIDashboardPath.Get(), "assets", driverName)
 	if _, err := os.Stat(path); err != nil {
 		return nd.Spec.URL, nd.Spec.Checksum, nil
 	}

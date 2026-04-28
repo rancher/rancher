@@ -48,6 +48,16 @@ func TestRoutes_Vue(t *testing.T) {
 	err = os.WriteFile(filepath.Join(dashboardDir, "favicon.png"), []byte(faviconContent), 0644)
 	assert.NoError(t, err)
 
+	// Create the assets subdirectory used by node-agent bootstrap downloads
+	// (e.g. rancher-system-agent-amd64) served under /assets/.
+	assetsDir := filepath.Join(tempDir, "assets")
+	err = os.Mkdir(assetsDir, 0755)
+	assert.NoError(t, err)
+
+	agentBinaryContent := "rancher-system-agent bytes"
+	err = os.WriteFile(filepath.Join(assetsDir, "rancher-system-agent-amd64"), []byte(agentBinaryContent), 0644)
+	assert.NoError(t, err)
+
 	origPath := settings.UIDashboardPath.Get()
 	origOffline := settings.UIOfflinePreferred.Get()
 
@@ -99,6 +109,12 @@ func TestRoutes_Vue(t *testing.T) {
 			name:           "Favicon served from dashboard subdir",
 			path:           "/favicon.png",
 			expectedBody:   faviconContent,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Agent binary served from assets",
+			path:           "/assets/rancher-system-agent-amd64",
+			expectedBody:   agentBinaryContent,
 			expectedStatus: http.StatusOK,
 		},
 		{

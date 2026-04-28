@@ -260,8 +260,8 @@ RUN case "${ARCH}" in \
     sha256sum -c driver-linode.sha256 && \
     rm driver-linode.sha256 && \
     unzip /tmp/docker-machine-driver-linode.zip -d /opt/drivers/management-state/bin && \
-    mkdir -p /usr/share/rancher/ui/assets/ && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
+    mkdir -p /usr/share/rancher/ui-dashboard/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-linode.zip
 
 RUN case "${ARCH}" in \
@@ -274,7 +274,7 @@ RUN case "${ARCH}" in \
     sha256sum -c machine-harvester.sha256 && \
     rm machine-harvester.sha256 && \
     tar xvzf /tmp/docker-machine-driver-harvester.tar.gz -C /opt/drivers/management-state/bin && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 
 
@@ -366,7 +366,7 @@ RUN mkdir -p /usr/share/rancher/ui-dashboard/api-ui && \
     ln -s dashboard/robots.txt ../robots.txt && \
     ln -s dashboard/humans.txt ../humans.txt && \
     ln -s dashboard/VERSION.txt ../VERSION.txt && \
-    cd ../../ui/assets && \
+    cd ../assets && \
     curl -sfL "${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64" -O && \
     printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_arm64}" "rancher-system-agent-arm64" > rancher-system-agent-arm64.sha256 && \
     sha256sum -c rancher-system-agent-arm64.sha256 && \

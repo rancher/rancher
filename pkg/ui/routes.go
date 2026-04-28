@@ -34,6 +34,8 @@ func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrat
 		}
 	})
 	router.Handle("/api-ui/", vue.ServeAPIUI())
+	router.Handle("/assets", vue.IndexFileOnNotFound())
+	router.Handle("/assets/", vue.IndexFileOnNotFound())
 	router.Handle("/dashboard/", vue.IndexFileOnNotFound())
 	router.Handle("/", vueIndexUnlessAPI())
 
