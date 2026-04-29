@@ -181,8 +181,9 @@ func (a *Answer) ObjClusterName() string {
 }
 
 type ImportedConfig struct {
-	KubeConfig         string `json:"kubeConfig" norman:"type=password"`
-	PrivateRegistryURL string `json:"privateRegistryURL,omitempty"`
+	KubeConfig                 string   `json:"kubeConfig" norman:"type=password"`
+	PrivateRegistryURL         string   `json:"privateRegistryURL,omitempty"`
+	PrivateRegistryPullSecrets []string `json:"privateRegistryPullSecrets,omitempty"`
 }
 
 type ClusterStatus struct {
@@ -232,6 +233,7 @@ type ClusterStatus struct {
 	AADClientCertSecret        string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	AppliedClusterAgentImagePullSecretsHash    string                        `json:"appliedClusterAgentImagePullSecretsHash,omitempty"`
 
 	// ReadyReconciling indicates that the cluster's readiness state is currently being managed by provisioning controller.
 	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, Connected) should avoid updating Ready condition to prevent state flapping.
