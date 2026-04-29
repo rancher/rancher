@@ -13,6 +13,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/utils/ptr"
@@ -436,7 +437,9 @@ func (p *Planner) encryptionKeyRotationRestartService(controlPlane *rkev1.RKECon
 		)
 		nodePlan.Instructions = append(nodePlan.Instructions,
 			encryptionKeyRotationWaitForSecretsEncryptStatus(controlPlane),
-			encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane, leaderStage),
+			plan.OneTimeInstruction{
+				CommonInstruction: encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane, leaderStage),
+			},
 			encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(controlPlane),
 		)
 	}
@@ -502,7 +505,9 @@ func (p *Planner) encryptionKeyRotationLeaderPhaseReconcile(controlPlane *rkev1.
 
 	nodePlan.Instructions = []plan.OneTimeInstruction{
 		apply,
-		encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane, ""),
+		{
+			CommonInstruction: encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane, ""),
+		},
 		encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(controlPlane),
 	}
 	nodePlan.PeriodicInstructions = []plan.PeriodicInstruction{
@@ -632,8 +637,8 @@ func encryptionKeyRotationGenerationEnv(controlPlane *rkev1.RKEControlPlane) str
 
 // encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction generates a one time instruction which will scrape the secrets-encrypt
 // status.
-func encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane *rkev1.RKEControlPlane, expected string) plan.OneTimeInstruction {
-	i := plan.OneTimeInstruction{
+func encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane *rkev1.RKEControlPlane, expected string) planapi.CommonInstruction {
+	i := planapi.CommonInstruction{
 		Name:    "secrets-encrypt-status-script",
 		Command: "sh",
 		Args: []string{
@@ -656,15 +661,17 @@ func encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPl
 // status.
 func encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
-		Name:    encryptionKeyRotationSecretsEncryptStatusCommand,
-		Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-		Args: []string{
-			"secrets-encrypt",
-			"status",
-		},
-		Env: []string{
-			encryptionKeyRotationStatusEnv(controlPlane),
-			encryptionKeyRotationGenerationEnv(controlPlane),
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    encryptionKeyRotationSecretsEncryptStatusCommand,
+			Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			Args: []string{
+				"secrets-encrypt",
+				"status",
+			},
+			Env: []string{
+				encryptionKeyRotationStatusEnv(controlPlane),
+				encryptionKeyRotationGenerationEnv(controlPlane),
+			},
 		},
 		SaveOutput: true,
 	}
@@ -672,13 +679,19 @@ func encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(controlPlane *r
 
 // encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction generates a periodic instruction which will scrape the secrets-encrypt
 // status from the node every 5 seconds.
-func encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(controlPlane *rkev1.RKEControlPlane) plan.PeriodicInstruction {
-	return plan.PeriodicInstruction{
-		Name:    encryptionKeyRotationSecretsEncryptStatusCommand,
-		Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-		Args: []string{
-			"secrets-encrypt",
-			"status",
+func encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(controlPlane *rkev1.RKEControlPlane) planapi.PeriodicInstruction {
+	return planapi.PeriodicInstruction{
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    encryptionKeyRotationSecretsEncryptStatusCommand,
+			Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			Args: []string{
+				"secrets-encrypt",
+				"status",
+			},
+			Env: []string{
+				encryptionKeyRotationStatusEnv(controlPlane),
+				encryptionKeyRotationGenerationEnv(controlPlane),
+			},
 		},
 		PeriodSeconds: 5,
 	}
@@ -690,15 +703,17 @@ func encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(controlPlane *
 // fails, then the plan will fail.
 func encryptionKeyRotationWaitForSystemctlStatusInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
-		Name:    "wait-for-systemctl-status",
-		Command: "sh",
-		Args: []string{
-			"-x", encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationWaitForSystemctlStatusPath), capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
-		},
-		Env: []string{
-			encryptionKeyRotationEndpointEnv,
-			encryptionKeyRotationStatusEnv(controlPlane),
-			encryptionKeyRotationGenerationEnv(controlPlane),
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "wait-for-systemctl-status",
+			Command: "sh",
+			Args: []string{
+				"-x", encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationWaitForSystemctlStatusPath), capr.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
+			},
+			Env: []string{
+				encryptionKeyRotationEndpointEnv,
+				encryptionKeyRotationStatusEnv(controlPlane),
+				encryptionKeyRotationGenerationEnv(controlPlane),
+			},
 		},
 		SaveOutput: false,
 	}
@@ -709,15 +724,17 @@ func encryptionKeyRotationWaitForSystemctlStatusInstruction(controlPlane *rkev1.
 // will be successful.
 func encryptionKeyRotationWaitForSecretsEncryptStatus(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
-		Name:    "wait-for-secrets-encrypt-status",
-		Command: "sh",
-		Args: []string{
-			"-x", encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationWaitForSecretsEncryptStatusPath), capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-		},
-		Env: []string{
-			encryptionKeyRotationEndpointEnv,
-			encryptionKeyRotationStatusEnv(controlPlane),
-			encryptionKeyRotationGenerationEnv(controlPlane),
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "wait-for-secrets-encrypt-status",
+			Command: "sh",
+			Args: []string{
+				"-x", encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationWaitForSecretsEncryptStatusPath), capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			},
+			Env: []string{
+				encryptionKeyRotationEndpointEnv,
+				encryptionKeyRotationStatusEnv(controlPlane),
+				encryptionKeyRotationGenerationEnv(controlPlane),
+			},
 		},
 		SaveOutput: true,
 	}
