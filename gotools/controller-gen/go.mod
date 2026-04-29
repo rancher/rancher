@@ -9,7 +9,7 @@ tool sigs.k8s.io/controller-tools/cmd/controller-gen
 require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -30,9 +30,9 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.33.10 // indirect
-	k8s.io/apiextensions-apiserver v0.33.10 // indirect
-	k8s.io/apimachinery v0.33.10 // indirect
+	k8s.io/api v0.33.11 // indirect
+	k8s.io/apiextensions-apiserver v0.33.11 // indirect
+	k8s.io/apimachinery v0.33.11 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/controller-tools v0.17.1 // indirect
