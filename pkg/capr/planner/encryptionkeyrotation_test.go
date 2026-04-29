@@ -735,6 +735,48 @@ func Test_rotateEncryptionKeys_marksFailedWhenNoSuitableLeaderExists(t *testing.
 	assert.Empty(t, updatedStatus.RotateEncryptionKeysLeader)
 }
 
+func Test_rotateEncryptionKeys_postRotateRestartDoesNotRequireStoredLeader(t *testing.T) {
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
+
+	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
+		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
+		RotateEncryptionKeysPhase:  rkev1.RotateEncryptionKeysPhasePostRotateRestart,
+		RotateEncryptionKeysLeader: "deleted-leader",
+		Initialization: rkev1.RKEControlPlaneInitializationStatus{
+			ControlPlaneInitialized: ptr.To(true),
+		},
+	})
+	clusterPlan := newTestEncryptionKeyRotationPlan(
+		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
+	)
+	entry := newTestPlanEntryFromPlan(clusterPlan, "server-1")
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRestartPlan(controlPlane, plan.Secret{}, "https://server-1:9345", entry)
+	assert.NoError(t, err)
+	clusterPlan.Nodes["server-1"] = &plan.Node{
+		Plan:    nodePlan,
+		InSync:  true,
+		Healthy: true,
+		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
+			encryptionKeyRotationSecretsEncryptStatusCommand: {
+				Stdout: []byte("Current Rotation Stage: reencrypt_finished\nServer Encryption Hashes: All hashes match\n"),
+			},
+		},
+	}
+
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
+	mockPlanner.capiClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(cluster *capi.Cluster) (*capi.Cluster, error) {
+		assert.False(t, ptr.Deref(cluster.Spec.Paused, true))
+		return cluster, nil
+	})
+
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+
+	assert.True(t, IsErrWaiting(err))
+	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseDone, updatedStatus.RotateEncryptionKeysPhase)
+	assert.Empty(t, updatedStatus.RotateEncryptionKeysLeader)
+}
+
 func Test_rotateEncryptionKeys_marksFailedWhenVersionUnsupported(t *testing.T) {
 	mockPlanner := newMockPlanner(t, InfoFunctions{})
 	mockPlanner.planner.store.equalities = testPlannerEqualities()
