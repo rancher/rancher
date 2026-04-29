@@ -174,23 +174,23 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return p.setEncryptionKeyRotateState(status, controlPlane.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseRotate)
 	}
 
-	// Keep the same leader once chosen so requeues keep observing the same
-	// rotate-keys command output instead of moving the operation between servers.
-	leader, err := p.encryptionKeyRotationFindLeader(status, clusterPlan, initNode)
-	if err != nil {
-		status, err = p.encryptionKeyRotationFailed(status, err)
-		return p.encryptionKeyRotationHandleFailure(controlPlane, status, err)
-	}
-
-	if status.RotateEncryptionKeysLeader != leader.Machine.Name {
-		status.RotateEncryptionKeysLeader = leader.Machine.Name
-		return status, errWaitingf("elected %s as control plane leader for encryption key rotation", leader.Machine.Name)
-	}
-
 	logrus.Debugf("[planner] rkecluster %s/%s: current encryption key rotation phase: [%s]", controlPlane.Namespace, controlPlane.Spec.ClusterName, controlPlane.Status.RotateEncryptionKeysPhase)
 
 	switch controlPlane.Status.RotateEncryptionKeysPhase {
 	case rkev1.RotateEncryptionKeysPhaseRotate:
+		// Keep the same leader once chosen so requeues keep observing the same
+		// rotate-keys command output instead of moving the operation between servers.
+		leader, err := p.encryptionKeyRotationFindLeader(status, clusterPlan, initNode)
+		if err != nil {
+			status, err = p.encryptionKeyRotationFailed(status, err)
+			return p.encryptionKeyRotationHandleFailure(controlPlane, status, err)
+		}
+
+		if status.RotateEncryptionKeysLeader != leader.Machine.Name {
+			status.RotateEncryptionKeysLeader = leader.Machine.Name
+			return status, errWaitingf("elected %s as control plane leader for encryption key rotation", leader.Machine.Name)
+		}
+
 		// Pause CAPI while rotate-keys is active so unrelated rollout activity does
 		// not race with the encryption-key rotation plan.
 		if err := p.pauseCAPICluster(controlPlane, true); err != nil {

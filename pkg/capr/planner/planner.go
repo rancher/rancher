@@ -243,8 +243,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, fmt.Errorf("rkecluster %s/%s: error semver parsing kubernetes version %s: %v", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion, err)
 	}
 
-	releaseData := p.retrievalFunctions.ReleaseData(p.ctx, cp)
-	if releaseData == nil {
+	if p.retrievalFunctions.ReleaseData(p.ctx, cp) == nil {
 		return status, errWaitingf("%s/%s: KDM release data is empty for %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
 	}
 
