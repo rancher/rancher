@@ -98,7 +98,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
-		if err := filter.ValidateForAttribute([]string{"userName", "externalId"}, opEqual); err != nil {
+		if err := filter.ValidateForAttributes([]string{"userName", "externalId"}, opEqual); err != nil {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}

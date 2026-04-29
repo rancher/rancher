@@ -60,7 +60,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
-		if err := filter.ValidateForAttribute([]string{"displayName", "externalId"}, opEqual); err != nil {
+		if err := filter.ValidateForAttributes([]string{"displayName", "externalId"}, opEqual); err != nil {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}

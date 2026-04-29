@@ -389,7 +389,7 @@ func TestFilterMatchesCaseExact(t *testing.T) {
 	}
 }
 
-func TestFilterValidateForAttribute(t *testing.T) {
+func TestFilterValidateForAttributes(t *testing.T) {
 	tests := []struct {
 		name              string
 		filter            *Filter
@@ -454,7 +454,7 @@ func TestFilterValidateForAttribute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.filter.ValidateForAttribute(tt.allowedAttributes, tt.allowedOperators...)
+			err := tt.filter.ValidateForAttributes(tt.allowedAttributes, tt.allowedOperators...)
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {

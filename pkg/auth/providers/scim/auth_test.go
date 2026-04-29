@@ -17,6 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+func enabledProvider(string) providerConfig { return providerConfig{Enabled: true} }
+
 func TestTokenAuthenticator(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
@@ -52,7 +54,7 @@ func TestTokenAuthenticator(t *testing.T) {
 			secretCache:        secretCache,
 			isDisabledProvider: isDisabledProvider,
 			expireTokensAfter:  func() time.Duration { return 0 },
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true} },
+			getConfig:          enabledProvider,
 		}
 
 		w := httptest.NewRecorder()
@@ -110,7 +112,7 @@ func TestTokenAuthenticator(t *testing.T) {
 			secretCache:        secretCache,
 			isDisabledProvider: isDisabledProvider,
 			expireTokensAfter:  func() time.Duration { return time.Hour },
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true} },
+			getConfig:          enabledProvider,
 		}
 
 		w := httptest.NewRecorder()
@@ -204,7 +206,7 @@ func TestTokenAuthenticator(t *testing.T) {
 			secretCache:        secretCache,
 			isDisabledProvider: isDisabledProvider,
 			expireTokensAfter:  func() time.Duration { return 0 },
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true} },
+			getConfig:          enabledProvider,
 		}
 
 		w := httptest.NewRecorder()
@@ -241,7 +243,7 @@ func TestTokenAuthenticator(t *testing.T) {
 			secretCache:        secretCache,
 			isDisabledProvider: isDisabledProvider,
 			expireTokensAfter:  func() time.Duration { return 0 },
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true} },
+			getConfig:          enabledProvider,
 		}
 
 		someOtherToken := "c4faf0453d39dffa3bf7d3135f6a15e50dbd4b71fe74c5d5b9d45772e36511e1"
@@ -283,7 +285,7 @@ func TestTokenAuthenticator(t *testing.T) {
 			secrets:            secrets,
 			isDisabledProvider: isDisabledProvider,
 			expireTokensAfter:  func() time.Duration { return time.Hour },
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true} },
+			getConfig:          enabledProvider,
 		}
 
 		w := httptest.NewRecorder()
@@ -334,7 +336,7 @@ func TestTokenAuthenticator(t *testing.T) {
 			secrets:            secrets,
 			isDisabledProvider: isDisabledProvider,
 			expireTokensAfter:  func() time.Duration { return time.Hour },
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true} },
+			getConfig:          enabledProvider,
 		}
 
 		w := httptest.NewRecorder()
@@ -385,7 +387,7 @@ func TestTokenAuthenticator(t *testing.T) {
 			secrets:            secrets,
 			isDisabledProvider: isDisabledProvider,
 			expireTokensAfter:  func() time.Duration { return time.Hour },
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true} },
+			getConfig:          enabledProvider,
 		}
 
 		w := httptest.NewRecorder()
