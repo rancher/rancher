@@ -118,20 +118,34 @@ func Save(version, output string) error {
 
 func fetch(url string) (io.ReadCloser, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
 
 	fmt.Println("fetching", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("cannot create request: %w", err)
 	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		cancel()
 		return nil, fmt.Errorf("request unsuccessful: %w", err)
 	}
 
-	return res.Body, nil
+	return &cancelOnClose{ReadCloser: res.Body, cancel: cancel}, nil
+}
+
+// cancelOnClose wraps an io.ReadCloser so that a context.CancelFunc
+// is called when the body is closed, rather than when fetch returns.
+type cancelOnClose struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (c *cancelOnClose) Close() error {
+	err := c.ReadCloser.Close()
+	c.cancel()
+	return err
 }
 
 func k3sImages(version string) ([]string, error) {
@@ -144,6 +158,7 @@ func k3sImages(version string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer body.Close()
 	defer io.Copy(io.Discard, body)
 
 	images := []string{}
