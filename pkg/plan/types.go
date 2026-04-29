@@ -1,5 +1,7 @@
 package plan
 
+import "hash"
+
 // Plan represents the basic unit of work performed by the system-agent.
 type Plan struct {
 	Files                []File                `json:"files,omitempty"`
@@ -12,13 +14,16 @@ type Plan struct {
 // Path is the absolute path on the node (e.g. /etc/kubernetes/ssl/ca.pem).
 // Content is base64-encoded. If Directory is true, a directory is created, not a file.
 type File struct {
-	Content     string `json:"content,omitempty"`
-	Directory   bool   `json:"directory,omitempty"`
-	UID         int    `json:"uid,omitempty"`
-	GID         int    `json:"gid,omitempty"`
-	Path        string `json:"path,omitempty"`
-	Permissions string `json:"permissions,omitempty"` // internally, the string will be converted to a uint32 to satisfy os.FileMode
-	Action      string `json:"action,omitempty"`
+	Content       string                `json:"content,omitempty"`
+	Directory     bool                  `json:"directory,omitempty"`
+	UID           int                   `json:"uid,omitempty"`
+	GID           int                   `json:"gid,omitempty"`
+	Path          string                `json:"path,omitempty"`
+	Permissions   string                `json:"permissions,omitempty"` // internally, the string will be converted to a uint32 to satisfy os.FileMode
+	Action        string                `json:"action,omitempty"`
+	Dynamic       bool                  `json:"dynamic,omitempty"`
+	Minor         bool                  `json:"minor,omitempty"`
+	DrainHashFunc func(hash.Hash) error `json:"-"`
 }
 
 // CommonInstruction holds fields shared by all instruction types.
