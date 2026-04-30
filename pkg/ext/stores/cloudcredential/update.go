@@ -35,7 +35,7 @@ func (s *Store) Update(
 		return nil, false, err
 	}
 
-	if !isAdmin && oldSecret.Labels[LabelCloudCredentialOwner] != sanitizeLabelValue(userInfo.GetName()) {
+	if !isAdmin && oldSecret.Labels[CloudCredentialOwnerLabel] != sanitizeLabelValue(userInfo.GetName()) {
 		return nil, false, apierrors.NewForbidden(GVR.GroupResource(), name, fmt.Errorf("insufficient permissions to update cloud credential"))
 	}
 
@@ -62,9 +62,9 @@ func (s *Store) Update(
 	}
 
 	// Get owner from the existing credential annotation
-	owner := oldCredential.Annotations[AnnotationCreatorID]
+	owner := oldCredential.Annotations[CreatorIDAnnotation]
 	if owner == "" {
-		owner = oldSecret.Labels[LabelCloudCredentialOwner]
+		owner = oldSecret.Labels[CloudCredentialOwnerLabel]
 	}
 
 	resultCredential, err := s.SystemStore.Update(oldSecret, oldCredential, newCredential, options, owner)

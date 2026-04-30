@@ -20,12 +20,7 @@ import (
 )
 
 func isSystemDataField(k string) bool {
-	switch k {
-	case FieldConditions, FieldVisibleFields:
-		return true
-	default:
-		return false
-	}
+	return k == FieldConditions || k == FieldVisibleFields
 }
 
 // isCloudCredentialSecret checks if a secret is a cloud credential secret based on its type
@@ -37,7 +32,7 @@ func namespaceMatches(secret *corev1.Secret, namespace string) bool {
 	if namespace == metav1.NamespaceAll {
 		return true
 	}
-	return secret.Labels[LabelCloudCredentialNamespace] == namespace
+	return secret.Labels[CloudCredentialNamespaceLabel] == namespace
 }
 
 // toSecret converts a CloudCredential object into the equivalent Secret resource.
@@ -73,13 +68,13 @@ func toSecret(credential *ext.CloudCredential, owner string) (*corev1.Secret, er
 	for k, v := range credential.Labels {
 		secret.Labels[k] = v
 	}
-	secret.Labels[LabelCloudCredential] = "true"
-	secret.Labels[LabelCloudCredentialName] = credential.Name
+	secret.Labels[CloudCredentialLabel] = "true"
+	secret.Labels[CloudCredentialNameLabel] = credential.Name
 	if credential.Namespace != "" {
-		secret.Labels[LabelCloudCredentialNamespace] = credential.Namespace
+		secret.Labels[CloudCredentialNamespaceLabel] = credential.Namespace
 	}
 	if owner != "" {
-		secret.Labels[LabelCloudCredentialOwner] = sanitizeLabelValue(owner)
+		secret.Labels[CloudCredentialOwnerLabel] = sanitizeLabelValue(owner)
 	}
 
 	// Set annotations
@@ -90,13 +85,13 @@ func toSecret(credential *ext.CloudCredential, owner string) (*corev1.Secret, er
 		secret.Annotations[k] = v
 	}
 	if credential.Spec.Description != "" {
-		secret.Annotations[AnnotationDescription] = credential.Spec.Description
+		secret.Annotations[CloudCredentialDescriptionAnnotation] = credential.Spec.Description
 	}
 	if owner != "" {
-		secret.Annotations[AnnotationCreatorID] = owner
+		secret.Annotations[CreatorIDAnnotation] = owner
 	}
-	// Drop last-applied-configuration because it can leak credential data.
-	delete(secret.Annotations, AnnotationLastAppliedConfig)
+	// Drop kubectl's last-applied annotation because it can leak credential data.
+	delete(secret.Annotations, corev1.LastAppliedConfigAnnotation)
 
 	// Copy finalizers and owner references
 	secret.Finalizers = append(secret.Finalizers, credential.Finalizers...)
@@ -146,7 +141,7 @@ func fromSecret(secret *corev1.Secret, dynamicSchemaCache mgmtv3.DynamicSchemaCa
 	}
 
 	// Get the CloudCredential name from the label
-	credName := secret.Labels[LabelCloudCredentialName]
+	credName := secret.Labels[CloudCredentialNameLabel]
 	if credName == "" {
 		// Fallback to secret name if label is missing
 		credName = secret.Name
@@ -156,7 +151,7 @@ func fromSecret(secret *corev1.Secret, dynamicSchemaCache mgmtv3.DynamicSchemaCa
 	}
 
 	// Get the original namespace from the label
-	credNamespace := secret.Labels[LabelCloudCredentialNamespace]
+	credNamespace := secret.Labels[CloudCredentialNamespaceLabel]
 
 	credential := &ext.CloudCredential{
 		TypeMeta: metav1.TypeMeta{
@@ -175,7 +170,7 @@ func fromSecret(secret *corev1.Secret, dynamicSchemaCache mgmtv3.DynamicSchemaCa
 		Spec: ext.CloudCredentialSpec{
 			Type: credType,
 			// Credentials and VisibleFields are intentionally left empty (write-only).
-			Description: secret.Annotations[AnnotationDescription],
+			Description: secret.Annotations[CloudCredentialDescriptionAnnotation],
 		},
 		Status: ext.CloudCredentialStatus{
 			// Reference to the backing secret
@@ -193,7 +188,7 @@ func fromSecret(secret *corev1.Secret, dynamicSchemaCache mgmtv3.DynamicSchemaCa
 	credential.Labels = make(map[string]string)
 	for k, v := range secret.Labels {
 		switch k {
-		case LabelCloudCredential, LabelCloudCredentialName, LabelCloudCredentialNamespace:
+		case CloudCredentialLabel, CloudCredentialNameLabel, CloudCredentialNamespaceLabel:
 			// Skip internal labels
 		default:
 			credential.Labels[k] = v
@@ -204,7 +199,7 @@ func fromSecret(secret *corev1.Secret, dynamicSchemaCache mgmtv3.DynamicSchemaCa
 	credential.Annotations = make(map[string]string)
 	for k, v := range secret.Annotations {
 		switch k {
-		case AnnotationDescription, AnnotationLastAppliedConfig:
+		case CloudCredentialDescriptionAnnotation, corev1.LastAppliedConfigAnnotation:
 			// Skip internal annotations and security-sensitive annotations
 		default:
 			credential.Annotations[k] = v
@@ -300,7 +295,7 @@ var (
 	// Field path mappings for managed fields transformation
 	// Since description is now stored in annotations rather than data, we map it appropriately
 	pathSecData           = fieldpath.MakePathOrDie("data")
-	pathSecAnnotationDesc = fieldpath.MakePathOrDie("metadata", "annotations", AnnotationDescription)
+	pathSecAnnotationDesc = fieldpath.MakePathOrDie("metadata", "annotations", CloudCredentialDescriptionAnnotation)
 	pathCredDescription   = fieldpath.MakePathOrDie("spec", "description")
 
 	// secret data reported as status is dropped by the map, as is .data itself
@@ -331,11 +326,11 @@ func toListOptions(listOptions *metav1.ListOptions, userInfo user.Info, isAdmin 
 	}
 
 	secretLabels := labels.Set{
-		LabelCloudCredential: "true",
+		CloudCredentialLabel: "true",
 	}
 
 	if !isAdmin {
-		secretLabels[LabelCloudCredentialOwner] = sanitizeLabelValue(userInfo.GetName())
+		secretLabels[CloudCredentialOwnerLabel] = sanitizeLabelValue(userInfo.GetName())
 	}
 
 	labelSet = labels.Merge(labelSet, secretLabels)

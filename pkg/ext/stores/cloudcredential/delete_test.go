@@ -103,7 +103,7 @@ func TestDeleteCollection(t *testing.T) {
 		h.secretClient.EXPECT().
 			List(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialOwner+"="+readOnlyUser)
+				assert.Contains(t, opts.LabelSelector, CloudCredentialOwnerLabel+"="+readOnlyUser)
 				return &corev1.SecretList{Items: []corev1.Secret{}}, nil
 			})
 
