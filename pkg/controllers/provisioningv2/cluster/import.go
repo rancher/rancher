@@ -66,10 +66,10 @@ func (h *handler) deployAgent(cluster *v1.Cluster, status v1.ClusterStatus) (boo
 	}
 
 	secretName := fmt.Sprintf("%s-kubeconfig", cluster.Spec.ClusterAPIConfig.ClusterName)
-	return true, h.deploy(cluster, cluster.Namespace, secretName, tokenValue)
+	return true, h.deploy(cluster, cluster.Namespace, secretName, tokenValue, status.ClusterName)
 }
 
-func (h *handler) deploy(cluster *v1.Cluster, secretNamespace, secretName string, token string) error {
+func (h *handler) deploy(cluster *v1.Cluster, secretNamespace, secretName, token, clusterID string) error {
 	secret, err := h.secretCache.Get(secretNamespace, secretName)
 	if apierror.IsNotFound(err) {
 		h.clusters.EnqueueAfter(cluster.Namespace, cluster.Name, 2*time.Second)
@@ -95,7 +95,7 @@ func (h *handler) deploy(cluster *v1.Cluster, secretNamespace, secretName string
 		return err
 	}
 
-	resp, err := httpClient.Get(fmt.Sprintf("%s/v3/import/%s.yaml", serverURL, token))
+	resp, err := httpClient.Get(fmt.Sprintf("%s/v3/import/%s_%s.yaml", serverURL, token, clusterID))
 	if err != nil {
 		return err
 	}
