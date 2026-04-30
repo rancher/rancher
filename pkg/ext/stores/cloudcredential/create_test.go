@@ -47,10 +47,10 @@ func TestStoreCreate(t *testing.T) {
 
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-			require.Equal(t, regularUser, secret.Annotations[AnnotationCreatorID])
-			require.Equal(t, sanitizeLabelValue(regularUser), secret.Labels[LabelCloudCredentialOwner])
+			require.Equal(t, regularUser, secret.Annotations[CreatorIDAnnotation])
+			require.Equal(t, sanitizeLabelValue(regularUser), secret.Labels[CloudCredentialOwnerLabel])
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 
@@ -67,11 +67,11 @@ func TestStoreCreate(t *testing.T) {
 		h.expectNamespaceExists()
 
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-			require.Equal(t, adminUser, secret.Annotations[AnnotationCreatorID])
+			require.Equal(t, adminUser, secret.Annotations[CreatorIDAnnotation])
 			require.Equal(t, CredentialNamespace, secret.Namespace)
 			require.Equal(t, SecretTypePrefix+credential.Spec.Type, string(secret.Type))
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 
@@ -192,7 +192,7 @@ func TestSystemStoreCreateCleansUpOnFromSecretFailure(t *testing.T) {
 			Name:      "secret-created",
 			Namespace: CredentialNamespace,
 			Labels: map[string]string{
-				LabelCloudCredentialName: credential.Name,
+				CloudCredentialNameLabel: credential.Name,
 			},
 			ManagedFields: []metav1.ManagedFieldsEntry{
 				{
@@ -226,7 +226,7 @@ func TestCreateWithVisibleFields(t *testing.T) {
 			require.Contains(t, secret.Data, FieldVisibleFields)
 			require.Contains(t, secret.Data, "accessKey")
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 
@@ -254,7 +254,7 @@ func TestRBACCreate(t *testing.T) {
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 
@@ -272,7 +272,7 @@ func TestRBACCreate(t *testing.T) {
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 
@@ -290,7 +290,7 @@ func TestRBACCreate(t *testing.T) {
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 
@@ -308,7 +308,7 @@ func TestRBACCreate(t *testing.T) {
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 

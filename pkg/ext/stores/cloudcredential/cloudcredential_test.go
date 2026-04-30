@@ -182,12 +182,12 @@ func secretForCredential(credential *ext.CloudCredential) *corev1.Secret {
 			ResourceVersion: "1",
 			UID:             typesUID("secret-uid"),
 			Labels: map[string]string{
-				LabelCloudCredential:          "true",
-				LabelCloudCredentialName:      credential.Name,
-				LabelCloudCredentialNamespace: credential.Namespace,
+				CloudCredentialLabel:          "true",
+				CloudCredentialNameLabel:      credential.Name,
+				CloudCredentialNamespaceLabel: credential.Namespace,
 			},
 			Annotations: map[string]string{
-				AnnotationDescription: credential.Spec.Description,
+				CloudCredentialDescriptionAnnotation: credential.Spec.Description,
 			},
 			ManagedFields: []metav1.ManagedFieldsEntry{
 				{
@@ -207,8 +207,8 @@ func secretForCredential(credential *ext.CloudCredential) *corev1.Secret {
 }
 
 func setSecretOwner(secret *corev1.Secret, owner string) {
-	secret.Labels[LabelCloudCredentialOwner] = sanitizeLabelValue(owner)
-	secret.Annotations[AnnotationCreatorID] = owner
+	secret.Labels[CloudCredentialOwnerLabel] = sanitizeLabelValue(owner)
+	secret.Annotations[CreatorIDAnnotation] = owner
 }
 
 type fakeUpdatedObjectInfo struct {
@@ -291,13 +291,13 @@ func TestToSecret(t *testing.T) {
 
 	assert.Equal(t, "existing-secret", secret.Name)
 	assert.Equal(t, CredentialNamespace, secret.Namespace)
-	assert.Equal(t, "true", secret.Labels[LabelCloudCredential])
-	assert.Equal(t, credential.Name, secret.Labels[LabelCloudCredentialName])
-	assert.Equal(t, credential.Namespace, secret.Labels[LabelCloudCredentialNamespace])
-	assert.Equal(t, adminUser, secret.Labels[LabelCloudCredentialOwner])
+	assert.Equal(t, "true", secret.Labels[CloudCredentialLabel])
+	assert.Equal(t, credential.Name, secret.Labels[CloudCredentialNameLabel])
+	assert.Equal(t, credential.Namespace, secret.Labels[CloudCredentialNamespaceLabel])
+	assert.Equal(t, adminUser, secret.Labels[CloudCredentialOwnerLabel])
 
-	assert.Equal(t, adminUser, secret.Annotations[AnnotationCreatorID])
-	assert.Equal(t, credential.Spec.Description, secret.Annotations[AnnotationDescription])
+	assert.Equal(t, adminUser, secret.Annotations[CreatorIDAnnotation])
+	assert.Equal(t, credential.Spec.Description, secret.Annotations[CloudCredentialDescriptionAnnotation])
 	assert.Equal(t, "value", secret.Annotations["custom-annotation"])
 
 	require.Contains(t, secret.Data, "accessKey")
@@ -316,16 +316,16 @@ func TestFromSecret(t *testing.T) {
 			ResourceVersion: "10",
 			UID:             typesUID("secret-uid"),
 			Labels: map[string]string{
-				LabelCloudCredential:          "true",
-				LabelCloudCredentialName:      testCredName,
-				LabelCloudCredentialNamespace: "ns-default",
-				LabelCloudCredentialOwner:     sanitizeLabelValue(adminUser),
+				CloudCredentialLabel:          "true",
+				CloudCredentialNameLabel:      testCredName,
+				CloudCredentialNamespaceLabel: "ns-default",
+				CloudCredentialOwnerLabel:     sanitizeLabelValue(adminUser),
 				"custom":                      "value",
 			},
 			Annotations: map[string]string{
-				AnnotationDescription: "desc",
-				AnnotationCreatorID:   adminUser,
-				"custom-annotation":   "annotation",
+				CloudCredentialDescriptionAnnotation: "desc",
+				CreatorIDAnnotation:                  adminUser,
+				"custom-annotation":                  "annotation",
 			},
 			ManagedFields: []metav1.ManagedFieldsEntry{
 				{FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:data":{}}`)}},
@@ -344,9 +344,9 @@ func TestFromSecret(t *testing.T) {
 	assert.Equal(t, "ns-default", credential.Namespace)
 	assert.Equal(t, "amazon", credential.Spec.Type)
 	assert.Equal(t, "desc", credential.Spec.Description)
-	assert.Equal(t, sanitizeLabelValue(adminUser), credential.Labels[LabelCloudCredentialOwner])
+	assert.Equal(t, sanitizeLabelValue(adminUser), credential.Labels[CloudCredentialOwnerLabel])
 	assert.Equal(t, "value", credential.Labels["custom"])
-	assert.Equal(t, adminUser, credential.Annotations[AnnotationCreatorID])
+	assert.Equal(t, adminUser, credential.Annotations[CreatorIDAnnotation])
 	assert.Equal(t, "annotation", credential.Annotations["custom-annotation"])
 	require.NotNil(t, credential.Status.Secret)
 	assert.Equal(t, secret.Name, credential.Status.Secret.Name)
@@ -544,7 +544,7 @@ func TestRBACCrossVerb(t *testing.T) {
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = "other"
+			secret.Labels[CloudCredentialNameLabel] = "other"
 			return secret, nil
 		})
 		_, err = h.store.Create(ctx, newCredential("other"), nil, nil)
@@ -585,7 +585,7 @@ func TestRBACCrossVerb(t *testing.T) {
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = "other"
+			secret.Labels[CloudCredentialNameLabel] = "other"
 			return secret, nil
 		})
 		_, err = h.store.Create(ctx, newCredential("other"), nil, nil)
@@ -595,7 +595,7 @@ func TestRBACCrossVerb(t *testing.T) {
 		h.secretClient.EXPECT().
 			List(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialOwner+"="+noAccessUser)
+				assert.Contains(t, opts.LabelSelector, CloudCredentialOwnerLabel+"="+noAccessUser)
 				return &corev1.SecretList{Items: []corev1.Secret{}}, nil
 			})
 		listObj, err := h.store.list(ctx, &metav1.ListOptions{})
@@ -628,7 +628,7 @@ func TestRBACCrossVerb(t *testing.T) {
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
-			secret.Labels[LabelCloudCredentialName] = credential.Name
+			secret.Labels[CloudCredentialNameLabel] = credential.Name
 			return secret, nil
 		})
 		_, err := h.store.Create(ctx, credential.DeepCopy(), nil, nil)
@@ -724,12 +724,12 @@ func TestPrintCloudCredential(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "my-cred",
 				CreationTimestamp: metav1.NewTime(fixedNow),
-				Annotations:       map[string]string{AnnotationCreatorID: "u-admin"},
+				Annotations:       map[string]string{CreatorIDAnnotation: "u-admin"},
 			},
 			Spec:   ext.CloudCredentialSpec{Type: "amazonec2", Description: "test cred"},
 			Status: ext.CloudCredentialStatus{},
 		}
-		rows, err := printCloudCredential(cred, printers.GenerateOptions{})
+		rows, err := cloudCredentialToTableRows(cred, printers.GenerateOptions{})
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		cells := rows[0].Cells
@@ -745,9 +745,9 @@ func TestPrintCloudCredential(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "cred"},
 			Spec:       ext.CloudCredentialSpec{Type: "test"},
 		}
-		rows, err := printCloudCredential(cred, printers.GenerateOptions{})
+		rows, err := cloudCredentialToTableRows(cred, printers.GenerateOptions{})
 		require.NoError(t, err)
-		assert.Equal(t, "<unknown>", rows[0].Cells[3])
+		assert.Equal(t, unknownOwnerValue, rows[0].Cells[3])
 	})
 }
 
@@ -770,7 +770,7 @@ func TestToListOptions(t *testing.T) {
 		result, err := toListOptions(opts, &u, true)
 		require.NoError(t, err)
 		assert.Contains(t, result.LabelSelector, "custom=true")
-		assert.Contains(t, result.LabelSelector, LabelCloudCredential+"=true")
+		assert.Contains(t, result.LabelSelector, CloudCredentialLabel+"=true")
 	})
 
 	t.Run("admin with nil options gets empty options", func(t *testing.T) {
@@ -778,7 +778,7 @@ func TestToListOptions(t *testing.T) {
 		u := k8suser.DefaultInfo{Name: "admin"}
 		result, err := toListOptions(&metav1.ListOptions{}, &u, true)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredential+"=true")
+		assert.Contains(t, result.LabelSelector, CloudCredentialLabel+"=true")
 	})
 
 	t.Run("non-admin with no options gets owner selector", func(t *testing.T) {
@@ -787,7 +787,7 @@ func TestToListOptions(t *testing.T) {
 		opts := &metav1.ListOptions{}
 		result, err := toListOptions(opts, &u, false)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredentialOwner+"=user-1")
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=user-1")
 	})
 
 	t.Run("non-admin with nil options gets owner selector", func(t *testing.T) {
@@ -795,7 +795,7 @@ func TestToListOptions(t *testing.T) {
 		u := k8suser.DefaultInfo{Name: "user-1"}
 		result, err := toListOptions(&metav1.ListOptions{}, &u, false)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredentialOwner+"=user-1")
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=user-1")
 	})
 
 	t.Run("system users get sanitized owner selector", func(t *testing.T) {
@@ -803,7 +803,7 @@ func TestToListOptions(t *testing.T) {
 		u := k8suser.DefaultInfo{Name: "system:admin"}
 		result, err := toListOptions(&metav1.ListOptions{}, &u, false)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredentialOwner+"="+sanitizeLabelValue(u.Name))
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"="+sanitizeLabelValue(u.Name))
 	})
 
 	t.Run("non-admin with existing selector merges owner", func(t *testing.T) {
@@ -812,38 +812,38 @@ func TestToListOptions(t *testing.T) {
 		opts := &metav1.ListOptions{LabelSelector: "custom=true"}
 		result, err := toListOptions(opts, &u, false)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredentialOwner+"=user-1")
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=user-1")
 		assert.Contains(t, result.LabelSelector, "custom=true")
 	})
 
 	t.Run("non-admin with same owner in selector passes through", func(t *testing.T) {
 		t.Parallel()
 		u := k8suser.DefaultInfo{Name: "user-1"}
-		opts := &metav1.ListOptions{LabelSelector: LabelCloudCredentialOwner + "=user-1"}
+		opts := &metav1.ListOptions{LabelSelector: CloudCredentialOwnerLabel + "=user-1"}
 		result, err := toListOptions(opts, &u, false)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredentialOwner+"=user-1")
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=user-1")
 	})
 
 	t.Run("system users keep matching explicit owner selector", func(t *testing.T) {
 		t.Parallel()
 		u := k8suser.DefaultInfo{Name: "other:user"}
-		opts := &metav1.ListOptions{LabelSelector: LabelCloudCredentialOwner + "=other_user"}
+		opts := &metav1.ListOptions{LabelSelector: CloudCredentialOwnerLabel + "=other_user"}
 		result, err := toListOptions(opts, &u, false)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredentialOwner+"=other_user")
-		assert.NotContains(t, result.LabelSelector, LabelCloudCredentialOwner+"=other:user")
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=other_user")
+		assert.NotContains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=other:user")
 	})
 
 	t.Run("system users override conflicting owner selector", func(t *testing.T) {
 		t.Parallel()
 		u := k8suser.DefaultInfo{Name: "user:1"}
-		opts := &metav1.ListOptions{LabelSelector: LabelCloudCredentialOwner + "=other-user"}
+		opts := &metav1.ListOptions{LabelSelector: CloudCredentialOwnerLabel + "=other-user"}
 		result, err := toListOptions(opts, &u, false)
 		require.NoError(t, err)
-		assert.Contains(t, result.LabelSelector, LabelCloudCredentialOwner+"="+sanitizeLabelValue(u.Name))
-		assert.NotContains(t, result.LabelSelector, LabelCloudCredentialOwner+"=user:1")
-		assert.NotContains(t, result.LabelSelector, LabelCloudCredentialOwner+"=other-user")
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"="+sanitizeLabelValue(u.Name))
+		assert.NotContains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=user:1")
+		assert.NotContains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=other-user")
 	})
 }
 
@@ -863,7 +863,7 @@ func TestPrintCloudCredentialList(t *testing.T) {
 		},
 	}
 
-	rows, err := printCloudCredentialList(list, printers.GenerateOptions{})
+	rows, err := cloudCredentialListToTableRows(list, printers.GenerateOptions{})
 	require.NoError(t, err)
 	assert.Len(t, rows, 2)
 	assert.Equal(t, "cred1", rows[0].Cells[0])

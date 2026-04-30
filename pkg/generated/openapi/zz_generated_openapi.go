@@ -464,7 +464,7 @@ func schema_pkg_apis_extcattleio_v1_CloudCredentialSpec(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type specifies the cloud provider type (e.g., \"amazon\", \"digitalocean\", \"azure\", \"google\", \"vsphere\"). For generic credentials without validation, use \"generic\".",
+							Description: "Type specifies the service the credential can authenticate with (e.g., \"amazon\", \"digitalocean\", \"azure\", \"google\", \"vsphere\"). If generic credentials are enabled, accepts any string beginning with `x-` and skips validation",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",

@@ -362,8 +362,8 @@ type CloudCredential struct {
 
 // CloudCredentialSpec defines the desired state of CloudCredential.
 type CloudCredentialSpec struct {
-	// Type specifies the cloud provider type (e.g., "amazon", "digitalocean", "azure", "google", "vsphere").
-	// For generic credentials without validation, use "generic".
+	// Type specifies the service the credential can authenticate with (e.g., "amazon", "digitalocean", "azure", "google", "vsphere").
+	// If generic credentials are enabled, accepts any string beginning with `x-` and skips validation
 	// +kubebuilder:validation:Required
 	Type string `json:"type"`
 

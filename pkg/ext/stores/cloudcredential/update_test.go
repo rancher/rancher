@@ -68,7 +68,7 @@ func TestStoreUpdate(t *testing.T) {
 
 		h.secretClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
 			assert.Equal(t, secret.Name, s.Name)
-			assert.Equal(t, adminUser, s.Annotations[AnnotationCreatorID])
+			assert.Equal(t, adminUser, s.Annotations[CreatorIDAnnotation])
 			s.ResourceVersion = "2"
 			return s, nil
 		})
@@ -307,10 +307,10 @@ func TestUpdateStatus(t *testing.T) {
 		h := newSystemStoreHarness(t)
 
 		first := *secretForCredential(newCredential(testCredName))
-		first.Labels[LabelCloudCredentialNamespace] = "ns-a"
+		first.Labels[CloudCredentialNamespaceLabel] = "ns-a"
 		second := *secretForCredential(newCredential(testCredName))
 		second.Name = "second-secret"
-		second.Labels[LabelCloudCredentialNamespace] = "ns-b"
+		second.Labels[CloudCredentialNamespaceLabel] = "ns-b"
 		h.expectSecretListForNameAndNamespace(testCredName, "ns-b", first, second)
 
 		h.secretClient.EXPECT().
