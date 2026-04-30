@@ -42,7 +42,7 @@ func (s *Store) Delete(
 		}
 	}
 
-	if !isAdmin && secret.Labels[LabelCloudCredentialOwner] != sanitizeLabelValue(userInfo.GetName()) {
+	if !isAdmin && secret.Labels[CloudCredentialOwnerLabel] != sanitizeLabelValue(userInfo.GetName()) {
 		return nil, false, apierrors.NewForbidden(GVR.GroupResource(), name, fmt.Errorf("insufficient permissions to delete cloud credentials"))
 	}
 
@@ -110,7 +110,7 @@ func (s *Store) DeleteCollection(
 	for i := range credList.Items {
 		cred := &credList.Items[i]
 
-		if !isAdmin && cred.Labels[LabelCloudCredentialOwner] != sanitizeLabelValue(userInfo.GetName()) {
+		if !isAdmin && cred.Labels[CloudCredentialOwnerLabel] != sanitizeLabelValue(userInfo.GetName()) {
 			return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("insufficient permissions to delete cloud credential: %v", cred.Name))
 		}
 

@@ -21,42 +21,46 @@ import (
 )
 
 const (
-	// CredentialNamespace is the namespace where CloudCredential secrets are stored
+	// CredentialNamespace is the namespace where backing CloudCredential secrets are stored.
 	CredentialNamespace = "cattle-cloud-credentials"
 
-	// SecretTypePrefix is the prefix for the Secret type field to identify cloud credential secrets
+	// SecretTypePrefix prefixes Secret.Type for CloudCredential backing secrets; the suffix is spec.type.
 	SecretTypePrefix = "rke.cattle.io/cloud-credential-"
 
-	// Labels for identifying and categorizing cloud credential secrets
-	LabelCloudCredential          = "cattle.io/cloud-credential"
-	LabelCloudCredentialName      = "cattle.io/cloud-credential-name"
-	LabelCloudCredentialNamespace = "cattle.io/cloud-credential-namespace"
-	LabelCloudCredentialOwner     = "cattle.io/cloud-credential-owner"
+	// CloudCredentialLabel marks Secrets managed by the CloudCredential store.
+	CloudCredentialLabel = "cattle.io/cloud-credential"
+	// CloudCredentialNameLabel stores the CloudCredential metadata.name on the backing Secret.
+	CloudCredentialNameLabel = "cattle.io/cloud-credential-name"
+	// CloudCredentialNamespaceLabel stores the CloudCredential namespace while the backing Secret lives in CredentialNamespace.
+	CloudCredentialNamespaceLabel = "cattle.io/cloud-credential-namespace"
+	// CloudCredentialOwnerLabel stores a sanitized owner value so label selectors can enforce scoped access.
+	CloudCredentialOwnerLabel = "cattle.io/cloud-credential-owner"
+	// CloudCredentialDescriptionAnnotation stores spec.description on the backing Secret.
+	CloudCredentialDescriptionAnnotation = "cattle.io/cloud-credential-description"
+	// CreatorIDAnnotation stores the unsanitized creator ID for display and filtering by the UI.
+	CreatorIDAnnotation = "field.cattle.io/creatorId"
 
-	// Annotations for cloud credential metadata
-	AnnotationDescription = "cattle.io/cloud-credential-description"
-	AnnotationCreatorID   = "field.cattle.io/creatorId"
-
-	// AnnotationLastAppliedConfig is the standard kubectl annotation that leaks credential data.
-	// It is always stripped from both the backing secret and the returned CloudCredential.
-	AnnotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
-
-	// GeneratePrefix is the prefix used for generated credential secret names
+	// GeneratePrefix is the prefix used for generated backing Secret names.
 	GeneratePrefix = "cc-"
 
-	// GenericTypePrefix is the prefix required for generic credential types
+	// GenericTypePrefix is the prefix required for generic credential types.
 	GenericTypePrefix = "x-"
 
 	// CredentialConfigSuffix is appended to the type to form the credential config schema name.
 	// Must be lowercase to match how DynamicSchemas are registered by node drivers and KEv2 operators.
 	CredentialConfigSuffix = "credentialconfig"
 
-	// Data field names used in the backing secret for status information
-	FieldConditions    = "conditions"
+	// FieldConditions stores marshaled status.conditions in backing Secret data.
+	FieldConditions = "conditions"
+	// FieldVisibleFields stores the per-credential visible field override in backing Secret data.
 	FieldVisibleFields = "visibleFields"
 
+	// SingularName is the storage singular for CloudCredential resources.
 	SingularName = "cloudcredential"
-	PluralName   = SingularName + "s"
+	// PluralName is the storage plural for CloudCredential resources.
+	PluralName = SingularName + "s"
+
+	unknownOwnerValue = "<unknown>"
 )
 
 var (
@@ -74,7 +78,7 @@ var (
 	GVR = schema.GroupVersionResource{
 		Group:    GV.Group,
 		Version:  GV.Version,
-		Resource: "cloudcredentials",
+		Resource: PluralName,
 	}
 )
 
@@ -159,6 +163,10 @@ func (s *Store) New() runtime.Object {
 	return obj
 }
 
+// Destroy implements [rest.Storage]
+func (s *Store) Destroy() {
+}
+
 // userFrom extracts user info from context and checks cloud credential access.
 // Returns the user info, whether they have full access to cloudcredentials, and
 // whether they have the specific verb permission.
@@ -185,10 +193,6 @@ func (s *Store) userFrom(ctx context.Context, verb string) (user.Info, bool, err
 	return userInfo, decision == authorizer.DecisionAllow, err
 }
 
-// Destroy implements [rest.Storage]
-func (s *Store) Destroy() {
-}
-
 // ConvertToTable implements [rest.TableConvertor]
 func (s *Store) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return s.tableConverter.ConvertToTable(ctx, obj, tableOptions)
@@ -198,25 +202,25 @@ func (s *Store) ConvertToTable(ctx context.Context, obj runtime.Object, tableOpt
 func printHandler(h printers.PrintHandler) {
 	columnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Type", Type: "string", Description: "Type is the cloud provider type"},
+		{Name: "Type", Type: "string", Description: "Type specifies the service the credential can authenticate with"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Owner", Type: "string", Priority: 1, Description: "Owner is the user who owns this credential"},
 		{Name: "Description", Type: "string", Priority: 1, Description: "Description is a human readable description of the credential"},
 	}
-	_ = h.TableHandler(columnDefinitions, printCloudCredentialList)
-	_ = h.TableHandler(columnDefinitions, printCloudCredential)
+	_ = h.TableHandler(columnDefinitions, cloudCredentialListToTableRows)
+	_ = h.TableHandler(columnDefinitions, cloudCredentialToTableRows)
 }
 
-// printCloudCredential prints a single CloudCredential object as a table row.
-func printCloudCredential(credential *ext.CloudCredential, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	owner := "<unknown>"
+// cloudCredentialToTableRows converts a single CloudCredential into table rows.
+func cloudCredentialToTableRows(credential *ext.CloudCredential, _ printers.GenerateOptions) ([]metav1.TableRow, error) {
+	owner := unknownOwnerValue
 	if credential.Annotations != nil {
-		if ownerAnnotation, ok := credential.Annotations[AnnotationCreatorID]; ok && ownerAnnotation != "" {
+		if ownerAnnotation, ok := credential.Annotations[CreatorIDAnnotation]; ok && ownerAnnotation != "" {
 			owner = ownerAnnotation
 		}
 	}
-	if owner == "<unknown>" && credential.Labels != nil {
-		if ownerLabel, ok := credential.Labels[LabelCloudCredentialOwner]; ok && ownerLabel != "" {
+	if owner == unknownOwnerValue && credential.Labels != nil {
+		if ownerLabel, ok := credential.Labels[CloudCredentialOwnerLabel]; ok && ownerLabel != "" {
 			owner = ownerLabel
 		}
 	}
@@ -235,11 +239,11 @@ func printCloudCredential(credential *ext.CloudCredential, options printers.Gene
 	}}, nil
 }
 
-// printCloudCredentialList prints a list of CloudCredential objects as table rows.
-func printCloudCredentialList(credentialList *ext.CloudCredentialList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+// cloudCredentialListToTableRows converts a CloudCredential list into table rows.
+func cloudCredentialListToTableRows(credentialList *ext.CloudCredentialList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(credentialList.Items))
 	for i := range credentialList.Items {
-		r, err := printCloudCredential(&credentialList.Items[i], options)
+		r, err := cloudCredentialToTableRows(&credentialList.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
@@ -250,10 +254,10 @@ func printCloudCredentialList(credentialList *ext.CloudCredentialList, options p
 
 // Interface implementations
 var (
-	_ rest.Creater = &Store{}
-	_ rest.Getter  = &Store{}
-	_ rest.Lister  = &Store{}
-	//_ rest.Watcher                  = &Store{}
+	_ rest.Creater                  = &Store{}
+	_ rest.Getter                   = &Store{}
+	_ rest.Lister                   = &Store{}
+	_ rest.Watcher                  = &Store{}
 	_ rest.GracefulDeleter          = &Store{}
 	_ rest.CollectionDeleter        = &Store{}
 	_ rest.Updater                  = &Store{}

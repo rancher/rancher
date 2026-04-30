@@ -37,7 +37,7 @@ func (s *Store) Get(
 	}
 
 	// Non-admin users can only see their own credentials
-	if !isAdmin && secret.Labels[LabelCloudCredentialOwner] != sanitizeLabelValue(userInfo.GetName()) {
+	if !isAdmin && secret.Labels[CloudCredentialOwnerLabel] != sanitizeLabelValue(userInfo.GetName()) {
 		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
@@ -53,9 +53,9 @@ func (s *Store) Get(
 // The name parameter is the CloudCredential name (stored in the label), not the Secret name.
 func (s *SystemStore) GetSecret(name, namespace string) (*corev1.Secret, error) {
 	// Find the secret by CloudCredential name label
-	ls := labels.SelectorFromSet(map[string]string{LabelCloudCredentialName: name})
+	ls := labels.SelectorFromSet(map[string]string{CloudCredentialNameLabel: name})
 	if namespace != metav1.NamespaceAll {
-		req, err := labels.NewRequirement(LabelCloudCredentialNamespace, "=", []string{namespace})
+		req, err := labels.NewRequirement(CloudCredentialNamespaceLabel, "=", []string{namespace})
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +98,7 @@ func (s *Store) List(ctx context.Context, internaloptions *metainternalversion.L
 	// Extract namespace from request context and filter by it
 	namespace := request.NamespaceValue(ctx)
 	if namespace != metav1.NamespaceAll {
-		labelSelector := fmt.Sprintf("%s=%s", LabelCloudCredentialNamespace, namespace)
+		labelSelector := fmt.Sprintf("%s=%s", CloudCredentialNamespaceLabel, namespace)
 		if options.LabelSelector == "" {
 			options.LabelSelector = labelSelector
 		} else {
@@ -127,9 +127,9 @@ func (s *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Clo
 func (s *SystemStore) list(options *metav1.ListOptions) (*ext.CloudCredentialList, error) {
 	// Add label selector to only get cloud credential secrets
 	if options.LabelSelector == "" {
-		options.LabelSelector = fmt.Sprintf("%s=true", LabelCloudCredential)
+		options.LabelSelector = fmt.Sprintf("%s=true", CloudCredentialLabel)
 	} else {
-		options.LabelSelector = fmt.Sprintf("%s,%s=true", options.LabelSelector, LabelCloudCredential)
+		options.LabelSelector = fmt.Sprintf("%s,%s=true", options.LabelSelector, CloudCredentialLabel)
 	}
 
 	secrets, err := s.secretClient.List(CredentialNamespace, *options)

@@ -94,10 +94,10 @@ func TestSystemStoreGetSecret(t *testing.T) {
 	t.Run("filters listed secrets by request namespace", func(t *testing.T) {
 		h := newSystemStoreHarness(t)
 		first := *secretForCredential(newCredential(testCredName))
-		first.Labels[LabelCloudCredentialNamespace] = "ns-a"
+		first.Labels[CloudCredentialNamespaceLabel] = "ns-a"
 		second := *secretForCredential(newCredential(testCredName))
 		second.Name = "second-secret"
-		second.Labels[LabelCloudCredentialNamespace] = "ns-b"
+		second.Labels[CloudCredentialNamespaceLabel] = "ns-b"
 		h.expectSecretListForNameAndNamespace(testCredName, "ns-b", first, second)
 
 		result, err := h.store.SystemStore.GetSecret(testCredName, "ns-b")
@@ -145,8 +145,8 @@ func TestStoreList(t *testing.T) {
 		h.secretClient.EXPECT().
 			List(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialNamespace+"=user-ns")
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredential+"=true")
+				assert.Contains(t, opts.LabelSelector, CloudCredentialNamespaceLabel+"=user-ns")
+				assert.Contains(t, opts.LabelSelector, CloudCredentialLabel+"=true")
 				return &corev1.SecretList{}, nil
 			})
 
@@ -162,8 +162,8 @@ func TestStoreList(t *testing.T) {
 		h.secretClient.EXPECT().
 			List(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
-				assert.NotContains(t, opts.LabelSelector, LabelCloudCredentialNamespace)
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredential+"=true")
+				assert.NotContains(t, opts.LabelSelector, CloudCredentialNamespaceLabel)
+				assert.Contains(t, opts.LabelSelector, CloudCredentialLabel+"=true")
 				return &corev1.SecretList{}, nil
 			})
 
@@ -531,7 +531,7 @@ func TestRBACList(t *testing.T) {
 		h.secretClient.EXPECT().
 			List(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialOwner+"="+readOnlyUser,
+				assert.Contains(t, opts.LabelSelector, CloudCredentialOwnerLabel+"="+readOnlyUser,
 					"list should include owner label selector for non-admin users")
 				return &corev1.SecretList{Items: []corev1.Secret{}}, nil
 			})
@@ -547,7 +547,7 @@ func TestRBACList(t *testing.T) {
 		h.secretClient.EXPECT().
 			List(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialOwner+"="+noAccessUser)
+				assert.Contains(t, opts.LabelSelector, CloudCredentialOwnerLabel+"="+noAccessUser)
 				return &corev1.SecretList{Items: []corev1.Secret{}}, nil
 			})
 
@@ -636,7 +636,7 @@ func TestRBACWatch(t *testing.T) {
 		h.secretClient.EXPECT().
 			Watch(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (watch.Interface, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialOwner+"="+noAccessUser)
+				assert.Contains(t, opts.LabelSelector, CloudCredentialOwnerLabel+"="+noAccessUser)
 				return fakeWatcher, nil
 			})
 
@@ -679,7 +679,7 @@ func TestWatch(t *testing.T) {
 		h.secretClient.EXPECT().
 			Watch(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (watch.Interface, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialOwner+"="+noAccessUser)
+				assert.Contains(t, opts.LabelSelector, CloudCredentialOwnerLabel+"="+noAccessUser)
 				return fakeWatcher, nil
 			})
 
@@ -732,7 +732,7 @@ func TestWatch(t *testing.T) {
 		h.secretClient.EXPECT().
 			Watch(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (watch.Interface, error) {
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredentialOwner+"="+readOnlyUser,
+				assert.Contains(t, opts.LabelSelector, CloudCredentialOwnerLabel+"="+readOnlyUser,
 					"watch should include owner label selector for non-admin users")
 				return fakeWatcher, nil
 			})
@@ -846,7 +846,7 @@ func TestSystemStoreListErrors(t *testing.T) {
 			List(CredentialNamespace, gomock.Any()).
 			DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
 				assert.Contains(t, opts.LabelSelector, "custom-label=foo")
-				assert.Contains(t, opts.LabelSelector, LabelCloudCredential+"=true")
+				assert.Contains(t, opts.LabelSelector, CloudCredentialLabel+"=true")
 				return &corev1.SecretList{}, nil
 			})
 
