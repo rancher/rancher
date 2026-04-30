@@ -3,12 +3,12 @@ package keycloakoidc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
-	"github.com/pkg/errors"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -151,12 +151,12 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.T
 	var externalID string
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return apiv3.Principal{}, errors.Errorf("invalid id %v", principalID)
+		return apiv3.Principal{}, fmt.Errorf("invalid id %v", principalID)
 	}
 	externalID = strings.TrimPrefix(parts[1], "//")
 	parts = strings.SplitN(parts[0], "_", 2)
 	if len(parts) != 2 {
-		return apiv3.Principal{}, errors.Errorf("invalid id %v", principalID)
+		return apiv3.Principal{}, fmt.Errorf("invalid id %v", principalID)
 	}
 	principalType := parts[1]
 	keyCloakClient, err := k.newClient(config, token)
@@ -212,6 +212,13 @@ func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oau
 
 	reusedToken, err := oauth2.ReuseTokenSource(oauthToken, oauthConfig.TokenSource(ctx, oauthToken)).Token()
 	if err != nil {
+		// invalid_grant means the refresh token was revoked at the IdP (e.g. session
+		// deleted in Keycloak). This won't resolve on retry, so surface it as
+		// NonTransientError to stop the controller from requeuing.
+		var retrieveErr *oauth2.RetrieveError
+		if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant" {
+			return oauthToken, &common.NonTransientError{Err: fmt.Errorf("setting up reusable token: %w", err)}
+		}
 		return oauthToken, fmt.Errorf("setting up reusable token: %w", err)
 	}
 

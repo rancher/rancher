@@ -1,6 +1,7 @@
 package providerrefresh
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -246,6 +247,14 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 			} else {
 				newGroupPrincipals, err = providers.RefetchGroupPrincipals(principalID, providerName, secret)
 				if err != nil {
+					// Non-transient errors (e.g. invalid_grant when the user's IdP session
+					// is revoked) must propagate to the controller so it can annotate the
+					// UserAttribute and stop requeuing. Without this, the loop continues
+					// to GetPrincipal which hits the same issue and keeps requeuing.
+					var nte *common.NonTransientError
+					if errors.As(err, &nte) {
+						return nil, err
+					}
 					// In the case that we cant access a server, we still want to continue refreshing, but
 					// we no longer want to disable derived tokens, or remove their login tokens for this provider.
 					if err.Error() != "no access" {

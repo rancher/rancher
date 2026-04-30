@@ -686,6 +686,97 @@ func TestTriggerUserRefreshSkipsAnnotatedUser(t *testing.T) {
 		"Update should not be called for annotated user attribute")
 }
 
+func TestRefreshAttributesNonTransientError(t *testing.T) {
+	t.Parallel()
+
+	const providerName = "testoidc"
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "user-abcde"},
+		PrincipalIDs: []string{providerName + "_user://some-guid"},
+	}
+
+	attribs := &apiv3.UserAttribute{
+		ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+		GroupPrincipals: map[string]apiv3.Principals{},
+		ExtraByProvider: map[string]map[string][]string{},
+	}
+
+	loginToken := &apiv3.Token{
+		UserID:       "user-abcde",
+		IsDerived:    false,
+		AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://some-guid"},
+			Provider:   providerName,
+		},
+	}
+
+	providers.ProviderNames = map[string]bool{
+		providerName: true,
+	}
+	providers.Providers = map[string]common.AuthProvider{
+		providerName: &mockNonTransientProvider{},
+	}
+
+	ctrl := gomock.NewController(t)
+	secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+
+	users.EXPECT().Cache().Return(nil)
+	secrets.EXPECT().Cache().Return(scache)
+	scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+	tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+	var tokenDeleteCalled, tokenUpdateCalled bool
+	r := &refresher{
+		tokenLister: &fakes.TokenListerMock{
+			ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+				return []*apiv3.Token{loginToken}, nil
+			},
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(_, _ string) (*apiv3.User, error) {
+				return user, nil
+			},
+		},
+		tokens: &fakes.TokenInterfaceMock{
+			DeleteFunc: func(_ string, _ *metav1.DeleteOptions) error {
+				tokenDeleteCalled = true
+				return nil
+			},
+		},
+		tokenMGR: tokens.NewMockedManager(tokenClient),
+		extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+			exttokens.NewTimeHandler(),
+			exttokens.NewHashHandler(),
+			exttokens.NewAuthHandler()),
+	}
+
+	got, err := r.refreshAttributes(attribs)
+	assert.Nil(t, got)
+	assert.Error(t, err)
+
+	var nte *common.NonTransientError
+	assert.ErrorAs(t, err, &nte)
+	assert.False(t, tokenDeleteCalled, "tokens should not be deleted when NonTransientError is returned")
+	assert.False(t, tokenUpdateCalled, "tokens should not be updated when NonTransientError is returned")
+}
+
+type mockNonTransientProvider struct {
+	mockLocalProvider
+}
+
+func (p *mockNonTransientProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	return nil, &common.NonTransientError{Err: fmt.Errorf("oauth2: invalid_grant: Session not active")}
+}
+
+func (p *mockNonTransientProvider) IsDisabledProvider() (bool, error) {
+	return false, nil
+}
+
 type mockLocalProvider struct {
 	canAccess   bool
 	disabled    bool
