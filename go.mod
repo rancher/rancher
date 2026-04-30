@@ -133,7 +133,7 @@ require (
 	github.com/rancher/shepherd v0.0.0-20260427181519-3a8ec0abcf3c
 	github.com/rancher/steve v0.9.5
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
-	github.com/rancher/wrangler/v3 v3.6.0-rc.1
+	github.com/rancher/wrangler/v3 v3.6.0-rc.2
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
@@ -146,7 +146,7 @@ require (
 	golang.org/x/net v0.52.0
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/text v0.35.0
+	golang.org/x/text v0.36.0
 	google.golang.org/api v0.269.0
 	google.golang.org/grpc v1.79.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
