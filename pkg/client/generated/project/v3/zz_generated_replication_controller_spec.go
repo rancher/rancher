@@ -38,6 +38,7 @@ const (
 	ReplicationControllerSpecFieldScale                         = "scale"
 	ReplicationControllerSpecFieldScheduling                    = "scheduling"
 	ReplicationControllerSpecFieldSchedulingGates               = "schedulingGates"
+	ReplicationControllerSpecFieldSchedulingGroup               = "schedulingGroup"
 	ReplicationControllerSpecFieldSeccompProfile                = "seccompProfile"
 	ReplicationControllerSpecFieldSelector                      = "selector"
 	ReplicationControllerSpecFieldServiceAccountName            = "serviceAccountName"
@@ -51,7 +52,6 @@ const (
 	ReplicationControllerSpecFieldUid                           = "uid"
 	ReplicationControllerSpecFieldVolumes                       = "volumes"
 	ReplicationControllerSpecFieldWindowsOptions                = "windowsOptions"
-	ReplicationControllerSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type ReplicationControllerSpec struct {
@@ -91,6 +91,7 @@ type ReplicationControllerSpec struct {
 	Scale                         *int64                         `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      map[string]string              `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -104,5 +105,4 @@ type ReplicationControllerSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }

@@ -7,7 +7,7 @@ env:
   HOST_ARCH: amd64
   ARCH: amd64
   PYTHON_VERSION: '3.11'
-  GOLANG_VERSION: '1.25'
+  GOLANG_VERSION: '1.26'
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}
@@ -95,7 +95,7 @@ jobs:
           CATTLE_KDM_BRANCH: ${{ steps.env.outputs.CATTLE_KDM_BRANCH }}
         run: |
           mkdir -p bin
-          curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > bin/data.json
+          curl -sLf oda/${CATTLE_KDM_BRANCH}/data/data.json" > bin/data.json
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:

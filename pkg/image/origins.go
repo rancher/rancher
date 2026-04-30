@@ -274,7 +274,7 @@ var OriginMap = map[string]string{
 	"supportability-review-operator":                          "https://github.com/rancher/supportability-review",
 	"scc-operator":                                            "https://github.com/rancher/scc-operator",
 	"security-scan":                                           "https://github.com/rancher/security-scan",
-	"shell":                                                   "https://github.com/rancher/shell",
+	"shell":                                                   "https://github.com/rancher-teja/shell",
 	"system-agent":                                            "https://github.com/rancher/system-agent",
 	"system-agent-installer-k3s":                              "https://github.com/rancher/system-agent-installer-k3s",
 	"system-agent-installer-rke2":                             "https://github.com/rancher/system-agent-installer-rke2",

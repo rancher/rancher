@@ -7,7 +7,7 @@ spec:
   customBenchmarkConfigMapName: sample-ssb-1.0
   customBenchmarkConfigMapNamespace: rancher-compliance-system
   minKubernetesVersion: '1.30.0'
-  maxKubernetesVersion: '1.36.0'
+  maxKubernetesVersion: '1.37.0'
 ---
 apiVersion: v1
 kind: ConfigMap

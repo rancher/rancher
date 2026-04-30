@@ -1,40 +1,15 @@
-# Dockerfile.runtime — Rancher build and test environment
-#
-# This image is the container in which all "make <target>" commands run.
-# It is built automatically by scripts/container-run the first time (or when
-# this file changes), then reused from the local Docker image cache.
-#
-# You do not need to interact with this file directly. Use make:
-#
-#   make build             # compile rancher and agent binaries
-#   make test              # run unit tests
-#   make package           # build the rancher container image
-#   make ci                # full CI build (default)
-#
-# The image is tagged with a content hash of this file, so any change here
-# automatically triggers a rebuild on the next make invocation.
-#
-# Key contents:
-#   - Go toolchain (from registry.suse.com/bci/golang)
-#   - Docker CLI + buildx (for building container images inside the container)
-#   - K3s binaries (for integration tests that spin up a local cluster)
-#   - k3d (for provisioning tests)
-#   - golangci-lint (amd64 only)
-#   - rancher-machine
-#   - Python 3.11 + tox (for validation/integration test suites)
-
-FROM registry.suse.com/bci/golang:1.25
+FROM registry.suse.com/bci/golang:1.26
 
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
 ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher142
-ENV CATTLE_K3S_VERSION=v1.35.4+k3s1
+ENV CATTLE_K3S_VERSION=v1.36.0-rc1+k3s1
 ENV HELM_UNITTEST_VERSION=1.0.3
 # k3d ci version
 ENV K3D_VERSION=v5.7.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.15
+ENV CATTLE_KDM_BRANCH=dev-v2.15-pr
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
@@ -54,7 +29,7 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
     fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.35.4-k3s1 \
+COPY --from=rancher/k3s:v1.36.0-rc1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
