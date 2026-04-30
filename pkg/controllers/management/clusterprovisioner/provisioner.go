@@ -37,7 +37,6 @@ type Provisioner struct {
 	Clusters              v3.ClusterInterface
 	ConfigMaps            corev1.ConfigMapInterface
 	NodeLister            v3.NodeLister
-	Nodes                 v3.NodeInterface
 	engineService         *service.EngineService
 	backoff               *flowcontrol.Backoff
 	KontainerDriverLister v3.KontainerDriverLister
@@ -54,7 +53,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		ConfigMaps:            management.Core.ConfigMaps(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
-		Nodes:                 management.Management.Nodes(""),
 		backoff:               flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
@@ -64,7 +62,13 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	}
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
-	management.Management.Nodes("").AddHandler(ctx, "cluster-provisioner-controller", p.machineChanged)
+
+	// NOTE: there used to be a Machines handler here, that would Enqueue() the corresponding mgmt.Cluster on every reconciliation
+	// This was not optimal, given that any reconciliation from any of the possibly dozens or even hundreds or nodes per cluster would
+	// unconditionally execute not only all management.Cluster handlers, but also associated types, like provisioning Clusters
+	// The hierarchy is indeed more complex, as there is core/v1.Nodes -> mgmt/v3.Nodes -> mgmt/v3.Clusters -> provisioning/v1.Clusters relationships
+	// In fact, there is already another Machine->Cluster trigger in "cluster-stats" controller, which is explicitly rate-limited,
+	// so this relationship is actually preserved.
 }
 
 func skipOperatorCluster(action string, cluster *apimgmtv3.Cluster) bool {
@@ -353,14 +357,6 @@ func (p *Provisioner) update(cluster *apimgmtv3.Cluster, create bool) (*apimgmtv
 	}
 
 	return cluster, nil
-}
-
-func (p *Provisioner) machineChanged(key string, machine *apimgmtv3.Node) (runtime.Object, error) {
-	parts := strings.SplitN(key, "/", 2)
-
-	p.ClusterController.Enqueue("", parts[0])
-
-	return machine, nil
 }
 
 func (p *Provisioner) Create(cluster *apimgmtv3.Cluster) (runtime.Object, error) {
