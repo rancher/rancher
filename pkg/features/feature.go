@@ -217,6 +217,13 @@ var (
 		false,
 		true,
 	)
+	ClusterShell = newFeature(
+		"cluster-shell",
+		"Enable the Rancher cluster shell feature",
+		true,
+		false,
+		true,
+	)
 )
 
 func ListEnabled() []string {
