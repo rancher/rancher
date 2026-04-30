@@ -510,7 +510,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 
 	tunnelAuth := &tunnelserver.Authorizers{}
 	tunnelServer := remotedialer.New(tunnelAuth.Authorize, tunnelserver.ErrorWriter)
-	peerManager, err := tunnelserver.NewPeerManager(ctx, core.Core().V1().Endpoints(), tunnelServer)
+	peerManager, err := tunnelserver.NewPeerManager(ctx, core.Core().V1().Endpoints(), core.Core().V1().Service(), tunnelServer)
 	if err != nil {
 		return nil, err
 	}
