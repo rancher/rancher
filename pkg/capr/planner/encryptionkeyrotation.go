@@ -356,9 +356,7 @@ func encryptionKeyRotationIsSuitableControlPlane(entry *planEntry) bool {
 // Control-plane nodes are restarted after that and are used for convergence checks.
 func encryptionKeyRotationRestartTargetsForCluster(clusterPlan *plan.Plan) encryptionKeyRotationRestartTargets {
 	return encryptionKeyRotationRestartTargets{
-		etcdOnly: collect(clusterPlan, func(entry *planEntry) bool {
-			return isEtcd(entry) && !isControlPlane(entry)
-		}),
+		etcdOnly:     collect(clusterPlan, IsOnlyEtcd),
 		controlPlane: collect(clusterPlan, isControlPlane),
 	}
 }
@@ -412,7 +410,7 @@ func (p *Planner) encryptionKeyRotationRestartService(controlPlane *rkev1.RKECon
 			}
 			return encryptionKeyRotationRuntimeStatus{}, status, err
 		}
-		status, err = p.encryptionKeyRotationFailed(status, err)
+		status, err = p.encryptionKeyRotationFailedRequiringEtcdRestore(status, err)
 		return encryptionKeyRotationRuntimeStatus{}, status, err
 	}
 
@@ -472,6 +470,8 @@ func (p *Planner) encryptionKeyRotationRestartPlan(controlPlane *rkev1.RKEContro
 		nodePlan.Instructions = append(nodePlan.Instructions,
 			encryptionKeyRotationWaitForSecretsEncryptStatus(controlPlane),
 		)
+		// The wait instruction gates command availability after restart. Periodic
+		// status is kept as the convergence source while the planner requeues.
 		nodePlan.PeriodicInstructions = []plan.PeriodicInstruction{
 			encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(controlPlane),
 		}
@@ -511,7 +511,7 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 			}
 			return encryptionKeyRotationRuntimeStatus{}, status, errWaitingf("waiting for encryption key rotation status after rotate-keys timeout on leader [%s]: %v", leader.Machine.Name, err)
 		}
-		status, err = p.encryptionKeyRotationFailed(status, err)
+		status, err = p.encryptionKeyRotationFailedRequiringEtcdRestore(status, err)
 		return encryptionKeyRotationRuntimeStatus{}, status, err
 	}
 
@@ -591,9 +591,11 @@ func encryptionKeyRotationStatusFromOutput(output string) (encryptionKeyRotation
 	}
 
 	if status.Stage == "" {
+		logrus.Debugf("[planner] unable to parse encryption key rotation stage from secrets-encrypt status output: %q", output)
 		return encryptionKeyRotationRuntimeStatus{}, errWaitingf("unable to parse rotation stage from output")
 	}
 	if !strings.Contains(output, "Server Encryption Hashes:") {
+		logrus.Debugf("[planner] unable to parse encryption key rotation hashes from secrets-encrypt status output: %q", output)
 		return encryptionKeyRotationRuntimeStatus{}, errWaitingf("unable to parse rotation hashes from output")
 	}
 
@@ -726,6 +728,8 @@ func encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(controlPlane *
 	}
 }
 
+// encryptionKeyRotationWaitForSystemctlStatusInstruction waits for the node to
+// come back after restart and respond to systemctl status before continuing.
 func encryptionKeyRotationWaitForSystemctlStatusInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
 		Name:    "wait-for-systemctl-status",
@@ -742,6 +746,9 @@ func encryptionKeyRotationWaitForSystemctlStatusInstruction(controlPlane *rkev1.
 	}
 }
 
+// encryptionKeyRotationWaitForSecretsEncryptStatus waits for a restarted
+// control-plane node to respond to secrets-encrypt status before periodic status
+// output is used for convergence checks.
 func encryptionKeyRotationWaitForSecretsEncryptStatus(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
 		Name:    "wait-for-secrets-encrypt-status",
@@ -769,10 +776,23 @@ func (p *Planner) encryptionKeyRotationHandleFailure(controlPlane *rkev1.RKECont
 	return status, err
 }
 
+// encryptionKeyRotationFailed marks the rotation failed and clears the stored
+// leader for failures that do not imply downstream encryption state changed.
 func (p *Planner) encryptionKeyRotationFailed(status rkev1.RKEControlPlaneStatus, err error) (rkev1.RKEControlPlaneStatus, error) {
+	return p.encryptionKeyRotationFailedWithMessage(status, err, "encryption key rotation failed")
+}
+
+// encryptionKeyRotationFailedRequiringEtcdRestore marks the rotation failed for
+// errors that happen while running rotate-keys or after it may have changed
+// downstream encryption state.
+func (p *Planner) encryptionKeyRotationFailedRequiringEtcdRestore(status rkev1.RKEControlPlaneStatus, err error) (rkev1.RKEControlPlaneStatus, error) {
+	return p.encryptionKeyRotationFailedWithMessage(status, err, "encryption key rotation failed, please perform an etcd restore")
+}
+
+func (p *Planner) encryptionKeyRotationFailedWithMessage(status rkev1.RKEControlPlaneStatus, err error, message string) (rkev1.RKEControlPlaneStatus, error) {
 	status.RotateEncryptionKeysPhase = rkev1.RotateEncryptionKeysPhaseFailed
 	status.RotateEncryptionKeysLeader = ""
-	return status, errors.Wrap(err, "encryption key rotation failed")
+	return status, errors.Wrap(err, message)
 }
 
 func encryptionKeyRotationScriptPath(controlPlane *rkev1.RKEControlPlane, file string) string {

@@ -508,6 +508,7 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 			}
 			if testCase.expectFailed {
 				assert.Error(t, err)
+				assert.ErrorContains(t, err, "please perform an etcd restore")
 				assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
 				return
 			}
@@ -666,6 +667,7 @@ func Test_rotateEncryptionKeys_marksFailedWhenLeaderPlanFails(t *testing.T) {
 	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
 	assert.Error(t, err)
+	assert.ErrorContains(t, err, "please perform an etcd restore")
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
 	assert.Empty(t, updatedStatus.RotateEncryptionKeysLeader)
 }
@@ -730,7 +732,9 @@ func Test_rotateEncryptionKeys_marksFailedWhenNoSuitableLeaderExists(t *testing.
 
 	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
-	assert.Error(t, err)
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "please perform an etcd restore")
+	}
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
 	assert.Empty(t, updatedStatus.RotateEncryptionKeysLeader)
 }
@@ -774,6 +778,39 @@ func Test_rotateEncryptionKeys_postRotateRestartDoesNotRequireStoredLeader(t *te
 
 	assert.True(t, IsErrWaiting(err))
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseDone, updatedStatus.RotateEncryptionKeysPhase)
+	assert.Empty(t, updatedStatus.RotateEncryptionKeysLeader)
+}
+
+func Test_rotateEncryptionKeys_marksFailedWithRestoreWhenPostRotateRestartPlanFails(t *testing.T) {
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
+
+	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
+		RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
+		RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhasePostRotateRestart,
+		Initialization: rkev1.RKEControlPlaneInitializationStatus{
+			ControlPlaneInitialized: ptr.To(true),
+		},
+	})
+	clusterPlan := newTestEncryptionKeyRotationPlan(
+		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
+	)
+	entry := newTestPlanEntryFromPlan(clusterPlan, "server-1")
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRestartPlan(controlPlane, plan.Secret{}, "https://server-1:9345", entry)
+	assert.NoError(t, err)
+	clusterPlan.Nodes["server-1"] = &plan.Node{
+		Plan:   nodePlan,
+		Failed: true,
+		InSync: true,
+	}
+
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
+
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "please perform an etcd restore")
+	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
 	assert.Empty(t, updatedStatus.RotateEncryptionKeysLeader)
 }
 
