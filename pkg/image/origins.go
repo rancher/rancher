@@ -13,7 +13,7 @@ import (
 // no longer used by Rancher. The keys of this map should
 // mirror the images listed in rancher-images.txt.
 // Some net-new images may be resolved via the check-origins script
-// (dapper check-origins).
+// (`make check-origins`).
 
 // images should be double-checked and confirmed
 // by the team which owns the image.
@@ -22,15 +22,16 @@ var OriginMap = map[string]string{
 	"ali-operator":                                            "https://github.com/rancher/ali-operator",
 	"aci-containers-controller":                               "https://github.com/noironetworks/aci-containers",
 	"aci-containers-host":                                     "https://github.com/noironetworks/aci-containers",
-	"appco-alertmanager":                                      "https://github.com/prometheus/alertmanager",
-	"appco-grafana":                                           "https://github.com/grafana/grafana",
+	"appco-curl":                                              "https://apps.rancher.io/applications/curl",
+	"appco-alertmanager":                                      "https://apps.rancher.io/applications/alertmanager",
+	"appco-grafana":                                           "https://apps.rancher.io/applications/grafana",
 	"appco-kubernetes-cluster-autoscaler":                     "https://apps.rancher.io/applications/kubernetes-cluster-autoscaler",
-	"appco-k8s-sidecar":                                       "https://github.com/kiwigrid/k8s-sidecar",
-	"appco-kube-rbac-proxy":                                   "https://github.com/brancz/kube-rbac-proxy",
-	"appco-kube-state-metrics":                                "https://github.com/kubernetes/kube-state-metrics",
-	"appco-node-exporter":                                     "https://github.com/prometheus/node_exporter",
-	"appco-redis":                                             "https://github.com/redis/redis",
-	"appco-thanos":                                            "https://github.com/thanos-io/thanos",
+	"appco-k8s-sidecar":                                       "https://apps.rancher.io/applications/k8s-sidecar",
+	"appco-kube-rbac-proxy":                                   "https://apps.rancher.io/applications/kube-rbac-proxy",
+	"appco-kube-state-metrics":                                "https://apps.rancher.io/applications/kube-state-metrics",
+	"appco-node-exporter":                                     "https://apps.rancher.io/applications/node-exporter",
+	"appco-redis":                                             "https://apps.rancher.io/applications/redis",
+	"appco-thanos":                                            "https://apps.rancher.io/applications/thanos",
 	"aks-operator":                                            "https://github.com/rancher/aks-operator",
 	"azureserviceoperator":                                    "https://github.com/rancher/azure-service-operator",
 	"backup-restore-operator":                                 "https://github.com/rancher/backup-restore-operator",

@@ -213,7 +213,7 @@ func validatePassword(user string, currentPass string, pass string, minPassLen i
 	}
 
 	if user == pass {
-		return errors.New("Password cannot be the same as username")
+		return errors.New("Password cannot be the same as the username")
 	}
 	if pass == currentPass {
 		return errors.New("The new password must not be the same as the current password")

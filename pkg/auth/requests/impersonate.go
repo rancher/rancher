@@ -59,7 +59,7 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 		// impersonate a different user, verify the token user is authz to impersonate
 		if i.sar != nil && reqUser != "" && reqUser != user {
 			if strings.HasPrefix(reqUser, serviceaccount.ServiceAccountUsernamePrefix) {
-				canDo, err := i.sar.UserCanImpersonateServiceAccount(req, user, reqUser)
+				canDo, err := i.sar.UserCanImpersonateServiceAccount(req, user, groups, reqUser)
 				if err != nil {
 					util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate service account: %w", err))
 					return
@@ -70,7 +70,7 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 				// add impersonated SA to context
 				*req = *req.WithContext(authcontext.SetSAImpersonation(req.Context(), reqUser))
 			} else {
-				canDo, err := i.sar.UserCanImpersonateUser(req, user, reqUser)
+				canDo, err := i.sar.UserCanImpersonateUser(req, user, groups, reqUser)
 				if err != nil {
 					util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate user: %w", err))
 					return
@@ -84,7 +84,7 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 						//user belongs to the group they are trying to impersonate
 						continue
 					}
-					canDo, err := i.sar.UserCanImpersonateGroup(req, user, g)
+					canDo, err := i.sar.UserCanImpersonateGroup(req, user, groups, g)
 					if err != nil {
 						util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate group: %w", err))
 						return
@@ -95,7 +95,7 @@ func (i *ImpersonatingAuth) ImpersonationMiddleware(next http.Handler) http.Hand
 				}
 
 				if len(reqExtras) > 0 {
-					canDo, err := i.sar.UserCanImpersonateExtras(req, user, reqExtras)
+					canDo, err := i.sar.UserCanImpersonateExtras(req, user, groups, reqExtras)
 					if err != nil {
 						util.WriteError(rw, http.StatusForbidden, fmt.Errorf("error checking if user can impersonate extras: %w", err))
 						return

@@ -54,7 +54,7 @@ conditions:
     disablesourceinput: true
     spec:
       files:
-        - 'Dockerfile.dapper'
+        - 'Dockerfile.runtime'
         - 'package/Dockerfile'
       matchpattern: 'ENV[\s\t]+CATTLE_K3S_VERSION[=\s]\S+'
 
@@ -65,7 +65,7 @@ conditions:
     disablesourceinput: true
     spec:
       files:
-        - 'Dockerfile.dapper'
+        - 'Dockerfile.runtime'
         - 'package/Dockerfile'
       matchpattern: 'COPY[\s\t]+--from=rancher/k3s:\S+'
 
@@ -77,7 +77,7 @@ targets:
     disablesourceinput: true
     spec:
       files:
-        - 'Dockerfile.dapper'
+        - 'Dockerfile.runtime'
         - 'package/Dockerfile'
       matchpattern: 'ENV[\s\t]+CATTLE_K3S_VERSION[=\s]+\S+'
       replacepattern: 'ENV CATTLE_K3S_VERSION={{ source "k3s-release" }}'
@@ -89,7 +89,7 @@ targets:
     disablesourceinput: true
     spec:
       files:
-        - 'Dockerfile.dapper'
+        - 'Dockerfile.runtime'
         - 'package/Dockerfile'
       matchpattern: 'COPY[\s\t]+--from=rancher/k3s:\S+'
       replacepattern: 'COPY --from=rancher/k3s:{{ source "k3s-image-release" }}'

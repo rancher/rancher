@@ -760,7 +760,6 @@ func (o *OpenIDCProvider) Logout(w http.ResponseWriter, r *http.Request, token a
 		return fmt.Errorf("getting config for OIDC Logout: %w", err)
 	}
 	if oidcConfig.LogoutAllForced {
-		logrus.Debugf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
 		return fmt.Errorf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
 	}
 
@@ -777,7 +776,6 @@ func (o *OpenIDCProvider) LogoutAll(w http.ResponseWriter, r *http.Request, toke
 
 	providerName := token.GetAuthProvider()
 	if !oidcConfig.LogoutAllEnabled {
-		logrus.Debugf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 		return fmt.Errorf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 

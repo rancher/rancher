@@ -22,6 +22,10 @@ import (
 var (
 	errDefault  = fmt.Errorf("error")
 	defaultCRTB = v3.ClusterRoleTemplateBinding{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "test-crtb",
+			Namespace: "testns",
+		},
 		UserName:           "test",
 		GroupName:          "",
 		GroupPrincipalName: "",
@@ -131,14 +135,14 @@ func TestReconcileBindings(t *testing.T) {
 					return nil, nil
 				}
 			},
-			wantError: true,
+			wantError: false,
 			crtb:      defaultCRTB.DeepCopy(),
 			wantConditions: []v1.Condition{
 				{
 					Type:    bindingExists,
 					Status:  v1.ConditionFalse,
 					Reason:  clusterNotFound,
-					Message: "cannot create binding because cluster clusterName was not found",
+					Message: "cannot create binding testns/test-crtb because cluster clusterName was not found",
 					LastTransitionTime: v1.Time{
 						Time: mockTime,
 					},

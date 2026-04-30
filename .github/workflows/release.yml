@@ -86,7 +86,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.26
     permissions:
       contents: read
       id-token: write
@@ -98,11 +98,6 @@ jobs:
       ARCH: amd64
       REGISTRY: "" # remove to set the registry at systemDefaultRegistry on the chart
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -214,7 +209,7 @@ jobs:
           path: /tmp/artifacts
   docker-image-digests:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.26
     needs: [create-images-files, merge-server-agent-installer-manifests]
     env:
       ARTIFACTS_BASE_DIR: "dist"
@@ -222,11 +217,6 @@ jobs:
       WINDOWS_FILE: "rancher-images-digests-windows.txt"
       CHECKSUM_FILE: "images-digests-sha256sum.txt"
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -251,7 +241,7 @@ jobs:
           path: /tmp/artifacts
   publish-artifacts:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.26
     needs: [merge-server-agent-installer-manifests, create-images-files, docker-image-digests]
     permissions:
       contents: write
@@ -262,31 +252,12 @@ jobs:
       WINDOWS_FILE: "rancher-images-digests-windows.txt"
       CHECKSUM_FILE: "images-digests-sha256sum.txt"
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
-      - name: install gh
-        shell: bash
-        env:
-          # renovate: datasource=github-release-attachments depName=cli/cli
-          GH_CLI_VERSION: v2.89.0
-          # renovate: datasource=github-release-attachments depName=cli/cli digestVersion=v2.89.0
-          GH_CLI_SUM_amd64: d0422caade520530e76c1c558da47daebaa8e1203d6b7ff10ad7d6faba3490d8
-        run: |
-          mkdir -p /tmp/gh && \
-          curl -fsL "https://github.com/cli/cli/releases/download/${GH_CLI_VERSION}/gh_${GH_CLI_VERSION#v}_linux_amd64.tar.gz" > /tmp/gh.tar.gz && \
-          echo "${GH_CLI_SUM_amd64}  /tmp/gh.tar.gz" | sha256sum -c - && \
-          tar xvzf /tmp/gh.tar.gz --strip-components=1 -C /tmp/gh && \
-          mv /tmp/gh/bin/gh /usr/bin/gh && \
-          chmod +x /usr/bin/gh
       - name: Create artifacts dir
         shell: bash
         run: mkdir -p /tmp/artifacts
@@ -334,17 +305,12 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: ghcr.io/rancher/ci-image/go1.26
     needs: [publish-artifacts, merge-server-agent-installer-manifests, docker-image-digests]
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
