@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
 ARCH=${ARCH:-"amd64"}
 CHART_REPO_DIR=build/charts
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.12"}
@@ -7,9 +9,9 @@ CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.12"}
 REGISTRY=${REGISTRY/:-""}
 IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
-SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')-suc
+SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" "${SCRIPT_DIR}/../package/Dockerfile" | awk -F'=' '{ print $NF }')-suc
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
-WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')
+WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" "${SCRIPT_DIR}/../package/Dockerfile" | awk -F'=' '{ print $NF }')
 WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
 
 # Query KDM data for RKE2 released versions where server args are defined.
@@ -17,7 +19,7 @@ RKE2_RELEASE_VERSIONS=$(jq -r 'def semver_array: (if startswith("v") then ltrims
 
   "v1.31.0" as $min_version | ($min_version | semver_array) as $target_array |
 
-  [.rke2.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' ../bin/data.json)
+  [.rke2.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' "${SCRIPT_DIR}/../bin/data.json")
 # Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
 RKE2_RELEASE_TAGS=( $(echo $RKE2_RELEASE_VERSIONS | tr + -) )
 # Prefix image repo and name to tags.
@@ -28,7 +30,7 @@ K3S_RELEASE_VERSIONS=$(jq -r 'def semver_array: (if startswith("v") then ltrimst
 
   "v1.31.0" as $min_version | ($min_version | semver_array) as $target_array |
 
-  [.k3s.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' ../bin/data.json)
+  [.k3s.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' "${SCRIPT_DIR}/../bin/data.json")
 # Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
 K3S_RELEASE_TAGS=( $(echo $K3S_RELEASE_VERSIONS | tr + -) )
 # Prefix image repo and name to tags.
