@@ -37,36 +37,39 @@ func NewHandler(scaledContext *config.ScaledContext) http.Handler {
 	}
 
 	authenticator := NewTokenAuthenticator(scaledContext.Wrangler)
+	rateLimiter := newRateLimiter(func(provider string) (int, int) {
+		cfg := srv.getConfig(provider)
+		return cfg.RateLimitRequestsPerSecond, cfg.RateLimitBurst
+	})
 
 	r := http.NewServeMux()
 
-	// Setup the middleware
-	authWrap := func(h http.HandlerFunc) http.HandlerFunc {
-		return authenticator.Authenticate(h).ServeHTTP
+	middlewares := func(h http.HandlerFunc) http.HandlerFunc {
+		return authenticator.Authenticate(rateLimiter.Wrap(h)).ServeHTTP
 	}
 
 	// Discovery endpoints
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/ServiceProviderConfig", authWrap(srv.GetServiceProviderConfig))
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes", authWrap(srv.ListResourceTypes))
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes/{id}", authWrap(srv.GetResourceType))
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas", authWrap(srv.ListSchemas))
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas/{id}", authWrap(srv.GetSchema))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ServiceProviderConfig", middlewares(srv.GetServiceProviderConfig))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes", middlewares(srv.ListResourceTypes))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes/{id}", middlewares(srv.GetResourceType))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas", middlewares(srv.ListSchemas))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas/{id}", middlewares(srv.GetSchema))
 
 	// User endpoints
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users", authWrap(srv.ListUsers))
-	r.HandleFunc("POST "+URLPrefix+"/{provider}/Users", authWrap(srv.CreateUser))
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.GetUser))
-	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.UpdateUser))
-	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.PatchUser))
-	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.DeleteUser))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users", middlewares(srv.ListUsers))
+	r.HandleFunc("POST "+URLPrefix+"/{provider}/Users", middlewares(srv.CreateUser))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.GetUser))
+	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.UpdateUser))
+	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.PatchUser))
+	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Users/{id}", middlewares(srv.DeleteUser))
 
 	// Group endpoints
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups", authWrap(srv.ListGroups))
-	r.HandleFunc("POST "+URLPrefix+"/{provider}/Groups", authWrap(srv.CreateGroup))
-	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.GetGroup))
-	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.UpdateGroup))
-	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.PatchGroup))
-	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.DeleteGroup))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups", middlewares(srv.ListGroups))
+	r.HandleFunc("POST "+URLPrefix+"/{provider}/Groups", middlewares(srv.CreateGroup))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.GetGroup))
+	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.UpdateGroup))
+	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.PatchGroup))
+	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Groups/{id}", middlewares(srv.DeleteGroup))
 
 	return r
 }

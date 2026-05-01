@@ -110,6 +110,8 @@ func TestDefaultProviderConfig(t *testing.T) {
 	assert.False(t, cfg.Paused)
 	assert.Equal(t, UserIDUserName, cfg.UserIDAttribute)
 	assert.Equal(t, GroupIDDisplayName, cfg.GroupIDAttribute)
+	assert.Equal(t, 0, cfg.RateLimitRequestsPerSecond)
+	assert.Equal(t, defaultRateLimitBurst, cfg.RateLimitBurst)
 }
 
 func TestGetProviderConfig(t *testing.T) {
@@ -158,7 +160,7 @@ func TestGetProviderConfig(t *testing.T) {
 						Data:       map[string]string{"enabled": "true"},
 					}, nil)
 			},
-			wantConfig: providerConfig{Enabled: true, UserIDAttribute: UserIDUserName, GroupIDAttribute: GroupIDDisplayName},
+			wantConfig: providerConfig{Enabled: true, UserIDAttribute: UserIDUserName, GroupIDAttribute: GroupIDDisplayName, RateLimitBurst: defaultRateLimitBurst},
 		},
 		{
 			name: "enabled false",
@@ -180,7 +182,7 @@ func TestGetProviderConfig(t *testing.T) {
 						Data:       map[string]string{"userIdAttribute": "externalId"},
 					}, nil)
 			},
-			wantConfig: providerConfig{Enabled: false, UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDDisplayName},
+			wantConfig: providerConfig{Enabled: false, UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDDisplayName, RateLimitBurst: defaultRateLimitBurst},
 		},
 		{
 			name: "paused true",
@@ -191,7 +193,7 @@ func TestGetProviderConfig(t *testing.T) {
 						Data:       map[string]string{"enabled": "true", "paused": "true"},
 					}, nil)
 			},
-			wantConfig: providerConfig{Enabled: true, Paused: true, UserIDAttribute: UserIDUserName, GroupIDAttribute: GroupIDDisplayName},
+			wantConfig: providerConfig{Enabled: true, Paused: true, UserIDAttribute: UserIDUserName, GroupIDAttribute: GroupIDDisplayName, RateLimitBurst: defaultRateLimitBurst},
 		},
 		{
 			name: "invalid bool value for enabled defaults to false",
@@ -217,7 +219,7 @@ func TestGetProviderConfig(t *testing.T) {
 						},
 					}, nil)
 			},
-			wantConfig: providerConfig{Enabled: true, UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDExternalID},
+			wantConfig: providerConfig{Enabled: true, UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDExternalID, RateLimitBurst: defaultRateLimitBurst},
 		},
 		{
 			name: "invalid attribute values fall back to defaults",
@@ -242,7 +244,35 @@ func TestGetProviderConfig(t *testing.T) {
 						Data:       map[string]string{"userIdAttribute": "externalId"},
 					}, nil)
 			},
-			wantConfig: providerConfig{UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDDisplayName},
+			wantConfig: providerConfig{UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDDisplayName, RateLimitBurst: defaultRateLimitBurst},
+		},
+		{
+			name: "rate limit config",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+						Data: map[string]string{
+							"rateLimitRequestsPerSecond": "50",
+							"rateLimitBurst":             "100",
+						},
+					}, nil)
+			},
+			wantConfig: providerConfig{UserIDAttribute: UserIDUserName, GroupIDAttribute: GroupIDDisplayName, RateLimitRequestsPerSecond: 50, RateLimitBurst: 100},
+		},
+		{
+			name: "invalid rate limit values fall back to defaults",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+						Data: map[string]string{
+							"rateLimitRequestsPerSecond": "not-a-number",
+							"rateLimitBurst":             "also-bad",
+						},
+					}, nil)
+			},
+			wantConfig: defaultProviderConfig(),
 		},
 	}
 
