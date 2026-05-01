@@ -27,7 +27,7 @@ type k8sToAutoscalerVersion struct {
 var k8sVersionToAutoscalerChartVersions = map[int]*k8sToAutoscalerVersion{
 	35: {
 		imageTag:     "1.35.0-4.1",
-		chartVersion: "9.56.1",
+		chartVersion: "9.56.0",
 	},
 	34: {
 		imageTag:     "1.34.0-3.4",
