@@ -65,15 +65,6 @@ var (
 		"cattle-capi-system",
 	}
 
-	SystemNamespacesIgnoringPullSecrets = []string{
-		"cattle-system",
-		"cattle-global-data",
-		"cattle-local-user-passwords",
-		"cattle-tokens",
-		"cattle-oidc-codes",
-		"cattle-oidc-client-secrets",
-	}
-
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
 	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.

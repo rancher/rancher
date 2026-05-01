@@ -14,18 +14,27 @@ import (
 	kcorev1 "k8s.io/api/core/v1"
 )
 
+const (
+	// SourcePullSecretLabel is used to track secrets in the cattle-system namespace which are used
+	// as the global system default registry pull secrets (via the global setting).
+	SourcePullSecretLabel = "management.cattle.io/rancher-default-registry-pull-secret"
+	// CopiedPullSecretLabel is used to track copies of the source pull secrets,
+	// so that their life cycle can be managed by other controllers (e.g. imported cluster cleanup).
+	CopiedPullSecretLabel = "management.cattle.io/rancher-managed-pull-secret"
+)
+
 var MgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
 
-// AgentPullSecret represents a single .dockerconfigjson entry for a given registry URL
+// AgentPullSecret represents a single pull secret used for agent image pulls.
 type AgentPullSecret struct {
-	// Name is the hostname of the private registry. It must not include leading protocols or trailing ports.
+	// Name is the name of the Kubernetes Secret containing the registry credentials for this pull secret.
 	Name string
 	// DockerConfigJSON is the base64 encoded .dockerconfigjson content that should be used when pulling from the private registry.
 	DockerConfigJSON string
 }
 
 type PrivateRegistry struct {
-	// URL is The hostname of the private registry. This value should not include any protocols (e.g. https://) or ports.
+	// URL is the hostname of the private registry. This value should not include any protocols (e.g. https://) or ports.
 	URL string
 	// PullSecrets are a slice of object references to secrets in the relevant cluster.
 	PullSecrets []kcorev1.SecretReference
@@ -64,7 +73,7 @@ func GetPrivateRegistryURL(cluster *v3.Cluster) string {
 // clusters.management.cattle.io/v3 object. If a cluster-level registry is not defined, or
 // the provided cluster is nil, it will return the global system default registry configuration if it exists.
 func GetPrivateRegistry(importedOrHostedCluster *v3.Cluster) (registry *PrivateRegistry, isGlobalDefault bool) {
-	if clr := GetPrivateImportedClusterLevelRegistry(importedOrHostedCluster); clr != nil {
+	if clr := GetImportedPrivateClusterLevelRegistry(importedOrHostedCluster); clr != nil {
 		return clr, false
 	}
 	return getDefaultRegistryConfiguration("", ""), true
@@ -84,12 +93,13 @@ func getDefaultRegistryConfiguration(registryURL, pullSecretNames string) *Priva
 
 	var globalSecrets []kcorev1.SecretReference
 	for _, pullSecret := range strings.Split(pullSecretNames, ",") {
+		pullSecret = strings.TrimSpace(pullSecret)
 		if pullSecret == "" {
 			continue
 		}
 		globalSecrets = append(globalSecrets, kcorev1.SecretReference{
 			Namespace: namespaces.System,
-			Name:      strings.TrimSpace(pullSecret),
+			Name:      pullSecret,
 		})
 	}
 
@@ -99,9 +109,9 @@ func getDefaultRegistryConfiguration(registryURL, pullSecretNames string) *Priva
 	}
 }
 
-// GetPrivateImportedClusterLevelRegistry returns the cluster-level registry for the given clusters.management.cattle.io/v3
+// GetImportedPrivateClusterLevelRegistry returns the cluster-level registry for the given clusters.management.cattle.io/v3
 // object (or nil if one is not found).
-func GetPrivateImportedClusterLevelRegistry(cluster *v3.Cluster) *PrivateRegistry {
+func GetImportedPrivateClusterLevelRegistry(cluster *v3.Cluster) *PrivateRegistry {
 	if cluster == nil {
 		return nil
 	}
@@ -127,8 +137,6 @@ func GetPrivateImportedClusterLevelRegistry(cluster *v3.Cluster) *PrivateRegistr
 	if len(secrets) > 0 {
 		for _, pullSecret := range secrets {
 			pullSecrets = append(pullSecrets, kcorev1.SecretReference{
-				// Like many other cluster scoped resources, secrets added to v3 clusters
-				// should be placed in the fleet-default namespace by either the UI or users.
 				Namespace: ns,
 				Name:      pullSecret,
 			})
@@ -223,7 +231,7 @@ func generateImportedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.Se
 	for _, pullSecret := range registry.PullSecrets {
 		sec, err := secretLister.Get(pullSecret.Namespace, pullSecret.Name)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to get pull secret %s in namespace %s for cluster %s: %v", pullSecret.Name, pullSecret.Namespace, cluster.Name, err)
+			return "", nil, fmt.Errorf("failed to get pull secret %s in namespace %s for cluster %s: %w", pullSecret.Name, pullSecret.Namespace, cluster.Name, err)
 		}
 
 		configJson, err := ConvertToDockerConfigJson(sec.Type, clusterSystemDefaultURL, sec.Data)

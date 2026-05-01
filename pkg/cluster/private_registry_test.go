@@ -90,7 +90,7 @@ func TestGetPrivateImportedClusterLevelRegistry(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := GetPrivateImportedClusterLevelRegistry(tt.cluster)
+			got := GetImportedPrivateClusterLevelRegistry(tt.cluster)
 			assert.Equal(t, tt.expected, got)
 		})
 	}
