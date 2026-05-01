@@ -204,6 +204,18 @@ tls: ingress
 # Set a custom image registry mirror to pull Rancher images from; useful in air-gapped environments.
 systemDefaultRegistry: ""
 
+# Controls whether the configured 'imagePullSecrets' are propagated to the local
+# cluster and any downstream clusters which rely on the global 'systemDefaultRegistry' setting.
+# - If true: The 'system-default-registry-pull-secrets' setting is automatically populated
+#   with a comma-separated list of imagePullSecret names as its default value.
+# - New Installs: Set this to 'true' if you are pointing to an authenticated system registry.
+# - Upgrades: Defaults to 'false' to prevent unintended mass downstream updates. Changing this to 'true'
+#   will automatically update all dependent downstream clusters with these secrets.
+# Alternatively, existing installs may directly modify the 'system-default-registry-pull-secrets' setting
+# after an upgrade to better time the propagation of these secrets to downstream clusters, or define
+# pull secrets not used by this chart.
+systemRegistryInheritsPullSecrets: false
+
 # Set to use the packaged system charts
 useBundledSystemChart: false
 
