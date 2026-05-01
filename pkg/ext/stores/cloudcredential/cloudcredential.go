@@ -69,6 +69,11 @@ var (
 		Version: "v1",
 	}
 
+	GR = schema.GroupResource{
+		Group:    GV.Group,
+		Resource: PluralName,
+	}
+
 	GVK = schema.GroupVersionKind{
 		Group:   GV.Group,
 		Version: GV.Version,

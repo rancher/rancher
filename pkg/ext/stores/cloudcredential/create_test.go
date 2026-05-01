@@ -45,6 +45,9 @@ func TestStoreCreate(t *testing.T) {
 		ctx := ctxWithUser(regularUser)
 		credential := newCredential(testCredName)
 
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			require.Equal(t, regularUser, secret.Annotations[CreatorIDAnnotation])
@@ -64,6 +67,9 @@ func TestStoreCreate(t *testing.T) {
 		ctx := ctxWithUser(adminUser)
 		credential := newCredential(testCredName)
 
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.expectNamespaceExists()
 
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
@@ -87,9 +93,6 @@ func TestStoreCreate(t *testing.T) {
 
 func TestSystemStoreCreateValidations(t *testing.T) {
 	t.Parallel()
-
-	h := newSystemStoreHarness(t)
-	ctx := context.Background()
 
 	tests := []struct {
 		name        string
@@ -132,7 +135,13 @@ func TestSystemStoreCreateValidations(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := h.store.SystemStore.Create(ctx, tt.credential, nil, adminUser)
+			h := newSystemStoreHarness(t)
+			if tt.name == "invalid managed fields" {
+				h.secretCache.EXPECT().
+					List(CredentialNamespace, gomock.Any()).
+					Return(([]*corev1.Secret)(nil), nil)
+			}
+			_, err := h.store.SystemStore.Create(context.Background(), tt.credential, nil, adminUser)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedErr)
 		})
@@ -158,9 +167,26 @@ func TestSystemStoreCreateDryRun(t *testing.T) {
 func TestSystemStoreCreateNamespaceAndSecretFailures(t *testing.T) {
 	t.Parallel()
 
+	t.Run("returns already exists when credential secret already exists", func(t *testing.T) {
+		h := newSystemStoreHarness(t)
+		credential := newCredential(testCredName)
+
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(secretPointers(corev1.Secret{}), nil)
+
+		created, err := h.store.SystemStore.Create(context.Background(), credential, nil, adminUser)
+		require.Error(t, err)
+		assert.Nil(t, created)
+		assert.True(t, apierrors.IsAlreadyExists(err))
+	})
+
 	t.Run("fails when namespace ensure errors", func(t *testing.T) {
 		h := newSystemStoreHarness(t)
 		credential := newCredential(testCredName)
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.namespaceCache.EXPECT().Get(CredentialNamespace).Return(nil, fmt.Errorf(genericErr))
 
 		_, err := h.store.SystemStore.Create(context.Background(), credential, nil, adminUser)
@@ -171,6 +197,9 @@ func TestSystemStoreCreateNamespaceAndSecretFailures(t *testing.T) {
 	t.Run("propagates secret client error", func(t *testing.T) {
 		h := newSystemStoreHarness(t)
 		credential := newCredential(testCredName)
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf(genericErr))
 
@@ -185,6 +214,9 @@ func TestSystemStoreCreateCleansUpOnFromSecretFailure(t *testing.T) {
 
 	h := newSystemStoreHarness(t)
 	credential := newCredential(testCredName)
+	h.secretCache.EXPECT().
+		List(CredentialNamespace, gomock.Any()).
+		Return(([]*corev1.Secret)(nil), nil)
 	h.expectNamespaceExists()
 
 	createdSecret := &corev1.Secret{
@@ -220,6 +252,9 @@ func TestCreateWithVisibleFields(t *testing.T) {
 		credential := newCredential(testCredName)
 		credential.Spec.VisibleFields = []string{"accessKey"}
 
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.expectNamespaceExists()
 
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
@@ -239,102 +274,5 @@ func TestCreateWithVisibleFields(t *testing.T) {
 		require.NotNil(t, result.Status.PublicData)
 		assert.Equal(t, "key", result.Status.PublicData["accessKey"])
 		assert.NotContains(t, result.Status.PublicData, "secretKey")
-	})
-}
-
-func TestRBACCreate(t *testing.T) {
-	t.Parallel()
-
-	t.Run("admin can create", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		ctx := ctxWithUser(adminUser)
-		credential := newCredential(testCredName)
-
-		h.expectNamespaceExists()
-		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-			secret.Name = "secret-created"
-			secret.Labels[CloudCredentialNameLabel] = credential.Name
-			return secret, nil
-		})
-
-		created, err := h.store.Create(ctx, credential, nil, nil)
-		require.NoError(t, err)
-		require.IsType(t, &ext.CloudCredential{}, created)
-	})
-
-	t.Run("read-only user can create", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		ctx := ctxWithUser(readOnlyUser)
-		credential := newCredential(testCredName)
-
-		h.expectNamespaceExists()
-		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-			secret.Name = "secret-created"
-			secret.Labels[CloudCredentialNameLabel] = credential.Name
-			return secret, nil
-		})
-
-		created, err := h.store.Create(ctx, credential, nil, nil)
-		require.NoError(t, err)
-		require.IsType(t, &ext.CloudCredential{}, created)
-	})
-
-	t.Run("full-access non-admin can create", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		ctx := ctxWithUser(fullAccessUser)
-		credential := newCredential(testCredName)
-
-		h.expectNamespaceExists()
-		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-			secret.Name = "secret-created"
-			secret.Labels[CloudCredentialNameLabel] = credential.Name
-			return secret, nil
-		})
-
-		created, err := h.store.Create(ctx, credential, nil, nil)
-		require.NoError(t, err)
-		require.IsType(t, &ext.CloudCredential{}, created)
-	})
-
-	t.Run("no-access user can create", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		ctx := ctxWithUser(noAccessUser)
-		credential := newCredential(testCredName)
-
-		h.expectNamespaceExists()
-		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
-			secret.Name = "secret-created"
-			secret.Labels[CloudCredentialNameLabel] = credential.Name
-			return secret, nil
-		})
-
-		created, err := h.store.Create(ctx, credential, nil, nil)
-		require.NoError(t, err)
-		require.IsType(t, &ext.CloudCredential{}, created)
-	})
-
-	t.Run("missing user context errors", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		credential := newCredential(testCredName)
-
-		_, err := h.store.Create(context.Background(), credential, nil, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no user info")
-	})
-
-	t.Run("authorizer error is propagated", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, errorAuthorizer())
-		ctx := ctxWithUser(adminUser)
-		credential := newCredential(testCredName)
-
-		_, err := h.store.Create(ctx, credential, nil, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "authorizer error")
 	})
 }

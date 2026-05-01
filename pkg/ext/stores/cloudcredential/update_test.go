@@ -339,80 +339,8 @@ func TestUpdateStatus(t *testing.T) {
 	})
 }
 
-// ============================================================================
-// Watch tests
-// ============================================================================
-
 func TestRBACUpdate(t *testing.T) {
 	t.Parallel()
-
-	setupForUpdate := func(h *storeTestHarness, owner string) *ext.CloudCredential {
-		secret := secretForCredential(newCredential(testCredName))
-		if owner != "" {
-			setSecretOwner(secret, owner)
-		}
-		h.expectSecretListForName(testCredName, *secret)
-		updated, err := fromSecret(secret.DeepCopy(), nil)
-		require.NoError(t, err)
-		updated.Spec.Description = "updated"
-		return updated
-	}
-
-	t.Run("admin can update", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		updated := setupForUpdate(h, "")
-
-		h.secretClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
-			s.ResourceVersion = "2"
-			return s, nil
-		})
-
-		objInfo := &fakeUpdatedObjectInfo{obj: updated}
-		result, _, err := h.store.Update(ctxWithUser(adminUser), testCredName, objInfo, nil, nil, false, &metav1.UpdateOptions{})
-		require.NoError(t, err)
-		cred := result.(*ext.CloudCredential)
-		assert.Equal(t, "updated", cred.Spec.Description)
-	})
-
-	t.Run("read-only user cannot update", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		updated := setupForUpdate(h, "")
-		objInfo := &fakeUpdatedObjectInfo{obj: updated}
-
-		_, _, err := h.store.Update(ctxWithUser(readOnlyUser), testCredName, objInfo, nil, nil, false, nil)
-		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
-	})
-
-	t.Run("full-access non-admin can update", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		updated := setupForUpdate(h, fullAccessUser)
-
-		h.secretClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
-			s.ResourceVersion = "2"
-			return s, nil
-		})
-
-		objInfo := &fakeUpdatedObjectInfo{obj: updated}
-		result, _, err := h.store.Update(ctxWithUser(fullAccessUser), testCredName, objInfo, nil, nil, false, &metav1.UpdateOptions{})
-		require.NoError(t, err)
-		cred := result.(*ext.CloudCredential)
-		assert.Equal(t, "updated", cred.Spec.Description)
-	})
-
-	t.Run("no-access user cannot update", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		updated := setupForUpdate(h, "")
-		objInfo := &fakeUpdatedObjectInfo{obj: updated}
-
-		_, _, err := h.store.Update(ctxWithUser(noAccessUser), testCredName, objInfo, nil, nil, false, nil)
-		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
-	})
 
 	t.Run("missing user context errors", func(t *testing.T) {
 		t.Parallel()

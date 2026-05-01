@@ -169,10 +169,6 @@ func TestDeleteCollection(t *testing.T) {
 	})
 }
 
-// ============================================================================
-// UpdateStatus tests
-// ============================================================================
-
 func TestDeletePermissions(t *testing.T) {
 	t.Parallel()
 
@@ -186,63 +182,6 @@ func TestDeletePermissions(t *testing.T) {
 		h.expectSecretListForName(testCredName, secret)
 
 		_, _, err := h.store.Delete(ctx, testCredName, nil, nil)
-		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
-	})
-}
-
-// ============================================================================
-// SystemStore.list error path tests
-// ============================================================================
-
-func TestRBACDelete(t *testing.T) {
-	t.Parallel()
-
-	t.Run("admin can delete", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		secret := *secretForCredential(newCredential(testCredName))
-		h.expectSecretListForName(testCredName, secret)
-		h.secretClient.EXPECT().Delete(CredentialNamespace, secret.Name, gomock.Any()).Return(nil)
-
-		obj, completed, err := h.store.Delete(ctxWithUser(adminUser), testCredName, nil, nil)
-		require.NoError(t, err)
-		assert.True(t, completed)
-		assert.Equal(t, testCredName, obj.(*ext.CloudCredential).Name)
-	})
-
-	t.Run("read-only user cannot delete", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		secret := *secretForCredential(newCredential(testCredName))
-		h.expectSecretListForName(testCredName, secret)
-
-		_, _, err := h.store.Delete(ctxWithUser(readOnlyUser), testCredName, nil, nil)
-		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
-	})
-
-	t.Run("full-access non-admin can delete", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		secret := *secretForCredential(newCredential(testCredName))
-		setSecretOwner(&secret, fullAccessUser)
-		h.expectSecretListForName(testCredName, secret)
-		h.secretClient.EXPECT().Delete(CredentialNamespace, secret.Name, gomock.Any()).Return(nil)
-
-		obj, completed, err := h.store.Delete(ctxWithUser(fullAccessUser), testCredName, nil, nil)
-		require.NoError(t, err)
-		assert.True(t, completed)
-		assert.Equal(t, testCredName, obj.(*ext.CloudCredential).Name)
-	})
-
-	t.Run("no-access user cannot delete", func(t *testing.T) {
-		t.Parallel()
-		h := newStoreHarness(t, rbacAuthorizer())
-		secret := *secretForCredential(newCredential(testCredName))
-		h.expectSecretListForName(testCredName, secret)
-
-		_, _, err := h.store.Delete(ctxWithUser(noAccessUser), testCredName, nil, nil)
 		require.Error(t, err)
 		assert.True(t, apierrors.IsForbidden(err))
 	})

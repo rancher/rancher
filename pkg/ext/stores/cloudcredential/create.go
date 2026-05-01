@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -72,6 +73,17 @@ func (s *SystemStore) Create(ctx context.Context, credential *ext.CloudCredentia
 		// Clear credentials from response (write-only)
 		credential.Spec.Credentials = nil
 		return credential, nil
+	}
+
+	existing, err := s.secretCache.List(CredentialNamespace, labels.SelectorFromSet(map[string]string{
+		CloudCredentialNameLabel:      credential.Name,
+		CloudCredentialNamespaceLabel: credential.Namespace},
+	))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, apierrors.NewAlreadyExists(GR, credential.Name)
 	}
 
 	// Create secret from credential

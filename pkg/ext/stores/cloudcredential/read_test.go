@@ -172,10 +172,6 @@ func TestStoreList(t *testing.T) {
 	})
 }
 
-// ============================================================================
-// ConvertToTable / print tests
-// ============================================================================
-
 func TestGetReturnsVisibleFieldsAndPublicData(t *testing.T) {
 	t.Parallel()
 
@@ -202,11 +198,6 @@ func TestGetReturnsVisibleFieldsAndPublicData(t *testing.T) {
 	assert.Nil(t, cred.Spec.Credentials, "credentials should never be returned on get")
 }
 
-// rbacAuthorizer returns an authorizer for comprehensive RBAC testing.
-// - adminUser: has "*" (wildcard/admin) access
-// - readOnlyUser: has "get" and "list" and "watch" access only
-// - fullAccessUser: has all specific verbs but NOT "*"
-// - noAccessUser: has no access at all
 func TestResolvePublicData(t *testing.T) {
 	t.Parallel()
 
@@ -402,10 +393,6 @@ func TestResolvePublicData(t *testing.T) {
 		assert.NotContains(t, result, "password")
 	})
 }
-
-// ============================================================================
-// Store.List wrapper tests
-// ============================================================================
 
 func TestRBACGet(t *testing.T) {
 	t.Parallel()
@@ -795,10 +782,6 @@ func TestWatch(t *testing.T) {
 		assert.True(t, apierrors.IsInternalError(err))
 	})
 }
-
-// ============================================================================
-// resolvePublicData tests
-// ============================================================================
 
 func TestSystemStoreListErrors(t *testing.T) {
 	t.Parallel()
