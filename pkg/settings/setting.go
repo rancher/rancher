@@ -333,9 +333,6 @@ var (
 	// The `dynamic` option will use remote assets for `-head` builds, otherwise the local assets for production builds.
 	UIOfflinePreferred = NewSetting("ui-offline-preferred", "dynamic")
 
-	// UIPath path within Rancher Manager where the old ember UI files are found.
-	UIPath = NewSetting("ui-path", "/usr/share/rancher/ui")
-
 	// UIPerformance experimental settings for UI functionality to improve the UX with large numbers of resources.
 	UIPerformance = NewSetting("ui-performance", "")
 

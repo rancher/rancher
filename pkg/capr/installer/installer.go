@@ -23,11 +23,11 @@ const (
 
 var (
 	localAgentInstallScripts = []string{
-		settings.UIPath.Get() + "/assets" + SystemAgentInstallPath,
+		settings.UIDashboardPath.Get() + "/assets" + SystemAgentInstallPath,
 		"." + SystemAgentInstallPath,
 	}
 	localWindowsRke2InstallScripts = []string{
-		settings.UIPath.Get() + "/assets" + WindowsRke2InstallPath,
+		settings.UIDashboardPath.Get() + "/assets" + WindowsRke2InstallPath,
 		"." + WindowsRke2InstallPath}
 )
 

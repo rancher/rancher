@@ -180,7 +180,6 @@ ENV CATTLE_ETCD_CHECKSUM_arm64=ef5fc443cf7cc5b82738f3c28363704896551900af90a6d62
 ENV DOCKER_MACHINE_LINODE_VERSION=v0.1.16
 ENV DOCKER_MACHINE_LINODE_CHECKSUM_amd64=d9c3b8c389a022b0e5c5e8912496c18a673fa74bb52ec6ab51c0a93e0f4de06d
 ENV DOCKER_MACHINE_LINODE_CHECKSUM_arm64=1a8336f66bffc2186f5fb77642f509b9370f177397ee71f1a8cb522e5979dbec
-ENV LINODE_UI_DRIVER_VERSION=v0.7.0
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v3.20.0-rancher1
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
@@ -261,8 +260,8 @@ RUN case "${ARCH}" in \
     sha256sum -c driver-linode.sha256 && \
     rm driver-linode.sha256 && \
     unzip /tmp/docker-machine-driver-linode.zip -d /opt/drivers/management-state/bin && \
-    mkdir -p /usr/share/rancher/ui/assets/ && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
+    mkdir -p /usr/share/rancher/ui-dashboard/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-linode.zip
 
 RUN case "${ARCH}" in \
@@ -275,7 +274,7 @@ RUN case "${ARCH}" in \
     sha256sum -c machine-harvester.sha256 && \
     rm machine-harvester.sha256 && \
     tar xvzf /tmp/docker-machine-driver-harvester.tar.gz -C /opt/drivers/management-state/bin && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 
 
@@ -357,7 +356,6 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     mkdir -p /var/lib/rancher-data/driver-metadata && \
     rm /tmp/etcd.tar.gz
 
-ENV CATTLE_UI_VERSION=2.14.0-alpha7
 ENV CATTLE_DASHBOARD_UI_VERSION=v2.14.0-alpha7
 
 ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
@@ -379,22 +377,17 @@ ENV AUDIT_LOG_MAXBACKUP=10
 ENV AUDIT_LOG_MAXSIZE=100
 ENV AUDIT_LEVEL=0
 
-RUN mkdir -p /usr/share/rancher/ui && \
-    cd /usr/share/rancher/ui && \
-    curl -sL "https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=1 && \
-    mkdir -p assets/rancher-ui-driver-linode && \
-    cd assets/rancher-ui-driver-linode && \
-    curl -O "https://linode.github.io/rancher-ui-driver-linode/releases/${LINODE_UI_DRIVER_VERSION}/component.js" && \
-    curl -O "https://linode.github.io/rancher-ui-driver-linode/releases/${LINODE_UI_DRIVER_VERSION}/component.css" && \
-    curl -O "https://linode.github.io/rancher-ui-driver-linode/releases/${LINODE_UI_DRIVER_VERSION}/linode.svg" && \
-    mkdir -p /usr/share/rancher/ui/api-ui && \
-    cd /usr/share/rancher/ui/api-ui && \
+RUN mkdir -p /usr/share/rancher/ui-dashboard/api-ui && \
+    cd /usr/share/rancher/ui-dashboard/api-ui && \
     curl -sL "https://releases.rancher.com/api-ui/${CATTLE_API_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=1 && \
     mkdir -p /usr/share/rancher/ui-dashboard/dashboard && \
     cd /usr/share/rancher/ui-dashboard/dashboard && \
     curl -sL "https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=2 && \
     ln -s dashboard/index.html ../index.html && \
-    cd ../../ui/assets && \
+    ln -s dashboard/robots.txt ../robots.txt && \
+    ln -s dashboard/humans.txt ../humans.txt && \
+    ln -s dashboard/VERSION.txt ../VERSION.txt && \
+    cd ../assets && \
     curl -sfL "${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64" -O && \
     printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_arm64}" "rancher-system-agent-arm64" > rancher-system-agent-arm64.sha256 && \
     sha256sum -c rancher-system-agent-arm64.sha256 && \
@@ -547,7 +540,7 @@ VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
 VOLUME /var/log
 
-LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
     "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
     "org.opencontainers.image.description"="Rancher Manager: complete container management platform." \
     "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
@@ -606,7 +599,7 @@ COPY --from=agent-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
-LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
     "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
     "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
     "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
