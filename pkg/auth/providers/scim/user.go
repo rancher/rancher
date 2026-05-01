@@ -98,8 +98,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
-		// Currently only support userName eq "<value>" filter.
-		if err := filter.ValidateForAttribute("userName", opEqual); err != nil {
+		if err := filter.ValidateForAttributes([]string{"userName", "externalId"}, opEqual); err != nil {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
@@ -150,7 +149,13 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 		externalID := first(attr.ExtraByProvider[provider]["externalid"])
 
 		// Apply filter.
-		if !filter.Matches(userName) {
+		var filterTarget string
+		if filter != nil && strings.EqualFold(filter.Attribute, "externalId") {
+			filterTarget = externalID
+		} else {
+			filterTarget = userName
+		}
+		if !filter.Matches(filterTarget) {
 			continue
 		}
 
@@ -228,6 +233,14 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cfg := s.getConfig(provider)
+	uid := cfg.userID(payload)
+	if uid == "" {
+		writeError(w, NewError(http.StatusBadRequest,
+			fmt.Sprintf("%s is required when configured as userIdAttribute", cfg.UserIDAttribute)))
+		return
+	}
+
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to list users: %s", err)
@@ -254,8 +267,12 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	principalName := provider + "_user://" + payload.UserName
-	user, err := s.userMGR.EnsureUser(principalName, payload.UserName)
+	principalName := userPrincipalName(provider, uid)
+	displayName := payload.DisplayName
+	if displayName == "" {
+		displayName = payload.UserName
+	}
+	user, err := s.userMGR.EnsureUser(principalName, displayName)
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to ensure user %s: %s", principalName, err)
 		writeError(w, NewInternalError())
@@ -421,12 +438,18 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cfg := s.getConfig(provider)
+
 	var shouldUpdateAttr, shouldUpdateUser bool
 	attr = attr.DeepCopy()
 	if attr.ExtraByProvider[provider] == nil {
 		attr.ExtraByProvider[provider] = map[string][]string{}
 	}
 	if userName := first(attr.ExtraByProvider[provider]["username"]); userName != payload.UserName {
+		if cfg.UserIDAttribute != UserIDExternalID {
+			writeError(w, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier"))
+			return
+		}
 		attr.ExtraByProvider[provider]["username"] = []string{payload.UserName}
 		shouldUpdateAttr = true
 	}
@@ -582,14 +605,16 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	attr = attr.DeepCopy()
 	user = user.DeepCopy()
 
+	cfg := s.getConfig(provider)
+
 	var shouldUpdateAttr, shouldUpdateUser bool
 	for _, op := range payload.Operations {
 		switch strings.ToLower(op.Op) {
-		case "replace":
-			updateAttr, updateUser, err := applyReplaceUser(provider, attr, user, op)
+		case "replace", "add":
+			updateAttr, updateUser, err := applyPatchUser(provider, attr, user, op, cfg)
 			if err != nil {
-				logrus.Errorf("scim::PatchUser: failed to apply replace operation: %s", err)
-				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Failed to apply replace operation: %s", err)))
+				logrus.Errorf("scim::PatchUser: failed to apply %s operation: %s", op.Op, err)
+				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Failed to apply %s operation: %s", op.Op, err)))
 				return
 			}
 			if updateAttr {
@@ -647,8 +672,9 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
-// applyReplaceUser applies a SCIM PATCH replace operation to a user.
-func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op patchOp) (bool, bool, error) {
+// applyPatchUser applies a SCIM PATCH add/replace operation to a user.
+// For single-valued attributes, add and replace have identical semantics (RFC 7644 §3.5.2).
+func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op patchOp, cfg providerConfig) (bool, bool, error) {
 	if op.Path == "" {
 		fields, ok := op.Value.(map[string]any)
 		if !ok {
@@ -657,11 +683,11 @@ func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op
 
 		var shouldUpdateAttr, shouldUpdateUser bool
 		for name, value := range fields {
-			updateAttr, updateUser, err := applyReplaceUser(provider, attr, user, patchOp{
+			updateAttr, updateUser, err := applyPatchUser(provider, attr, user, patchOp{
 				Op:    "replace",
 				Path:  name,
 				Value: value,
-			})
+			}, cfg)
 			if err != nil {
 				return false, false, fmt.Errorf("failed to apply replace operation: %v", err)
 			}
@@ -690,6 +716,30 @@ func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op
 
 			user.Enabled = &active
 			updateUser = true
+		}
+	case "displayname":
+		displayName, ok := op.Value.(string)
+		if !ok {
+			return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for displayName: %v", op.Value))
+		}
+
+		if user.DisplayName != displayName {
+			user.DisplayName = displayName
+			updateUser = true
+		}
+	case "username":
+		if cfg.UserIDAttribute != UserIDExternalID {
+			return false, false, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier")
+		}
+
+		username, ok := op.Value.(string)
+		if !ok {
+			return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for userName: %v", op.Value))
+		}
+
+		if first(attr.ExtraByProvider[provider]["username"]) != username {
+			attr.ExtraByProvider[provider]["username"] = []string{username}
+			updateAttr = true
 		}
 	case "externalid":
 		externalID, ok := op.Value.(string)

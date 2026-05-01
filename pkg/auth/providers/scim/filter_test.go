@@ -389,64 +389,72 @@ func TestFilterMatchesCaseExact(t *testing.T) {
 	}
 }
 
-func TestFilterValidateForAttribute(t *testing.T) {
+func TestFilterValidateForAttributes(t *testing.T) {
 	tests := []struct {
-		name             string
-		filter           *Filter
-		allowedAttribute string
-		allowedOperators []filterOperator
-		wantErr          bool
-		errContains      string
+		name              string
+		filter            *Filter
+		allowedAttributes []string
+		allowedOperators  []filterOperator
+		wantErr           bool
+		errContains       string
 	}{
 		{
-			name:             "nil filter is valid",
-			filter:           nil,
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          false,
+			name:              "nil filter is valid",
+			filter:            nil,
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "valid attribute and operator",
-			filter:           &Filter{Attribute: "userName", Operator: opEqual, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          false,
+			name:              "valid attribute and operator",
+			filter:            &Filter{Attribute: "userName", Operator: opEqual, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "attribute case insensitive match",
-			filter:           &Filter{Attribute: "USERNAME", Operator: opEqual, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          false,
+			name:              "attribute case insensitive match",
+			filter:            &Filter{Attribute: "USERNAME", Operator: opEqual, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "multiple allowed operators",
-			filter:           &Filter{Attribute: "userName", Operator: opStartsWith, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual, opStartsWith, opContains},
-			wantErr:          false,
+			name:              "multiple allowed operators",
+			filter:            &Filter{Attribute: "userName", Operator: opStartsWith, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual, opStartsWith, opContains},
 		},
 		{
-			name:             "unsupported attribute",
-			filter:           &Filter{Attribute: "externalId", Operator: opEqual, Value: "ext-123"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          true,
-			errContains:      "unsupported filter attribute",
+			name:              "multiple allowed attributes matches first",
+			filter:            &Filter{Attribute: "userName", Operator: opEqual, Value: "john"},
+			allowedAttributes: []string{"userName", "externalId"},
+			allowedOperators:  []filterOperator{opEqual},
 		},
 		{
-			name:             "unsupported operator",
-			filter:           &Filter{Attribute: "userName", Operator: opContains, Value: "john"},
-			allowedAttribute: "userName",
-			allowedOperators: []filterOperator{opEqual},
-			wantErr:          true,
-			errContains:      "unsupported filter operator",
+			name:              "multiple allowed attributes matches second",
+			filter:            &Filter{Attribute: "externalId", Operator: opEqual, Value: "ext-123"},
+			allowedAttributes: []string{"userName", "externalId"},
+			allowedOperators:  []filterOperator{opEqual},
+		},
+		{
+			name:              "unsupported attribute",
+			filter:            &Filter{Attribute: "externalId", Operator: opEqual, Value: "ext-123"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
+			wantErr:           true,
+			errContains:       "unsupported filter attribute",
+		},
+		{
+			name:              "unsupported operator",
+			filter:            &Filter{Attribute: "userName", Operator: opContains, Value: "john"},
+			allowedAttributes: []string{"userName"},
+			allowedOperators:  []filterOperator{opEqual},
+			wantErr:           true,
+			errContains:       "unsupported filter operator",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.filter.ValidateForAttribute(tt.allowedAttribute, tt.allowedOperators...)
+			err := tt.filter.ValidateForAttributes(tt.allowedAttributes, tt.allowedOperators...)
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {

@@ -17,10 +17,12 @@ type SCIMServer struct {
 	userAttributeCache v3.UserAttributeCache
 	userAttributes     v3.UserAttributeClient
 	userMGR            user.Manager
+	getConfig          func(provider string) providerConfig
 }
 
 // NewHandler instantiates [SCIMServer] and returns an [http.Handler] that serves SCIM API endpoints.
 func NewHandler(scaledContext *config.ScaledContext) http.Handler {
+	configMapCache := scaledContext.Wrangler.Core.ConfigMap().Cache()
 	srv := &SCIMServer{
 		groups:             scaledContext.Wrangler.Mgmt.Group(),
 		groupsCache:        scaledContext.Wrangler.Mgmt.Group().Cache(),
@@ -29,6 +31,9 @@ func NewHandler(scaledContext *config.ScaledContext) http.Handler {
 		userAttributeCache: scaledContext.Wrangler.Mgmt.UserAttribute().Cache(),
 		userAttributes:     scaledContext.Wrangler.Mgmt.UserAttribute(),
 		userMGR:            scaledContext.UserManager,
+		getConfig: func(provider string) providerConfig {
+			return getProviderConfig(configMapCache, provider)
+		},
 	}
 
 	authenticator := NewTokenAuthenticator(scaledContext.Wrangler)
