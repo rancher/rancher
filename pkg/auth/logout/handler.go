@@ -49,6 +49,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Secure:   isSecure,
 			Path:     "/",
 			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
 			MaxAge:   -1,
 			Expires:  cookieUnsetTimestamp,
 		}
