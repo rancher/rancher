@@ -28,10 +28,12 @@ const (
 //
 // Each field maps directly to a key in ConfigMap.Data:
 //
-//	enabled:          "true" | "false"   (default: false)
-//	paused:           "true" | "false"   (default: false)
-//	userIdAttribute:  "userName" | "externalId"   (default: "userName")
-//	groupIdAttribute: "displayName" | "externalId" (default: "displayName")
+//	enabled:                    "true" | "false"                (default: false)
+//	paused:                     "true" | "false"                (default: false)
+//	userIdAttribute:            "userName" | "externalId"       (default: "userName")
+//	groupIdAttribute:           "displayName" | "externalId"    (default: "displayName")
+//	rateLimitRequestsPerSecond: integer                         (default: 0 = disabled)
+//	rateLimitBurst:             integer                         (default: 10)
 type providerConfig struct {
 	// Enabled controls whether SCIM provisioning is active for this provider.
 	// The SCIM feature flag must also be enabled; this flag alone is not sufficient.
@@ -54,6 +56,15 @@ type providerConfig struct {
 	//
 	// Supported values: "displayName" (default), "externalId".
 	GroupIDAttribute string
+
+	// RateLimitRequestsPerSecond caps SCIM API requests per second for this provider.
+	// 0 disables rate limiting. In HA setups each replica enforces its own limit,
+	// so the effective cluster-wide rate is roughly this value multiplied by the number of replicas.
+	RateLimitRequestsPerSecond int
+
+	// RateLimitBurst is how many requests this provider can make in a quick burst
+	// before the steady-state rate kicks in.
+	RateLimitBurst int
 }
 
 func (c *providerConfig) userID(user scimUser) string {
@@ -74,10 +85,13 @@ func (c *providerConfig) groupID(displayName, externalID string) string {
 	}
 }
 
+const defaultRateLimitBurst = 10
+
 func defaultProviderConfig() providerConfig {
 	return providerConfig{
 		UserIDAttribute:  UserIDUserName,
 		GroupIDAttribute: GroupIDDisplayName,
+		RateLimitBurst:   defaultRateLimitBurst,
 	}
 }
 
@@ -136,6 +150,24 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 			cfg.GroupIDAttribute = v
 		} else {
 			logrus.Errorf("scim::getProviderConfig: invalid groupIdAttribute %q in configmap %s, using default", v, name)
+		}
+	}
+
+	if v, ok := cm.Data["rateLimitRequestsPerSecond"]; ok {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			logrus.Errorf("scim::getProviderConfig: invalid rateLimitRequestsPerSecond value %q in configmap %s, using default", v, name)
+		} else {
+			cfg.RateLimitRequestsPerSecond = n
+		}
+	}
+
+	if v, ok := cm.Data["rateLimitBurst"]; ok {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			logrus.Errorf("scim::getProviderConfig: invalid rateLimitBurst value %q in configmap %s, using default", v, name)
+		} else {
+			cfg.RateLimitBurst = n
 		}
 	}
 
