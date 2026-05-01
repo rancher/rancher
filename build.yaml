@@ -6,7 +6,3 @@ cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
 defaultShellVersion: rancher/shell:v0.8.0-rc.2
 fleetVersion: 110.0.0+up0.16.0-alpha.5
 defaultSccOperatorImage: rancher/scc-operator:v0.4.0-rc.1
-# NOTE: when updating this version, you will also need to update the hardcoded
-# k8s minor <-> image tag mapping in pkg/controllers/capr/autoscaler/fleet.go (imageTagVersions variable).
-# if adding support for a new k8s minor release (e.g. new rancher release)
-clusterAutoscalerChartVersion: 9.50.1

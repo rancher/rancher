@@ -269,21 +269,11 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 
 	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
-	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("1.34.0-3.4", result)
+	result := s.h.chartVersionsForCluster(cluster)
+	s.Equal("1.34.0-3.4", result.imageTag)
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
-	// Temporarily modify the imageTagVersions map to test unknown version
-	originalMap := imageTagVersions
-	imageTagVersions = map[int]string{
-		99: "1.99.0-9.9", // Use a version that's not in the original map
-	}
-
-	defer func() {
-		imageTagVersions = originalMap // Restore original map
-	}()
-
 	cluster := &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-cluster",
@@ -291,8 +281,8 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 		},
 	}
 
-	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("", result) // Should return empty string for unknown version
+	result := s.h.chartVersionsForCluster(cluster)
+	s.Equal(defaultChartVersionConfigs.imageTag, result.imageTag)
 }
 
 // Test cases for getChartImageSettings method
