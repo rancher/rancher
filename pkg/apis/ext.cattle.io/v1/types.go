@@ -3,6 +3,7 @@ package v1
 
 import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -341,6 +342,68 @@ type PasswordChangeRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions"`
 	// Summary of the GroupMembershipRefreshRequest status.
 	Summary string `json:"summary,omitempty"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CloudCredential is the public API for managing cloud credentials in Rancher.
+type CloudCredential struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec CloudCredentialSpec `json:"spec,omitempty"`
+	// +optional
+	Status CloudCredentialStatus `json:"status,omitempty"`
+}
+
+// CloudCredentialSpec defines the desired state of CloudCredential.
+type CloudCredentialSpec struct {
+	// Type specifies the service the credential can authenticate with (e.g., "amazon", "digitalocean", "azure", "google", "vsphere").
+	// If generic credentials are enabled, accepts any string beginning with `x-` and skips validation
+	// +kubebuilder:validation:Required
+	Type string `json:"type"`
+
+	// Credentials contains the write-only credential fields as key-value pairs.
+	// These fields are NOT persisted to etcd on the CloudCredential resource.
+	// The ext CloudCredential store writes them to the backing Secret and omits
+	// them from read responses.
+	// +optional
+	//
+	Credentials map[string]string `json:"credentials,omitempty"`
+
+	// VisibleFields is an optional list of credential field keys that are considered non-sensitive.
+	// Fields listed here will have their values returned in Status.PublicData on read operations.
+	// Any credential key NOT listed here is treated as private and will not be returned.
+	// +listType=set
+	// +optional
+	VisibleFields []string `json:"visibleFields,omitempty"`
+
+	// Description is an optional human-readable description of the credential.
+	// +optional
+	Description string `json:"description,omitempty"`
+}
+
+// CloudCredentialStatus defines the observed state of CloudCredential.
+type CloudCredentialStatus struct {
+	// Secret is the backing secret created for this credential.
+	// +optional
+	Secret *v1.ObjectReference `json:"secret,omitempty"`
+
+	// PublicData contains the values of any field in the `PublicFields` list from
+	// the corresponding DynamicSchema config for this type of CloudCredential.
+	//
+	// In the generic usecase PublicData contains the values of fields listed in
+	// Spec.VisibleFields.
+	// Only non-sensitive fields explicitly marked as visible are included here
+	// +optional
+	PublicData map[string]string `json:"publicData,omitempty"`
+
+	// Conditions represents the current state of the CloudCredential.
+	Conditions []metav1.Condition `json:"conditions"`
 }
 
 // +genclient

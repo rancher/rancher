@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"reflect"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -118,7 +120,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 			}
 		}
 		if !forceUpdate {
-			return m.createCredSchema(obj, credFields)
+			return m.createCredSchema(obj, credFields, fieldList(pubCredFields), fieldList(privateCredFields))
 		}
 	}
 
@@ -239,10 +241,10 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		}
 	}
 
-	return m.createCredSchema(obj, credFields)
+	return m.createCredSchema(obj, credFields, fieldList(pubCredFields), fieldList(privateCredFields))
 }
 
-func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]v32.Field) (*v32.NodeDriver, error) {
+func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]v32.Field, publicFields, privateFields []string) (*v32.NodeDriver, error) {
 	name := credentialConfigSchemaName(obj.Spec.DisplayName)
 	credSchema, err := m.schemaLister.Get("", name)
 
@@ -254,6 +256,8 @@ func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]
 			Create:       true,
 			Update:       true,
 		}
+		publicFields = append(publicFields, "defaultRegion")
+		sort.Strings(publicFields)
 	}
 
 	if err != nil {
@@ -261,6 +265,8 @@ func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]
 			credentialSchema := &v32.DynamicSchema{
 				Spec: v32.DynamicSchemaSpec{
 					ResourceFields: credFields,
+					PublicFields:   publicFields,
+					PrivateFields:  privateFields,
 				},
 			}
 			credentialSchema.Name = name
@@ -276,9 +282,16 @@ func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]
 			return obj, err
 		}
 		return obj, err
-	} else if !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) {
+	}
+
+	needsUpdate := !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) ||
+		!reflect.DeepEqual(credSchema.Spec.PublicFields, publicFields) ||
+		!reflect.DeepEqual(credSchema.Spec.PrivateFields, privateFields)
+	if needsUpdate {
 		toUpdate := credSchema.DeepCopy()
 		toUpdate.Spec.ResourceFields = credFields
+		toUpdate.Spec.PublicFields = publicFields
+		toUpdate.Spec.PrivateFields = privateFields
 		_, err := m.schemaClient.Update(toUpdate)
 		if err != nil {
 			return obj, err
@@ -485,6 +498,26 @@ func getCredFields(annotations map[string]string) (map[string]bool, map[string]b
 
 func credentialConfigSchemaName(driverName string) string {
 	return fmt.Sprintf("%s%s", driverName, "credentialconfig")
+}
+
+// fieldList converts a cred fields map (field name -> true) to a
+// sorted string slice suitable for DynamicSchemaSpec.PublicFields and DynamicSchemaSpec.PrivateFields.
+func fieldList(fields map[string]bool) []string {
+	if len(fields) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(fields))
+	for k, v := range fields {
+		if v && k != "" {
+			out = append(out, k)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	slices.Sort(out)
+	return out
 }
 
 func updateDefault(credField v32.Field, val, kind string) v32.Field {
