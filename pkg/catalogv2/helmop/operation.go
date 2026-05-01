@@ -953,6 +953,11 @@ func (s *Operations) createPod(secretData map[string][]byte, imageOverride strin
 			Value:    "true",
 			Effect:   "NoSchedule",
 		},
+		{
+			Key:      "CriticalAddonsOnly",
+			Operator: corev1.TolerationOpExists,
+			Effect:   "NoSchedule",
+		},
 	}
 	uniqueTolerations := mergeTolerations(defaultPodTolerations, tolerations)
 
