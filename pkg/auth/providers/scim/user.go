@@ -701,8 +701,13 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 		return shouldUpdateAttr, shouldUpdateUser, nil
 	}
 
+	path, _, err := stripSchemaURN(op.Path, userResource)
+	if err != nil {
+		return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid path %q: %s", op.Path, err))
+	}
+
 	var updateAttr, updateUser bool
-	switch strings.ToLower(op.Path) {
+	switch strings.ToLower(path) {
 	case "active":
 		active, err := boolFromValue(op.Value)
 		if err != nil {

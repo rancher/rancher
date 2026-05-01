@@ -241,6 +241,41 @@ func TestParseFilter(t *testing.T) {
 			wantErr:     true,
 			errContains: "invalid attribute name",
 		},
+
+		// URN-prefixed attributes
+		{
+			name:   "URN-prefixed user attribute",
+			filter: `urn:ietf:params:scim:schemas:core:2.0:User:userName eq "john.doe"`,
+			want: &Filter{
+				Attribute: "userName",
+				Operator:  opEqual,
+				Value:     "john.doe",
+			},
+		},
+		{
+			name:   "URN-prefixed group attribute",
+			filter: `urn:ietf:params:scim:schemas:core:2.0:Group:displayName eq "Engineering"`,
+			want: &Filter{
+				Attribute: "displayName",
+				Operator:  opEqual,
+				Value:     "Engineering",
+			},
+		},
+		{
+			name:   "URN-prefixed attribute with pr operator",
+			filter: `urn:ietf:params:scim:schemas:core:2.0:User:externalId pr`,
+			want: &Filter{
+				Attribute: "externalId",
+				Operator:  opPresent,
+				Value:     "",
+			},
+		},
+		{
+			name:        "unknown URN prefix in filter",
+			filter:      `urn:custom:schema:attr eq "value"`,
+			wantErr:     true,
+			errContains: "unrecognized schema URN",
+		},
 	}
 
 	for _, tt := range tests {
@@ -255,6 +290,117 @@ func TestParseFilter(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestStripSchemaURN(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                 string
+		path                 string
+		expectedResourceType string
+		wantAttrPath         string
+		wantResourceType     string
+		wantErr              bool
+		errContains          string
+	}{
+		{
+			name:         "bare attribute",
+			path:         "userName",
+			wantAttrPath: "userName",
+		},
+		{
+			name:         "bare nested attribute",
+			path:         "name.familyName",
+			wantAttrPath: "name.familyName",
+		},
+		{
+			name:             "user URN prefix",
+			path:             "urn:ietf:params:scim:schemas:core:2.0:User:userName",
+			wantAttrPath:     "userName",
+			wantResourceType: "User",
+		},
+		{
+			name:             "group URN prefix",
+			path:             "urn:ietf:params:scim:schemas:core:2.0:Group:displayName",
+			wantAttrPath:     "displayName",
+			wantResourceType: "Group",
+		},
+		{
+			name:                 "user URN matching resource type",
+			path:                 "urn:ietf:params:scim:schemas:core:2.0:User:active",
+			expectedResourceType: "User",
+			wantAttrPath:         "active",
+			wantResourceType:     "User",
+		},
+		{
+			name:                 "user URN mismatched resource type",
+			path:                 "urn:ietf:params:scim:schemas:core:2.0:User:userName",
+			expectedResourceType: "Group",
+			wantErr:              true,
+			errContains:          "does not match",
+		},
+		{
+			name:                 "group URN mismatched resource type",
+			path:                 "urn:ietf:params:scim:schemas:core:2.0:Group:displayName",
+			expectedResourceType: "User",
+			wantErr:              true,
+			errContains:          "does not match",
+		},
+		{
+			name:        "unknown URN prefix",
+			path:        "urn:ietf:params:scim:schemas:extension:custom:2.0:Foo:bar",
+			wantErr:     true,
+			errContains: "unrecognized schema URN",
+		},
+		{
+			name:             "URN with complex path",
+			path:             "urn:ietf:params:scim:schemas:core:2.0:User:emails[primary eq true].value",
+			wantAttrPath:     "emails[primary eq true].value",
+			wantResourceType: "User",
+		},
+		{
+			name:             "URN with members filter path",
+			path:             `urn:ietf:params:scim:schemas:core:2.0:Group:members[value eq "u-123"]`,
+			wantAttrPath:     `members[value eq "u-123"]`,
+			wantResourceType: "Group",
+		},
+		{
+			name:         "empty path",
+			path:         "",
+			wantAttrPath: "",
+		},
+		{
+			name:        "URN prefix with no attribute",
+			path:        "urn:ietf:params:scim:schemas:core:2.0:User:",
+			wantErr:     true,
+			errContains: "missing attribute name",
+		},
+		{
+			name:        "malformed urn prefix",
+			path:        "urn:bogus",
+			wantErr:     true,
+			errContains: "unrecognized schema URN",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			attrPath, resourceType, err := stripSchemaURN(tt.path, tt.expectedResourceType)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.ErrorContains(t, err, tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAttrPath, attrPath)
+			assert.Equal(t, tt.wantResourceType, resourceType)
 		})
 	}
 }

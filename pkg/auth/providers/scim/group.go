@@ -447,9 +447,11 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	group = group.DeepCopy()
 	cfg := s.getConfig(provider)
 
-	var shouldUpdateGroup bool
-	var membersToAdd []scimMember
-	var membersToRemove []string
+	var (
+		shouldUpdateGroup bool
+		membersToAdd      []scimMember
+		membersToRemove   []string
+	)
 
 	for _, op := range payload.Operations {
 		switch strings.ToLower(op.Op) {
@@ -465,8 +467,12 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 				shouldUpdateGroup = true
 			}
 		case "add":
-			// Add members to group
-			if strings.ToLower(op.Path) != "members" {
+			addPath, _, err := stripSchemaURN(op.Path, groupResource)
+			if err != nil {
+				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid path %q: %s", op.Path, err)))
+				return
+			}
+			if strings.ToLower(addPath) != "members" {
 				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported add path: %s", op.Path)))
 				return
 			}
@@ -504,14 +510,16 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		case "remove":
-			// Remove members from group
-			if !strings.HasPrefix(strings.ToLower(op.Path), "members[") {
+			removePath, _, err := stripSchemaURN(op.Path, groupResource)
+			if err != nil {
+				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid path %q: %s", op.Path, err)))
+				return
+			}
+			if !strings.HasPrefix(strings.ToLower(removePath), "members[") {
 				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported remove path: %s", op.Path)))
 				return
 			}
-			// Format: members[value eq "user-id"]
-			// Extract user-id from the filter
-			if userID := extractMemberValueFromPath(op.Path); userID != "" {
+			if userID := extractMemberValueFromPath(removePath); userID != "" {
 				membersToRemove = append(membersToRemove, userID)
 			} else {
 				writeError(w, NewError(http.StatusBadRequest, "Invalid member removal path format"))
@@ -1006,8 +1014,13 @@ func applyReplaceGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, e
 		return updated, nil
 	}
 
+	path, _, err := stripSchemaURN(op.Path, groupResource)
+	if err != nil {
+		return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid path %q: %s", op.Path, err))
+	}
+
 	var updated bool
-	switch strings.ToLower(op.Path) {
+	switch strings.ToLower(path) {
 	case "displayname":
 		if cfg.GroupIDAttribute != GroupIDExternalID {
 			return false, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier")
