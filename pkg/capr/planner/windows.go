@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	planapi "github.com/rancher/rancher/pkg/plan"
 )
 
 const (
@@ -208,10 +209,12 @@ var (
 		Minor:   true,
 	}
 	setPermissionsWindowsScriptInstruction = plan.OneTimeInstruction{
-		Name:    "Set permissions for RKE2 installation files on Windows",
-		Command: "powershell.exe",
-		Args: []string{"-File", fmt.Sprintf(setPermissionsWindowsScriptPath,
-			"c:\\var\\lib\\rancher\\capr")},
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "Set permissions for RKE2 installation files on Windows",
+			Command: "powershell.exe",
+			Args: []string{"-File", fmt.Sprintf(setPermissionsWindowsScriptPath,
+				"c:\\var\\lib\\rancher\\capr")},
+		},
 	}
 )
 
@@ -249,18 +252,20 @@ func windowsIdempotentInstruction(identifier, value, command string, args []stri
 	hashedValue := PlanHash([]byte(value))
 
 	return plan.OneTimeInstruction{
-		Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
-		Command: "powershell.exe",
-		Args: append([]string{
-			windowsIdempotentActionScriptPath(),
-			strings.ToLower(identifier),
-			hashedValue,
-			hashedCommand,
-			command,
-			// note: custom data directory paths are not currently respected by Windows nodes
-			"c:\\var\\lib\\rancher\\capr",
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
+			Command: "powershell.exe",
+			Args: append([]string{
+				windowsIdempotentActionScriptPath(),
+				strings.ToLower(identifier),
+				hashedValue,
+				hashedCommand,
+				command,
+				// note: custom data directory paths are not currently respected by Windows nodes
+				"c:\\var\\lib\\rancher\\capr",
+			},
+				args...),
+			Env: env,
 		},
-			args...),
-		Env: env,
 	}
 }

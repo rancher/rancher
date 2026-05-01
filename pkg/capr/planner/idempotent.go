@@ -8,6 +8,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	planapi "github.com/rancher/rancher/pkg/plan"
 )
 
 // idempotentActionScript wraps a provided command in additional checks which ensure the command
@@ -53,11 +54,13 @@ func generateIdempotencyCleanupInstruction(controlPlane *rkev1.RKEControlPlane, 
 		return plan.OneTimeInstruction{}
 	}
 	return plan.OneTimeInstruction{
-		Name:    "remove idempotency tracking",
-		Command: "/bin/sh",
-		Args: []string{
-			"-c",
-			fmt.Sprintf("rm -rf %s/idempotence/%s", capr.GetProvisioningDataDir(&controlPlane.Spec.ClusterConfiguration), key),
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "remove idempotency tracking",
+			Command: "/bin/sh",
+			Args: []string{
+				"-c",
+				fmt.Sprintf("rm -rf %s/idempotence/%s", capr.GetProvisioningDataDir(&controlPlane.Spec.ClusterConfiguration), key),
+			},
 		},
 	}
 }
@@ -69,18 +72,20 @@ func idempotentInstruction(controlPlane *rkev1.RKEControlPlane, identifier, valu
 	hashedCommand := PlanHash([]byte(command))
 	hashedValue := PlanHash([]byte(value))
 	return plan.OneTimeInstruction{
-		Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
-		Command: "/bin/sh",
-		Args: append([]string{
-			"-x",
-			idempotentActionScriptPath(controlPlane),
-			strings.ToLower(identifier),
-			hashedValue,
-			hashedCommand,
-			command,
-			capr.GetProvisioningDataDir(&controlPlane.Spec.ClusterConfiguration)},
-			args...),
-		Env: env,
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
+			Command: "/bin/sh",
+			Args: append([]string{
+				"-x",
+				idempotentActionScriptPath(controlPlane),
+				strings.ToLower(identifier),
+				hashedValue,
+				hashedCommand,
+				command,
+				capr.GetProvisioningDataDir(&controlPlane.Spec.ClusterConfiguration)},
+				args...),
+			Env: env,
+		},
 	}
 }
 
