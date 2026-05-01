@@ -571,6 +571,28 @@ func TestApplyReplaceGroup(t *testing.T) {
 		require.Error(t, err)
 		assert.False(t, updated)
 	})
+
+	t.Run("URN-prefixed externalId", func(t *testing.T) {
+		group := &v3.Group{ExternalID: "old-id"}
+		op := patchOp{Op: "replace", Path: "urn:ietf:params:scim:schemas:core:2.0:Group:externalId", Value: "new-id"}
+
+		updated, err := applyReplaceGroup(group, op, cfg)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, "new-id", group.ExternalID)
+	})
+
+	t.Run("URN-prefixed wrong resource type", func(t *testing.T) {
+		group := &v3.Group{}
+		op := patchOp{Op: "replace", Path: "urn:ietf:params:scim:schemas:core:2.0:User:userName", Value: "test"}
+
+		updated, err := applyReplaceGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		assert.Contains(t, err.Error(), "does not match")
+	})
 }
 
 func TestExtractMemberValueFromPath(t *testing.T) {
@@ -967,6 +989,221 @@ func TestPatchGroup(t *testing.T) {
 		err = json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, "new-external-id", resp["externalId"])
+	})
+
+	t.Run("URN-prefixed replace externalId", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "old-external-id",
+			Provider:    provider,
+		}
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		updatedGroup := existingGroup.DeepCopy()
+		updatedGroup.ExternalID = "new-external-id"
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Update(gomock.Any()).Return(updatedGroup, nil)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groups:      groupClient,
+			groupsCache: groupCache,
+			userCache:   userCache,
+			getConfig:   testDefaultGetConfig,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":    "replace",
+					"path":  "urn:ietf:params:scim:schemas:core:2.0:Group:externalId",
+					"value": "new-external-id",
+				},
+			},
+		}
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "new-external-id", resp["externalId"])
+	})
+
+	t.Run("URN-prefixed add members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			Provider:    provider,
+		}
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
+		}, nil).Times(2)
+		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "u-mo773yttt4"},
+			GroupPrincipals: map[string]v3.Principals{provider: {Items: []v3.Principal{}}},
+		}, nil)
+		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
+
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"}},
+		}, nil)
+		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"}}},
+			},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {"username": {"john.doe"}},
+			},
+		}, nil)
+
+		srv := &SCIMServer{
+			groupsCache:        groupCache,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":   "add",
+					"path": "urn:ietf:params:scim:schemas:core:2.0:Group:members",
+					"value": []map[string]any{
+						{"value": "u-mo773yttt4", "display": "john.doe"},
+					},
+				},
+			},
+		}
+		body, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("URN-prefixed remove member", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			Provider:    provider,
+		}
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
+		}, nil)
+		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"}}},
+			},
+		}, nil)
+		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
+
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache:        groupCache,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":   "remove",
+					"path": `urn:ietf:params:scim:schemas:core:2.0:Group:members[value eq "u-mo773yttt4"]`,
+				},
+			},
+		}
+		body, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("URN-prefixed path with wrong resource type returns error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			Provider:    provider,
+		}
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupCache,
+			getConfig:   testDefaultGetConfig,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":    "replace",
+					"path":  "urn:ietf:params:scim:schemas:core:2.0:User:userName",
+					"value": "test",
+				},
+			},
+		}
+		body, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }
 

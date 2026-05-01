@@ -2689,4 +2689,213 @@ func TestPatchUser(t *testing.T) {
 		srv.PatchUser(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
+
+	t.Run("URN-prefixed path for active", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			assert.Equal(t, false, *u.Enabled)
+			return u, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:active", "value": false}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, false, resp["active"])
+	})
+
+	t.Run("URN-prefixed path for externalId", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"old-ext-id"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new-ext-id", first(attr.ExtraByProvider[provider]["externalid"]))
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:externalId", "value": "new-ext-id"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "new-ext-id", resp["externalId"])
+	})
+
+	t.Run("URN-prefixed path with wrong resource type returns error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:Group:displayName", "value": "test"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("URN-prefixed path for emails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+					"email":      {"old@example.com"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new@example.com", first(attr.ExtraByProvider[provider]["email"]))
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:emails[primary eq true].value", "value": "new@example.com"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		emails, ok := resp["emails"].([]any)
+		require.True(t, ok)
+		require.Len(t, emails, 1)
+		emailMap := emails[0].(map[string]any)
+		assert.Equal(t, "new@example.com", emailMap["value"])
+	})
 }
