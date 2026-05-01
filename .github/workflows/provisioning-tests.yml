@@ -19,10 +19,10 @@ jobs:
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
         - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
+          V2PROV_TEST_RUN_REGEX: "^Test_(PreBootstrap|Autoscaling)_.*$"
           CATTLE_FEATURES: "provisioningprebootstrap=true"
         - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
+          V2PROV_TEST_RUN_REGEX: "^Test_(PreBootstrap|Autoscaling)_.*$"
           CATTLE_FEATURES: "provisioningprebootstrap=true"
     name: Provisioning tests
     runs-on:
