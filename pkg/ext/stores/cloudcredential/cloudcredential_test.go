@@ -541,6 +541,9 @@ func TestRBACCrossVerb(t *testing.T) {
 		assert.Equal(t, testCredName, obj.(*ext.CloudCredential).Name)
 
 		// Can create
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
@@ -582,6 +585,9 @@ func TestRBACCrossVerb(t *testing.T) {
 		assert.True(t, apierrors.IsNotFound(err))
 
 		// Can create
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
@@ -625,6 +631,9 @@ func TestRBACCrossVerb(t *testing.T) {
 		credential := newCredential(testCredName)
 
 		// Can create
+		h.secretCache.EXPECT().
+			List(CredentialNamespace, gomock.Any()).
+			Return(([]*corev1.Secret)(nil), nil)
 		h.expectNamespaceExists()
 		h.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			secret.Name = "secret-created"
@@ -710,10 +719,6 @@ func TestValidateCredentialType(t *testing.T) {
 		assert.Contains(t, err.Error(), "generic-cloud-credentials")
 	})
 }
-
-// ============================================================================
-// DeleteCollection tests
-// ============================================================================
 
 func TestPrintCloudCredential(t *testing.T) {
 	t.Parallel()
@@ -869,7 +874,3 @@ func TestPrintCloudCredentialList(t *testing.T) {
 	assert.Equal(t, "cred1", rows[0].Cells[0])
 	assert.Equal(t, "cred2", rows[1].Cells[0])
 }
-
-// ============================================================================
-// Store.Delete tests
-// ============================================================================
