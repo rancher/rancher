@@ -76,6 +76,7 @@ var (
 	CLIURLLinux                         = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                       = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
 	ClusterControllerStartCount         = NewSetting("cluster-controller-start-count", "50")
+	DisableLocalAuthProvider            = NewSetting("disable-local-auth-provider", "false")
 	EngineInstallURL                    = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/28.1.sh")
 	EngineISOURL                        = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
 	EngineNewestVersion                 = NewSetting("engine-newest-version", "v17.12.0")
@@ -127,6 +128,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
+	// ATTENTION: This file and the following line are used in the rancher/webhook CI to extract the default branch they need
 	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.15")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
