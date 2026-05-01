@@ -226,9 +226,6 @@ func (p *RTBTestSuite) TestClusterCreateDefaultRole() {
 		Name: namegen.AppendRandomString("test-cluster-"),
 	})
 	p.Require().NoError(err)
-	p.T().Cleanup(func() {
-		_ = client.Management.Cluster.Delete(cluster)
-	})
 
 	// Wait for InitialRolesPopulated condition.
 	p.Require().Eventually(func() bool {
@@ -296,9 +293,6 @@ func (p *RTBTestSuite) TestClusterCreateRoleLocked() {
 		Name: namegen.AppendRandomString("test-cluster-"),
 	})
 	p.Require().NoError(err)
-	p.T().Cleanup(func() {
-		_ = client.Management.Cluster.Delete(cluster)
-	})
 
 	p.Require().Eventually(func() bool {
 		c, err := client.Management.Cluster.ByID(cluster.ID)
@@ -339,9 +333,6 @@ func (p *RTBTestSuite) TestProjectCreateDefaultRole() {
 		ClusterID: "local",
 	})
 	p.Require().NoError(err)
-	p.T().Cleanup(func() {
-		_ = client.Management.Project.Delete(project)
-	})
 
 	p.Require().Eventually(func() bool {
 		prj, err := client.Management.Project.ByID(project.ID)
@@ -415,9 +406,6 @@ func (p *RTBTestSuite) TestProjectCreateRoleLocked() {
 		ClusterID: "local",
 	})
 	p.Require().NoError(err)
-	p.T().Cleanup(func() {
-		_ = client.Management.Project.Delete(project)
-	})
 
 	p.Require().Eventually(func() bool {
 		prj, err := client.Management.Project.ByID(project.ID)
@@ -462,9 +450,6 @@ func (p *RTBTestSuite) TestUserCreateDefaultRole() {
 		UserPrincipalID: principal,
 	})
 	p.Require().NoError(err)
-	p.T().Cleanup(func() {
-		_ = client.Management.ClusterRoleTemplateBinding.Delete(crtb)
-	})
 
 	// Wait for the CRTB to have userId populated.
 	p.Require().Eventually(func() bool {
