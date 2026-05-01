@@ -1,11 +1,13 @@
 package keycloakoidc
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -15,10 +17,12 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -218,4 +222,78 @@ func (m *fakeTokenManager) UpdateSecret(userID, provider, secret string) error {
 	}
 
 	return m.updateSecretFunc(userID, provider, secret)
+}
+
+func TestGetRefreshAndUpdateTokenInvalidGrant(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		responseCode     int
+		responseBody     string
+		wantNonTransient bool
+	}{
+		{
+			name:             "invalid_grant returns NonTransientError",
+			responseCode:     http.StatusBadRequest,
+			responseBody:     `{"error":"invalid_grant","error_description":"Session not active"}`,
+			wantNonTransient: true,
+		},
+		{
+			name:             "server_error is not NonTransientError",
+			responseCode:     http.StatusInternalServerError,
+			responseBody:     `{"error":"server_error","error_description":"Internal error"}`,
+			wantNonTransient: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.responseCode)
+				_, _ = w.Write([]byte(tt.responseBody))
+			}))
+			t.Cleanup(srv.Close)
+
+			k := &keyCloakOIDCProvider{}
+
+			storedToken, _ := json.Marshal(map[string]string{
+				"access_token":  "expired-token",
+				"refresh_token": "test-refresh-token",
+				"expiry":        time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
+			})
+
+			token := &apiv3.Token{
+				UserID:       "test-user",
+				AuthProvider: Name,
+			}
+
+			tokenMgr := &fakeTokenManager{
+				getSecretFunc: func(userID, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
+					return string(storedToken), nil
+				},
+			}
+			k.TokenMgr = tokenMgr
+
+			oauthConfig := oauth2.Config{
+				ClientID: "test-client",
+				Endpoint: oauth2.Endpoint{
+					TokenURL: srv.URL + "/token",
+				},
+			}
+
+			_, err := k.getRefreshAndUpdateToken(context.Background(), oauthConfig, token)
+			require.Error(t, err)
+
+			var nte *common.NonTransientError
+			if tt.wantNonTransient {
+				assert.ErrorAs(t, err, &nte)
+			} else {
+				assert.False(t, errors.As(err, &nte))
+			}
+		})
+	}
 }
