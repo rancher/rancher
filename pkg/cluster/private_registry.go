@@ -2,24 +2,58 @@ package cluster
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/fleet"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	"k8s.io/kubernetes/pkg/credentialprovider"
+	kcorev1 "k8s.io/api/core/v1"
 )
 
+var MgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+
+// AgentPullSecret represents a single .dockerconfigjson entry for a given registry URL
+type AgentPullSecret struct {
+	// Name is the hostname of the private registry. It must not include leading protocols or trailing ports.
+	Name string
+	// DockerConfigJSON is the base64 encoded .dockerconfigjson content that should be used when pulling from the private registry.
+	DockerConfigJSON string
+}
+
 type PrivateRegistry struct {
-	// URL for the registry
-	URL string `yaml:"url" json:"url,omitempty"`
+	// URL is The hostname of the private registry. This value should not include any protocols (e.g. https://) or ports.
+	URL string
+	// PullSecrets are a slice of object references to secrets in the relevant cluster.
+	PullSecrets []kcorev1.SecretReference
+}
+
+func (p *PrivateRegistry) PullSecretNamesAsSlice() []string {
+	var out []string
+	for _, secret := range p.PullSecrets {
+		out = append(out, secret.Name)
+	}
+	return out
+}
+
+func (p *PrivateRegistry) PullSecretsAsObjectReferences() []kcorev1.LocalObjectReference {
+	var out []kcorev1.LocalObjectReference
+	for _, secret := range p.PullSecrets {
+		out = append(out, kcorev1.LocalObjectReference{
+			Name: secret.Name,
+		})
+	}
+	return out
 }
 
 // GetPrivateRegistryURL returns the URL of the private registry specified. It will return the cluster level registry if
-// one is found, or the system default registry if no cluster level registry is found. If either is not found, it will
+// one is found, or the global system default registry if no cluster level registry is found. If neither is found, it will
 // return an empty string.
 func GetPrivateRegistryURL(cluster *v3.Cluster) string {
-	registry := GetPrivateRegistry(cluster)
+	registry, _ := GetPrivateRegistry(cluster)
 	if registry == nil {
 		return ""
 	}
@@ -27,104 +61,181 @@ func GetPrivateRegistryURL(cluster *v3.Cluster) string {
 }
 
 // GetPrivateRegistry returns a PrivateRegistry entry (or nil if one is not found) for the given
-// clusters.management.cattle.io/v3 object. If a cluster-level registry is not defined, it will return the system
-// default registry if one exists.
-func GetPrivateRegistry(cluster *v3.Cluster) *PrivateRegistry {
-	privateClusterLevelRegistry := GetPrivateClusterLevelRegistry(cluster)
-	if privateClusterLevelRegistry != nil {
-		return privateClusterLevelRegistry
+// clusters.management.cattle.io/v3 object. If a cluster-level registry is not defined, or
+// the provided cluster is nil, it will return the global system default registry configuration if it exists.
+func GetPrivateRegistry(importedOrHostedCluster *v3.Cluster) (registry *PrivateRegistry, isGlobalDefault bool) {
+	if clr := GetPrivateImportedClusterLevelRegistry(importedOrHostedCluster); clr != nil {
+		return clr, false
 	}
-	if settings.SystemDefaultRegistry.Get() != "" {
-		return &PrivateRegistry{
-			URL: settings.SystemDefaultRegistry.Get(),
-		}
-	}
-	return nil
+	return getDefaultRegistryConfiguration("", ""), true
 }
 
-// GetPrivateClusterLevelRegistry returns the cluster-level registry for the given clusters.management.cattle.io/v3
+func getDefaultRegistryConfiguration(registryURL, pullSecretNames string) *PrivateRegistry {
+	if registryURL == "" {
+		registryURL = settings.SystemDefaultRegistry.Get()
+	}
+	if registryURL == "" {
+		return nil
+	}
+
+	if pullSecretNames == "" {
+		pullSecretNames = settings.SystemDefaultRegistryPullSecrets.Get()
+	}
+
+	var globalSecrets []kcorev1.SecretReference
+	for _, pullSecret := range strings.Split(pullSecretNames, ",") {
+		if pullSecret == "" {
+			continue
+		}
+		globalSecrets = append(globalSecrets, kcorev1.SecretReference{
+			Namespace: namespaces.System,
+			Name:      strings.TrimSpace(pullSecret),
+		})
+	}
+
+	return &PrivateRegistry{
+		URL:         registryURL,
+		PullSecrets: globalSecrets,
+	}
+}
+
+// GetPrivateImportedClusterLevelRegistry returns the cluster-level registry for the given clusters.management.cattle.io/v3
 // object (or nil if one is not found).
-func GetPrivateClusterLevelRegistry(cluster *v3.Cluster) *PrivateRegistry {
-	if cluster != nil && cluster.Spec.ImportedConfig != nil && cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
-		return &PrivateRegistry{
-			URL: cluster.Spec.ImportedConfig.PrivateRegistryURL,
+func GetPrivateImportedClusterLevelRegistry(cluster *v3.Cluster) *PrivateRegistry {
+	if cluster == nil {
+		return nil
+	}
+
+	importedCfg := cluster.Spec.ImportedConfig
+	if importedCfg == nil {
+		// falls back to global configuration
+		return nil
+	}
+
+	url := importedCfg.PrivateRegistryURL
+	secrets := importedCfg.PrivateRegistryPullSecrets
+	if url == "" {
+		return nil
+	}
+
+	ns := cluster.Spec.FleetWorkspaceName
+	if ns == "" {
+		ns = fleet.ClustersDefaultNamespace
+	}
+
+	var pullSecrets []kcorev1.SecretReference
+	if len(secrets) > 0 {
+		for _, pullSecret := range secrets {
+			pullSecrets = append(pullSecrets, kcorev1.SecretReference{
+				// Like many other cluster scoped resources, secrets added to v3 clusters
+				// should be placed in the fleet-default namespace by either the UI or users.
+				Namespace: ns,
+				Name:      pullSecret,
+			})
 		}
 	}
-	return nil
+
+	return &PrivateRegistry{
+		URL:         url,
+		PullSecrets: pullSecrets,
+	}
 }
 
-// GeneratePrivateRegistryEncodedDockerConfig generates a base64 encoded docker config JSON blob for the provided
-// registry, and returns the registry url, the json credentials, and an error if one was encountered. If the cluster is
-// nil or no registry is configured for a v2prov cluster, no registry url or json blob are returned, but there
-// is no error returned, since not having a registry is not an error. If a registry is configured for the cluster such
-// that we know what the URL is, but we do not have enough information to generate the auth config, we return the url,
-// an empty string for the auth config, and no error, as we have determined where the private registry is, but the lack
-// of secrets indicate to us that the registry does not need authentication to communicate.For v2prov clusters, we extract
-// the username and password from the secret, and transform it into the expected docker config JSON format. This
-// function should not be called with unmigrated clusters, although it is benign to call this function with assembler
-// clusters, as the function will reassemble them anyway.
-func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, string, error) {
-	var err error
-	// Declare here so we don't need to check if the rkeClusterRegistryOrGlobalSystemDefault exists while working with v2prov
-	var globalSystemDefaultURL string
-
+// GeneratePrivateRegistryEncodedDockerConfig generates one or more AgentPullSecret
+// for the provided cluster.
+//
+// The function returns ("", nil, nil) when:
+//   - the cluster is nil
+//   - no registry is configured at either the global or cluster level
+//
+// Provisioned v2 clusters (rke2/k3s):
+//   - Uses .spec.ClusterSecrets to determine the cluster level registry URL and auth secret. Returns the registry URL and a single AgentPullSecret
+//
+// Imported/hosted clusters:
+//   - Uses .spec.ImportedConfig to determine the cluster level registry URL and all auth secrets configured. Returns the registry URL and one or more AgentPullSecret
+func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, []AgentPullSecret, error) {
 	if cluster == nil {
-		return "", "", nil
+		return "", nil, nil
 	}
 
-	if globalSystemDefaultRegistry := GetPrivateRegistry(cluster); globalSystemDefaultRegistry != nil {
-		globalSystemDefaultURL = globalSystemDefaultRegistry.URL
-
-		// Return the private registry URL for imported clusters if it's configured. Skip generating
-		// .dockerconfigjson since authentication is handled at the distro level for imported clusters.
-		if cluster.Spec.ImportedConfig != nil && cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
-			return globalSystemDefaultURL, "", nil
-		}
+	// cluster.GetSecret("PrivateRegistryURL") will only be populated for provisioned
+	// rke2/k3s clusters which have defined a system default registry, either at the cluster level
+	// or by inheriting the global system default registry configuration setup in Rancher.
+	// Imported and hosted clusters will not have these fields set, as they are only populated by the provv2 generating handlers.
+	// This field is the only reference to the cluster level registry URL for v2prov clusters.
+	if cluster.GetSecret(v3.ClusterPrivateRegistryURL) != "" {
+		return generateProvisionedClusterDockerConfig(cluster, secretLister)
 	}
 
-	// cluster.GetSecret("PrivateRegistryURL") will be empty if the cluster is
-	// imported, or RKE2 with no cluster level registry configured.
-	// For RKE2 with a cluster level registry configured, this is the
-	// only reference to the registry URL available on the v3.Cluster.
-	// Without it, we cannot generate the registry credentials (.dockerconfigjson)
+	// Otherwise, look elsewhere on the v3 cluster for registry info.
+	// This will also return the global system default registry configuration if the cluster
+	// doesn't provide any overrides.
+	if systemDefaultRegistry, _ := GetPrivateRegistry(cluster); systemDefaultRegistry != nil {
+		return generateImportedClusterDockerConfig(cluster, secretLister, systemDefaultRegistry)
+	}
+
+	// no registry configured
+	return "", nil, nil
+}
+
+func generateProvisionedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, []AgentPullSecret, error) {
 	v2ProvRegistryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
-	// if we don't get a v2ProvRegistryURL we can just return the image set on v1 Prov or the global system default one.
-	if v2ProvRegistryURL == "" {
-		return globalSystemDefaultURL, "", nil
-	}
 
-	// The PrivateRegistrySecret have the same name both for v1 or v2 provisioning clusters despite having different structures
+	// The PrivateRegistrySecret has the same name both for v1 or v2 provisioning clusters despite being in different areas of the spec
 	registrySecretName := cluster.GetSecret(v3.ClusterPrivateRegistrySecret)
-
-	// If we reach this point we know that we have a registry URL set on the v2prov downstream cluster.
-	// If it is a v2prov cluster without a registry URL the function would have already returned.
-	// This last check is to see if the registry requires an authorization, if it doesn't we just return the v2ProvRegistryURL.
 	if registrySecretName == "" {
-		return v2ProvRegistryURL, "", nil
+		return v2ProvRegistryURL, nil, nil
 	}
 
-	// If we have a registrySecretName (registry requires authentication) and this function reached this point
-	// it is a v2 prov cluster. We need to decode that information to return it.
 	registrySecret, err := secretLister.Get(cluster.Spec.FleetWorkspaceName, registrySecretName)
 	if err != nil {
-		return v2ProvRegistryURL, "", err
+		return v2ProvRegistryURL, nil, err
 	}
 
-	username := string(registrySecret.Data["username"])
-	password := string(registrySecret.Data["password"])
-	authConfig := credentialprovider.DockerConfigJSON{
-		Auths: credentialprovider.DockerConfig{
-			v2ProvRegistryURL: credentialprovider.DockerConfigEntry{
-				Username: username,
-				Password: password,
-			},
-		},
-	}
-
-	registryJSON, err := json.Marshal(authConfig)
+	configJson, err := ConvertToDockerConfigJson(registrySecret.Type, v2ProvRegistryURL, registrySecret.Data)
 	if err != nil {
-		return v2ProvRegistryURL, "", err
+		return "", nil, fmt.Errorf("clusterDeploy: failed to convert pull secret to json: %w", err)
 	}
 
-	return v2ProvRegistryURL, base64.StdEncoding.EncodeToString(registryJSON), nil
+	// note:
+	//       Provisioned rke2/k3s clusters only support a single image pull secret,
+	//       additional registry credentials are passed using the containerd configuration
+	//       delivered by the planner.
+	return v2ProvRegistryURL, []AgentPullSecret{{
+		Name:             "cattle-private-registry",
+		DockerConfigJSON: base64.StdEncoding.EncodeToString(configJson),
+	}}, nil
+}
+
+func generateImportedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister, registry *PrivateRegistry) (string, []AgentPullSecret, error) {
+	clusterSystemDefaultURL := registry.URL
+	// Only generate credentials for imported or hosted clusters.
+	if !MgmtNameRegexp.MatchString(cluster.Name) {
+		return clusterSystemDefaultURL, nil, nil
+	}
+
+	if len(registry.PullSecrets) == 0 {
+		return clusterSystemDefaultURL, nil, nil
+	}
+	var pullSecrets []AgentPullSecret
+
+	// build out all the cluster level pull secrets
+	for _, pullSecret := range registry.PullSecrets {
+		sec, err := secretLister.Get(pullSecret.Namespace, pullSecret.Name)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to get pull secret %s in namespace %s for cluster %s: %v", pullSecret.Name, pullSecret.Namespace, cluster.Name, err)
+		}
+
+		configJson, err := ConvertToDockerConfigJson(sec.Type, clusterSystemDefaultURL, sec.Data)
+		if err != nil {
+			return "", nil, fmt.Errorf("clusterDeploy: failed to convert pull secret to json: %w", err)
+		}
+
+		pullSecrets = append(pullSecrets, AgentPullSecret{
+			Name:             sec.Name,
+			DockerConfigJSON: base64.StdEncoding.EncodeToString(configJson),
+		})
+	}
+
+	return clusterSystemDefaultURL, pullSecrets, nil
 }
