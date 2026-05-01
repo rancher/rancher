@@ -13,24 +13,16 @@ type rateLimiter struct {
 	// mu protects the limiters map.
 	mu sync.Mutex
 	// limiters maps provider names to their individual rate limiters.
-	limiters map[string]*providerLimiter
+	limiters map[string]*rate.Limiter
 	// getConfig returns the current rate limit settings for a given provider.
 	getConfig func(provider string) (rate int, burst int)
-}
-
-// providerLimiter pairs a [rate.Limiter] with the settings it was created/updated with,
-// so we can detect when settings change and update the limiter in place.
-type providerLimiter struct {
-	limiter *rate.Limiter
-	rate    int
-	burst   int
 }
 
 // newRateLimiter creates a [rateLimiter] that reads per-provider rate and burst from the
 // provided function on every request, allowing config changes to take effect without restart.
 func newRateLimiter(getConfig func(provider string) (rate int, burst int)) *rateLimiter {
 	return &rateLimiter{
-		limiters:  make(map[string]*providerLimiter),
+		limiters:  make(map[string]*rate.Limiter),
 		getConfig: getConfig,
 	}
 }
@@ -66,28 +58,22 @@ func (l *rateLimiter) getLimiter(provider string) *rate.Limiter {
 		limit = rate.Inf
 	}
 
-	pl, ok := l.limiters[provider]
+	lim, ok := l.limiters[provider]
 	if !ok {
-		// If it's a first request for this provider create a fresh limiter.
-		pl = &providerLimiter{
-			limiter: rate.NewLimiter(limit, burst),
-			rate:    rps,
-			burst:   burst,
-		}
-		l.limiters[provider] = pl
-		return pl.limiter
+		// First request for this provider — create a fresh limiter.
+		lim = rate.NewLimiter(limit, burst)
+		l.limiters[provider] = lim
+		return lim
 	}
 
 	// Config may have changed since last request — update in place
 	// so we keep the current token count instead of resetting it.
-	if pl.rate != rps {
-		pl.limiter.SetLimit(limit)
-		pl.rate = rps
+	if lim.Limit() != limit {
+		lim.SetLimit(limit)
 	}
-	if pl.burst != burst {
-		pl.limiter.SetBurst(burst)
-		pl.burst = burst
+	if lim.Burst() != burst {
+		lim.SetBurst(burst)
 	}
 
-	return pl.limiter
+	return lim
 }
