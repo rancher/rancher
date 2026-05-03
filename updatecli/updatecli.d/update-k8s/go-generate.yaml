@@ -1,0 +1,34 @@
+name: '{{ .k8s.manifest }}'
+pipelineid: '{{ .k8s.pipelineid }}'
+id: 'go-generate' 
+dependson:
+  - 'bump-k8s-version'
+
+conditions:
+  run-go-generate:
+    name: 'Run go generate'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      command: 'go generate ./... && git diff --exit-code'
+      environments:
+        - name: HOME
+        - name: PATH
+      changedif:
+        kind: 'exitcode'
+        spec:
+          warning: 0
+          success: 1
+
+targets:
+  check-files-to-commit:
+    name: 'Check go generate changes'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      command: 'go generate ./... && git diff'
+      environments:
+        - name: HOME
+        - name: PATH
