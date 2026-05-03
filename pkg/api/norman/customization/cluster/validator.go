@@ -1,14 +1,18 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v5"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -16,11 +20,18 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/data/management"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
+	"github.com/rancher/rancher/pkg/ref"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// stsAccountIDTimeout bounds the STS GetCallerIdentity call made during EKS
+// duplicate validation so a slow AWS endpoint cannot stall cluster create.
+const stsAccountIDTimeout = 10 * time.Second
 
 type Validator struct {
 	ClusterClient v3.ClusterInterface
@@ -28,6 +39,7 @@ type Validator struct {
 	Users         v3.UserInterface
 	GrbLister     v3.GlobalRoleBindingLister
 	GrLister      v3.GlobalRoleLister
+	SecretLister  corev1.SecretLister
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -355,8 +367,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	// validation for creates only
 
 	// validate cluster does not reference an EKS cluster that is already backed by a Rancher cluster
-	name := eksConfig["displayName"]
-	region := eksConfig["region"]
+	name, _ := eksConfig["displayName"].(string)
+	region, _ := eksConfig["region"].(string)
 	amazonCredential, _ := eksConfig["amazonCredentialSecret"].(string)
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
@@ -365,6 +377,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("failed to confirm displayName is unique among Rancher EKS clusters for region %s", region))
 	}
 
+	// Two EKS clusters are the same iff they share account ID + region + cluster name.
+	// On a name+region collision, compare AWS account IDs via STS GetCallerIdentity.
 	for _, cluster := range clusters.Items {
 		if cluster.Spec.EKSConfig == nil {
 			continue
@@ -375,11 +389,15 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 		if region != cluster.Spec.EKSConfig.Region {
 			continue
 		}
-		// Allow same name+region if using different AWS credentials (different accounts)
-		if amazonCredential != cluster.Spec.EKSConfig.AmazonCredentialSecret {
-			continue
+		existingCredential := cluster.Spec.EKSConfig.AmazonCredentialSecret
+		if amazonCredential == existingCredential {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
 		}
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
+		newAccountID := v.eksAccountID(amazonCredential, region)
+		existingAccountID := v.eksAccountID(existingCredential, region)
+		if newAccountID != "" && newAccountID == existingAccountID {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
+		}
 	}
 
 	if !createFromImport {
@@ -394,6 +412,50 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	return nil
+}
+
+// eksAccountID resolves the AWS account ID for a cloud credential secret
+// reference (in `namespace:name` form) by calling STS GetCallerIdentity. Any
+// failure (missing secret, invalid creds, network error) returns "" so the
+// caller falls back to treating the credentials as a different account
+// rather than blocking cluster creation on a transient issue.
+func (v *Validator) eksAccountID(secretRef, region string) string {
+	if secretRef == "" || v.SecretLister == nil {
+		return ""
+	}
+	ns, name := ref.Parse(secretRef)
+	if ns == "" || name == "" {
+		return ""
+	}
+	secret, err := v.SecretLister.Get(ns, name)
+	if err != nil {
+		logrus.Warnf("EKS duplicate validation: failed to get cloud credential %s/%s: %v", ns, name, err)
+		return ""
+	}
+	accessKey := string(secret.Data["amazonec2credentialConfig-accessKey"])
+	secretKey := string(secret.Data["amazonec2credentialConfig-secretKey"])
+	if accessKey == "" || secretKey == "" {
+		return ""
+	}
+
+	// STS GetCallerIdentity is region-agnostic, but the v2 SDK requires a region
+	// to construct an endpoint — fall back to us-east-1 if the EKS config has none.
+	stsRegion := region
+	if stsRegion == "" {
+		stsRegion = "us-east-1"
+	}
+	cfg := aws.Config{
+		Region:      stsRegion,
+		Credentials: credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), stsAccountIDTimeout)
+	defer cancel()
+	out, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		logrus.Warnf("EKS duplicate validation: STS GetCallerIdentity failed for %s: %v", secretRef, err)
+		return ""
+	}
+	return aws.ToString(out.Account)
 }
 
 func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
