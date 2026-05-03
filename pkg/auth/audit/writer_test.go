@@ -382,3 +382,29 @@ func TestCompressedZLib(t *testing.T) {
 
 	assert.Equal(t, expected, logs.logs)
 }
+
+// TestPolicyFromAuditPolicyMalformedPathDoesNotPanic is a regression test for
+// issue #54490: a malformed JSONPath such as "$['testing'][5:" used to panic
+// in the upstream parser. PolicyFromAuditPolicy must surface the failure as
+// a regular error so the caller (the audit policy controller / webhook) can
+// reject the policy instead of crashing.
+func TestPolicyFromAuditPolicyMalformedPathDoesNotPanic(t *testing.T) {
+	policy := &auditlogv1.AuditPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "panic-filter-test",
+		},
+		Spec: auditlogv1.AuditPolicySpec{
+			Enabled: true,
+			AdditionalRedactions: []auditlogv1.Redaction{
+				{
+					Paths: []string{"$['testing'][5:"},
+				},
+			},
+		},
+	}
+
+	assert.NotPanics(t, func() {
+		_, err := PolicyFromAuditPolicy(policy)
+		assert.Error(t, err)
+	})
+}
