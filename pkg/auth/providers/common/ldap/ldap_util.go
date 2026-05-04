@@ -28,6 +28,8 @@ type ConfigAttributes struct {
 	UserLoginAttribute          string
 	UserNameAttribute           string
 	UserObjectClass             string
+	UserIDAttribute             string
+	GroupIDAttribute            string
 }
 
 func Connect(config *v3.LdapConfig, caPool *x509.CertPool) (*ldapv3.Conn, error) {
@@ -154,10 +156,18 @@ func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccoun
 	return nil
 }
 
-func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute string) (*v3.Principal, error) {
+func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute, identifierAttribute string) (*v3.Principal, error) {
 	var externalIDType, accountName, externalID, login, kind string
 	externalID = dnStr
 	externalIDType = scope
+
+	if identifierAttribute != "" {
+		values := GetAttributeValuesByName(attribs, identifierAttribute)
+		if len(values) == 0 || values[0] == "" {
+			return nil, fmt.Errorf("ldap: configured identifier attribute %q not found on entry %s", identifierAttribute, dnStr)
+		}
+		externalID = values[0]
+	}
 
 	if IsType(attribs, userObjectClass) {
 		for _, attr := range attribs {
@@ -221,7 +231,16 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	if len(parts) != 2 {
 		return errors.Errorf("invalid id %v", groupPrincipal.ObjectMeta.Name)
 	}
-	groupDN := strings.TrimPrefix(parts[1], "//")
+	groupValue := strings.TrimPrefix(parts[1], "//")
+
+	groupDN := groupValue
+	if config.GroupIDAttribute != "" {
+		dn, err := ResolveIdentifierToDN(searchDomain, config.GroupIDAttribute, groupValue, config.GroupObjectClass, config.ObjectClass, lConn)
+		if err != nil {
+			return fmt.Errorf("ldap: failed to resolve group identifier %q to DN: %w", groupValue, err)
+		}
+		groupDN = dn
+	}
 
 	filter := fmt.Sprintf(
 		"(&(%s=%s)(%s=%s))",
@@ -244,7 +263,7 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 
 	for i := 0; i < len(resultGroups.Entries); i++ {
 		entry := resultGroups.Entries[i]
-		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, config.GroupIDAttribute)
 		if err != nil {
 			logrus.Errorf("Error translating group result: %v", err)
 			continue
@@ -265,6 +284,31 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	}
 
 	return nil
+}
+
+func ResolveIdentifierToDN(searchBase, identifierAttribute, identifierValue, objectClass, objectClassAttr string, lConn ldapv3.Client) (string, error) {
+	filter := fmt.Sprintf(
+		"(&(%s=%s)(%s=%s))",
+		objectClassAttr,
+		SanitizeAttr(objectClass),
+		SanitizeAttr(identifierAttribute),
+		ldapv3.EscapeFilter(identifierValue),
+	)
+
+	search := NewWholeSubtreeSearchRequest(searchBase, filter, []string{"dn"})
+	result, err := lConn.Search(search)
+	if err != nil {
+		return "", fmt.Errorf("ldap: error resolving identifier %s=%s: %w", identifierAttribute, identifierValue, err)
+	}
+
+	if len(result.Entries) == 0 {
+		return "", fmt.Errorf("ldap: no entry found for %s=%s", identifierAttribute, identifierValue)
+	}
+	if len(result.Entries) > 1 {
+		return "", fmt.Errorf("ldap: multiple entries found for %s=%s, expected unique identifier", identifierAttribute, identifierValue)
+	}
+
+	return result.Entries[0].DN, nil
 }
 
 func FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, groupPrincipals []v3.Principal, nonDupGroupPrincipals []v3.Principal) []v3.Principal {
