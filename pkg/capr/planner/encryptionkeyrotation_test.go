@@ -178,42 +178,6 @@ func Test_encryptionKeyRotationFindLeader(t *testing.T) {
 	}
 }
 
-func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
-	t.Run("etcd-only init node split from control-plane convergence entries", func(t *testing.T) {
-		clusterPlan := newTestEncryptionKeyRotationPlan(
-			newTestEncryptionKeyRotationMachine("etcd-init", true, false, true, true, "https://etcd-init:9345"),
-			newTestEncryptionKeyRotationMachine("control-plane-leader", true, true, false, true, "https://control-plane-leader:9345"),
-			newTestEncryptionKeyRotationMachine("etcd-follower", true, false, false, true, "https://etcd-follower:9345"),
-			newTestEncryptionKeyRotationMachine("control-plane-follower", true, true, false, true, "https://control-plane-follower:9345"),
-		)
-
-		targets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
-
-		assert.Len(t, targets.etcdOnly, 2)
-		assert.Equal(t, "etcd-follower", targets.etcdOnly[0].Machine.Name)
-		assert.Equal(t, "etcd-init", targets.etcdOnly[1].Machine.Name)
-		assert.Len(t, targets.controlPlane, 2)
-		assert.Equal(t, "control-plane-follower", targets.controlPlane[0].Machine.Name)
-		assert.Equal(t, "control-plane-leader", targets.controlPlane[1].Machine.Name)
-	})
-
-	t.Run("control plane init node stays in control-plane restart group", func(t *testing.T) {
-		clusterPlan := newTestEncryptionKeyRotationPlan(
-			newTestEncryptionKeyRotationMachine("control-plane-init", true, true, true, true, "https://control-plane-init:9345"),
-			newTestEncryptionKeyRotationMachine("control-plane-leader", true, true, false, true, "https://control-plane-leader:9345"),
-			newTestEncryptionKeyRotationMachine("control-plane-follower", true, true, false, true, "https://control-plane-follower:9345"),
-		)
-
-		targets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
-
-		assert.Empty(t, targets.etcdOnly)
-		assert.Len(t, targets.controlPlane, 3)
-		assert.Equal(t, "control-plane-follower", targets.controlPlane[0].Machine.Name)
-		assert.Equal(t, "control-plane-init", targets.controlPlane[1].Machine.Name)
-		assert.Equal(t, "control-plane-leader", targets.controlPlane[2].Machine.Name)
-	})
-}
-
 func Test_encryptionKeyRotationSecretsEncryptInstruction(t *testing.T) {
 	controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 3}, rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 3},

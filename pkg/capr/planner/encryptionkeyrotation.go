@@ -85,15 +85,6 @@ type encryptionKeyRotationRuntimeStatus struct {
 	HashesMatch bool
 }
 
-type encryptionKeyRotationRestartTargets struct {
-	etcdOnly     []*planEntry
-	controlPlane []*planEntry
-}
-
-func (restartTargets encryptionKeyRotationRestartTargets) onlyLeaderNeedsRestart() bool {
-	return len(restartTargets.etcdOnly) == 0 && len(restartTargets.controlPlane) == 1
-}
-
 func (p *Planner) setEncryptionKeyRotateState(status rkev1.RKEControlPlaneStatus, rotate *rkev1.RotateEncryptionKeys, phase rkev1.RotateEncryptionKeysPhase) (rkev1.RKEControlPlaneStatus, error) {
 	if equality.Semantic.DeepEqual(status.RotateEncryptionKeys, rotate) && equality.Semantic.DeepEqual(status.RotateEncryptionKeysPhase, phase) {
 		return status, nil
@@ -208,8 +199,11 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 			return status, errWaitingf("waiting for encryption key rotation stage to finish on leader [%s]", leader.Machine.Name)
 		}
 
-		restartTargets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
-		if restartTargets.onlyLeaderNeedsRestart() {
+		// Etcd-only nodes still need restart, so their presence means followers must be restarted.
+		etcdOnlyEntries := collect(clusterPlan, IsOnlyEtcd)
+		// Control-plane nodes are the only nodes used for local status/hash convergence checks.
+		controlPlaneEntries := collect(clusterPlan, isControlPlane)
+		if len(etcdOnlyEntries) == 0 && len(controlPlaneEntries) == 1 {
 			// Single-server rotations can finish as soon as the leader reports final
 			// stage and matching hashes because there are no follower servers to restart.
 			if !rotationStatus.HashesMatch {
@@ -336,6 +330,7 @@ func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneSt
 
 	leader := initNode
 	if !isControlPlane(initNode) {
+		// Etcd-only init nodes cannot report local API status, so elect a control-plane node.
 		machines := collect(clusterPlan, encryptionKeyRotationIsSuitableControlPlane)
 		if len(machines) == 0 {
 			return nil, fmt.Errorf("no suitable control plane nodes for encryption key rotation")
@@ -352,23 +347,12 @@ func encryptionKeyRotationIsSuitableControlPlane(entry *planEntry) bool {
 	return isControlPlane(entry) && isNotDeleting(entry) && entry.Machine.Status.NodeRef.IsDefined() && capr.Ready.IsTrue(entry.Machine)
 }
 
-// encryptionKeyRotationRestartTargetsForCluster groups nodes for the restart phase.
-// Etcd-only nodes are restarted first but are not used for local status/hash checks.
-// Control-plane nodes are restarted after that and are used for convergence checks.
-func encryptionKeyRotationRestartTargetsForCluster(clusterPlan *plan.Plan) encryptionKeyRotationRestartTargets {
-	return encryptionKeyRotationRestartTargets{
-		etcdOnly:     collect(clusterPlan, IsOnlyEtcd),
-		controlPlane: collect(clusterPlan, isControlPlane),
-	}
-}
-
 // encryptionKeyRotationRestartNodes restarts etcd-only nodes first and then control-plane nodes.
 // Only control-plane nodes are used for local secrets-encrypt status checks during convergence,
 // and the last control-plane node must also report matching hashes before the phase can finish.
 func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan, joinServer string) (rkev1.RKEControlPlaneStatus, error) {
-	restartTargets := encryptionKeyRotationRestartTargetsForCluster(clusterPlan)
-
-	for _, entry := range restartTargets.etcdOnly {
+	// Etcd-only nodes are restarted first, but are not used for local convergence checks.
+	for _, entry := range collect(clusterPlan, IsOnlyEtcd) {
 		_, updatedStatus, err := p.encryptionKeyRotationRestartService(controlPlane, status, tokensSecret, joinServer, entry)
 		if err != nil {
 			return updatedStatus, err
@@ -376,7 +360,9 @@ func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEContr
 		status = updatedStatus
 	}
 
-	for i, entry := range restartTargets.controlPlane {
+	// Control-plane nodes are restarted after etcd-only nodes and provide status/hash convergence.
+	controlPlaneEntries := collect(clusterPlan, isControlPlane)
+	for i, entry := range controlPlaneEntries {
 		rotationStatus, updatedStatus, err := p.encryptionKeyRotationRestartService(controlPlane, status, tokensSecret, joinServer, entry)
 		if err != nil {
 			return updatedStatus, err
@@ -387,7 +373,7 @@ func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEContr
 			return status, errWaitingf("waiting for encryption key rotation stage to finish on machine [%s]", entry.Machine.Name)
 		}
 
-		if i == len(restartTargets.controlPlane)-1 && !rotationStatus.HashesMatch {
+		if i == len(controlPlaneEntries)-1 && !rotationStatus.HashesMatch {
 			return status, errWaitingf("waiting for encryption key rotation hashes to converge on machine [%s]", entry.Machine.Name)
 		}
 	}
