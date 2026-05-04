@@ -3,7 +3,9 @@ package ldap
 import (
 	"testing"
 
+	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetUserExternalID(t *testing.T) {
@@ -90,6 +92,106 @@ func TestSanitizeAttribute(t *testing.T) {
 		})
 	}
 }
+func TestAttributesToPrincipal(t *testing.T) {
+	t.Parallel()
+
+	userAttribs := []*ldapv3.EntryAttribute{
+		ldapv3.NewEntryAttribute("objectClass", []string{"person"}),
+		ldapv3.NewEntryAttribute("name", []string{"John Doe"}),
+		ldapv3.NewEntryAttribute("sAMAccountName", []string{"jdoe"}),
+		ldapv3.NewEntryAttribute("employeeID", []string{"EMP-42"}),
+	}
+
+	groupAttribs := []*ldapv3.EntryAttribute{
+		ldapv3.NewEntryAttribute("objectClass", []string{"group"}),
+		ldapv3.NewEntryAttribute("name", []string{"Engineering"}),
+		ldapv3.NewEntryAttribute("sAMAccountName", []string{"engineering"}),
+	}
+
+	tests := []struct {
+		name                string
+		attribs             []*ldapv3.EntryAttribute
+		dn                  string
+		scope               string
+		identifierAttribute string
+		wantName            string
+		wantDisplayName     string
+		wantErr             bool
+	}{
+		{
+			name:                "user with default DN identifier",
+			attribs:             userAttribs,
+			dn:                  "cn=John Doe,ou=Users,dc=example,dc=com",
+			scope:               "activedirectory_user",
+			identifierAttribute: "",
+			wantName:            "activedirectory_user://cn=John Doe,ou=Users,dc=example,dc=com",
+			wantDisplayName:     "John Doe",
+		},
+		{
+			name:                "user with sAMAccountName identifier",
+			attribs:             userAttribs,
+			dn:                  "cn=John Doe,ou=Users,dc=example,dc=com",
+			scope:               "activedirectory_user",
+			identifierAttribute: "sAMAccountName",
+			wantName:            "activedirectory_user://jdoe",
+			wantDisplayName:     "John Doe",
+		},
+		{
+			name:                "user with employeeID identifier",
+			attribs:             userAttribs,
+			dn:                  "cn=John Doe,ou=Users,dc=example,dc=com",
+			scope:               "activedirectory_user",
+			identifierAttribute: "employeeID",
+			wantName:            "activedirectory_user://EMP-42",
+			wantDisplayName:     "John Doe",
+		},
+		{
+			name:                "user with missing identifier attribute returns error",
+			attribs:             userAttribs,
+			dn:                  "cn=John Doe,ou=Users,dc=example,dc=com",
+			scope:               "activedirectory_user",
+			identifierAttribute: "nonExistentAttr",
+			wantErr:             true,
+		},
+		{
+			name:                "group with default DN identifier",
+			attribs:             groupAttribs,
+			dn:                  "cn=Engineering,ou=Groups,dc=example,dc=com",
+			scope:               "activedirectory_group",
+			identifierAttribute: "",
+			wantName:            "activedirectory_group://cn=Engineering,ou=Groups,dc=example,dc=com",
+			wantDisplayName:     "Engineering",
+		},
+		{
+			name:                "group with sAMAccountName identifier",
+			attribs:             groupAttribs,
+			dn:                  "cn=Engineering,ou=Groups,dc=example,dc=com",
+			scope:               "activedirectory_group",
+			identifierAttribute: "sAMAccountName",
+			wantName:            "activedirectory_group://engineering",
+			wantDisplayName:     "Engineering",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			principal, err := AttributesToPrincipal(
+				tt.attribs, tt.dn, tt.scope, "activedirectory",
+				"person", "name", "sAMAccountName", "group", "name",
+				tt.identifierAttribute,
+			)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantName, principal.Name)
+			assert.Equal(t, tt.wantDisplayName, principal.DisplayName)
+		})
+	}
+}
+
 func TestIsValidAttribute(t *testing.T) {
 	t.Parallel()
 

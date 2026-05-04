@@ -122,6 +122,27 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 	if config.GroupMemberMappingAttribute != "" && !ldap.IsValidAttr(config.GroupMemberMappingAttribute) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupMemberMappingAttribute")
 	}
+	if config.UserIDAttribute != "" && !ldap.IsValidAttr(config.UserIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userIdentifierAttribute")
+	}
+	if config.GroupIDAttribute != "" && !ldap.IsValidAttr(config.GroupIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupIdentifierAttribute")
+	}
+
+	storedLDAPConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	if err != nil {
+		return err
+	}
+	if storedLDAPConfig.Enabled {
+		if config.UserIDAttribute != storedLDAPConfig.UserIDAttribute {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"userIDAttribute cannot be changed on an enabled provider")
+		}
+		if config.GroupIDAttribute != storedLDAPConfig.GroupIDAttribute {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				"groupIDAttribute cannot be changed on an enabled provider")
+		}
+	}
 
 	if config.UserLoginFilter != "" {
 		if _, err := ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
