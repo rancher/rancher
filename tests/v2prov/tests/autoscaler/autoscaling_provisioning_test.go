@@ -57,7 +57,7 @@ func Test_Autoscaling_Provisioning(t *testing.T) {
 
 			// scale-down provisions a cluster with an oversized worker pool
 			// (Quantity=3 with min=1), then waits for the autoscaler to detect underutilization and scale
-			// the worker pool down. Sleeps 15 minutes to exceed the default 10-minute scale-down-unneeded-time.
+			// the worker pool down. waits a maximum of 15 minutes to exceed the default 10-minute scale-down-unneeded-time.
 			name: "scale-down",
 			workerPoolConfig: provisioningv1.RKEMachinePool{
 				Name:               "scale-down-workers",
@@ -174,7 +174,7 @@ func waitForMachinePoolScaling(t *testing.T, client *clients.Clients, c *provisi
 
 // waitForAutoscalerDeployment waits for the appropriate downstream autoscaler helmop to be "Ready" before adding load to the cluster
 func waitForAutoscalerDeployment(client *clients.Clients, name, namespace string) error {
-	// watch deployments - once the expected name becomes ready return
+	// watch helmops - once the expected name becomes ready return
 	return wait.Object(client.Ctx, client.Fleet.HelmOp().Watch, &fleet.HelmOp{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}, func(obj runtime.Object) (bool, error) {
 		helmop := obj.(*fleet.HelmOp)
 		if helmop.Status.Summary.DesiredReady == 0 {

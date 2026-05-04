@@ -126,7 +126,14 @@ func (h *autoscalerHandler) chartVersionsForCluster(cluster *capi.Cluster) *k8sT
 	v := h.getKubernetesMinorVersion(cluster)
 	versions, ok := k8sVersionToAutoscalerChartVersions[v]
 	if !ok {
-		logrus.Warnf("[autoscalerHandler] no chart versions found for cluster %s", cluster.Name)
+		logrus.Warnf(
+			"[autoscaler] no chart versions found for cluster %s/%s with kubernetes minor=%d, using default chartVersion=%s imageTag=%s",
+			cluster.Namespace,
+			cluster.Name,
+			v,
+			defaultChartVersionConfigs.chartVersion,
+			defaultChartVersionConfigs.imageTag,
+		)
 		return defaultChartVersionConfigs
 	}
 
