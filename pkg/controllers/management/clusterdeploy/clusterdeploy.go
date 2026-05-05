@@ -584,9 +584,14 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 		return nil, fmt.Errorf("waiting for server-url setting to be set")
 	}
 
+	prebootstrap, err := capr.ShouldPreBootstrap(cd.secretLister, cluster)
+	if err != nil {
+		return nil, err
+	}
+
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name,
-		token, url, capr.PreBootstrap(cluster), cluster, features,
+		token, url, prebootstrap, cluster, features,
 		taints, cd.secretLister, priorityClassExists, namespace.GetMutator())
 
 	return buf.Bytes(), err

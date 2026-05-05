@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -11,6 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -760,4 +762,136 @@ func TestSetCAPIResourceCondition(t *testing.T) {
 			assert.True(t, v1beta1Found, "v1beta1 condition should be set on status.deprecated.v1beta1.conditions")
 		})
 	}
+}
+
+func TestShouldPreBootstrap(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster *apimgmtv3.Cluster
+		secrets []*corev1.Secret
+		want    bool
+	}{
+		{
+			name: "authorized sync-bootstrap secret exists",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:        "c-test",
+					FleetWorkspaceName: "fleet-default",
+				},
+			},
+			secrets: []*corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bootstrap-secret",
+						Annotations: map[string]string{
+							SyncPreBootstrapAnnotation: "true",
+							AuthorizedObjectAnnotation: "c-test",
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "sync-bootstrap secret not authorized for cluster",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:        "c-test",
+					FleetWorkspaceName: "fleet-default",
+				},
+			},
+			secrets: []*corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bootstrap-secret",
+						Annotations: map[string]string{
+							SyncPreBootstrapAnnotation: "true",
+							AuthorizedObjectAnnotation: "c-other",
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "no sync-bootstrap secret",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:        "c-test",
+					FleetWorkspaceName: "fleet-default",
+				},
+			},
+			secrets: []*corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "non-bootstrap-secret",
+						Annotations: map[string]string{
+							AuthorizedObjectAnnotation: "c-test",
+						},
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secretCache.EXPECT().List("fleet-default", labels.Everything()).Return(tt.secrets, nil)
+
+			got, err := ShouldPreBootstrap(secretCache, tt.cluster)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestShouldPreBootstrapWhenClusterAlreadyPreBootstrapped(t *testing.T) {
+	cluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+		Spec: apimgmtv3.ClusterSpec{
+			DisplayName:        "c-test",
+			FleetWorkspaceName: "fleet-default",
+		},
+	}
+	apimgmtv3.ClusterConditionPreBootstrapped.True(cluster)
+
+	ctrl := gomock.NewController(t)
+	secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	// No EXPECT — cache should not be called for already pre-bootstrapped clusters
+
+	got, err := ShouldPreBootstrap(secretCache, cluster)
+	assert.NoError(t, err)
+	assert.False(t, got)
+}
+
+func TestShouldPreBootstrapWhenSecretListFails(t *testing.T) {
+	cluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+		Spec: apimgmtv3.ClusterSpec{
+			DisplayName:        "c-test",
+			FleetWorkspaceName: "fleet-default",
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secretCache.EXPECT().List("fleet-default", labels.Everything()).Return(nil, errors.New("list failed"))
+
+	got, err := ShouldPreBootstrap(secretCache, cluster)
+	assert.Error(t, err)
+	assert.False(t, got)
+}
+
+func TestClusterAuthorizedForSecret(t *testing.T) {
+	assert.True(t, ClusterAuthorizedForSecret("a,b,c-test", "c-test"))
+	assert.True(t, ClusterAuthorizedForSecret("a, c-test", "c-test"))
+	assert.False(t, ClusterAuthorizedForSecret("a,b", "c-test"))
+	assert.False(t, ClusterAuthorizedForSecret("", "c-test"))
+	assert.False(t, ClusterAuthorizedForSecret("c-test", ""))
 }

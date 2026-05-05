@@ -3,7 +3,6 @@ package planner
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/condition"
@@ -52,7 +51,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprp
 			}
 			authorizedObjects := secret.Annotations[capr.AuthorizedObjectAnnotation]
 			if authorizedObjects != "" {
-				for _, clusterName = range strings.Split(authorizedObjects, ",") {
+				for _, clusterName = range capr.AuthorizedClusterNames(authorizedObjects) {
 					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized secret %s/%s", secret.Namespace, clusterName, secret.Namespace, secret.Name)
 					relatedResources = append(relatedResources, relatedresource.Key{
 						Namespace: secret.Namespace,
@@ -74,7 +73,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprp
 			var relatedResources []relatedresource.Key
 			authorizedObjects := configmap.Annotations[capr.AuthorizedObjectAnnotation]
 			if authorizedObjects != "" {
-				for _, clusterName := range strings.Split(authorizedObjects, ",") {
+				for _, clusterName := range capr.AuthorizedClusterNames(authorizedObjects) {
 					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized configmap %s/%s", configmap.Namespace, clusterName, configmap.Namespace, configmap.Name)
 					relatedResources = append(relatedResources, relatedresource.Key{
 						Namespace: configmap.Namespace,
