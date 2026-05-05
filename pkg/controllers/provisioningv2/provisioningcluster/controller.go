@@ -356,9 +356,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		reconcileCondition(&status, capr.Ready, rkeCP, capr.Ready)
 
 		if mgmtCluster != nil {
-			// mgmtCluster from retrieveMgmtClusterFromCache is already a DeepCopy.
-			oldStatus := mgmtCluster.Status
-
+			oldStatus := *mgmtCluster.Status.DeepCopy()
 			mgmtCluster.Status.ReadyReconciling = !capr.Stable.IsTrue(rkeCP)
 
 			// Set MCIC.Ready from rkeCP when !Stable (rkeCP's Ready owns MCIC.Ready during provisioning)
