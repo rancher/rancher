@@ -34,6 +34,8 @@ type Node struct {
 	PlanDataExists bool                                 `json:"planDataExists,omitempty"`
 	ProbeStatus    map[string]ProbeStatus               `json:"probeStatus,omitempty"`
 	ProbesUsable   bool                                 `json:"probesUsable,omitempty"` // ProbesUsable indicates that the probes have passed at least once for the appliedPlan
+	PlanState      planapi.PlanState                    `json:"planState,omitempty"`
+	PlanRevision   int                                  `json:"planRevision,omitempty"`
 }
 
 type Secret struct {

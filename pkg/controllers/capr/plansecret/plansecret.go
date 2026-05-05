@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr/planner"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -115,12 +116,16 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 		}
 	}
 
-	if failedChecksum == planner.PlanHash(plan) {
+	// plan-state:failed is written by the agent when failure is definitive (takes priority over checksum-based detection).
+	// Fall back to checksum comparison for backward compatibility with older agents.
+	currentPlanState := planapi.PlanState(secret.Data[planapi.PlanStateKey])
+	if currentPlanState == planapi.PlanStateFailed || failedChecksum == planner.PlanHash(plan) {
 		logrus.Debugf("[plansecret] %s/%s: rv: %s: Detected failed plan application, reconciling machine PlanApplied condition to error", secret.Namespace, secret.Name, secret.ResourceVersion)
 		// plans which temporarily fail will continue to set the failedChecksum as expected, however this should not be considered a
 		// true failure unless we have required that the plan not fail at any point, or we have reached the maximum of attempts configured.
 		// After a successful application, the checksum is cleared by the system-agent.
-		if maxFailures == "-1" || failureCount == maxFailures {
+		// When plan-state:failed is set by the agent, failure is already definitive — skip the threshold check.
+		if currentPlanState == planapi.PlanStateFailed || maxFailures == "-1" || failureCount == maxFailures {
 			var andRuntimeUnit string
 			if clusterName, ok := secret.Labels[capr.ClusterNameLabel]; ok && len(clusterName) > 0 {
 				if controlPlane, err := h.rkeControlPlaneCache.Get(secret.Namespace, clusterName); err != nil {
