@@ -45,7 +45,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io"
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
-	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
+	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
@@ -154,7 +154,7 @@ type Context struct {
 	API                 apiregv1.Interface
 	CRD                 crdv1.Interface
 	K8s                 *namespace.Clientset
-	Plan                plancontrolers.Interface
+	Upgrade             upgradev1.Interface
 	Telemetry           telemetryv1.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
@@ -183,7 +183,7 @@ type Context struct {
 	core         *namespace.WranglerFactory
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
-	plan         *upgrade.Factory
+	upgrade      *upgrade.Factory
 	telemetry    *telemetry.Factory
 
 	started bool
@@ -345,7 +345,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.Core = wContextCopy.core.WithAgent(userAgent).V1()
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
-	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
+	wContextCopy.Upgrade = wContextCopy.upgrade.WithAgent(userAgent).V1()
 
 	return &wContextCopy
 }
@@ -391,7 +391,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	plan, err := upgrade.NewFactoryFromConfigWithOptions(restConfig, opts)
+	upgrade, err := upgrade.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -546,18 +546,18 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		ClientConfig:            clientConfig,
 		MultiClusterManager:     noopMCM{},
 		CachedDiscovery:         cache,
-		RESTMapper:              restMapper,
-		leadership:              leadership,
-		controllerLock:          &sync.Mutex{},
-		PeerManager:             peerManager,
-		RESTClientGetter:        restClientGetter,
-		CatalogContentManager:   content,
-		HelmOperations:          helmop,
-		SystemChartsManager:     systemCharts,
-		TunnelAuthorizer:        tunnelAuth,
-		TunnelServer:            tunnelServer,
-		Plan:                    plan.Upgrade().V1(),
-		Telemetry:               telemetry.Telemetry().V1(),
+		RESTMapper:            restMapper,
+		leadership:            leadership,
+		controllerLock:        &sync.Mutex{},
+		PeerManager:           peerManager,
+		RESTClientGetter:      restClientGetter,
+		CatalogContentManager: content,
+		HelmOperations:        helmop,
+		SystemChartsManager:   systemCharts,
+		TunnelAuthorizer:      tunnelAuth,
+		TunnelServer:          tunnelServer,
+		Upgrade:               upgrade.Upgrade().V1(),
+		Telemetry:             telemetry.Telemetry().V1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -572,7 +572,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		crd:          crd,
 		rke:          rke,
 		rbac:         rbac,
-		plan:         plan,
+		upgrade:      upgrade,
 		telemetry:    telemetry,
 	}
 
