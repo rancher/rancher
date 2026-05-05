@@ -9,6 +9,7 @@ func RequiredCRDs() []string {
 	requiredCRDS := BasicCRDs()
 	if features.ProvisioningV2.Enabled() {
 		requiredCRDS = append(requiredCRDS, ProvisioningV2CRDs()...)
+		requiredCRDS = append(requiredCRDS, PlanCRDs()...)
 		if features.RKE2.Enabled() {
 			requiredCRDS = append(requiredCRDS, RKE2CRDs()...)
 		}
@@ -30,6 +31,9 @@ func RequiredCRDs() []string {
 	}
 	if features.OIDCProvider.Enabled() {
 		requiredCRDS = append(requiredCRDS, OIDCClientCRD()...)
+	}
+	if features.ImportedDay2Ops.Enabled() {
+		requiredCRDS = append(requiredCRDS, PlanCRDs()...)
 	}
 
 	requiredCRDS = append(requiredCRDS, TelemetryCRDs()...)
@@ -196,6 +200,12 @@ func TelemetryCRDs() []string {
 	}
 }
 
+func PlanCRDs() []string {
+	return []string{
+		"beacons.plan.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
@@ -207,6 +217,7 @@ var MigratedResources = map[string]bool{
 	"authtokens.management.cattle.io":                                 false,
 	"azureadproviders.management.cattle.io":                           false,
 	"basicauths.project.cattle.io":                                    false,
+	"beacons.plan.cattle.io":                                          true,
 	"certificates.project.cattle.io":                                  false,
 	"cloudcredentials.management.cattle.io":                           false,
 	"clusterauthtokens.cluster.cattle.io":                             false,
