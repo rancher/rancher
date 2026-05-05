@@ -261,3 +261,76 @@ func Test_downloadExternalSupportingImages(t *testing.T) {
 		})
 	}
 }
+
+func Test_filterLatestPatchReleases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{
+			name:  "keeps latest patch per minor",
+			input: []string{"v1.28.1+k3s1", "v1.28.2+k3s1", "v1.28.3+k3s1"},
+			want:  []string{"v1.28.3+k3s1"},
+		},
+		{
+			name:  "keeps one entry per minor",
+			input: []string{"v1.28.3+k3s1", "v1.29.2+k3s1", "v1.30.0+k3s1"},
+			want:  []string{"v1.28.3+k3s1", "v1.29.2+k3s1", "v1.30.0+k3s1"},
+		},
+		{
+			name:  "same patch prefers higher build number",
+			input: []string{"v1.28.3+k3s1", "v1.28.3+k3s2"},
+			want:  []string{"v1.28.3+k3s2"},
+		},
+		{
+			name:  "rke2 versions",
+			input: []string{"v1.29.1+rke2r1", "v1.29.2+rke2r1", "v1.30.1+rke2r1", "v1.30.1+rke2r2"},
+			want:  []string{"v1.29.2+rke2r1", "v1.30.1+rke2r2"},
+		},
+		{
+			name:  "mixed minor versions across k8s releases",
+			input: []string{"v1.27.10+k3s1", "v1.28.5+k3s1", "v1.28.4+k3s1", "v1.29.0+k3s1"},
+			want:  []string{"v1.27.10+k3s1", "v1.28.5+k3s1", "v1.29.0+k3s1"},
+		},
+		{
+			name:  "empty input",
+			input: []string{},
+			want:  []string{},
+		},
+		{
+			name:  "unparseable versions are skipped",
+			input: []string{"not-a-version", "v1.28.3+k3s1"},
+			want:  []string{"v1.28.3+k3s1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := assert.New(t)
+			got := filterLatestPatchReleases(tt.input)
+			a.ElementsMatch(tt.want, got)
+		})
+	}
+}
+
+func Test_extractBuildNumber(t *testing.T) {
+	tests := []struct {
+		metadata string
+		want     int
+	}{
+		{"k3s1", 1},
+		{"k3s2", 2},
+		{"k3s10", 10},
+		{"rke2r1", 1},
+		{"rke2r2", 2},
+		{"", 0},
+		{"nodigits", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.metadata, func(t *testing.T) {
+			assert.Equal(t, tt.want, extractBuildNumber(tt.metadata))
+		})
+	}
+}
