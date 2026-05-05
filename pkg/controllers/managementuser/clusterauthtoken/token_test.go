@@ -155,7 +155,16 @@ func TestExtCreate(t *testing.T) {
 			wantError:            true,
 			wantClusterAuthToken: true,
 			wantAuthTokenEnabled: true,
-			wantAuthTokenDeleted: true,
+		},
+		{
+			name:               "create already exists, update instead",
+			token:              testToken,
+			existingTokenError: authTokenNotFoundError,
+			createAuthTokenErr: apierrors.NewAlreadyExists(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name),
+
+			wantClusterAuthToken: true,
+			wantAuthTokenEnabled: true,
+			wantAuthTokenUpdate:  true,
 		},
 		{
 			name:               "get current token error",
@@ -349,7 +358,16 @@ func TestCreate(t *testing.T) {
 			wantError:            true,
 			wantClusterAuthToken: true,
 			wantAuthTokenEnabled: true,
-			wantAuthTokenDeleted: true,
+		},
+		{
+			name:               "create already exists, update instead",
+			token:              testToken,
+			existingTokenError: authTokenNotFoundError,
+			createAuthTokenErr: apierrors.NewAlreadyExists(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name),
+
+			wantClusterAuthToken: true,
+			wantAuthTokenEnabled: true,
+			wantAuthTokenUpdate:  true,
 		},
 		{
 			name:               "get current token error",
@@ -594,6 +612,18 @@ func TestExtUpdate(t *testing.T) {
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
+		{
+			name:                      "update auth token not found, create already exists, update instead",
+			token:                     setExtTokenUser(testToken, "new-user"),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			updateAuthTokenErr:        authTokenNotFoundError,
+			createAuthTokenErr:        apierrors.NewAlreadyExists(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name),
+
+			wantClusterAuthToken: true,
+			wantAuthTokenUpdate:  true,
+			wantAuthTokenEnabled: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -823,6 +853,18 @@ func TestUpdate(t *testing.T) {
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
+		{
+			name:                      "update auth token not found, create already exists, update instead",
+			token:                     setTokenUser(testToken, "new-user"),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			updateAuthTokenErr:        authTokenNotFoundError,
+			createAuthTokenErr:        apierrors.NewAlreadyExists(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name),
+
+			wantClusterAuthToken: true,
+			wantAuthTokenUpdate:  true,
+			wantAuthTokenEnabled: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -943,11 +985,16 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 	var modifiedToken *clusterv3.ClusterAuthToken
 	var isUpdated bool
 	var isDeleted bool
+	var updateCallCount int
 	mockAuthTokens := fakes.ClusterAuthTokenInterfaceMock{}
 	mockAuthTokens.UpdateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
+		updateCallCount++
 		isUpdated = true
 		modifiedToken = in1
-		return in1, testInput.UpdateAuthTokenErr
+		if updateCallCount == 1 {
+			return in1, testInput.UpdateAuthTokenErr
+		}
+		return in1, nil
 	}
 	mockAuthTokens.CreateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
 		modifiedToken = in1
@@ -956,6 +1003,15 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 	mockAuthTokens.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
 		isDeleted = true
 		return nil
+	}
+	mockAuthTokens.GetFunc = func(name string, opts metav1.GetOptions) (*clusterv3.ClusterAuthToken, error) {
+		if testInput.ExistingClusterAuthToken != nil {
+			return testInput.ExistingClusterAuthToken.DeepCopy(), nil
+		}
+		return &clusterv3.ClusterAuthToken{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			TypeMeta:   metav1.TypeMeta{Kind: "ClusterAuthToken"},
+		}, nil
 	}
 
 	// cluster userAttributes are also updated in these functions
@@ -1082,11 +1138,16 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 	var modifiedToken *clusterv3.ClusterAuthToken
 	var isUpdated bool
 	var isDeleted bool
+	var updateCallCount int
 	mockAuthTokens := fakes.ClusterAuthTokenInterfaceMock{}
 	mockAuthTokens.UpdateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
+		updateCallCount++
 		isUpdated = true
 		modifiedToken = in1
-		return in1, testInput.UpdateAuthTokenErr
+		if updateCallCount == 1 {
+			return in1, testInput.UpdateAuthTokenErr
+		}
+		return in1, nil
 	}
 	mockAuthTokens.CreateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
 		modifiedToken = in1
@@ -1095,6 +1156,15 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 	mockAuthTokens.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
 		isDeleted = true
 		return nil
+	}
+	mockAuthTokens.GetFunc = func(name string, opts metav1.GetOptions) (*clusterv3.ClusterAuthToken, error) {
+		if testInput.ExistingClusterAuthToken != nil {
+			return testInput.ExistingClusterAuthToken.DeepCopy(), nil
+		}
+		return &clusterv3.ClusterAuthToken{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			TypeMeta:   metav1.TypeMeta{Kind: "ClusterAuthToken"},
+		}, nil
 	}
 
 	// cluster userAttributes are also updated in these functions
