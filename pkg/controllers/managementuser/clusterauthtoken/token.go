@@ -154,6 +154,20 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	_, err = h.clusterAuthToken.Update(clusterAuthToken)
 	if errors.IsNotFound(err) {
 		_, err = h.clusterAuthToken.Create(clusterAuthToken)
+		// Lister said NotFound but the API server says it exists — the
+		// lister cache was stale. Fetch the real object and update it so
+		// we don't silently accept stale field values.
+		if errors.IsAlreadyExists(err) {
+			existing, err := h.clusterAuthToken.Get(clusterAuthToken.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			existing.UserName = clusterAuthToken.UserName
+			existing.Enabled = clusterAuthToken.Enabled
+			existing.ExpiresAt = clusterAuthToken.ExpiresAt
+			_, err = h.clusterAuthToken.Update(existing)
+			return nil, err
+		}
 	}
 	return nil, err
 }
@@ -239,20 +253,28 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 		}
 	}
 
-	// Now create the shadow token.
-	clusterAuthToken, err = h.clusterAuthToken.Create(clusterAuthToken)
-	if err == nil {
-		return nil
+	// Now create the shadow token. If it already exists (e.g. a previous
+	// attempt created it but setInitialized failed due to a resourceVersion
+	// conflict), update it rather than deleting. Deleting can cause
+	// a create-delete loop that blocks ACE authentication.
+	if _, err = h.clusterAuthToken.Create(clusterAuthToken); err != nil {
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+
+		existing, err := h.clusterAuthToken.Get(clusterAuthToken.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		existing.UserName = clusterAuthToken.UserName
+		existing.Enabled = clusterAuthToken.Enabled
+		existing.ExpiresAt = clusterAuthToken.ExpiresAt
+		if _, err = h.clusterAuthToken.Update(existing); err != nil {
+			return err
+		}
 	}
 
-	// Avoid leaving partially created resources.
-	if err := h.clusterAuthToken.Delete(clusterAuthToken.Name, &metav1.DeleteOptions{}); err != nil {
-		logrus.Errorf("failed to delete cluster auth token `%s` after creation failure: %v",
-			clusterAuthToken.Name, err)
-	}
-
-	// Report creation failure
-	return err
+	return nil
 }
 
 // Updated is called when a token is updated, and is responsible for creating/updating the corresponding
@@ -309,11 +331,8 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 		username:  clusterAuthToken.UserName,
 	}
 
-	// if the token is hashed, compare its value to make sure the downstream has the latest hash
-	//
-	// BEWARE! for an unhashed token a comparison here is bogus. the downstream hash was
-	// made on creation and any hash we make here to compare with will be different from
-	// it due to the random salt!
+	// Only compare values if the token was hashed — for plaintext tokens the
+	// downstream copy was salted at creation time, so the two will never match.
 	if token.Annotations[tokens.TokenHashed] == "true" {
 		hashVersion, err := hashers.GetHashVersion(token.Token)
 		if err != nil {
@@ -355,6 +374,18 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 	_, err = h.clusterAuthToken.Update(clusterAuthToken)
 	if errors.IsNotFound(err) {
 		_, err = h.clusterAuthToken.Create(clusterAuthToken)
+		// Same stale-lister recovery as in [ExtUpdated] above.
+		if errors.IsAlreadyExists(err) {
+			existing, err := h.clusterAuthToken.Get(clusterAuthToken.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			existing.UserName = clusterAuthToken.UserName
+			existing.Enabled = clusterAuthToken.Enabled
+			existing.ExpiresAt = clusterAuthToken.ExpiresAt
+			_, err = h.clusterAuthToken.Update(existing)
+			return nil, err
+		}
 	}
 
 	return nil, err
