@@ -350,6 +350,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Upgrade = wContextCopy.upgrade.WithAgent(userAgent).V1()
+	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1alpha1()
 
 	return &wContextCopy
 }

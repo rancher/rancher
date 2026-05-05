@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -101,7 +102,11 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	}
 
 	beacon, err := h.beacons.Get(cp.Namespace, cp.Name, metav1.GetOptions{})
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[planner] rkecluster %s/%s: waiting for beacon to be created", cp.Namespace, cp.Name)
+		h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
+		return status, nil
+	} else if err != nil {
 		return status, err
 	}
 
@@ -121,9 +126,9 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 			return status, err
 		}
 	} else if owner != PlannerOwnerKey {
-		logrus.Debugf("[planner] rkecluster %s/%s: waiting to acquire beacon")
+		logrus.Debugf("[planner] rkecluster %s/%s: waiting to acquire beacon", cp.Namespace, cp.Name)
 		h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
-		return status, err
+		return status, nil
 	}
 
 	// With the upcoming CAPI v1beta2, status objects were changed to add new fields and conditions. Unfortunately, for
@@ -189,7 +194,7 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
 
 	beacon = beacon.DeepCopy()
-	beacon.Labels[planv1alpha1.OwnerLabel] = ""
+	delete(beacon.Labels, planv1alpha1.OwnerLabel)
 	_, err = h.beacons.Update(beacon)
 	if err != nil {
 		return status, err

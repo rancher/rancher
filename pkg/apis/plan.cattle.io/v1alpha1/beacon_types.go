@@ -16,7 +16,7 @@ type BeaconStatus struct {
 	// System-agents should download connection information when the beacon is active.
 	Active bool `json:"active"`
 
-	// RegistrationEndpoint is the URL a system-agent must query to download it's machine-plan and corresponding
+	// RegistrationEndpoint is the URL a system-agent must query to download its machine-plan and corresponding
 	// kubeconfig.
 	RegistrationEndpoint string `json:"registrationEndpoint,omitempty"`
 }
