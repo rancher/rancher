@@ -11,6 +11,7 @@ import (
 	"time"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	planv1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/features"
@@ -112,6 +113,12 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 	)
 
 	result = append(result, installer(cluster, secretName)...)
+	result = append(result, &planv1alpha1.Beacon{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Name,
+		},
+	})
 
 	// Calculate a hash value of the templates
 	data, err := json.Marshal(result)
