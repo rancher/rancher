@@ -5,7 +5,9 @@ import (
 	"reflect"
 	"sort"
 
+	clusterapiv3 "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	mgmtapiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
@@ -43,9 +45,23 @@ type tokenHandler struct {
 	clusterSecretLister        wcore.SecretCache
 }
 
+// validateToken rejects tokens missing a name or userID before they reach any
+// Kubernetes API call. Without this, an empty string triggers "resource name may
+// not be empty" errors that requeue forever and block sync for the entire cluster.
+func validateToken(name, userID string) error {
+	if name == "" || userID == "" {
+		logrus.Warnf("[%s] skipping token with empty name=%q or userID=%q", clusterAuthTokenController, name, userID)
+		return generic.ErrSkip
+	}
+	return nil
+}
+
 // extCreate is called when a given ext token is created, and is responsible for
 // updating/creating the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
+	if err := validateToken(token.GetName(), token.Spec.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] ext CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
 
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
@@ -75,6 +91,9 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 // ExtUpdated is called when a given ext token is modified, and is responsible
 // for updating/creating the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
+	if err := validateToken(token.GetName(), token.Spec.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] ext UPDATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
 
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
@@ -175,13 +194,19 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 // ExtRemove is called when a given ext token is deleted,
 // and removes the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) ExtRemove(token *extv1.Token) (*extv1.Token, error) {
+	if err := validateToken(token.GetName(), token.GetUserID()); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] ext REMOVE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
 
 	return nil, h.remove(token.GetName(), token.GetUserID(), extTokenUserClusterKey(token))
 }
 
 // Create is called when a given token is created, and is responsible for creating a ClusterAuthToken in a downstream cluster.
-func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
+func (h *tokenHandler) Create(token *mgmtapiv3.Token) (runtime.Object, error) {
+	if err := validateToken(token.Name, token.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] v3 CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
 
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
@@ -279,7 +304,10 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 
 // Updated is called when a token is updated, and is responsible for creating/updating the corresponding
 // ClusterAuthTokens in the downstream cluster.
-func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
+func (h *tokenHandler) Updated(token *mgmtapiv3.Token) (runtime.Object, error) {
+	if err := validateToken(token.Name, token.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] v3 UPDATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
 
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
@@ -391,7 +419,10 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 	return nil, err
 }
 
-func (h *tokenHandler) Remove(token *managementv3.Token) (runtime.Object, error) {
+func (h *tokenHandler) Remove(token *mgmtapiv3.Token) (runtime.Object, error) {
+	if err := validateToken(token.Name, token.UserID); err != nil {
+		return token, err
+	}
 	logrus.Debugf("[%s] v3 REMOVE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
 
 	return nil, h.remove(token.GetName(), token.GetUserID(), tokenUserClusterKey(token))
@@ -428,7 +459,7 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 
 	var lastName string
 	if len(tokens) == 1 {
-		lastName = tokens[0].(*managementv3.Token).Name
+		lastName = tokens[0].(*mgmtapiv3.Token).Name
 	} else if len(extTokens) == 1 {
 		lastName = extTokens[0].(*extv1.Token).Name
 	}
@@ -468,7 +499,7 @@ func (h *tokenHandler) updateClusterUserAttribute(userID string) error {
 
 	clusterUserAttribute, err := h.clusterUserAttributeLister.Get(h.namespace, userID)
 	if errors.IsNotFound(err) {
-		_, err = h.clusterUserAttribute.Create(&clusterv3.ClusterUserAttribute{
+		_, err = h.clusterUserAttribute.Create(&clusterapiv3.ClusterUserAttribute{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},

@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"testing"
 
-	clusterv3 "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
+	clusterapiv3 "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	mgmtapiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3/fakes"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -22,7 +21,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -40,7 +39,7 @@ func TestExtCreate(t *testing.T) {
 		},
 		Spec: extv1.TokenSpec{
 			UserID:  userID,
-			Enabled: pointer.Bool(true),
+			Enabled: ptr.To(true),
 		},
 		Status: extv1.TokenStatus{
 			ExpiresAt: "10000000000",
@@ -48,7 +47,7 @@ func TestExtCreate(t *testing.T) {
 			Hash:      hashedTokenKey,
 		},
 	}
-	testAuthToken := &clusterv3.ClusterAuthToken{
+	testAuthToken := &clusterapiv3.ClusterAuthToken{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-token",
 		},
@@ -59,7 +58,7 @@ func TestExtCreate(t *testing.T) {
 		UserName:  userID,
 		Enabled:   true,
 	}
-	testAuthSecret := &v1.Secret{
+	testAuthSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cat-test-token",
 		},
@@ -77,8 +76,8 @@ func TestExtCreate(t *testing.T) {
 		name  string
 		token *extv1.Token
 
-		existingClusterAuthToken  *clusterv3.ClusterAuthToken
-		existingClusterAuthSecret *v1.Secret
+		existingClusterAuthToken  *clusterapiv3.ClusterAuthToken
+		existingClusterAuthSecret *corev1.Secret
 		existingTokenError        error
 		tokenHashingEnabled       bool
 		updateAuthTokenErr        error
@@ -112,7 +111,7 @@ func TestExtCreate(t *testing.T) {
 		},
 		{
 			name:               "token disabled, create token",
-			token:              setExtTokenEnabled(testToken, pointer.BoolPtr(false)),
+			token:              setExtTokenEnabled(testToken, ptr.To(false)),
 			existingTokenError: authTokenNotFoundError,
 
 			wantClusterAuthToken: true,
@@ -173,6 +172,26 @@ func TestExtCreate(t *testing.T) {
 
 			wantError: true,
 		},
+		{
+			name: "empty userID, skip token",
+			token: &extv1.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-token"},
+				Spec:       extv1.TokenSpec{UserID: ""},
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
+		{
+			name: "empty name, skip token",
+			token: &extv1.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
+				Spec:       extv1.TokenSpec{UserID: userID},
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -225,17 +244,17 @@ func TestExtCreate(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	testToken := &managementv3.Token{
+	testToken := &mgmtapiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-token",
 		},
 		ExpiresAt: "10000000000",
 		UserID:    userID,
 		Token:     tokenKey,
-		Enabled:   pointer.Bool(true),
+		Enabled:   ptr.To(true),
 	}
 
-	testAuthToken := &clusterv3.ClusterAuthToken{
+	testAuthToken := &clusterapiv3.ClusterAuthToken{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-token",
 		},
@@ -246,7 +265,7 @@ func TestCreate(t *testing.T) {
 		UserName:  userID,
 		Enabled:   true,
 	}
-	testAuthSecret := &v1.Secret{
+	testAuthSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cat-test-token",
 		},
@@ -261,10 +280,10 @@ func TestCreate(t *testing.T) {
 	authTokenNotFoundError := apierrors.NewNotFound(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name)
 	tests := []struct {
 		name  string
-		token *managementv3.Token
+		token *mgmtapiv3.Token
 
-		existingClusterAuthToken  *clusterv3.ClusterAuthToken
-		existingClusterAuthSecret *v1.Secret
+		existingClusterAuthToken  *clusterapiv3.ClusterAuthToken
+		existingClusterAuthSecret *corev1.Secret
 		existingTokenError        error
 		tokenHashingEnabled       bool
 		updateAuthTokenErr        error
@@ -307,7 +326,7 @@ func TestCreate(t *testing.T) {
 		},
 		{
 			name:               "token disabled, create token",
-			token:              setTokenEnabled(testToken, pointer.BoolPtr(false)),
+			token:              setTokenEnabled(testToken, ptr.To(false)),
 			existingTokenError: authTokenNotFoundError,
 
 			wantClusterAuthToken: true,
@@ -376,6 +395,26 @@ func TestCreate(t *testing.T) {
 
 			wantError: true,
 		},
+		{
+			name: "empty userID, skip token",
+			token: &mgmtapiv3.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-token"},
+				UserID:     "",
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
+		{
+			name: "empty name, skip token",
+			token: &mgmtapiv3.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
+				UserID:     userID,
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -440,7 +479,7 @@ func TestExtUpdate(t *testing.T) {
 		},
 		Spec: extv1.TokenSpec{
 			UserID:  userID,
-			Enabled: pointer.Bool(true),
+			Enabled: ptr.To(true),
 		},
 		Status: extv1.TokenStatus{
 			ExpiresAt: "10000000000",
@@ -448,7 +487,7 @@ func TestExtUpdate(t *testing.T) {
 			Hash:      hashedTokenKey,
 		},
 	}
-	testAuthToken := &clusterv3.ClusterAuthToken{
+	testAuthToken := &clusterapiv3.ClusterAuthToken{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-token",
 		},
@@ -459,7 +498,7 @@ func TestExtUpdate(t *testing.T) {
 		UserName:  userID,
 		Enabled:   true,
 	}
-	testAuthSecret := &v1.Secret{
+	testAuthSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cat-test-token",
 		},
@@ -480,8 +519,8 @@ func TestExtUpdate(t *testing.T) {
 		name  string
 		token *extv1.Token
 
-		existingClusterAuthToken  *clusterv3.ClusterAuthToken
-		existingClusterAuthSecret *v1.Secret
+		existingClusterAuthToken  *clusterapiv3.ClusterAuthToken
+		existingClusterAuthSecret *corev1.Secret
 		existingTokenError        error
 		tokenHashingEnabled       bool
 		updateAuthTokenErr        error
@@ -495,7 +534,7 @@ func TestExtUpdate(t *testing.T) {
 	}{
 		{
 			name:                      "token disabled, update token",
-			token:                     setExtTokenEnabled(testToken, pointer.Bool(false)),
+			token:                     setExtTokenEnabled(testToken, ptr.To(false)),
 			existingClusterAuthToken:  testAuthToken,
 			existingClusterAuthSecret: testAuthSecret,
 
@@ -624,6 +663,26 @@ func TestExtUpdate(t *testing.T) {
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
+		{
+			name: "empty userID, skip token",
+			token: &extv1.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-token"},
+				Spec:       extv1.TokenSpec{UserID: ""},
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
+		{
+			name: "empty name, skip token",
+			token: &extv1.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
+				Spec:       extv1.TokenSpec{UserID: userID},
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -672,16 +731,16 @@ func TestExtUpdate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	testToken := &managementv3.Token{
+	testToken := &mgmtapiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-token",
 		},
 		ExpiresAt: "10000000000",
 		UserID:    userID,
 		Token:     tokenKey,
-		Enabled:   pointer.Bool(true),
+		Enabled:   ptr.To(true),
 	}
-	testAuthToken := &clusterv3.ClusterAuthToken{
+	testAuthToken := &clusterapiv3.ClusterAuthToken{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-token",
 		},
@@ -692,7 +751,7 @@ func TestUpdate(t *testing.T) {
 		UserName:  userID,
 		Enabled:   true,
 	}
-	testAuthSecret := &v1.Secret{
+	testAuthSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cat-test-token",
 		},
@@ -710,10 +769,10 @@ func TestUpdate(t *testing.T) {
 	authTokenNotFoundError := apierrors.NewNotFound(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name)
 	tests := []struct {
 		name  string
-		token *managementv3.Token
+		token *mgmtapiv3.Token
 
-		existingClusterAuthToken  *clusterv3.ClusterAuthToken
-		existingClusterAuthSecret *v1.Secret
+		existingClusterAuthToken  *clusterapiv3.ClusterAuthToken
+		existingClusterAuthSecret *corev1.Secret
 		existingTokenError        error
 		tokenHashingEnabled       bool
 		updateAuthTokenErr        error
@@ -727,7 +786,7 @@ func TestUpdate(t *testing.T) {
 	}{
 		{
 			name:                      "token disabled, update token",
-			token:                     setTokenEnabled(testToken, pointer.Bool(false)),
+			token:                     setTokenEnabled(testToken, ptr.To(false)),
 			existingClusterAuthToken:  testAuthToken,
 			existingClusterAuthSecret: testAuthSecret,
 
@@ -865,6 +924,26 @@ func TestUpdate(t *testing.T) {
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
+		{
+			name: "empty userID, skip token",
+			token: &mgmtapiv3.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-token"},
+				UserID:     "",
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
+		{
+			name: "empty name, skip token",
+			token: &mgmtapiv3.Token{
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
+				UserID:     userID,
+			},
+
+			wantError:     true,
+			wantSkipError: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -921,7 +1000,7 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
-func hashToken(token *managementv3.Token, hashedToken string) *managementv3.Token {
+func hashToken(token *mgmtapiv3.Token, hashedToken string) *mgmtapiv3.Token {
 	newToken := token.DeepCopy()
 	newToken.Token = hashedToken
 	if newToken.Annotations == nil {
@@ -931,28 +1010,28 @@ func hashToken(token *managementv3.Token, hashedToken string) *managementv3.Toke
 	return newToken
 }
 
-func setTokenEnabled(token *managementv3.Token, enabled *bool) *managementv3.Token {
+func setTokenEnabled(token *mgmtapiv3.Token, enabled *bool) *mgmtapiv3.Token {
 	newToken := token.DeepCopy()
 	newToken.Enabled = enabled
 	return newToken
 }
 
-func setTokenExpiry(token *managementv3.Token, expiry string) *managementv3.Token {
+func setTokenExpiry(token *mgmtapiv3.Token, expiry string) *mgmtapiv3.Token {
 	newToken := token.DeepCopy()
 	newToken.ExpiresAt = expiry
 	return newToken
 }
 
-func setTokenUser(token *managementv3.Token, user string) *managementv3.Token {
+func setTokenUser(token *mgmtapiv3.Token, user string) *mgmtapiv3.Token {
 	newToken := token.DeepCopy()
 	newToken.UserID = user
 	return newToken
 }
 
 type testInput struct {
-	Token                     *managementv3.Token
-	ExistingClusterAuthToken  *clusterv3.ClusterAuthToken
-	ExistingClusterAuthSecret *v1.Secret
+	Token                     *mgmtapiv3.Token
+	ExistingClusterAuthToken  *clusterapiv3.ClusterAuthToken
+	ExistingClusterAuthSecret *corev1.Secret
 	ExistingTokenError        error
 	TokenHashingEnabled       bool
 	UpdateAuthTokenErr        error
@@ -963,7 +1042,7 @@ type testInput struct {
 func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 	ctrl := gomock.NewController(t)
 	mockLister := fakes.ClusterAuthTokenListerMock{}
-	mockLister.GetFunc = func(namespace, name string) (*clusterv3.ClusterAuthToken, error) {
+	mockLister.GetFunc = func(namespace, name string) (*clusterapiv3.ClusterAuthToken, error) {
 		return testInput.ExistingClusterAuthToken.DeepCopy(), testInput.ExistingTokenError
 	}
 	mockSecretLister := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
@@ -982,12 +1061,12 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		return in1, testInput.UpdateAuthTokenErr
 	}).AnyTimes()
 
-	var modifiedToken *clusterv3.ClusterAuthToken
+	var modifiedToken *clusterapiv3.ClusterAuthToken
 	var isUpdated bool
 	var isDeleted bool
 	var updateCallCount int
 	mockAuthTokens := fakes.ClusterAuthTokenInterfaceMock{}
-	mockAuthTokens.UpdateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
+	mockAuthTokens.UpdateFunc = func(in1 *clusterapiv3.ClusterAuthToken) (*clusterapiv3.ClusterAuthToken, error) {
 		updateCallCount++
 		isUpdated = true
 		modifiedToken = in1
@@ -996,7 +1075,7 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		}
 		return in1, nil
 	}
-	mockAuthTokens.CreateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
+	mockAuthTokens.CreateFunc = func(in1 *clusterapiv3.ClusterAuthToken) (*clusterapiv3.ClusterAuthToken, error) {
 		modifiedToken = in1
 		return in1, testInput.CreateAuthTokenErr
 	}
@@ -1004,11 +1083,11 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		isDeleted = true
 		return nil
 	}
-	mockAuthTokens.GetFunc = func(name string, opts metav1.GetOptions) (*clusterv3.ClusterAuthToken, error) {
+	mockAuthTokens.GetFunc = func(name string, opts metav1.GetOptions) (*clusterapiv3.ClusterAuthToken, error) {
 		if testInput.ExistingClusterAuthToken != nil {
 			return testInput.ExistingClusterAuthToken.DeepCopy(), nil
 		}
-		return &clusterv3.ClusterAuthToken{
+		return &clusterapiv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 			TypeMeta:   metav1.TypeMeta{Kind: "ClusterAuthToken"},
 		}, nil
@@ -1021,7 +1100,7 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},
-			Enabled: pointer.BoolPtr(true),
+			Enabled: ptr.To(true),
 		}, nil
 	}
 	userAttributeLister := mgmtFakes.UserAttributeListerMock{}
@@ -1032,8 +1111,8 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		}, nil
 	}
 	clusterUserAttributeLister := fakes.ClusterUserAttributeListerMock{}
-	clusterUserAttributeLister.GetFunc = func(namespace, name string) (*clusterv3.ClusterUserAttribute, error) {
-		return &clusterv3.ClusterUserAttribute{
+	clusterUserAttributeLister.GetFunc = func(namespace, name string) (*clusterapiv3.ClusterUserAttribute, error) {
+		return &clusterapiv3.ClusterUserAttribute{
 			LastRefresh:  "1000",
 			NeedsRefresh: false,
 			Enabled:      true,
@@ -1096,8 +1175,8 @@ func setExtTokenUser(token *extv1.Token, user string) *extv1.Token {
 
 type testExtInput struct {
 	Token                     *extv1.Token
-	ExistingClusterAuthToken  *clusterv3.ClusterAuthToken
-	ExistingClusterAuthSecret *v1.Secret
+	ExistingClusterAuthToken  *clusterapiv3.ClusterAuthToken
+	ExistingClusterAuthSecret *corev1.Secret
 	ExistingTokenError        error
 	TokenHashingEnabled       bool
 	UpdateAuthTokenErr        error
@@ -1106,8 +1185,8 @@ type testExtInput struct {
 }
 
 type testOutput struct {
-	ModifiedClusterAuthToken  *clusterv3.ClusterAuthToken
-	ModifiedClusterAuthSecret *v1.Secret
+	ModifiedClusterAuthToken  *clusterapiv3.ClusterAuthToken
+	ModifiedClusterAuthSecret *corev1.Secret
 	AuthTokenUpdated          bool
 	AuthTokenDeleted          bool
 	Error                     error
@@ -1116,7 +1195,7 @@ type testOutput struct {
 func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 	ctrl := gomock.NewController(t)
 	mockLister := fakes.ClusterAuthTokenListerMock{}
-	mockLister.GetFunc = func(namespace, name string) (*clusterv3.ClusterAuthToken, error) {
+	mockLister.GetFunc = func(namespace, name string) (*clusterapiv3.ClusterAuthToken, error) {
 		return testInput.ExistingClusterAuthToken.DeepCopy(), testInput.ExistingTokenError
 	}
 	mockSecretLister := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
@@ -1135,12 +1214,12 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		return in1, testInput.UpdateAuthTokenErr
 	}).AnyTimes()
 
-	var modifiedToken *clusterv3.ClusterAuthToken
+	var modifiedToken *clusterapiv3.ClusterAuthToken
 	var isUpdated bool
 	var isDeleted bool
 	var updateCallCount int
 	mockAuthTokens := fakes.ClusterAuthTokenInterfaceMock{}
-	mockAuthTokens.UpdateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
+	mockAuthTokens.UpdateFunc = func(in1 *clusterapiv3.ClusterAuthToken) (*clusterapiv3.ClusterAuthToken, error) {
 		updateCallCount++
 		isUpdated = true
 		modifiedToken = in1
@@ -1149,7 +1228,7 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		}
 		return in1, nil
 	}
-	mockAuthTokens.CreateFunc = func(in1 *clusterv3.ClusterAuthToken) (*clusterv3.ClusterAuthToken, error) {
+	mockAuthTokens.CreateFunc = func(in1 *clusterapiv3.ClusterAuthToken) (*clusterapiv3.ClusterAuthToken, error) {
 		modifiedToken = in1
 		return in1, testInput.CreateAuthTokenErr
 	}
@@ -1157,11 +1236,11 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		isDeleted = true
 		return nil
 	}
-	mockAuthTokens.GetFunc = func(name string, opts metav1.GetOptions) (*clusterv3.ClusterAuthToken, error) {
+	mockAuthTokens.GetFunc = func(name string, opts metav1.GetOptions) (*clusterapiv3.ClusterAuthToken, error) {
 		if testInput.ExistingClusterAuthToken != nil {
 			return testInput.ExistingClusterAuthToken.DeepCopy(), nil
 		}
-		return &clusterv3.ClusterAuthToken{
+		return &clusterapiv3.ClusterAuthToken{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 			TypeMeta:   metav1.TypeMeta{Kind: "ClusterAuthToken"},
 		}, nil
@@ -1174,7 +1253,7 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: userID,
 			},
-			Enabled: pointer.BoolPtr(true),
+			Enabled: ptr.To(true),
 		}, nil
 	}
 	userAttributeLister := mgmtFakes.UserAttributeListerMock{}
@@ -1185,8 +1264,8 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		}, nil
 	}
 	clusterUserAttributeLister := fakes.ClusterUserAttributeListerMock{}
-	clusterUserAttributeLister.GetFunc = func(namespace, name string) (*clusterv3.ClusterUserAttribute, error) {
-		return &clusterv3.ClusterUserAttribute{
+	clusterUserAttributeLister.GetFunc = func(namespace, name string) (*clusterapiv3.ClusterUserAttribute, error) {
+		return &clusterapiv3.ClusterUserAttribute{
 			LastRefresh:  "1000",
 			NeedsRefresh: false,
 			Enabled:      true,
