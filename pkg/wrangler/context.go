@@ -36,6 +36,8 @@ import (
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io"
+	planv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io"
 	projectv3 "github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io"
@@ -156,6 +158,7 @@ type Context struct {
 	K8s                 *namespace.Clientset
 	Upgrade             upgradev1.Interface
 	Telemetry           telemetryv1.Interface
+	Plan                planv1alpha1.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -185,6 +188,7 @@ type Context struct {
 	crd          *apiextensions.Factory
 	upgrade      *upgrade.Factory
 	telemetry    *telemetry.Factory
+	plan         *plan.Factory
 
 	started bool
 }
@@ -467,6 +471,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
+	plan, err := plan.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	k8s, err := namespace.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
@@ -546,18 +555,19 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		ClientConfig:            clientConfig,
 		MultiClusterManager:     noopMCM{},
 		CachedDiscovery:         cache,
-		RESTMapper:            restMapper,
-		leadership:            leadership,
-		controllerLock:        &sync.Mutex{},
-		PeerManager:           peerManager,
-		RESTClientGetter:      restClientGetter,
-		CatalogContentManager: content,
-		HelmOperations:        helmop,
-		SystemChartsManager:   systemCharts,
-		TunnelAuthorizer:      tunnelAuth,
-		TunnelServer:          tunnelServer,
-		Upgrade:               upgrade.Upgrade().V1(),
-		Telemetry:             telemetry.Telemetry().V1(),
+		RESTMapper:              restMapper,
+		leadership:              leadership,
+		controllerLock:          &sync.Mutex{},
+		PeerManager:             peerManager,
+		RESTClientGetter:        restClientGetter,
+		CatalogContentManager:   content,
+		HelmOperations:          helmop,
+		SystemChartsManager:     systemCharts,
+		TunnelAuthorizer:        tunnelAuth,
+		TunnelServer:            tunnelServer,
+		Upgrade:                 upgrade.Upgrade().V1(),
+		Telemetry:               telemetry.Telemetry().V1(),
+		Plan:                    plan.Plan().V1alpha1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -574,6 +584,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		upgrade:      upgrade,
 		telemetry:    telemetry,
+		plan:         plan,
 	}
 
 	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer(wContext), "deferred-capi")
