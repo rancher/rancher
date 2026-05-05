@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 	"reflect"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -101,26 +101,26 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	if driver.Exists() && err == nil && !forceUpdate {
 		// add credential schema
 		credFields := map[string]v32.Field{}
-		pubCredFields, privateCredFields, passwordFields, defaults, optionals := getCredFields(obj.Annotations)
+		credFieldMetadata := getCredFields(obj.Annotations)
 		for name, field := range existingSchema.Spec.ResourceFields {
-			if SSHKeyFields[name] || passwordFields[name] || privateCredFields[name] {
+			if SSHKeyFields[name] || credFieldMetadata.password.Has(name) || credFieldMetadata.private.Has(name) {
 				if field.Type != "password" {
 					forceUpdate = true
 					break
 				}
 			}
 			// even if forceUpdate is false, calculate credFields to check if credSchema needs to be updated
-			if privateCredFields[name] || pubCredFields[name] {
+			if credFieldMetadata.private.Has(name) || credFieldMetadata.public.Has(name) {
 				credField := field
-				credField.Required = !optionals[name]
-				if val, ok := defaults[name]; ok {
+				credField.Required = !credFieldMetadata.optional.Has(name)
+				if val, ok := credFieldMetadata.defaults[name]; ok {
 					credField = updateDefault(credField, val, field.Type)
 				}
 				credFields[name] = credField
 			}
 		}
 		if !forceUpdate {
-			return m.createCredSchema(obj, credFields, fieldList(pubCredFields), fieldList(privateCredFields))
+			return m.createCredSchema(obj, credFields, credFieldMetadata.publicList(), credFieldMetadata.privateList())
 		}
 	}
 
@@ -176,7 +176,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	}
 	credFields := map[string]v32.Field{}
 	resourceFields := map[string]v32.Field{}
-	pubCredFields, privateCredFields, passwordFields, defaults, optionals := getCredFields(obj.Annotations)
+	credFieldMetadata := getCredFields(obj.Annotations)
 	for _, flag := range flags {
 		name, field, err := FlagToField(flag)
 		if err != nil {
@@ -192,14 +192,14 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 			}
 		}
 
-		if privateCredFields[name] || passwordFields[name] || SSHKeyFields[name] {
+		if credFieldMetadata.private.Has(name) || credFieldMetadata.password.Has(name) || SSHKeyFields[name] {
 			field.Type = "password"
 		}
 
-		if pubCredFields[name] || privateCredFields[name] {
+		if credFieldMetadata.public.Has(name) || credFieldMetadata.private.Has(name) {
 			credField := field
-			credField.Required = !optionals[name]
-			if val, ok := defaults[name]; ok {
+			credField.Required = !credFieldMetadata.optional.Has(name)
+			if val, ok := credFieldMetadata.defaults[name]; ok {
 				credField = updateDefault(credField, val, field.Type)
 			}
 			credFields[name] = credField
@@ -241,7 +241,7 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		}
 	}
 
-	return m.createCredSchema(obj, credFields, fieldList(pubCredFields), fieldList(privateCredFields))
+	return m.createCredSchema(obj, credFields, credFieldMetadata.publicList(), credFieldMetadata.privateList())
 }
 
 func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]v32.Field, publicFields, privateFields []string) (*v32.NodeDriver, error) {
@@ -481,43 +481,52 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	return nil
 }
 
-func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool, map[string]bool, map[string]string, map[string]bool) {
-	getMap := func(fields string) map[string]bool {
-		data := map[string]bool{}
-		for _, field := range strings.Split(fields, ",") {
-			data[field] = true
-		}
-		return data
+type credentialFieldMetadata struct {
+	public   sets.Set[string]
+	private  sets.Set[string]
+	password sets.Set[string]
+	optional sets.Set[string]
+	defaults map[string]string
+}
+
+func getCredFields(annotations map[string]string) credentialFieldMetadata {
+	return credentialFieldMetadata{
+		public:   parseCredentialFieldSet(annotations["publicCredentialFields"]),
+		private:  parseCredentialFieldSet(annotations["privateCredentialFields"]),
+		password: parseCredentialFieldSet(annotations["passwordFields"]),
+		optional: parseCredentialFieldSet(annotations["optionalCredentialFields"]),
+		defaults: ParseKeyValueString(annotations["defaults"]),
 	}
-	return getMap(annotations["publicCredentialFields"]),
-		getMap(annotations["privateCredentialFields"]),
-		getMap(annotations["passwordFields"]),
-		ParseKeyValueString(annotations["defaults"]),
-		getMap(annotations["optionalCredentialFields"])
+}
+
+func parseCredentialFieldSet(fields string) sets.Set[string] {
+	set := sets.New[string]()
+	for _, field := range strings.Split(fields, ",") {
+		if field == "" {
+			continue
+		}
+		set.Insert(field)
+	}
+	return set
+}
+
+func (m credentialFieldMetadata) publicList() []string {
+	return sortedSetList(m.public)
+}
+
+func (m credentialFieldMetadata) privateList() []string {
+	return sortedSetList(m.private)
 }
 
 func credentialConfigSchemaName(driverName string) string {
 	return fmt.Sprintf("%s%s", driverName, "credentialconfig")
 }
 
-// fieldList converts a cred fields map (field name -> true) to a
-// sorted string slice suitable for DynamicSchemaSpec.PublicFields and DynamicSchemaSpec.PrivateFields.
-func fieldList(fields map[string]bool) []string {
+func sortedSetList(fields sets.Set[string]) []string {
 	if len(fields) == 0 {
 		return nil
 	}
-
-	out := make([]string, 0, len(fields))
-	for k, v := range fields {
-		if v && k != "" {
-			out = append(out, k)
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	slices.Sort(out)
-	return out
+	return sets.List(fields)
 }
 
 func updateDefault(credField v32.Field, val, kind string) v32.Field {

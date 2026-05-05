@@ -3,46 +3,49 @@ package nodedriver
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFieldList(t *testing.T) {
+func TestGetCredFields(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    map[string]bool
-		expected []string
+		name             string
+		annotations      map[string]string
+		expectedPublic   []string
+		expectedPrivate  []string
+		expectedPassword sets.Set[string]
+		expectedOptional sets.Set[string]
+		expectedDefaults map[string]string
 	}{
 		{
-			name:     "nil map returns nil",
-			input:    nil,
-			expected: nil,
+			name:             "nil annotations return empty metadata",
+			annotations:      nil,
+			expectedPublic:   nil,
+			expectedPrivate:  nil,
+			expectedPassword: sets.New[string](),
+			expectedOptional: sets.New[string](),
+			expectedDefaults: map[string]string{},
 		},
 		{
-			name:     "empty map returns nil",
-			input:    map[string]bool{},
-			expected: nil,
-		},
-		{
-			name:     "single field",
-			input:    map[string]bool{"accessKey": true},
-			expected: []string{"accessKey"},
-		},
-		{
-			name:     "multiple fields are sorted",
-			input:    map[string]bool{"username": true, "accessKey": true, "endpoint": true},
-			expected: []string{"accessKey", "endpoint", "username"},
-		},
-		{
-			name:     "empty string key is excluded",
-			input:    map[string]bool{"": true, "accessKey": true},
-			expected: []string{"accessKey"},
-		},
-		{
-			name:     "false values are excluded",
-			input:    map[string]bool{"password": true, "apiKey": false, "secretKey": true},
-			expected: []string{"password", "secretKey"},
+			name: "annotation fields are normalized into sorted sets",
+			annotations: map[string]string{
+				"publicCredentialFields":   "username,accessKey,,endpoint,accessKey",
+				"privateCredentialFields":  ",password,secretKey,password",
+				"passwordFields":           "password,,token,password",
+				"optionalCredentialFields": "endpoint,,password,endpoint",
+				"defaults":                 "endpoint:example.com,region:us-west-2",
+			},
+			expectedPublic:   []string{"accessKey", "endpoint", "username"},
+			expectedPrivate:  []string{"password", "secretKey"},
+			expectedPassword: sets.New[string]("password", "token"),
+			expectedOptional: sets.New[string]("endpoint", "password"),
+			expectedDefaults: map[string]string{
+				"endpoint": "example.com",
+				"region":   "us-west-2",
+			},
 		},
 	}
 
@@ -50,8 +53,18 @@ func TestFieldList(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := fieldList(tt.input)
-			assert.Equal(t, tt.expected, result)
+
+			result := getCredFields(tt.annotations)
+
+			assert.Equal(t, tt.expectedPublic, result.publicList())
+			assert.Equal(t, tt.expectedPrivate, result.privateList())
+			assert.Equal(t, tt.expectedPassword, result.password)
+			assert.Equal(t, tt.expectedOptional, result.optional)
+			assert.Equal(t, tt.expectedDefaults, result.defaults)
+			assert.False(t, result.public.Has(""))
+			assert.False(t, result.private.Has(""))
+			assert.False(t, result.password.Has(""))
+			assert.False(t, result.optional.Has(""))
 		})
 	}
 }
