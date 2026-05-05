@@ -120,7 +120,7 @@ spec:
                 x-kubernetes-list-type: map
               registrationEndpoint:
                 description: |-
-                  RegistrationEndpoint is the URL a system-agent must query to download it's machine-plan and corresponding
+                  RegistrationEndpoint is the URL a system-agent must query to download its machine-plan and corresponding
                   kubeconfig.
                 type: string
             required:
