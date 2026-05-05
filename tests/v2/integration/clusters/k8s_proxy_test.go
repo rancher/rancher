@@ -44,7 +44,7 @@ func (s *K8sProxyTestSuite) TearDownSuite() {
 // cluster is found within the timeout.
 func (s *K8sProxyTestSuite) findDownstreamClusterID() (string, error) {
 	var clusterID string
-	err := wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(s.T().Context(), 5*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		clusterList, err := s.client.Management.Cluster.ListAll(nil)
 		if err != nil {
 			return false, err
