@@ -2,6 +2,8 @@ package autoscaler
 
 import (
 	"fmt"
+	"net/url"
+	"os"
 	"reflect"
 	"strings"
 
@@ -214,6 +216,43 @@ func getChartName() string {
 	}
 
 	return "cluster-autoscaler"
+}
+
+// getChartRepository returns the chart repository URL to use for the fleet helm op.
+// If the CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY env var is set and the system default
+// registry is configured, the registry host in the URL is substituted with the system default
+// registry to support airgapped deployments.
+func getChartRepository() string {
+	repo := settings.ClusterAutoscalerChartRepository.Get()
+
+	envChartRepo := os.Getenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
+	systemDefaultRegistry := settings.SystemDefaultRegistry.Get()
+	if envChartRepo == "" || systemDefaultRegistry == "" {
+		return repo
+	}
+
+	return substituteRegistryHost(repo, systemDefaultRegistry)
+}
+
+// substituteRegistryHost replaces the registry host in the given repository URL with the
+// provided registry. It handles both OCI (oci://) and standard HTTP(S) URLs.
+func substituteRegistryHost(repoURL, registry string) string {
+	if strings.HasPrefix(repoURL, "oci://") {
+		rest := strings.TrimPrefix(repoURL, "oci://")
+		slashIdx := strings.Index(rest, "/")
+		if slashIdx == -1 {
+			return "oci://" + registry
+		}
+		return "oci://" + registry + rest[slashIdx:]
+	}
+
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		logrus.Debugf("[autoscaler] failed to parse chart repository URL '%s': %v", repoURL, err)
+		return repoURL
+	}
+	u.Host = registry
+	return u.String()
 }
 
 // getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object
