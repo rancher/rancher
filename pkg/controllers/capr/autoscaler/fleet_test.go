@@ -3,6 +3,7 @@ package autoscaler
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -222,7 +223,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 					Helm: &fleet.HelmOptions{
 						Chart:       getChartName(),
 						Version:     buildconfig.ClusterAutoscalerChartVersion,
-						Repo:        settings.ClusterAutoscalerChartRepository.Get(),
+						Repo:        getChartRepository(),
 						ReleaseName: "cluster-autoscaler",
 						Values: &fleet.GenericMap{
 							Data: map[string]any{
@@ -502,4 +503,107 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
+}
+
+// Test cases for substituteRegistryHost function
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_ReplacesHost() {
+	result := substituteRegistryHost("oci://registry.rancher.io/rancher/cluster-autoscaler", "my-registry.company.com")
+	s.Equal("oci://my-registry.company.com/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_ReplacesHostWithPort() {
+	result := substituteRegistryHost("oci://registry.rancher.io/rancher/cluster-autoscaler", "my-registry.company.com:5000")
+	s.Equal("oci://my-registry.company.com:5000/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_NoPath() {
+	result := substituteRegistryHost("oci://registry.rancher.io", "my-registry.company.com")
+	s.Equal("oci://my-registry.company.com", result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_HTTP_ReplacesHost() {
+	result := substituteRegistryHost("https://charts.rancher.io/charts", "my-registry.company.com")
+	s.Equal("https://my-registry.company.com/charts", result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_InvalidURL_ReturnsOriginal() {
+	original := "not-a-valid-url://\x00host"
+	result := substituteRegistryHost(original, "my-registry.company.com")
+	s.Equal(original, result)
+}
+
+// setupChartRepositorySettings sets up the chart repository and system default registry settings
+// for testing, and returns a cleanup function that restores the original values.
+func (s *autoscalerSuite) setupChartRepositorySettings(repoURL, systemRegistry, envVarValue string) func() {
+	originalRepo := settings.ClusterAutoscalerChartRepository.Get()
+	originalRegistry := settings.SystemDefaultRegistry.Get()
+
+	if envVarValue != "" {
+		os.Setenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY", envVarValue)
+	} else {
+		os.Unsetenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
+	}
+	_ = settings.ClusterAutoscalerChartRepository.Set(repoURL)
+	_ = settings.SystemDefaultRegistry.Set(systemRegistry)
+
+	return func() {
+		_ = settings.ClusterAutoscalerChartRepository.Set(originalRepo)
+		_ = settings.SystemDefaultRegistry.Set(originalRegistry)
+		os.Unsetenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
+	}
+}
+
+// Test cases for getChartRepository function
+
+func (s *autoscalerSuite) TestGetChartRepository_NoEnvVar_NoSystemRegistry_ReturnsOriginal() {
+	cleanup := s.setupChartRepositorySettings("oci://registry.rancher.io/rancher/cluster-autoscaler", "", "")
+	defer cleanup()
+
+	result := getChartRepository()
+	s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_EnvVarSet_NoSystemRegistry_ReturnsOriginal() {
+	cleanup := s.setupChartRepositorySettings(
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+		"",
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+	)
+	defer cleanup()
+
+	result := getChartRepository()
+	s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_NoEnvVar_SystemRegistrySet_ReturnsOriginal() {
+	cleanup := s.setupChartRepositorySettings("oci://registry.rancher.io/rancher/cluster-autoscaler", "my-registry.company.com", "")
+	defer cleanup()
+
+	result := getChartRepository()
+	s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_BothSet_SubstitutesRegistry() {
+	cleanup := s.setupChartRepositorySettings(
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+		"my-registry.company.com",
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+	)
+	defer cleanup()
+
+	result := getChartRepository()
+	s.Equal("oci://my-registry.company.com/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_BothSet_HTTPChart_SubstitutesRegistry() {
+	cleanup := s.setupChartRepositorySettings(
+		"https://charts.rancher.io/charts",
+		"my-registry.company.com",
+		"https://charts.rancher.io/charts",
+	)
+	defer cleanup()
+
+	result := getChartRepository()
+	s.Equal("https://my-registry.company.com/charts", result)
 }
