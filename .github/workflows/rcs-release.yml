@@ -80,7 +80,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: ghcr.io/rancher/ci-image/go1.26:latest
     permissions:
       contents: read
       id-token: write
@@ -90,14 +90,15 @@ jobs:
       cancel-in-progress: false
     env:
       ARCH: amd64
+      REGISTRY: ""
     steps:
       - name: install dependencies
         shell: bash
         run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: setup and build
+        uses: ./.github/actions/rancher-chart/build
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
@@ -106,8 +107,6 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CHARTS;
             secret/data/github/repo/${{ github.repository }}/aws/credentials chartsBucketName | CHARTS_BUCKET_NAME;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
-      - name: setup and build
-        uses: ./.github/actions/rancher-chart/build
       - name: publish
         env:
           CHARTS_BUCKET_NAME: ${{ env.CHARTS_BUCKET_NAME }}
@@ -175,7 +174,8 @@ jobs:
           image: "${{ env.IMAGE_INSTALLER }}"
         uses: ./.github/actions/merge-manifests
   create-images-files:
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.26:latest
     permissions:
       contents: read
       id-token: write
@@ -184,6 +184,9 @@ jobs:
       CHECKSUM_FILE: "sha256sum.txt"
       ARTIFACTS_BASE_DIR: "bin"
     steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git aws-cli
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: generate
