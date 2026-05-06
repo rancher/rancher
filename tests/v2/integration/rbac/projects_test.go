@@ -508,14 +508,36 @@ func (p *RTBTestSuite) waitForResourceQuota(client *rancher.Client, nsName strin
 func (p *RTBTestSuite) waitForProjectUsedLimit(client *rancher.Client, projectID, field, value string) {
 	p.Require().Eventually(func() bool {
 		proj, err := client.Management.Project.ByID(projectID)
-		if err != nil || proj.ResourceQuota == nil || proj.ResourceQuota.UsedLimit == nil {
+		if err != nil {
+			p.T().Logf("waitForProjectUsedLimit: error fetching project: %v", err)
+			return false
+		}
+		if proj.ResourceQuota == nil {
+			p.T().Logf("waitForProjectUsedLimit: ResourceQuota is nil (want %s=%s)", field, value)
+			if value == "0" || value == "" {
+				return true
+			}
+			return false
+		}
+		if proj.ResourceQuota.UsedLimit == nil {
+			p.T().Logf("waitForProjectUsedLimit: UsedLimit is nil (want %s=%s)", field, value)
+			if value == "0" || value == "" {
+				return true
+			}
 			return false
 		}
 		switch field {
 		case "pods":
-			return proj.ResourceQuota.UsedLimit.Pods == value
+			actual := proj.ResourceQuota.UsedLimit.Pods
+			p.T().Logf("waitForProjectUsedLimit: pods=%q (want %q)", actual, value)
+			return actual == value
 		case "services":
-			return proj.ResourceQuota.UsedLimit.Services == value
+			actual := proj.ResourceQuota.UsedLimit.Services
+			p.T().Logf("waitForProjectUsedLimit: services=%q (want %q)", actual, value)
+			if value == "0" {
+				return actual == "0" || actual == ""
+			}
+			return actual == value
 		}
 		return false
 	}, 2*time.Minute, 2*time.Second, "waiting for project usedLimit.%s=%s", field, value)
