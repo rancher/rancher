@@ -413,18 +413,18 @@ func TestPreserveStoredFields(t *testing.T) {
 				AuthConfig: v3.AuthConfig{
 					LogoutAllSupported: true,
 				},
-				LogoutEndpoint:   "https://custom.gov/logout",
-				LogoutAllEnabled: true,
-				LogoutAllForced:  true,
+				EndSessionEndpoint: "https://custom.gov/logout",
+				LogoutAllEnabled:   true,
+				LogoutAllForced:    true,
 			},
 			incoming: v3.AzureADConfig{},
 			want: v3.AzureADConfig{
 				AuthConfig: v3.AuthConfig{
 					LogoutAllSupported: true,
 				},
-				LogoutEndpoint:   "https://custom.gov/logout",
-				LogoutAllEnabled: true,
-				LogoutAllForced:  true,
+				EndSessionEndpoint: "https://custom.gov/logout",
+				LogoutAllEnabled:   true,
+				LogoutAllForced:    true,
 			},
 		},
 		{
@@ -614,9 +614,9 @@ func TestLogoutAll(t *testing.T) {
 			},
 			wantURLAbsent: []string{"post_logout_redirect_uri"},
 		},
-		"custom LogoutEndpoint overrides default": {
+		"custom EndSessionEndpoint overrides default": {
 			config: newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
-				c.LogoutEndpoint = "https://custom.gov/logout"
+				c.EndSessionEndpoint = "https://custom.gov/logout"
 			}),
 			finalRedirect: "https://example.com/logged-out",
 			wantURLContains: []string{

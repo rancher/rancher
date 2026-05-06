@@ -144,8 +144,8 @@ func preserveStoredFields(stored, incoming *apiv3.AzureADConfig) {
 	if incoming.AllowedPrincipalIDs == nil {
 		incoming.AllowedPrincipalIDs = stored.AllowedPrincipalIDs
 	}
+	incoming.EndSessionEndpoint = stored.EndSessionEndpoint
 	incoming.LogoutAllSupported = stored.LogoutAllSupported
-	incoming.LogoutEndpoint = stored.LogoutEndpoint
 	incoming.LogoutAllEnabled = stored.LogoutAllEnabled
 	incoming.LogoutAllForced = stored.LogoutAllForced
 }
