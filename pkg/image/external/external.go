@@ -181,7 +181,7 @@ func downloadExternalImageListFromURL(url string) (string, error) {
 // For example, given [v1.28.1+k3s1, v1.28.2+k3s1, v1.28.3+k3s1, v1.29.0+k3s1] it returns
 // [v1.28.3+k3s1, v1.29.0+k3s1]. If two releases share the same k8s major.minor.patch, the
 // one with the higher build number suffix (e.g. k3s2 > k3s1, rke2r2 > rke2r1) is preferred.
-// Releases whose versions cannot be parsed are silently dropped.
+// Releases whose versions cannot be parsed are logged as warnings and dropped.
 func filterLatestPatchReleases(releases []string) []string {
 	type entry struct {
 		original string
@@ -194,7 +194,7 @@ func filterLatestPatchReleases(releases []string) []string {
 		trimmed := strings.TrimPrefix(release, "v")
 		sv, err := semver.NewVersion(trimmed)
 		if err != nil {
-			logrus.Debugf("filterLatestPatchReleases: skipping unparseable release %q: %v", release, err)
+			logrus.Warnf("filterLatestPatchReleases: skipping unparseable release %q: %v", release, err)
 			continue
 		}
 
