@@ -3,7 +3,6 @@ package ldap
 import (
 	"crypto/x509"
 	"fmt"
-	"reflect"
 	"strings"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
@@ -96,7 +95,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 	}
 
 	if len(opResult.Entries) < 1 {
-		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
+		return v3.Principal{}, nil, apierror.NewAPIError(validation.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
 	}
 
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)
@@ -195,12 +194,12 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 			ldap.SanitizeAttr(config.GroupObjectClass),
 		)
 		newGroupPrincipals, err := p.searchLdap(query, groupScope, config, lConn)
-		// Deduplicate groupprincipals get from userMemberAttribute
-		nonDupGroupPrincipals = ldap.FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals, groupPrincipals, nonDupGroupPrincipals)
-		groupPrincipals = append(groupPrincipals, nonDupGroupPrincipals...)
 		if err != nil {
 			return userPrincipal, groupPrincipals, err
 		}
+		// Deduplicate groupprincipals get from userMemberAttribute
+		nonDupGroupPrincipals = ldap.FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals, groupPrincipals, nonDupGroupPrincipals)
+		groupPrincipals = append(groupPrincipals, nonDupGroupPrincipals...)
 	}
 
 	if len(groupPrincipals) == 0 {
@@ -473,7 +472,7 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 
 	results, err := lConn.SearchWithPaging(search, 1000)
 	if err != nil {
-		ldapErr, ok := reflect.ValueOf(err).Interface().(*ldapv3.Error)
+		ldapErr, ok := err.(*ldapv3.Error)
 		if ok && ldapErr.ResultCode != ldapv3.LDAPResultNoSuchObject {
 			return []v3.Principal{}, fmt.Errorf("ldap: error searching for query %s:, error: %w", query, err)
 		}
@@ -546,7 +545,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 
 	searchRequest := ldap.NewBaseObjectSearchRequest(
 		distinguishedName,
-		fmt.Sprintf("(%s=%s)", ObjectClass, config.UserObjectClass),
+		fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.UserObjectClass)),
 		config.GetUserSearchAttributes(ObjectClass),
 	)
 
@@ -556,7 +555,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 	}
 
 	if nEntries := len(result.Entries); nEntries < 1 {
-		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
+		return nil, httperror.NewAPIError(httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
 	} else if nEntries > 1 {
 		return nil, fmt.Errorf("ldap: user search found more than one result")
 	}
@@ -574,7 +573,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 	}
 
 	if len(opResult.Entries) < 1 {
-		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
+		return nil, httperror.NewAPIError(httperror.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
 	}
 
 	_, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)
