@@ -459,6 +459,7 @@ func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry
 func updateConfigWithAddresses(config map[string]interface{}, info *machineNetworkInfo) {
 	nodeIPs := convert.ToStringSlice(config["node-ip"])
 	var toAdd []string
+	primaryNodeIPFamily := primaryAddressFamily(config)
 
 	switch info.DriverName {
 	case management.PodDriver:
@@ -492,7 +493,7 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 	if info.IPv6Address != "" && !slices.Contains(nodeIPs, info.IPv6Address) {
 		nodeIPs = append(nodeIPs, info.IPv6Address)
 	}
-
+	nodeIPs = reorderAddressesByFamily(nodeIPs, primaryNodeIPFamily)
 	config["node-ip"] = nodeIPs
 
 	// If a cloud provider is configured, it will manage the external IP.
@@ -513,8 +514,68 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 
 			nodeExternalIPs = append(nodeExternalIPs, ip)
 		}
+		nodeExternalIPs = reorderAddressesByFamily(nodeExternalIPs, primaryNodeIPFamily)
 		config["node-external-ip"] = nodeExternalIPs
 	}
+}
+
+// primaryAddressFamily inspects the "service-cidr" key in the provided config map and returns the IP address
+// family (4 or 6) of the first non-empty CIDR found;
+// returns 0 if "service-cidr" is absent, empty, or if the first non-empty CIDR is not a valid network address.
+// The service-cidr value should be a comma-separated string.
+func primaryAddressFamily(config map[string]interface{}) int {
+	for _, serviceCIDRValue := range convert.ToStringSlice(config["service-cidr"]) {
+		for _, serviceCIDR := range strings.Split(serviceCIDRValue, ",") {
+			serviceCIDR = strings.TrimSpace(serviceCIDR)
+			if serviceCIDR == "" {
+				continue
+			}
+			_, parsedCIDR, err := net.ParseCIDR(serviceCIDR)
+			if err != nil {
+				return 0
+			}
+			if parsedCIDR.IP.To4() != nil {
+				return 4
+			}
+			return 6
+		}
+	}
+	return 0
+}
+
+// reorderAddressesByFamily reorders the provided address slice so that addresses belonging to the primary IP family
+// (4 for IPv4, 6 for IPv6) are placed first, followed by addresses of the other IP family, and finally any values
+// that cannot be parsed as IP addresses (e.g. interface names). The relative order within each group is preserved.
+// The slice is returned unchanged when it contains fewer than two elements or when primaryFamily is 0.
+func reorderAddressesByFamily(addresses []string, primaryFamily int) []string {
+	if len(addresses) < 2 || primaryFamily == 0 {
+		return addresses
+	}
+
+	primary := make([]string, 0, len(addresses))
+	other := make([]string, 0, len(addresses))
+	nonIP := make([]string, 0, len(addresses))
+
+	for _, address := range addresses {
+		parsedIP := net.ParseIP(address)
+		if parsedIP == nil {
+			nonIP = append(nonIP, address)
+			continue
+		}
+
+		if primaryFamily == 4 && parsedIP.To4() != nil {
+			primary = append(primary, address)
+			continue
+		}
+		if primaryFamily == 6 && parsedIP.To4() == nil {
+			primary = append(primary, address)
+			continue
+		}
+
+		other = append(other, address)
+	}
+
+	return append(append(primary, other...), nonIP...)
 }
 
 // updateConfigWithAdvertiseAddresses sets the advertise-address and tls-san in the config
