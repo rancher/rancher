@@ -120,23 +120,34 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 		return nil, err
 	}
 
-	dn := externalID
-
-	logrus.Debugf("LDAP Refetch principals base DN: {%s}", dn)
-
-	search := ldap.NewBaseObjectSearchRequest(
-		dn,
-		fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.UserObjectClass)),
-		config.GetUserSearchAttributes(defaultUserAttributes...),
-	)
-
-	result, err := lConn.Search(search)
+	var result *ldapv3.SearchResult
+	if config.UserIDAttribute != "" {
+		filter := fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
+			ldap.SanitizeAttr(config.UserIDAttribute), ldapv3.EscapeFilter(externalID),
+		)
+		search := ldap.NewWholeSubtreeSearchRequest(
+			config.UserSearchBase,
+			filter,
+			config.GetUserSearchAttributes(defaultUserAttributes...),
+		)
+		result, err = lConn.Search(search)
+	} else {
+		logrus.Debugf("LDAP Refetch principals base DN: {%s}", externalID)
+		search := ldap.NewBaseObjectSearchRequest(
+			externalID,
+			fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.UserObjectClass)),
+			config.GetUserSearchAttributes(defaultUserAttributes...),
+		)
+		result, err = lConn.Search(search)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	if nEntries := len(result.Entries); nEntries < 1 {
-		return nil, fmt.Errorf("cannot locate user information for %s", search.Filter)
+		return nil, fmt.Errorf("cannot locate user information for %s", externalID)
 	} else if nEntries > 1 {
 		return nil, fmt.Errorf("ldap user search found more than one result")
 	}
@@ -180,7 +191,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(lConn ldapv3.Client, config *
 		return v3.Principal{}, nil, nil
 	}
 
-	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, config.UserIDAttribute)
 	if err != nil {
 		return userPrincipal, groupPrincipals, err
 	}
@@ -235,6 +246,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(lConn ldapv3.Client, config *
 			UserLoginAttribute:          config.UserLoginAttribute,
 			UserNameAttribute:           config.UserNameAttribute,
 			UserObjectClass:             config.UserObjectClass,
+			GroupIDAttribute:            config.GroupIDAttribute,
 		}
 		searchAttributes := []string{MemberOfAttribute, ObjectClass, config.GroupObjectClass, config.UserLoginAttribute, config.GroupNameAttribute,
 			config.GroupSearchAttribute}
@@ -295,7 +307,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(
 	}
 
 	for _, e := range result.Entries {
-		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, config.GroupIDAttribute)
 		if err != nil {
 			logrus.Errorf("AD: Error in getting principal for group entry %v: %v", e, err)
 			continue
@@ -309,7 +321,12 @@ func (p *adProvider) getGroupPrincipalsFromSearch(
 	return groupPrincipals, nil
 }
 
-func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
+func (p *adProvider) getPrincipal(externalID string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
+	identifierAttr := p.identifierAttributeForScope(config, scope)
+	if identifierAttr != "" {
+		return p.getPrincipalByAttribute(externalID, scope, identifierAttr, config, caPool)
+	}
+
 	var search *ldapv3.SearchRequest
 	var filter string
 	if !slice.ContainsString(scopes, scope) {
@@ -317,7 +334,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	}
 
 	var attribs []*ldapv3.EntryAttribute
-	object, err := ldapv3.ParseDN(distinguishedName)
+	object, err := ldapv3.ParseDN(externalID)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +346,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	}
 
 	if !ldap.IsType(attribs, scope) && !p.permissionCheck(attribs, config) {
-		logrus.Errorf("Failed to get object %s", distinguishedName)
+		logrus.Errorf("Failed to get object %s", externalID)
 		return nil, nil
 	}
 
@@ -339,14 +356,13 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		filter = fmt.Sprintf("(%s=%s)", ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass))
 	}
 
-	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
+	logrus.Debugf("Query for getPrincipal(%s): %s", externalID, filter)
 	lConn, err := p.ldapConnection(config, caPool)
 	if err != nil {
 		return nil, err
 	}
 	defer lConn.Close()
-	// Bind before query
-	// If service account bind fails, and auth is on, return principal formed using DN
+
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
 	err = lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
 	if err != nil {
@@ -358,9 +374,9 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 				kind = "group"
 			}
 			principal := &v3.Principal{
-				ObjectMeta:    metav1.ObjectMeta{Name: scope + "://" + distinguishedName},
-				DisplayName:   distinguishedName,
-				LoginName:     distinguishedName,
+				ObjectMeta:    metav1.ObjectMeta{Name: scope + "://" + externalID},
+				DisplayName:   externalID,
+				LoginName:     externalID,
 				PrincipalType: kind,
 			}
 
@@ -377,7 +393,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	}
 
 	search = ldap.NewBaseObjectSearchRequest(
-		distinguishedName,
+		externalID,
 		filter,
 		attrs,
 	)
@@ -385,7 +401,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	result, err := lConn.Search(search)
 	if err != nil {
 		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == 32 {
-			return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", distinguishedName))}
+			return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", externalID))}
 		}
 		return nil, apierror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), validation.ServerError, "Internal server error")
 	}
@@ -402,11 +418,79 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		return nil, fmt.Errorf("permission denied")
 	}
 
-	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	principal, err := ldap.AttributesToPrincipal(entryAttributes, externalID, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, "")
 	if err != nil {
 		return nil, err
 	}
 	return principal, nil
+}
+
+func (p *adProvider) getPrincipalByAttribute(externalID, scope, identifierAttribute string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
+	if !slice.ContainsString(scopes, scope) {
+		return nil, fmt.Errorf("invalid scope %s", scope)
+	}
+
+	lConn, err := p.ldapConnection(config, caPool)
+	if err != nil {
+		return nil, err
+	}
+	defer lConn.Close()
+
+	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
+	err = lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
+	if err != nil {
+		return nil, fmt.Errorf("activedirectory: error binding service account: %w", err)
+	}
+
+	var filter string
+	var searchBase string
+	var attrs []string
+	if strings.EqualFold(UserScope, scope) {
+		filter = fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
+			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
+		)
+		searchBase = config.UserSearchBase
+		attrs = config.GetUserSearchAttributes(defaultUserAttributes...)
+	} else {
+		filter = fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass),
+			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
+		)
+		searchBase = config.UserSearchBase
+		if config.GroupSearchBase != "" {
+			searchBase = config.GroupSearchBase
+		}
+		attrs = config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass)
+	}
+
+	search := ldap.NewWholeSubtreeSearchRequest(searchBase, filter, attrs)
+	result, err := lConn.Search(search)
+	if err != nil {
+		return nil, fmt.Errorf("activedirectory: error searching for %s=%s: %w", identifierAttribute, externalID, err)
+	}
+
+	if len(result.Entries) < 1 {
+		return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s=%s not found", identifierAttribute, externalID))}
+	} else if len(result.Entries) > 1 {
+		return nil, fmt.Errorf("activedirectory: multiple entries found for %s=%s", identifierAttribute, externalID)
+	}
+
+	entry := result.Entries[0]
+	if !p.permissionCheck(entry.Attributes, config) {
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	return ldap.AttributesToPrincipal(entry.Attributes, entry.DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, identifierAttribute)
+}
+
+func (p *adProvider) identifierAttributeForScope(config *v3.ActiveDirectoryConfig, scope string) string {
+	if strings.EqualFold(UserScope, scope) {
+		return config.UserIDAttribute
+	}
+	return config.GroupIDAttribute
 }
 
 func (p *adProvider) searchPrincipals(name, principalType string, config *v3.ActiveDirectoryConfig, lConn *ldapv3.Conn) ([]v3.Principal, error) {
@@ -515,7 +599,8 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 
 	for i := 0; i < len(results.Entries); i++ {
 		entry := results.Entries[i]
-		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		identifierAttr := p.identifierAttributeForScope(config, scope)
+		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, identifierAttr)
 		if err != nil {
 			logrus.Errorf("Error translating search result: %s", err)
 			continue

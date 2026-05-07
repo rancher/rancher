@@ -150,7 +150,11 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 	userScope = p.userScope
 	groupScope = p.groupScope
 
-	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, userScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	userIdentifierAttr := config.UserIDAttribute
+	if p.samlSearchProvider() && userIdentifierAttr == "" {
+		userIdentifierAttr = config.UserLoginAttribute
+	}
+	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, userScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, userIdentifierAttr)
 	if err != nil {
 		return v3.Principal{}, groupPrincipals, err
 	}
@@ -244,6 +248,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 			UserLoginAttribute:          config.UserLoginAttribute,
 			UserNameAttribute:           config.UserNameAttribute,
 			UserObjectClass:             config.UserObjectClass,
+			GroupIDAttribute:            config.GroupIDAttribute,
 		}
 		searchAttributes := []string{config.GroupMemberUserAttribute, config.GroupMemberMappingAttribute, ObjectClass, config.GroupObjectClass, config.UserLoginAttribute,
 			config.GroupNameAttribute, config.GroupSearchAttribute}
@@ -358,7 +363,7 @@ func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, conf
 		return nil, fmt.Errorf("permission denied")
 	}
 
-	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, "")
 	if err != nil {
 		return nil, err
 	}
@@ -480,33 +485,32 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 	}
 
 	for i := 0; i < len(results.Entries); i++ {
-		externalID := results.Entries[i].DN
 		entry := results.Entries[i]
 
-		if p.samlSearchProvider() {
-			if strings.EqualFold("user", entityType) {
-				userLoginValues := ldap.GetAttributeValuesByName(entry.Attributes, config.UserLoginAttribute)
-				if len(userLoginValues) > 0 {
-					externalID = userLoginValues[0] // only support first
-				}
-			} else {
-				groupDNValues := ldap.GetAttributeValuesByName(entry.Attributes, config.GroupDNAttribute)
-				if len(groupDNValues) > 0 {
-					externalID = groupDNValues[0] // only support first
-				}
+		var identifierAttr string
+		if strings.EqualFold("user", entityType) {
+			identifierAttr = config.UserIDAttribute
+			if p.samlSearchProvider() && identifierAttr == "" {
+				identifierAttr = config.UserLoginAttribute
+			}
+		} else {
+			identifierAttr = config.GroupIDAttribute
+			if p.samlSearchProvider() && identifierAttr == "" {
+				identifierAttr = config.GroupDNAttribute
 			}
 		}
 
 		principal, err := ldap.AttributesToPrincipal(
 			entry.Attributes,
-			externalID,
+			entry.DN,
 			scope,
 			p.providerName,
 			config.UserObjectClass,
 			config.UserNameAttribute,
 			config.UserLoginAttribute,
 			config.GroupObjectClass,
-			config.GroupNameAttribute)
+			config.GroupNameAttribute,
+			identifierAttr)
 		if err != nil {
 			return []v3.Principal{}, err
 		}
@@ -539,29 +543,43 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 		return nil, err
 	}
 
-	distinguishedName, _, err := p.getDNAndScopeFromPrincipalID(principalID)
+	externalID, _, err := p.getDNAndScopeFromPrincipalID(principalID)
 	if err != nil {
 		return nil, err
 	}
 
-	searchRequest := ldap.NewBaseObjectSearchRequest(
-		distinguishedName,
-		fmt.Sprintf("(%s=%s)", ObjectClass, config.UserObjectClass),
-		config.GetUserSearchAttributes(ObjectClass),
-	)
-
-	result, err := lConn.Search(searchRequest)
+	var result *ldapv3.SearchResult
+	if config.UserIDAttribute != "" {
+		filter := fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
+			ldap.SanitizeAttr(config.UserIDAttribute), ldapv3.EscapeFilter(externalID),
+		)
+		searchRequest := ldap.NewWholeSubtreeSearchRequest(
+			config.UserSearchBase,
+			filter,
+			config.GetUserSearchAttributes(ObjectClass),
+		)
+		result, err = lConn.Search(searchRequest)
+	} else {
+		searchRequest := ldap.NewBaseObjectSearchRequest(
+			externalID,
+			fmt.Sprintf("(%s=%s)", ObjectClass, config.UserObjectClass),
+			config.GetUserSearchAttributes(ObjectClass),
+		)
+		result, err = lConn.Search(searchRequest)
+	}
 	if err != nil {
-		return nil, errors.New("no access")
+		return nil, fmt.Errorf("ldap: error searching for user %s: %w", externalID, err)
 	}
 
 	if nEntries := len(result.Entries); nEntries < 1 {
-		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
+		return nil, fmt.Errorf("ldap: cannot locate user information for %s", externalID)
 	} else if nEntries > 1 {
 		return nil, fmt.Errorf("ldap: user search found more than one result")
 	}
 
-	userDN := result.Entries[0].DN //userDN is externalID
+	userDN := result.Entries[0].DN
 
 	searchOpRequest := ldap.NewBaseObjectSearchRequest(
 		userDN,
@@ -570,11 +588,11 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 	)
 	opResult, err := lConn.Search(searchOpRequest)
 	if err != nil {
-		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
+		return nil, fmt.Errorf("ldap: error searching for operational attributes: %w", err)
 	}
 
 	if len(opResult.Entries) < 1 {
-		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
+		return nil, fmt.Errorf("ldap: cannot locate user operational attributes for %s", userDN)
 	}
 
 	_, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)

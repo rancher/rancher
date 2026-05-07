@@ -217,7 +217,10 @@ func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAcce
 	}
 
 	var principal *v3.Principal
-	if p.samlSearchProvider() {
+	identifierAttr := p.identifierAttributeForScope(config, scope)
+	if identifierAttr != "" {
+		principal, err = p.getPrincipalByAttribute(externalID, scope, identifierAttr, config, caPool)
+	} else if p.samlSearchProvider() {
 		principal, err = p.samlSearchGetPrincipal(externalID, scope, config, caPool)
 	} else {
 		principal, err = p.getPrincipal(externalID, scope, config, caPool)
@@ -348,8 +351,10 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	}
 
 	var searchRequest *ldapv3.SearchRequest
+	var identifierAttr string
 
 	if scope == p.userScope {
+		identifierAttr = config.UserLoginAttribute
 		filter := fmt.Sprintf(
 			"(&(%s=%s)(%s=%s))",
 			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
@@ -362,6 +367,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 			config.GetUserSearchAttributes(ObjectClass),
 		)
 	} else {
+		identifierAttr = config.GroupDNAttribute
 		filter := fmt.Sprintf(
 			"(&(%s=%s)(%s=%s))",
 			ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass),
@@ -387,30 +393,98 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	}
 
 	entry := result.Entries[0]
-	entryAttributes := entry.Attributes
-
-	if scope == p.userScope {
-		userLoginValues := ldap.GetAttributeValuesByName(entry.Attributes, config.UserLoginAttribute)
-		if len(userLoginValues) > 0 {
-			externalID = userLoginValues[0] // only support first
-		}
-	} else {
-		groupDNValues := ldap.GetAttributeValuesByName(entry.Attributes, config.GroupDNAttribute)
-		if len(groupDNValues) > 0 {
-			externalID = groupDNValues[0] // only support first
-		}
-	}
-
 	return ldap.AttributesToPrincipal(
-		entryAttributes,
-		externalID,
+		entry.Attributes,
+		entry.DN,
 		scope,
 		p.providerName,
 		config.UserObjectClass,
 		config.UserNameAttribute,
 		config.UserLoginAttribute,
 		config.GroupObjectClass,
-		config.GroupNameAttribute)
+		config.GroupNameAttribute,
+		identifierAttr)
+}
+
+func (p *ldapProvider) getPrincipalByAttribute(
+	externalID, scope, identifierAttribute string, config *v3.LdapConfig, caPool *x509.CertPool,
+) (*v3.Principal, error) {
+	if scope != p.userScope && scope != p.groupScope {
+		return nil, fmt.Errorf("invalid %s and/or %s scope", p.userScope, p.groupScope)
+	}
+
+	lConn, err := ldap.Connect(config, caPool)
+	if err != nil {
+		return nil, err
+	}
+	defer lConn.Close()
+
+	err = ldap.AuthenticateServiceAccountUser(
+		config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
+	if err != nil {
+		return nil, err
+	}
+
+	var filter string
+	var searchBase string
+	var attrs []string
+
+	if scope == p.userScope {
+		filter = fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
+			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
+		)
+		searchBase = config.UserSearchBase
+		attrs = config.GetUserSearchAttributes(ObjectClass)
+	} else {
+		filter = fmt.Sprintf(
+			"(&(%s=%s)(%s=%s))",
+			ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass),
+			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
+		)
+		searchBase = config.GroupSearchBase
+		if searchBase == "" {
+			searchBase = config.UserSearchBase
+		}
+		attrs = config.GetGroupSearchAttributes(ObjectClass)
+	}
+
+	searchRequest := ldap.NewWholeSubtreeSearchRequest(searchBase, filter, attrs)
+	result, err := lConn.Search(searchRequest)
+	if err != nil {
+		return nil, fmt.Errorf("ldap: error searching for %s=%s: %w", identifierAttribute, externalID, err)
+	}
+
+	if len(result.Entries) < 1 {
+		return nil, fmt.Errorf("ldap: no entry found for %s=%s", identifierAttribute, externalID)
+	} else if len(result.Entries) > 1 {
+		return nil, fmt.Errorf("ldap: multiple entries found for %s=%s", identifierAttribute, externalID)
+	}
+
+	entry := result.Entries[0]
+	if !p.permissionCheck(entry.Attributes, config) {
+		return nil, fmt.Errorf("permission denied")
+	}
+
+	return ldap.AttributesToPrincipal(
+		entry.Attributes,
+		entry.DN,
+		scope,
+		p.providerName,
+		config.UserObjectClass,
+		config.UserNameAttribute,
+		config.UserLoginAttribute,
+		config.GroupObjectClass,
+		config.GroupNameAttribute,
+		identifierAttribute)
+}
+
+func (p *ldapProvider) identifierAttributeForScope(config *v3.LdapConfig, scope string) string {
+	if scope == p.userScope {
+		return config.UserIDAttribute
+	}
+	return config.GroupIDAttribute
 }
 
 func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {

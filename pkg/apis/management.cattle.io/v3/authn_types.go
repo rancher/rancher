@@ -514,6 +514,8 @@ type ActiveDirectoryConfig struct {
 	GroupMemberMappingAttribute  string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,required"`
 	ConnectionTimeout            int64    `json:"connectionTimeout,omitempty"           norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
+	UserIDAttribute              string   `json:"userIDAttribute,omitempty"`
+	GroupIDAttribute             string   `json:"groupIDAttribute,omitempty"`
 }
 
 func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
@@ -522,6 +524,9 @@ func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...stri
 		c.UserLoginAttribute,
 		c.UserNameAttribute,
 		c.UserEnabledAttribute,
+	}
+	if c.UserIDAttribute != "" {
+		userSearchAttributes = append(userSearchAttributes, c.UserIDAttribute)
 	}
 	return append(userSearchAttributes, searchAttributes...)
 }
@@ -532,6 +537,9 @@ func (c *ActiveDirectoryConfig) GetGroupSearchAttributes(searchAttributes ...str
 		c.UserLoginAttribute,
 		c.GroupNameAttribute,
 		c.GroupSearchAttribute,
+	}
+	if c.GroupIDAttribute != "" {
+		groupSeachAttributes = append(groupSeachAttributes, c.GroupIDAttribute)
 	}
 	return append(groupSeachAttributes, searchAttributes...)
 }
@@ -572,6 +580,8 @@ type LdapFields struct {
 	ConnectionTimeout               int64    `json:"connectionTimeout,omitempty"               norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled    bool     `json:"nestedGroupMembershipEnabled"              norman:"default=false"`
 	SearchUsingServiceAccount       bool     `json:"searchUsingServiceAccount"       norman:"default=false"`
+	UserIDAttribute                 string   `json:"userIDAttribute,omitempty"`
+	GroupIDAttribute                string   `json:"groupIDAttribute,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -590,6 +600,9 @@ func (c *LdapConfig) GetUserSearchAttributes(searchAttributes ...string) []strin
 		c.UserNameAttribute,
 		c.UserEnabledAttribute,
 	}
+	if c.UserIDAttribute != "" {
+		userSearchAttributes = append(userSearchAttributes, c.UserIDAttribute)
+	}
 	return append(userSearchAttributes, searchAttributes...)
 }
 
@@ -600,6 +613,9 @@ func (c *LdapConfig) GetGroupSearchAttributes(searchAttributes ...string) []stri
 		c.UserLoginAttribute,
 		c.GroupNameAttribute,
 		c.GroupSearchAttribute,
+	}
+	if c.GroupIDAttribute != "" {
+		groupSeachAttributes = append(groupSeachAttributes, c.GroupIDAttribute)
 	}
 	return append(groupSeachAttributes, searchAttributes...)
 }
