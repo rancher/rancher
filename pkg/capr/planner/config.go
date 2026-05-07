@@ -520,36 +520,27 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 }
 
 // primaryAddressFamily inspects the "service-cidr" key in the provided config map and returns the IP address
-// family (4 or 6) of the first non-empty CIDR found. Values may be a comma-separated string or a slice of strings;
-// entries are iterated in order and the first parseable, non-empty CIDR determines the result.
-// Returns 0 if "service-cidr" is absent, empty, or if the first CIDR is not a valid network address.
+// family (4 or 6) of the first non-empty CIDR found;
+// returns 0 if "service-cidr" is absent, empty, or if the first non-empty CIDR is not a valid network address.
+// The service-cidr value should be a comma-separated string.
 func primaryAddressFamily(config map[string]interface{}) int {
-	var firstCIDR string
 	for _, serviceCIDRValue := range convert.ToStringSlice(config["service-cidr"]) {
 		for _, serviceCIDR := range strings.Split(serviceCIDRValue, ",") {
 			serviceCIDR = strings.TrimSpace(serviceCIDR)
 			if serviceCIDR == "" {
 				continue
 			}
-			firstCIDR = serviceCIDR
-			break
+			_, parsedCIDR, err := net.ParseCIDR(serviceCIDR)
+			if err != nil {
+				return 0
+			}
+			if parsedCIDR.IP.To4() != nil {
+				return 4
+			}
+			return 6
 		}
-		if firstCIDR != "" {
-			break
-		}
 	}
-	if firstCIDR == "" {
-		return 0
-	}
-
-	_, parsedCIDR, err := net.ParseCIDR(firstCIDR)
-	if err != nil {
-		return 0
-	}
-	if parsedCIDR.IP.To4() != nil {
-		return 4
-	}
-	return 6
+	return 0
 }
 
 // reorderAddressesByFamily reorders the provided address slice so that addresses belonging to the primary IP family
