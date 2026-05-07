@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/privateregistry"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/webhookchart"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/proxysettings"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
@@ -40,6 +41,9 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		clients.Admission.ValidatingWebhookConfiguration(),
 		clients.CRD.CustomResourceDefinition())
 	scaleavailable.Register(ctx, clients)
+	if err := webhookchart.Register(ctx, clients, registryOverride); err != nil {
+		return err
+	}
 	if err := systemcharts.Register(ctx, clients, registryOverride); err != nil {
 		return err
 	}
