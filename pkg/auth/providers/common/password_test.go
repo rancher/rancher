@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"testing"
 
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -101,4 +102,36 @@ func TestSavePasswordSecret(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, wantSecret.Namespace+":"+wantSecret.Name, name)
 	assert.Equal(t, wantSecret, createdSecret)
+}
+
+func TestCreateOrUpdateSecretsNoUpdateWhenUnchanged(t *testing.T) {
+	const (
+		field    = "password"
+		authType = "ldapconfig"
+		value    = "s3cr3t"
+	)
+	secretName := fmt.Sprintf("%s-%s", authType, field)
+
+	ctrl := gomock.NewController(t)
+	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretsCache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+
+	// The secret already exists and its Data already holds the correct value.
+	existing := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: SecretsNamespace,
+		},
+		Data: map[string][]byte{field: []byte(value)},
+		Type: corev1.SecretTypeOpaque,
+	}
+	secretsCache.EXPECT().Get(SecretsNamespace, secretName).Return(existing, nil)
+	secretController.EXPECT().Cache().Return(secretsCache)
+
+	// Update must NOT be called when the stored value is already correct.
+	secretController.EXPECT().Update(gomock.Any()).Times(0)
+
+	got, err := CreateOrUpdateSecrets(secretController, value, field, authType)
+	assert.NoError(t, err)
+	assert.Equal(t, SecretsNamespace+":"+secretName, got)
 }
