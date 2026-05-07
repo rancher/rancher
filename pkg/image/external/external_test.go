@@ -25,8 +25,8 @@ const (
 func makeRelease(version string) map[string]interface{} {
 	return map[string]interface{}{
 		"version":                 version,
-		"minChannelServerVersion": "v2.8.0",
-		"maxChannelServerVersion": "v2.10.0",
+		"minChannelServerVersion": "v2.14.0",
+		"maxChannelServerVersion": "v2.16.0",
 	}
 }
 
@@ -41,8 +41,8 @@ func makeExternalData(versions ...string) map[string]interface{} {
 }
 
 func TestGetExternalImages(t *testing.T) {
-	// testRancherVersion is within the [v2.8.0, v2.10.0] band used by makeRelease.
-	const testRancherVersion = "v2.9.0"
+	// testRancherVersion is within the [v2.14.0, v2.16.0] band used by makeRelease.
+	const testRancherVersion = "v2.15.0"
 
 	kubeSemVer := &semver.Version{
 		Major: 1,
