@@ -7,7 +7,6 @@ import (
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -221,7 +220,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 					DefaultNamespace: "kube-system",
 					Helm: &fleet.HelmOptions{
 						Chart:       getChartName(),
-						Version:     buildconfig.ClusterAutoscalerChartVersion,
+						Version:     s.h.chartVersionsForCluster(cluster).chartVersion,
 						Repo:        settings.ClusterAutoscalerChartRepository.Get(),
 						ReleaseName: "cluster-autoscaler",
 						Values: &fleet.GenericMap{
@@ -269,21 +268,11 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 
 	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
-	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("1.34.0-3.4", result)
+	result := s.h.chartVersionsForCluster(cluster)
+	s.Equal("1.34.0-3.4", result.imageTag)
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
-	// Temporarily modify the imageTagVersions map to test unknown version
-	originalMap := imageTagVersions
-	imageTagVersions = map[int]string{
-		99: "1.99.0-9.9", // Use a version that's not in the original map
-	}
-
-	defer func() {
-		imageTagVersions = originalMap // Restore original map
-	}()
-
 	cluster := &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-cluster",
@@ -291,8 +280,8 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 		},
 	}
 
-	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("", result) // Should return empty string for unknown version
+	result := s.h.chartVersionsForCluster(cluster)
+	s.Equal(defaultChartVersionConfigs.imageTag, result.imageTag)
 }
 
 // Test cases for getChartImageSettings method
