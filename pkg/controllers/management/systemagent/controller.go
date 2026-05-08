@@ -106,12 +106,20 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cluster.Name,
 				Namespace: cluster.Name,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: cluster.APIVersion,
+						Kind:       cluster.Kind,
+						Name:       cluster.Name,
+						UID:        cluster.UID,
+					},
+				},
 			}})
 		if err != nil {
-			return nil, err
+			return cluster, err
 		}
 	} else if err != nil {
-		return nil, err
+		return cluster, err
 	}
 
 	clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)

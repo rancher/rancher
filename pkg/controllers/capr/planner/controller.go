@@ -114,14 +114,14 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 		beacon = beacon.DeepCopy()
 		beacon.Labels = map[string]string{}
 		beacon.Labels[planv1alpha1.OwnerLabel] = PlannerOwnerKey
-		_, err = h.beacons.Update(beacon)
+		beacon, err = h.beacons.Update(beacon)
 		if err != nil {
 			return status, err
 		}
 	} else if owner, ok := beacon.Labels[planv1alpha1.OwnerLabel]; !ok {
 		beacon = beacon.DeepCopy()
 		beacon.Labels[planv1alpha1.OwnerLabel] = PlannerOwnerKey
-		_, err = h.beacons.Update(beacon)
+		beacon, err = h.beacons.Update(beacon)
 		if err != nil {
 			return status, err
 		}
