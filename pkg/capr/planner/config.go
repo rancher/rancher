@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	channelmodel "github.com/rancher/channelserver/pkg/model"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
@@ -44,6 +45,35 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+const restartScopeDownstream = "downstream"
+
+// agentAffectingServerConfig extracts the values of server-only flags from machineGlobalConfig
+// that are known to affect agent behavior.
+func agentAffectingServerConfig(controlPlane *rkev1.RKEControlPlane) map[string]interface{} {
+	release := capr.GetKDMReleaseData(context.TODO(), controlPlane) // already used in filter.go
+	return agentAffectingServerConfigWithRelease(controlPlane, release)
+}
+
+func agentAffectingServerConfigWithRelease(controlPlane *rkev1.RKEControlPlane, release *channelmodel.Release) map[string]interface{} {
+	result := map[string]interface{}{}
+	if release == nil {
+		return result
+	}
+	for k, field := range release.ServerArgs {
+		if !serverArgRequiresDownstreamRestart(field) {
+			continue
+		}
+		if v, ok := controlPlane.Spec.MachineGlobalConfig.Data[k]; ok {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+func serverArgRequiresDownstreamRestart(field channelmodel.Arg) bool {
+	return slices.Contains(field.RestartScope, restartScopeDownstream)
+}
 
 // addEtcd mutates the given config map with etcd-specific configuration elements, and adds S3-related arguments and files if renderS3 is true.
 func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, renderS3 bool) (result []plan.File, _ error) {
@@ -374,7 +404,11 @@ func addOtherFiles(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, 
 	return nodePlan, nil
 }
 
-func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
+func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string, entry *planEntry) string {
+	return restartStampWithRelease(nodePlan, controlPlane, image, entry, capr.GetKDMReleaseData(context.TODO(), controlPlane))
+}
+
+func restartStampWithRelease(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string, entry *planEntry, release *channelmodel.Release) string {
 	restartStamp := sha256.New()
 	restartStamp.Write([]byte(strconv.Itoa(controlPlane.Spec.ProvisionGeneration)))
 	restartStamp.Write([]byte(image))
@@ -386,10 +420,15 @@ func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, i
 		restartStamp.Write([]byte(file.Content))
 	}
 	restartStamp.Write([]byte(strconv.FormatInt(controlPlane.Status.ConfigGeneration, 10)))
+	if isOnlyWorker(entry) {
+		if config, err := json.Marshal(agentAffectingServerConfigWithRelease(controlPlane, release)); err == nil {
+			restartStamp.Write(config)
+		}
+	}
 	return hex.EncodeToString(restartStamp.Sum(nil))
 }
 
-func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
+func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string, entry *planEntry) string {
 	h := sha256.New()
 	h.Write([]byte(strconv.Itoa(controlPlane.Spec.ProvisionGeneration)))
 	h.Write([]byte(image))
@@ -405,6 +444,11 @@ func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, imag
 		}
 	}
 	h.Write([]byte(strconv.FormatInt(controlPlane.Status.ConfigGeneration, 10)))
+	if isOnlyWorker(entry) {
+		if serverFlagBytes, err := json.Marshal(agentAffectingServerConfig(controlPlane)); err == nil {
+			h.Write(serverFlagBytes)
+		}
+	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 
