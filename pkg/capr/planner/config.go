@@ -41,6 +41,31 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// agentAffectingServerFlags lists flags that are server-only in KDM (appear in ServerArgs
+// but not AgentArgs) yet still affect agent behavior at runtime. Because filterConfigData
+// strips these from worker config files, the worker restart stamp never changes when they
+// are toggled — workers would not restart and would not pick up the change.
+//
+// Flags in this list are included in the worker restart stamp and drain hash so that
+// changing them causes affected workers to restart.
+//
+// NOTE: When a new server-only flag is found to affect agent behavior, add it here.
+var agentAffectingServerFlags = []string{
+	"disable-kube-proxy",
+}
+
+// agentAffectingServerConfig extracts the values of server-only flags from machineGlobalConfig
+// that are known to affect agent behavior.
+func agentAffectingServerConfig(controlPlane *rkev1.RKEControlPlane) map[string]interface{} {
+	result := map[string]interface{}{}
+	for _, k := range agentAffectingServerFlags {
+		if v, ok := controlPlane.Spec.MachineGlobalConfig.Data[k]; ok {
+			result[k] = v
+		}
+	}
+	return result
+}
+
 // addEtcd mutates the given config map with etcd-specific configuration elements, and adds S3-related arguments and files if renderS3 is true.
 func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry, renderS3 bool) (result []plan.File, _ error) {
 	if !isEtcd(entry) || controlPlane.Spec.ETCD == nil {
@@ -326,7 +351,7 @@ func addOtherFiles(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, 
 	return nodePlan, nil
 }
 
-func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
+func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string, entry *planEntry) string {
 	restartStamp := sha256.New()
 	restartStamp.Write([]byte(strconv.Itoa(controlPlane.Spec.ProvisionGeneration)))
 	restartStamp.Write([]byte(image))
@@ -338,10 +363,15 @@ func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, i
 		restartStamp.Write([]byte(file.Content))
 	}
 	restartStamp.Write([]byte(strconv.FormatInt(controlPlane.Status.ConfigGeneration, 10)))
+	if isOnlyWorker(entry) {
+		if config, err := json.Marshal(agentAffectingServerConfig(controlPlane)); err == nil {
+			restartStamp.Write(config)
+		}
+	}
 	return hex.EncodeToString(restartStamp.Sum(nil))
 }
 
-func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
+func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string, entry *planEntry) string {
 	h := sha256.New()
 	h.Write([]byte(strconv.Itoa(controlPlane.Spec.ProvisionGeneration)))
 	h.Write([]byte(image))
@@ -357,6 +387,11 @@ func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, imag
 		}
 	}
 	h.Write([]byte(strconv.FormatInt(controlPlane.Status.ConfigGeneration, 10)))
+	if isOnlyWorker(entry) {
+		if serverFlagBytes, err := json.Marshal(agentAffectingServerConfig(controlPlane)); err == nil {
+			h.Write(serverFlagBytes)
+		}
+	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 

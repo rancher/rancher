@@ -10,11 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func TestPrimaryAddressFamily(t *testing.T) {
@@ -800,4 +803,112 @@ func buildExtractConfigGzipPayload(t *testing.T, payload []byte) string {
 	}
 
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func TestAgentAffectingServerConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   map[string]any
+		expected map[string]interface{}
+	}{
+		{
+			name:     "empty config",
+			config:   map[string]any{},
+			expected: map[string]interface{}{},
+		},
+		{
+			name:     "disable-kube-proxy present",
+			config:   map[string]any{"disable-kube-proxy": true, "cni": "cilium"},
+			expected: map[string]interface{}{"disable-kube-proxy": true},
+		},
+		{
+			name:     "only unrelated keys",
+			config:   map[string]any{"cni": "cilium", "tls-san": "example.com"},
+			expected: map[string]interface{}{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cp := &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
+						MachineGlobalConfig: rkev1.GenericMap{Data: tt.config},
+					},
+				},
+			}
+			result := agentAffectingServerConfig(cp)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestRestartStampWorkerChangesWithDisableKubeProxy(t *testing.T) {
+	a := assert.New(t)
+
+	workerEntry := &planEntry{
+		Metadata: &plan.Metadata{
+			Labels: map[string]string{
+				capr.CattleOSLabel:        "linux",
+				capr.ControlPlaneRoleLabel: "false",
+				capr.EtcdRoleLabel:        "false",
+				capr.WorkerRoleLabel:      "true",
+			},
+		},
+		Machine: &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "false",
+					capr.EtcdRoleLabel:        "false",
+					capr.WorkerRoleLabel:      "true",
+				},
+			},
+		},
+	}
+
+	cpEntry := &planEntry{
+		Metadata: &plan.Metadata{
+			Labels: map[string]string{
+				capr.CattleOSLabel:        "linux",
+				capr.ControlPlaneRoleLabel: "true",
+				capr.EtcdRoleLabel:        "true",
+				capr.WorkerRoleLabel:      "false",
+			},
+		},
+		Machine: &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					capr.ControlPlaneRoleLabel: "true",
+					capr.EtcdRoleLabel:        "true",
+					capr.WorkerRoleLabel:      "false",
+				},
+			},
+		},
+	}
+
+	cpWithout := &rkev1.RKEControlPlane{
+		Spec: rkev1.RKEControlPlaneSpec{
+			ClusterConfiguration: rkev1.ClusterConfiguration{
+				MachineGlobalConfig: rkev1.GenericMap{Data: map[string]any{"cni": "cilium"}},
+			},
+		},
+	}
+	cpWith := &rkev1.RKEControlPlane{
+		Spec: rkev1.RKEControlPlaneSpec{
+			ClusterConfiguration: rkev1.ClusterConfiguration{
+				MachineGlobalConfig: rkev1.GenericMap{Data: map[string]any{"cni": "cilium", "disable-kube-proxy": true}},
+			},
+		},
+	}
+
+	nodePlan := plan.NodePlan{}
+	image := "test-image"
+
+	workerStampWithout := restartStamp(nodePlan, cpWithout, image, workerEntry)
+	workerStampWith := restartStamp(nodePlan, cpWith, image, workerEntry)
+	a.NotEqual(workerStampWithout, workerStampWith, "worker restart stamp should change when disable-kube-proxy is toggled")
+
+	cpStampWithout := restartStamp(nodePlan, cpWithout, image, cpEntry)
+	cpStampWith := restartStamp(nodePlan, cpWith, image, cpEntry)
+	a.Equal(cpStampWithout, cpStampWith, "control plane restart stamp should not be affected by agentAffectingServerFlags logic")
 }
