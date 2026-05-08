@@ -132,7 +132,7 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 
 	result, err := lConn.Search(search)
 	if err != nil {
-		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == 32 {
+		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == ldapv3.LDAPResultNoSuchObject {
 			return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", dn))}
 		}
 		return nil, err
@@ -390,7 +390,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 
 	result, err := lConn.Search(search)
 	if err != nil {
-		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == 32 {
+		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == ldapv3.LDAPResultNoSuchObject {
 			return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", distinguishedName))}
 		}
 		return nil, apierror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), validation.ServerError, "Internal server error")
