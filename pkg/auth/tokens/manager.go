@@ -16,7 +16,6 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/util"
-	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	ctrlv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -92,8 +91,25 @@ func userPrincipalIndexer(obj any) ([]string, error) {
 	return user.PrincipalIDs, nil
 }
 
+// deriveTokenInput holds the user-provided fields accepted when creating a
+// derived token. Both "clusterId" (Norman API name) and "clusterName"
+// (Kubernetes resource field) are accepted for the cluster reference.
+type deriveTokenInput struct {
+	Description string `json:"description"`
+	TTLMillis   int64  `json:"ttl"`
+	ClusterID   string `json:"clusterId"`
+	ClusterName string `json:"clusterName"`
+}
+
+func (d deriveTokenInput) clusterRef() string {
+	if d.ClusterID != "" {
+		return d.ClusterID
+	}
+	return d.ClusterName
+}
+
 // createDerivedToken will create a jwt token for the authenticated user
-func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue string) (apiv3.Token, string, int, error) {
+func (m *Manager) createDerivedToken(input deriveTokenInput, tokenAuthValue string) (apiv3.Token, string, int, error) {
 	logrus.Debug("Create Derived Token Invoked")
 
 	token, _, err := m.GetToken(tokenAuthValue)
@@ -101,7 +117,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return apiv3.Token{}, "", http.StatusUnauthorized, err
 	}
 
-	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(input.TTLMillis)) * time.Millisecond)
 	if err != nil {
 		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating max-ttl %v", err)
 	}
@@ -114,8 +130,8 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		UserID:        token.GetUserID(),
 		AuthProvider:  token.GetAuthProvider(),
 		ProviderInfo:  token.GetProviderInfo(),
-		Description:   jsonInput.Description,
-		ClusterName:   jsonInput.ClusterID,
+		Description:   input.Description,
+		ClusterName:   input.clusterRef(),
 	}
 	derivedToken, unhashedTokenKey, err = m.createToken(derivedToken)
 
@@ -294,13 +310,13 @@ func (m *Manager) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%s", err))
 	}
 
-	jsonInput := clientv3.Token{}
-	err = json.Unmarshal(bytes, &jsonInput)
+	var input deriveTokenInput
+	err = json.Unmarshal(bytes, &input)
 	if err != nil {
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%s", err))
 	}
 
-	token, unhashedTokenKey, status, err := m.createDerivedToken(jsonInput, tokenAuthValue)
+	token, unhashedTokenKey, status, err := m.createDerivedToken(input, tokenAuthValue)
 	if err != nil {
 		logrus.Errorf("deriveToken failed with error: %v", err)
 		if status == 0 {
