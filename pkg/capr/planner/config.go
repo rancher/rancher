@@ -578,8 +578,8 @@ func reorderAddressesByFamily(addresses []string, primaryFamily int) []string {
 	return append(append(primary, other...), nonIP...)
 }
 
-// updateConfigWithAdvertiseAddresses sets the advertise-address and tls-san in the config
-// if the non-worker node has different internal and external IPs.
+// updateConfigWithAdvertiseAddresses sets advertise-address and tls-san in the config
+// for non-worker nodes when the configured node-ip and node-external-ip values differ.
 // It reads node-ip and node-external-ip from the config (already ordered by preferred IP family)
 // and uses the first node-ip value as the advertise-address.
 func updateConfigWithAdvertiseAddresses(config map[string]interface{}, info *machineNetworkInfo) {
