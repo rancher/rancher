@@ -2,7 +2,10 @@ module github.com/rancher/rancher/pkg/client
 
 go 1.26.0
 
-replace github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260423064226-5e6ff046a71a
+replace (
+	github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260505143155-552e07ef956f
+	github.com/rancher/wrangler/v3 => github.com/rancher-teja/wrangler/v3 v3.6.0-rc.1.0.20260507143116-dcc9e570f425
+)
 
 require (
 	github.com/rancher/norman v0.9.0

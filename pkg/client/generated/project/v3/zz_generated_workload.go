@@ -76,6 +76,7 @@ const (
 	WorkloadFieldScale                                = "scale"
 	WorkloadFieldScheduling                           = "scheduling"
 	WorkloadFieldSchedulingGates                      = "schedulingGates"
+	WorkloadFieldSchedulingGroup                      = "schedulingGroup"
 	WorkloadFieldSeccompProfile                       = "seccompProfile"
 	WorkloadFieldSelector                             = "selector"
 	WorkloadFieldServiceAccountName                   = "serviceAccountName"
@@ -102,7 +103,6 @@ const (
 	WorkloadFieldWorkloadAnnotations                  = "workloadAnnotations"
 	WorkloadFieldWorkloadLabels                       = "workloadLabels"
 	WorkloadFieldWorkloadMetrics                      = "workloadMetrics"
-	WorkloadFieldWorkloadRef                          = "workloadRef"
 )
 
 type Workload struct {
@@ -175,6 +175,7 @@ type Workload struct {
 	Scale                                *int64                                           `json:"scale,omitempty" yaml:"scale,omitempty"`
 	Scheduling                           *Scheduling                                      `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates                      []PodSchedulingGate                              `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup                      *PodSchedulingGroup                              `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                       *SeccompProfile                                  `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                             *LabelSelector                                   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName                   string                                           `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -201,7 +202,6 @@ type Workload struct {
 	WorkloadAnnotations                  map[string]string                                `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                       map[string]string                                `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics                      []WorkloadMetric                                 `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
-	WorkloadRef                          *WorkloadReference                               `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type WorkloadCollection struct {

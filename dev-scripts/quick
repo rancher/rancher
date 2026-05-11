@@ -22,7 +22,7 @@ CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
 
 # download kontainer driver metadata
-curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json >./data.json
+curl -sLf https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data/data.json >./data.json
 
 BUILD_ARGS=()
 BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
