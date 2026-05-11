@@ -20,8 +20,11 @@ func TestWebhookConfigMapTemplate_NilCluster(t *testing.T) {
 func TestWebhookConfigMapTemplate_NilCustomization(t *testing.T) {
 	cluster := &apimgmtv3.Cluster{}
 	out, err := WebhookConfigMapTemplate(cluster)
-	assert.NoError(t, err)
-	assert.Nil(t, out)
+	require.NoError(t, err)
+	require.NotNil(t, out, "nil customization should emit explicit defaults for reset")
+	yaml := string(out)
+	assert.Contains(t, yaml, "replicaCount: 1")
+	assert.Contains(t, yaml, "enabled: false")
 }
 
 func TestWebhookConfigMapTemplate_EmptyCustomization(t *testing.T) {
@@ -33,8 +36,10 @@ func TestWebhookConfigMapTemplate_EmptyCustomization(t *testing.T) {
 		},
 	}
 	out, err := WebhookConfigMapTemplate(cluster)
-	assert.NoError(t, err)
-	assert.Nil(t, out, "empty customization should produce nil output")
+	require.NoError(t, err)
+	require.NotNil(t, out, "empty customization should emit explicit defaults for reset")
+	yaml := string(out)
+	assert.Contains(t, yaml, "replicaCount: 1")
 }
 
 func TestWebhookConfigMapTemplate_ReplicaCount(t *testing.T) {
@@ -89,13 +94,6 @@ func TestWebhookConfigMapTemplate_FullCustomization(t *testing.T) {
 	assert.Contains(t, yaml, "minAvailable:")
 }
 
-func TestWebhookConfigMapClearTemplate(t *testing.T) {
-	out := WebhookConfigMapClearTemplate()
-	yaml := string(out)
-	assert.Contains(t, yaml, "name: rancher-config")
-	assert.Contains(t, yaml, "namespace: cattle-system")
-	assert.Contains(t, yaml, `rancher-webhook: ""`)
-}
 
 func TestIndentBlock(t *testing.T) {
 	input := "line1\nline2\nline3"

@@ -133,6 +133,9 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 		toUpdate.Status.AppliedAgentEnvVars = modified.Status.AppliedAgentEnvVars
 		toUpdate.Status.AppliedClusterAgentDeploymentCustomization = modified.Status.AppliedClusterAgentDeploymentCustomization
 		toUpdate.Status.AppliedClusterAgentImagePullSecretsHash = modified.Status.AppliedClusterAgentImagePullSecretsHash
+		if !modified.Spec.Internal {
+			toUpdate.Status.AppliedWebhookDeploymentCustomization = modified.Status.AppliedWebhookDeploymentCustomization
+		}
 		// Copy conditions this controller owns
 		util.CopyCondition(apimgmtv3.ClusterConditionAgentDeployed, modified, toUpdate)
 		util.CopyCondition(apimgmtv3.ClusterConditionSystemAccountCreated, modified, toUpdate)
@@ -353,21 +356,9 @@ func (cd *clusterDeploy) manageWebhookConfig(cluster *apimgmtv3.Cluster) error {
 
 	logrus.Infof("clusterDeploy: manageWebhookConfig: webhook deployment customization changed for cluster [%s], pushing ConfigMap", cluster.Name)
 
-	var cmYAML []byte
-	var err error
-
-	if cluster.Spec.WebhookDeploymentCustomization != nil {
-		cmYAML, err = systemtemplate.WebhookConfigMapTemplate(cluster)
-		if err != nil {
-			return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to generate webhook ConfigMap for cluster [%s]: %w", cluster.Name, err)
-		}
-	}
-
-	// If customization is nil or produced no values, push a clear template
-	// so the downstream chart reverts to defaults.
-	if cmYAML == nil {
-		logrus.Infof("clusterDeploy: manageWebhookConfig: clearing webhook config for cluster [%s]", cluster.Name)
-		cmYAML = systemtemplate.WebhookConfigMapClearTemplate()
+	cmYAML, err := systemtemplate.WebhookConfigMapTemplate(cluster)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to generate webhook ConfigMap for cluster [%s]: %w", cluster.Name, err)
 	}
 
 	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)

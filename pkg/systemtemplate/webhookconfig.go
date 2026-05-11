@@ -14,18 +14,19 @@ import (
 // the downstream systemcharts controller picks the values up via its existing
 // getChartValues("rancher-webhook") path.
 //
-// Returns nil, nil when the cluster has no webhook customization set.
+// When cluster is nil, returns nil, nil. When customization is nil, emits explicit
+// chart defaults so the downstream systemcharts controller detects the change and
+// resets any previously-customized fields.
 func WebhookConfigMapTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
-	if cluster == nil || cluster.Spec.WebhookDeploymentCustomization == nil {
+	if cluster == nil {
 		return nil, nil
 	}
 
+	// wdc may be nil — WebhookHelmValues handles that case and returns explicit
+	// defaults so the downstream isInstalled merge-patch check detects the diff.
 	helmValues, err := chart.WebhookHelmValues(cluster.Spec.WebhookDeploymentCustomization)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build webhook Helm values: %w", err)
-	}
-	if len(helmValues) == 0 {
-		return nil, nil
 	}
 
 	valuesYAML, err := yaml.Marshal(helmValues)
@@ -33,9 +34,6 @@ func WebhookConfigMapTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 		return nil, fmt.Errorf("failed to marshal webhook Helm values to YAML: %w", err)
 	}
 
-	// Build the ConfigMap YAML inline. Using server-side apply with a unique
-	// field manager lets us own only the "rancher-webhook" key without clobbering
-	// other keys that may exist in rancher-config.
 	cmYAML := fmt.Sprintf(`apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -49,23 +47,6 @@ data:
 %s`, indentBlock(string(valuesYAML), 4))
 
 	return []byte(cmYAML), nil
-}
-
-// WebhookConfigMapClearTemplate generates a ConfigMap YAML that clears the
-// "rancher-webhook" key from the rancher-config ConfigMap. This is used when the
-// user removes webhook customization so the chart reverts to defaults.
-func WebhookConfigMapClearTemplate() []byte {
-	return []byte(`apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: rancher-config
-  namespace: cattle-system
-  labels:
-    app.kubernetes.io/managed-by: rancher
-    app.kubernetes.io/part-of: rancher
-data:
-  rancher-webhook: ""
-`)
 }
 
 // indentBlock indents every line of s by n spaces.

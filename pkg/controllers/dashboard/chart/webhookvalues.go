@@ -7,16 +7,41 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
+// webhookDefaultResetValues holds explicit chart-default overrides emitted when
+// WebhookDeploymentCustomization is cleared.  The system chart manager compares
+// desired values against the currently-installed release config using JSON merge
+// patch.  Because merge patch can only ADD or OVERWRITE keys (it cannot express
+// "revert to chart default"), we must emit explicit defaults for every key our
+// code may have previously set.  Without these, the merge produces the same JSON
+// as the current release config and the manager incorrectly skips the upgrade.
+var webhookDefaultResetValues = map[string]interface{}{
+	"replicaCount":        1,
+	"tolerations":         []interface{}{},
+	"affinity":            nil,
+	"resources":           map[string]interface{}{},
+	"podDisruptionBudget": map[string]interface{}{"enabled": false},
+}
+
 // WebhookHelmValues translates a WebhookDeploymentCustomization into a Helm values map
 // suitable for passing to the rancher-webhook chart. The keys correspond directly to
 // the values defined in the chart's values.yaml.
-// Returns nil, nil when customization is nil.
+// When customization is nil, returns explicit default overrides so the system chart
+// manager detects the change and resets any previously-customized fields.
 func WebhookHelmValues(wdc *v3.WebhookDeploymentCustomization) (map[string]interface{}, error) {
 	if wdc == nil {
-		return nil, nil
+		return webhookDefaultResetValues, nil
 	}
 
-	values := map[string]interface{}{}
+	// Start with defaults for every key we might set so that clearing a field
+	// (e.g. dropping PodDisruptionBudget) always produces a diff against the
+	// currently-installed release config.
+	values := map[string]interface{}{
+		"replicaCount":        1,
+		"tolerations":         []interface{}{},
+		"affinity":            nil,
+		"resources":           map[string]interface{}{},
+		"podDisruptionBudget": map[string]interface{}{"enabled": false},
+	}
 
 	if wdc.ReplicaCount != nil {
 		values["replicaCount"] = *wdc.ReplicaCount

@@ -287,8 +287,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				wdc, err := h.getLocalWebhookCustomization()
 				if err != nil && !errors.IsNotFound(err) {
 					logrus.Warnf("[systemcharts] failed to get local cluster for webhook values: %v", err)
-				}
-				if wdc != nil {
+				} else {
 					helmValues, err := chart.WebhookHelmValues(wdc)
 					if err != nil {
 						logrus.Warnf("[systemcharts] failed to build webhook helm values: %v", err)
@@ -701,9 +700,7 @@ func (h *handler) updateAppliedWebhookCustomization() error {
 		}
 		cluster := cached.DeepCopy()
 		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
-		// Use Update (not UpdateStatus) because the clusters.management.cattle.io
-		// CRD does not define a status subresource.
-		_, err = h.clusters.Update(cluster)
+		_, err = h.clusters.UpdateStatus(cluster)
 		return err
 	})
 }
