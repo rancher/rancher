@@ -178,7 +178,7 @@ func (n *namespaceHandler) ensureProjectScopeSecretClusterLabel(project *v3.Proj
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // getProjectScopedSecretsFromNamespace gets all project scoped secret from a project namespace.

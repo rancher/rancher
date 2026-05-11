@@ -507,7 +507,7 @@ func Test_namespaceHandler_ensureProjectScopeSecretClusterLabel(t *testing.T) {
 			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				m.EXPECT().Update(secretWithClusterLabel).Return(nil, errDefault)
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name:    "multiple secrets with update failures",
@@ -521,7 +521,7 @@ func Test_namespaceHandler_ensureProjectScopeSecretClusterLabel(t *testing.T) {
 			setupManagementClient: func(m *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				m.EXPECT().Update(secretWithClusterLabel).Return(nil, errDefault).Times(2)
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 	}
 
