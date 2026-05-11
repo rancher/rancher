@@ -3,7 +3,6 @@ package autoscaler
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 
@@ -170,15 +169,14 @@ func getChartName() string {
 }
 
 // getChartRepository returns the chart repository URL to use for the fleet helm op.
-// If the CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY env var is set and the system default
-// registry is configured, the registry host in the URL is substituted with the system default
+// If the cluster autoscaler chart repository setting and the system default registry are
+// both configured, the registry host in the URL is substituted with the system default
 // registry to support airgapped deployments.
 func getChartRepository() string {
 	repo := settings.ClusterAutoscalerChartRepository.Get()
 
-	envChartRepo := os.Getenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
 	systemDefaultRegistry := settings.SystemDefaultRegistry.Get()
-	if envChartRepo == "" || systemDefaultRegistry == "" {
+	if repo == "" || systemDefaultRegistry == "" {
 		return repo
 	}
 
