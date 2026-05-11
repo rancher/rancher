@@ -182,6 +182,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -296,6 +301,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -410,6 +420,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -496,6 +511,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -582,6 +602,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -667,6 +692,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -752,6 +782,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -888,6 +923,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -998,6 +1038,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1108,6 +1153,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1191,6 +1241,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1467,6 +1522,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher-test.io/rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1621,6 +1681,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1748,6 +1813,10 @@ expectedValues := map[string]interface{}{
 },
 },
 "replicaCount": int32(2),
+"tolerations":         []interface{}{},
+"affinity":            nil,
+"resources":           map[string]interface{}{},
+"podDisruptionBudget": map[string]interface{}{"enabled": false},
 }
 mocks.manager.EXPECT().Ensure(
 namespace.System,
@@ -1869,6 +1938,7 @@ mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-c
 			// Individual tests that need stricter validation override these in their setup function.
 			mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
 			mocks.clusters.EXPECT().Update(gomock.Any()).Return(localCuster, nil).AnyTimes()
+			mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
 
 			// allow test to add expected calls to mock and run any additional setup
 			tt.setup(mocks)
@@ -1911,6 +1981,7 @@ func Test_TurtlesInstallation(t *testing.T) {
 
 	mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.clusters.EXPECT().Update(gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
 	features.ManagedSystemUpgradeController.Set(false)
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
@@ -1927,6 +1998,11 @@ func Test_TurtlesInstallation(t *testing.T) {
 		"image": map[string]interface{}{
 			"repository": "rancher/rancher-webhook",
 		},
+		"replicaCount":        1,
+		"tolerations":         []interface{}{},
+		"affinity":            nil,
+		"resources":           map[string]interface{}{},
+		"podDisruptionBudget": map[string]interface{}{"enabled": false},
 	}
 	expectedTurtlesValues := map[string]interface{}{
 		"priorityClassName": priorityClassName,
@@ -1991,6 +2067,7 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 
 	mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.clusters.EXPECT().Update(gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
 
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).AnyTimes()

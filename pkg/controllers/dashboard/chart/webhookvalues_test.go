@@ -13,13 +13,25 @@ import (
 func TestWebhookHelmValues_nil(t *testing.T) {
 	values, err := WebhookHelmValues(nil)
 	require.NoError(t, err)
-	assert.Nil(t, values)
+	require.NotNil(t, values)
+	assert.Equal(t, 1, values["replicaCount"])
+	assert.Equal(t, []interface{}{}, values["tolerations"])
+	assert.Nil(t, values["affinity"])
+	assert.Equal(t, map[string]interface{}{}, values["resources"])
+	pdb := values["podDisruptionBudget"].(map[string]interface{})
+	assert.Equal(t, false, pdb["enabled"])
 }
 
 func TestWebhookHelmValues_empty(t *testing.T) {
 	values, err := WebhookHelmValues(&v3.WebhookDeploymentCustomization{})
 	require.NoError(t, err)
-	assert.Empty(t, values)
+	require.NotNil(t, values)
+	assert.Equal(t, 1, values["replicaCount"])
+	assert.Equal(t, []interface{}{}, values["tolerations"])
+	assert.Nil(t, values["affinity"])
+	assert.Equal(t, map[string]interface{}{}, values["resources"])
+	pdb := values["podDisruptionBudget"].(map[string]interface{})
+	assert.Equal(t, false, pdb["enabled"])
 }
 
 func TestWebhookHelmValues_replicaCount(t *testing.T) {
