@@ -71,8 +71,6 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 		return nil, nil
 	}
 
-	fmt.Printf("=== [namespaceHandler.OnChange 000] '%s' ===\n", namespace.Name)
-
 	project, err := n.getProjectFromNamespace(namespace)
 	if err != nil {
 		return nil, fmt.Errorf("error getting project for namespace %s: %w", namespace.Name, err)
@@ -80,8 +78,6 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 	if project == nil {
 		return nil, nil
 	}
-
-	fmt.Printf("=== [namespaceHandler.OnChange 000] %s/%s (%s) ===\n", project.Namespace, project.Name, project.Spec.DisplayName)
 
 	// migrate existing project scoped secrets
 	if err := n.migrateExistingNormanProjectScopedSecrets(project); err != nil {
