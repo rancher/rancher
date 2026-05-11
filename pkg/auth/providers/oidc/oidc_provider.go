@@ -560,8 +560,38 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *h
 	if err != nil {
 		return userInfo, oauth2Token, "", err
 	}
+	if err := mergeGroupsFromUserInfo(userInfo, claimInfo); err != nil {
+		return userInfo, oauth2Token, "", err
+	}
 
 	return userInfo, oauth2Token, rawIDToken, nil
+}
+
+func mergeGroupsFromUserInfo(userInfo *oidc.UserInfo, claimInfo *ClaimInfo) error {
+	if userInfo == nil || claimInfo == nil {
+		return nil
+	}
+
+	// Keep ID token/custom claim values authoritative and only use userinfo as fallback.
+	if claimInfo.Groups != nil && claimInfo.FullGroupPath != nil && claimInfo.Roles != nil {
+		return nil
+	}
+
+	var userInfoClaims ClaimInfo
+	if err := userInfo.Claims(&userInfoClaims); err != nil {
+		return err
+	}
+	if claimInfo.Groups == nil {
+		claimInfo.Groups = userInfoClaims.Groups
+	}
+	if claimInfo.FullGroupPath == nil {
+		claimInfo.FullGroupPath = userInfoClaims.FullGroupPath
+	}
+	if claimInfo.Roles == nil {
+		claimInfo.Roles = userInfoClaims.Roles
+	}
+
+	return nil
 }
 
 func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *apiv3.OIDCConfig, token *oauth2.Token, userName string) (*ClaimInfo, error) {
