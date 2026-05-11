@@ -311,6 +311,7 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 	suffix := []byte("\n" + cluster.Name)
 	rc := &rest.Config{
 		Host:        u.String(),
+		Dial:        clusterDialer,
 		BearerToken: string(secret.Data[secretmigrator.SecretKey]),
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData:     append(caBytes, suffix...),
@@ -319,12 +320,6 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		Timeout:     45 * time.Second,
 		RateLimiter: ratelimit.None,
 		UserAgent:   rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name,
-		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
-			if ht, ok := rt.(*http.Transport); ok {
-				ht.DialContext = clusterDialer
-			}
-			return rt
-		},
 	}
 
 	return rc, nil

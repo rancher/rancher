@@ -21,7 +21,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.15
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.15
+ARG CATTLE_KDM_BRANCH=dev-v2.15-pr
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -69,7 +69,7 @@ RUN zypper refresh && \
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.25 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
@@ -104,7 +104,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
 FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
-    curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
+    curl -sLf "https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
 
 FROM builder AS tini
@@ -173,7 +173,7 @@ ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher142
 ENV CATTLE_MACHINE_CHECKSUM_amd64=9ae8f09bde3d036ab71659bcdbd7f03e2566371b985eb44e67cacfa6481306e5
 ENV CATTLE_MACHINE_CHECKSUM_arm64=0d2afec21404af012ba49afd60c1d7bba962fab6685d794a46f2202b72908580
 ENV CATTLE_K3S_VERSION=v1.36.0+k3s1
-ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
+ENV CATTLE_MACHINE_PROVISION_IMAGE=teja04783/machine:v0.0.2-test
 ENV CATTLE_ETCD_VERSION=v3.6.7
 ENV CATTLE_ETCD_CHECKSUM_amd64=cf8af880c5a01ee5363cefa14a3e0cb7e5308dcf4ed17a6973099c9a7aee5a9a
 ENV CATTLE_ETCD_CHECKSUM_arm64=ef5fc443cf7cc5b82738f3c28363704896551900af90a6d622cae740b5644270
@@ -360,7 +360,7 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
 ENV CATTLE_UI_VERSION=2.14.0-alpha7
 ENV CATTLE_DASHBOARD_UI_VERSION=v2.14.0-alpha7
 
-ENV CATTLE_CLI_VERSION=v2.15.0-rc.2
+ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
@@ -573,8 +573,8 @@ RUN /usr/bin/unshare --version && \
 
 ARG ARCH
 ENV KUBECTL_VERSION=v1.36.0
-ENV KUBECTL_CHECKSUM_amd64=fd31c7d7129260e608f6faf92d5984c3267ad0b5ead3bced2fe125686e286ad6
-ENV KUBECTL_CHECKSUM_arm64=6f0cd088a82dde5d5807122056069e2fac4ed447cc518efc055547ae46525f14
+ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
+ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
 
 RUN case "${ARCH}" in \
         amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \

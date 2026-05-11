@@ -43,6 +43,7 @@ const (
 	CronJobSpecFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	CronJobSpecFieldScheduling                    = "scheduling"
 	CronJobSpecFieldSchedulingGates               = "schedulingGates"
+	CronJobSpecFieldSchedulingGroup               = "schedulingGroup"
 	CronJobSpecFieldSeccompProfile                = "seccompProfile"
 	CronJobSpecFieldSelector                      = "selector"
 	CronJobSpecFieldServiceAccountName            = "serviceAccountName"
@@ -59,7 +60,6 @@ const (
 	CronJobSpecFieldUid                           = "uid"
 	CronJobSpecFieldVolumes                       = "volumes"
 	CronJobSpecFieldWindowsOptions                = "windowsOptions"
-	CronJobSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type CronJobSpec struct {
@@ -104,6 +104,7 @@ type CronJobSpec struct {
 	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	Selector                      *LabelSelector                 `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
@@ -120,5 +121,4 @@ type CronJobSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
