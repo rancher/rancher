@@ -187,12 +187,16 @@ func getChartRepository() string {
 // provided registry. It handles both OCI (oci://) and standard HTTP(S) URLs.
 func substituteRegistryHost(repoURL, registry string) string {
 	if strings.HasPrefix(repoURL, "oci://") {
-		rest := strings.TrimPrefix(repoURL, "oci://")
-		slashIdx := strings.Index(rest, "/")
-		if slashIdx == -1 {
+		imageRef, err := reference.ParseNamed(strings.TrimPrefix(repoURL, "oci://"))
+		if err != nil {
+			logrus.Debugf("[autoscaler] failed to parse OCI chart repository URL '%s': %v", repoURL, err)
+			return repoURL
+		}
+		path := reference.Path(imageRef)
+		if path == "" {
 			return "oci://" + registry
 		}
-		return "oci://" + registry + rest[slashIdx:]
+		return "oci://" + registry + "/" + path
 	}
 
 	u, err := url.Parse(repoURL)

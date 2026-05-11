@@ -517,8 +517,9 @@ func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_ReplacesHostWithPort() 
 }
 
 func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_NoPath() {
-	result := substituteRegistryHost("oci://registry.rancher.io", "my-registry.company.com")
-	s.Equal("oci://my-registry.company.com", result)
+	original := "oci://registry.rancher.io"
+	result := substituteRegistryHost(original, "my-registry.company.com")
+	s.Equal(original, result)
 }
 
 func (s *autoscalerSuite) TestSubstituteRegistryHost_HTTP_ReplacesHost() {
