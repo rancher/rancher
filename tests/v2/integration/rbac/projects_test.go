@@ -751,6 +751,17 @@ func (p *RTBTestSuite) TestProjectQuotaAddRemoveFields() {
 	})
 	p.Require().NoError(err)
 
+	// Remove the services field. Trying to retrigger the controller.
+	project, err = client.Management.Project.Update(project, map[string]any{
+		"resourceQuota": &management.ProjectResourceQuota{
+			Limit: &management.ResourceQuotaLimit{Pods: "10"},
+		},
+		"namespaceDefaultResourceQuota": &management.NamespaceResourceQuota{
+			Limit: &management.ResourceQuotaLimit{Pods: "3"},
+		},
+	})
+	p.Require().NoError(err)
+
 	// After removing services, usedLimit.services should drop to 0.
 	p.waitForProjectUsedLimit(client, project.ID, "services", "0")
 }
