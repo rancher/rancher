@@ -100,6 +100,26 @@ func Test_Render(t *testing.T) {
 			},
 			failMsg: "uninstall test case failed",
 		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test6",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"skipSchemaValidation": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--skip-schema-validation=true", "test6", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "skip schema validation test case failed",
+		},
 	}
 
 	for _, testCase := range testCases {
