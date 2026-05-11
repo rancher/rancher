@@ -174,7 +174,7 @@ func (n *namespaceHandler) ensureProjectScopeSecretClusterLabel(project *v3.Proj
 			secretCopy.Labels[ProjectScopedSecretClusterLabel] = project.Spec.ClusterName
 
 			_, err := n.managementSecretClient.Update(secretCopy)
-			errors.Join(errs, err)
+			errs = errors.Join(errs, err)
 		}
 	}
 
