@@ -17,6 +17,14 @@ func TestInstaller_WindowsInstallScript(t *testing.T) {
 	CACert := "uibesrwguiobsdrujigbsduigbuidbg"
 	a := assert.New(t)
 
+	// Capture and restore global settings to prevent test pollution
+	originalServerURL := settings.ServerURL.Get()
+	originalCACerts := settings.CACerts.Get()
+	t.Cleanup(func() {
+		settings.ServerURL.Set(originalServerURL)
+		settings.CACerts.Set(originalCACerts)
+	})
+
 	// act
 	err := settings.ServerURL.Set("localhost")
 	a.Nil(err)
@@ -66,6 +74,14 @@ func TestInstaller_LinuxInstallScript(t *testing.T) {
 	CACert := "uibesrwguiobsdrujigbsduigbuidbg"
 	a := assert.New(t)
 
+	// Capture and restore global settings to prevent test pollution
+	originalServerURL := settings.ServerURL.Get()
+	originalCACerts := settings.CACerts.Get()
+	t.Cleanup(func() {
+		settings.ServerURL.Set(originalServerURL)
+		settings.CACerts.Set(originalCACerts)
+	})
+
 	// act
 	err := settings.ServerURL.Set("localhost")
 	a.Nil(err)
@@ -100,10 +116,10 @@ func TestInstaller_LinuxInstallScript(t *testing.T) {
 	a.Nil(err)
 	a.NotNil(script)
 
-	// Verify environment variables are exported (not just assigned)
-	a.Contains(string(script), "export HTTP_PROXY=\"http://proxy.example.com:3128\"")
-	a.Contains(string(script), "export HTTPS_PROXY=\"http://proxy.example.com:3128\"")
-	a.Contains(string(script), "export NO_PROXY=\"127.0.0.0/8,10.0.0.0/8\"")
+	// Verify environment variables are exported with proper shell escaping (single quotes)
+	a.Contains(string(script), "export HTTP_PROXY='http://proxy.example.com:3128'")
+	a.Contains(string(script), "export HTTPS_PROXY='http://proxy.example.com:3128'")
+	a.Contains(string(script), "export NO_PROXY='127.0.0.0/8,10.0.0.0/8'")
 
 	// Verify other required variables
 	a.Contains(string(script), "CATTLE_ROLE_NONE=true")
@@ -113,4 +129,114 @@ func TestInstaller_LinuxInstallScript(t *testing.T) {
 
 	// Verify shebang
 	a.Contains(string(script), "#!/usr/bin/env sh")
+}
+
+func TestInstaller_LinuxInstallScript_ShellInjectionPrevention(t *testing.T) {
+	a := assert.New(t)
+
+	// Capture and restore global settings
+	originalServerURL := settings.ServerURL.Get()
+	originalCACerts := settings.CACerts.Get()
+	t.Cleanup(func() {
+		settings.ServerURL.Set(originalServerURL)
+		settings.CACerts.Set(originalCACerts)
+	})
+
+	err := settings.ServerURL.Set("localhost")
+	a.Nil(err)
+	err = settings.CACerts.Set("test")
+	a.Nil(err)
+
+	tests := []struct {
+		name             string
+		envVar           corev1.EnvVar
+		shouldContain    string
+		shouldNotContain []string
+		description      string
+	}{
+		{
+			name: "double quotes in value",
+			envVar: corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: `value with "quotes"`,
+			},
+			shouldContain:    `export TEST_VAR='value with "quotes"'`,
+			shouldNotContain: []string{`export TEST_VAR="value with "quotes""`},
+			description:      "Double quotes should be safely contained within single quotes",
+		},
+		{
+			name: "single quote in value",
+			envVar: corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: `it's a value`,
+			},
+			shouldContain:    `export TEST_VAR='it'\''s a value'`,
+			shouldNotContain: []string{`export TEST_VAR='it's a value'`},
+			description:      "Single quotes should be properly escaped",
+		},
+		{
+			name: "backticks in value",
+			envVar: corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: "`whoami`",
+			},
+			shouldContain:    "export TEST_VAR='`whoami`'",
+			shouldNotContain: []string{`export TEST_VAR="` + "`whoami`" + `"`},
+			description:      "Backticks should not execute commands",
+		},
+		{
+			name: "dollar sign in value",
+			envVar: corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: "$PATH:/custom/path",
+			},
+			shouldContain:    "export TEST_VAR='$PATH:/custom/path'",
+			shouldNotContain: []string{`export TEST_VAR="$PATH:/custom/path"`},
+			description:      "Dollar signs should not trigger variable expansion",
+		},
+		{
+			name: "command substitution attempt",
+			envVar: corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: "$(rm -rf /)",
+			},
+			shouldContain:    "export TEST_VAR='$(rm -rf /)'",
+			shouldNotContain: []string{`export TEST_VAR="$(rm -rf /)"`},
+			description:      "Command substitution should not execute",
+		},
+		{
+			name: "newline in value",
+			envVar: corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: "line1\nline2",
+			},
+			shouldContain: "export TEST_VAR='line1\nline2'",
+			description:   "Newlines should be safely contained",
+		},
+		{
+			name: "semicolon command separator",
+			envVar: corev1.EnvVar{
+				Name:  "TEST_VAR",
+				Value: "value; rm -rf /",
+			},
+			shouldContain:    "export TEST_VAR='value; rm -rf /'",
+			shouldNotContain: []string{`export TEST_VAR="value; rm -rf /"`},
+			description:      "Semicolons should not allow command injection",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			script, err := LinuxInstallScript(context.TODO(), "", []corev1.EnvVar{tt.envVar}, "", "")
+			a.Nil(err)
+			a.NotNil(script)
+
+			scriptStr := string(script)
+			a.Contains(scriptStr, tt.shouldContain, tt.description)
+
+			for _, forbidden := range tt.shouldNotContain {
+				a.NotContains(scriptStr, forbidden, "Should not use unsafe escaping")
+			}
+		})
+	}
 }
