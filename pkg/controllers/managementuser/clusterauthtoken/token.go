@@ -103,6 +103,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+	clusterAuthToken = clusterAuthToken.DeepCopy()
 
 	forced := false
 	clusterAuthTokenSecret, err := h.clusterSecretLister.Get(h.namespace, common.ClusterAuthTokenSecretName(token.Name))
@@ -117,6 +118,8 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 		forced = true
 		hashedValue := token.Status.Hash
 		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
+	} else {
+		clusterAuthTokenSecret = clusterAuthTokenSecret.DeepCopy()
 	}
 
 	err = h.updateClusterUserAttribute(token.GetUserID())
@@ -181,6 +184,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 			if err != nil {
 				return nil, err
 			}
+			existing = existing.DeepCopy()
 			existing.UserName = clusterAuthToken.UserName
 			existing.Enabled = clusterAuthToken.Enabled
 			existing.ExpiresAt = clusterAuthToken.ExpiresAt
@@ -272,6 +276,7 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 			logrus.Errorf("error migrating clusterAuthToken's secret %s: %s", clusterAuthTokenSecret.Name, err)
 			return err
 		}
+		existing = existing.DeepCopy()
 		existing.Data = clusterAuthTokenSecret.Data
 		if _, err = h.clusterSecret.Update(existing); err != nil {
 			return err
@@ -291,6 +296,7 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 		if err != nil {
 			return err
 		}
+		existing = existing.DeepCopy()
 		existing.UserName = clusterAuthToken.UserName
 		existing.Enabled = clusterAuthToken.Enabled
 		existing.ExpiresAt = clusterAuthToken.ExpiresAt
@@ -317,6 +323,7 @@ func (h *tokenHandler) Updated(token *mgmtapiv3.Token) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+	clusterAuthToken = clusterAuthToken.DeepCopy()
 
 	forced := false
 	clusterAuthTokenSecret, err := h.clusterSecretLister.Get(h.namespace, common.ClusterAuthTokenSecretName(token.Name))
@@ -340,6 +347,8 @@ func (h *tokenHandler) Updated(token *mgmtapiv3.Token) (runtime.Object, error) {
 		}
 
 		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
+	} else {
+		clusterAuthTokenSecret = clusterAuthTokenSecret.DeepCopy()
 	}
 
 	err = h.updateClusterUserAttribute(token.GetUserID())
@@ -408,6 +417,7 @@ func (h *tokenHandler) Updated(token *mgmtapiv3.Token) (runtime.Object, error) {
 			if err != nil {
 				return nil, err
 			}
+			existing = existing.DeepCopy()
 			existing.UserName = clusterAuthToken.UserName
 			existing.Enabled = clusterAuthToken.Enabled
 			existing.ExpiresAt = clusterAuthToken.ExpiresAt
