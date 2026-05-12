@@ -480,6 +480,7 @@ COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
 COPY go.mod go.sum ./
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download

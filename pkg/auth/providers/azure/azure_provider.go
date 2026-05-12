@@ -86,7 +86,7 @@ func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acce
 		return fmt.Errorf("azure AD [logout-all]: provider not configured for SSO logout")
 	}
 
-	endSessionEndpoint := cfg.LogoutEndpoint
+	endSessionEndpoint := cfg.EndSessionEndpoint
 	if endSessionEndpoint == "" {
 		endSessionEndpoint, err = url.JoinPath(cfg.Endpoint, cfg.TenantID, "/oauth2/v2.0/logout")
 		if err != nil {

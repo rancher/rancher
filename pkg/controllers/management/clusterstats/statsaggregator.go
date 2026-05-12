@@ -245,6 +245,12 @@ func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 			// This has the tendency to timeout
 			version, err := userContext.K8sClient.Discovery().ServerVersion()
 			if err == nil {
+				if version != nil {
+					// These fields can vary depending on the node serving the request
+					// Since they are not consumed, we omit them from the status to avoid unnecessary flickering of the fields
+					version.BuildDate, version.Platform = "", ""
+				}
+
 				isClusterVersionOk := cluster.Status.Version != nil
 				isNewVersionOk := version != nil
 				if isClusterVersionOk != isNewVersionOk ||

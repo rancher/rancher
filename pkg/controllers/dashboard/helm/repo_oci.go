@@ -121,8 +121,8 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 	var index *repo.IndexFile
 
 	// If repo is disabled, then don't update the clusterrepo
-	if clusterRepo.Spec.Enabled != nil && !*clusterRepo.Spec.Enabled {
-		return setErrorCondition(clusterRepo, err, newStatus, ociInterval, ociCondition, o.clusterRepoController)
+	if isDisabled(clusterRepo) {
+		return setErrorCondition(clusterRepo, nil, newStatus, ociInterval, ociCondition, o.clusterRepoController)
 	}
 
 	secret, err := catalogv2.GetSecret(o.secretCacheController, &clusterRepo.Spec, clusterRepo.Namespace)

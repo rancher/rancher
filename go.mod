@@ -11,6 +11,7 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/rancher/pkg/plan => ./pkg/plan
 	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
@@ -127,6 +128,7 @@ require (
 	github.com/rancher/muchang v0.1.0
 	github.com/rancher/norman v0.9.1
 	github.com/rancher/rancher/pkg/client v0.0.0
+	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1-rc.1
 	github.com/rancher/remotedialer-proxy v0.7.0-rc.5
 	github.com/rancher/rke v1.8.0

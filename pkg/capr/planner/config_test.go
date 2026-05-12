@@ -17,6 +17,94 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPrimaryAddressFamily(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   map[string]interface{}
+		expected int
+	}{
+		{
+			name:     "returns 0 when service-cidr is missing",
+			config:   map[string]interface{}{},
+			expected: 0,
+		},
+		{
+			name: "returns 4 for IPv4-first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "10.43.0.0/16,2001:db8:43::/112",
+			},
+			expected: 4,
+		},
+		{
+			name: "returns 6 for IPv6-first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "2001:db8:43::/112,10.43.0.0/16",
+			},
+			expected: 6,
+		},
+		{
+			name: "handles whitespace and multiple list entries",
+			config: map[string]interface{}{
+				"service-cidr": []string{"   ", "  2001:db8:43::/112  ,10.43.0.0/16"},
+			},
+			expected: 6,
+		},
+		{
+			name: "returns 0 for invalid first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "not-a-cidr,10.43.0.0/16",
+			},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, primaryAddressFamily(tt.config))
+		})
+	}
+}
+
+func TestReorderAddressesByFamily(t *testing.T) {
+	tests := []struct {
+		name           string
+		addresses      []string
+		primaryFamily  int
+		expected       []string
+	}{
+		{
+			name:          "no-op when fewer than two addresses",
+			addresses:     []string{"10.0.0.1"},
+			primaryFamily: 4,
+			expected:      []string{"10.0.0.1"},
+		},
+		{
+			name:          "no-op when primary family is unset",
+			addresses:     []string{"2001:db8::1", "10.0.0.1"},
+			primaryFamily: 0,
+			expected:      []string{"2001:db8::1", "10.0.0.1"},
+		},
+		{
+			name:          "reorders IPv4 first and keeps group order stable",
+			addresses:     []string{"2001:db8::1", "10.0.0.1", "eth0", "10.0.0.2", "iface0", "2001:db8::2"},
+			primaryFamily: 4,
+			expected:      []string{"10.0.0.1", "10.0.0.2", "2001:db8::1", "2001:db8::2", "eth0", "iface0"},
+		},
+		{
+			name:          "reorders IPv6 first and keeps non-IP values at the end",
+			addresses:     []string{"10.0.0.2", "2001:db8::b", "eth0", "2001:db8::a", "10.0.0.1"},
+			primaryFamily: 6,
+			expected:      []string{"2001:db8::b", "2001:db8::a", "10.0.0.2", "10.0.0.1", "eth0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, reorderAddressesByFamily(tt.addresses, tt.primaryFamily))
+		})
+	}
+}
+
 func TestUpdateConfigWithAddresses(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -30,6 +118,7 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			initialConfig: map[string]interface{}{
 				"node-ip":             []string{},
 				"node-external-ip":    []string{},
+				"service-cidr":        "10.43.0.0/16,2001:db8:43::/112",
 				"cloud-provider-name": "",
 			},
 			info: &machineNetworkInfo{
@@ -39,6 +128,23 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 				DriverName:        management.Amazonec2driver,
 			},
 			expectedNodeIPs:         []string{"10.0.0.5", "2001:db8::1"},
+			expectedNodeExternalIPs: []string{"1.2.3.4"},
+		},
+		{
+			name: "AWS dual-stack node with IPv6-first service-cidr",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "2001:db8:43::/112,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Amazonec2driver,
+			},
+			expectedNodeIPs:         []string{"2001:db8::1", "10.0.0.5"},
 			expectedNodeExternalIPs: []string{"1.2.3.4"},
 		},
 		{
@@ -263,6 +369,38 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			},
 			expectedNodeIPs:         []string{"10.0.0.5"},
 			expectedNodeExternalIPs: []string{"2001:db8::dead:beef"},
+		},
+		{
+			name: "node-external-ip is reordered to match IPv6-first service-cidr",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "2001:db8:43::/112,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4", "2001:db8::dead:beef"},
+			},
+			expectedNodeIPs:         []string{"10.0.0.5"},
+			expectedNodeExternalIPs: []string{"2001:db8::dead:beef", "1.2.3.4"},
+		},
+		{
+			name: "invalid service-cidr preserves existing node-ip order",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "not-a-cidr,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Amazonec2driver,
+			},
+			expectedNodeIPs:         []string{"10.0.0.5", "2001:db8::1"},
+			expectedNodeExternalIPs: []string{"1.2.3.4"},
 		},
 		// Azure (and other drivers that only populate Driver.IPAddress with no PrivateIPAddress):
 		// node-ip and node-external-ip must both remain unset when there is no internal IP.

@@ -338,68 +338,172 @@ func TestMigrateNewFlowAnnotation(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		current            *v3.AzureADConfig
 		proposed           *v3.AzureADConfig
 		annotationExpected bool
 	}{
 		{
-			name: "new setup on Rancher v2.6.7+ after an upgrade from previous version",
-			current: &v3.AzureADConfig{
-				AuthConfig: v3.AuthConfig{
-					Enabled: false,
-				},
-				GraphEndpoint: "https://graph.microsoft.com",
-			},
+			name:               "nil annotations gets annotation set",
 			proposed:           &v3.AzureADConfig{},
 			annotationExpected: true,
 		},
 		{
-			name: "new setup on Rancher v2.6.7+",
-			current: &v3.AzureADConfig{
+			name: "existing annotations preserved and annotation set",
+			proposed: &v3.AzureADConfig{
 				AuthConfig: v3.AuthConfig{
-					Enabled: false,
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
-							GraphEndpointMigratedAnnotation: "true",
+							"other": "value",
 						},
 					},
 				},
-				GraphEndpoint: "https://graph.microsoft.com",
 			},
-			proposed:           &v3.AzureADConfig{},
-			annotationExpected: true,
-		},
-		{
-			name: "reconfigure existing new setup",
-			current: &v3.AzureADConfig{
-				AuthConfig: v3.AuthConfig{
-					Enabled: true,
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							GraphEndpointMigratedAnnotation: "true",
-						},
-					},
-				},
-				GraphEndpoint: "https://graph.microsoft.com",
-			},
-			proposed:           &v3.AzureADConfig{},
 			annotationExpected: true,
 		},
 	}
 
-	for i := range tests {
-		test := tests[i]
+	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			migrateNewFlowAnnotation(test.current, test.proposed)
+			migrateNewFlowAnnotation(test.proposed)
 			_, hasAnnotation := test.proposed.Annotations[GraphEndpointMigratedAnnotation]
-			if test.annotationExpected && !hasAnnotation {
-				assert.Fail(t, "expected annotation on the processed config, but did not find one")
-			}
-			if !test.annotationExpected && hasAnnotation {
-				assert.Fail(t, "did not expect the annotation on the processed config, but found one")
-			}
+			assert.Equal(t, test.annotationExpected, hasAnnotation)
+		})
+	}
+}
+
+func TestPreserveStoredFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		stored   v3.AzureADConfig
+		incoming v3.AzureADConfig
+		want     v3.AzureADConfig
+	}{
+		{
+			name: "stored Enabled true survives incoming false",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+		},
+		{
+			name:   "stored Enabled false allows incoming true",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+		},
+		{
+			name:     "both Enabled false stays false",
+			stored:   v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{},
+			want:     v3.AzureADConfig{},
+		},
+		{
+			name: "SLO fields always preserved from stored",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					LogoutAllSupported: true,
+				},
+				EndSessionEndpoint: "https://custom.gov/logout",
+				LogoutAllEnabled:   true,
+				LogoutAllForced:    true,
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					LogoutAllSupported: true,
+				},
+				EndSessionEndpoint: "https://custom.gov/logout",
+				LogoutAllEnabled:   true,
+				LogoutAllForced:    true,
+			},
+		},
+		{
+			name: "AccessMode preserved when incoming is empty",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "restricted"},
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "restricted"},
+			},
+		},
+		{
+			name: "AccessMode from incoming used when non-empty",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "restricted"},
+			},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "unrestricted"},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "unrestricted"},
+			},
+		},
+		{
+			name: "AllowedPrincipalIDs preserved when incoming is nil",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://123"},
+				},
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://123"},
+				},
+			},
+		},
+		{
+			name: "AllowedPrincipalIDs from incoming used when non-nil",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://123"},
+				},
+			},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://456"},
+				},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://456"},
+				},
+			},
+		},
+		{
+			name:   "zero-value stored does not corrupt incoming",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled:    true,
+					AccessMode: "unrestricted",
+				},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled:    true,
+					AccessMode: "unrestricted",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			preserveStoredFields(&tt.stored, &tt.incoming)
+			assert.Equal(t, tt.want, tt.incoming)
 		})
 	}
 }
@@ -510,9 +614,9 @@ func TestLogoutAll(t *testing.T) {
 			},
 			wantURLAbsent: []string{"post_logout_redirect_uri"},
 		},
-		"custom LogoutEndpoint overrides default": {
+		"custom EndSessionEndpoint overrides default": {
 			config: newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
-				c.LogoutEndpoint = "https://custom.gov/logout"
+				c.EndSessionEndpoint = "https://custom.gov/logout"
 			}),
 			finalRedirect: "https://example.com/logged-out",
 			wantURLContains: []string{

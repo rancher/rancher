@@ -90,7 +90,8 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 		logrus.Errorf("Failed to fetch Azure AD Config from Kubernetes: %v", err)
 		return httperror.NewAPIError(httperror.ServerError, "failed to fetch Azure AD Config from Kubernetes")
 	}
-	migrateNewFlowAnnotation(currentConfig, azureADConfig)
+	migrateNewFlowAnnotation(azureADConfig)
+	preserveStoredFields(currentConfig, azureADConfig)
 
 	azureLogin := &apiv3.AzureADLogin{
 		Code: azureADConfigApplyInput.Code,
@@ -133,9 +134,25 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request)
 }
 
-// Check the current auth config and make sure that the proposed one submitted through the API has up-to-date annotations.
-// Rancher relies on GraphEndpointMigratedAnnotation to choose the right authentication flow and Graph API.
-func migrateNewFlowAnnotation(current, proposed *apiv3.AzureADConfig) {
+func preserveStoredFields(stored, incoming *apiv3.AzureADConfig) {
+	if stored.Enabled {
+		incoming.Enabled = true
+	}
+	if incoming.AccessMode == "" {
+		incoming.AccessMode = stored.AccessMode
+	}
+	if incoming.AllowedPrincipalIDs == nil {
+		incoming.AllowedPrincipalIDs = stored.AllowedPrincipalIDs
+	}
+	incoming.EndSessionEndpoint = stored.EndSessionEndpoint
+	incoming.LogoutAllSupported = stored.LogoutAllSupported
+	incoming.LogoutAllEnabled = stored.LogoutAllEnabled
+	incoming.LogoutAllForced = stored.LogoutAllForced
+}
+
+// migrateNewFlowAnnotation ensures the proposed config has the GraphEndpointMigratedAnnotation set.
+// Rancher relies on this annotation to choose the right authentication flow and Graph API.
+func migrateNewFlowAnnotation(proposed *apiv3.AzureADConfig) {
 	// This covers the case where admins upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
 	// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
 	// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.

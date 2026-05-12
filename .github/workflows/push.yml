@@ -5,7 +5,9 @@ on:
       - "main"
       - "release/v*"
 
-permissions: {}
+permissions:
+  contents: read
+  id-token: none
 
 env:
   COMMIT: ${{ github.sha }}
