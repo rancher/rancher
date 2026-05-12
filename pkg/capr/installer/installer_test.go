@@ -60,3 +60,57 @@ func TestInstaller_WindowsInstallScript(t *testing.T) {
 	// ensure agent env vars are not on the same line
 	a.NotContains(string(script), formattedAgentVar1+formattedAgentVar2)
 }
+
+func TestInstaller_LinuxInstallScript(t *testing.T) {
+	// arrange
+	CACert := "uibesrwguiobsdrujigbsduigbuidbg"
+	a := assert.New(t)
+
+	// act
+	err := settings.ServerURL.Set("localhost")
+	a.Nil(err)
+
+	err = settings.CACerts.Set(CACert)
+	a.Nil(err)
+
+	CACertEncoded := systemtemplate.CAChecksum()
+
+	agentVar1 := corev1.EnvVar{
+		Name:  "HTTP_PROXY",
+		Value: "http://proxy.example.com:3128",
+	}
+
+	agentVar2 := corev1.EnvVar{
+		Name:  "HTTPS_PROXY",
+		Value: "http://proxy.example.com:3128",
+	}
+
+	agentVar3 := corev1.EnvVar{
+		Name:  "NO_PROXY",
+		Value: "127.0.0.0/8,10.0.0.0/8",
+	}
+
+	script, err := LinuxInstallScript(context.TODO(), "test", []corev1.EnvVar{
+		agentVar1,
+		agentVar2,
+		agentVar3,
+	}, "localhost", "")
+
+	// assert
+	a.Nil(err)
+	a.NotNil(script)
+
+	// Verify environment variables are exported (not just assigned)
+	a.Contains(string(script), "export HTTP_PROXY=\"http://proxy.example.com:3128\"")
+	a.Contains(string(script), "export HTTPS_PROXY=\"http://proxy.example.com:3128\"")
+	a.Contains(string(script), "export NO_PROXY=\"127.0.0.0/8,10.0.0.0/8\"")
+
+	// Verify other required variables
+	a.Contains(string(script), "CATTLE_ROLE_NONE=true")
+	a.Contains(string(script), "CATTLE_TOKEN=\"test\"")
+	a.Contains(string(script), "CATTLE_SERVER=localhost")
+	a.Contains(string(script), fmt.Sprintf("CATTLE_CA_CHECKSUM=\"%s\"", CACertEncoded))
+
+	// Verify shebang
+	a.Contains(string(script), "#!/usr/bin/env sh")
+}

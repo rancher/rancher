@@ -110,7 +110,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 		if envVar.Value == "" {
 			continue
 		}
-		envVarBuf.WriteString(fmt.Sprintf("%s=\"%s\"\n", envVar.Name, envVar.Value))
+		envVarBuf.WriteString(fmt.Sprintf("export %s=\"%s\"\n", envVar.Name, envVar.Value))
 	}
 	server := ""
 	if settings.ServerURL.Get() != "" {
