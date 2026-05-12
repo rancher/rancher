@@ -73,9 +73,9 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/aws/aws-sdk-go v1.55.8
-	github.com/aws/aws-sdk-go-v2 v1.41.5
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.14
-	github.com/aws/aws-sdk-go-v2/service/eks v1.81.2
+	github.com/aws/aws-sdk-go-v2 v1.41.7
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.16
+	github.com/aws/aws-sdk-go-v2/service/eks v1.83.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/bradleyfalzon/ghinstallation/v2 v2.16.0
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -115,14 +115,14 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/rancher/aks-operator v1.13.5
-	github.com/rancher/ali-operator v1.13.2
+	github.com/rancher/aks-operator v1.13.6-rc.1
+	github.com/rancher/ali-operator v1.13.3-rc.1
 	github.com/rancher/apiserver v0.7.7
 	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
 	github.com/rancher/dynamiclistener v0.7.5
-	github.com/rancher/eks-operator v1.13.5
+	github.com/rancher/eks-operator v1.13.6-rc.1
 	github.com/rancher/fleet/pkg/apis v0.14.2
-	github.com/rancher/gke-operator v1.13.5
+	github.com/rancher/gke-operator v1.13.6-rc.1
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.5
@@ -193,21 +193,21 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.14 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.21 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.21 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.21 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.71.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.53.7 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.21 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.0.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.30.15 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10 // indirect
-	github.com/aws/smithy-go v1.24.2 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.17 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.24 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.71.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.301.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/iam v1.53.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.9 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.23 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.0.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.30.17 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.21 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.42.1 // indirect
+	github.com/aws/smithy-go v1.25.1 // indirect
 	github.com/cjlapao/common-go v0.0.39 // indirect
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
@@ -368,7 +368,7 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.39.1 // indirect
+	github.com/onsi/gomega v1.40.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
