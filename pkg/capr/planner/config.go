@@ -578,21 +578,25 @@ func reorderAddressesByFamily(addresses []string, primaryFamily int) []string {
 	return append(append(primary, other...), nonIP...)
 }
 
-// updateConfigWithAdvertiseAddresses sets the advertise-address and tls-san in the config
-// if the non-worker node has different internal and external IPs.
+// updateConfigWithAdvertiseAddresses sets advertise-address and tls-san in the config
+// for non-worker nodes when the configured node-ip and node-external-ip values differ.
+// It reads node-ip and node-external-ip from the config (already ordered by preferred IP family)
+// and uses the first node-ip value as the advertise-address.
 func updateConfigWithAdvertiseAddresses(config map[string]interface{}, info *machineNetworkInfo) {
-	if isOnlyWorker(info.Entry) || len(info.InternalAddresses) == 0 || len(info.ExternalAddresses) == 0 {
+	nodeIPs := convert.ToStringSlice(config["node-ip"])
+	nodeExternalIPs := convert.ToStringSlice(config["node-external-ip"])
+	if isOnlyWorker(info.Entry) || len(nodeIPs) == 0 || len(nodeExternalIPs) == 0 {
 		return
 	}
-	internalAddresses := slices.Clone(info.InternalAddresses)
-	externalAddresses := slices.Clone(info.ExternalAddresses)
+	internalAddresses := slices.Clone(nodeIPs)
+	externalAddresses := slices.Clone(nodeExternalIPs)
 	slices.Sort(internalAddresses)
 	slices.Sort(externalAddresses)
 	if !slices.Equal(internalAddresses, externalAddresses) {
-		config["advertise-address"] = info.InternalAddresses[0]
+		config["advertise-address"] = nodeIPs[0]
 
 		tlsSan := convert.ToStringSlice(config["tls-san"])
-		for _, ip := range info.ExternalAddresses {
+		for _, ip := range nodeExternalIPs {
 			if !slices.Contains(tlsSan, ip) {
 				tlsSan = append(tlsSan, ip)
 			}

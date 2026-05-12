@@ -525,139 +525,125 @@ func TestUpdateConfigWithAdvertiseAddresses(t *testing.T) {
 		expectedConfig map[string]interface{}
 	}{
 		{
-			name:          "control-plane node with different internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with different node-ip and node-external-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1", "tls-san": []string{"192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with same internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"192.168.1.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with same node-ip and node-external-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"192.168.1.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"192.168.1.1"}, "node-external-ip": []string{"192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with same set of node-ip and node-external-ip in different order",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"192.168.1.1", "192.168.1.2"},
+				"node-external-ip": []string{"192.168.1.2", "192.168.1.1"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"192.168.1.1", "192.168.1.2"}, "node-external-ip": []string{"192.168.1.2", "192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with empty node-ip returns early",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{},
+				"node-external-ip": []string{"192.168.1.1"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{}, "node-external-ip": []string{"192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with empty node-external-ip returns early",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"10.0.0.1"}, "node-external-ip": []string{}},
+		},
+		{
+			name:           "control-plane node with absent node-ip returns early",
+			initialConfig:  map[string]interface{}{},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  false,
 			expectedConfig: map[string]interface{}{},
 		},
 		{
-			name:          "control-plane node with same set of internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"192.168.1.1", "192.168.1.2"},
-				ExternalAddresses: []string{"192.168.1.2", "192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "worker-only node should be skipped",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: workerEntry},
 			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
+			expectedConfig: map[string]interface{}{"node-ip": []string{"10.0.0.1"}, "node-external-ip": []string{"192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with no internal IP",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with multiple different IPs uses first node-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.2", "10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.2", "192.168.1.1"},
 			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with no external IP",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with no internal or external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{},
-				ExternalAddresses: []string{},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "worker-only node should be skipped",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             workerEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with multiple different IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.2", "10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.2", "192.168.1.1"},
-				Entry:             controlPlaneEntry,
-			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.2", "tls-san": []string{"192.168.1.2", "192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with different internal and external interface names",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"eth1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with interface names uses first node-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"eth0"},
+				"node-external-ip": []string{"eth1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "eth0", "tls-san": []string{"eth1"}},
 		},
 		{
-			name:          "control-plane node with same internal and external interface names",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"eth0"},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with mixed different ip and interface name",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  true,
-			expectedConfig: map[string]interface{}{"advertise-address": "eth0", "tls-san": []string{"192.168.1.1"}},
-		},
-		{
-			name: "control-plane node with pre-existing tls-san",
+			name: "control-plane node with pre-existing tls-san appends node-external-ip",
 			initialConfig: map[string]interface{}{
-				"tls-san": []string{"existing-san", "192.168.1.1"},
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1", "192.168.1.2"},
+				"tls-san":          []string{"existing-san", "192.168.1.1"},
 			},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1", "192.168.1.2"},
-				Entry:             controlPlaneEntry,
-			},
+			info:          &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet: true,
-			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1",
-				"tls-san": []string{"existing-san", "192.168.1.1", "192.168.1.2"}},
+			expectedConfig: map[string]interface{}{
+				"advertise-address": "10.0.0.1",
+				"tls-san":           []string{"existing-san", "192.168.1.1", "192.168.1.2"},
+			},
+		},
+		{
+			name: "IPv6-first node-ip uses first (IPv6) as advertise-address",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"2001:db8::1", "10.0.0.1"},
+				"node-external-ip": []string{"1.2.3.4"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  true,
+			expectedConfig: map[string]interface{}{"advertise-address": "2001:db8::1", "tls-san": []string{"1.2.3.4"}},
+		},
+		{
+			name: "IPv4-first node-ip uses first (IPv4) as advertise-address",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1", "2001:db8::1"},
+				"node-external-ip": []string{"1.2.3.4"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  true,
+			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1", "tls-san": []string{"1.2.3.4"}},
 		},
 	}
 
