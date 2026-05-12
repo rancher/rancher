@@ -53,6 +53,7 @@ var (
 	primaryImages = map[string]string{
 		chart.RemoteDialerProxyChartName: "rancher/remotedialer-proxy",
 		chart.TurtlesChartName:           "rancher/turtles",
+		chart.WebhookChartName:           "rancher/rancher-webhook",
 	}
 	// topLevelImagePullSecrets tracks the system charts that do not
 	// use the standard 'global.cattle.imagePullSecrets' field to accept pull
@@ -63,6 +64,7 @@ var (
 		chart.TurtlesChartName:           {},
 	}
 	watchedSettings = map[string]struct{}{
+		settings.RancherWebhookVersion.Name:               {},
 		settings.RancherTurtlesVersion.Name:               {},
 		settings.SystemDefaultRegistry.Name:               {},
 		settings.ShellImage.Name:                          {},
@@ -231,6 +233,31 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
+		{
+			// webhookchart controller manages the webhook on the local cluster (early install).
+			// systemcharts manages it here only for downstream clusters (MCMAgent enabled) so
+			// the same chart version and WDC-driven ConfigMap values are applied there.
+			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.WebhookChartName,
+			ChartName:           chart.WebhookChartName,
+			ExactVersionSetting: settings.RancherWebhookVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{
+					"capi": nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+				}
+				h.setPriorityClass(values, chart.WebhookChartName)
+				// WDC-translated helm values arrive via the rancher-config ConfigMap
+				// pushed by the clusterdeploy controller for downstream clusters.
+				configMapValues := h.getChartValues(chart.WebhookChartName)
+				return data.MergeMaps(values, configMapValues)
+			},
+			Enabled: func() bool {
+				return features.MCMAgent.Enabled()
+			},
+		},
 		{
 			ReleaseNamespace:    namespace.System,
 			ReleaseName:         chart.RemoteDialerProxyChartName,
