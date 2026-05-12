@@ -21,8 +21,12 @@ func TestInstaller_WindowsInstallScript(t *testing.T) {
 	originalServerURL := settings.ServerURL.Get()
 	originalCACerts := settings.CACerts.Get()
 	t.Cleanup(func() {
-		settings.ServerURL.Set(originalServerURL)
-		settings.CACerts.Set(originalCACerts)
+		if err := settings.ServerURL.Set(originalServerURL); err != nil {
+			t.Errorf("failed to restore ServerURL setting: %v", err)
+		}
+		if err := settings.CACerts.Set(originalCACerts); err != nil {
+			t.Errorf("failed to restore CACerts setting: %v", err)
+		}
 	})
 
 	// act
@@ -78,8 +82,12 @@ func TestInstaller_LinuxInstallScript(t *testing.T) {
 	originalServerURL := settings.ServerURL.Get()
 	originalCACerts := settings.CACerts.Get()
 	t.Cleanup(func() {
-		settings.ServerURL.Set(originalServerURL)
-		settings.CACerts.Set(originalCACerts)
+		if err := settings.ServerURL.Set(originalServerURL); err != nil {
+			t.Errorf("failed to restore ServerURL setting: %v", err)
+		}
+		if err := settings.CACerts.Set(originalCACerts); err != nil {
+			t.Errorf("failed to restore CACerts setting: %v", err)
+		}
 	})
 
 	// act
@@ -138,8 +146,12 @@ func TestInstaller_LinuxInstallScript_ShellInjectionPrevention(t *testing.T) {
 	originalServerURL := settings.ServerURL.Get()
 	originalCACerts := settings.CACerts.Get()
 	t.Cleanup(func() {
-		settings.ServerURL.Set(originalServerURL)
-		settings.CACerts.Set(originalCACerts)
+		if err := settings.ServerURL.Set(originalServerURL); err != nil {
+			t.Errorf("failed to restore ServerURL setting: %v", err)
+		}
+		if err := settings.CACerts.Set(originalCACerts); err != nil {
+			t.Errorf("failed to restore CACerts setting: %v", err)
+		}
 	})
 
 	err := settings.ServerURL.Set("localhost")
@@ -227,6 +239,7 @@ func TestInstaller_LinuxInstallScript_ShellInjectionPrevention(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			a := assert.New(t)
 			script, err := LinuxInstallScript(context.TODO(), "", []corev1.EnvVar{tt.envVar}, "", "")
 			a.Nil(err)
 			a.NotNil(script)
