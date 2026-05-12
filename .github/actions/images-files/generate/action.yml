@@ -5,7 +5,7 @@ runs:
   steps:
     - name: install dependencies
       shell: bash
-      run: zypper install -y jq awk
+      run: zypper install -y aws-cli jq awk
     - name: Setup Environment Variables
       uses: ./.github/actions/setup-tag-env
     - id: env
