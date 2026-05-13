@@ -738,7 +738,93 @@ func TestStoreCreate(t *testing.T) {
 		require.Len(t, tokenManager.clusterTokenKeys, 0)
 		assert.Equal(t, "", config.AuthInfos["downstream2"].Token)
 
+		rancherExec := config.AuthInfos[defaultClusterName].Exec
+		require.NotNil(t, rancherExec)
+		assert.Equal(t, "client.authentication.k8s.io/v1beta1", rancherExec.APIVersion)
+		assert.Equal(t, "rancher", rancherExec.Command)
+		assert.Contains(t, rancherExec.Args, "--server=rancher.example.com")
+
+		downstream2Exec := config.AuthInfos["downstream2"].Exec
+		require.NotNil(t, downstream2Exec)
+		assert.Equal(t, "rancher", downstream2Exec.Command)
+		assert.Contains(t, downstream2Exec.Args, "--server=rancher.example.com")
+		assert.Contains(t, downstream2Exec.Args, "--cluster="+downstream2)
+
 		assert.Equal(t, "downstream1", config.CurrentContext)
+	})
+	t.Run("token generation disabled", func(t *testing.T) {
+		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.Now()
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		tokenManager := &fakeTokenManager{}
+
+		store := &Store{
+			mcmEnabled:          true,
+			authorizer:          authorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenStore:          tokenStore,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			tokenMgr:            tokenManager,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: func() bool { return false },
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1, downstream2},
+				CurrentContext: downstream1,
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+		require.IsType(t, &ext.Kubeconfig{}, obj)
+
+		created := obj.(*ext.Kubeconfig)
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		require.Len(t, config.AuthInfos, 2)
+		assert.Empty(t, tokenManager.sharedTokenKeys)
+		assert.Empty(t, tokenManager.clusterTokenKeys)
+
+		rancherExec := config.AuthInfos[defaultClusterName].Exec
+		require.NotNil(t, rancherExec, "exec credential block should be present when token generation is disabled")
+		assert.Equal(t, "rancher", rancherExec.Command)
+		assert.Contains(t, rancherExec.Args, "--server=rancher.example.com")
+		assert.Contains(t, rancherExec.Args, "--user="+defaultClusterName)
+
+		downstream2Exec := config.AuthInfos["downstream2"].Exec
+		require.NotNil(t, downstream2Exec)
+		assert.Equal(t, "rancher", downstream2Exec.Command)
+		assert.Contains(t, downstream2Exec.Args, "--server=rancher.example.com")
+		assert.Contains(t, downstream2Exec.Args, "--user=downstream2")
+		assert.Contains(t, downstream2Exec.Args, "--cluster="+downstream2)
 	})
 	t.Run("all clusters specified", func(t *testing.T) {
 		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
