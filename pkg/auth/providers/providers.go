@@ -154,7 +154,6 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	p = cognito.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[cognito.Name] = true
 	providersWithSecrets[cognito.Name] = true
-	UnrefreshableProviders[cognito.Name] = true
 	Providers[cognito.Name] = p
 }
 

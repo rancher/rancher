@@ -220,7 +220,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 			principalID = ""
 		}
 
-		// If there is no principalID for the provider, there is no reason to go through the refetch process
+		// If there is no principalID for the provider, there is no reason to go through the refetch process.
 		if principalID != "" {
 			secret := ""
 			hasPerUserSecrets, err := providers.ProviderHasPerUserSecrets(providerName)
@@ -238,7 +238,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 				}
 			}
 
-			// SAML cannot refresh, so we do restore the existing principals.
+			// For providers that don't support refresh (like SAML), we restore the existing principals.
 			if providers.UnrefreshableProviders[providerName] {
 				existingPrincipals := attribs.GroupPrincipals[providerName].Items
 				if existingPrincipals != nil {

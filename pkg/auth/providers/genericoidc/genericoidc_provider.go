@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -128,11 +127,6 @@ func (g *GenOIDCProvider) TransformToAuthProvider(authConfig map[string]any) (ma
 	p[publicclient.GenericOIDCProviderFieldScopes] = authConfig["scope"]
 
 	return p, nil
-}
-
-// RefetchGroupPrincipals is not implemented for OIDC.
-func (g *GenOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
-	return nil, errors.New("Not implemented")
 }
 
 // groupToPrincipal takes a bare group name and turns it into a apiv3.Principal group object by filling-in other fields
