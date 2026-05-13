@@ -249,8 +249,13 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					},
 				}
 				h.setPriorityClass(values, chart.WebhookChartName)
-				// WDC-translated helm values arrive via the rancher-config ConfigMap
-				// pushed by the clusterdeploy controller for downstream clusters.
+				// Seed HA defaults (replicaCount, affinity, PDB, resources, tolerations).
+				// WDC-translated overrides arrive via the rancher-config ConfigMap.
+				if haDefaults, err := chart.WebhookHelmValues(nil); err != nil {
+					logrus.Warnf("[systemcharts] failed to get webhook HA defaults: %v", err)
+				} else {
+					values = data.MergeMaps(haDefaults, values)
+				}
 				configMapValues := h.getChartValues(chart.WebhookChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
