@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	cluster2 "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	controllerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -131,6 +132,13 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 		},
 	}
+
+	var pullSecrets []string
+	registry, _ := cluster2.GetPrivateRegistry(nil)
+	if registry != nil {
+		pullSecrets = registry.PullSecretNamesAsSlice()
+	}
+	systemGlobalRegistry["cattle"].(map[string]interface{})["imagePullSecrets"] = pullSecrets
 
 	additionalCA, err := getAdditionalCA(h.secretsCache)
 	if err != nil {

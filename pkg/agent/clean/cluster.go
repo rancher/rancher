@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
@@ -148,6 +149,11 @@ func Cluster() error {
 	rErr := cleanupRoles(client)
 	if len(rErr) > 0 {
 		errors = append(errors, rErr...)
+	}
+
+	sErr := cleanUpImagePullSecrets(client)
+	if len(sErr) > 0 {
+		errors = append(errors, sErr...)
 	}
 
 	if len(errors) > 0 {
@@ -325,6 +331,27 @@ func cleanupClusterRoles(client *kubernetes.Clientset) []error {
 		logrus.Infof("Deleting clusterRole: %v", cr.Name)
 		if !dryRun {
 			err = client.RbacV1().ClusterRoles().Delete(context.TODO(), cr.Name, metav1.DeleteOptions{})
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errs
+}
+
+func cleanUpImagePullSecrets(client *kubernetes.Clientset) []error {
+	logrus.Info("Starting cleanup of imagePullSecrets")
+	s, err := client.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: cluster.CopiedPullSecretLabel + "=true",
+	})
+	if err != nil {
+		return []error{err}
+	}
+	var errs []error
+	for _, secret := range s.Items {
+		logrus.Infof("Deleting secret: %v", secret.Name)
+		if !dryRun {
+			err = client.CoreV1().Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 			if err != nil {
 				errs = append(errs, err)
 			}

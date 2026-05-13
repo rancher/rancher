@@ -13,6 +13,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/cluster"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -40,9 +41,9 @@ const (
 	projectIDLabel                = "field.cattle.io/projectId"
 	ProjectScopedSecretLabel      = "management.cattle.io/project-scoped-secret"
 	pssCopyAnnotation             = "management.cattle.io/project-scoped-secret-copy"
-	pssIgnoreNamespacesAnnotation = "management.cattle.io/project-scoped-secret-ignore-namespaces"
+	PSSIgnoreNamespacesAnnotation = "management.cattle.io/project-scoped-secret-ignore-namespaces"
 
-	needsGlobalPrivateRegistryPullSecret = "management.cattle.io/use-global-private-registry-pull-secret"
+	NeedsGlobalPrivateRegistryPullSecret = "management.cattle.io/use-global-private-registry-pull-secret"
 )
 
 // previous controller label, annotations and finalizer
@@ -358,7 +359,7 @@ func (n *namespaceHandler) getNamespacesFromGlobalPullSecret(secret *corev1.Secr
 // that have opted in to the global private registry pull secret.
 func (n *namespaceHandler) getNamespacesForGlobalPullSecretProjects() ([]*corev1.Namespace, error) {
 	projects, err := n.projectCache.List(n.clusterName, labels.SelectorFromSet(map[string]string{
-		needsGlobalPrivateRegistryPullSecret: "true",
+		NeedsGlobalPrivateRegistryPullSecret: "true",
 	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list projects which need global private registry pull secret: %w", err)
@@ -478,22 +479,22 @@ func areSecretsSame(s1, s2 *corev1.Secret) bool {
 		reflect.DeepEqual(s1.Labels, s2.Labels)
 }
 
-func isSystemProject(project *v3.Project) bool {
-	if project.Labels == nil {
+func isSystemProject(proj *v3.Project) bool {
+	if proj.Labels == nil {
 		return false
 	}
-	return project.Labels["authz.management.cattle.io/system-project"] == "true"
+	return proj.Labels[project.SystemProjectLabelKey] == "true"
 }
 
 func usesGlobalSecrets(project *v3.Project) bool {
 	if project.Labels == nil {
 		return false
 	}
-	return project.Labels[needsGlobalPrivateRegistryPullSecret] == "true"
+	return project.Labels[NeedsGlobalPrivateRegistryPullSecret] == "true"
 }
 
 func secretIgnoresNamespace(annos map[string]string, namespace string) bool {
-	v, ok := annos[pssIgnoreNamespacesAnnotation]
+	v, ok := annos[PSSIgnoreNamespacesAnnotation]
 	if !ok {
 		return false
 	}

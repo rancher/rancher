@@ -81,7 +81,7 @@ func (h *handler) startRancher() {
 		HTTPSListenPort:         443,
 		Features:                os.Getenv("CATTLE_FEATURES"),
 		AddLocal:                "true",
-		ClusterRegistry:         os.Getenv("CATTLE_CLUSTER_REGISTRY"),
+		ClusterRegistry:         os.Getenv("CATTLE_SYSTEM_DEFAULT_REGISTRY"),
 		RancherNamespaceOptions: os.Getenv("RANCHER_NAMESPACE_OPTIONS"),
 	})
 	if err != nil {

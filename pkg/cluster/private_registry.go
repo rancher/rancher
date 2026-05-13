@@ -218,7 +218,7 @@ func generateProvisionedClusterDockerConfig(cluster *v3.Cluster, secretLister v1
 func generateImportedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister, registry *PrivateRegistry) (string, []AgentPullSecret, error) {
 	clusterSystemDefaultURL := registry.URL
 	// Only generate credentials for imported or hosted clusters.
-	if !MgmtNameRegexp.MatchString(cluster.Name) {
+	if cluster == nil || !MgmtNameRegexp.MatchString(cluster.Name) {
 		return clusterSystemDefaultURL, nil, nil
 	}
 

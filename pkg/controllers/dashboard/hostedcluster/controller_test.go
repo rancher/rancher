@@ -43,6 +43,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"httpProxy":            os.Getenv("HTTP_PROXY"),
@@ -91,6 +92,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"httpProxy":            os.Getenv("HTTP_PROXY"),
@@ -137,6 +139,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"httpProxy":            os.Getenv("HTTP_PROXY"),
@@ -174,9 +177,67 @@ func Test_handler_onClusterChange(t *testing.T) {
 				return manager
 			},
 		},
+		{
+			name: "installation with global pull secrets",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					AKSConfig: &aksv1.AKSClusterConfigSpec{},
+				},
+			},
+			newManager: func(ctrl *gomock.Controller) chart.Manager {
+				settings.ConfigMapName.Set("pass")
+				settings.AksOperatorVersion.Set("")
+				settings.SystemDefaultRegistry.Set("registry.example.com")
+				settings.SystemDefaultRegistryPullSecrets.Set("pull-secret-a,pull-secret-b")
+
+				manager := chartsfake.NewMockManager(ctrl)
+				expectedValues := map[string]interface{}{
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "registry.example.com",
+							"imagePullSecrets":      []string{"pull-secret-a", "pull-secret-b"},
+						},
+					},
+					"httpProxy":            os.Getenv("HTTP_PROXY"),
+					"httpsProxy":           os.Getenv("HTTPS_PROXY"),
+					"noProxy":              os.Getenv("NO_PROXY"),
+					"additionalTrustedCAs": false,
+					"priorityClassName":    priorityClassName,
+				}
+				var b bool
+				manager.EXPECT().Ensure(
+					AksCrdChart.ReleaseNamespace,
+					AksCrdChart.ReleaseName,
+					AksCrdChart.ChartName,
+					settings.AksOperatorVersion.Get(),
+					"",
+					nil,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil)
+				manager.EXPECT().Ensure(
+					AksChart.ReleaseNamespace,
+					AksChart.ReleaseName,
+					AksChart.ChartName,
+					settings.AksOperatorVersion.Get(),
+					"",
+					expectedValues,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil)
+
+				return manager
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			initialSDR := settings.SystemDefaultRegistry.Get()
+			initialSDRPull := settings.SystemDefaultRegistryPullSecrets.Get()
+			t.Cleanup(func() {
+				settings.SystemDefaultRegistry.Set(initialSDR)
+				settings.SystemDefaultRegistryPullSecrets.Set(initialSDRPull)
+			})
 			ctrl := gomock.NewController(t)
 			h := newHandler(ctrl)
 			h.manager = tt.newManager(ctrl)

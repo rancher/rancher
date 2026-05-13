@@ -56,12 +56,7 @@ func main() {
 
 	initFeatures()
 
-	// The cleanup is only performed by the cattle-cluster-agent,
-	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
-	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
-		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
-		go clean.UnusedCattleCredentials()
-	}
+	runCleanup(ctx)
 
 	if os.Getenv("CLUSTER_CLEANUP") == "true" {
 		err = clean.Cluster()
@@ -93,6 +88,25 @@ func getParams() (map[string]interface{}, error) {
 
 func getTokenAndURL() (string, string, error) {
 	return cluster.TokenAndURL()
+}
+
+func runCleanup(ctx context.Context) {
+	// The cleanup is only performed by the cattle-cluster-agent,
+	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
+	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
+		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
+		go clean.UnusedCattleCredentials()
+	}
+
+	if os.Getenv("CATTLE_AGENT_PULL_SECRETS") != "" {
+		// Run once on startup to make sure that there are no lingering pull secrets in the cattle-system namespace
+		go func() {
+			err := clean.UnusedPullSecrets(ctx)
+			if err != nil {
+				logrus.Errorf("failed to remove unused pull secrets: %v", err)
+			}
+		}()
+	}
 }
 
 func isConnect() bool {

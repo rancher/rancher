@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/hostedcluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/mcmagent"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/privateregistry"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
@@ -53,6 +54,9 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		hostedcluster.Register(ctx, clients)
 		// Automatically enable / disable built-in ProxyEndpoints via settings
 		proxysettings.Register(ctx, clients)
+		// Automatically handle global private registry pull secrets
+		// in the local and downstream imported / hosted clusters.
+		privateregistry.Register(ctx, clients)
 	}
 
 	if features.Fleet.Enabled() {
