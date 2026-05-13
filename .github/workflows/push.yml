@@ -53,13 +53,25 @@ jobs:
           persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/build-images/agent
-  integration-tests:
-    needs: [build-server, build-agent]
-    uses: ./.github/workflows/integration-tests.yml
+  verify-ci:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
+      checks: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COMMIT_SHA: ${{ github.sha }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Verify CI passed on merged PR
+        run: ./.github/scripts/verify-ci-on-commit.sh
   push-images:
-    needs: [unit-tests, integration-tests]
+    needs: [unit-tests, build-server, build-agent, verify-ci]
     strategy:
       matrix:
         os: [linux]
