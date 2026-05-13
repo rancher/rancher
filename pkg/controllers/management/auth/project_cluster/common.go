@@ -30,7 +30,10 @@ const (
 	clusterContext                  = "cluster"
 )
 
-var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+var (
+	crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+	allNonCustomVerbs           = []string{"get", "update", "delete", "patch", "create", "list", "watch", "deletecollection"}
+)
 
 func deleteNamespace(controller string, nsName string, nsClient v1.NamespaceInterface) error {
 	ns, err := nsClient.Get(context.TODO(), nsName, metav1.GetOptions{})
@@ -127,7 +130,7 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
 				Resources:     []string{resourceType},
 				ResourceNames: []string{resourceName},
-				Verbs:         []string{rbacv1.VerbAll},
+				Verbs:         allNonCustomVerbs,
 			},
 		},
 	}
