@@ -187,7 +187,6 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	appliedPlanData := secret.Data["appliedPlan"]
 	failedChecksum := string(secret.Data["failed-checksum"])
 	output := secret.Data["applied-output"]
-	failedOutput := secret.Data["failed-output"]
 	appliedPeriodicOutput := secret.Data["applied-periodic-output"]
 	probes := secret.Data["probe-statuses"]
 	failureCount := secret.Data["failure-count"]
@@ -270,18 +269,6 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		output = decodedOutput
 		result.Output = map[string][]byte{}
 		if err := json.Unmarshal(output, &result.Output); err != nil {
-			return nil, err
-		}
-	}
-
-	if len(failedOutput) > 0 {
-		decodedFailedOutput, err := readGzip(failedOutput)
-		if err != nil {
-			return nil, err
-		}
-		failedOutput = decodedFailedOutput
-		result.FailedOutput = map[string][]byte{}
-		if err := json.Unmarshal(failedOutput, &result.FailedOutput); err != nil {
 			return nil, err
 		}
 	}

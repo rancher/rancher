@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -193,6 +194,9 @@ func Test_encryptionKeyRotationSecretsEncryptInstruction(t *testing.T) {
 	assert.Contains(t, commandArguments, "secrets-encrypt")
 	assert.Contains(t, commandArguments, encryptionKeyRotationCommandRotateKeys)
 	assert.Contains(t, commandArguments, "2>&1")
+	assert.Contains(t, commandArguments, encryptionKeyRotationRotateKeysExitCodePrefix)
+	assert.Contains(t, commandArguments, "exit 0")
+	assert.NotContains(t, commandArguments, "grep")
 	assert.NotContains(t, commandArguments, "prepare")
 	assert.NotContains(t, commandArguments, "reencrypt")
 	assert.Contains(t, instruction.Env, "ENCRYPTION_KEY_ROTATION_GENERATION=3")
@@ -390,6 +394,7 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 		name         string
 		periodicOut  string
 		savedOutput  string
+		exitCode     int
 		planFailed   bool
 		expectStage  string
 		expectWait   bool
@@ -399,12 +404,14 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 			name: "complete status returned",
 			periodicOut: "Current Rotation Stage: reencrypt_finished\n" +
 				"Server Encryption Hashes: All hashes match\n",
+			savedOutput: "keys rotated, reencryption finished\n",
 			expectStage: encryptionKeyRotationStageReencryptFinished,
 		},
 		{
 			name: "incomplete status returned for requeue",
 			periodicOut: "Current Rotation Stage: start\n" +
 				"Server Encryption Hashes: hash mismatch\n",
+			savedOutput: "keys rotated, reencryption finished\n",
 			expectStage: encryptionKeyRotationStageStart,
 		},
 		{
@@ -412,20 +419,20 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 			periodicOut: "Current Rotation Stage: reencrypt_finished\n" +
 				"Server Encryption Hashes: All hashes match\n",
 			savedOutput: "level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): " + encryptionKeyRotationRotateKeysTimeoutMessage + "\"\n",
-			planFailed:  true,
+			exitCode:    1,
 			expectStage: encryptionKeyRotationStageReencryptFinished,
 		},
 		{
 			name:        "timeout output waits for periodic status when not yet available",
 			savedOutput: "level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): " + encryptionKeyRotationRotateKeysTimeoutMessage + "\"\n",
-			planFailed:  true,
+			exitCode:    1,
 			expectWait:  true,
 		},
 		{
 			name:         "rotate-keys error ID marks status failed",
 			savedOutput:  "time=\"2026-04-09T15:16:16Z\" level=fatal msg=\"Error: see server log for details: secret-encrypt error ID 78467\"\n",
+			exitCode:     1,
 			periodicOut:  "Current Rotation Stage: reencrypt_finished\nServer Encryption Hashes: All hashes match\n",
-			planFailed:   true,
 			expectFailed: true,
 		},
 		{
@@ -447,16 +454,16 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Empty(t, joinedServer)
 
-			failedOutput := map[string][]byte{}
+			output := map[string][]byte{}
 			if testCase.savedOutput != "" {
-				failedOutput[nodePlan.Instructions[0].Name] = []byte(testCase.savedOutput)
+				output[nodePlan.Instructions[0].Name] = testRotateKeysOutput(testCase.savedOutput, testCase.exitCode)
 			}
 			leaderEntry.Plan = &plan.Node{
-				Plan:         nodePlan,
-				FailedOutput: failedOutput,
-				Failed:       testCase.planFailed,
-				InSync:       true,
-				Healthy:      true,
+				Plan:    nodePlan,
+				Output:  output,
+				Failed:  testCase.planFailed,
+				InSync:  true,
+				Healthy: true,
 				PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 					encryptionKeyRotationSecretsEncryptStatusCommand: {
 						Stdout: []byte(testCase.periodicOut),
@@ -506,6 +513,9 @@ func Test_rotateEncryptionKeys_marksDoneWhenSingleServerHasFinishedStatus(t *tes
 		Plan:    nodePlan,
 		InSync:  true,
 		Healthy: true,
+		Output: map[string][]byte{
+			nodePlan.Instructions[0].Name: testRotateKeysOutput("keys rotated, reencryption finished\n", 0),
+		},
 		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 			encryptionKeyRotationSecretsEncryptStatusCommand: {
 				Stdout: []byte("Current Rotation Stage: reencrypt_finished\nServer Encryption Hashes: All hashes match\n"),
@@ -547,6 +557,9 @@ func Test_rotateEncryptionKeys_movesToRestartPhaseWhenEtcdOnlyFollowersExist(t *
 		Plan:    nodePlan,
 		InSync:  true,
 		Healthy: true,
+		Output: map[string][]byte{
+			nodePlan.Instructions[0].Name: testRotateKeysOutput("keys rotated, reencryption finished\n", 0),
+		},
 		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 			encryptionKeyRotationSecretsEncryptStatusCommand: {
 				Stdout: []byte("Current Rotation Stage: reencrypt_finished\nServer Encryption Hashes: All hashes match\n"),
@@ -585,6 +598,9 @@ func Test_rotateEncryptionKeys_requeuesWhileLeaderStatusIncomplete(t *testing.T)
 		Plan:    nodePlan,
 		InSync:  true,
 		Healthy: true,
+		Output: map[string][]byte{
+			nodePlan.Instructions[0].Name: testRotateKeysOutput("keys rotated, reencryption finished\n", 0),
+		},
 		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 			encryptionKeyRotationSecretsEncryptStatusCommand: {
 				Stdout: []byte("Current Rotation Stage: start\nServer Encryption Hashes: hash mismatch\n"),
@@ -656,10 +672,9 @@ func Test_rotateEncryptionKeys_requeuesWhenLeaderRotateKeysTimesOut(t *testing.T
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:   nodePlan,
-		Failed: true,
 		InSync: true,
-		FailedOutput: map[string][]byte{
-			nodePlan.Instructions[0].Name: []byte("level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): " + encryptionKeyRotationRotateKeysTimeoutMessage + "\"\n"),
+		Output: map[string][]byte{
+			nodePlan.Instructions[0].Name: testRotateKeysOutput("level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): "+encryptionKeyRotationRotateKeysTimeoutMessage+"\"\n", 1),
 		},
 		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 			encryptionKeyRotationSecretsEncryptStatusCommand: {
@@ -811,6 +826,9 @@ func Test_encryptionKeyRotationRotateKeysReconcile_isIdempotentAcrossRepeatedCal
 		Plan:    nodePlan,
 		InSync:  true,
 		Healthy: true,
+		Output: map[string][]byte{
+			nodePlan.Instructions[0].Name: testRotateKeysOutput("keys rotated, reencryption finished\n", 0),
+		},
 		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 			encryptionKeyRotationSecretsEncryptStatusCommand: {
 				Stdout: []byte("Current Rotation Stage: start\nServer Encryption Hashes: hash mismatch\n"),
@@ -983,6 +1001,10 @@ func copyStringMap(in map[string]string) map[string]string {
 	return out
 }
 
+func testRotateKeysOutput(output string, exitCode int) []byte {
+	return []byte(output + encryptionKeyRotationRotateKeysExitCodePrefix + strconv.Itoa(exitCode) + "\n")
+}
+
 func copyNode(in *plan.Node) *plan.Node {
 	if in == nil {
 		return nil
@@ -993,12 +1015,6 @@ func copyNode(in *plan.Node) *plan.Node {
 		out.Output = make(map[string][]byte, len(in.Output))
 		for key, value := range in.Output {
 			out.Output[key] = append([]byte(nil), value...)
-		}
-	}
-	if in.FailedOutput != nil {
-		out.FailedOutput = make(map[string][]byte, len(in.FailedOutput))
-		for key, value := range in.FailedOutput {
-			out.FailedOutput[key] = append([]byte(nil), value...)
 		}
 	}
 	if in.PeriodicOutput != nil {

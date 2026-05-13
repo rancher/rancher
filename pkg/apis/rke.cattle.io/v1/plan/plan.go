@@ -28,11 +28,7 @@ type Node struct {
 	JoinedTo    string    `json:"joinedTo,omitempty"`
 	// Output stores SaveOutput content for one-time instructions from the last
 	// successfully applied plan.
-	Output map[string][]byte `json:"-"`
-	// FailedOutput stores SaveOutput content for one-time instructions from a
-	// failed apply attempt. Failed output is persisted separately from applied
-	// output, so it cannot be recovered from Output plus the Failed flag alone.
-	FailedOutput   map[string][]byte                    `json:"-"`
+	Output         map[string][]byte                    `json:"-"`
 	PeriodicOutput map[string]PeriodicInstructionOutput `json:"-"`
 	Failed         bool                                 `json:"failed,omitempty"`
 	InSync         bool                                 `json:"inSync,omitempty"`

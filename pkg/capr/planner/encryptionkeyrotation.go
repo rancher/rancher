@@ -29,11 +29,13 @@ const (
 	encryptionKeyRotationRotateKeysTimeoutMessage    = "see server log for details"
 	encryptionKeyRotationRotateKeysTimeoutEndpoint   = "/encrypt/config"
 	encryptionKeyRotationStatusTimeoutEndpoint       = "/encrypt/status"
+	encryptionKeyRotationRotateKeysExitCodePrefix    = "rancher-rotate-keys-exit-code="
 
 	encryptionKeyRotationBinPrefix = "capr/encryption-key-rotation/bin"
 
 	encryptionKeyRotationWaitForSystemctlStatusPath      = "wait_for_systemctl_status.sh"
 	encryptionKeyRotationWaitForSecretsEncryptStatusPath = "wait_for_secrets_encrypt_status.sh"
+	encryptionKeyRotationSecretsEncryptStatusPath        = "secrets_encrypt_status.sh"
 
 	encryptionKeyRotationWaitForSystemctlStatus = `
 #!/bin/sh
@@ -68,6 +70,30 @@ done
 exit 1
 `
 
+	encryptionKeyRotationSecretsEncryptStatusScript = `
+#!/bin/sh
+
+runtime=$1
+i=0
+
+while [ $i -lt 10 ]; do
+	output="$($runtime secrets-encrypt status)"
+	if [ $? -eq 0 ]; then
+		if [ -n "$2" ]; then
+			echo $output | grep -q "$2"
+				if [ $? -eq 0 ]; then
+					exit 0
+				fi
+		else
+			exit 0
+		fi
+	fi
+	sleep 10
+	i=$((i + 1))
+done
+exit 1
+`
+
 	encryptionKeyRotationEndpointEnv       = "CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/k3s/containerd/containerd.sock"
 	encryptionKeyRotationGenerationEnvName = "ENCRYPTION_KEY_ROTATION_GENERATION"
 )
@@ -83,6 +109,11 @@ var encryptionKeyRotationTimeoutMarkers = []string{
 type encryptionKeyRotationRuntimeStatus struct {
 	Stage       string
 	HashesMatch bool
+}
+
+type encryptionKeyRotationCommandResult struct {
+	Output   string
+	ExitCode int
 }
 
 func (p *Planner) setEncryptionKeyRotateState(status rkev1.RKEControlPlaneStatus, rotate *rkev1.RotateEncryptionKeys, phase rkev1.RotateEncryptionKeysPhase) (rkev1.RKEControlPlaneStatus, error) {
@@ -450,14 +481,20 @@ func (p *Planner) encryptionKeyRotationRestartPlan(controlPlane *rkev1.RKEContro
 	)
 
 	if isControlPlane(entry) {
-		nodePlan.Files = append(nodePlan.Files, plan.File{
-			Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
-			Path:    encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
-		})
+		nodePlan.Files = append(nodePlan.Files,
+			plan.File{
+				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
+				Path:    encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
+			},
+			plan.File{
+				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationSecretsEncryptStatusScript)),
+				Path:    encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationSecretsEncryptStatusPath),
+			},
+		)
 		nodePlan.Instructions = append(nodePlan.Instructions,
 			encryptionKeyRotationWaitForSecretsEncryptStatus(controlPlane),
 			plan.OneTimeInstruction{
-				CommonInstruction: encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane, leaderStage),
+				CommonInstruction: encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(controlPlane, ""),
 			},
 			encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(controlPlane),
 		)
@@ -486,6 +523,7 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 		return encryptionKeyRotationRuntimeStatus{}, status, err
 	}
 
+	instructionName := nodePlan.Instructions[0].Name
 	err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation [%s] for machine [%s]", controlPlane.Status.RotateEncryptionKeysPhase, leader.Machine.Name), leader, nodePlan, joinedServer, 1, 1)
 	if err != nil {
 		if IsErrWaiting(err) {
@@ -494,7 +532,16 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 			}
 			return encryptionKeyRotationRuntimeStatus{}, status, err
 		}
-		if encryptionKeyRotationRotateKeysTimedOut(leader, nodePlan.Instructions[0].Name) {
+		status, err = p.encryptionKeyRotationFailedRequiringEtcdRestore(status, err)
+		return encryptionKeyRotationRuntimeStatus{}, status, err
+	}
+
+	result, err := encryptionKeyRotationRotateKeysResult(leader, instructionName)
+	if err != nil {
+		return encryptionKeyRotationRuntimeStatus{}, status, err
+	}
+	if result.ExitCode != 0 {
+		if encryptionKeyRotationCommandTimedOut(result.Output, encryptionKeyRotationRotateKeysTimeoutEndpoint) {
 			logrus.Warnf("[planner] rkecluster %s/%s: rotate-keys command on leader [%s] exceeded the CLI timeout; continuing to observe periodic status because rotation may still be running in the background", controlPlane.Namespace, controlPlane.Spec.ClusterName, leader.Machine.Name)
 			rotationStatus, err := encryptionKeyRotationSecretsEncryptStatusFromPeriodic(leader)
 			if err == nil {
@@ -502,7 +549,7 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 			}
 			return encryptionKeyRotationRuntimeStatus{}, status, errWaitingf("waiting for encryption key rotation status after rotate-keys timeout on leader [%s]: %v", leader.Machine.Name, err)
 		}
-		status, err = p.encryptionKeyRotationFailedRequiringEtcdRestore(status, err)
+		status, err = p.encryptionKeyRotationFailedRequiringEtcdRestore(status, fmt.Errorf("rotate-keys command failed with exit code %d", result.ExitCode))
 		return encryptionKeyRotationRuntimeStatus{}, status, err
 	}
 
@@ -535,6 +582,16 @@ func (p *Planner) encryptionKeyRotationRotateKeysPlan(controlPlane *rkev1.RKECon
 		},
 		encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(controlPlane),
 	}
+	nodePlan.Files = append(nodePlan.Files,
+		plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
+			Path:    encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
+		},
+		plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationSecretsEncryptStatusScript)),
+			Path:    encryptionKeyRotationScriptPath(controlPlane, encryptionKeyRotationSecretsEncryptStatusPath),
+		},
+	)
 	nodePlan.PeriodicInstructions = []plan.PeriodicInstruction{
 		encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(controlPlane),
 	}
@@ -639,7 +696,7 @@ func encryptionKeyRotationSecretsEncryptInstruction(controlPlane *rkev1.RKEContr
 		"/bin/sh",
 		[]string{
 			"-c",
-			fmt.Sprintf("%s secrets-encrypt %s 2>&1", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), encryptionKeyRotationCommandRotateKeys),
+			encryptionKeyRotationRotateKeysCommand(controlPlane),
 		},
 		[]string{
 			encryptionKeyRotationGenerationEnv(controlPlane),
@@ -650,35 +707,48 @@ func encryptionKeyRotationSecretsEncryptInstruction(controlPlane *rkev1.RKEContr
 	return instruction, nil
 }
 
-// encryptionKeyRotationRotateKeysTimedOut reports whether the saved rotate-keys output
-// matches a known CLI timeout on the upstream /encrypt/config endpoint.
-func encryptionKeyRotationRotateKeysTimedOut(entry *planEntry, instructionName string) bool {
-	message, ok := encryptionKeyRotationRotateKeysOutput(entry, instructionName)
-	if !ok {
-		return false
-	}
-
-	return encryptionKeyRotationCommandTimedOut(message, encryptionKeyRotationRotateKeysTimeoutEndpoint)
+// encryptionKeyRotationRotateKeysCommand captures the CLI output and exit code
+// in normal saved output. The wrapper exits successfully so the planner can
+// classify timeout and failure cases in Go instead of shell.
+func encryptionKeyRotationRotateKeysCommand(controlPlane *rkev1.RKEControlPlane) string {
+	return strings.Join([]string{
+		fmt.Sprintf("output=\"$(%s secrets-encrypt %s 2>&1)\"", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), encryptionKeyRotationCommandRotateKeys),
+		"exitCode=$?",
+		"printf '%s\\n' \"$output\"",
+		fmt.Sprintf("printf '%s%%s\\n' \"$exitCode\"", encryptionKeyRotationRotateKeysExitCodePrefix),
+		"exit 0",
+	}, "\n")
 }
 
-// encryptionKeyRotationRotateKeysOutput returns the saved one-time output for the given
-// rotate-keys instruction, using failed output when the node plan is marked failed.
-func encryptionKeyRotationRotateKeysOutput(entry *planEntry, instructionName string) (string, bool) {
+// encryptionKeyRotationRotateKeysResult returns the saved rotate-keys output and
+// exit code captured by the one-time instruction wrapper.
+func encryptionKeyRotationRotateKeysResult(entry *planEntry, instructionName string) (encryptionKeyRotationCommandResult, error) {
 	if entry == nil || entry.Plan == nil || instructionName == "" {
-		return "", false
+		return encryptionKeyRotationCommandResult{}, fmt.Errorf("cannot read rotate-keys output without a plan entry and instruction name")
 	}
 
-	outputs := entry.Plan.Output
-	if entry.Plan.Failed {
-		outputs = entry.Plan.FailedOutput
-	}
-
-	output, ok := outputs[instructionName]
+	output, ok := entry.Plan.Output[instructionName]
 	if !ok {
-		return "", false
+		return encryptionKeyRotationCommandResult{}, errWaitingf("waiting for rotate-keys output on machine [%s]", entry.Machine.Name)
 	}
 
-	return string(output), true
+	message := string(output)
+	for _, line := range strings.Split(message, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, encryptionKeyRotationRotateKeysExitCodePrefix) {
+			continue
+		}
+		exitCode, err := strconv.Atoi(strings.TrimPrefix(line, encryptionKeyRotationRotateKeysExitCodePrefix))
+		if err != nil {
+			return encryptionKeyRotationCommandResult{}, fmt.Errorf("failed to parse rotate-keys exit code from output for machine [%s]: %w", entry.Machine.Name, err)
+		}
+		return encryptionKeyRotationCommandResult{
+			Output:   message,
+			ExitCode: exitCode,
+		}, nil
+	}
+
+	return encryptionKeyRotationCommandResult{}, errWaitingf("waiting for rotate-keys exit code output on machine [%s]", entry.Machine.Name)
 }
 
 // encryptionKeyRotationCommandTimedOut matches the timeout signatures Rancher has seen
