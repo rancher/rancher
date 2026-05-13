@@ -774,48 +774,15 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -918,8 +885,8 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster with imported-cluster-version-managements disabled",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -927,39 +894,6 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -1035,8 +969,8 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster with imported-cluster-version-managements disabled and with existing plans",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -1045,39 +979,6 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -1152,8 +1053,8 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "normal installation in local cluster with imperative API enabled but RDP disabled",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(2)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
 				os.Setenv("IMPERATIVE_API_DIRECT", "true")
@@ -1163,39 +1064,6 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -1246,47 +1114,15 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with config cache errors",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(7)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(5)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"capi": nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -1538,47 +1374,15 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with image override",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(7)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(5)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.1")
 				_ = settings.RancherTurtlesVersion.Set("2.0.1")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"capi": nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": "",
-							"imagePullSecrets":      ([]string)(nil),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher-test.io/rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.1",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"rancher-test.io/"+settings.ShellImage.Get(),
-				).Return(nil)
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -1678,9 +1482,9 @@ func Test_ChartInstallation(t *testing.T) {
 			name: "installation with webhook values",
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(7)
+				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(5)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -1709,35 +1513,6 @@ func Test_ChartInstallation(t *testing.T) {
 					"",
 					"2.0.1",
 					expectedRDPValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"priorityClassName": "newClass",
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": false,
-					},
-					"global": "",
-					"newKey": "newValue",
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
@@ -1815,70 +1590,37 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 			},
 		},
-		{
-			name: "installation with webhook deployment customization",
-			setup: func(mocks testMocks) {
-				rc := int32(2)
-				clusterWithWebhookCustom := &v3.Cluster{
-					Status: v3.ClusterStatus{Driver: "k3s"},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "local",
-						Annotations: map[string]string{
-							importedclusterversionmanagement.VersionManagementAnno: "system-default",
-						},
-					},
-					Spec: v3.ClusterSpec{
-						ClusterSpecBase: v3.ClusterSpecBase{
-							WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{
-								ReplicaCount: &rc,
-							},
-						},
-					},
-				}
-				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
-				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).AnyTimes()
-				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-				_ = settings.RancherWebhookVersion.Set("2.0.0")
-				_ = settings.RancherTurtlesVersion.Set("2.0.0")
-				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
-				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
-				features.MCM.Set(true)
-				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
-				// rancher-webhook — replicaCount comes from WebhookDeploymentCustomization
-				expectedValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": true,
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        int32(2),
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
+{
+name: "installation with webhook deployment customization",
+setup: func(mocks testMocks) {
+rc := int32(2)
+clusterWithWebhookCustom := &v3.Cluster{
+Status: v3.ClusterStatus{Driver: "k3s"},
+ObjectMeta: metav1.ObjectMeta{
+Name: "local",
+Annotations: map[string]string{
+importedclusterversionmanagement.VersionManagementAnno: "system-default",
+},
+},
+Spec: v3.ClusterSpec{
+ClusterSpecBase: v3.ClusterSpecBase{
+WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{
+ReplicaCount: &rc,
+},
+},
+},
+}
+mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
+mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).Times(2)
+mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+_ = settings.RancherWebhookVersion.Set("2.0.0")
+_ = settings.RancherTurtlesVersion.Set("2.0.0")
+_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+features.MCM.Set(true)
+_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
