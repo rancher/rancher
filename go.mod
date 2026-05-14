@@ -117,7 +117,7 @@ require (
 	github.com/rancher/ali-operator v1.14.0-rc.1
 	github.com/rancher/apiserver v0.9.2
 	github.com/rancher/channelserver v0.10.0
-	github.com/rancher/dynamiclistener v0.7.4
+	github.com/rancher/dynamiclistener v0.7.6
 	github.com/rancher/eks-operator v1.14.0-rc.5
 	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
 	github.com/rancher/gke-operator v1.14.0-rc.3
