@@ -579,29 +579,48 @@ while IFS= read -r i; do
     fi
 done < "${list}"
 
+use_helm_for_charts=false
 if $has_oci_charts; then
-    if ! docker_uses_containerd_snapshotter && ! helm_available; then
-        echo "====================================================================="
-        echo "ERROR: ${list} contains OCI Helm charts but this host cannot pull"
-        echo "them. Docker is not using the containerd snapshotter and the helm"
-        echo "CLI is not installed."
-        echo ""
-        echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
-        echo "    1. Edit /etc/docker/daemon.json to include:"
-        echo "         { \"features\": { \"containerd-snapshotter\": true } }"
-        echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
-        echo ""
-        echo "  WORKAROUND (alternative): install the helm CLI:"
-        echo "    https://helm.sh/docs/intro/install/"
-        echo "====================================================================="
-        exit 1
+    if ! docker_uses_containerd_snapshotter; then
+        if helm_available; then
+            echo "WARNING: Docker is not using the containerd snapshotter; falling back to helm CLI for OCI Helm charts."
+            use_helm_for_charts=true
+        else
+            echo "====================================================================="
+            echo "ERROR: ${list} contains OCI Helm charts but this host cannot pull"
+            echo "them. Docker is not using the containerd snapshotter and the helm"
+            echo "CLI is not installed."
+            echo ""
+            echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
+            echo "    1. Edit /etc/docker/daemon.json to include:"
+            echo "         { \"features\": { \"containerd-snapshotter\": true } }"
+            echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
+            echo ""
+            echo "  WORKAROUND (alternative): install the helm CLI:"
+            echo "    https://helm.sh/docs/intro/install/"
+            echo "====================================================================="
+            exit 1
+        fi
     fi
+fi
+
+if $use_helm_for_charts; then
+    mkdir -p ./rancher-oci-charts
 fi
 
 pulled=""
 while IFS= read -r i; do
     [ -z "${i}" ] && continue
     i="${source_registry}${i}"
+    if $use_helm_for_charts && is_oci_helm_chart "${i}"; then
+        chart_version="${i#*:}"
+        if helm pull "oci://${i%:*}" --version "${chart_version//_/+}" -d ./rancher-oci-charts > /dev/null 2>&1; then
+            echo "Helm chart pull success: ${i}"
+        else
+            echo "Helm chart pull failed: ${i}"
+        fi
+        continue
+    fi
     if docker pull "${i}" > /dev/null 2>&1; then
         echo "Image pull success: ${i}"
         pulled="${pulled} ${i}"
