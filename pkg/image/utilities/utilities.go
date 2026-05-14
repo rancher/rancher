@@ -642,10 +642,18 @@ while IFS= read -r i; do
     i="${source_registry}${i}"
     if $use_helm_for_charts && is_oci_helm_chart "${i}"; then
         chart_version="${i#*:}"
-        if helm pull "oci://${i%:*}" --version "${chart_version//_/+}" -d ./rancher-oci-charts 2>&1; then
-            echo "Helm chart pull success: ${i}"
+        echo "Pulling chart: ${i}..."
+        helm_error=$(helm pull "oci://${i%:*}" --version "${chart_version//_/+}" -d ./rancher-oci-charts 2>&1)
+        if [ $? -eq 0 ]; then
+            echo "✓ Chart pull success: ${i}"
         else
-            echo "Helm chart pull failed: ${i}"
+            echo "✗ Chart pull FAILED: ${i}"
+            echo "Error output:"
+            echo "${helm_error}"
+            echo ""
+            echo "ERROR: OCI Helm charts are required for Prime functionality."
+            echo "Cannot proceed with incomplete artifact set."
+            exit 1
         fi
         continue
     fi
