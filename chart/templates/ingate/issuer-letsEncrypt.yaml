@@ -27,7 +27,4 @@ spec:
           ingress:
             class: {{ .Values.letsEncrypt.ingress.class }}
           {{- end }}
-      - http01:
-          ingress:
-            class: {{ .Values.letsEncrypt.ingress.class }}
 {{- end -}}
