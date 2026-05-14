@@ -4,7 +4,7 @@ package buildconfig
 
 const (
 	CspAdapterMinVersion     = "109.0.0+up9.0.0"
-	DefaultSccOperatorImage  = "rancher/scc-operator:v0.4.0"
+	DefaultSccOperatorImage  = "rancher/scc-operator:v0.4.1"
 	DefaultShellVersion      = "rancher/shell:v0.7.0"
 	FleetVersion             = "109.0.2+up0.15.2-rc.1"
 	RemoteDialerProxyVersion = "109.0.2+up0.7.2"
