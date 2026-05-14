@@ -77,6 +77,15 @@ func RefreshAllForCron() {
 	ref.refreshAll(false)
 }
 
+// TriggerAllUserRefresh triggers a forced refresh for all users.
+func TriggerAllUserRefresh() {
+	if ref == nil {
+		return
+	}
+
+	ref.TriggerAllUserRefresh()
+}
+
 func RefreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.UserAttribute, error) {
 	if ref == nil {
 		return nil, errors.Errorf("refresh daemon not yet initialized")
