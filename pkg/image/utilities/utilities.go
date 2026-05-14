@@ -511,7 +511,9 @@ done
 if $use_helm_for_charts; then
     target_oci_base="${target_registry%/}"
     helm_push_args=()
-    if [[ "${target_oci_base}" == localhost* || "${target_oci_base}" == 127.0.0.1* ]]; then
+    target_host="${target_oci_base#http://}"
+    target_host="${target_host#https://}"
+    if [[ "${target_host}" == localhost* || "${target_host}" == 127.0.0.1* || "${target_host}" == 0.0.0.0* ]]; then
         helm_push_args+=("--plain-http")
     fi
     for i in "${linux_images[@]}"; do
