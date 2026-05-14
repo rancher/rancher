@@ -1,4 +1,4 @@
-{{- if and (eq (include "rancher.useExternalTls" .) "false") (eq .Values.ingress.tls.source "letsEncrypt") -}}
+{{- if and (eq (include "rancher.useExternalTls" .) "false") (or (eq .Values.gateway.tls.source "letsEncrypt") (eq .Values.ingress.tls.source "letsEncrypt")) -}}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -16,6 +16,17 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-{{ .Values.letsEncrypt.environment }}
     solvers:
+      - http01:
+          {{- if and ( not .Values.ingress.enabled ) (eq (include "rancher.gatewayEnabled" .) "true") }}
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: {{ include "rancher.gateway" . }}
+                namespace: {{ .Release.Namespace }}
+                kind: Gateway
+          {{- else }}
+          ingress:
+            class: {{ .Values.letsEncrypt.ingress.class }}
+          {{- end }}
       - http01:
           ingress:
             class: {{ .Values.letsEncrypt.ingress.class }}

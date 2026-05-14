@@ -33,6 +33,16 @@ tests:
   - hasDocuments:
       count: 0
     template: ingate/issuer-rancher.yaml
+- it: should render letsEncrypt but not rancher with default cert-manager
+  set:
+    gateway.tls.source: letsEncrypt
+  asserts:
+  - hasDocuments:
+      count: 1
+    template: ingate/issuer-letsEncrypt.yaml
+  - hasDocuments:
+      count: 0
+    template: ingate/issuer-rancher.yaml
 - it: should render rancher but not letsEncrypt with default cert-manager
   set:
     ingress.tls.source: rancher
