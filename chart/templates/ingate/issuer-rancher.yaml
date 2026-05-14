@@ -1,4 +1,4 @@
-{{- if and (eq (include "rancher.useExternalTls" .) "false") (and (eq .Values.gateway.tls.source "rancher") (eq .Values.ingress.tls.source "rancher")) -}}
+{{- if and (eq (include "rancher.useExternalTls" .) "false") (and (eq .Values.gateway.gatewayClass.tls.source "rancher") (eq .Values.ingress.tls.source "rancher")) -}}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:

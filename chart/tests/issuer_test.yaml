@@ -35,7 +35,7 @@ tests:
     template: ingate/issuer-rancher.yaml
 - it: should render letsEncrypt but not rancher with default cert-manager
   set:
-    gateway.tls.source: letsEncrypt
+    gateway.gatewayClass.tls.source: letsEncrypt
   asserts:
   - hasDocuments:
       count: 1
