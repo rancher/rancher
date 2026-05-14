@@ -486,6 +486,7 @@ func (s *Store) Create(
 		data.Users = append(data.Users, kconfig.User{
 			Name:  defaultClusterName,
 			Token: sharedTokenKey,
+			Host:  host,
 		})
 		data.Contexts = append(data.Contexts, kconfig.Context{
 			Name:    defaultClusterName,
@@ -566,8 +567,10 @@ func (s *Store) Create(
 				User:    clusterName,
 			})
 			data.Users = append(data.Users, kconfig.User{
-				Name:  clusterName,
-				Token: tokenKey,
+				Name:      clusterName,
+				Token:     tokenKey,
+				Host:      host,
+				ClusterID: cluster.Name,
 			})
 
 			if s.mcmEnabled { // Nodes are only available if MCM is enabled.
