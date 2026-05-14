@@ -14,14 +14,9 @@ import (
 	_ "net/http/pprof"
 	"net/url"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
@@ -258,11 +253,13 @@ func run(ctx context.Context) error {
 		}
 	}
 
+	done := make(chan struct{})
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
 
 		if writeCertsOnly {
-			exitCertWriter(ctx)
+			close(done)
+			return nil
 		}
 
 		err = rancher.Run(topContext)
@@ -298,51 +295,13 @@ func run(ctx context.Context) error {
 			}
 			return false
 		}, onConnect)
-		time.Sleep(5 * time.Second)
-	}
-}
-
-func exitCertWriter(ctx context.Context) {
-	// share-mnt process needs an always restart policy and to be killed so it can restart on startup
-	// this functionality is really only needed for OSes with ephemeral /etc like RancherOS
-	// everything here will just exit(0) with errors as we need to bail out completely.
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM)
-	// trap SIGTERM here so that container can exit with 0
-	go func() {
-		<-sigs
-		os.Exit(0)
-	}()
-
-	logrus.Info("attempting to stop the share-mnt container so it can reboot on startup")
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
-	if err != nil {
-		logrus.Error(err)
-		os.Exit(0)
-	}
-
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=share-mnt")
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		logrus.Error(err)
-		os.Exit(0)
-	}
-
-	for _, container := range containers {
-		if len(container.Names) > 0 && strings.Contains(container.Names[0], "share-mnt") {
-			err := c.ContainerKill(ctx, container.ID, "SIGTERM")
-			if err != nil {
-				logrus.Error(err)
-				os.Exit(0) // only need to write certs so exit cleanly
-			}
+		select {
+		case <-done:
+			return nil
+		case <-time.After(5 * time.Second):
+			// wait before retrying
 		}
 	}
-	// wait for itself to be kill with SIGTERM so it can return exit 0
-	select {}
 }
 
 func certinfo(cert *x509.Certificate) {
