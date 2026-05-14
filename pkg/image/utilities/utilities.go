@@ -521,8 +521,11 @@ if $use_helm_for_charts; then
         chart_ns="${chart_repo%/*}"
         chart_file="./rancher-oci-charts/${chart_name}-${chart_ver_oci//_/+}.tgz"
         if [ ! -f "${chart_file}" ]; then
-            echo "Helm chart file not found, skipping: ${chart_file}"
-            continue
+            echo "ERROR: Chart file missing: ${chart_file}"
+            echo "Expected location: ./rancher-oci-charts/"
+            echo "Ensure rancher-save-images.sh completed successfully and"
+            echo "rancher-oci-charts/ directory was transferred to this host."
+            exit 1
         fi
         echo "Helm chart push: ${chart_file} -> oci://${target_oci_base}/${chart_ns}"
         helm push "${chart_file}" "oci://${target_oci_base}/${chart_ns}" "${helm_push_args[@]}"
@@ -669,6 +672,12 @@ done < "${list}"
 
 echo "Creating ${images} with $(echo ${pulled} | wc -w | tr -d '[:space:]') images"
 docker save $(echo ${pulled}) | gzip --stdout > ${images}
+
+if $use_helm_for_charts; then
+    chart_count=$(ls ./rancher-oci-charts/*.tgz 2>/dev/null | wc -l)
+    echo ""
+    echo "OCI Helm charts saved in ./rancher-oci-charts/ (${chart_count} files). Reused on next runs and by rancher-load-images.sh. Remove with: rm -rf ./rancher-oci-charts"
+fi
 `
 	linuxMirrorScript = "#!/bin/sh\nset -e -x\n\n"
 	windowsLoadScript = `$ErrorActionPreference = 'Stop'
