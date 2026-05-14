@@ -392,6 +392,50 @@ if [ ! -z "${source_registry}" ]; then
     source_registry="${source_registry}/"
 fi
 
+docker_uses_containerd_snapshotter () {
+    docker info 2>/dev/null | grep -qi "containerd.snapshotter"
+}
+
+helm_available () {
+    command -v helm >/dev/null 2>&1
+}
+
+is_oci_helm_chart () {
+    [[ "$1" == *"/rancher/charts/"* || "$1" == "rancher/charts/"* ]]
+}
+
+# Preflight: rancher-images.txt now ships OCI Helm chart entries that
+# 'docker push' cannot handle unless the daemon uses the containerd
+# snapshotter. If the host has neither the snapshotter nor the helm CLI, fail
+# fast with a clear message instead of producing cryptic media-type errors.
+has_oci_charts=false
+while IFS= read -r i; do
+    [ -z "${i}" ] && continue
+    if is_oci_helm_chart "${i}"; then
+        has_oci_charts=true
+        break
+    fi
+done < "${list}"
+
+if $has_oci_charts; then
+    if ! docker_uses_containerd_snapshotter && ! helm_available; then
+        echo "====================================================================="
+        echo "ERROR: ${list} contains OCI Helm charts but this host cannot push"
+        echo "them. Docker is not using the containerd snapshotter and the helm"
+        echo "CLI is not installed."
+        echo ""
+        echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
+        echo "    1. Edit /etc/docker/daemon.json to include:"
+        echo "         { \"features\": { \"containerd-snapshotter\": true } }"
+        echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
+        echo ""
+        echo "  WORKAROUND (alternative): install the helm CLI:"
+        echo "    https://helm.sh/docs/intro/install/"
+        echo "====================================================================="
+        exit 1
+    fi
+fi
+
 docker load --input ${images}
 
 linux_images=()
@@ -508,6 +552,50 @@ fi
 source_registry="${source_registry%/}"
 if [ ! -z "${source_registry}" ]; then
     source_registry="${source_registry}/"
+fi
+
+docker_uses_containerd_snapshotter () {
+    docker info 2>/dev/null | grep -qi "containerd.snapshotter"
+}
+
+helm_available () {
+    command -v helm >/dev/null 2>&1
+}
+
+is_oci_helm_chart () {
+    [[ "$1" == *"/rancher/charts/"* || "$1" == "rancher/charts/"* ]]
+}
+
+# Preflight: rancher-images.txt now ships OCI Helm chart entries that
+# 'docker pull' cannot handle unless the daemon uses the containerd
+# snapshotter. If the host has neither the snapshotter nor the helm CLI, fail
+# fast with a clear message instead of producing cryptic media-type errors.
+has_oci_charts=false
+while IFS= read -r i; do
+    [ -z "${i}" ] && continue
+    if is_oci_helm_chart "${i}"; then
+        has_oci_charts=true
+        break
+    fi
+done < "${list}"
+
+if $has_oci_charts; then
+    if ! docker_uses_containerd_snapshotter && ! helm_available; then
+        echo "====================================================================="
+        echo "ERROR: ${list} contains OCI Helm charts but this host cannot pull"
+        echo "them. Docker is not using the containerd snapshotter and the helm"
+        echo "CLI is not installed."
+        echo ""
+        echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
+        echo "    1. Edit /etc/docker/daemon.json to include:"
+        echo "         { \"features\": { \"containerd-snapshotter\": true } }"
+        echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
+        echo ""
+        echo "  WORKAROUND (alternative): install the helm CLI:"
+        echo "    https://helm.sh/docs/intro/install/"
+        echo "====================================================================="
+        exit 1
+    fi
 fi
 
 pulled=""
