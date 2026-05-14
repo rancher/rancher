@@ -417,22 +417,28 @@ while IFS= read -r i; do
     fi
 done < "${list}"
 
+use_helm_for_charts=false
 if $has_oci_charts; then
-    if ! docker_uses_containerd_snapshotter && ! helm_available; then
-        echo "====================================================================="
-        echo "ERROR: ${list} contains OCI Helm charts but this host cannot push"
-        echo "them. Docker is not using the containerd snapshotter and the helm"
-        echo "CLI is not installed."
-        echo ""
-        echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
-        echo "    1. Edit /etc/docker/daemon.json to include:"
-        echo "         { \"features\": { \"containerd-snapshotter\": true } }"
-        echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
-        echo ""
-        echo "  WORKAROUND (alternative): install the helm CLI:"
-        echo "    https://helm.sh/docs/intro/install/"
-        echo "====================================================================="
-        exit 1
+    if ! docker_uses_containerd_snapshotter; then
+        if helm_available; then
+            echo "WARNING: Docker is not using the containerd snapshotter; falling back to helm CLI for OCI Helm charts."
+            use_helm_for_charts=true
+        else
+            echo "====================================================================="
+            echo "ERROR: ${list} contains OCI Helm charts but this host cannot push"
+            echo "them. Docker is not using the containerd snapshotter and the helm"
+            echo "CLI is not installed."
+            echo ""
+            echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
+            echo "    1. Edit /etc/docker/daemon.json to include:"
+            echo "         { \"features\": { \"containerd-snapshotter\": true } }"
+            echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
+            echo ""
+            echo "  WORKAROUND (alternative): install the helm CLI:"
+            echo "    https://helm.sh/docs/intro/install/"
+            echo "====================================================================="
+            exit 1
+        fi
     fi
 fi
 
@@ -477,6 +483,9 @@ fi
 arch_list+=("linux-amd64")
 for i in "${linux_images[@]}"; do
     [ -z "${i}" ] && continue
+    if $use_helm_for_charts && is_oci_helm_chart "${i}"; then
+        continue
+    fi
     arch_suffix=""
     use_manifest=false
     if [[ (-n "${windows_image_list}") && " ${windows_images[@]}" =~ " ${i}" ]]; then
@@ -500,6 +509,29 @@ for i in "${linux_images[@]}"; do
         push_manifest "${image_name}"
     fi
 done
+
+if $use_helm_for_charts; then
+    target_oci_base="${target_registry%/}"
+    helm_push_args=()
+    if [[ "${target_oci_base}" == localhost* || "${target_oci_base}" == 127.0.0.1* ]]; then
+        helm_push_args+=("--plain-http")
+    fi
+    for i in "${linux_images[@]}"; do
+        [ -z "${i}" ] && continue
+        is_oci_helm_chart "${i}" || continue
+        chart_repo="${i%:*}"
+        chart_ver_oci="${i#*:}"
+        chart_name="${chart_repo##*/}"
+        chart_ns="${chart_repo%/*}"
+        chart_file="./rancher-oci-charts/${chart_name}-${chart_ver_oci//_/+}.tgz"
+        if [ ! -f "${chart_file}" ]; then
+            echo "Helm chart file not found, skipping: ${chart_file}"
+            continue
+        fi
+        echo "Helm chart push: ${chart_file} -> oci://${target_oci_base}/${chart_ns}"
+        helm push "${chart_file}" "oci://${target_oci_base}/${chart_ns}" "${helm_push_args[@]}"
+    done
+fi
 `
 	linuxSaveScript = `#!/bin/bash
 list="rancher-images.txt"
