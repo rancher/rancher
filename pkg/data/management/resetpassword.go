@@ -7,10 +7,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/multicall"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/urfave/cli"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,8 +21,8 @@ import (
 )
 
 func RegisterPasswordResetCommand() {
-	reexec.Register("/usr/bin/reset-password", resetPassword)
-	reexec.Register("reset-password", resetPassword)
+	multicall.Register("/usr/bin/reset-password", resetPassword)
+	multicall.Register("reset-password", resetPassword)
 }
 
 const (

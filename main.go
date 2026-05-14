@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
+	"github.com/rancher/rancher/pkg/multicall"
 	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/v3/pkg/signals"
@@ -26,10 +26,15 @@ var (
 	kubeConfig     string
 )
 
-func main() {
+func init() {
 	management.RegisterPasswordResetCommand()
 	management.RegisterEnsureDefaultAdminCommand()
-	if reexec.Init() {
+}
+
+func main() {
+	// This program multicall commands based on binary/symlink name
+	if fn := multicall.Resolve(); fn != nil {
+		fn()
 		return
 	}
 

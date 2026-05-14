@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/multicall"
 	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/urfave/cli"
@@ -19,8 +19,8 @@ import (
 )
 
 func RegisterEnsureDefaultAdminCommand() {
-	reexec.Register("/usr/bin/ensure-default-admin", ensureDefaultAdmin)
-	reexec.Register("ensure-default-admin", ensureDefaultAdmin)
+	multicall.Register("/usr/bin/ensure-default-admin", ensureDefaultAdmin)
+	multicall.Register("ensure-default-admin", ensureDefaultAdmin)
 }
 
 func ensureDefaultAdmin() {
