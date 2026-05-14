@@ -425,16 +425,14 @@ if $has_oci_charts; then
             use_helm_for_charts=true
         else
             echo "====================================================================="
-            echo "ERROR: ${list} contains OCI Helm charts but this host cannot push"
-            echo "them. Docker is not using the containerd snapshotter and the helm"
-            echo "CLI is not installed."
+            echo "ERROR: List contains non-image OCI artifacts, which are not supported"
+            echo "by docker's legacy storage drivers. You must take action in order to continue."
             echo ""
-            echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
-            echo "    1. Edit /etc/docker/daemon.json to include:"
-            echo "         { \"features\": { \"containerd-snapshotter\": true } }"
-            echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
+            echo "Preferred: configure docker to use the containerd image store"
+            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine
+            echo "    NOTE: Switching image stores hides all images and containers currently present in the original docker image store."
             echo ""
-            echo "  WORKAROUND (alternative): install the helm CLI:"
+            echo "Alternative: install the helm CLI:"
             echo "    https://helm.sh/docs/intro/install/"
             echo "====================================================================="
             exit 1
@@ -619,16 +617,14 @@ if $has_oci_charts; then
             use_helm_for_charts=true
         else
             echo "====================================================================="
-            echo "ERROR: ${list} contains OCI Helm charts but this host cannot pull"
-            echo "them. Docker is not using the containerd snapshotter and the helm"
-            echo "CLI is not installed."
+            echo "ERROR: List contains non-image OCI artifacts, which are not supported"
+            echo "by docker's legacy storage drivers. You must take action in order to continue."
             echo ""
-            echo "  WORKAROUND (preferred): enable Docker's containerd snapshotter:"
-            echo "    1. Edit /etc/docker/daemon.json to include:"
-            echo "         { \"features\": { \"containerd-snapshotter\": true } }"
-            echo "    2. Run: systemctl daemon-reload && systemctl restart docker"
+            echo "Preferred: configure docker to use the containerd image store"
+            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine
+            echo "    NOTE: Switching image stores hides all images and containers currently present in the original docker image store."
             echo ""
-            echo "  WORKAROUND (alternative): install the helm CLI:"
+            echo "Alternative: install the helm CLI:"
             echo "    https://helm.sh/docs/intro/install/"
             echo "====================================================================="
             exit 1
