@@ -408,7 +408,7 @@ func TestPreserveStoredFields(t *testing.T) {
 			want:     v3.AzureADConfig{},
 		},
 		{
-			name: "LogoutAllSupported always from stored",
+			name: "LogoutAllSupported preserved from stored",
 			stored: v3.AzureADConfig{
 				AuthConfig: v3.AuthConfig{
 					LogoutAllSupported: true,
