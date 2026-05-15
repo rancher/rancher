@@ -360,6 +360,8 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, s
 	switch resp.StatusCode {
 	case 200:
 	case 201:
+	case 404:
+		return nil, "", &common.NonTransientError{Err: fmt.Errorf("request failed, got status code: %d", resp.StatusCode)}
 	default:
 		return nil, "", fmt.Errorf("request failed, got status code: %d", resp.StatusCode)
 	}

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -95,5 +96,54 @@ func TestK3sImages(t *testing.T) {
 				t.Fatalf("want error containing %q got %v", tc.err, err)
 			}
 		})
+	}
+}
+
+// TestFetchContextNotCanceledBeforeBodyRead verifies that the context
+// returned by fetch is not canceled before the caller reads the body.
+// This reproduces the bug where `defer cancel()` in fetch would cancel
+// the context immediately on return, causing "context canceled" errors
+// when the caller tried to read the response body.
+func TestFetchContextNotCanceledBeforeBodyRead(t *testing.T) {
+	content := "docker.io/rancher/mirrored-pause:v1.0.0\ndocker.io/rancher/mirrored-coredns-coredns:v1.0.0\n"
+
+	// Simulate what the real fetch does: return a body whose reads
+	// are gated by a context. If the context is cancelled before
+	// reading, reads fail with "context canceled".
+	defer func() { fetcher = fetch }()
+	fetcher = func(url string) (io.ReadCloser, error) {
+		ctx, cancel := context.WithCancel(context.Background())
+		pr, pw := io.Pipe()
+
+		go func() {
+			<-ctx.Done()
+			// Once context is canceled, close the write end with
+			// the context error — mirroring net/http transport behavior.
+			pw.CloseWithError(ctx.Err())
+		}()
+
+		go func() {
+			// Write content but don't close — the context
+			// cancellation path above will close it.
+			pw.Write([]byte(content))
+		}()
+
+		// This is the key part: the old code did `defer cancel()` here,
+		// which would cancel immediately. The fix wraps the body so
+		// cancel is deferred to Close().
+		return &cancelOnClose{ReadCloser: pr, cancel: cancel}, nil
+	}
+
+	imgs, err := k3sImages("v1.2.3+k3s0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := []string{
+		"docker.io/rancher/mirrored-pause:v1.0.0",
+		"docker.io/rancher/mirrored-coredns-coredns:v1.0.0",
+	}
+	if !reflect.DeepEqual(imgs, want) {
+		t.Errorf("want %v got %v", want, imgs)
 	}
 }

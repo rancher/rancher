@@ -12,10 +12,13 @@ const (
 	AzureADConfigFieldCreatorID             = "creatorId"
 	AzureADConfigFieldDeviceAuthEndpoint    = "deviceAuthEndpoint"
 	AzureADConfigFieldEnabled               = "enabled"
+	AzureADConfigFieldEndSessionEndpoint    = "endSessionEndpoint"
 	AzureADConfigFieldEndpoint              = "endpoint"
 	AzureADConfigFieldGraphEndpoint         = "graphEndpoint"
 	AzureADConfigFieldGroupMembershipFilter = "groupMembershipFilter"
 	AzureADConfigFieldLabels                = "labels"
+	AzureADConfigFieldLogoutAllEnabled      = "logoutAllEnabled"
+	AzureADConfigFieldLogoutAllForced       = "logoutAllForced"
 	AzureADConfigFieldLogoutAllSupported    = "logoutAllSupported"
 	AzureADConfigFieldName                  = "name"
 	AzureADConfigFieldOwnerReferences       = "ownerReferences"
@@ -39,10 +42,13 @@ type AzureADConfig struct {
 	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DeviceAuthEndpoint    string            `json:"deviceAuthEndpoint,omitempty" yaml:"deviceAuthEndpoint,omitempty"`
 	Enabled               bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	EndSessionEndpoint    string            `json:"endSessionEndpoint,omitempty" yaml:"endSessionEndpoint,omitempty"`
 	Endpoint              string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	GraphEndpoint         string            `json:"graphEndpoint,omitempty" yaml:"graphEndpoint,omitempty"`
 	GroupMembershipFilter string            `json:"groupMembershipFilter,omitempty" yaml:"groupMembershipFilter,omitempty"`
 	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllEnabled      bool              `json:"logoutAllEnabled,omitempty" yaml:"logoutAllEnabled,omitempty"`
+	LogoutAllForced       bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported    bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`

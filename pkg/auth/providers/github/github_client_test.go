@@ -1,6 +1,7 @@
 package github
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,6 +10,8 @@ import (
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitHubClientGetOrgTeams(t *testing.T) {
@@ -62,6 +65,38 @@ func TestGitHubClientGetOrgTeams(t *testing.T) {
 	if !strings.HasSuffix(teams[0].HTMLURL, "/orgs/org/teams/developers") {
 		t.Errorf("Unexpected htmlURL %s", teams[0].HTMLURL)
 	}
+}
+
+func TestGetFromGithubReturnsNonTransientErrorOn404(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	gcClient := &GClient{httpClient: srv.Client()}
+	_, _, err := gcClient.getFromGithub("token", srv.URL)
+
+	require.Error(t, err)
+	var nte *common.NonTransientError
+	assert.ErrorAs(t, err, &nte)
+}
+
+func TestGetFromGithubReturnsGenericErrorOnOtherFailure(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	gcClient := &GClient{httpClient: srv.Client()}
+	_, _, err := gcClient.getFromGithub("token", srv.URL)
+
+	require.Error(t, err)
+	var nte *common.NonTransientError
+	assert.False(t, errors.As(err, &nte))
 }
 
 func TestGetUrlForOrgTeams(t *testing.T) {

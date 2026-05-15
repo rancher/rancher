@@ -8,9 +8,9 @@ To run the integration tests in `tests/v2/integration`, use
 make ci
 ```
 
-This will run `scripts/test` inside a Dapper container created using `Dockerfile.dapper`. The script will set up and run
-Rancher. Upon startup, Rancher will create a local cluster using k3s and deploy CRDs to it. Once the Rancher and the
-local cluster are ready, the tests will be run.
+This will run `scripts/test` inside the Rancher runtime container built from `Dockerfile.runtime`. The script
+will set up and run Rancher. Upon startup, Rancher will create a local cluster using k3s and deploy CRDs to it. Once
+the Rancher and the local cluster are ready, the tests will be run.
 
 This _should_ work on Mac and Linux systems out of the box, at least in theory. The whole integration test process does
 consume a fair bit of CPU and memory. If you experience unexpected timeouts, you may not have enough compute power. If
@@ -44,7 +44,7 @@ We create the downstream cluster using the provided `cluster.New()` function in
 a container in the test namespace that runs a machine provisioner. This machine provisioner will create a
 [`systemd-node`](https://github.com/rancher/systemd-node/tree/master) container that will create its own contained
 Kubernetes cluster. In other words, the end result is
-- A Docker container (created by Dapper) running
+- A Docker container running the Rancher runtime environment
   - `scripts/test` running
     - Integration tests
     - Rancher

@@ -3,7 +3,9 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/api/scheme"
+	"github.com/rancher/shepherd/pkg/clientbase"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/suite"
@@ -634,6 +637,78 @@ func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
 	}, 2*time.Minute, 2*time.Second, "failed waiting for cluster role bindings to be deleted")
 
 	p.assertClusterAccessRevoked(testUser)
+}
+
+func (p *RTBTestSuite) TestCRTBCannotTargetUsersAndGroup() {
+	client := p.newSubSession()
+
+	_, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		Name:             namegen.AppendRandomString("crtb-"),
+		ClusterID:        "local",
+		UserID:           p.testUser.ID,
+		GroupPrincipalID: "someauthprovidergroupid",
+		RoleTemplateID:   "clustercatalogs-view",
+	})
+	p.Require().Error(err)
+
+	var apiErr *clientbase.APIError
+	p.Require().True(errors.As(err, &apiErr), "expected APIError, got: %v", err)
+	p.Require().Equal(http.StatusUnprocessableEntity, apiErr.StatusCode)
+	p.Require().Contains(apiErr.Body, "must target a user [userId]/[userPrincipalId] OR a group [groupId]/[groupPrincipalId]")
+}
+
+func (p *RTBTestSuite) TestCRTBMustHaveTarget() {
+	client := p.newSubSession()
+
+	_, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		Name:           namegen.AppendRandomString("crtb-"),
+		ClusterID:      "local",
+		RoleTemplateID: "clustercatalogs-view",
+	})
+	p.Require().Error(err)
+
+	var apiErr *clientbase.APIError
+	p.Require().True(errors.As(err, &apiErr), "expected APIError, got: %v", err)
+	p.Require().Equal(http.StatusUnprocessableEntity, apiErr.StatusCode)
+	p.Require().Contains(apiErr.Body, "must target a user [userId]/[userPrincipalId] OR a group [groupId]/[groupPrincipalId]")
+}
+
+func (p *RTBTestSuite) TestCRTBCannotUpdateSubjectsOrCluster() {
+	client := p.newSubSession()
+
+	oldCRTB, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		Name:           namegen.AppendRandomString("crtb-"),
+		ClusterID:      "local",
+		UserID:         p.testUser.ID,
+		RoleTemplateID: "clustercatalogs-view",
+	})
+	p.Require().NoError(err)
+
+	// Wait for userPrincipalId to be populated.
+	p.Require().Eventually(func() bool {
+		reloaded, err := client.Management.ClusterRoleTemplateBinding.ByID(oldCRTB.ID)
+		if err != nil {
+			return false
+		}
+		oldCRTB = reloaded
+		return oldCRTB.UserPrincipalID != ""
+	}, 2*time.Minute, 2*time.Second, "waiting for userPrincipalId to be populated")
+
+	// Attempt to update immutable fields.
+	updatedCRTB, err := client.Management.ClusterRoleTemplateBinding.Update(oldCRTB, map[string]interface{}{
+		"clusterId":        "fakecluster",
+		"userId":           "",
+		"userPrincipalId":  "asdf",
+		"groupPrincipalId": "asdf",
+		"groupId":          "asdf",
+	})
+	p.Require().NoError(err)
+
+	p.Require().Equal(oldCRTB.ClusterID, updatedCRTB.ClusterID)
+	p.Require().Equal(oldCRTB.UserID, updatedCRTB.UserID)
+	p.Require().Equal(oldCRTB.UserPrincipalID, updatedCRTB.UserPrincipalID)
+	p.Require().Equal(oldCRTB.GroupPrincipalID, updatedCRTB.GroupPrincipalID)
+	p.Require().Equal(oldCRTB.GroupID, updatedCRTB.GroupID)
 }
 
 func TestRTBTestSuite(t *testing.T) {

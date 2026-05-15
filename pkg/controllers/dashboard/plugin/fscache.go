@@ -17,9 +17,9 @@ import (
 	"syscall"
 
 	"github.com/Masterminds/semver/v3"
-	filepathsecure "github.com/cyphar/filepath-securejoin"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -71,58 +71,27 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) erro
 		}
 	}
 
-	if plugin.CompressedEndpoint != "" {
-		resp, err := http.Get(plugin.CompressedEndpoint)
-		if err != nil {
-			return fmt.Errorf("get request failed for URL [%s]. Error: %w", plugin.CompressedEndpoint, err)
+	hasCompressedEndpoint := plugin.CompressedEndpoint != ""
+	hasEndpoint := plugin.Endpoint != ""
+	var errs error
+
+	if hasCompressedEndpoint {
+		cmpCacheErr := c.cacheCompressedEndpoint(&plugin)
+		if cmpCacheErr == nil {
+			return nil
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return fmt.Errorf("failed to fetch file from URL [%s]. Status code: %d", plugin.CompressedEndpoint, resp.StatusCode)
-		}
-		p, _ := filepathsecure.SecureJoin(FSCacheRootDir, plugin.Name)
-		if err := os.MkdirAll(p, os.ModePerm); err != nil {
-			return fmt.Errorf("failed to create cache directory with path [%s]. Error: %w", p, err)
-		}
-		err = Untar(p, resp.Body)
-		if err != nil {
-			return fmt.Errorf("failed to untar file: %w", err)
-		}
-	} else if plugin.Endpoint != "" {
-		version, err := getVersionFromPackageJSON(fmt.Sprintf("%s/%s", plugin.Endpoint, PackageJSONFilename))
-		if err != nil {
-			return fmt.Errorf("failed to get version from package.json file. Error: %w", err)
-		}
-		cachedVersion, err := semver.NewVersion(plugin.Version)
-		if err != nil {
-			return fmt.Errorf("spec.plugin.version [%s] is not a semver version. Error: %w", plugin.Version, err)
-		}
-		if !cachedVersion.Equal(version) {
-			return fmt.Errorf("plugin [%s] version [%s] does not match version in controller's cache [%s]", plugin.Name, version.String(), cachedVersion.String())
-		}
-		files, err := fetchFilesTxt(fmt.Sprintf("%s/%s", plugin.Endpoint, FilesTxtFilename))
-		if err != nil {
-			return fmt.Errorf("failed to get files.txt file. Error: %w", err)
-		}
-		for _, file := range files {
-			if file == "" {
-				continue
-			}
-			data, err := fetchFile(plugin.Endpoint + "/" + file)
-			if err != nil {
-				return fmt.Errorf("failed to fetch file [%s] .Error: %w", file, err)
-			}
-			path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
-			if err != nil {
-				return fmt.Errorf("failed to build file [%s] path for caching. Error: %w", file, err)
-			}
-			if err := c.Save(data, path); err != nil {
-				logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
-			}
+		logrus.Warnf("failed to cache using the compressed endpoint. Error: %s", cmpCacheErr)
+		errs = errors.Join(errs, cmpCacheErr)
+	}
+
+	if hasEndpoint {
+		if cacheErr := c.cacheEndpoint(&plugin); cacheErr != nil {
+			logrus.Warnf("failed to cache using the endpoint. Error: %s", cacheErr)
+			errs = errors.Join(errs, cacheErr)
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // SyncWithIndex syncs up entries in the filesystem cache with the index's entries.
@@ -176,8 +145,10 @@ func Untar(dst string, r io.Reader) error {
 			continue
 		}
 
-		target := filepath.Join(dst, header.Name)
-
+		target, err := utils.SecureJoin(dst, header.Name)
+		if err != nil {
+			return fmt.Errorf("failed to build path for file [%s]", header.Name)
+		}
 		switch header.Typeflag {
 
 		// if it's a dir, and it doesn't exist, create it
@@ -222,7 +193,7 @@ func (c FSCache) Save(data []byte, path string) error {
 
 // Delete takes in a plugin's name and version, and deletes its entry in the filesystem cache
 func (c FSCache) Delete(name, version string) error {
-	p, err := filepathsecure.SecureJoin(FSCacheRootDir, name)
+	p, err := utils.SecureJoin(FSCacheRootDir, name)
 	if err != nil {
 		return fmt.Errorf("failed to get cache path for [%s]. Error: %w", name, err)
 	}
@@ -239,7 +210,7 @@ func (c FSCache) Delete(name, version string) error {
 // isCached takes in the name and version of a plugin and returns true if
 // it is cached (entry exists and files were fetched), returns false otherwise
 func (c FSCache) isCached(name, version string) (bool, error) {
-	path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(name, version))
+	path, err := utils.SecureJoin(FSCacheRootDir, filepath.Join(name, version))
 	if err != nil {
 		return false, fmt.Errorf("failed to get cache directory path [%s]. Error: %w", filepath.Join(name, version), err)
 	}
@@ -384,6 +355,66 @@ func validateFilesTxtEntries(entries []string) error {
 		}
 		if fileNameRegex.MatchString(file) {
 			return fmt.Errorf("invalid file entry: %s", file)
+		}
+	}
+	return nil
+}
+
+func (c FSCache) cacheCompressedEndpoint(plugin *v1.UIPluginEntry) error {
+	resp, err := http.Get(plugin.CompressedEndpoint)
+	if err != nil {
+		return fmt.Errorf("get request failed for URL [%s]. Error: %w", plugin.CompressedEndpoint, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("failed to fetch file from URL [%s]. Status code: %d", plugin.CompressedEndpoint, resp.StatusCode)
+	}
+	p, err := utils.SecureJoin(FSCacheRootDir, plugin.Name)
+	if err != nil {
+		return fmt.Errorf("failed to build cache directory path for plugin [%s]. Error: %w", plugin.Name, err)
+	}
+
+	if err := os.MkdirAll(p, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to create cache directory with path [%s]. Error: %w", p, err)
+	}
+	err = Untar(p, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to untar file: %w", err)
+	}
+	return err
+}
+
+func (c FSCache) cacheEndpoint(plugin *v1.UIPluginEntry) error {
+	version, err := getVersionFromPackageJSON(fmt.Sprintf("%s/%s", plugin.Endpoint, PackageJSONFilename))
+	if err != nil {
+		return fmt.Errorf("failed to get version from package.json file. Error: %w", err)
+	}
+	cachedVersion, err := semver.NewVersion(plugin.Version)
+	if err != nil {
+		return fmt.Errorf("spec.plugin.version [%s] is not a semver version. Error: %w", plugin.Version, err)
+	}
+	if !cachedVersion.Equal(version) {
+		return fmt.Errorf("plugin [%s] version [%s] does not match version in controller's cache [%s]", plugin.Name, version.String(), cachedVersion.String())
+	}
+	files, err := fetchFilesTxt(fmt.Sprintf("%s/%s", plugin.Endpoint, FilesTxtFilename))
+	if err != nil {
+		return fmt.Errorf("failed to get files.txt file. Error: %w", err)
+	}
+	for _, file := range files {
+		if file == "" {
+			continue
+		}
+		data, err := fetchFile(plugin.Endpoint + "/" + file)
+		if err != nil {
+			return fmt.Errorf("failed to fetch file [%s] .Error: %w", file, err)
+		}
+		path, err := utils.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
+		if err != nil {
+			return fmt.Errorf("failed to build file [%s] path for caching. Error: %w", file, err)
+		}
+		if err := c.Save(data, path); err != nil {
+			logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
+			return fmt.Errorf("failed to cache file [%s] at path [%s]. Error: %w", file, path, err)
 		}
 	}
 	return nil

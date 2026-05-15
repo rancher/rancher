@@ -1,9 +1,11 @@
 package clients
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
+	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -523,6 +525,59 @@ func TestUserToPrincipal(t *testing.T) {
 	for name, tt := range principalTests {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.want, userToPrincipal(tt.user))
+		})
+	}
+}
+
+func TestIsODataNotFound(t *testing.T) {
+	t.Parallel()
+
+	notFoundCode := "Request_ResourceNotFound"
+	otherCode := "Request_BadRequest"
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "ODataError with Request_ResourceNotFound code",
+			err: func() error {
+				mainErr := odataerrors.NewMainError()
+				mainErr.SetCode(&notFoundCode)
+				oDataErr := odataerrors.NewODataError()
+				oDataErr.SetErrorEscaped(mainErr)
+				return oDataErr
+			}(),
+			want: true,
+		},
+		{
+			name: "ODataError with different code",
+			err: func() error {
+				mainErr := odataerrors.NewMainError()
+				mainErr.SetCode(&otherCode)
+				oDataErr := odataerrors.NewODataError()
+				oDataErr.SetErrorEscaped(mainErr)
+				return oDataErr
+			}(),
+			want: false,
+		},
+		{
+			name: "ODataError with no error escaped",
+			err:  odataerrors.NewODataError(),
+			want: false,
+		},
+		{
+			name: "non-OData error",
+			err:  fmt.Errorf("some other error"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isODataNotFound(tt.err))
 		})
 	}
 }

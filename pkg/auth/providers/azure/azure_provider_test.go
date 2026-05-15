@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -337,68 +338,387 @@ func TestMigrateNewFlowAnnotation(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		current            *v3.AzureADConfig
 		proposed           *v3.AzureADConfig
 		annotationExpected bool
 	}{
 		{
-			name: "new setup on Rancher v2.6.7+ after an upgrade from previous version",
-			current: &v3.AzureADConfig{
-				AuthConfig: v3.AuthConfig{
-					Enabled: false,
-				},
-				GraphEndpoint: "https://graph.microsoft.com",
-			},
+			name:               "nil annotations gets annotation set",
 			proposed:           &v3.AzureADConfig{},
 			annotationExpected: true,
 		},
 		{
-			name: "new setup on Rancher v2.6.7+",
-			current: &v3.AzureADConfig{
+			name: "existing annotations preserved and annotation set",
+			proposed: &v3.AzureADConfig{
 				AuthConfig: v3.AuthConfig{
-					Enabled: false,
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
-							GraphEndpointMigratedAnnotation: "true",
+							"other": "value",
 						},
 					},
 				},
-				GraphEndpoint: "https://graph.microsoft.com",
 			},
-			proposed:           &v3.AzureADConfig{},
-			annotationExpected: true,
-		},
-		{
-			name: "reconfigure existing new setup",
-			current: &v3.AzureADConfig{
-				AuthConfig: v3.AuthConfig{
-					Enabled: true,
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							GraphEndpointMigratedAnnotation: "true",
-						},
-					},
-				},
-				GraphEndpoint: "https://graph.microsoft.com",
-			},
-			proposed:           &v3.AzureADConfig{},
 			annotationExpected: true,
 		},
 	}
 
-	for i := range tests {
-		test := tests[i]
+	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			migrateNewFlowAnnotation(test.current, test.proposed)
+			migrateNewFlowAnnotation(test.proposed)
 			_, hasAnnotation := test.proposed.Annotations[GraphEndpointMigratedAnnotation]
-			if test.annotationExpected && !hasAnnotation {
-				assert.Fail(t, "expected annotation on the processed config, but did not find one")
-			}
-			if !test.annotationExpected && hasAnnotation {
-				assert.Fail(t, "did not expect the annotation on the processed config, but found one")
+			assert.Equal(t, test.annotationExpected, hasAnnotation)
+		})
+	}
+}
+
+func TestPreserveStoredFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		stored   v3.AzureADConfig
+		incoming v3.AzureADConfig
+		want     v3.AzureADConfig
+	}{
+		{
+			name: "stored Enabled true survives incoming false",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+		},
+		{
+			name:   "stored Enabled false allows incoming true",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{Enabled: true},
+			},
+		},
+		{
+			name:     "both Enabled false stays false",
+			stored:   v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{},
+			want:     v3.AzureADConfig{},
+		},
+		{
+			name: "LogoutAllSupported preserved from stored",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					LogoutAllSupported: true,
+				},
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					LogoutAllSupported: true,
+				},
+			},
+		},
+		{
+			name:   "LogoutAllEnabled from incoming overrides stored false",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				LogoutAllEnabled: true,
+			},
+			want: v3.AzureADConfig{
+				LogoutAllEnabled: true,
+			},
+		},
+		{
+			name: "LogoutAllEnabled from incoming overrides stored true",
+			stored: v3.AzureADConfig{
+				LogoutAllEnabled: true,
+			},
+			incoming: v3.AzureADConfig{},
+			want:     v3.AzureADConfig{},
+		},
+		{
+			name:   "LogoutAllForced from incoming overrides stored false",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				LogoutAllForced: true,
+			},
+			want: v3.AzureADConfig{
+				LogoutAllForced: true,
+			},
+		},
+		{
+			name: "EndSessionEndpoint preserved when incoming is empty",
+			stored: v3.AzureADConfig{
+				EndSessionEndpoint: "https://custom.gov/logout",
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				EndSessionEndpoint: "https://custom.gov/logout",
+			},
+		},
+		{
+			name: "EndSessionEndpoint from incoming used when non-empty",
+			stored: v3.AzureADConfig{
+				EndSessionEndpoint: "https://custom.gov/logout",
+			},
+			incoming: v3.AzureADConfig{
+				EndSessionEndpoint: "https://other.gov/logout",
+			},
+			want: v3.AzureADConfig{
+				EndSessionEndpoint: "https://other.gov/logout",
+			},
+		},
+		{
+			name: "AccessMode preserved when incoming is empty",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "restricted"},
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "restricted"},
+			},
+		},
+		{
+			name: "AccessMode from incoming used when non-empty",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "restricted"},
+			},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "unrestricted"},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{AccessMode: "unrestricted"},
+			},
+		},
+		{
+			name: "AllowedPrincipalIDs preserved when incoming is nil",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://123"},
+				},
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://123"},
+				},
+			},
+		},
+		{
+			name: "AllowedPrincipalIDs from incoming used when non-nil",
+			stored: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://123"},
+				},
+			},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://456"},
+				},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					AllowedPrincipalIDs: []string{"azuread_user://456"},
+				},
+			},
+		},
+		{
+			name:   "zero-value stored does not corrupt incoming",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled:    true,
+					AccessMode: "unrestricted",
+				},
+			},
+			want: v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled:    true,
+					AccessMode: "unrestricted",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			preserveStoredFields(&tt.stored, &tt.incoming)
+			assert.Equal(t, tt.want, tt.incoming)
+		})
+	}
+}
+
+func newAzureConfig(endpoint, tenantID, appID string, mods ...func(*v3.AzureADConfig)) *v3.AzureADConfig {
+	cfg := &v3.AzureADConfig{
+		Endpoint:         endpoint,
+		TenantID:         tenantID,
+		ApplicationID:    appID,
+		LogoutAllEnabled: true,
+	}
+	for _, mod := range mods {
+		mod(cfg)
+	}
+	return cfg
+}
+
+func TestLogout(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		config  *v3.AzureADConfig
+		wantErr bool
+	}{
+		"regular logout allowed when LogoutAllForced is false": {
+			config:  newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			wantErr: false,
+		},
+		"regular logout rejected when LogoutAllForced is true": {
+			config: newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
+				c.LogoutAllForced = true
+			}),
+			wantErr: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return tt.config, nil }}
+			r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logout", nil)
+			w := httptest.NewRecorder()
+
+			err := p.Logout(w, r, &v3.Token{})
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
+}
+
+func TestLogoutAllDisabled(t *testing.T) {
+	t.Parallel()
+
+	cfg := newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
+		c.LogoutAllEnabled = false
+	})
+	p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return cfg, nil }}
+
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{FinalRedirectURL: "https://example.com/logged-out"})
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logoutAll", bytes.NewReader(b))
+	w := httptest.NewRecorder()
+
+	assert.ErrorContains(t, p.LogoutAll(w, r, &v3.Token{}), "not configured for SSO logout")
+}
+
+func TestLogoutAll(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		config          *v3.AzureADConfig
+		idTokenCookie   string
+		finalRedirect   string
+		wantURLContains []string
+		wantURLAbsent   []string
+	}{
+		"default endpoint, with id_token_hint and post_logout_redirect_uri": {
+			config:        newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			idTokenCookie: "my.jwt.token",
+			finalRedirect: "https://example.com/logged-out",
+			wantURLContains: []string{
+				"https://login.microsoftonline.com/tenant1/oauth2/v2.0/logout",
+				"client_id=app1",
+				"id_token_hint=my.jwt.token",
+				"post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
+			},
+		},
+		"default endpoint, without id_token_hint": {
+			config:        newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			finalRedirect: "https://example.com/logged-out",
+			wantURLContains: []string{
+				"https://login.microsoftonline.com/tenant1/oauth2/v2.0/logout",
+				"client_id=app1",
+				"post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
+			},
+			wantURLAbsent: []string{"id_token_hint"},
+		},
+		"default endpoint, without post_logout_redirect_uri": {
+			config:        newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			idTokenCookie: "my.jwt.token",
+			wantURLContains: []string{
+				"https://login.microsoftonline.com/tenant1/oauth2/v2.0/logout",
+				"client_id=app1",
+				"id_token_hint=my.jwt.token",
+			},
+			wantURLAbsent: []string{"post_logout_redirect_uri"},
+		},
+		"custom EndSessionEndpoint overrides default": {
+			config: newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
+				c.EndSessionEndpoint = "https://custom.gov/logout"
+			}),
+			finalRedirect: "https://example.com/logged-out",
+			wantURLContains: []string{
+				"https://custom.gov/logout",
+				"client_id=app1",
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return tt.config, nil }}
+
+			b, err := json.Marshal(&v3.AuthConfigLogoutInput{FinalRedirectURL: tt.finalRedirect})
+			require.NoError(t, err)
+
+			r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logoutAll", bytes.NewReader(b))
+			if tt.idTokenCookie != "" {
+				r.AddCookie(&http.Cookie{Name: IDTokenCookie, Value: tt.idTokenCookie})
+			}
+			w := httptest.NewRecorder()
+
+			require.NoError(t, p.LogoutAll(w, r, &v3.Token{}))
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "authConfigLogoutOutput", resp["type"])
+			assert.Equal(t, "authConfigLogoutOutput", resp["baseType"])
+
+			idpURL, _ := resp["idpRedirectUrl"].(string)
+			for _, want := range tt.wantURLContains {
+				assert.Contains(t, idpURL, want)
+			}
+			for _, absent := range tt.wantURLAbsent {
+				assert.NotContains(t, idpURL, absent)
+			}
+		})
+	}
+}
+
+func TestSetIDTokenCookie(t *testing.T) {
+	t.Parallel()
+
+	r := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/", nil)
+	w := httptest.NewRecorder()
+	setIDTokenCookie(r, w, "my.id.token")
+
+	resp := w.Result()
+	cookies := resp.Cookies()
+	var found *http.Cookie
+	for _, c := range cookies {
+		if c.Name == IDTokenCookie {
+			found = c
+			break
+		}
+	}
+	require.NotNil(t, found, "expected %s cookie to be set", IDTokenCookie)
+	assert.Equal(t, "my.id.token", found.Value)
+	assert.True(t, found.HttpOnly)
 }

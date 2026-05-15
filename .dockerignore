@@ -1,7 +1,7 @@
 ./bin
-./.dapper
 ./build
 ./dist
+./.worktrees
 ./.idea
 ./default.etcd
 ./package/rancher

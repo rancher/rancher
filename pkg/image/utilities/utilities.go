@@ -68,7 +68,7 @@ func GatherTargetArtifactsAndSources(
 	}
 	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
 
-	// already downloaded in dapper
+	// expected to already exist in the current runtime or working tree
 	b, err := os.ReadFile(filepath.Join("data.json"))
 	if os.IsNotExist(err) {
 		b, err = os.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))

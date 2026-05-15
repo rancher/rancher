@@ -12,7 +12,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/lasso/pkg/dynamic"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
@@ -49,7 +50,7 @@ func getInfraRef(rkeCluster *rkev1.RKECluster) *corev1.ObjectReference {
 
 // objects generates the corresponding rkecontrolplanes.rke.cattle.io, clusters.cluster.x-k8s.io, and
 // machinedeployments.cluster.x-k8s.io objects based on the passed in clusters.provisioning.cattle.io object
-func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
+func objects(cluster *provv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
 	if !cluster.DeletionTimestamp.IsZero() {
 		return nil, nil
 	}
@@ -76,6 +77,9 @@ func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSch
 	}
 
 	result = append(result, machineDeployments...)
+
+	beacon := beacon(cluster)
+	result = append(result, beacon)
 	return result, nil
 }
 
@@ -87,7 +91,7 @@ func pruneBySchema(data map[string]interface{}, dynamicSchemaSpec v3.DynamicSche
 	}
 }
 
-func takeOwnership(dynamic *dynamic.Controller, cluster *rancherv1.Cluster, nodeConfig runtime.Object) error {
+func takeOwnership(dynamic *dynamic.Controller, cluster *provv1.Cluster, nodeConfig runtime.Object) error {
 	m, err := meta.Accessor(nodeConfig)
 	if err != nil {
 		return err
@@ -126,7 +130,7 @@ func takeOwnership(dynamic *dynamic.Controller, cluster *rancherv1.Cluster, node
 	return err
 }
 
-func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machinePool rancherv1.RKEMachinePool,
+func toMachineTemplate(machinePoolName string, cluster *provv1.Cluster, machinePool provv1.RKEMachinePool,
 	dynamic *dynamic.Controller, secrets v1.SecretCache) (*unstructured.Unstructured, error) {
 	apiVersion := machinePool.NodeConfig.APIVersion
 	kind := machinePool.NodeConfig.Kind
@@ -212,7 +216,7 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	return ustr, nil
 }
 
-func populateHostnameLengthLimitAnnotation(mp rancherv1.RKEMachinePool, cluster *rancherv1.Cluster, annotations map[string]string) error {
+func populateHostnameLengthLimitAnnotation(mp provv1.RKEMachinePool, cluster *provv1.Cluster, annotations map[string]string) error {
 	if cluster == nil {
 		return errors.New("cannot add hostname length limit annotation for nil cluster")
 	}
@@ -286,7 +290,7 @@ func createBootstrapTemplateHash(template *rkev1.RKEBootstrapTemplate) string {
 	return hex.EncodeToString(sha.Sum(nil))[:8]
 }
 
-func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, dynamic *dynamic.Controller,
+func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dynamic *dynamic.Controller,
 	dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
 
 	if dynamicSchema == nil {
@@ -547,7 +551,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 }
 
 // deploymentHealthChecks Health checks will mark a machine as failed if it has any of the conditions below for the duration of the given timeout. https://cluster-api.sigs.k8s.io/tasks/healthcheck.html#what-is-a-machinehealthcheck
-func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePool rancherv1.RKEMachinePool, cluster *rancherv1.Cluster) *capi.MachineHealthCheck {
+func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePool provv1.RKEMachinePool, cluster *provv1.Cluster) *capi.MachineHealthCheck {
 	var maxUnhealthy *intstr.IntOrString
 	if machinePool.MaxUnhealthy != nil {
 		maxUnhealthy = new(intstr.IntOrString)
@@ -606,7 +610,7 @@ func assign(labels map[string]string, key string, value interface{}) error {
 	return nil
 }
 
-func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
+func rkeCluster(cluster *provv1.Cluster) *rkev1.RKECluster {
 	return &rkev1.RKECluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,
@@ -617,7 +621,7 @@ func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
 }
 
 // rkeControlPlane generates the rkecontrolplane object for a provided cluster object
-func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
+func rkeControlPlane(cluster *provv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	// We need to base64/gzip encode the spec of our rancherv1.Cluster object so that we can reference it from the
 	// downstream cluster
 	filteredClusterSpec := cluster.Spec.DeepCopy()
@@ -658,7 +662,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 	}, nil
 }
 
-func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPlane, infraRef *corev1.ObjectReference) *capi.Cluster {
+func capiCluster(cluster *provv1.Cluster, rkeControlPlane *rkev1.RKEControlPlane, infraRef *corev1.ObjectReference) *capi.Cluster {
 	gvk, err := gvk.Get(rkeControlPlane)
 	if err != nil {
 		// this is a build issue if it happens
@@ -679,7 +683,7 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		annotations[capr.ClusterAutoscalerPausedAnnotation] = "true"
 	}
 
-	ownerGVK := rancherv1.SchemeGroupVersion.WithKind("Cluster")
+	ownerGVK := provv1.SchemeGroupVersion.WithKind("Cluster")
 	ownerAPIVersion, _ := ownerGVK.ToAPIVersionAndKind()
 
 	gv, err := schema.ParseGroupVersion(infraRef.APIVersion)
@@ -710,8 +714,8 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 					Kind:               ownerGVK.Kind,
 					Name:               cluster.Name,
 					UID:                cluster.UID,
-					Controller:         &[]bool{true}[0],
-					BlockOwnerDeletion: &[]bool{true}[0],
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
 				},
 			},
 		},
@@ -722,7 +726,29 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 	}
 }
 
-func durationToSeconds(d *metav1.Duration, cluster *rancherv1.Cluster) *int32 {
+func beacon(cluster *provv1.Cluster) *planv1alpha1.Beacon {
+	ownerGVK := provv1.SchemeGroupVersion.WithKind("Cluster")
+	ownerAPIVersion, _ := ownerGVK.ToAPIVersionAndKind()
+
+	return &planv1alpha1.Beacon{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         ownerAPIVersion,
+					Kind:               ownerGVK.Kind,
+					Name:               cluster.Name,
+					UID:                cluster.UID,
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+	}
+}
+
+func durationToSeconds(d *metav1.Duration, cluster *provv1.Cluster) *int32 {
 	if d == nil {
 		return nil
 	}

@@ -1,7 +1,9 @@
 name: Unit Tests
 on: [workflow_dispatch, workflow_call]
 
-permissions: {}
+permissions:
+  contents: read
+  id-token: none
 
 jobs:
   unit-test:

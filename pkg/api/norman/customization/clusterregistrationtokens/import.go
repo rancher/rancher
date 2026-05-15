@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -17,7 +18,8 @@ import (
 )
 
 type ClusterImport struct {
-	Clusters v3.ClusterInterface
+	Clusters     v3.ClusterInterface
+	SecretLister v1.SecretLister
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
@@ -60,7 +62,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	if err = systemtemplate.SystemTemplate(resp, agentImage, authImage, "", token, url,
-		false, cluster, nil, nil, nil, false, namespace.GetMutator()); err != nil {
+		false, cluster, nil, nil, ch.SecretLister, false, namespace.GetMutator()); err != nil {
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}

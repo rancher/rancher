@@ -5,7 +5,7 @@ runs:
   steps:
     - name: install dependencies
       shell: bash
-      run: zypper install -y aws-cli wget jq awk
+      run: zypper install -y aws-cli
     - name: Create base dir
       shell: bash
       run: mkdir -p "${ARTIFACTS_BASE_DIR}" /tmp/images-files

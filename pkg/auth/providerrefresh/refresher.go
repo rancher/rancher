@@ -1,6 +1,7 @@
 package providerrefresh
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -130,6 +132,11 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 		}
 	}
 
+	if _, ok := attribs.Annotations[common.ProviderRefreshErrorAnnotation]; ok {
+		logrus.Debugf("Skipping refresh trigger for %v: annotated with non-transient error", userName)
+		return
+	}
+
 	attribs.NeedsRefresh = true
 	if needCreate {
 		_, err := r.userAttributes.Create(attribs)
@@ -231,7 +238,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 				}
 			}
 
-			// SAML cannot refresh, so we do restore the existing providers.
+			// SAML cannot refresh, so we do restore the existing principals.
 			if providers.UnrefreshableProviders[providerName] {
 				existingPrincipals := attribs.GroupPrincipals[providerName].Items
 				if existingPrincipals != nil {
@@ -240,6 +247,14 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 			} else {
 				newGroupPrincipals, err = providers.RefetchGroupPrincipals(principalID, providerName, secret)
 				if err != nil {
+					// Non-transient errors (e.g. invalid_grant when the user's IdP session
+					// is revoked) must propagate to the controller so it can annotate the
+					// UserAttribute and stop requeuing. Without this, the loop continues
+					// to GetPrincipal which hits the same issue and keeps requeuing.
+					var nte *common.NonTransientError
+					if errors.As(err, &nte) {
+						return nil, err
+					}
 					// In the case that we cant access a server, we still want to continue refreshing, but
 					// we no longer want to disable derived tokens, or remove their login tokens for this provider.
 					if err.Error() != "no access" {

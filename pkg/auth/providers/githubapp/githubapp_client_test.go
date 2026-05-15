@@ -3,6 +3,7 @@ package githubapp
 import (
 	"cmp"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -284,6 +285,38 @@ func TestGithubAppClientGetTeamsForUserProvidingInstallationID(t *testing.T) {
 		return cmp.Compare(a.ID, b.ID)
 	})
 	assert.Equal(t, want, orgs)
+}
+
+func TestGithubAppGetFromGithubReturnsNonTransientErrorOn404(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	appClient := githubAppClient{httpClient: srv.Client()}
+	_, _, err := appClient.getFromGithub(t.Context(), "token", srv.URL)
+
+	require.Error(t, err)
+	var nte *common.NonTransientError
+	assert.ErrorAs(t, err, &nte)
+}
+
+func TestGithubAppGetFromGithubReturnsGenericErrorOnOtherFailure(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	appClient := githubAppClient{httpClient: srv.Client()}
+	_, _, err := appClient.getFromGithub(t.Context(), "token", srv.URL)
+
+	require.Error(t, err)
+	var nte *common.NonTransientError
+	assert.False(t, errors.As(err, &nte))
 }
 
 func stripScheme(t *testing.T, ts *httptest.Server) string {

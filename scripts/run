@@ -22,6 +22,14 @@ export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}'):844
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_FEATURES="harvester=false"
 
+# Ensure $HOME/.kube/k3s.yaml symlink exists on the bind-mounted filesystem.
+# The Dockerfile.runtime creates this symlink inside the image layer, but the
+# repo bind mount overlays /go/src/github.com/rancher/rancher, hiding it.
+# Rancher polls $HOME/.kube/k3s.yaml waiting for k3s to write its kubeconfig
+# to /etc/rancher/k3s/k3s.yaml; without this symlink it waits forever.
+mkdir -p "${HOME}/.kube"
+ln -sf /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/k3s.yaml"
+
 #########################################################################################################################################
 # DISCLAIMER                                                                                                                            #
 # Copied from https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/hack/dind#L28-L37                              #
@@ -38,22 +46,16 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; the
   sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
 fi
 
-if [ $CI ]; then
-  # DISCLAIMER
-  # This code relies on the fact that our CI pipleine runs on one system at a time. Currently with drone this means that the setting `DRONE_AGENT_CONCURRENCY=1`
-
-  # Attempt to find and stop any previous instances of dapper containers.
-  # To combat the scenario where drone runners are reused and an instance of rancher is still running.
+if [ "$CI" ]; then
+  # Attempt to find and stop any previous runtime containers from a reused CI runner.
   echo "Checking for running containers from a previous build."
 
-  # gets a list of all docker containers that were started in a CI build.
-  dapper_containers=$(docker ps --format '{{.Names}}/{{.Label "DRONE_BUILD_NUMBER"}}' --filter 'label=CI=true')
-  for container_info in $dapper_containers; do
+  runtime_containers=$(docker ps --format '{{.Names}}/{{.Label "DRONE_BUILD_NUMBER"}}' --filter 'label=CI=true')
+  for container_info in $runtime_containers; do
     IFS='/' read -ra split_info <<<"$container_info"
 
-    # remove containers that were not created in this build
     if [ "${split_info[1]}" != "${DRONE_BUILD_NUMBER}" ]; then
-      echo "Removing old drone container ${split_info[0]}"
+      echo "Removing old runtime container ${split_info[0]}"
       docker stop ${split_info[0]}
       docker rm ${split_info[0]}
     fi

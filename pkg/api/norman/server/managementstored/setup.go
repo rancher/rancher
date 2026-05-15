@@ -69,6 +69,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodeDriverType,
 		client.NodePoolType,
 		client.NodeType,
+		client.OIDCClientType,
 		client.PodSecurityAdmissionConfigurationTemplateType,
 		client.PreferenceType,
 		client.ProjectNetworkPolicyType,
@@ -104,6 +105,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Project(schemas, apiContext)
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	PodSecurityAdmissionConfigurationTemplate(schemas, apiContext)
+	OIDCClients(schemas, apiContext)
 	GlobalRole(schemas, apiContext)
 	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
@@ -366,4 +368,8 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 
 func RancherUserNotifications(schemas *types.Schemas, management *config.ScaledContext) {
 	schemas.Schema(&managementschema.Version, client.RancherUserNotificationType)
+}
+
+func OIDCClients(schemas *types.Schemas, management *config.ScaledContext) {
+	schemas.Schema(&managementschema.Version, client.OIDCClientType)
 }

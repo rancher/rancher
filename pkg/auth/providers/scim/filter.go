@@ -2,6 +2,7 @@ package scim
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -72,6 +73,13 @@ func ParseFilter(filter string) (*Filter, error) {
 
 	attr := tokens[0]
 	opStr := strings.ToLower(tokens[1])
+
+	// Strip URN prefix if present (RFC 7644 section 3.10).
+	strippedAttr, _, err := stripSchemaURN(attr, "")
+	if err != nil {
+		return nil, fmt.Errorf("invalid attribute name %q: %w", attr, err)
+	}
+	attr = strippedAttr
 
 	// Validate attribute name.
 	if !isValidAttributeName(attr) {
@@ -162,16 +170,19 @@ func (f *Filter) MatchesCaseExact(value string) bool {
 	return f.MatchesValue(value, true)
 }
 
-// ValidateForAttribute checks if the filter is valid for the specified attribute and operators.
+// ValidateForAttributes checks if the filter is valid for the specified attributes and operators.
 // Returns an error if the filter uses an unsupported attribute or operator.
-func (f *Filter) ValidateForAttribute(allowedAttribute string, allowedOperators ...filterOperator) error {
+func (f *Filter) ValidateForAttributes(allowedAttributes []string, allowedOperators ...filterOperator) error {
 	if f == nil {
 		return nil
 	}
 
 	// Check attribute (case-insensitive per SCIM spec).
-	if !strings.EqualFold(f.Attribute, allowedAttribute) {
-		return fmt.Errorf("unsupported filter attribute %q: only %q is supported", f.Attribute, allowedAttribute)
+	if !slices.ContainsFunc(allowedAttributes, func(a string) bool {
+		return strings.EqualFold(f.Attribute, a)
+	}) {
+		return fmt.Errorf("unsupported filter attribute %q: only %s supported",
+			f.Attribute, strings.Join(allowedAttributes, ", "))
 	}
 
 	// Check operator.
@@ -236,6 +247,38 @@ func tokenize(filter string) ([]string, error) {
 	}
 
 	return tokens, nil
+}
+
+// knownResourceSchemaURNs maps schema URN prefixes to their resource type.
+// Only resource schemas are valid as attribute path prefixes per RFC 7644 section 3.10.
+var knownResourceSchemaURNs = map[string]string{
+	userSchemaID:  userResource,
+	groupSchemaID: groupResource,
+}
+
+// stripSchemaURN removes a recognized schema URN prefix from an attribute path
+// per RFC 7644 section 3.10. If path has no URN prefix, it is returned unchanged.
+// If expectedResourceType is non-empty, the URN's resource type must match it.
+func stripSchemaURN(path, expectedResourceType string) (string, string, error) {
+	if !strings.HasPrefix(path, "urn:") {
+		return path, "", nil
+	}
+
+	for urn, resourceType := range knownResourceSchemaURNs {
+		prefix := urn + ":"
+		if strings.HasPrefix(path, prefix) {
+			attrPath := path[len(prefix):]
+			if attrPath == "" {
+				return "", "", fmt.Errorf("missing attribute name after schema URN prefix")
+			}
+			if expectedResourceType != "" && !strings.EqualFold(resourceType, expectedResourceType) {
+				return "", "", fmt.Errorf("schema URN %q does not match resource type %q", urn, expectedResourceType)
+			}
+			return attrPath, resourceType, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("unrecognized schema URN prefix in attribute path %q", path)
 }
 
 // isValidAttributeName checks if the attribute name is valid per SCIM spec.

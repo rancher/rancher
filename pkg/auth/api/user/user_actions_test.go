@@ -11,11 +11,12 @@ import (
 
 func TestValidatePassword(t *testing.T) {
 	tests := []struct {
-		name        string
-		username    string
-		currentpass string
-		password    string
-		expectsErr  bool
+		name         string
+		username     string
+		currentpass  string
+		password     string
+		expectsErr   bool
+		expectErrMsg string
 	}{
 		{
 			name:        "password too short",
@@ -66,15 +67,29 @@ func TestValidatePassword(t *testing.T) {
 			password:    "myfavoritepassword",
 			expectsErr:  true,
 		},
+		{
+			name:         "new password matches username",
+			username:     "administrativeuser",
+			currentpass:  "myfavoritepassword",
+			password:     "administrativeuser",
+			expectsErr:   true,
+			expectErrMsg: "Password cannot be the same as the username",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validatePassword(tt.username, tt.currentpass, tt.password, 12)
-			if err != nil && !tt.expectsErr {
-				t.Errorf("Received unexpected error: %v", err)
-			} else if err == nil && tt.expectsErr {
-				t.Error("Expected error when non received")
+			switch {
+			case tt.expectsErr && tt.expectErrMsg != "":
+				assert.EqualError(t, err, tt.expectErrMsg)
+				return
+			case tt.expectsErr:
+				assert.Error(t, err, "Expected an error but got nil")
+				return
+			case !tt.expectsErr:
+				assert.NoError(t, err, "Expected no error but got one")
+				return
 			}
 		})
 	}

@@ -6,21 +6,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/condition"
-
+	planv1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	caprplanner "github.com/rancher/rancher/pkg/capr/planner"
-	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	plancontrollers "github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io/v1alpha1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+const PlannerOwnerKey = "planner"
 
 var (
 	capiScalingUpCondition   = condition.Cond("ScalingUp")
@@ -30,15 +35,17 @@ var (
 
 type handler struct {
 	planner       *caprplanner.Planner
-	controlPlanes v1.RKEControlPlaneController
+	controlPlanes rkecontrollers.RKEControlPlaneController
+	beacons       plancontrollers.BeaconClient
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprplanner.Planner) {
 	h := handler{
 		planner:       planner,
 		controlPlanes: clients.RKE.RKEControlPlane(),
+		beacons:       clients.Plan.Beacon(),
 	}
-	v1.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)
+	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)
 	relatedresource.Watch(ctx, "planner", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 		if secret, ok := obj.(*corev1.Secret); ok {
 			var relatedResources []relatedresource.Key
@@ -94,6 +101,36 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 		return status, nil
 	}
 
+	beacon, err := h.beacons.Get(cp.Namespace, cp.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[planner] rkecluster %s/%s: waiting for beacon to be created", cp.Namespace, cp.Name)
+		h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
+		return status, nil
+	} else if err != nil {
+		return status, err
+	}
+
+	if beacon.Labels == nil {
+		beacon = beacon.DeepCopy()
+		beacon.Labels = map[string]string{}
+		beacon.Labels[planv1alpha1.OwnerLabel] = PlannerOwnerKey
+		beacon, err = h.beacons.Update(beacon)
+		if err != nil {
+			return status, err
+		}
+	} else if owner, ok := beacon.Labels[planv1alpha1.OwnerLabel]; !ok {
+		beacon = beacon.DeepCopy()
+		beacon.Labels[planv1alpha1.OwnerLabel] = PlannerOwnerKey
+		beacon, err = h.beacons.Update(beacon)
+		if err != nil {
+			return status, err
+		}
+	} else if owner != PlannerOwnerKey {
+		logrus.Debugf("[planner] rkecluster %s/%s: waiting to acquire beacon", cp.Namespace, cp.Name)
+		h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
+		return status, nil
+	}
+
 	// With the upcoming CAPI v1beta2, status objects were changed to add new fields and conditions. Unfortunately, for
 	// clusters without machine deployments or machine pools, the controlplane MUST have the `ScalingUp`, `ScalingDown`,
 	// and `RollingOut` conditions. See https://github.com/kubernetes-sigs/cluster-api/issues/11820.
@@ -122,7 +159,7 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	status.ObservedGeneration = cp.Generation
 
 	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cp.Namespace, cp.Name)
-	status, err := h.planner.Process(cp, status)
+	status, err = h.planner.Process(cp, status)
 	if err != nil {
 		// planner.Process can encounter 3 types of errors:
 		// * planner.errWaiting - This is an error that indicates we are waiting for something, and will not re-enqueue the object
@@ -155,6 +192,14 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	}
 	// No error encountered during planner.Process
 	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
+
+	beacon = beacon.DeepCopy()
+	delete(beacon.Labels, planv1alpha1.OwnerLabel)
+	_, err = h.beacons.Update(beacon)
+	if err != nil {
+		return status, err
+	}
+
 	capr.Ready.True(&status)
 	capr.Ready.Message(&status, "")
 	capr.Ready.Reason(&status, "")

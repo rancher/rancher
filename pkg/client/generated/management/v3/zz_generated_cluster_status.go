@@ -12,6 +12,7 @@ const (
 	ClusterStatusFieldAllocatable                                = "allocatable"
 	ClusterStatusFieldAppliedAgentEnvVars                        = "appliedAgentEnvVars"
 	ClusterStatusFieldAppliedClusterAgentDeploymentCustomization = "appliedClusterAgentDeploymentCustomization"
+	ClusterStatusFieldAppliedClusterAgentImagePullSecretsHash    = "appliedClusterAgentImagePullSecretsHash"
 	ClusterStatusFieldAppliedEnableNetworkPolicy                 = "appliedEnableNetworkPolicy"
 	ClusterStatusFieldAppliedSpec                                = "appliedSpec"
 	ClusterStatusFieldAuthImage                                  = "authImage"
@@ -57,6 +58,7 @@ type ClusterStatus struct {
 	Allocatable                                map[string]string             `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	AppliedAgentEnvVars                        []EnvVar                      `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	AppliedClusterAgentImagePullSecretsHash    string                        `json:"appliedClusterAgentImagePullSecretsHash,omitempty" yaml:"appliedClusterAgentImagePullSecretsHash,omitempty"`
 	AppliedEnableNetworkPolicy                 bool                          `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedSpec                                *ClusterSpec                  `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AuthImage                                  string                        `json:"authImage,omitempty" yaml:"authImage,omitempty"`

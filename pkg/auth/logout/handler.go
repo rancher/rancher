@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/sirupsen/logrus"
 )
@@ -41,7 +42,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	isSecure := r.URL.Scheme == "https"
 
-	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName} {
+	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie} {
 		tokenCookie := &http.Cookie{
 			Name:     cookieName,
 			Value:    "",

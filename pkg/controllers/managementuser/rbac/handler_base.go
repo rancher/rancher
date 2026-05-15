@@ -653,6 +653,9 @@ type globalRoleEnqueuer struct {
 
 // namespaceEnqueueGRBs enqueues GRBs that reference the changed namespace in their inherited namespaced rules.
 func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
 	ns, ok := obj.(*corev1.Namespace)
 	if !ok {
 		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grbByNamespaceEnqueuer)
@@ -677,6 +680,9 @@ func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Ob
 
 // namespaceEnqueueGRs enqueues GRs that reference the changed namespace in their inherited namespaced rules.
 func (g *globalRoleEnqueuer) namespaceEnqueueGRs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
 	ns, ok := obj.(*corev1.Namespace)
 	if !ok {
 		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grByNamespaceEnqueuer)

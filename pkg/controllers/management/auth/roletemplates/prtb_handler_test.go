@@ -976,69 +976,6 @@ func TestPRTBHandlerHandleMigration(t *testing.T) {
 	}
 }
 
-func TestPRTBContentKey(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		prtb     *v3.ProjectRoleTemplateBinding
-		expected string
-	}{
-		{
-			name: "user principal name takes priority",
-			prtb: &v3.ProjectRoleTemplateBinding{
-				UserPrincipalName: "local://user1",
-				UserName:          "user1",
-				RoleTemplateName:  "project-member",
-				ProjectName:       "c-m-1234:p-5678",
-			},
-			expected: "local://user1/project-member/c-m-1234:p-5678",
-		},
-		{
-			name: "user name used when no principal",
-			prtb: &v3.ProjectRoleTemplateBinding{
-				UserName:         "user1",
-				RoleTemplateName: "project-member",
-				ProjectName:      "c-m-1234:p-5678",
-			},
-			expected: "user1/project-member/c-m-1234:p-5678",
-		},
-		{
-			name: "group principal name used",
-			prtb: &v3.ProjectRoleTemplateBinding{
-				GroupPrincipalName: "activedirectory_group://CN=admins",
-				RoleTemplateName:   "project-owner",
-				ProjectName:        "c-m-1234:p-5678",
-			},
-			expected: "activedirectory_group://CN=admins/project-owner/c-m-1234:p-5678",
-		},
-		{
-			name: "group name used as fallback",
-			prtb: &v3.ProjectRoleTemplateBinding{
-				GroupName:        "local-group",
-				RoleTemplateName: "project-member",
-				ProjectName:      "c-m-1234:p-5678",
-			},
-			expected: "local-group/project-member/c-m-1234:p-5678",
-		},
-		{
-			name: "empty subject",
-			prtb: &v3.ProjectRoleTemplateBinding{
-				RoleTemplateName: "project-member",
-				ProjectName:      "c-m-1234:p-5678",
-			},
-			expected: "/project-member/c-m-1234:p-5678",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := prtbContentKey(tt.prtb)
-			if got != tt.expected {
-				t.Errorf("prtbContentKey() = %q, want %q", got, tt.expected)
-			}
-		})
-	}
-}
 
 func TestDeleteDuplicatePRTBs(t *testing.T) {
 	t.Parallel()

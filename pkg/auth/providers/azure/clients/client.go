@@ -11,7 +11,7 @@ const Name = "azuread"
 // AzureClient specifies the subset of operations that a real client would delegate to some SDK for accessing
 // one of the two APIs to work with Active Directory resources - Azure AD Graph and Microsoft Graph.
 type AzureClient interface {
-	LoginUser(*v3.AzureADConfig, *v3.AzureADLogin) (v3.Principal, []v3.Principal, string, error)
+	LoginUser(*v3.AzureADConfig, *v3.AzureADLogin) (v3.Principal, []v3.Principal, string, string, error)
 	AccessToken() string
 	MarshalTokenJSON() (string, error)
 

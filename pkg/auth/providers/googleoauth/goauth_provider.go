@@ -195,13 +195,13 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 				if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusForbidden {
 					user, err = adminSvc.Users.Get(externalID).ViewType(domainPublicViewType).Do()
 					if err != nil {
-						return principal, err
+						return principal, wrapGoogleNonTransient(err)
 					}
 				} else {
-					return principal, err
+					return principal, wrapGoogleNonTransient(err)
 				}
 			} else {
-				return principal, err
+				return principal, wrapGoogleNonTransient(err)
 			}
 		}
 		acc := Account{
@@ -226,7 +226,7 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 					return principal, nil
 				}
 			}
-			return principal, err
+			return principal, wrapGoogleNonTransient(err)
 		}
 		return g.toPrincipal(groupType, Account{SubjectUniqueID: group.Id, Email: group.Email, Name: group.Name}, token), nil
 	default:
@@ -279,12 +279,16 @@ func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret 
 	logrus.Debugf("[Google OAuth] GetPrincipal: Parsed principalID")
 	groupPrincipals, err := g.getGroupsUserBelongsTo(adminSvc, externalID, config.Hostname, config)
 	if err != nil {
-		return principals, err
+		return principals, wrapGoogleNonTransient(err)
 	}
 	if !config.NestedGroupMembershipEnabled {
 		return groupPrincipals, nil
 	}
-	return g.fetchParentGroups(config, groupPrincipals, adminSvc, config.Hostname)
+	nested, err := g.fetchParentGroups(config, groupPrincipals, adminSvc, config.Hostname)
+	if err != nil {
+		return nil, wrapGoogleNonTransient(err)
+	}
+	return nested, nil
 }
 
 func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
@@ -435,4 +439,11 @@ func (g *googleOauthProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !googleOauthConfig.Enabled, nil
+}
+
+func wrapGoogleNonTransient(err error) error {
+	if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusNotFound {
+		return &common.NonTransientError{Err: err}
+	}
+	return err
 }

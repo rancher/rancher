@@ -776,3 +776,45 @@ tests:
             value: RELEASE-NAME-rancher
           - name: RANCHER_NAMESPACES_OPTIONS
             value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"}}"
+- it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when imagePullSecrets is empty
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: ""
+- it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when systemRegistryInheritsPullSecrets is false
+  set:
+    systemRegistryInheritsPullSecrets: false
+    imagePullSecrets:
+      - name: my-pull-secret
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "my-pull-secret"
+- it: should add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when a single imagePullSecret is set and systemRegistryInheritsPullSecrets is true
+  set:
+    systemRegistryInheritsPullSecrets: true
+    imagePullSecrets:
+      - name: my-pull-secret
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "my-pull-secret"
+- it: should add CATTLE_BASE_REGISTRY_PULL_SECRETS as a comma-delimited list when multiple imagePullSecrets are set and systemRegistryInheritsPullSecrets is true
+  set:
+    systemRegistryInheritsPullSecrets: true
+    imagePullSecrets:
+      - name: secret-one
+      - name: secret-two
+      - name: secret-three
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "secret-one,secret-two,secret-three"

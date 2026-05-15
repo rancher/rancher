@@ -20,6 +20,7 @@ var (
 		"podsecurityadmissionconfigurationtemplates": true,
 		"projects":                                   true,
 		"projectroletemplatebindings":                true,
+		"proxyendpoints":                             true,
 		"oidcclients":                                true,
 		"users":                                      true,
 	}

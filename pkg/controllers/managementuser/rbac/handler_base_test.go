@@ -6,13 +6,17 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -313,6 +317,194 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 			}
 			err := m.compareAndUpdateClusterRole(test.clusterRole, test.roleTemplate)
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestNamespaceEnqueueGRBs(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		obj        runtime.Object
+		grResults  []*v3.GlobalRole
+		grErr      error
+		grbResults map[string][]*v3.GlobalRoleBinding
+		grbErr     error
+		wantKeys   []relatedresource.Key
+		wantErr    bool
+	}{
+		"nil object returns nil": {
+			obj:      nil,
+			wantKeys: nil,
+			wantErr:  false,
+		},
+		"non-namespace object returns error": {
+			obj:     &corev1.Pod{},
+			wantErr: true,
+		},
+		"no matching global roles returns empty": {
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+			},
+			grResults: nil,
+			wantKeys:  nil,
+			wantErr:   false,
+		},
+		"error listing global roles": {
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+			},
+			grErr:   fmt.Errorf("index error"),
+			wantErr: true,
+		},
+		"error listing global role bindings": {
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+			},
+			grResults: []*v3.GlobalRole{
+				{ObjectMeta: metav1.ObjectMeta{Name: "gr1"}},
+			},
+			grbErr:  fmt.Errorf("grb index error"),
+			wantErr: true,
+		},
+		"returns keys for all grbs of matching global roles": {
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+			},
+			grResults: []*v3.GlobalRole{
+				{ObjectMeta: metav1.ObjectMeta{Name: "gr1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "gr2"}},
+			},
+			grbResults: map[string][]*v3.GlobalRoleBinding{
+				"gr1": {
+					{ObjectMeta: metav1.ObjectMeta{Name: "grb1"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "grb2"}},
+				},
+				"gr2": {
+					{ObjectMeta: metav1.ObjectMeta{Name: "grb3"}},
+				},
+			},
+			wantKeys: []relatedresource.Key{
+				{Name: "grb1"},
+				{Name: "grb2"},
+				{Name: "grb3"},
+			},
+			wantErr: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+			grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+
+			if test.obj != nil {
+				if _, ok := test.obj.(*corev1.Namespace); ok {
+					grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, gomock.Any()).Return(test.grResults, test.grErr).AnyTimes()
+					for _, gr := range test.grResults {
+						grbs := test.grbResults[gr.Name]
+						grbCache.EXPECT().GetByIndex("mgmt-auth-grb-gr-idex", gr.Name).Return(grbs, test.grbErr).AnyTimes()
+					}
+				}
+			}
+
+			enqueuer := globalRoleEnqueuer{
+				grbLister: grbCache,
+				grLister:  grCache,
+			}
+
+			keys, err := enqueuer.namespaceEnqueueGRBs("", "test", test.obj)
+			if test.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.wantKeys, keys)
+		})
+	}
+}
+
+func TestNamespaceEnqueueGRs(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		obj       runtime.Object
+		grResults []*v3.GlobalRole
+		grErr     error
+		wantKeys  []relatedresource.Key
+		wantErr   bool
+	}{
+		"nil object returns nil": {
+			obj:      nil,
+			wantKeys: nil,
+			wantErr:  false,
+		},
+		"non-namespace object returns error": {
+			obj:     &corev1.Pod{},
+			wantErr: true,
+		},
+		"no matching global roles returns empty": {
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+			},
+			grResults: nil,
+			wantKeys:  nil,
+			wantErr:   false,
+		},
+		"error listing global roles": {
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+			},
+			grErr:   fmt.Errorf("index error"),
+			wantErr: true,
+		},
+		"returns keys for all matching global roles": {
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+			},
+			grResults: []*v3.GlobalRole{
+				{ObjectMeta: metav1.ObjectMeta{Name: "gr1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "gr2"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "gr3"}},
+			},
+			wantKeys: []relatedresource.Key{
+				{Name: "gr1"},
+				{Name: "gr2"},
+				{Name: "gr3"},
+			},
+			wantErr: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+			grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+
+			if test.obj != nil {
+				if _, ok := test.obj.(*corev1.Namespace); ok {
+					grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, gomock.Any()).Return(test.grResults, test.grErr).AnyTimes()
+				}
+			}
+
+			enqueuer := globalRoleEnqueuer{
+				grbLister: grbCache,
+				grLister:  grCache,
+			}
+
+			keys, err := enqueuer.namespaceEnqueueGRs("", "test", test.obj)
+			if test.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.wantKeys, keys)
 		})
 	}
 }

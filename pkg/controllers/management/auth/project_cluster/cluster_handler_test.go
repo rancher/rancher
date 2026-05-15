@@ -1,9 +1,10 @@
 package project_cluster
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
 	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/labels"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -25,7 +26,7 @@ var (
 
 func getExpectedVerbs(roleName string) []string {
 	if roleName == "test-cluster-clusterowner" {
-		return []string{"*"}
+		return []string{"get", "update", "delete", "patch", "create", "list", "watch", "deletecollection"}
 	}
 	return []string{"get"}
 }

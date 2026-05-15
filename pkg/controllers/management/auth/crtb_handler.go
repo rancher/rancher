@@ -182,7 +182,7 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding,
 // When a CRTB is created or updated, translate it into several k8s roles and bindings to actually enforce the RBAC
 // Specifically:
 // - ensure the subject can see the cluster in the mgmt API
-// - if the subject was granted owner permissions for the clsuter, ensure they can create/update/delete the cluster
+// - if the subject was granted owner permissions for the cluster, ensure they can create/update/delete the cluster
 // - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules in the cluster's mgmt plane namespace
 func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding, localConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: bindingExists}
@@ -193,14 +193,15 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 
 	clusterName := binding.ClusterName
 	cluster, err := c.clusterLister.Get("", clusterName)
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		c.s.AddCondition(localConditions, condition, failedToGetCluster, err)
 		return err
 	}
 	if cluster == nil {
-		err = fmt.Errorf("cannot create binding because cluster %s was not found", clusterName)
-		c.s.AddCondition(localConditions, condition, clusterNotFound, err)
-		return err
+		notFoundErr := fmt.Errorf("cannot create binding %s/%s because cluster %s was not found", binding.Namespace, binding.Name, clusterName)
+		logrus.Warn(notFoundErr)
+		c.s.AddCondition(localConditions, condition, clusterNotFound, notFoundErr)
+		return nil
 	}
 	// if roletemplate is not builtin, check if it's inherited/cloned
 	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext, 0)
