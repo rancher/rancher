@@ -50,7 +50,7 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
 
 ENV GOLANGCI_LINT=v2.12.2
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/main/install.sh | sh -s "${GOLANGCI_LINT}"; \
     fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.
