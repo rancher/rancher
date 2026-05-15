@@ -104,6 +104,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/locker v1.0.1
+	github.com/moby/sys/reexec v0.1.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible

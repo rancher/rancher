@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/ehazlett/simplelog"
+	"github.com/moby/sys/reexec"
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
-	"github.com/rancher/rancher/pkg/multicall"
 	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/v3/pkg/signals"
@@ -32,9 +32,8 @@ func init() {
 }
 
 func main() {
-	// This program multicall commands based on binary/symlink name
-	if fn := multicall.Resolve(); fn != nil {
-		fn()
+	// This program supports multicall commands based on binary/symlink name
+	if reexec.Init() {
 		return
 	}
 

@@ -7,10 +7,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/moby/sys/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/multicall"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/urfave/cli"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,8 +21,10 @@ import (
 )
 
 func RegisterPasswordResetCommand() {
-	multicall.Register("/usr/bin/reset-password", resetPassword)
-	multicall.Register("reset-password", resetPassword)
+	reexec.Register("reset-password", resetPassword)
+
+	// NOTE: future versions of reexec (unreleased at the moment) may panic when registering a full path, so this line may need to be deleted:
+	reexec.Register("/usr/bin/reset-password", resetPassword)
 }
 
 const (
