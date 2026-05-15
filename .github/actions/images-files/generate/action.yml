@@ -11,9 +11,9 @@ runs:
     - id: env
       name: Setup Dependencies Env Variables
       uses: ./.github/actions/setup-build-env
-    - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+    - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
-        go-version: '${{ steps.env.outputs.GO_VERSION }}'
+        go-version-file: 'go.mod'
         cache: ${{ github.event_name == 'pull_request' }}
     - name: Download data.json
       shell: bash

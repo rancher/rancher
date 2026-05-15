@@ -13,7 +13,6 @@ jobs:
     runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
     env:
       GOLANG_CI_LINT_VERSION: v2.7.2
-      GOLANG_VERSION: '1.25'
     steps:
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
@@ -24,7 +23,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: "${{ env.GOLANG_VERSION }}"
+          go-version-file: 'go.mod'
           cache: ${{ github.event_name == 'pull_request' }}
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0

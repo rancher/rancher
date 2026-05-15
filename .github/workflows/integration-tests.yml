@@ -7,7 +7,6 @@ env:
   HOST_ARCH: amd64
   ARCH: amd64
   PYTHON_VERSION: '3.11'
-  GOLANG_VERSION: '1.25'
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}
@@ -99,7 +98,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: "${{ env.GOLANG_VERSION }}"
+          go-version-file: 'go.mod'
       - name: Build Integration Setup
         shell: bash
         run: |
