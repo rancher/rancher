@@ -329,7 +329,7 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 	}
 
 	if makeOwner {
-		rules[0].Verbs = []string{"*"}
+		rules[0].Verbs = []string{"get", "update", "delete", "patch", "create", "list", "watch", "deletecollection"}
 	} else {
 		rules[0].Verbs = []string{"get"}
 	}
