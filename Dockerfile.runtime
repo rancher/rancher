@@ -23,7 +23,7 @@
 #   - rancher-machine
 #   - Python 3.11 + tox (for validation/integration test suites)
 
-FROM registry.suse.com/bci/golang:1.25
+FROM registry.suse.com/bci/golang:1.26
 
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
