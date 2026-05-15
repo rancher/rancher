@@ -112,7 +112,10 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	}
 	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
 	if err != nil {
-		return nil, err
+		if errors.IsNotFound(err) {
+			return cluster, nil
+		}
+		return cluster, err
 	}
 	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
 		return cluster, nil
@@ -501,7 +504,10 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 	}
 	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
 	if err != nil {
-		return nil, err
+		if errors.IsNotFound(err) {
+			return cluster, nil
+		}
+		return cluster, err
 	}
 	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
 		return cluster, nil
