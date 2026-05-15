@@ -1,8 +1,8 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.25.0
+go 1.26.0
 
-toolchain go1.25.8
+toolchain go1.26.3
 
 replace (
 	github.com/rancher/rancher/pkg/plan => ../plan
