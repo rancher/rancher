@@ -331,7 +331,7 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 			},
 			expected: map[string]any{
 				"id":                 "genericoidc",
-				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
+				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback&scope=openid+profile+email",
 				"scopes":             "openid profile email",
 				"logoutAllSupported": false,
 				"logoutAllEnabled":   false,
@@ -351,7 +351,7 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 			},
 			expected: map[string]any{
 				"id":                 "genericoidc",
-				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback&acr_values=testing",
+				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback&scope=openid+profile+email&acr_values=testing",
 				"scopes":             "openid profile email",
 				"logoutAllSupported": false,
 				"logoutAllEnabled":   false,

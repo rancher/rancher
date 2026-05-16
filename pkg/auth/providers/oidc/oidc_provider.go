@@ -257,21 +257,35 @@ func GetOIDCRedirectionURL(config map[string]any, pkceVerifier string, values ur
 func (o *OpenIDCProvider) getRedirectURL(authConfig map[string]any) (string, error) {
 	name := authConfig["metadata"].(map[string]any)["name"].(string)
 	rancherAPIHost, ok := authConfig[client.GenericOIDCConfigFieldRancherAPIHost].(string)
+	
+	scopes, _ := authConfig["scope"].(string)
+
 	// No API Host - no PKCE Redirection.
 	if !ok {
 		logrus.Debugf("OpenIDCProvider: No API Host - no PKCE Redirection")
 		authURL, _ := FetchAuthURL(authConfig)
-		return fmt.Sprintf(
+		redirectURL := fmt.Sprintf(
 			"%s?client_id=%s&response_type=code&redirect_uri=%s",
 			authURL,
 			authConfig["clientId"],
 			authConfig["rancherUrl"],
-		), nil
+		)
+		if scopes != "" {
+			redirectURL = fmt.Sprintf("%s&scope=%s", redirectURL, url.QueryEscape(scopes))
+		}
+		return redirectURL, nil
 
 	}
 
 	// This redirects via the handler in pkg/auth/handler
-	return url.JoinPath(rancherAPIHost, "v1-oidc", name)
+	redirectURL, err := url.JoinPath(rancherAPIHost, "v1-oidc", name)
+	if err != nil {
+		return "", err
+	}
+	if scopes != "" {
+		redirectURL = fmt.Sprintf("%s?scope=%s", redirectURL, url.QueryEscape(scopes))
+	}
+	return redirectURL, nil
 }
 
 func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
