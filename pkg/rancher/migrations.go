@@ -48,6 +48,7 @@ const (
 	rkeCleanupMigration                               = "rkecleanupmigration"
 	managementNodeCleanupMigration                    = "managementnodecleanupmigration"
 	cleanupProvisioningClusterMgmtOnlyConditions      = "cleanupprovisioningclustermgmtonlyconditions"
+	migrateRKE2PrimeAnnotation                        = "migrateke2primeannotation"
 	rancherVersionKey                                 = "rancherVersion"
 	projectsCreatedKey                                = "projectsCreated"
 	namespacesAssignedKey                             = "namespacesAssigned"
@@ -59,6 +60,7 @@ const (
 	rkeCleanupCompletedKey                            = "rkecleanupcompleted"
 	managementCleanupCompletedKey                     = "managementcleanupcompleted"
 	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
+	rke2PrimeAnnotationMigratedKey                     = "rke2PrimeAnnotationMigrated"
 )
 
 var (
@@ -115,6 +117,9 @@ func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 			return err
 		}
 		if err := cleanupMgmtOnlyConditionsFromProvisioningClusters(wranglerContext); err != nil {
+			return err
+		}
+		if err := migrateExistingRKE2ClustersPrimeAnnotation(wranglerContext); err != nil {
 			return err
 		}
 	}
@@ -802,5 +807,67 @@ func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) 
 	}
 
 	cm.Data[provisioningClusterMgmtOnlyConditionsCleanedUpKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+// migrateExistingRKE2ClustersPrimeAnnotation sets the provisioning.cattle.io/rke2-prime-enabled=false
+// annotation on all existing RKE2 provisioning clusters that do not already have the annotation.
+// This ensures existing clusters are unaffected when the rke2-provisioning-prime-default setting
+// defaults to true (e.g., in Prime builds).
+func migrateExistingRKE2ClustersPrimeAnnotation(w *wrangler.CAPIContext) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateRKE2PrimeAnnotation)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[rke2PrimeAnnotationMigratedKey] == "true" {
+		return nil
+	}
+
+	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, provCluster := range provClusters.Items {
+		// Only process RKE2 clusters (those with an RKEConfig and an RKE2 kubernetes version)
+		if provCluster.Spec.RKEConfig == nil {
+			continue
+		}
+		if capr.GetRuntime(provCluster.Spec.KubernetesVersion) != capr.RuntimeRKE2 {
+			continue
+		}
+
+		// Skip if annotation is already set
+		if _, ok := provCluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
+			continue
+		}
+
+		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+
+			// Re-check after fresh get
+			if _, ok := cluster.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
+				return nil
+			}
+
+			cluster = cluster.DeepCopy()
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[capr.RKE2PrimeEnabledAnnotation] = "false"
+			_, err = w.Provisioning.Cluster().Update(cluster)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[rke2PrimeAnnotationMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }

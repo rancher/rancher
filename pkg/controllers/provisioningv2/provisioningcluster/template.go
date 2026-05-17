@@ -644,7 +644,8 @@ func rkeControlPlane(cluster *provv1.Cluster) (*rkev1.RKEControlPlane, error) {
 				capr.InitNodeMachineIDLabel: cluster.Labels[capr.InitNodeMachineIDLabel],
 			},
 			Annotations: map[string]string{
-				capr.ClusterSpecAnnotation: b64GZCluster,
+				capr.ClusterSpecAnnotation:     b64GZCluster,
+				capr.RKE2PrimeEnabledAnnotation: cluster.Annotations[capr.RKE2PrimeEnabledAnnotation],
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
