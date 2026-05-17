@@ -131,4 +131,16 @@ func TestAddRKE2Prime(t *testing.T) {
 		// Without KDM release data, prime won't be added (safety check)
 		assert.NotContains(t, config, "prime")
 	})
+
+	t.Run("empty annotation falls through to global setting", func(t *testing.T) {
+		_ = settings.Rke2ProvisioningPrimeDefault.Set("false")
+		// An empty annotation value (e.g. propagated from a cluster without the annotation)
+		// should be treated as absent, falling through to the global setting.
+		cp := newTestControlPlane("v1.35.0+rke2r1", map[string]string{
+			capr.RKE2PrimeEnabledAnnotation: "",
+		})
+		config := map[string]interface{}{}
+		addRKE2Prime(config, cp, newServerEntry())
+		assert.NotContains(t, config, "prime")
+	})
 }

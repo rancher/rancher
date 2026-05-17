@@ -205,9 +205,10 @@ func addRKE2Prime(config map[string]interface{}, controlPlane *rkev1.RKEControlP
 		return
 	}
 
-	// Determine if prime should be enabled: annotation takes precedence over global setting
+	// Determine if prime should be enabled: annotation takes precedence over global setting.
+	// An empty annotation value is treated the same as absent (fall through to global setting).
 	primeEnabled := false
-	if ann, ok := controlPlane.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok {
+	if ann, ok := controlPlane.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok && ann != "" {
 		primeEnabled = strings.EqualFold(ann, "true")
 	} else {
 		primeEnabled = strings.EqualFold(settings.Rke2ProvisioningPrimeDefault.Get(), "true")
