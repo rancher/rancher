@@ -48,7 +48,7 @@ const (
 	rkeCleanupMigration                               = "rkecleanupmigration"
 	managementNodeCleanupMigration                    = "managementnodecleanupmigration"
 	cleanupProvisioningClusterMgmtOnlyConditions      = "cleanupprovisioningclustermgmtonlyconditions"
-	migrateRKE2PrimeAnnotation                        = "migrateke2primeannotation"
+	migrateRKE2PrimeAnnotation                        = "migraterke2primeannotation"
 	rancherVersionKey                                 = "rancherVersion"
 	projectsCreatedKey                                = "projectsCreated"
 	namespacesAssignedKey                             = "namespacesAssigned"
@@ -60,7 +60,7 @@ const (
 	rkeCleanupCompletedKey                            = "rkecleanupcompleted"
 	managementCleanupCompletedKey                     = "managementcleanupcompleted"
 	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
-	rke2PrimeAnnotationMigratedKey                     = "rke2PrimeAnnotationMigrated"
+	rke2PrimeAnnotationMigratedKey                    = "rke2PrimeAnnotationMigrated"
 )
 
 var (
