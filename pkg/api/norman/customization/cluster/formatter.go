@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -34,10 +35,12 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	if convert.ToBool(resource.Values["internal"]) {
 		delete(resource.Links, "remove")
 	}
-	shellLink := request.URLBuilder.Link("shell", resource)
-	shellLink = strings.Replace(shellLink, "http", "ws", 1)
-	shellLink = strings.Replace(shellLink, "/shell", "?shell=true", 1)
-	resource.Links["shell"] = shellLink
+	if features.ClusterShell.Enabled() {
+		shellLink := request.URLBuilder.Link("shell", resource)
+		shellLink = strings.Replace(shellLink, "http", "ws", 1)
+		shellLink = strings.Replace(shellLink, "/shell", "?shell=true", 1)
+		resource.Links["shell"] = shellLink
+	}
 	resource.AddAction(request, v32.ClusterActionGenerateKubeconfig)
 	resource.AddAction(request, v32.ClusterActionImportYaml)
 

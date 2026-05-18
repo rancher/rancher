@@ -148,6 +148,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 
 	registryURL, registryConfig, err := util.GeneratePrivateRegistryEncodedDockerConfig(cluster, secretLister)
 	if err != nil {
+		logrus.Errorf("[system-template] failed to generate registry config when deploying cattle cluster agent for cluster %s: %v", cluster.Name, err)
 		return err
 	}
 
@@ -233,6 +234,11 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		pdb = string(pdbYaml)
 	}
 
+	rcfg := ""
+	if len(registryConfig) > 0 {
+		rcfg = registryConfig[0].DockerConfigJSON
+	}
+
 	context := &clusterAgentContext{
 		Features:              toFeatureString(agentFeatures),
 		CAChecksum:            CAChecksum(),
@@ -245,7 +251,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
 		IsPreBootstrap:        isPreBootstrap,
-		PrivateRegistryConfig: registryConfig,
+		PrivateRegistryConfig: rcfg,
 		Tolerations:           tolerations,
 		AppendTolerations:     agentAppendTolerations,
 		Affinity:              agentAffinity,

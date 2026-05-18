@@ -75,8 +75,8 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		deploymentCache:                wContext.Apps.Deployment().Cache(),
 		clusterRepo:                    wContext.Catalog.ClusterRepo(),
 		clusterCache:                   wContext.Mgmt.Cluster().Cache(),
-		plan:                           wContext.Plan.Plan(),
-		planCache:                      wContext.Plan.Plan().Cache(),
+		plan:                           wContext.Upgrade.Plan(),
+		planCache:                      wContext.Upgrade.Plan().Cache(),
 		secrets:                        wContext.Core.Secret(),
 		validatingWebhookConfiguration: wContext.Admission.ValidatingWebhookConfiguration(),
 		mutatingWebhookConfigurations:  wContext.Admission.MutatingWebhookConfiguration(),
@@ -94,7 +94,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 
 	wContext.Apps.Deployment().OnChange(ctx, "legacy-k3sBasedUpgrader-deprecation", h.onDeployment)
 
-	wContext.Plan.Plan().OnChange(ctx, "monitor-plans", h.onPlan)
+	wContext.Upgrade.Plan().OnChange(ctx, "monitor-plans", h.onPlan)
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "monitor-local-cluster", h.onCluster)
 

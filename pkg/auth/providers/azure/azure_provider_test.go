@@ -408,23 +408,67 @@ func TestPreserveStoredFields(t *testing.T) {
 			want:     v3.AzureADConfig{},
 		},
 		{
-			name: "SLO fields always preserved from stored",
+			name: "LogoutAllSupported preserved from stored",
 			stored: v3.AzureADConfig{
 				AuthConfig: v3.AuthConfig{
 					LogoutAllSupported: true,
 				},
-				EndSessionEndpoint: "https://custom.gov/logout",
-				LogoutAllEnabled:   true,
-				LogoutAllForced:    true,
 			},
 			incoming: v3.AzureADConfig{},
 			want: v3.AzureADConfig{
 				AuthConfig: v3.AuthConfig{
 					LogoutAllSupported: true,
 				},
+			},
+		},
+		{
+			name:   "LogoutAllEnabled from incoming overrides stored false",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				LogoutAllEnabled: true,
+			},
+			want: v3.AzureADConfig{
+				LogoutAllEnabled: true,
+			},
+		},
+		{
+			name: "LogoutAllEnabled from incoming overrides stored true",
+			stored: v3.AzureADConfig{
+				LogoutAllEnabled: true,
+			},
+			incoming: v3.AzureADConfig{},
+			want:     v3.AzureADConfig{},
+		},
+		{
+			name:   "LogoutAllForced from incoming overrides stored false",
+			stored: v3.AzureADConfig{},
+			incoming: v3.AzureADConfig{
+				LogoutAllForced: true,
+			},
+			want: v3.AzureADConfig{
+				LogoutAllForced: true,
+			},
+		},
+		{
+			name: "EndSessionEndpoint preserved when incoming is empty",
+			stored: v3.AzureADConfig{
 				EndSessionEndpoint: "https://custom.gov/logout",
-				LogoutAllEnabled:   true,
-				LogoutAllForced:    true,
+			},
+			incoming: v3.AzureADConfig{},
+			want: v3.AzureADConfig{
+				EndSessionEndpoint: "https://custom.gov/logout",
+			},
+		},
+		{
+			name: "EndSessionEndpoint from incoming used when non-empty",
+			stored: v3.AzureADConfig{
+				EndSessionEndpoint: "https://custom.gov/logout",
+			},
+			incoming: v3.AzureADConfig{
+				EndSessionEndpoint: "https://other.gov/logout",
+			},
+			want: v3.AzureADConfig{
+				EndSessionEndpoint: "https://other.gov/logout",
 			},
 		},
 		{

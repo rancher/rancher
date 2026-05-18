@@ -63,6 +63,8 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	}
 
 	clustersClient.AddHandler(ctx, "cluster-stats", s.sync)
+	// This handler enqueues the corresponding mgmt.Cluster for every mgmt.Node reconciliation. Other handlers may also rely on this.
+	// Nonetheless, in order to prevent unnecessary reconciliation when a cluster has many nodes, we are throttling (and deduplicating) the trigger.
 	machinesClient.AddHandler(ctx, "cluster-stats", s.machineChanged)
 }
 
@@ -358,8 +360,12 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 		return nil, nil
 	}
 
-	d := s.getMininumWaitTime(machine.Namespace)
-	s.Clusters.Controller().EnqueueAfter("", machine.Namespace, d)
+	if d := s.getMininumWaitTime(machine.Namespace); d > 0 {
+		s.Clusters.Controller().EnqueueAfter("", machine.Namespace, d)
+	} else {
+		// EnqueueAfter with a zero duration short-circuits to workqueue.Add, bypassing the rate-limiter
+		s.Clusters.Controller().Enqueue("", machine.Namespace)
+	}
 
 	return nil, nil
 }

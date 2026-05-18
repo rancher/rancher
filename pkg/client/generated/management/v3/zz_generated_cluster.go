@@ -21,6 +21,7 @@ const (
 	ClusterFieldAnnotations                                          = "annotations"
 	ClusterFieldAppliedAgentEnvVars                                  = "appliedAgentEnvVars"
 	ClusterFieldAppliedClusterAgentDeploymentCustomization           = "appliedClusterAgentDeploymentCustomization"
+	ClusterFieldAppliedClusterAgentImagePullSecretsHash              = "appliedClusterAgentImagePullSecretsHash"
 	ClusterFieldAppliedEnableNetworkPolicy                           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedSpec                                          = "appliedSpec"
 	ClusterFieldAuthImage                                            = "authImage"
@@ -106,6 +107,7 @@ type Cluster struct {
 	Annotations                                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AppliedAgentEnvVars                                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization           *AgentDeploymentCustomization  `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	AppliedClusterAgentImagePullSecretsHash              string                         `json:"appliedClusterAgentImagePullSecretsHash,omitempty" yaml:"appliedClusterAgentImagePullSecretsHash,omitempty"`
 	AppliedEnableNetworkPolicy                           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedSpec                                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AuthImage                                            string                         `json:"authImage,omitempty" yaml:"authImage,omitempty"`

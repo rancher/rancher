@@ -26,7 +26,7 @@ type handler struct {
 	migrator             *Migrator
 	authConfigLister     v3.AuthConfigLister
 	clusters             mgmtcontrollers.ClusterClient
-	provisioningClusters provv1.ClusterController
+	provisioningClusters provv1.ClusterClient
 	projectLister        v3.ProjectLister
 	// AuthConfigs contain internal-only fields that deal with various auth providers.
 	// Those fields are not present everywhere, nor are they defined in the CRD. Given

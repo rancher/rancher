@@ -17,6 +17,10 @@ spec:
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}-pre-upgrade
       restartPolicy: Never
+{{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 6 }}
+{{- end }}
       containers:
         - name: {{ template "rancher.name" . }}-pre-upgrade
           image: "{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . .Values.preUpgrade.image.registry)) .Values.preUpgrade.image.repository }}:{{ .Values.preUpgrade.image.tag }}"

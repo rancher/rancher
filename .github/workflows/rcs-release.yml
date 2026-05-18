@@ -4,7 +4,8 @@ on:
     tags:
       - "v*-rcs*"
 
-permissions: {}
+permissions:
+  contents: read
 
 env:
   COMMIT: ${{ github.sha }}

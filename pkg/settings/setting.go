@@ -61,6 +61,8 @@ var (
 		"cattle-tokens",
 		"cattle-oidc-codes",
 		"cattle-oidc-client-secrets",
+		"cattle-turtles-system",
+		"cattle-capi-system",
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
@@ -95,7 +97,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.15-pr")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.15-rke2-k3s-may-patch")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -275,6 +277,10 @@ var (
 	// SystemDefaultRegistry is the default container registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
 	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
+
+	// SystemDefaultRegistryPullSecrets are the default pull secrets used for authenticating to the system default container registry.
+	// The environmental variable "CATTLE_BASE_REGISTRY_PULL_SECRETS" controls the default value of this setting.
+	SystemDefaultRegistryPullSecrets = NewSetting("system-default-registry-pull-secrets", os.Getenv("CATTLE_BASE_REGISTRY_PULL_SECRETS"))
 
 	// K3sBasedUpgraderUninstallConcurrency defines the maximum number of clusters
 	// for which Rancher can simultaneously uninstall the legacy K3s-based upgrade app.
