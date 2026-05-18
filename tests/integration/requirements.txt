@@ -3,7 +3,7 @@ websocket-client==0.56.0
 PyJWT==2.4.0
 
 flask==2.2.5
-pytest==6.2.5
+pytest==9.0.3
 pytest-repeat==0.8.0
 pytest-xdist==2.0.0
 pytest-timeout==2.1.0
