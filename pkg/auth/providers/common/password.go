@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/namespace"
@@ -50,7 +49,7 @@ func CreateOrUpdateSecrets(secrets wcorev1.SecretController, secretInfo, field, 
 		return "", fmt.Errorf("error getting secret for %s : %w", name, err)
 	}
 
-	if err == nil && !reflect.DeepEqual(curr.Data, secret.Data) {
+	if err == nil && string(curr.Data[field]) != secretInfo {
 		_, err = secrets.Update(secret)
 		if err != nil {
 			return "", fmt.Errorf("error updating secret %s: %w", name, err)
