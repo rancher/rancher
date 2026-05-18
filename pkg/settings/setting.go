@@ -129,6 +129,9 @@ var (
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
+	SystemAgentInstallerTokenTTLEnabled = NewSetting("system-agent-installer-token-ttl-enabled", "true")
+	SystemAgentInstallerTokenShortTTL   = NewSetting("system-agent-installer-token-short-ttl", "30s")
+	SystemAgentInstallerTokenLongTTL    = NewSetting("system-agent-installer-token-long-ttl", "30m")
 	SystemNamespaces                    = NewSetting("system-namespaces", strings.Join(systemNamespaces, ","))
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")

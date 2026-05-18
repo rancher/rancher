@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -119,6 +120,9 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 	planSecret, secret, err := r.findSA(req)
 	if apierrors.IsNotFound(err) {
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	} else if errors.Is(err, retrievalInvalidatedError) {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	} else if err != nil {
