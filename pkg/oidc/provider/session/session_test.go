@@ -294,6 +294,62 @@ func TestCleanUpExpiredSession(t *testing.T) {
 	}
 }
 
+func TestCleanUpExpiredSessionsListErrorDoesNotDeadlock(t *testing.T) {
+	// When secretCache.List returns an error, the mutex is released so that subsequent
+	// store operations (e.g. Remove) are not permanently blocked.
+	ctrl := gomock.NewController(t)
+
+	secretCache := fake.NewMockCacheInterface[*v1.Secret](ctrl)
+	secretCache.EXPECT().
+		List(namespace, labels.Set{secretLabel: "true"}.AsSelector()).
+		Return(nil, fmt.Errorf("list error"))
+
+	fakeCode := "code123"
+	secretClient := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl)
+	// AnyTimes because the call will never reach Delete if the mutex deadlocks.
+	secretClient.EXPECT().
+		Delete(namespace, fakeCode, &metav1.DeleteOptions{}).
+		Return(nil).
+		AnyTimes()
+
+	storage := &SecretSessionStore{
+		secretClient: secretClient,
+		secretCache:  secretCache,
+		expiryTime:   time.Hour,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// If the mutex is not released, the test will deadlock and time out.
+	c := make(chan time.Time)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		storage.cleanUpExpiredSessions(ctx, c)
+	}()
+
+	// Trigger the error path. The buggy implementation calls return while still
+	// holding m.mu, so the goroutine exits with the mutex locked.
+	c <- time.Unix(0, 0)
+	wg.Wait()
+
+	// Remove must acquire m.mu. If cleanUpExpiredSessions exited while holding
+	// the lock, this call will deadlock and the test will time out.
+	done := make(chan error, 1)
+	go func() {
+		done <- storage.Remove(fakeCode)
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("deadlock: mutex was not released after cleanUpExpiredSessions encountered a list error")
+	}
+}
+
 func TestRemove(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	fakeCode := "code123"
