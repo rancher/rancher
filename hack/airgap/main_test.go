@@ -125,7 +125,7 @@ func TestFetchContextNotCanceledBeforeBodyRead(t *testing.T) {
 		go func() {
 			// Write content but don't close — the context
 			// cancellation path above will close it.
-			pw.Write([]byte(content))
+			_, _ = pw.Write([]byte(content))
 		}()
 
 		// This is the key part: the old code did `defer cancel()` here,
