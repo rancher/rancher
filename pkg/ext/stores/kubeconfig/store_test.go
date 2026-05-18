@@ -1184,7 +1184,7 @@ func TestStoreCreate(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, obj)
 		assert.True(t, apierrors.IsBadRequest(err))
-		assert.Contains(t, err.Error(), "exceeds max ttl")
+		assert.ErrorContains(t, err, "exceeds max ttl")
 	})
 	t.Run("exclude default entry with no clusters", func(t *testing.T) {
 		store := &Store{
@@ -1211,7 +1211,7 @@ func TestStoreCreate(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, obj)
 		assert.True(t, apierrors.IsBadRequest(err))
-		assert.Contains(t, err.Error(), "at least one cluster is required when includeDefaultEntry is false")
+		assert.ErrorContains(t, err, "at least one cluster is required when includeDefaultEntry is false")
 	})
 	t.Run("exclude default entry with non-ACE clusters", func(t *testing.T) {
 		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -1285,7 +1285,7 @@ func TestStoreCreate(t *testing.T) {
 
 		require.Len(t, tokenManager.sharedTokenKeys, 1)
 		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
-		require.Len(t, tokenManager.clusterTokenKeys, 0)
+		require.Empty(t, tokenManager.clusterTokenKeys)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
@@ -1351,7 +1351,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.NotContains(t, config.Contexts, defaultClusterName)
 		assert.NotContains(t, config.AuthInfos, defaultClusterName)
 
-		require.Len(t, tokenManager.sharedTokenKeys, 0)
+		require.Empty(t, tokenManager.sharedTokenKeys)
 		require.Len(t, tokenManager.clusterTokenKeys, 1)
 
 		assert.Equal(t, "downstream2-cp", config.CurrentContext)
