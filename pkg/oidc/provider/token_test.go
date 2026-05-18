@@ -352,6 +352,32 @@ func TestTokenEndpoint(t *testing.T) {
 			},
 			wantError: `{"error":"access_denied","error_description":"user is disabled"}`,
 		},
+		// Regression test for: session code was only removed on successful token
+		// creation; a failed createTokenResponse left the code reusable, violating
+		// the OIDC spec requirement that authorization codes are single-use.
+		"authorization_code removes the session even when token creation fails": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "authorization_code")
+				data.Set("code", fakeCode)
+				data.Set("code_verifier", fakeCodeVerifier)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.sessionClient.EXPECT().Get(fakeCode).Return(fakeSession, nil)
+				// Remove must be called regardless of whether token creation succeeds.
+				m.sessionClient.EXPECT().Remove(fakeCode).Return(nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{fakeOIDCClient}, nil)
+				m.secretCache.EXPECT().Get("cattle-oidc-client-secrets", fakeClientID).Return(fakeClientk8sSecret, nil)
+				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(fakeExpiredToken, nil)
+			},
+			wantError: `{"error":"access_denied","error_description":"Rancher token has expired"}`,
+		},
 		"authorization_code returns a refresh_token when offline_token scope is provided": {
 			req: func() *http.Request {
 				data := url.Values{}
