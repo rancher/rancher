@@ -182,7 +182,12 @@ func New(
 
 // NewSystemFromWrangler is a convenience function for creating a system token
 // store. It initializes the returned store from the provided wrangler context.
-func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
+// An optional authorizer can be provided for cluster-scoped token authorization.
+func NewSystemFromWrangler(wranglerContext *wrangler.Context, authz ...authorizer.Authorizer) *SystemStore {
+	var authorizer authorizer.Authorizer
+	if len(authz) > 0 {
+		authorizer = authz[0]
+	}
 	return NewSystem(
 		wranglerContext.Core.Namespace(),
 		wranglerContext.Core.Namespace().Cache(),
@@ -193,6 +198,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 		NewTimeHandler(),
 		NewHashHandler(),
 		NewAuthHandler(),
+		authorizer,
 	)
 }
 
@@ -200,6 +206,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 // accessors to all the other controllers the store requires for proper
 // function. Note that it is recommended to use the NewSystemFromWrangler
 // convenience function instead.
+// An optional authorizer can be provided as the last argument for cluster-scoped token authorization.
 func NewSystem(
 	namespaceClient v1.NamespaceClient,
 	namespaceCache v1.NamespaceCache,
@@ -210,8 +217,14 @@ func NewSystem(
 	timer timeHandler,
 	hasher hashHandler,
 	auth authHandler,
+	authz ...authorizer.Authorizer,
 ) *SystemStore {
+	var authorizer authorizer.Authorizer
+	if len(authz) > 0 {
+		authorizer = authz[0]
+	}
 	tokenStore := SystemStore{
+		authorizer:      authorizer,
 		namespaceClient: namespaceClient,
 		namespaceCache:  namespaceCache,
 		secretClient:    secretClient,
@@ -673,7 +686,10 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 				token.Spec.ClusterName, err))
 		}
 
-		// Verify that user is authorized to access cluster
+		if t.authorizer == nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("authorizer is required for cluster-scoped tokens"))
+		}
+
 		decision, _, err := t.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 			User:            userInfo,
 			Verb:            "get",
