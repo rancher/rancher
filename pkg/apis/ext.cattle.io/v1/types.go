@@ -254,6 +254,12 @@ type KubeconfigSpec struct {
 	// TTL is the time-to-live of the kubeconfig tokens, in seconds.
 	// +optional
 	TTL int64 `json:"ttl,omitempty"`
+	// IncludeDefaultEntry controls whether the default "rancher" cluster/user/context entry
+	// pointing directly to the Rancher server URL is included in the generated kubeconfig.
+	// When nil or true (the default), the entry is included for backward compatibility.
+	// When false, the entry is omitted.
+	// +optional
+	IncludeDefaultEntry *bool `json:"includeDefaultEntry,omitempty"`
 }
 
 // KubeconfigStatus defines the most recently observed status of the Kubeconfig.
