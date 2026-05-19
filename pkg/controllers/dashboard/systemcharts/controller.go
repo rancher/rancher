@@ -149,7 +149,7 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 	}
 
 	chartsToInstall := h.getChartsToInstall()
-	logrus.Debugf("[system-charts] evaluating %d chart definition(s)", len(chartsToInstall))
+	logrus.Tracef("[system-charts] evaluating %d chart definition(s)", len(chartsToInstall))
 
 	for _, chartDef := range chartsToInstall {
 		logrus.Tracef("[system-charts] processing chart %q (namespace=%q, release=%q, uninstall=%v)", chartDef.ChartName, chartDef.ReleaseNamespace, chartDef.ReleaseName, chartDef.Uninstall)
@@ -560,7 +560,7 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 		if err != nil {
 			return nil, err
 		}
-		logrus.Debugf("[system-charts] enqueuing %q to reconcile after managed plan deletion", repoName)
+		logrus.Infof("[system-charts] enqueuing %q to reconcile after managed plan deletion", repoName)
 		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
 	}
 	if plan.DeletionTimestamp == nil && index == -1 {

@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"slices"
 	"strings"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	provisioningv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
@@ -28,28 +30,29 @@ import (
 )
 
 type handler struct {
-	settings                 mgmtcontrollers.SettingController
-	secrets                  corecontrollers.SecretController
-	secretCache              corecontrollers.SecretCache
-	project                  mgmtcontrollers.ProjectController
-	projectCache             mgmtcontrollers.ProjectCache
-	mgmtCluster              mgmtcontrollers.ClusterController
-	mgmtClusterCache         mgmtcontrollers.ClusterCache
-	provisioningClusterCache provisioningv1.ClusterCache
+	secrets               corecontrollers.SecretController
+	secretCache           corecontrollers.SecretCache
+	project               mgmtcontrollers.ProjectController
+	projectCache          mgmtcontrollers.ProjectCache
+	mgmtClusterCache      mgmtcontrollers.ClusterCache
+	mgmtClusterController mgmtcontrollers.ClusterController
 }
 
-const clusterToSysProjIndex = "mgmt-system-project"
+const (
+	clusterToSysProjIndex       = "mgmt-system-project"
+	clusterEnqueueBatchSize     = 10
+	clusterEnqueueDelay         = 2 * time.Second
+	clusterEnqueueJitterCeiling = 750 // milliseconds
+)
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
 	h := &handler{
-		settings:                 wContext.Mgmt.Setting(),
-		secrets:                  wContext.Core.Secret(),
-		secretCache:              wContext.Core.Secret().Cache(),
-		project:                  wContext.Mgmt.Project(),
-		projectCache:             wContext.Mgmt.Project().Cache(),
-		mgmtCluster:              wContext.Mgmt.Cluster(),
-		mgmtClusterCache:         wContext.Mgmt.Cluster().Cache(),
-		provisioningClusterCache: wContext.Provisioning.Cluster().Cache(),
+		secrets:               wContext.Core.Secret(),
+		secretCache:           wContext.Core.Secret().Cache(),
+		project:               wContext.Mgmt.Project(),
+		projectCache:          wContext.Mgmt.Project().Cache(),
+		mgmtClusterCache:      wContext.Mgmt.Cluster().Cache(),
+		mgmtClusterController: wContext.Mgmt.Cluster(),
 	}
 
 	// maps cluster names to their system projects
@@ -63,50 +66,37 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 		return []string{}, nil
 	})
 
-	h.settings.OnChange(ctx, "sync-source-secrets", h.labelSourceGlobalRegistryPullSecret)
-	h.mgmtCluster.OnChange(ctx, "manage-system-project-pull-secret-label", h.labelSystemProject)
-	h.mgmtCluster.OnChange(ctx, "manage-pss-downstream-clusters", h.manageImportedAndHostedClusterPSS)
+	// Updates source pull secrets in the cattle-system namespace when the global settings change
+	wContext.Mgmt.Setting().OnChange(ctx, "sync-source-secrets", h.labelConfiguredSourceGlobalRegistryPullSecrets)
+
+	// Labels the system project of imported or hosted clusters to request image pull secrets
+	wContext.Mgmt.Cluster().OnChange(ctx, "manage-configured-system-project-pull-secret-label", h.labelSystemProject)
+
+	// Creates PSS copies of the cluster level pull secrets configured for imported and hosted clusters.
+	wContext.Mgmt.Cluster().OnChange(ctx, "manage-pss-downstream-clusters", h.manageClusterSpecificPSS)
+
+	// Ensures that secrets configured in the global settings always have the source pull secret label.
+	wContext.Core.Secret().OnChange(ctx, "manage-configured-system-project-pull-secret-label", h.labelSourceGlobalRegistryPullSecret)
 
 	// enqueue any v3 cluster which relies on the global configuration to ensure that in place updates to global pull secrets are promptly applied to downstream clusters.
-	relatedresource.WatchClusterScoped(ctx, "sync-cluster-global-pull-secret-contents", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		sec, ok := obj.(*kcorev1.Secret)
-		if !ok {
-			logrus.Errorf("[private-registry] failed to convert to secret")
-			return nil, nil
-		}
-		if sec.Labels == nil || sec.Labels[util.SourcePullSecretLabel] != "true" {
-			return nil, nil
-		}
-
-		configuredPullSecrets := activeGlobalPullSecrets()
-		if !configuredPullSecrets.Has(sec.Name) {
-			return nil, nil
-		}
-
-		return findV3ClustersUsingGlobalPullSecrets(h.mgmtClusterCache)
-	}, wContext.Mgmt.Cluster(), wContext.Core.Secret())
+	relatedresource.WatchClusterScoped(ctx, "sync-cluster-global-pull-secret-contents", h.syncClusterOnGlobalPullSecretChange, wContext.Mgmt.Cluster(), wContext.Core.Secret())
 
 	// enqueue any v3 cluster which relies on the global configuration to ensure that setting changes are promptly applied to downstream clusters
-	relatedresource.WatchClusterScoped(ctx, "sync-cluster-global-pull-secret-settings", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if name != settings.SystemDefaultRegistryPullSecrets.Name && name != settings.SystemDefaultRegistry.Name {
-			return nil, nil
-		}
-		return findV3ClustersUsingGlobalPullSecrets(h.mgmtClusterCache)
-	}, wContext.Mgmt.Cluster(), wContext.Mgmt.Setting())
+	relatedresource.WatchClusterScoped(ctx, "sync-cluster-global-pull-secret-settings", h.syncClusterOnGlobalRegistrySettingChange, wContext.Mgmt.Cluster(), wContext.Mgmt.Setting())
 }
 
 // labelSystemProject manages the 'management.cattle.io/use-global-private-registry-pull-secret' label
 // on system projects associated with imported or hosted clusters which rely on the global system default
 // registry pull secrets. This label is referenced in the project scoped secrets implementation to
 // ensure that the globally defined pull secrets are properly copied into the relevant namespaces in
-// the local cluster and downstream imported and hosted clusters.
+// downstream imported and hosted clusters.
 func (h *handler) labelSystemProject(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil {
+	if cluster == nil || cluster.Name == "local" {
 		return cluster, nil
 	}
 
 	logrus.Tracef("[private-registry] syncing system project label for cluster %q", cluster.Name)
-	if (!v3.ClusterConditionSystemProjectCreated.IsTrue(cluster) || !v3.ClusterConditionAgentDeployed.IsTrue(cluster)) && cluster.Name != "local" {
+	if !v3.ClusterConditionSystemProjectCreated.IsTrue(cluster) || !v3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		logrus.Debugf("[private-registry] cluster %q not ready (systemProjectCreated=%v, agentDeployed=%v), skipping",
 			cluster.Name,
 			v3.ClusterConditionSystemProjectCreated.IsTrue(cluster),
@@ -163,11 +153,11 @@ func (h *handler) labelSystemProject(_ string, cluster *v3.Cluster) (*v3.Cluster
 	return cluster, nil
 }
 
-// labelSourceGlobalRegistryPullSecret handles the labeling and unlabeling of global system default registry pull secrets.
-// The label is used by other controls to synchronize the contents of the source pull secret to PSS copies in downstream clusters and
-// system project namespaces in the local cluster.
-func (h *handler) labelSourceGlobalRegistryPullSecret(_ string, setting *v3.Setting) (*v3.Setting, error) {
-	if setting == nil || setting.Name != settings.SystemDefaultRegistryPullSecrets.Name {
+// labelConfiguredSourceGlobalRegistryPullSecrets handles the labeling and unlabeling of global system default registry pull secrets whenever the
+// global settings change. The label is used by other controllers to synchronize the contents of the source pull secret to PSS copies
+// in downstream clusters and system project namespaces in the local cluster.
+func (h *handler) labelConfiguredSourceGlobalRegistryPullSecrets(_ string, setting *v3.Setting) (*v3.Setting, error) {
+	if setting == nil || (setting.Name != settings.SystemDefaultRegistryPullSecrets.Name && setting.Name != settings.SystemDefaultRegistry.Name) {
 		return setting, nil
 	}
 
@@ -244,12 +234,58 @@ func (h *handler) labelSourceGlobalRegistryPullSecret(_ string, setting *v3.Sett
 	return setting, nil
 }
 
-// manageImportedAndHostedClusterPSS handles the synchronization of source image pull secrets and project scoped secrets
-// for downstream imported and hosted clusters only. This handler specifically focuses on clusters which define an override,
-// and ignores clusters that rely on the global configuration. Imported / Hosted clusters which rely on the GSDR will
-// receive their pull secrets via alternative system project pull secret propagation logic incorporated in the PSS implementation.
-func (h *handler) manageImportedAndHostedClusterPSS(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil || cluster.Name == "local" {
+// labelSourceGlobalRegistryPullSecret ensures that the secrets defined in the SystemDefaultRegistryPullSecrets global setting
+// always have the correct SourcePullSecretLabel label and PSS namespace ignore label values.
+func (h *handler) labelSourceGlobalRegistryPullSecret(_ string, s *kcorev1.Secret) (*corev1.Secret, error) {
+	if s == nil {
+		return s, nil
+	}
+	if s.Namespace != namespaces.System {
+		return s, nil
+	}
+	if s.Data == nil {
+		return s, nil
+	}
+
+	activePullSecrets := activeGlobalPullSecrets()
+	if !activePullSecrets.Has(s.Name) {
+		return s, nil
+	}
+
+	sps, hasSps := s.Labels[util.SourcePullSecretLabel]
+	ins, hasIns := s.Annotations[secret.PSSIgnoreNamespacesAnnotation]
+	expectedIns := strings.Join(settings.SystemNamespacesIgnoringPullSecrets, ",")
+	if !hasSps || sps != "true" || !hasIns || ins == "" || ins != expectedIns {
+		s = s.DeepCopy()
+		if s.Labels == nil {
+			s.Labels = map[string]string{}
+		}
+		if s.Annotations == nil {
+			s.Annotations = map[string]string{}
+		}
+		if !hasSps || sps != "true" {
+			s.Labels[util.SourcePullSecretLabel] = "true"
+		}
+		if !hasIns || ins == "" || ins != expectedIns {
+			s.Annotations[secret.PSSIgnoreNamespacesAnnotation] = expectedIns
+		}
+		_, err := h.secrets.Update(s)
+		if err != nil {
+			logrus.Errorf("[private-registry] failed to label secret %q as source pull secret: %v", s.Name, err)
+			return s, err
+		}
+	}
+
+	return s, nil
+}
+
+// manageClusterSpecificPSS handles the synchronization of source image pull secrets and project scoped secrets
+// for downstream imported and hosted clusters, as well as the local cluster. This handler specifically
+// focuses on clusters which define an override, and ignores clusters that rely on the global configuration,
+// with an exception for the local cluster. Imported / Hosted clusters which rely on the GSDR will receive
+// their pull secrets via alternative system project pull secret propagation logic incorporated in the PSS implementation.
+func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
+	if cluster == nil {
 		return cluster, nil
 	}
 
@@ -262,7 +298,7 @@ func (h *handler) manageImportedAndHostedClusterPSS(_ string, cluster *v3.Cluste
 		return cluster, nil
 	}
 
-	if !v3.ClusterConditionSystemProjectCreated.IsTrue(cluster) || !v3.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if cluster.Name != "local" && (!v3.ClusterConditionSystemProjectCreated.IsTrue(cluster) || !v3.ClusterConditionAgentDeployed.IsTrue(cluster)) {
 		logrus.Debugf("[private-registry] cluster %q not ready (systemProjectCreated=%v, agentDeployed=%v), skipping",
 			cluster.Name,
 			v3.ClusterConditionSystemProjectCreated.IsTrue(cluster),
@@ -289,7 +325,7 @@ func (h *handler) manageImportedAndHostedClusterPSS(_ string, cluster *v3.Cluste
 	}
 
 	privateRegistry, isGlobalDefault := util.GetPrivateRegistry(cluster)
-	if (privateRegistry == nil || isGlobalDefault) && len(createdPSS) == 0 {
+	if cluster.Name != "local" && (privateRegistry == nil || isGlobalDefault) && len(createdPSS) == 0 {
 		logrus.Debugf("[private-registry] no applicable cluster-level pull secrets for cluster %q (isGlobalDefault=%v), skipping", cluster.Name, isGlobalDefault)
 		return cluster, nil
 	}
@@ -320,7 +356,13 @@ func (h *handler) manageImportedAndHostedClusterPSS(_ string, cluster *v3.Cluste
 
 	// Delete any PSS's that were created for secrets no longer specified on the cluster object.
 	for _, pss := range createdPSS {
-		if slices.ContainsFunc(sourceAuthSecrets, func(s *kcorev1.Secret) bool { return s.Name == pss.Name }) {
+		if slices.ContainsFunc(sourceAuthSecrets, func(s *kcorev1.Secret) bool {
+			expectedName := s.Name
+			if cluster.Name != "local" {
+				expectedName = util.GeneratePullSecretName(s.Name)
+			}
+			return expectedName == pss.Name
+		}) {
 			continue
 		}
 		logrus.Debugf("[private-registry] deleting stale PSS %q from namespace %q", pss.Name, backingNamespace)
@@ -331,7 +373,7 @@ func (h *handler) manageImportedAndHostedClusterPSS(_ string, cluster *v3.Cluste
 		}
 	}
 
-	if isGlobalDefault || privateRegistry == nil {
+	if (cluster.Name != "local" && isGlobalDefault) || privateRegistry == nil {
 		return cluster, nil
 	}
 
@@ -340,38 +382,114 @@ func (h *handler) manageImportedAndHostedClusterPSS(_ string, cluster *v3.Cluste
 		data, err := util.ConvertToDockerConfigJson(privateRegistry.URL, sourcePullSecret)
 		if err != nil {
 			logrus.Errorf("[private-registry] failed to convert pull secret %q to docker config for cluster %q: %v", sourcePullSecret.Name, cluster.Name, err)
-			continue
+			return cluster, err
 		}
 
-		existingSecret := findSecretByName(createdPSS, sourcePullSecret.Name)
+		// Compute the name the PSS will use in the backing namespace.
+		pssName := sourcePullSecret.Name
+		if cluster.Name != "local" {
+			pssName = util.GeneratePullSecretName(pssName)
+		}
+
+		existingSecret := findSecretByName(createdPSS, pssName)
 		if existingSecret == nil {
-			logrus.Debugf("[private-registry] creating PSS %q in namespace %q for cluster %q", sourcePullSecret.Name, backingNamespace, cluster.Name)
-			pss := buildPSS(sysProj, backingNamespace, sourcePullSecret.Name, data)
-			_, err = h.secrets.Create(pss)
-			if err != nil && !errors.IsAlreadyExists(err) {
-				logrus.Errorf("[private-registry] failed to create PSS %q in namespace %q: %v", sourcePullSecret.Name, backingNamespace, err)
+			logrus.Debugf("[private-registry] creating PSS %q in namespace %q for cluster %q", pssName, backingNamespace, cluster.Name)
+			pss := buildPSS(sysProj, backingNamespace, pssName, data)
+			_, err := h.secrets.Create(pss)
+			if err == nil {
+				continue
+			}
+			if !errors.IsAlreadyExists(err) {
+				logrus.Errorf("[private-registry] failed to create PSS %q in namespace %q: %v", pssName, backingNamespace, err)
+				return cluster, err
+			}
+			// adopt the pull secret if it already exists but does not have
+			// the expected label. We fetch from cache to avoid relying on the
+			// potentially nil return value from Create on conflict.
+			existing, err := h.secretCache.Get(backingNamespace, pssName)
+			if err != nil {
+				logrus.Errorf("[private-registry] failed to get existing PSS %q in namespace %q for adoption: %v", pssName, backingNamespace, err)
+				return cluster, err
+			}
+			existing = existing.DeepCopy()
+			if existing.Labels == nil {
+				existing.Labels = map[string]string{}
+			}
+			if existing.Data == nil {
+				existing.Data = map[string][]byte{}
+			}
+			existing.Labels[util.CopiedPullSecretLabel] = "true"
+			existing.Data[kcorev1.DockerConfigJsonKey] = data
+			logrus.Debugf("[private-registry] adopting existing PSS %q in namespace %q for cluster %q", pssName, backingNamespace, cluster.Name)
+			_, err = h.secrets.Update(existing)
+			if err != nil {
+				logrus.Errorf("[private-registry] failed to update adopted PSS %q in namespace %q: %v", pssName, backingNamespace, err)
 				return cluster, err
 			}
 			continue
 		}
 
+		if existingSecret.Data == nil {
+			existingSecret.Data = map[string][]byte{}
+		}
+
 		existingData := existingSecret.Data[kcorev1.DockerConfigJsonKey]
 		if bytes.Equal(existingData, data) {
-			logrus.Tracef("[private-registry] PSS %q in namespace %q is up to date", sourcePullSecret.Name, backingNamespace)
+			logrus.Tracef("[private-registry] PSS %q in namespace %q is up to date", pssName, backingNamespace)
 			continue
 		}
 
-		logrus.Debugf("[private-registry] updating PSS %q in namespace %q for cluster %q", sourcePullSecret.Name, backingNamespace, cluster.Name)
+		logrus.Debugf("[private-registry] updating PSS %q in namespace %q for cluster %q", pssName, backingNamespace, cluster.Name)
 		existingSecret = existingSecret.DeepCopy()
 		existingSecret.Data[kcorev1.DockerConfigJsonKey] = data
 		_, err = h.secrets.Update(existingSecret)
 		if err != nil {
-			logrus.Errorf("[private-registry] failed to update PSS %q in namespace %q: %v", sourcePullSecret.Name, backingNamespace, err)
+			logrus.Errorf("[private-registry] failed to update PSS %q in namespace %q: %v", pssName, backingNamespace, err)
 			return cluster, err
 		}
 	}
 
 	return cluster, nil
+}
+
+// syncClusterOnGlobalPullSecretChange re-enqueues all imported/hosted/local clusters that rely on the
+// global registry configuration whenever a source pull secret in cattle-system is updated.
+func (h *handler) syncClusterOnGlobalPullSecretChange(_ string, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	sec, ok := obj.(*kcorev1.Secret)
+	if !ok {
+		logrus.Errorf("[private-registry] failed to convert to secret")
+		return nil, nil
+	}
+	if sec.Labels == nil || sec.Labels[util.SourcePullSecretLabel] != "true" {
+		return nil, nil
+	}
+
+	configuredPullSecrets := activeGlobalPullSecrets()
+	if !configuredPullSecrets.Has(sec.Name) {
+		return nil, nil
+	}
+
+	clusters, err := findV3ClustersUsingGlobalPullSecrets(h.mgmtClusterCache)
+	if err != nil {
+		return nil, err
+	}
+	enqueueStaggered(clusters, h.mgmtClusterController)
+	return nil, nil
+}
+
+// syncClusterOnGlobalRegistrySettingChange re-enqueues all imported/hosted/local clusters that rely on
+// the global registry configuration whenever the SystemDefaultRegistry or SystemDefaultRegistryPullSecrets
+// settings are updated.
+func (h *handler) syncClusterOnGlobalRegistrySettingChange(_ string, name string, _ runtime.Object) ([]relatedresource.Key, error) {
+	if name != settings.SystemDefaultRegistryPullSecrets.Name && name != settings.SystemDefaultRegistry.Name {
+		return nil, nil
+	}
+	clusters, err := findV3ClustersUsingGlobalPullSecrets(h.mgmtClusterCache)
+	if err != nil {
+		return nil, err
+	}
+	enqueueStaggered(clusters, h.mgmtClusterController)
+	return nil, nil
 }
 
 func (h *handler) getSystemProjectForCluster(clusterName string) (*v3.Project, error) {
@@ -381,7 +499,7 @@ func (h *handler) getSystemProjectForCluster(clusterName string) (*v3.Project, e
 		logrus.Errorf("[private-registry] failed to look up system project for cluster %q: %v", clusterName, err)
 		return nil, err
 	}
-	if clusterSystemProj == nil || len(clusterSystemProj) == 0 {
+	if len(clusterSystemProj) == 0 {
 		logrus.Tracef("[private-registry] no system project found for cluster %q", clusterName)
 		return nil, fmt.Errorf("no system project found for cluster %q", clusterName)
 	}
@@ -423,22 +541,18 @@ func findSecretByName(secrets []*kcorev1.Secret, name string) *kcorev1.Secret {
 	return nil
 }
 
-func findV3ClustersUsingGlobalPullSecrets(clusterCache mgmtcontrollers.ClusterCache) ([]relatedresource.Key, error) {
+func findV3ClustersUsingGlobalPullSecrets(clusterCache mgmtcontrollers.ClusterCache) ([]string, error) {
 	clusters, err := clusterCache.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
-	var clusterNames []relatedresource.Key
+	var clusterNames []string
 	for _, cluster := range clusters {
 		_, isGlobalDefault := util.GetPrivateRegistry(cluster)
 		if !isGlobalDefault {
 			continue
 		}
-		if util.MgmtNameRegexp.MatchString(cluster.Name) {
-			clusterNames = append(clusterNames, relatedresource.Key{
-				Name: cluster.Name,
-			})
-		}
+		clusterNames = append(clusterNames, cluster.Name)
 	}
 	return clusterNames, nil
 }
@@ -452,4 +566,16 @@ func activeGlobalPullSecrets() sets.Set[string] {
 		}
 	}
 	return specifiedSecretsSet
+}
+
+// enqueueStaggered enqueues the given cluster names with a staggered delay to avoid thundering herd issues.
+// Clusters are enqueued in batches of 10 with a base delay of 2 seconds between batches, plus a random jitter
+// of up to 750 milliseconds.
+func enqueueStaggered(clusterNames []string, clusterController mgmtcontrollers.ClusterController) {
+	for i, cluster := range clusterNames {
+		batchIndex := i / clusterEnqueueBatchSize
+		jitter := time.Duration(rand.IntN(clusterEnqueueJitterCeiling)) * time.Millisecond
+		delay := time.Duration(batchIndex)*(clusterEnqueueDelay) + jitter
+		clusterController.EnqueueAfter(cluster, delay)
+	}
 }

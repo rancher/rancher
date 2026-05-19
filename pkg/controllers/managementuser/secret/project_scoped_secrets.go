@@ -418,7 +418,7 @@ func (n *namespaceHandler) getNamespacesFromSecret(secret *corev1.Secret) ([]*co
 }
 
 // getGlobalPullSecrets retrieves the pull secrets specified in the SystemDefaultRegistryPullSecrets setting
-// and returns copies of those secrets which have been relabeled to indicate that they are not source secrets.
+// and returns copies of those secrets which have been relabeled and renamed to indicate that they are not source secrets.
 // The returned secrets can be safely synchronized into project namespaces without impacting future list operations for
 // source secrets. Secrets that are not of type kubernetes.io/dockerconfigjson are silently skipped
 // rather than causing an error, as we don't want a single misconfigured secret to block reconciliation of
@@ -450,6 +450,9 @@ func (n *namespaceHandler) getGlobalPullSecrets() ([]*corev1.Secret, error) {
 		}
 		delete(secretCopy.Labels, cluster.SourcePullSecretLabel)
 		secretCopy.Labels[cluster.CopiedPullSecretLabel] = "true"
+
+		// rename the downstream secret to help avoid trampling user defined secrets.
+		secretCopy.Name = cluster.GeneratePullSecretName(secretCopy.Name)
 		pullSecrets = append(pullSecrets, secretCopy)
 	}
 	return pullSecrets, nil

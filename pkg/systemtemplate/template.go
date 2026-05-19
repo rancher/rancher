@@ -93,7 +93,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{.Name}}
+  name: "{{.Name}}"
   namespace: cattle-system
   labels:
     management.cattle.io/cattle-cluster-agent-pull-secret: "true"
@@ -239,7 +239,7 @@ spec:
       {{- if .AgentDeploymentPullSecrets}}
       imagePullSecrets:
       {{- range .AgentDeploymentPullSecrets}}
-      - name: {{.Name}}
+      - name: "{{.Name}}"
       {{- end }}
       {{- end }}
       {{- if .IsPreBootstrap }}
@@ -311,7 +311,7 @@ spec:
       {{- if .AgentDeploymentPullSecrets}}
       imagePullSecrets:
       {{- range .AgentDeploymentPullSecrets}}
-      - name: {{.Name}}
+      - name: "{{.Name}}"
       {{- end}}
       {{- end}}
       volumes:

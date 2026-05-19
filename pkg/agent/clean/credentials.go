@@ -18,22 +18,25 @@ import (
 // from the cattle-system namespace that are no longer used by the cattle-cluster-agent.
 // This can occur in imported or hosted clusters, when either the cluster or global pull secret
 // configuration is changed after initial provisioning.
-func UnusedPullSecrets(ctx context.Context) error {
+func UnusedPullSecrets(ctx context.Context) {
 	client, err := rest.InClusterConfig()
 	if err != nil {
-		return err
+		logrus.Errorf("Error getting in cluster config: %v", err)
+		return
 	}
 
 	k8s, err := kubernetes.NewForConfig(client)
 	if err != nil {
-		return err
+		logrus.Errorf("Error getting kubernetes client: %v", err)
+		return
 	}
 	secret := k8s.CoreV1().Secrets("cattle-system")
 	copiedPullSecrets, err := secret.List(ctx, metav1.ListOptions{
 		LabelSelector: "management.cattle.io/cattle-cluster-agent-pull-secret=true",
 	})
 	if err != nil {
-		return err
+		logrus.Errorf("Error listing cattle-cluster-agent-pull-secrets: %v", err)
+		return
 	}
 
 	configuredPullSecrets := strings.Split(os.Getenv("CATTLE_AGENT_PULL_SECRETS"), ",")
@@ -46,20 +49,20 @@ func UnusedPullSecrets(ctx context.Context) error {
 	}
 
 	if len(secretsToRemove) == 0 {
-		return nil
+		return
 	}
 
 	logrus.Infof("removing %d unused pull secrets", len(secretsToRemove))
 	for _, pullSecret := range secretsToRemove {
 		err = secret.Delete(ctx, pullSecret.Name, metav1.DeleteOptions{})
 		if err != nil {
-			return err
+			logrus.Errorf("Error deleting pull secret: %v", err)
+			continue
 		}
 		logrus.Infof("removed unused pull secret %q", pullSecret.Name)
 	}
 
 	logrus.Infof("removed %d unused pull secrets", len(secretsToRemove))
-	return nil
 }
 
 // UnusedCattleCredentials removes all of the cattle-credentials that aren't being used by the current pod on a ticker. Meant to be run from a goroutine so it doesn't stop the parent execution

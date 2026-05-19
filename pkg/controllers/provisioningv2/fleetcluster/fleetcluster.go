@@ -82,7 +82,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			// cluster for the cluster level registry.
 			return mgmtcluster.GetPrivateRegistryURL(mgmtCluster)
 		}
-		return image.GetPrivateRepoURLFromCluster(cluster)
+		url, _ := image.GetPrivateRepoURLFromCluster(cluster)
+		return url
 	}
 
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,

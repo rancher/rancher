@@ -459,7 +459,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "fd5589102bdb6941ee7ec3488e014ca2d290551eda5bc9620fcd1de14f3e775e",
+				"cattle-cluster-agent": "cd6af455643df366219d5cd6f09b923ea34ce8ae676ae9f5761a61dac72fe906",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -480,8 +480,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
 			},
 			expectedSecretHashes: map[string]string{
-				"cattle-credentials-a15c1b308a": "e5b7eedd320bfd99546203b85a24d29b6be73e506053ac39065fd42ebb217b86",
-				"my-pull-secret":                "61985305208c14eb725a4a32dd8c31ae7963ff54212d7b700ae8c7a619cc3e57",
+				"cattle-credentials-a15c1b308a":              "e5b7eedd320bfd99546203b85a24d29b6be73e506053ac39065fd42ebb217b86",
+				"my-pull-secret-rancher-managed-pull-secret": "2df73d5a6af032f3ac7014a342b7f8e36a2ddc6431be33f5ffe03964fa17f8fc",
 			},
 		},
 		{
@@ -494,7 +494,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					DisplayName: "test-prov-no-system-secrets",
 					ImportedConfig: &apimgmtv3.ImportedConfig{
 						PrivateRegistryURL:         "my-registry.example.com",
-						PrivateRegistryPullSecrets: []string{"my-pull-secret"},
+						PrivateRegistryPullSecrets: []string{"my-pull-secret-rancher-managed-pull-secret"},
 					},
 				},
 			},
@@ -502,10 +502,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			token:      "test-token",
 			url:        "https://rancher.example.com",
 			secrets: map[string]*corev1.Secret{
-				"fleet-default:my-pull-secret": {
+				"fleet-default:my-pull-secret-rancher-managed-pull-secret": {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "fleet-default",
-						Name:      "my-pull-secret",
+						Name:      "my-pull-secret-rancher-managed-pull-secret",
 					},
 					Type: corev1.SecretTypeBasicAuth,
 					Data: map[string][]byte{
@@ -585,7 +585,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "b51bb5eefa28f4575463418dd583c98d9de920966a1acb87bb9f50d073bb844d",
+				"cattle-cluster-agent": "71b6caef327667e09762e6ed504feba21e54fb06a7517cf1220e13517786318a",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -606,9 +606,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
 			},
 			expectedSecretHashes: map[string]string{
-				"cattle-credentials-a15c1b308a": "e5b7eedd320bfd99546203b85a24d29b6be73e506053ac39065fd42ebb217b86",
-				"secret-one":                    "ec0ab5854406c5dc00c68a85944219623a18a81f26731c55f321dec6b31e6fcc",
-				"secret-two":                    "799af6afbcfcc7698b8ac8f282f49cc51bd4b775454bc28d902e9217416196d5",
+				"cattle-credentials-a15c1b308a":          "e5b7eedd320bfd99546203b85a24d29b6be73e506053ac39065fd42ebb217b86",
+				"secret-one-rancher-managed-pull-secret": "d4e2a71ad3344fd5487e36c6f9987bdad155e42e75675f0af39f9b03027203a1",
+				"secret-two-rancher-managed-pull-secret": "a8b13caa20117d26374c99ffbc3dbc4b9a62d9b58c4040b43ae11596c1fe7b0c",
 			},
 		},
 		{

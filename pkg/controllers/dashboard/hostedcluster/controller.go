@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	cluster2 "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
+	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	controllerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -20,6 +21,11 @@ import (
 )
 
 const priorityClassKey = "priorityClassName"
+
+type operatorChart struct {
+	charts  []chart.Definition
+	version func() string
+}
 
 var (
 	AksCrdChart = chart.Definition{
@@ -52,6 +58,21 @@ var (
 		ReleaseName:      "rancher-gke-operator",
 		ChartName:        "rancher-gke-operator",
 	}
+
+	operatorChartMap = map[string]operatorChart{
+		"aks": {
+			charts:  []chart.Definition{AksCrdChart, AksChart},
+			version: settings.AksOperatorVersion.Get,
+		},
+		"gke": {
+			charts:  []chart.Definition{GkeCrdChart, GkeChart},
+			version: settings.GkeOperatorVersion.Get,
+		},
+		"eks": {
+			charts:  []chart.Definition{EksCrdChart, EksChart},
+			version: settings.EksOperatorVersion.Get,
+		},
+	}
 )
 
 type handler struct {
@@ -59,6 +80,7 @@ type handler struct {
 	projectCache controllerv3.ProjectCache
 	secretsCache v1.SecretCache
 	chartsConfig chart.RancherConfigGetter
+	apps         catalogcontrollers.AppController
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
@@ -67,82 +89,93 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 		projectCache: wContext.Mgmt.Project().Cache(),
 		secretsCache: wContext.Core.Secret().Cache(),
 		chartsConfig: chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
+		apps:         wContext.Catalog.App(),
 	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "cluster-provisioning-operator", h.onClusterChange)
 	wContext.Core.Secret().OnChange(ctx, "watch-helm-release", h.onSecretChange)
+	wContext.Mgmt.Setting().OnChange(ctx, "hosted-operator-redeploy", h.onSettingsChange)
 }
 
-func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h handler) onClusterChange(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil {
 		return cluster, nil
 	}
-
 	skipChartInstallation := strings.EqualFold(settings.SkipHostedClusterChartInstallation.Get(), "true")
 	if skipChartInstallation {
 		logrus.Warn("Skipping installation of hosted cluster charts, 'skip-hosted-cluster-chart-installation' is set to true")
 		return cluster, nil
 	}
-
-	var toInstallCrdChart, toInstallChart *chart.Definition
-	var toInstallCrdChartVersion, toInstallChartVersion string
-	toInstallCrdChartVersion = ""
-	toInstallChartVersion = ""
-	if cluster.Spec.AKSConfig != nil {
-		toInstallCrdChart = &AksCrdChart
-		toInstallChart = &AksChart
-		if aksOperatorVersion := settings.AksOperatorVersion.Get(); aksOperatorVersion != "" {
-			toInstallCrdChartVersion = aksOperatorVersion
-			toInstallChartVersion = aksOperatorVersion
+	switch {
+	case cluster.Spec.AKSConfig != nil:
+		operator := operatorChartMap["aks"]
+		err := h.ensureChart(&operator.charts[0], &operator.charts[1], operator.version())
+		if err != nil {
+			return cluster, err
 		}
-	} else if cluster.Spec.EKSConfig != nil {
-		toInstallCrdChart = &EksCrdChart
-		toInstallChart = &EksChart
-		if eksOperatorVersion := settings.EksOperatorVersion.Get(); eksOperatorVersion != "" {
-			toInstallCrdChartVersion = eksOperatorVersion
-			toInstallChartVersion = eksOperatorVersion
+	case cluster.Spec.EKSConfig != nil:
+		operator := operatorChartMap["eks"]
+		err := h.ensureChart(&operator.charts[0], &operator.charts[1], operator.version())
+		if err != nil {
+			return cluster, err
 		}
-	} else if cluster.Spec.GKEConfig != nil {
-		toInstallCrdChart = &GkeCrdChart
-		toInstallChart = &GkeChart
-		if gkeOperatorVersion := settings.GkeOperatorVersion.Get(); gkeOperatorVersion != "" {
-			toInstallCrdChartVersion = gkeOperatorVersion
-			toInstallChartVersion = gkeOperatorVersion
+	case cluster.Spec.GKEConfig != nil:
+		operator := operatorChartMap["gke"]
+		err := h.ensureChart(&operator.charts[0], &operator.charts[1], operator.version())
+		if err != nil {
+			return cluster, err
 		}
-	}
-
-	if toInstallCrdChart == nil || toInstallChart == nil {
+	default:
 		return cluster, nil
 	}
+	return cluster, nil
+}
 
-	if err := h.manager.Ensure(
-		toInstallCrdChart.ReleaseNamespace,
-		toInstallCrdChart.ChartName,
-		toInstallCrdChart.ReleaseName,
-		toInstallCrdChartVersion,
-		"",
-		nil,
-		true,
-		""); err != nil {
-		return cluster, err
+func (h handler) onSettingsChange(_ string, setting *v3.Setting) (*v3.Setting, error) {
+	if setting == nil || (setting.Name != settings.SystemDefaultRegistryPullSecrets.Name && setting.Name != settings.SystemDefaultRegistry.Name) {
+		return setting, nil
 	}
-
-	systemGlobalRegistry := map[string]interface{}{
-		"cattle": map[string]interface{}{
-			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-		},
+	skipChartInstallation := strings.EqualFold(settings.SkipHostedClusterChartInstallation.Get(), "true")
+	if skipChartInstallation {
+		logrus.Warn("Skipping installation of hosted cluster charts, 'skip-hosted-cluster-chart-installation' is set to true")
+		return setting, nil
 	}
+	// Ensure that previously installed operators are updated with the latest configuration.
+	for provider, operator := range operatorChartMap {
+		_, err := h.apps.Cache().Get(operator.charts[1].ReleaseNamespace, operator.charts[1].ReleaseName)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		// update the chart with the latest registry configuration
+		err = h.ensureChart(&operator.charts[0], &operator.charts[1], operator.version())
+		if err != nil {
+			return nil, err
+		}
+		logrus.Infof("Successfully redeployed %s operator chart due to change in registry settings", provider)
+	}
+	return setting, nil
+}
 
+func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition, chartVersion string) error {
 	var pullSecrets []string
 	registry, _ := cluster2.GetPrivateRegistry(nil)
 	if registry != nil {
 		pullSecrets = registry.PullSecretNamesAsSlice()
 	}
-	systemGlobalRegistry["cattle"].(map[string]interface{})["imagePullSecrets"] = pullSecrets
+
+	systemGlobalRegistry := map[string]interface{}{
+		"cattle": map[string]interface{}{
+			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+			"imagePullSecrets":      pullSecrets,
+		},
+	}
 
 	additionalCA, err := getAdditionalCA(h.secretsCache)
 	if err != nil {
-		return cluster, err
+		return err
 	}
 
 	chartValues := map[string]interface{}{
@@ -152,31 +185,44 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		"noProxy":              os.Getenv("NO_PROXY"),
 		"additionalTrustedCAs": additionalCA != nil,
 	}
+
 	// add priority class value
 	if priorityClassName, err := h.chartsConfig.GetGlobalValue(chart.PriorityClassKey); err != nil {
 		if !chart.IsNotFoundError(err) {
-			logrus.Warnf("Failed to get rancher priorityClassName for 'rancher-webhook': %s", err.Error())
+			logrus.Warnf("Failed to get rancher priorityClassName for '%q': %v", toInstallChart.ChartName, err)
 		}
 	} else {
 		chartValues[priorityClassKey] = priorityClassName
 	}
 
 	if err := h.manager.Ensure(
+		toInstallCrdChart.ReleaseNamespace,
+		toInstallCrdChart.ChartName,
+		toInstallCrdChart.ReleaseName,
+		chartVersion,
+		"",
+		nil,
+		true,
+		""); err != nil {
+		return err
+	}
+
+	if err := h.manager.Ensure(
 		toInstallChart.ReleaseNamespace,
 		toInstallChart.ChartName,
 		toInstallChart.ReleaseName,
-		toInstallChartVersion,
+		chartVersion,
 		"",
 		chartValues,
 		true,
 		""); err != nil {
-		return cluster, err
+		return err
 	}
 
-	return cluster, nil
+	return nil
 }
 
-// check helm release secrets for aks/eks/gke operator chart, if it has been uninstalled, then remove it in m.manager.desiredChart
+// check helm release secrets for aks/eks/gke operator chart, if it has been uninstalled, then remove it in h.manager.desiredChart
 // so that we don't automatically redeploy it unless there is an AKS/EKS/GKE cluster triggering it
 func (h handler) onSecretChange(key string, obj *corev1.Secret) (*corev1.Secret, error) {
 	if obj == nil {

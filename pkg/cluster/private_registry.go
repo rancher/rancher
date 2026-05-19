@@ -11,6 +11,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	kcorev1 "k8s.io/api/core/v1"
 )
 
@@ -186,6 +187,13 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	return "", nil, nil
 }
 
+// GeneratePullSecretName accepts an image pull secret name and returns a new name that
+// is generated and managed by Rancher. This is done to help avoid trampling user defined
+// secrets in downstream environments.
+func GeneratePullSecretName(secretName string) string {
+	return name.SafeConcatName(secretName, "rancher-managed-pull-secret")
+}
+
 func generateProvisionedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, []AgentPullSecret, error) {
 	v2ProvRegistryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
 
@@ -240,7 +248,7 @@ func generateImportedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.Se
 		}
 
 		pullSecrets = append(pullSecrets, AgentPullSecret{
-			Name:             sec.Name,
+			Name:             GeneratePullSecretName(sec.Name),
 			DockerConfigJSON: base64.StdEncoding.EncodeToString(configJson),
 		})
 	}

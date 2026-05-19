@@ -787,7 +787,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pull-secret-1",
+						Name:      "pull-secret-1-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -839,7 +839,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "valid-secret",
+						Name:      "valid-secret-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -873,7 +873,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pull-secret-1",
+						Name:      "pull-secret-1-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -881,7 +881,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pull-secret-2",
+						Name:      "pull-secret-2-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -915,7 +915,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "exists",
+						Name:      "exists-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -1006,9 +1006,9 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 				}, nil)
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().Get(testNamespace, "global-pull-secret", gomock.Any()).Return(nil, errNotFound)
+				f.EXPECT().Get(testNamespace, "global-pull-secret-rancher-managed-pull-secret", gomock.Any()).Return(nil, errNotFound)
 				f.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
-					assert.Equal(t, "global-pull-secret", s.Name)
+					assert.Equal(t, "global-pull-secret-rancher-managed-pull-secret", s.Name)
 					assert.Equal(t, testNamespace, s.Namespace)
 					assert.Equal(t, "true", s.Annotations[pssCopyAnnotation])
 					assert.Equal(t, "true", s.Labels[cluster.CopiedPullSecretLabel])
@@ -1017,7 +1017,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 				f.EXPECT().List(testNamespace, metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
 				f.EXPECT().List(testNamespace, metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
-						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret", Namespace: testNamespace}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret-rancher-managed-pull-secret", Namespace: testNamespace}},
 					},
 				}, nil)
 			},
@@ -1106,9 +1106,9 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 					return s, nil
 				})
 				// CreateOrUpdateNamespacedResource for global pull secret
-				f.EXPECT().Get(testNamespace, "global-pull-secret", gomock.Any()).Return(nil, errNotFound)
+				f.EXPECT().Get(testNamespace, "global-pull-secret-rancher-managed-pull-secret", gomock.Any()).Return(nil, errNotFound)
 				f.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
-					assert.Equal(t, "global-pull-secret", s.Name)
+					assert.Equal(t, "global-pull-secret-rancher-managed-pull-secret", s.Name)
 					assert.Equal(t, testNamespace, s.Namespace)
 					return s, nil
 				})
@@ -1120,7 +1120,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 				}, nil)
 				f.EXPECT().List(testNamespace, metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
-						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret", Namespace: testNamespace}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret-rancher-managed-pull-secret", Namespace: testNamespace}},
 					},
 				}, nil)
 			},

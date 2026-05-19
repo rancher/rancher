@@ -13,6 +13,7 @@ import (
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -110,40 +111,50 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 	// authentication for that hostname, we need to fall back to the global configuration.
 	_, UsingGSDRDefault := image.GetPrivateRepoURLFromControlPlane(controlPlane)
 	if GSDR != "" && UsingGSDRDefault && !foundExistingGSDRConfiguration {
-		// we can only use the first pull secret set globally, since
-		// provisioned clusters have a 1-to-1 mapping of hostnames to secrets.
-		// Due to the format of registries.yaml, it's not possible to specify more than
-		// one set of credentials per hostname.
+		// since provisioned clusters have a 1-to-1 mapping of hostnames to secrets (
+		// due to the format of registries.yaml), it's not possible to specify more than
+		// one set of credentials per hostname. We iterate across all pull secrets
+		// until we find the first valid entry for the given registry host. If we don't find any,
+		// it's assumed that the URL is unauthenticated, and registres.yaml is left empty.
 		registry, _ := cluster.GetPrivateRegistry(nil)
 		if registry != nil && len(registry.PullSecrets) > 0 {
-			globalSecret := registry.PullSecretNamesAsSlice()[0]
-			secret, err := p.secretCache.Get(namespaces.System, globalSecret)
-			if err != nil {
-				return data, err
+			var foundCredentials bool
+			for _, secretName := range registry.PullSecretNamesAsSlice() {
+				secret, err := p.secretCache.Get(namespaces.System, secretName)
+				if err != nil {
+					logrus.Debugf("[planner] skipping global pull secret %q for registry %q: failed to fetch: %v", secretName, GSDR, err)
+					continue
+				}
+				if secret.Type != corev1.SecretTypeDockerConfigJson {
+					logrus.Debugf("[planner] skipping global pull secret %q: expected type %q, got %q", secretName, corev1.SecretTypeDockerConfigJson, secret.Type)
+					continue
+				}
+				if secret.Data == nil {
+					logrus.Debugf("[planner] skipping global pull secret %q: nil data", secretName)
+					continue
+				}
+				username, password, _, err := cluster.UnwrapDockerConfigJson(GSDR, secret.Data)
+				if err != nil {
+					logrus.Debugf("[planner] skipping global pull secret %q: does not contain credentials for registry %q: %v", secretName, GSDR, err)
+					continue
+				}
+				if username == "" && password == "" && string(secret.Data[rkev1.IdentityTokenAuthConfigSecretKey]) == "" {
+					logrus.Debugf("[planner] skipping global pull secret %q: no credentials found for registry %q", secretName, GSDR)
+					continue
+				}
+				registryConfig := &registryConfig{}
+				registryConfig.Auth = &authConfig{
+					Username:      username,
+					Password:      password,
+					IdentityToken: string(secret.Data[rkev1.IdentityTokenAuthConfigSecretKey]),
+				}
+				configs[GSDR] = registryConfig
+				foundCredentials = true
+				break
 			}
-
-			if secret.Type != corev1.SecretTypeDockerConfigJson {
-				return data, fmt.Errorf("global secret [%s] must be of type [%s]",
-					globalSecret, corev1.SecretTypeDockerConfigJson)
+			if !foundCredentials {
+				logrus.Warnf("[planner] no global pull secret contained credentials for registry %q. registries.yaml will be unpopulated.", GSDR)
 			}
-
-			if secret.Data == nil {
-				return data, fmt.Errorf("global secret [%s] has nil data", globalSecret)
-			}
-
-			username, password, _, err := cluster.UnwrapDockerConfigJson(GSDR, secret.Data)
-			if err != nil {
-				return data, err
-			}
-
-			registryConfig := &registryConfig{}
-			registryConfig.Auth = &authConfig{
-				Username:      username,
-				Password:      password,
-				IdentityToken: string(secret.Data[rkev1.IdentityTokenAuthConfigSecretKey]),
-			}
-
-			configs[GSDR] = registryConfig
 		}
 	}
 

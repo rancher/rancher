@@ -3,12 +3,14 @@ package cluster
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -25,41 +27,53 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		secret      *corev1.Secret
-		expectedErr error
-		validate    func(t *testing.T, got []byte)
+		name           string
+		secret         *corev1.Secret
+		expectedErrMsg string
+		validate       func(t *testing.T, got []byte)
 	}{
 		{
 			name: "rke auth-config: valid",
 			secret: &corev1.Secret{
-				Type: v1.AuthConfigSecretType,
-				Data: map[string][]byte{"auth": []byte("myuser:mypass")},
+				ObjectMeta: metav1.ObjectMeta{Name: "auth-secret"},
+				Type:       v1.AuthConfigSecretType,
+				Data:       map[string][]byte{"auth": []byte("myuser:mypass")},
 			},
 			validate: func(t *testing.T, got []byte) {
 				assert.JSONEq(t, string(buildExpectedDockerConfigJSON("myuser", "mypass")), string(got))
 			},
 		},
 		{
+			name: "rke auth-config: nil data",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "auth-secret"},
+				Type:       v1.AuthConfigSecretType,
+			},
+			expectedErrMsg: fmt.Sprintf(ErrSecretDataNil, "auth-secret", host),
+		},
+		{
 			name: "rke auth-config: missing auth key",
 			secret: &corev1.Secret{
-				Type: v1.AuthConfigSecretType,
-				Data: map[string][]byte{},
+				ObjectMeta: metav1.ObjectMeta{Name: "auth-secret"},
+				Type:       v1.AuthConfigSecretType,
+				Data:       map[string][]byte{},
 			},
-			expectedErr: ErrAuthKeyNotFound,
+			expectedErrMsg: fmt.Sprintf(ErrAuthKeyNotFound, "auth-secret", host),
 		},
 		{
 			name: "rke auth-config: malformed auth value (no colon delimiter)",
 			secret: &corev1.Secret{
-				Type: v1.AuthConfigSecretType,
-				Data: map[string][]byte{"auth": []byte("myusermypass")},
+				ObjectMeta: metav1.ObjectMeta{Name: "auth-secret"},
+				Type:       v1.AuthConfigSecretType,
+				Data:       map[string][]byte{"auth": []byte("myusermypass")},
 			},
-			expectedErr: ErrAuthMalformed,
+			expectedErrMsg: fmt.Sprintf(ErrAuthMalformed, "auth-secret", host),
 		},
 		{
 			name: "basic-auth: valid",
 			secret: &corev1.Secret{
-				Type: corev1.SecretTypeBasicAuth,
+				ObjectMeta: metav1.ObjectMeta{Name: "basic-secret"},
+				Type:       corev1.SecretTypeBasicAuth,
 				Data: map[string][]byte{
 					"username": []byte("myuser"),
 					"password": []byte("mypass"),
@@ -70,25 +84,36 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 			},
 		},
 		{
+			name: "basic-auth: nil data",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "basic-secret"},
+				Type:       corev1.SecretTypeBasicAuth,
+			},
+			expectedErrMsg: fmt.Sprintf(ErrSecretDataNil, "basic-secret", host),
+		},
+		{
 			name: "basic-auth: missing username",
 			secret: &corev1.Secret{
-				Type: corev1.SecretTypeBasicAuth,
-				Data: map[string][]byte{"password": []byte("mypass")},
+				ObjectMeta: metav1.ObjectMeta{Name: "basic-secret"},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data:       map[string][]byte{"password": []byte("mypass")},
 			},
-			expectedErr: ErrUsernameNotFound,
+			expectedErrMsg: fmt.Sprintf(ErrUsernameNotFound, "basic-secret", host),
 		},
 		{
 			name: "basic-auth: missing password",
 			secret: &corev1.Secret{
-				Type: corev1.SecretTypeBasicAuth,
-				Data: map[string][]byte{"username": []byte("myuser")},
+				ObjectMeta: metav1.ObjectMeta{Name: "basic-secret"},
+				Type:       corev1.SecretTypeBasicAuth,
+				Data:       map[string][]byte{"username": []byte("myuser")},
 			},
-			expectedErr: ErrPasswordNotFound,
+			expectedErrMsg: fmt.Sprintf(ErrPasswordNotFound, "basic-secret", host),
 		},
 		{
 			name: "dockerconfigjson: valid passthrough",
 			secret: &corev1.Secret{
-				Type: corev1.SecretTypeDockerConfigJson,
+				ObjectMeta: metav1.ObjectMeta{Name: "docker-secret"},
+				Type:       corev1.SecretTypeDockerConfigJson,
 				Data: map[string][]byte{
 					corev1.DockerConfigJsonKey: buildExpectedDockerConfigJSON("myuser", "mypass"),
 				},
@@ -98,20 +123,30 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 			},
 		},
 		{
+			name: "dockerconfigjson: nil data",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "docker-secret"},
+				Type:       corev1.SecretTypeDockerConfigJson,
+			},
+			expectedErrMsg: fmt.Sprintf(ErrSecretDataNil, "docker-secret", host),
+		},
+		{
 			name: "dockerconfigjson: missing key",
 			secret: &corev1.Secret{
-				Type: corev1.SecretTypeDockerConfigJson,
-				Data: map[string][]byte{},
+				ObjectMeta: metav1.ObjectMeta{Name: "docker-secret"},
+				Type:       corev1.SecretTypeDockerConfigJson,
+				Data:       map[string][]byte{},
 			},
-			expectedErr: ErrDockerConfigKeyNotFound,
+			expectedErrMsg: fmt.Sprintf(ErrDockerConfigKeyNotFound, "docker-secret", host),
 		},
 		{
 			name: "unsupported secret type",
 			secret: &corev1.Secret{
-				Type: "some.other/type",
-				Data: map[string][]byte{},
+				ObjectMeta: metav1.ObjectMeta{Name: "other-secret"},
+				Type:       "some.other/type",
+				Data:       map[string][]byte{},
 			},
-			expectedErr: ErrUnsupportedSecretType,
+			expectedErrMsg: fmt.Sprintf(ErrUnsupportedSecretType, "other-secret", host, "some.other/type"),
 		},
 	}
 
@@ -120,8 +155,8 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := ConvertToDockerConfigJson(host, tt.secret)
-			if tt.expectedErr != nil {
-				assert.ErrorIs(t, err, tt.expectedErr)
+			if tt.expectedErrMsg != "" {
+				assert.ErrorContains(t, err, tt.expectedErrMsg)
 				assert.Nil(t, got)
 				return
 			}
@@ -196,9 +231,7 @@ func TestUnwrapDockerConfigJson(t *testing.T) {
 		expectedUsername string
 		expectedPassword string
 		expectedAuth     string
-		expectedErr      error
-		// errContains is used instead of expectedErr when the error format may vary (e.g. stdlib errors).
-		errContains string
+		expectedErrMsg   string
 	}{
 		{
 			name:             "valid config with matching hostname",
@@ -209,22 +242,22 @@ func TestUnwrapDockerConfigJson(t *testing.T) {
 			expectedAuth:     base64.StdEncoding.EncodeToString([]byte("myuser:mypass")),
 		},
 		{
-			name:        "missing .dockerconfigjson key",
-			host:        host,
-			data:        map[string][]byte{},
-			expectedErr: ErrDockerConfigJsonNotFound,
+			name:           "missing .dockerconfigjson key",
+			host:           host,
+			data:           map[string][]byte{},
+			expectedErrMsg: fmt.Sprintf(ErrDockerConfigJsonNotFound, host),
 		},
 		{
-			name:        "invalid JSON",
-			host:        host,
-			data:        map[string][]byte{corev1.DockerConfigJsonKey: []byte("not-json")},
-			errContains: "invalid character",
+			name:           "invalid JSON",
+			host:           host,
+			data:           map[string][]byte{corev1.DockerConfigJsonKey: []byte("not-json")},
+			expectedErrMsg: "invalid character",
 		},
 		{
-			name:        "hostname not found in auths",
-			host:        "other.registry.example.com",
-			data:        makeConfigJSON(host, "myuser", "mypass"),
-			expectedErr: ErrRegistryHostnameNotFound,
+			name:           "hostname not found in auths",
+			host:           "other.registry.example.com",
+			data:           makeConfigJSON(host, "myuser", "mypass"),
+			expectedErrMsg: fmt.Sprintf(ErrRegistryHostnameNotFound, "other.registry.example.com"),
 		},
 	}
 
@@ -233,12 +266,8 @@ func TestUnwrapDockerConfigJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			username, password, auth, err := UnwrapDockerConfigJson(tt.host, tt.data)
-			if tt.expectedErr != nil {
-				assert.ErrorIs(t, err, tt.expectedErr)
-				return
-			}
-			if tt.errContains != "" {
-				assert.ErrorContains(t, err, tt.errContains)
+			if tt.expectedErrMsg != "" {
+				assert.ErrorContains(t, err, tt.expectedErrMsg)
 				return
 			}
 			require.NoError(t, err)

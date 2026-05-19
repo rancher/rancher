@@ -349,7 +349,7 @@ func cleanUpImagePullSecrets(client *kubernetes.Clientset) []error {
 	}
 	var errs []error
 	for _, secret := range s.Items {
-		logrus.Infof("Deleting secret: %v", secret.Name)
+		logrus.Infof("Deleting secret %q in namespace %q", secret.Name, secret.Namespace)
 		if !dryRun {
 			err = client.CoreV1().Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 			if err != nil {

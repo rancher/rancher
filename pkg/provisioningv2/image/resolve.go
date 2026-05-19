@@ -11,12 +11,13 @@ import (
 )
 
 func ResolveWithControlPlane(image string, cp *rkev1.RKEControlPlane) string {
-	csdr, _ := GetPrivateRepoURLFromControlPlane(cp)
-	return resolve(csdr, image)
+	url, _ := GetPrivateRepoURLFromControlPlane(cp)
+	return resolve(url, image)
 }
 
 func ResolveWithCluster(image string, cluster *v1.Cluster) string {
-	return resolve(GetPrivateRepoURLFromCluster(cluster), image)
+	url, _ := GetPrivateRepoURLFromCluster(cluster)
+	return resolve(url, image)
 }
 
 func resolve(reg, image string) string {
@@ -33,8 +34,9 @@ func resolve(reg, image string) string {
 
 // GetPrivateRepoSecretFromCluster returns the name of the secret containing the credentials for the cluster level system-default-registry.
 func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) string {
+	url, isGlobalDefault := GetPrivateRepoURLFromCluster(cluster)
 	if cluster != nil && cluster.Spec.RKEConfig != nil && cluster.Spec.RKEConfig.Registries != nil {
-		config, ok := cluster.Spec.RKEConfig.Registries.Configs[GetPrivateRepoURLFromCluster(cluster)]
+		config, ok := cluster.Spec.RKEConfig.Registries.Configs[url]
 		if ok {
 			return config.AuthConfigSecretName
 		}
@@ -43,10 +45,12 @@ func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) string {
 	// fall back to the GSDR if configured, but only return the first pull secret. Due to the format of the containerd registry authentication file
 	// only one credential can be configured per hostname.
 	globalPullSecrets := settings.SystemDefaultRegistryPullSecrets.Get()
-	if globalPullSecrets != "" {
-		firstEntry := strings.TrimSpace(strings.Split(globalPullSecrets, ",")[0])
-		if firstEntry != "" {
-			return firstEntry
+	if isGlobalDefault && globalPullSecrets != "" {
+		for _, entry := range strings.Split(globalPullSecrets, ",") {
+			secret := strings.TrimSpace(entry)
+			if secret != "" {
+				return secret
+			}
 		}
 	}
 
@@ -56,13 +60,12 @@ func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) string {
 // GetPrivateRepoURLFromCluster returns the system-default-registry URL from either the clusters
 // machineGlobalConfig, or one of its machineSelectorConfig's which has no label selectors.
 // If no cluster level system-default-registry is configured, it will return the global system-default-registry.
-func GetPrivateRepoURLFromCluster(cluster *v1.Cluster) string {
+func GetPrivateRepoURLFromCluster(cluster *v1.Cluster) (string, bool) {
 	if cluster != nil && cluster.Spec.RKEConfig != nil {
-		url, _ := getPrivateRepoURL(cluster.Spec.RKEConfig.MachineGlobalConfig, cluster.Spec.RKEConfig.MachineSelectorConfig)
-		return url
+		return getPrivateRepoURL(cluster.Spec.RKEConfig.MachineGlobalConfig, cluster.Spec.RKEConfig.MachineSelectorConfig)
 	}
 
-	return settings.SystemDefaultRegistry.Get()
+	return settings.SystemDefaultRegistry.Get(), true
 }
 
 // GetPrivateRepoURLFromControlPlane returns the system-default-registry URL from either the control planes

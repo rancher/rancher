@@ -231,7 +231,7 @@ func TestGetPrivateRepoURLFromCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withGlobalRegistry(t, tt.global)
-			got := GetPrivateRepoURLFromCluster(tt.cluster)
+			got, _ := GetPrivateRepoURLFromCluster(tt.cluster)
 			assert.Equal(t, tt.expectedURL, got)
 		})
 	}
@@ -291,31 +291,57 @@ func TestGetPrivateRepoURLFromControlPlane(t *testing.T) {
 }
 
 func TestGetPrivateRepoSecretFromCluster(t *testing.T) {
-	const clusterRegistry = "cluster.registry.io"
+	const (
+		clusterRegistry = "cluster.registry.io"
+		globalRegistry  = "global.registry.io"
+	)
 
 	tests := []struct {
 		name           string
 		cluster        *v1.Cluster
+		globalRegistry string
 		globalSecrets  string
 		expectedSecret string
 	}{
 		{
 			name:           "nil cluster with no global pull secrets returns empty string",
 			cluster:        nil,
+			globalRegistry: globalRegistry,
 			globalSecrets:  "",
 			expectedSecret: "",
 		},
 		{
 			name:           "nil cluster with global pull secrets returns first secret",
 			cluster:        nil,
+			globalRegistry: globalRegistry,
 			globalSecrets:  "global-secret,other-secret",
 			expectedSecret: "global-secret",
 		},
 		{
 			name:           "nil cluster with global pull secrets trims whitespace",
 			cluster:        nil,
+			globalRegistry: globalRegistry,
 			globalSecrets:  "  trimmed-secret  , other-secret",
 			expectedSecret: "trimmed-secret",
+		},
+		{
+			name: "cluster SDR explicitly set to same hostname as global SDR, does not use global pull secrets",
+			cluster: &v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						ClusterConfiguration: rkev1.ClusterConfiguration{
+							MachineGlobalConfig: rkev1.GenericMap{
+								Data: map[string]any{
+									"system-default-registry": globalRegistry,
+								},
+							},
+						},
+					},
+				},
+			},
+			globalRegistry: globalRegistry,
+			globalSecrets:  "global-secret",
+			expectedSecret: "",
 		},
 		{
 			name: "cluster with matching registry config returns its auth secret",
@@ -339,11 +365,15 @@ func TestGetPrivateRepoSecretFromCluster(t *testing.T) {
 					},
 				},
 			},
+			globalRegistry: globalRegistry,
 			globalSecrets:  "global-secret",
 			expectedSecret: "my-cluster-secret",
 		},
+		// The next two cases confirm that when a cluster defines its own SDR (different
+		// from the global), global pull secrets are never used, even if the cluster has
+		// no matching registry config entry of its own.
 		{
-			name: "cluster with registries but no matching key falls back to global pull secrets",
+			name: "cluster SDR differs from global SDR with unmatched registry config does not use global pull secrets",
 			cluster: &v1.Cluster{
 				Spec: v1.ClusterSpec{
 					RKEConfig: &v1.RKEConfig{
@@ -364,11 +394,12 @@ func TestGetPrivateRepoSecretFromCluster(t *testing.T) {
 					},
 				},
 			},
+			globalRegistry: globalRegistry,
 			globalSecrets:  "global-secret",
-			expectedSecret: "global-secret",
+			expectedSecret: "",
 		},
 		{
-			name: "cluster with nil registries falls back to global pull secrets",
+			name: "cluster SDR differs from global SDR with nil registries does not use global pull secrets",
 			cluster: &v1.Cluster{
 				Spec: v1.ClusterSpec{
 					RKEConfig: &v1.RKEConfig{
@@ -383,13 +414,22 @@ func TestGetPrivateRepoSecretFromCluster(t *testing.T) {
 					},
 				},
 			},
+			globalRegistry: globalRegistry,
 			globalSecrets:  "global-secret",
+			expectedSecret: "",
+		},
+		{
+			name:           "global SDR is malformed, get first valid entry",
+			cluster:        &v1.Cluster{},
+			globalRegistry: globalRegistry,
+			globalSecrets:  ", global-secret",
 			expectedSecret: "global-secret",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			withGlobalRegistry(t, tt.globalRegistry)
 			withGlobalPullSecrets(t, tt.globalSecrets)
 			got := GetPrivateRepoSecretFromCluster(tt.cluster)
 			assert.Equal(t, tt.expectedSecret, got)

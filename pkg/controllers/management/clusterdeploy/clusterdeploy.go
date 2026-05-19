@@ -428,7 +428,9 @@ func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeCon
 // The value is generated using the secrets name, namespace, and the observed resource version.
 func (cd *clusterDeploy) manageImagePullSecretHash(cluster *apimgmtv3.Cluster) (string, bool, error) {
 	registry, _ := util.GetPrivateRegistry(cluster)
-	if registry == nil || len(registry.PullSecrets) == 0 {
+	// since provisioned clusters don't use pull secrets we don't need to track the hash. This also helps
+	// reduce unneeded agent redeployments.
+	if registry == nil || len(registry.PullSecrets) == 0 || !util.MgmtNameRegexp.MatchString(cluster.Name) {
 		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
 	}
 
@@ -436,10 +438,7 @@ func (cd *clusterDeploy) manageImagePullSecretHash(cluster *apimgmtv3.Cluster) (
 	for _, pullSecret := range registry.PullSecrets {
 		s, err := cd.secretLister.Get(pullSecret.Namespace, pullSecret.Name)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				logrus.Errorf("clusterDeploy: manageImagePullSecretHash: failed to retrieve secret [%s]: %v", pullSecret.Name, err)
-				continue
-			}
+			logrus.Errorf("clusterDeploy: manageImagePullSecretHash: failed to retrieve secret [%s]: %v", pullSecret.Name, err)
 			return "", false, err
 		}
 		secretReferences = append(secretReferences, fmt.Sprintf("%s:%s=%s", s.Namespace, s.Name, s.ResourceVersion))

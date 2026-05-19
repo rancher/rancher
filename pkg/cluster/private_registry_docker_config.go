@@ -3,7 +3,6 @@ package cluster
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -12,16 +11,16 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-var (
-	ErrSecretDataNil            = errors.New("secret data is nil")
-	ErrAuthKeyNotFound          = errors.New("secret 'rke.cattle.io/auth-config' does not have expected 'auth' key")
-	ErrAuthMalformed            = errors.New("secret 'rke.cattle.io/auth-config' does not have 'auth' value in expected username:password format")
-	ErrUsernameNotFound         = errors.New("secret 'kubernetes.io/basic-auth' has no 'username' field")
-	ErrPasswordNotFound         = errors.New("secret 'kubernetes.io/basic-auth' has no 'password' field")
-	ErrDockerConfigKeyNotFound  = errors.New("secret 'kubernetes.io/dockerconfigjson' has no '.dockerconfigjson' field")
-	ErrUnsupportedSecretType    = errors.New("unsupported secret type")
-	ErrDockerConfigJsonNotFound = errors.New(".dockerconfigjson not found in secret")
-	ErrRegistryHostnameNotFound = errors.New("registry hostname not found in secret")
+const (
+	ErrSecretDataNil            = "pull secret %q for registry %q has nil data"
+	ErrAuthKeyNotFound          = "pull secret %q for registry %q of type 'rke.cattle.io/auth-config' is missing the 'auth' key"
+	ErrAuthMalformed            = "pull secret %q for registry %q of type 'rke.cattle.io/auth-config' has malformed 'auth' value: expected username:password format"
+	ErrUsernameNotFound         = "pull secret %q for registry %q of type 'kubernetes.io/basic-auth' is missing the 'username' field"
+	ErrPasswordNotFound         = "pull secret %q for registry %q of type 'kubernetes.io/basic-auth' is missing the 'password' field"
+	ErrDockerConfigKeyNotFound  = "pull secret %q for registry %q of type 'kubernetes.io/dockerconfigjson' is missing the '.dockerconfigjson' field"
+	ErrUnsupportedSecretType    = "pull secret %q for registry %q has unsupported type %q"
+	ErrDockerConfigJsonNotFound = "pull secret for registry %q is missing the '.dockerconfigjson' key"
+	ErrRegistryHostnameNotFound = "registry hostname %q not found in pull secret"
 )
 
 // ConvertToDockerConfigJson converts various types of secrets into a proper .dockerconfigjson format. Specifically, rke.cattle.io/auth-config, kubernetes.io/basic-auth,
@@ -30,41 +29,41 @@ func ConvertToDockerConfigJson(registryHost string, secret *kcorev1.Secret) ([]b
 	switch secret.Type {
 	case v1.AuthConfigSecretType:
 		if secret.Data == nil {
-			return nil, fmt.Errorf("'rke.cattle.io/auth-config': %w", ErrSecretDataNil)
+			return nil, fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
 		}
 		auth, ok := secret.Data["auth"]
 		if !ok {
-			return nil, ErrAuthKeyNotFound
+			return nil, fmt.Errorf(ErrAuthKeyNotFound, secret.Name, registryHost)
 		}
 		username, password, found := strings.Cut(string(auth), ":")
 		if !found {
-			return nil, ErrAuthMalformed
+			return nil, fmt.Errorf(ErrAuthMalformed, secret.Name, registryHost)
 		}
 		return BuildDockerConfigJson(registryHost, username, password)
 	case kcorev1.SecretTypeBasicAuth:
 		if secret.Data == nil {
-			return nil, fmt.Errorf("'kubernetes.io/basic-auth': %w", ErrSecretDataNil)
+			return nil, fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
 		}
 		username, ok := secret.Data["username"]
 		if !ok {
-			return nil, ErrUsernameNotFound
+			return nil, fmt.Errorf(ErrUsernameNotFound, secret.Name, registryHost)
 		}
 		password, ok := secret.Data["password"]
 		if !ok {
-			return nil, ErrPasswordNotFound
+			return nil, fmt.Errorf(ErrPasswordNotFound, secret.Name, registryHost)
 		}
 		return BuildDockerConfigJson(registryHost, string(username), string(password))
 	case kcorev1.SecretTypeDockerConfigJson:
 		if secret.Data == nil {
-			return nil, fmt.Errorf("'kubernetes.io/dockerconfigjson': %w", ErrSecretDataNil)
+			return nil, fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
 		}
 		cfg, ok := secret.Data[kcorev1.DockerConfigJsonKey]
 		if !ok {
-			return nil, ErrDockerConfigKeyNotFound
+			return nil, fmt.Errorf(ErrDockerConfigKeyNotFound, secret.Name, registryHost)
 		}
 		return cfg, nil
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedSecretType, secret.Type)
+		return nil, fmt.Errorf(ErrUnsupportedSecretType, secret.Name, registryHost, secret.Type)
 	}
 }
 
@@ -85,7 +84,7 @@ func BuildDockerConfigJson(registryHostname, username, password string) ([]byte,
 func UnwrapDockerConfigJson(registryHostname string, configJson map[string][]byte) (username string, password string, auth string, err error) {
 	credJson, ok := configJson[kcorev1.DockerConfigJsonKey]
 	if !ok {
-		return "", "", "", ErrDockerConfigJsonNotFound
+		return "", "", "", fmt.Errorf(ErrDockerConfigJsonNotFound, registryHostname)
 	}
 
 	var cred credentialprovider.DockerConfigJSON
@@ -96,7 +95,7 @@ func UnwrapDockerConfigJson(registryHostname string, configJson map[string][]byt
 
 	entry, ok := cred.Auths[registryHostname]
 	if !ok {
-		return "", "", "", ErrRegistryHostnameNotFound
+		return "", "", "", fmt.Errorf(ErrRegistryHostnameNotFound, registryHostname)
 	}
 
 	auth = fmt.Sprintf("%s:%s", entry.Username, entry.Password)

@@ -3,6 +3,7 @@ package usercontrollers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -177,8 +178,12 @@ func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) er
 		return err
 	}
 
-	job, err := c.createCleanupJob(userContext, sa.Name, secrets)
+	job, err := c.createCleanupJob(userContext, cluster, sa.Name, secrets)
 	if err != nil {
+		cleanupErr := c.cleanupImagePullSecrets(userContext, secrets)
+		if cleanupErr != nil {
+			return errors.Join(err, cleanupErr)
+		}
 		return err
 	}
 
@@ -287,10 +292,11 @@ func (c *ClusterLifecycleCleanup) createCleanupImagePullSecrets(userContext *con
 
 	var copiedSecrets []*corev1.Secret
 	for _, sec := range registry.PullSecrets {
-		existingPullSec, err := userContext.K8sClient.CoreV1().Secrets(namespaces.System).Get(c.ctx, sec.Name, metav1.GetOptions{})
+		downstreamPullSecretName := util.GeneratePullSecretName(sec.Name)
+		existingPullSec, err := userContext.K8sClient.CoreV1().Secrets(namespaces.System).Get(c.ctx, downstreamPullSecretName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				logrus.Warnf("image pull secret %s/%s was not found, skipping copy", sec.Namespace, sec.Name)
+				logrus.Warnf("image pull secret %s/%s was not found, skipping copy", sec.Namespace, downstreamPullSecretName)
 				continue
 			}
 			return nil, err
@@ -301,7 +307,7 @@ func (c *ClusterLifecycleCleanup) createCleanupImagePullSecrets(userContext *con
 			return nil, err
 		}
 
-		defaultPullSecretName := name.SafeConcatName("cattle-cleanup", sec.Name, cluster.Name)
+		defaultPullSecretName := name.SafeConcatName("cattle-cleanup", downstreamPullSecretName, cluster.Name)
 
 		s := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -329,6 +335,9 @@ func (c *ClusterLifecycleCleanup) createCleanupImagePullSecrets(userContext *con
 
 		if !bytes.Equal(defPull.Data[coreV1.DockerConfigJsonKey], data) {
 			defPull = defPull.DeepCopy()
+			if defPull.Data == nil {
+				defPull.Data = make(map[string][]byte)
+			}
 			defPull.Data[coreV1.DockerConfigJsonKey] = data
 			_, err = userContext.K8sClient.CoreV1().Secrets("default").Update(c.ctx, defPull, metav1.UpdateOptions{})
 			if err != nil {
@@ -368,7 +377,7 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRoleBinding(
 	return userContext.K8sClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), &clusterRoleBinding, metav1.CreateOptions{})
 }
 
-func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserContext, sa string, secrets []*corev1.Secret) (*batchV1.Job, error) {
+func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserContext, cluster *v3.Cluster, sa string, secrets []*corev1.Secret) (*batchV1.Job, error) {
 	meta := metav1.ObjectMeta{
 		GenerateName: "cattle-cleanup-",
 		Namespace:    "default",
@@ -384,7 +393,7 @@ func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserConte
 					Containers: []coreV1.Container{
 						coreV1.Container{
 							Name:  "cleanup-agent",
-							Image: image.Resolve(settings.AgentImage.Get()),
+							Image: image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
 							Env: []coreV1.EnvVar{
 								coreV1.EnvVar{
 									Name:  "CLUSTER_CLEANUP",
@@ -492,6 +501,18 @@ func (c *ClusterLifecycleCleanup) updateClusterRoleBindingOwner(
 		}
 		return nil
 	})
+}
+
+func (c *ClusterLifecycleCleanup) cleanupImagePullSecrets(userContext *config.UserContext, secrets []*corev1.Secret) error {
+	for _, secret := range secrets {
+		if secret == nil {
+			continue
+		}
+		if deleteErr := userContext.K8sClient.CoreV1().Secrets("default").Delete(c.ctx, secret.Name, metav1.DeleteOptions{}); deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+			logrus.WithError(deleteErr).Warnf("failed to delete cleanup image pull secret %s/%s after cleanup job creation failed", coreV1.NamespaceDefault, secret.Name)
+		}
+	}
+	return nil
 }
 
 func cleanupNamespaces(client kubernetes.Interface) error {

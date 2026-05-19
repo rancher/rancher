@@ -96,16 +96,8 @@ func runCleanup(ctx context.Context) {
 	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
 		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
 		go clean.UnusedCattleCredentials()
-	}
-
-	if os.Getenv("CATTLE_AGENT_PULL_SECRETS") != "" {
 		// Run once on startup to make sure that there are no lingering pull secrets in the cattle-system namespace
-		go func() {
-			err := clean.UnusedPullSecrets(ctx)
-			if err != nil {
-				logrus.Errorf("failed to remove unused pull secrets: %v", err)
-			}
-		}()
+		go clean.UnusedPullSecrets(ctx)
 	}
 }
 
