@@ -111,6 +111,10 @@ type Options struct {
 	ClusterRegistry                string
 	AggregationRegistrationTimeout time.Duration
 	RancherNamespaceOptions        string
+
+	// LocalUserPasswordsNamespace should be set to true if the namespace for
+	// storing user passwords should be created.
+	LocalUserPasswordsNamespace bool
 }
 
 type Rancher struct {
@@ -445,7 +449,7 @@ func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
-	if features.MCM.Enabled() {
+	if r.opts.LocalUserPasswordsNamespace {
 		// ensure namespace for storing local users password is created
 		if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: pbkdf2.LocalUserPasswordsNamespace},
