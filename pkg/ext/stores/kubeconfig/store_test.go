@@ -428,7 +428,12 @@ func TestStoreCreate(t *testing.T) {
 			return configMap, nil
 		}).Times(1)
 
-		tokenManager := &fakeTokenManager{} // Subtest specific instance.
+		var createdTokens []*ext.Token
+		tokenManager := &fakeTokenManager{}
+		tokenManager.createTokenFunc = func(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+			createdTokens = append(createdTokens, token.DeepCopy())
+			return tokenManager.generate(token)
+		}
 
 		store := &Store{
 			mcmEnabled:          true,
@@ -546,6 +551,11 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
 		require.Len(t, tokenManager.clusterTokenKeys, 1)
 		assert.Equal(t, tokenManager.clusterTokenKeys[0], config.AuthInfos["downstream2"].Token)
+
+		require.Len(t, createdTokens, 2)
+		for _, tok := range createdTokens {
+			assert.Equal(t, created.Name, tok.Labels["authn.management.cattle.io/kubeconfig-id"])
+		}
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})

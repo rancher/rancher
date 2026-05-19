@@ -466,7 +466,7 @@ func (s *Store) Create(
 	err = func() error { // Deliberately use an anonymous function to capture the status and error conditions.
 		// Generate a shared token for the default and non-ACE clusters.
 		if !dryRun && generateToken && needsSharedToken {
-			extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, "")
+			extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, "", kubeConfigID)
 			sharedToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 			if err != nil {
 				conditions = append(conditions, metav1.Condition{
@@ -557,7 +557,7 @@ func (s *Store) Create(
 
 			// Generate a cluster-scoped token for the ACE cluster.
 			if !dryRun && generateToken {
-				extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, cluster.Name)
+				extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, cluster.Name, kubeConfigID)
 				clusterToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 				if err != nil {
 					conditions = append(conditions, metav1.Condition{
@@ -864,8 +864,13 @@ func first(values []string) string {
 }
 
 // buildExtToken builds an [ext.Token] for a kubeconfig token.
-func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor, ttl int64, clusterID string) *ext.Token {
+func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor, ttl int64, clusterID, kubeConfigID string) *ext.Token {
 	return &ext.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				tokens.TokenKubeconfigIDLabel: kubeConfigID,
+			},
+		},
 		Spec: ext.TokenSpec{
 			UserID:        userName,
 			UserPrincipal: toExtTokenPrincipal(authToken.GetUserPrincipal()),
