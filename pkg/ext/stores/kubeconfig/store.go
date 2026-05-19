@@ -137,7 +137,7 @@ type Store struct {
 
 // New creates a new instance of [Store].
 func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
-	extTokenStore := exttokens.NewSystemFromWrangler(wranglerContext)
+	extTokenStore := exttokens.NewSystemFromWrangler(wranglerContext, authorizer)
 	store := &Store{
 		mcmEnabled:      mcmEnabled,
 		configMapCache:  wranglerContext.Core.ConfigMap().Cache(),
