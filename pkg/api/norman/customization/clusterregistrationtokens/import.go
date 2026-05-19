@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/docker/distribution/reference"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -56,6 +57,12 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		authImage = authImages[0]
 	}
 
+	if err := validateAuthImage(authImage); err != nil {
+		resp.WriteHeader(http.StatusBadRequest)
+		resp.Write([]byte("invalid authImage - " + err.Error()))
+		return
+	}
+
 	var cluster *apimgmtv3.Cluster
 	if clusterID != "" {
 		cluster, _ = ch.Clusters.Get(clusterID, metav1.GetOptions{})
@@ -81,4 +88,12 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}
+}
+
+func validateAuthImage(authImage string) error {
+	if authImage == "" {
+		return nil
+	}
+	_, err := reference.ParseNormalizedNamed(authImage)
+	return err
 }
