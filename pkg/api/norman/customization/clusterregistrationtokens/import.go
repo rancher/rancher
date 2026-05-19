@@ -3,6 +3,7 @@ package clusterregistrationtokens
 import (
 	"net/http"
 
+	"github.com/docker/distribution/reference"
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
@@ -15,6 +16,14 @@ import (
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func validateAuthImage(authImage string) error {
+	if authImage == "" {
+		return nil
+	}
+	_, err := reference.ParseNormalizedNamed(authImage)
+	return err
+}
 
 type ClusterImport struct {
 	Clusters v3.ClusterInterface
@@ -40,6 +49,12 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 	authImages := req.URL.Query()["authImage"]
 	if len(authImages) > 0 {
 		authImage = authImages[0]
+	}
+
+	if err := validateAuthImage(authImage); err != nil {
+		resp.WriteHeader(http.StatusBadRequest)
+		resp.Write([]byte("invalid authImage - " + err.Error()))
+		return
 	}
 
 	var cluster *apimgmtv3.Cluster
