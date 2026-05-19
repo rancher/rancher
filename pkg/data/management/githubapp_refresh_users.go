@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
@@ -9,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const providerRefreshRequestedAnnotation = "auth.cattle.io/provider-refresh-requested"
@@ -21,7 +23,8 @@ const providerRefreshRequestedAnnotation = "auth.cattle.io/provider-refresh-requ
 func RefreshGitHubAppUsersOnce(ctx context.Context, authConfigs apisv3.AuthConfigClient) {
 	authConfig, err := authConfigs.Get(githubapp.Name, metav1.GetOptions{})
 	if k8serrors.IsNotFound(err) {
-		return // Provider config is missing; nothing to do.
+		logrus.Debugf("refreshGitHubAppUsersOnce: AuthConfig %s not found, skipping", githubapp.Name)
+		return
 	}
 	if err != nil {
 		logrus.Errorf("refreshGitHubAppUsersOnce: getting AuthConfig: %v", err)
@@ -29,22 +32,34 @@ func RefreshGitHubAppUsersOnce(ctx context.Context, authConfigs apisv3.AuthConfi
 	}
 
 	if !authConfig.Enabled {
-		return // Provider is not enabled; nothing to do.
+		logrus.Debugf("refreshGitHubAppUsersOnce: provider %s is not enabled, skipping", githubapp.Name)
+		return
 	}
 
 	if authConfig.Annotations[providerRefreshRequestedAnnotation] == "true" {
-		return // Already ran.
+		logrus.Debugf("refreshGitHubAppUsersOnce: provider %s already refreshed, skipping", githubapp.Name)
+		return
 	}
 
+	logrus.Infof("refreshGitHubAppUsersOnce: triggering refresh for all users of provider %s", githubapp.Name)
 	providerrefresh.TriggerAllUserRefresh()
 
-	// Set the annotation so subsequent restarts skip it.
-	authConfig = authConfig.DeepCopy()
-	if authConfig.Annotations == nil {
-		authConfig.Annotations = map[string]string{}
+	// Use a JSON Merge Patch instead of a typed Update to set the
+	// annotation. AuthConfig objects store provider-specific fields not
+	// defined in the base v3.AuthConfig struct; a typed Update (PUT)
+	// would strip those fields and corrupt the stored configuration.
+	patch, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"annotations": map[string]string{
+				providerRefreshRequestedAnnotation: "true",
+			},
+		},
+	})
+	if err != nil {
+		logrus.Errorf("refreshGitHubAppUsersOnce: marshaling patch: %v", err)
+		return
 	}
-	authConfig.Annotations[providerRefreshRequestedAnnotation] = "true"
-	if _, err := authConfigs.Update(authConfig); err != nil {
-		logrus.Warnf("refreshGitHubAppUsersOnce: setting annotation: %v", err)
+	if _, err := authConfigs.Patch(githubapp.Name, types.MergePatchType, patch); err != nil {
+		logrus.Warnf("refreshGitHubAppUsersOnce: patching annotation: %v", err)
 	}
 }
