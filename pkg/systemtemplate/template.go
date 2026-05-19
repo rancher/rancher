@@ -209,7 +209,7 @@ spec:
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}
-          image: {{.AgentImage}}
+          image: "{{.AgentImage}}"
           volumeMounts:
           - name: cattle-credentials
             mountPath: /cattle-credentials
@@ -485,7 +485,7 @@ spec:
       - operator: Exists
       containers:
       - name: kube-api-auth
-        image: {{.AuthImage}}
+        image: "{{.AuthImage}}"
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: k8s-ssl
