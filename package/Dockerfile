@@ -21,7 +21,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.15
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.15-rke2-k3s-may-patch
+ARG CATTLE_KDM_BRANCH=dev-v2.15
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -104,7 +104,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
 FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
-    curl -sLf "https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data/data.json" > /var/lib/rancher-data/driver-metadata/data.json
+    curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
 
 FROM builder AS tini
@@ -169,11 +169,11 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher142
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher143
 ENV CATTLE_MACHINE_CHECKSUM_amd64=9ae8f09bde3d036ab71659bcdbd7f03e2566371b985eb44e67cacfa6481306e5
 ENV CATTLE_MACHINE_CHECKSUM_arm64=0d2afec21404af012ba49afd60c1d7bba962fab6685d794a46f2202b72908580
 ENV CATTLE_K3S_VERSION=v1.36.0+k3s1
-ENV CATTLE_MACHINE_PROVISION_IMAGE=teja04783/machine:v0.0.2-test
+ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.6.7
 ENV CATTLE_ETCD_CHECKSUM_amd64=cf8af880c5a01ee5363cefa14a3e0cb7e5308dcf4ed17a6973099c9a7aee5a9a
 ENV CATTLE_ETCD_CHECKSUM_arm64=ef5fc443cf7cc5b82738f3c28363704896551900af90a6d622cae740b5644270

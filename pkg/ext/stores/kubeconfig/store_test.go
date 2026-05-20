@@ -428,7 +428,12 @@ func TestStoreCreate(t *testing.T) {
 			return configMap, nil
 		}).Times(1)
 
-		tokenManager := &fakeTokenManager{} // Subtest specific instance.
+		var createdTokens []*ext.Token
+		tokenManager := &fakeTokenManager{}
+		tokenManager.createTokenFunc = func(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+			createdTokens = append(createdTokens, token.DeepCopy())
+			return tokenManager.generate(token)
+		}
 
 		store := &Store{
 			mcmEnabled:          true,
@@ -546,6 +551,11 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
 		require.Len(t, tokenManager.clusterTokenKeys, 1)
 		assert.Equal(t, tokenManager.clusterTokenKeys[0], config.AuthInfos["downstream2"].Token)
+
+		require.Len(t, createdTokens, 2)
+		for _, tok := range createdTokens {
+			assert.Equal(t, created.Name, tok.Labels["authn.management.cattle.io/kubeconfig-id"])
+		}
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
@@ -1184,7 +1194,309 @@ func TestStoreCreate(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, obj)
 		assert.True(t, apierrors.IsBadRequest(err))
-		assert.Contains(t, err.Error(), "exceeds max ttl")
+		assert.ErrorContains(t, err, "exceeds max ttl")
+	})
+	t.Run("exclude default entry with no clusters", func(t *testing.T) {
+		store := &Store{
+			authorizer:    commonAuthorizer,
+			userCache:     userCache,
+			tokenStore:    tokenStore,
+			tokenMgr:      tokenManager,
+			getDefaultTTL: getDefaultTTL,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				IncludeDefaultEntry: ptr.To(false),
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsBadRequest(err))
+		assert.ErrorContains(t, err, "at least one cluster is required when includeDefaultEntry is false")
+	})
+	t.Run("exclude default entry with non-ACE clusters", func(t *testing.T) {
+		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		tokenManager := &fakeTokenManager{}
+
+		store := &Store{
+			mcmEnabled:          true,
+			authorizer:          allowAuthorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenStore:          tokenStore,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			tokenMgr:            tokenManager,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:            []string{downstream1},
+				IncludeDefaultEntry: ptr.To(false),
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+		assert.Equal(t, "false", configMap.Data[IncludeDefaultEntryField])
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		require.Len(t, config.Clusters, 1)
+		assert.Contains(t, config.Clusters, "downstream1")
+		assert.NotContains(t, config.Clusters, defaultClusterName)
+
+		require.Len(t, config.Contexts, 1)
+		assert.Contains(t, config.Contexts, "downstream1")
+		assert.NotContains(t, config.Contexts, defaultClusterName)
+
+		require.Len(t, config.AuthInfos, 1)
+		assert.Contains(t, config.AuthInfos, defaultClusterName)
+
+		require.Len(t, tokenManager.sharedTokenKeys, 1)
+		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
+		require.Empty(t, tokenManager.clusterTokenKeys)
+
+		assert.Equal(t, "downstream1", config.CurrentContext)
+	})
+	t.Run("exclude default entry with ACE-only clusters", func(t *testing.T) {
+		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		tokenManager := &fakeTokenManager{}
+
+		store := &Store{
+			mcmEnabled:          true,
+			authorizer:          allowAuthorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenStore:          tokenStore,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			tokenMgr:            tokenManager,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:            []string{downstream2},
+				IncludeDefaultEntry: ptr.To(false),
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		assert.NotContains(t, config.Clusters, defaultClusterName)
+		assert.NotContains(t, config.Contexts, defaultClusterName)
+		assert.NotContains(t, config.AuthInfos, defaultClusterName)
+
+		require.Empty(t, tokenManager.sharedTokenKeys)
+		require.Len(t, tokenManager.clusterTokenKeys, 1)
+
+		assert.Equal(t, "downstream2-cp", config.CurrentContext)
+	})
+	t.Run("exclude default entry with mixed clusters", func(t *testing.T) {
+		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		tokenManager := &fakeTokenManager{}
+
+		store := &Store{
+			mcmEnabled:          true,
+			authorizer:          allowAuthorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenStore:          tokenStore,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			tokenMgr:            tokenManager,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:            []string{downstream1, downstream2},
+				CurrentContext:      downstream1,
+				IncludeDefaultEntry: ptr.To(false),
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		assert.NotContains(t, config.Clusters, defaultClusterName)
+		assert.NotContains(t, config.Contexts, defaultClusterName)
+
+		assert.Contains(t, config.AuthInfos, defaultClusterName)
+		require.Len(t, tokenManager.sharedTokenKeys, 1)
+		assert.Equal(t, tokenManager.sharedTokenKeys[0], config.AuthInfos[defaultClusterName].Token)
+		require.Len(t, tokenManager.clusterTokenKeys, 1)
+
+		assert.Equal(t, "downstream1", config.CurrentContext)
+	})
+	t.Run("include default entry explicitly", func(t *testing.T) {
+		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		tokenManager := &fakeTokenManager{}
+
+		store := &Store{
+			mcmEnabled:          true,
+			authorizer:          allowAuthorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenStore:          tokenStore,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			tokenMgr:            tokenManager,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:            []string{downstream1},
+				IncludeDefaultEntry: ptr.To(true),
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+		assert.Equal(t, "true", configMap.Data[IncludeDefaultEntryField])
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		assert.Contains(t, config.Clusters, defaultClusterName)
+		assert.Contains(t, config.Contexts, defaultClusterName)
+		assert.Contains(t, config.AuthInfos, defaultClusterName)
 	})
 }
 
@@ -2263,6 +2575,17 @@ func TestStoreUpdate(t *testing.T) {
 			assert.False(t, isCreated)
 			assert.True(t, apierrors.IsBadRequest(err))
 		})
+		t.Run("spec.includeDefaultEntry", func(t *testing.T) {
+			newKubeconfig := oldKubeconfig.DeepCopy()
+			newKubeconfig.Spec.IncludeDefaultEntry = ptr.To(false)
+			objInfo := &fakeUpdatedObjectInfo{obj: newKubeconfig}
+
+			kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, options)
+			require.Error(t, err)
+			assert.Nil(t, kubeconfig)
+			assert.False(t, isCreated)
+			assert.True(t, apierrors.IsBadRequest(err))
+		})
 	})
 	t.Run("dryRun", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -2648,5 +2971,64 @@ func TestPrintKubeconfig(t *testing.T) {
 		require.Len(t, row.Cells, 8)
 		assert.Equal(t, unknownValue, row.Cells[3].(string))
 		assert.Equal(t, unknownValue, row.Cells[4].(string))
+	})
+}
+
+func TestIncludeDefaultEntryConfigMapRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	store := &Store{}
+
+	t.Run("nil round-trips as nil", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL: 3600,
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.NotContains(t, cm.Data, IncludeDefaultEntryField)
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		assert.Nil(t, result.Spec.IncludeDefaultEntry)
+	})
+	t.Run("false round-trips as false", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL:                 3600,
+				IncludeDefaultEntry: ptr.To(false),
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.Equal(t, "false", cm.Data[IncludeDefaultEntryField])
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		require.NotNil(t, result.Spec.IncludeDefaultEntry)
+		assert.False(t, *result.Spec.IncludeDefaultEntry)
+	})
+	t.Run("true round-trips as true", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL:                 3600,
+				IncludeDefaultEntry: ptr.To(true),
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.Equal(t, "true", cm.Data[IncludeDefaultEntryField])
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		require.NotNil(t, result.Spec.IncludeDefaultEntry)
+		assert.True(t, *result.Spec.IncludeDefaultEntry)
 	})
 }

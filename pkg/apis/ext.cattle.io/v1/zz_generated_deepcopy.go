@@ -195,6 +195,11 @@ func (in *KubeconfigSpec) DeepCopyInto(out *KubeconfigSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.IncludeDefaultEntry != nil {
+		in, out := &in.IncludeDefaultEntry, &out.IncludeDefaultEntry
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

@@ -820,13 +820,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		ml, _ := cluster.Machines(clients, c)
-		activeMachines := 0
-		for _, machine := range ml.Items {
-			if machine.DeletionTimestamp.IsZero() {
-				activeMachines++
-			}
-		}
-		return activeMachines == 1
+		return len(ml.Items) == 1
 	}, 15*time.Minute, 2*time.Second, "did not converge back to a single node")
 
 	require.Eventually(t, func() bool {

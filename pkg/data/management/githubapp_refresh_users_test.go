@@ -1,16 +1,19 @@
 package management
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestRefreshGitHubAppUsersOnce(t *testing.T) {
@@ -19,11 +22,10 @@ func TestRefreshGitHubAppUsersOnce(t *testing.T) {
 	notFound := k8serrors.NewNotFound(schema.GroupResource{Resource: "authconfigs"}, "githubapp")
 
 	tests := []struct {
-		name            string
-		authConfig      *v3.AuthConfig
-		getErr          error
-		wantUpdateCalls int
-		wantAnnotation  bool
+		name       string
+		authConfig *v3.AuthConfig
+		getErr     error
+		wantPatch  bool
 	}{
 		{
 			name:   "provider not configured",
@@ -49,7 +51,6 @@ func TestRefreshGitHubAppUsersOnce(t *testing.T) {
 				},
 				Enabled: true,
 			},
-			wantAnnotation: true,
 		},
 		{
 			name: "first run",
@@ -57,8 +58,7 @@ func TestRefreshGitHubAppUsersOnce(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "githubapp"},
 				Enabled:    true,
 			},
-			wantUpdateCalls: 1,
-			wantAnnotation:  true,
+			wantPatch: true,
 		},
 	}
 
@@ -71,23 +71,20 @@ func TestRefreshGitHubAppUsersOnce(t *testing.T) {
 			mock := fake.NewMockNonNamespacedClientInterface[*v3.AuthConfig, *v3.AuthConfigList](ctrl)
 			mock.EXPECT().Get("githubapp", metav1.GetOptions{}).Return(tt.authConfig, tt.getErr)
 
-			var updated *v3.AuthConfig
-			if tt.wantUpdateCalls > 0 {
-				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(cfg *v3.AuthConfig) (*v3.AuthConfig, error) {
-					updated = cfg
-					return cfg, nil
-				}).Times(tt.wantUpdateCalls)
+			if tt.wantPatch {
+				mock.EXPECT().Patch("githubapp", types.MergePatchType, gomock.Any()).DoAndReturn(
+					func(_ string, _ types.PatchType, data []byte, _ ...string) (*v3.AuthConfig, error) {
+						var payload map[string]any
+						require.NoError(t, json.Unmarshal(data, &payload))
+						metadata, _ := payload["metadata"].(map[string]any)
+						annotations, _ := metadata["annotations"].(map[string]any)
+						assert.Equal(t, "true", annotations[providerRefreshRequestedAnnotation])
+						return tt.authConfig, nil
+					},
+				)
 			}
 
 			RefreshGitHubAppUsersOnce(t.Context(), mock)
-
-			if tt.wantAnnotation {
-				source := updated
-				if source == nil {
-					source = tt.authConfig
-				}
-				assert.Equal(t, "true", source.Annotations[providerRefreshRequestedAnnotation])
-			}
 		})
 	}
 }

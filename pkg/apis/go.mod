@@ -3,15 +3,7 @@ module github.com/rancher/rancher/pkg/apis
 go 1.26.0
 
 replace (
-	github.com/rancher/aks-operator => github.com/rancher-teja/aks-operator v1.13.0-rc.1.0.20260506102828-d2c5e80a5223
-	github.com/rancher/ali-operator => github.com/rancher-teja/ali-operator v1.13.0-rc.1.0.20260506095922-b7708fdb3b3e
-	github.com/rancher/eks-operator => github.com/rancher-teja/eks-operator v1.14.0-rc.1.0.20260506090247-a9c11ffb810f
-	github.com/rancher/gke-operator => github.com/rancher-teja/gke-operator v1.14.0-rc.1.0.20260506092726-5ac4d5aeee7b
-	github.com/rancher/lasso => github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260505081514-7d93f2343c4e
-	github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260505143155-552e07ef956f
 	github.com/rancher/rancher/pkg/plan => ../plan
-	github.com/rancher/rke => github.com/rancher-teja/rke v1.8.14-0.20260423104215-3916aa7c88c6
-	github.com/rancher/wrangler/v3 => github.com/rancher-teja/wrangler/v3 v3.6.0-rc.1.0.20260507143116-dcc9e570f425
 	k8s.io/api => k8s.io/api v0.36.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.36.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.36.0
@@ -42,15 +34,15 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.14.0-rc.2
-	github.com/rancher/ali-operator v1.14.0-rc.1
-	github.com/rancher/eks-operator v1.14.0-rc.5
+	github.com/rancher/aks-operator v1.15.0-rc.1
+	github.com/rancher/ali-operator v1.15.0-rc.1
+	github.com/rancher/eks-operator v1.15.0-rc.1
 	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
-	github.com/rancher/gke-operator v1.14.0-rc.3
-	github.com/rancher/norman v0.9.1
+	github.com/rancher/gke-operator v1.15.0-rc.1
+	github.com/rancher/norman v0.9.5
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/rke v1.8.0
-	github.com/rancher/wrangler/v3 v3.7.0-rc.1
+	github.com/rancher/wrangler/v3 v3.7.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.36.0
@@ -92,12 +84,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/term v0.42.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect

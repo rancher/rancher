@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -1405,6 +1406,116 @@ func TestStoreCreate(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, test.rtok, tok)
+			}
+		})
+	}
+}
+
+func TestSystemStoreCreateClusterScoped(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		authorizer authorizer.Authorizer
+		cluster    *v3.Cluster
+		clusterErr error
+		err        string
+	}{
+		{
+			name:       "nil authorizer returns error",
+			authorizer: nil,
+			cluster:    &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+			err:        "authorizer is required for cluster-scoped tokens",
+		},
+		{
+			name:       "cluster not found",
+			authorizer: nil,
+			clusterErr: apierrors.NewNotFound(GVR.GroupResource(), "c-m-missing"),
+			err:        "cluster c-m-missing not found",
+		},
+		{
+			name: "authorizer denies access",
+			authorizer: authorizer.AuthorizerFunc(func(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "denied", nil
+			}),
+			cluster: &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+			err:     "is not allowed to access cluster",
+		},
+		{
+			name: "authorizer allows access",
+			authorizer: authorizer.AuthorizerFunc(func(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			cluster: &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			nsCache.EXPECT().Get(TokenNamespace).AnyTimes()
+
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			ccache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+
+			timer := NewMocktimeHandler(ctrl)
+			hasher := NewMockhashHandler(ctrl)
+			auth := NewMockauthHandler(ctrl)
+
+			store := NewSystem(nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth, test.authorizer)
+
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				AuthProvider: "local",
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+				},
+			}, nil)
+
+			if test.clusterErr != nil {
+				ccache.EXPECT().Get("c-m-missing").Return(nil, test.clusterErr)
+			} else {
+				ccache.EXPECT().Get(test.cluster.Name).Return(test.cluster, nil)
+			}
+
+			if test.err == "" {
+				hasher.EXPECT().MakeAndHashSecret().Return("secretval", "hashval", nil)
+				timer.EXPECT().Now().Return("fake-now")
+
+				secrets.EXPECT().Create(gomock.Any()).Return(&properSecret, nil)
+			}
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID:      "world",
+					ClusterName: "c-m-test",
+				},
+			}
+			if test.clusterErr != nil {
+				token.Spec.ClusterName = "c-m-missing"
+			}
+
+			userInfo := &mockUser{name: "world"}
+			_, err := store.Create(context.Background(), GVR.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
+
+			if test.err != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
