@@ -204,7 +204,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		assign(&token)
 	}
 
-	for providerName := range providers.ProviderNames {
+	for _, providerName := range providers.ProviderNames() {
 		// We have to find out if the user has a principal for the provider.
 		principalID := GetPrincipalIDForProvider(providerName, user)
 		var newGroupPrincipals []apiv3.Principal
@@ -223,23 +223,19 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		// If there is no principalID for the provider, there is no reason to go through the refetch process
 		if principalID != "" {
 			secret := ""
-			hasPerUserSecrets, err := providers.ProviderHasPerUserSecrets(providerName)
-			if err != nil {
-				return nil, err
-			}
-			if hasPerUserSecrets {
+			canRefresh := true
+
+			if providers.ProviderUsesUserSecrets(providerName) {
 				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
 				if apierrors.IsNotFound(err) {
-					// There is no secret so we can't refresh, just continue to the next attribute.
-					return attribs, nil
-				}
-				if err != nil {
+					canRefresh = false
+					errorConfirmingLogins = true
+				} else if err != nil {
 					return nil, err
 				}
 			}
 
-			// SAML cannot refresh, so we do restore the existing principals.
-			if providers.UnrefreshableProviders[providerName] {
+			if !providers.ProviderCanRefreshPrincipals(providerName) || !canRefresh {
 				existingPrincipals := attribs.GroupPrincipals[providerName].Items
 				if existingPrincipals != nil {
 					newGroupPrincipals = existingPrincipals

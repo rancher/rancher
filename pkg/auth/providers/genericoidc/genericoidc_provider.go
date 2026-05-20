@@ -135,6 +135,9 @@ func (g *GenOIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 	return nil, errors.New("Not implemented")
 }
 
+func (g *GenOIDCProvider) UsesUserSecrets() bool       { return false }
+func (g *GenOIDCProvider) CanRefreshPrincipals() bool { return false }
+
 // groupToPrincipal takes a bare group name and turns it into a apiv3.Principal group object by filling-in other fields
 // with basic provider information.
 func (g *GenOIDCProvider) groupToPrincipal(groupName string) apiv3.Principal {

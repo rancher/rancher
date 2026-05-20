@@ -33,6 +33,14 @@ type AuthProvider interface {
 	GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error)
 	CustomizeSchema(schema *types.Schema)
 	TransformToAuthProvider(authConfig map[string]any) (map[string]any, error)
+	// UsesUserSecrets reports whether the provider stores per-user OAuth tokens
+	// in secrets. Providers that authenticate via service credentials (e.g. an
+	// App private key) return false.
+	UsesUserSecrets() bool
+	// CanRefreshPrincipals reports whether the provider supports refetching
+	// group principals at refresh time. Providers that return false will have
+	// their existing group principals preserved instead.
+	CanRefreshPrincipals() bool
 	RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error)
 	CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error)
 	// GetUserExtraAttributes retrieves the extra attributes from the specified principal.
