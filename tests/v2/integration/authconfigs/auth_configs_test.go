@@ -43,28 +43,30 @@ func (s *AuthConfigTestSuite) TestAuthConfigsExistAndCannotBeDeleted() {
 	s.Require().NoError(err)
 
 	expectedTypes := map[string]bool{
-		"githubConfig":          false,
-		"localConfig":           false,
 		"activeDirectoryConfig": false,
-		"azureADConfig":         false,
-		"openLdapConfig":        false,
-		"freeIpaConfig":         false,
-		"pingConfig":            false,
 		"adfsConfig":            false,
-		"keyCloakConfig":        false,
-		"oktaConfig":            false,
-		"googleOauthConfig":     false,
-		"shibbolethConfig":      false,
-		"oidcConfig":            false,
-		"keyCloakOIDCConfig":    false,
-		"genericOIDCConfig":     false,
+		"azureADConfig":         false,
 		"cognitoConfig":         false,
+		"freeIpaConfig":         false,
+		"genericOIDCConfig":     false,
 		"githubAppConfig":       false,
+		"githubConfig":          false,
+		"googleOauthConfig":     false,
+		"keyCloakConfig":        false,
+		"keyCloakOIDCConfig":    false,
+		"localConfig":           false,
+		"oidcConfig":            false,
+		"oktaConfig":            false,
+		"openLdapConfig":        false,
+		"pingConfig":            false,
+		"shibbolethConfig":      false,
 	}
 
 	for _, config := range configs.Data {
 		if _, ok := expectedTypes[config.Type]; ok {
 			expectedTypes[config.Type] = true
+		} else {
+			s.Failf("unexpected auth config type %q found in API response", config.Type)
 		}
 	}
 
@@ -98,16 +100,16 @@ func (s *AuthConfigTestSuite) TestAuthConfigActions() {
 
 	// Configs that should have testAndApply action.
 	testAndApplyConfigs := []string{
-		"githubConfig",
 		"activeDirectoryConfig",
 		"azureADConfig",
-		"openLdapConfig",
+		"cognitoConfig",
 		"freeIpaConfig",
+		"genericOIDCConfig",
+		"githubAppConfig",
+		"githubConfig",
 		"googleOauthConfig",
 		"oidcConfig",
-		"genericOIDCConfig",
-		"cognitoConfig",
-		"githubAppConfig",
+		"openLdapConfig",
 	}
 	for _, configType := range testAndApplyConfigs {
 		c, ok := configMap[configType]
@@ -118,13 +120,13 @@ func (s *AuthConfigTestSuite) TestAuthConfigActions() {
 
 	// Configs that should have configureTest action.
 	configureTestConfigs := []string{
-		"githubConfig",
 		"azureADConfig",
+		"cognitoConfig",
+		"genericOIDCConfig",
+		"githubAppConfig",
+		"githubConfig",
 		"googleOauthConfig",
 		"oidcConfig",
-		"genericOIDCConfig",
-		"cognitoConfig",
-		"githubAppConfig",
 	}
 	for _, configType := range configureTestConfigs {
 		c, ok := configMap[configType]
@@ -135,10 +137,10 @@ func (s *AuthConfigTestSuite) TestAuthConfigActions() {
 
 	// Configs that should have testAndEnable action.
 	testAndEnableConfigs := []string{
-		"pingConfig",
 		"adfsConfig",
 		"keyCloakConfig",
 		"oktaConfig",
+		"pingConfig",
 		"shibbolethConfig",
 	}
 	for _, configType := range testAndEnableConfigs {
