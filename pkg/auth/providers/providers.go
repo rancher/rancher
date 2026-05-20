@@ -3,7 +3,9 @@ package providers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -242,12 +244,7 @@ func ProviderNames() []string {
 	mu.RLock()
 	defer mu.RUnlock()
 
-	names := make([]string, 0, len(providers))
-	for name := range providers {
-		names = append(names, name)
-	}
-
-	return names
+	return slices.Collect(maps.Keys(providers))
 }
 
 // SetProviders replaces the provider map. Intended for use in tests.
