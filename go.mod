@@ -136,7 +136,7 @@ require (
 	github.com/rancher/shepherd v0.0.0-20260430211500-1f50d155268e
 	github.com/rancher/steve v0.9.7
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
-	github.com/rancher/wrangler/v3 v3.6.0-rc.2
+	github.com/rancher/wrangler/v3 v3.6.0
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
@@ -144,9 +144,9 @@ require (
 	github.com/urfave/cli v1.22.16
 	github.com/vmware/govmomi v0.42.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.49.0
-	golang.org/x/mod v0.34.0
-	golang.org/x/net v0.52.0
+	golang.org/x/crypto v0.50.0
+	golang.org/x/mod v0.35.0
+	golang.org/x/net v0.53.0
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/text v0.36.0
@@ -402,10 +402,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/term v0.41.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/time v0.14.0
-	golang.org/x/tools v0.43.0 // indirect
+	golang.org/x/tools v0.44.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
