@@ -64,6 +64,7 @@ func main() {
 	rancherConfig.Host = hostURL
 	rancherConfig.Cleanup = &cleanup
 	rancherConfig.ClusterName = clusterName
+	rancherConfig.AdminPassword = bootstrapPassword
 
 	if err := defaults.Set(rancherConfig); err != nil {
 		logrus.Fatalf("error with setting up config file: %v", err)

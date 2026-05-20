@@ -107,6 +107,15 @@ func (s *PVTestSuite) TestPersistentVolumeUpdate() {
 	s.Require().NotNil(pv)
 
 	id := pv["id"].(string)
+	s.T().Cleanup(func() {
+		req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/%s", s.pvURL(), id), nil)
+		s.Require().NoError(err)
+		resp, err := httpClient.Do(req)
+		if err == nil {
+			io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
+	})
 
 	// Fields within the persistentVolumeSource should not be updated.
 	updated := s.putPV(httpClient, id, map[string]any{

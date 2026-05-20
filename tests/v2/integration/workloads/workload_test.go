@@ -340,7 +340,6 @@ func (s *WorkloadTestSuite) TestWorkloadImageChangePrivateRegistry() {
 			map[string]any{"name": "one", "image": "testuser/testimage"},
 		},
 	})
-	s.Equal(wl["name"], wl["name"])
 	pullSecrets, ok := wl["imagePullSecrets"].([]any)
 	s.Require().True(ok)
 	s.Require().Len(pullSecrets, 1)
@@ -880,8 +879,33 @@ func (s *WorkloadTestSuite) TestWorkloadActionReadOnly() {
 		return false
 	}, 30*time.Second, time.Second, "timed out waiting for workload to appear in list")
 
-	// Fetch the first revision ID.
-	revisionsURL := fmt.Sprintf("%s/%s?action=rollback", s.workloadURL(project), wlID)
+	// Fetch a real replicaSet ID from the workload's revisions link.
+	wlRevisionsURL := fmt.Sprintf("%s/%s/revisions", s.workloadURL(project), wlID)
+	var replicaSetID string
+	s.Require().Eventually(func() bool {
+		resp, err := httpClient.Get(wlRevisionsURL)
+		if err != nil {
+			return false
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		var list struct {
+			Data []map[string]any `json:"data"`
+		}
+		if json.Unmarshal(body, &list) != nil || len(list.Data) == 0 {
+			return false
+		}
+		id, ok := list.Data[0]["id"].(string)
+		if !ok || id == "" {
+			return false
+		}
+		replicaSetID = id
+		return true
+	}, 30*time.Second, time.Second, "timed out waiting for workload revision to appear")
+
+	rollbackURL := fmt.Sprintf("%s/%s?action=rollback", s.workloadURL(project), wlID)
+	rollbackBody, err := json.Marshal(map[string]any{"replicaSetId": replicaSetID})
+	s.Require().NoError(err)
 
 	roClient, err := client.AsUser(roUser)
 	s.Require().NoError(err)
@@ -889,7 +913,7 @@ func (s *WorkloadTestSuite) TestWorkloadActionReadOnly() {
 	s.Require().NoError(err)
 
 	// Read-only user attempting rollback should receive 404.
-	roResp, err := roHTTP.Post(revisionsURL, "application/json", bytes.NewReader([]byte(`{"replicaSetId":""}`)))
+	roResp, err := roHTTP.Post(rollbackURL, "application/json", bytes.NewReader(rollbackBody))
 	s.Require().NoError(err)
 	io.ReadAll(roResp.Body)
 	roResp.Body.Close()
@@ -900,12 +924,13 @@ func (s *WorkloadTestSuite) TestWorkloadActionReadOnly() {
 	memberHTTP, err := rest.HTTPClientFor(memberClient.WranglerContext.RESTConfig)
 	s.Require().NoError(err)
 
-	// Project-member user attempting rollback should receive 2xx or a non-404 error.
-	memberResp, err := memberHTTP.Post(revisionsURL, "application/json", bytes.NewReader([]byte(`{"replicaSetId":""}`)))
+	// Project-member user attempting rollback should succeed (2xx).
+	memberResp, err := memberHTTP.Post(rollbackURL, "application/json", bytes.NewReader(rollbackBody))
 	s.Require().NoError(err)
-	io.ReadAll(memberResp.Body)
+	memberRespBody, _ := io.ReadAll(memberResp.Body)
 	memberResp.Body.Close()
-	s.NotEqual(http.StatusNotFound, memberResp.StatusCode)
+	s.Truef(memberResp.StatusCode >= 200 && memberResp.StatusCode < 300,
+		"expected 2xx for project-member rollback, got %d: %s", memberResp.StatusCode, string(memberRespBody))
 }
 
 func TestWorkload(t *testing.T) {

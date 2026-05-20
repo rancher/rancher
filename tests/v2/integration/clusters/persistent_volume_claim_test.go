@@ -206,6 +206,18 @@ func (s *PVCTestSuite) TestCanCreateAzureAnyAccountStorageType() {
 	})
 	s.Truef(status >= 200 && status < 300,
 		"unexpected status %d creating PVC with storageaccounttype: %v", status, result)
+	if pvcID, ok := result["id"].(string); ok {
+		s.T().Cleanup(func() {
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/%s", s.pvcURL(project.ID), pvcID), nil)
+			if err == nil {
+				resp, err := httpClient.Do(req)
+				if err == nil {
+					io.ReadAll(resp.Body)
+					resp.Body.Close()
+				}
+			}
+		})
+	}
 
 	// Try with skuName.
 	sc2Name := s.createStorageClassNorman(httpClient,
@@ -225,6 +237,18 @@ func (s *PVCTestSuite) TestCanCreateAzureAnyAccountStorageType() {
 	})
 	s.Truef(status >= 200 && status < 300,
 		"unexpected status %d creating PVC with skuName: %v", status, result)
+	if pvcID, ok := result["id"].(string); ok {
+		s.T().Cleanup(func() {
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/%s", s.pvcURL(project.ID), pvcID), nil)
+			if err == nil {
+				resp, err := httpClient.Do(req)
+				if err == nil {
+					io.ReadAll(resp.Body)
+					resp.Body.Close()
+				}
+			}
+		})
+	}
 }
 
 // TestCanCreatePVCNoStorageNoVol asserts that a PVC with no storage class and
