@@ -202,7 +202,7 @@ func (l *Provider) getGroupPrincipals(user *apiv3.User) ([]apiv3.Principal, erro
 	return groupPrincipals, nil
 }
 
-func (l *Provider) UsesUserSecrets() bool       { return false }
+func (l *Provider) UsesUserSecrets() bool      { return false }
 func (l *Provider) CanRefreshPrincipals() bool { return true }
 
 func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {

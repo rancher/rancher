@@ -291,7 +291,7 @@ func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret 
 	return nested, nil
 }
 
-func (g *googleOauthProvider) UsesUserSecrets() bool       { return true }
+func (g *googleOauthProvider) UsesUserSecrets() bool      { return true }
 func (g *googleOauthProvider) CanRefreshPrincipals() bool { return true }
 
 func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {

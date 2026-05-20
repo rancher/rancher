@@ -1066,4 +1066,3 @@ func TestRTBContentKey(t *testing.T) {
 		})
 	}
 }
-

@@ -548,7 +548,8 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -607,7 +608,8 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -638,7 +640,8 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -669,7 +672,8 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -703,7 +707,8 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -1138,7 +1143,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1198,7 +1204,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1254,7 +1261,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": false
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1311,7 +1319,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1362,7 +1371,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1387,7 +1397,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1422,7 +1433,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1467,7 +1479,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": false
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1493,7 +1506,8 @@ func TestUpdateUser(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1514,7 +1528,8 @@ func TestUpdateUser(t *testing.T) {
 
 		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"]}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1571,7 +1586,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1619,7 +1635,8 @@ func TestUpdateUser(t *testing.T) {
 			"active": false
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1649,7 +1666,8 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1670,7 +1688,8 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1699,7 +1718,8 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1722,7 +1742,8 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1754,7 +1775,8 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1774,7 +1796,8 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1827,7 +1850,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1890,7 +1914,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": "True"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1944,7 +1969,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1999,7 +2025,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "emails[primary eq true].value", "value": "new@example.com"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2061,7 +2088,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "value": {"externalId": "new-ext-id", "active": false}}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2110,7 +2138,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "displayName", "value": "New Name"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2158,7 +2187,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "add", "path": "displayName", "value": "John Doe"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2206,7 +2236,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "add", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2262,7 +2293,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "userName", "value": "new.name"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2308,7 +2340,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "userName", "value": "new.name"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2351,7 +2384,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": true}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2375,7 +2409,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2402,7 +2437,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2444,7 +2480,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2485,7 +2522,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "remove", "path": "active"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2526,7 +2564,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "unsupportedPath", "value": "test"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2551,7 +2590,8 @@ func TestPatchUser(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2592,7 +2632,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": "not-a-boolean"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2638,7 +2679,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2683,7 +2725,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2732,7 +2775,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2786,7 +2830,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:externalId", "value": "new-ext-id"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2833,7 +2878,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:Group:displayName", "value": "test"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2883,7 +2929,8 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:emails[primary eq true].value", "value": "new@example.com"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)

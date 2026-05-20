@@ -272,7 +272,7 @@ func (g *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 	return groupPrincipals, nil
 }
 
-func (g *Provider) UsesUserSecrets() bool       { return true }
+func (g *Provider) UsesUserSecrets() bool      { return true }
 func (g *Provider) CanRefreshPrincipals() bool { return true }
 
 func (g *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {

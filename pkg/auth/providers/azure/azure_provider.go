@@ -196,7 +196,7 @@ func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.
 	return groupPrincipals, nil
 }
 
-func (ap *Provider) UsesUserSecrets() bool       { return false }
+func (ap *Provider) UsesUserSecrets() bool      { return false }
 func (ap *Provider) CanRefreshPrincipals() bool { return true }
 
 func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {

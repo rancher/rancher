@@ -976,7 +976,6 @@ func TestPRTBHandlerHandleMigration(t *testing.T) {
 	}
 }
 
-
 func TestDeleteDuplicatePRTBs(t *testing.T) {
 	t.Parallel()
 
@@ -1176,7 +1175,7 @@ func TestDeleteDuplicatePRTBs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "prtb-2",
 						Namespace:         "ns",
-						CreationTimestamp:  now,
+						CreationTimestamp: now,
 						DeletionTimestamp: &now,
 					},
 					UserName:         "user1",
@@ -1263,4 +1262,3 @@ func TestDeleteDuplicatePRTBs(t *testing.T) {
 		})
 	}
 }
-

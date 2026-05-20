@@ -28,11 +28,11 @@ import (
 )
 
 var (
-	errTest                     = fmt.Errorf("test error")
-	priorityClassName           = "rancher-critical"
-	operatorNamespace           = "rancher-operator-system"
-	provisioningCapiNamespace   = "cattle-provisioning-capi-system"
-	priorityConfig    = &v1.ConfigMap{
+	errTest                   = fmt.Errorf("test error")
+	priorityClassName         = "rancher-critical"
+	operatorNamespace         = "rancher-operator-system"
+	provisioningCapiNamespace = "cattle-provisioning-capi-system"
+	priorityConfig            = &v1.ConfigMap{
 		Data: map[string]string{
 			"priorityClassName": priorityClassName,
 		},

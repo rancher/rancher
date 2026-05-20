@@ -462,7 +462,7 @@ func (p *mockLdapProvider) TransformToAuthProvider(authConfig map[string]any) (m
 	panic("TransformToAuthProvider Unimplemented!")
 }
 
-func (p *mockLdapProvider) UsesUserSecrets() bool       { return false }
+func (p *mockLdapProvider) UsesUserSecrets() bool      { return false }
 func (p *mockLdapProvider) CanRefreshPrincipals() bool { return true }
 
 func (p *mockLdapProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {

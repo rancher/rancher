@@ -300,7 +300,7 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		srv := &SCIMServer{
 			userCache: userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig: testDefaultGetConfig,
 		}
 
 		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
@@ -322,7 +322,7 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		srv := &SCIMServer{
 			userCache: userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig: testDefaultGetConfig,
 		}
 
 		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
@@ -354,7 +354,7 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		srv := &SCIMServer{
 			userCache: userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig: testDefaultGetConfig,
 		}
 
 		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
@@ -703,7 +703,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -743,7 +744,7 @@ func TestPatchGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -762,7 +763,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -788,7 +790,7 @@ func TestPatchGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -807,7 +809,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -846,7 +849,7 @@ func TestPatchGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupCache,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -865,7 +868,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -930,7 +934,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -979,7 +984,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -1033,7 +1039,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -1106,7 +1113,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -1162,7 +1170,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -1199,7 +1208,8 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -1479,7 +1489,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1603,7 +1613,7 @@ func TestCreateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1637,7 +1647,7 @@ func TestCreateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1704,7 +1714,7 @@ func TestCreateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1737,7 +1747,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1779,7 +1789,7 @@ func TestCreateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1823,7 +1833,7 @@ func TestCreateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1875,7 +1885,7 @@ func TestCreateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1921,7 +1931,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1967,7 +1977,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2037,7 +2047,8 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -2076,11 +2087,12 @@ func TestGetGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members,other_attribute", nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -2115,11 +2127,12 @@ func TestGetGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -2144,11 +2157,12 @@ func TestGetGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -2171,11 +2185,12 @@ func TestGetGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -2206,11 +2221,12 @@ func TestGetGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -2270,7 +2286,8 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -2313,7 +2330,7 @@ func TestUpdateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2324,7 +2341,8 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2377,7 +2395,7 @@ func TestUpdateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2388,7 +2406,8 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2441,7 +2460,8 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2479,7 +2499,8 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2546,7 +2567,8 @@ func TestUpdateGroup(t *testing.T) {
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2570,7 +2592,8 @@ func TestUpdateGroup(t *testing.T) {
 			"displayName": "Engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", "grp-abc123")
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", "grp-abc123")
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2588,7 +2611,8 @@ func TestUpdateGroup(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", "grp-abc123")
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", "grp-abc123")
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2607,7 +2631,8 @@ func TestUpdateGroup(t *testing.T) {
 
 		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "id": "grp-abc123"}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", "grp-abc123")
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", "grp-abc123")
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2631,7 +2656,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2640,7 +2665,8 @@ func TestUpdateGroup(t *testing.T) {
 			"displayName": "Engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2672,7 +2698,7 @@ func TestUpdateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2683,7 +2709,8 @@ func TestUpdateGroup(t *testing.T) {
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2760,7 +2787,8 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2794,11 +2822,12 @@ func TestDeleteGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2862,7 +2891,8 @@ func TestDeleteGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2879,11 +2909,12 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2906,11 +2937,12 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2941,11 +2973,12 @@ func TestDeleteGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2980,11 +3013,12 @@ func TestDeleteGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig:          testDefaultGetConfig,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
