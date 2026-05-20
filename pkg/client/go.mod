@@ -2,14 +2,11 @@ module github.com/rancher/rancher/pkg/client
 
 go 1.26.0
 
-replace (
-	github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260505143155-552e07ef956f
-	github.com/rancher/wrangler/v3 => github.com/rancher-teja/wrangler/v3 v3.6.0-rc.1.0.20260507143116-dcc9e570f425
-)
+toolchain go1.26.3
 
 require (
-	github.com/rancher/norman v0.9.0
-	k8s.io/apimachinery v0.36.0
+	github.com/rancher/norman v0.9.5
+	k8s.io/apimachinery v0.36.1
 )
 
 require (
@@ -18,7 +15,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rancher/wrangler/v3 v3.4.0 // indirect
+	github.com/rancher/wrangler/v3 v3.7.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.53.0 // indirect

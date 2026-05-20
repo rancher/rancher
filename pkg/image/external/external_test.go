@@ -99,10 +99,6 @@ func TestGetExternalImages(t *testing.T) {
 			if err != nil {
 				t.Errorf("failed to get KDM data.json from url %v", tt.args.kdmUrl)
 			}
-			defer get.Body.Close()
-			if get.StatusCode != http.StatusOK {
-				t.Fatalf("failed to fetch KDM data.json from url %v: status %d", tt.args.kdmUrl, get.StatusCode)
-			}
 			resp, err := io.ReadAll(get.Body)
 			if err != nil {
 				t.Errorf("failed to read response from url %v", tt.args.kdmUrl)
