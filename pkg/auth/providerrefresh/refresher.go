@@ -208,6 +208,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		// We have to find out if the user has a principal for the provider.
 		principalID := GetPrincipalIDForProvider(providerName, user)
 		var newGroupPrincipals []apiv3.Principal
+		canRefresh := true
 
 		providerDisabled, err := providers.IsDisabledProvider(providerName)
 		if err != nil {
@@ -223,7 +224,6 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		// If there is no principalID for the provider, there is no reason to go through the refetch process
 		if principalID != "" {
 			secret := ""
-			canRefresh := true
 
 			if providers.ProviderUsesUserSecrets(providerName) {
 				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
@@ -300,23 +300,24 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		// Update extras if either the user has an active login token, or an API token/kubeconfig token and is still active in the auth provider.
 		// If the user cannot access the auth provider, the derived tokens are deactivated below and should not be used to determine extra attributes.
 		if principalID != "" && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccessProvider || errorConfirmingLogins))) {
-			// A user is 1:1 with its principal for a given provider, no need to get principals from tokens beyond the first one
-			var token accessor.TokenAccessor
-			if len(loginTokens[providerName]) > 0 {
-				token = loginTokens[providerName][0]
-			} else {
-				token = derivedTokens[providerName][0]
-			}
-			userPrincipal, err := providers.GetPrincipal(principalID, token)
-			if err != nil {
-				return nil, err
-			}
-			userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
-			if userExtraInfo != nil {
-				if attribs.ExtraByProvider == nil {
-					attribs.ExtraByProvider = make(map[string]map[string][]string)
+			if canRefresh {
+				var token accessor.TokenAccessor
+				if len(loginTokens[providerName]) > 0 {
+					token = loginTokens[providerName][0]
+				} else {
+					token = derivedTokens[providerName][0]
 				}
-				attribs.ExtraByProvider[providerName] = userExtraInfo
+				userPrincipal, err := providers.GetPrincipal(principalID, token)
+				if err != nil {
+					return nil, err
+				}
+				userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+				if userExtraInfo != nil {
+					if attribs.ExtraByProvider == nil {
+						attribs.ExtraByProvider = make(map[string]map[string][]string)
+					}
+					attribs.ExtraByProvider[providerName] = userExtraInfo
+				}
 			}
 		}
 

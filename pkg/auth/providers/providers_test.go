@@ -3,6 +3,7 @@ package providers
 import (
 	"testing"
 
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
@@ -32,11 +33,12 @@ func TestIsSAMLProvider(t *testing.T) {
 }
 
 func TestProviderUsesUserSecrets(t *testing.T) {
-	t.Parallel()
-
-	providers[github.Name] = &github.Provider{}
-	providers[githubapp.Name] = &githubapp.Provider{}
-	providers[local.Name] = &local.Provider{}
+	SetProviders(map[string]common.AuthProvider{
+		github.Name:    &github.Provider{},
+		githubapp.Name: &githubapp.Provider{},
+		local.Name:     &local.Provider{},
+	})
+	defer SetProviders(nil)
 
 	assert.True(t, ProviderUsesUserSecrets(github.Name))
 	assert.False(t, ProviderUsesUserSecrets(githubapp.Name))
@@ -44,10 +46,11 @@ func TestProviderUsesUserSecrets(t *testing.T) {
 }
 
 func TestProviderCanRefreshPrincipals(t *testing.T) {
-	t.Parallel()
-
-	providers[github.Name] = &github.Provider{}
-	providers[genericoidc.Name] = &genericoidc.GenOIDCProvider{}
+	SetProviders(map[string]common.AuthProvider{
+		github.Name:      &github.Provider{},
+		genericoidc.Name: &genericoidc.GenOIDCProvider{},
+	})
+	defer SetProviders(nil)
 
 	assert.True(t, ProviderCanRefreshPrincipals(github.Name))
 	assert.False(t, ProviderCanRefreshPrincipals(genericoidc.Name))
