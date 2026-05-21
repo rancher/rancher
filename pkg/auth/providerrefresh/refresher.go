@@ -299,25 +299,23 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 
 		// Update extras if either the user has an active login token, or an API token/kubeconfig token and is still active in the auth provider.
 		// If the user cannot access the auth provider, the derived tokens are deactivated below and should not be used to determine extra attributes.
-		if principalID != "" && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccessProvider || errorConfirmingLogins))) {
-			if canRefresh {
-				var token accessor.TokenAccessor
-				if len(loginTokens[providerName]) > 0 {
-					token = loginTokens[providerName][0]
-				} else {
-					token = derivedTokens[providerName][0]
+		if principalID != "" && canRefresh && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccessProvider || errorConfirmingLogins))) {
+			var token accessor.TokenAccessor
+			if len(loginTokens[providerName]) > 0 {
+				token = loginTokens[providerName][0]
+			} else {
+				token = derivedTokens[providerName][0]
+			}
+			userPrincipal, err := providers.GetPrincipal(principalID, token)
+			if err != nil {
+				return nil, err
+			}
+			userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+			if userExtraInfo != nil {
+				if attribs.ExtraByProvider == nil {
+					attribs.ExtraByProvider = make(map[string]map[string][]string)
 				}
-				userPrincipal, err := providers.GetPrincipal(principalID, token)
-				if err != nil {
-					return nil, err
-				}
-				userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
-				if userExtraInfo != nil {
-					if attribs.ExtraByProvider == nil {
-						attribs.ExtraByProvider = make(map[string]map[string][]string)
-					}
-					attribs.ExtraByProvider[providerName] = userExtraInfo
-				}
+				attribs.ExtraByProvider[providerName] = userExtraInfo
 			}
 		}
 
