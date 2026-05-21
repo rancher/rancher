@@ -7,7 +7,6 @@ import (
 type Client struct {
 	clientbase.APIBaseClient
 
-	NodePool                                  NodePoolOperations
 	Node                                      NodeOperations
 	NodeDriver                                NodeDriverOperations
 	PodSecurityAdmissionConfigurationTemplate PodSecurityAdmissionConfigurationTemplateOperations
@@ -51,7 +50,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 		APIBaseClient: baseClient,
 	}
 
-	client.NodePool = newNodePoolClient(client)
 	client.Node = newNodeClient(client)
 	client.NodeDriver = newNodeDriverClient(client)
 	client.PodSecurityAdmissionConfigurationTemplate = newPodSecurityAdmissionConfigurationTemplateClient(client)

@@ -2,6 +2,8 @@ module github.com/rancher/rancher/gotools/controller-gen
 
 go 1.26.0
 
+toolchain go1.26.3
+
 tool sigs.k8s.io/controller-tools/cmd/controller-gen
 
 replace golang.org/x/net => golang.org/x/net v0.38.0 // CVE-2025-22870, CVE-2025-22872

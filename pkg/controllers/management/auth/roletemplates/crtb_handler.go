@@ -204,6 +204,8 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		return binding, fmt.Errorf("ClusterRoleTemplateBinding %v has no subject", binding.Name)
 	}
 
+	needsUpdate := false
+
 	if binding.UserName == "" {
 		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
 		user, err := c.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
@@ -213,7 +215,7 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		}
 
 		binding.UserName = user.Name
-		c.s.AddCondition(localConditions, condition, subjectExists, nil)
+		needsUpdate = true
 	}
 
 	if binding.UserPrincipalName == "" {
@@ -225,10 +227,19 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		for _, p := range u.PrincipalIDs {
 			if strings.HasSuffix(p, binding.UserName) {
 				binding.UserPrincipalName = p
+				needsUpdate = true
 				break
 			}
 		}
-		c.s.AddCondition(localConditions, condition, subjectExists, nil)
+	}
+
+	if needsUpdate {
+		updated, err := c.crtbClient.Update(binding)
+		if err != nil {
+			c.s.AddCondition(localConditions, condition, failedToCreateUser, err)
+			return binding, err
+		}
+		binding = updated
 	}
 
 	c.s.AddCondition(localConditions, condition, subjectExists, nil)

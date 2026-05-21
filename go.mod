@@ -2,12 +2,13 @@ module github.com/rancher/rancher
 
 go 1.26.0
 
+toolchain go1.26.3
+
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	github.com/rancher/rancher/pkg/plan => ./pkg/plan
@@ -131,10 +132,9 @@ require (
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.8.0-rc.5
-	github.com/rancher/rke v1.8.0
-	github.com/rancher/shepherd v0.0.0-20260430211500-1f50d155268e
+	github.com/rancher/shepherd v0.0.0-20260506044456-11bc6308a7c7
 	github.com/rancher/steve v0.9.10
-	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260519183600-f1362a3fe1a8
+	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
 	github.com/rancher/wrangler/v3 v3.7.0
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
@@ -189,7 +189,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.24 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
-	github.com/ProtonMail/go-crypto v1.1.6 // indirect
+	github.com/ProtonMail/go-crypto v1.3.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.32.17 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
@@ -347,7 +347,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-version v1.6.0
+	github.com/hashicorp/go-version v1.8.0
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
