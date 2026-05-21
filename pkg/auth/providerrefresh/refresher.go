@@ -156,7 +156,51 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	}
 }
 
-func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAttribute, error) {
+func (r *refresher) deleteToken(token accessor.TokenAccessor) error {
+	switch token.(type) {
+	case *apiv3.Token:
+		return r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
+	case *ext.Token:
+		return r.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
+	default:
+		return fmt.Errorf("unable to delete token of unknown type %T", token)
+	}
+}
+
+func (r *refresher) disableToken(token accessor.TokenAccessor) error {
+	switch t := token.(type) {
+	case *apiv3.Token:
+		v3Token := t.DeepCopy()
+		v3Token.Enabled = ptr.To(false)
+		_, err := r.tokenMGR.UpdateToken(v3Token)
+		return err
+	case *ext.Token:
+		return r.extTokenStore.Disable(t.GetName())
+	default:
+		return fmt.Errorf("unable to disable token of unknown type %T", token)
+	}
+}
+
+func (r *refresher) deleteLoginTokens(providerName string, loginTokens map[string][]accessor.TokenAccessor) error {
+	for _, token := range loginTokens[providerName] {
+		if err := r.deleteToken(token); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+// refreshAttributes re-evaluates a user's access across all configured auth
+// providers. For each provider it refreshes group memberships, checks whether
+// the user can still log in, and cleans up login tokens for providers that
+// rejected the user. If no provider confirms access and none had transient
+// errors, all derived (non-login) tokens are disabled. Transient errors are
+// treated conservatively: tokens are preserved to avoid locking out users due
+// to temporary IdP failures.
+func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.UserAttribute, error) {
 	var (
 		derivedTokenList      []accessor.TokenAccessor
 		canLogInAtAll         bool
@@ -183,7 +227,6 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		}
 	}
 
-	// List v3.Tokens.
 	tokenUserIDLabelSet := labels.Set(map[string]string{tokens.UserIDLabel: user.Name})
 	v3Tokens, err := r.tokenLister.List("", tokenUserIDLabelSet.AsSelector())
 	if err != nil {
@@ -194,7 +237,6 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 		assign(token)
 	}
 
-	// List ext.Tokens.
 	extTokens, err := r.extTokenStore.ListForUser(user.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error listing ext tokens for user %s: %w", user.Name, err)
@@ -205,173 +247,176 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 	}
 
 	for _, providerName := range providers.ProviderNames() {
-		// We have to find out if the user has a principal for the provider.
-		principalID := GetPrincipalIDForProvider(providerName, user)
-		var newGroupPrincipals []apiv3.Principal
-		canRefresh := true
-
-		providerDisabled, err := providers.IsDisabledProvider(providerName)
+		canAccess, errConfirming, err := r.refreshProvider(attribs, providerName, user, loginTokens, derivedTokens, errorConfirmingLogins)
 		if err != nil {
-			logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
-			// This is set as false by the return, but it's re-set here to be explicit/safe about the behavior.
-			providerDisabled = false
+			return nil, err
 		}
-		if providerDisabled {
-			// If this auth provider has been disabled, act as though the user lost access to this provider.
-			principalID = ""
+		if errConfirming {
+			errorConfirmingLogins = true
 		}
-
-		// If there is no principalID for the provider, there is no reason to go through the refetch process
-		if principalID != "" {
-			secret := ""
-
-			if providers.ProviderUsesUserSecrets(providerName) {
-				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
-				if apierrors.IsNotFound(err) {
-					canRefresh = false
-					errorConfirmingLogins = true
-				} else if err != nil {
-					return nil, err
-				}
-			}
-
-			if !providers.ProviderCanRefreshPrincipals(providerName) || !canRefresh {
-				existingPrincipals := attribs.GroupPrincipals[providerName].Items
-				if existingPrincipals != nil {
-					newGroupPrincipals = existingPrincipals
-				}
-			} else {
-				newGroupPrincipals, err = providers.RefetchGroupPrincipals(principalID, providerName, secret)
-				if err != nil {
-					// Non-transient errors (e.g. invalid_grant when the user's IdP session
-					// is revoked) must propagate to the controller so it can annotate the
-					// UserAttribute and stop requeuing. Without this, the loop continues
-					// to GetPrincipal which hits the same issue and keeps requeuing.
-					var nte *common.NonTransientError
-					if errors.As(err, &nte) {
-						return nil, err
-					}
-					// In the case that we cant access a server, we still want to continue refreshing, but
-					// we no longer want to disable derived tokens, or remove their login tokens for this provider.
-					if err.Error() != "no access" {
-						errorConfirmingLogins = true
-						logrus.Warnf(
-							"Error refreshing token principals for auth provider %s, userattribute %s, principal %s, skipping: %v",
-							providerName,
-							attribs.Name,
-							principalID,
-							err,
-						)
-						existingPrincipals := attribs.GroupPrincipals[providerName].Items
-						if existingPrincipals != nil {
-							newGroupPrincipals = existingPrincipals
-						}
-					} else {
-						// In the case that the user explicitly cannot login at all to this provider
-						// (e.g. they no longer exist) we pretend they have no principal with this provider
-						// so that their login tokens get blanked out
-						principalID = ""
-					}
-				}
-			}
-		}
-
-		if len(newGroupPrincipals) == 0 {
-			newGroupPrincipals = nil
-		}
-
-		attribs.GroupPrincipals[providerName] = apiv3.Principals{Items: newGroupPrincipals}
-
-		canAccessProvider := false
-
-		if principalID != "" && !errorConfirmingLogins {
-			// We want to verify that the user still has rancher access.
-			canStillAccess, err := providers.CanAccessWithGroupProviders(providerName, principalID, newGroupPrincipals)
-			if err != nil {
-				return nil, err
-			}
-
-			if canStillAccess {
-				canAccessProvider = true
-				canLogInAtAll = true
-			}
-		}
-
-		// Update extras if either the user has an active login token, or an API token/kubeconfig token and is still active in the auth provider.
-		// If the user cannot access the auth provider, the derived tokens are deactivated below and should not be used to determine extra attributes.
-		if principalID != "" && canRefresh && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccessProvider || errorConfirmingLogins))) {
-			var token accessor.TokenAccessor
-			if len(loginTokens[providerName]) > 0 {
-				token = loginTokens[providerName][0]
-			} else {
-				token = derivedTokens[providerName][0]
-			}
-			userPrincipal, err := providers.GetPrincipal(principalID, token)
-			if err != nil {
-				return nil, err
-			}
-			userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
-			if userExtraInfo != nil {
-				if attribs.ExtraByProvider == nil {
-					attribs.ExtraByProvider = make(map[string]map[string][]string)
-				}
-				attribs.ExtraByProvider[providerName] = userExtraInfo
-			}
-		}
-
-		// If the user doesn't have access through this provider, we want to remove their
-		// login tokens for this provider
-		if !canAccessProvider && !errorConfirmingLogins {
-			for _, token := range loginTokens[providerName] {
-				var err error
-				switch token.(type) {
-				case *apiv3.Token:
-					err = r.tokens.Delete(token.GetName(), &metav1.DeleteOptions{})
-				case *ext.Token:
-					err = r.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
-				default:
-					err = fmt.Errorf("unable to delete token of unknown type %T", token)
-				}
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						continue
-					}
-					return nil, err
-				}
-			}
+		if canAccess {
+			canLogInAtAll = true
 		}
 	}
 
-	// If they can still log in, or we failed to validate one of their logins, don't disable derived tokens
 	if canLogInAtAll || errorConfirmingLogins {
 		return attribs, nil
 	}
 
-	// User has been deactivated, disable their tokens.
 	for _, token := range derivedTokenList {
-		var err error
-		switch t := token.(type) {
-		case *apiv3.Token:
-			v3Token := t.DeepCopy()
-			v3Token.Enabled = ptr.To(false)
-			_, err = r.tokenMGR.UpdateToken(v3Token)
-		case *ext.Token:
-			err = r.extTokenStore.Disable(t.GetName())
-		default:
-			err = fmt.Errorf("unable to update token of unknown type %T", token)
-		}
-		if err != nil {
+		if err := r.disableToken(token); err != nil {
 			return nil, fmt.Errorf("error disabling token %s: %w", token.GetName(), err)
 		}
 	}
-	return attribs, err
+
+	return attribs, nil
 }
 
-func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
+// refreshProvider refreshes a single provider's state within attribs.
+// It returns whether the user can access the provider and whether there was
+// an error confirming their login (which prevents token cleanup).
+func (r *refresher) refreshProvider(
+	attribs *apiv3.UserAttribute,
+	providerName string,
+	user *apiv3.User,
+	loginTokens, derivedTokens map[string][]accessor.TokenAccessor,
+	errorConfirmingLogins bool,
+) (canAccess bool, errConfirming bool, err error) {
+	principalID := GetPrincipalIDForProvider(providerName, user)
+
+	providerDisabled, err := providers.IsDisabledProvider(providerName)
+	if err != nil {
+		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
+		providerDisabled = false
+	}
+	if providerDisabled {
+		principalID = ""
+	}
+
+	if principalID == "" {
+		attribs.GroupPrincipals[providerName] = apiv3.Principals{}
+		if !errorConfirmingLogins {
+			if err := r.deleteLoginTokens(providerName, loginTokens); err != nil {
+				return false, false, err
+			}
+		}
+		return false, false, nil
+	}
+
+	newGroupPrincipals, canRefresh, errConfirming, principalID, err := r.refreshGroupPrincipals(attribs, providerName, user.Name, principalID, loginTokens)
+	if err != nil {
+		return false, false, err
+	}
+
+	if len(newGroupPrincipals) == 0 {
+		newGroupPrincipals = nil
+	}
+	attribs.GroupPrincipals[providerName] = apiv3.Principals{Items: newGroupPrincipals}
+
+	if principalID != "" && !errorConfirmingLogins && !errConfirming {
+		canStillAccess, err := providers.CanAccessWithGroupProviders(providerName, principalID, newGroupPrincipals)
+		if err != nil {
+			return false, false, err
+		}
+		canAccess = canStillAccess
+	}
+
+	if principalID != "" && canRefresh && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccess || errorConfirmingLogins || errConfirming))) {
+		var token accessor.TokenAccessor
+		if len(loginTokens[providerName]) > 0 {
+			token = loginTokens[providerName][0]
+		} else {
+			token = derivedTokens[providerName][0]
+		}
+		userPrincipal, err := providers.GetPrincipal(principalID, token)
+		if err != nil {
+			return false, false, err
+		}
+		userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+		if userExtraInfo != nil {
+			if attribs.ExtraByProvider == nil {
+				attribs.ExtraByProvider = make(map[string]map[string][]string)
+			}
+			attribs.ExtraByProvider[providerName] = userExtraInfo
+		}
+	}
+
+	if !canAccess && !errorConfirmingLogins && !errConfirming {
+		if err := r.deleteLoginTokens(providerName, loginTokens); err != nil {
+			return false, false, err
+		}
+	}
+
+	return canAccess, errConfirming, nil
+}
+
+// refreshGroupPrincipals fetches or preserves group principals for a provider.
+func (r *refresher) refreshGroupPrincipals(
+	attribs *apiv3.UserAttribute,
+	providerName string,
+	userName string,
+	principalID string,
+	loginTokens map[string][]accessor.TokenAccessor,
+) (groups []apiv3.Principal, canRefresh bool, errConfirming bool, updatedPrincipalID string, err error) {
+	canRefresh = true
+	updatedPrincipalID = principalID
+	secret := ""
+
+	if providers.ProviderUsesUserSecrets(providerName) {
+		secret, err = r.tokenMGR.GetSecret(userName, providerName, loginTokens[providerName])
+		if apierrors.IsNotFound(err) {
+			canRefresh = false
+			errConfirming = true
+		} else if err != nil {
+			return nil, false, false, principalID, err
+		}
+	}
+
+	if !providers.ProviderCanRefreshPrincipals(providerName) || !canRefresh {
+		existing := attribs.GroupPrincipals[providerName].Items
+		if existing != nil {
+			groups = existing
+		}
+		return groups, canRefresh, errConfirming, updatedPrincipalID, nil
+	}
+
+	groups, err = providers.RefetchGroupPrincipals(principalID, providerName, secret)
+	if err == nil {
+		return groups, canRefresh, errConfirming, updatedPrincipalID, nil
+	}
+
+	// Non-transient errors must propagate so the controller can annotate
+	// the UserAttribute and stop requeuing.
+	var nte *common.NonTransientError
+	if errors.As(err, &nte) {
+		return nil, false, false, principalID, err
+	}
+
+	if err.Error() != "no access" {
+		errConfirming = true
+		logrus.Warnf(
+			"Error refreshing token principals for auth provider %s, userattribute %s, principal %s, skipping: %v",
+			providerName, attribs.Name, principalID, err,
+		)
+		existing := attribs.GroupPrincipals[providerName].Items
+		if existing != nil {
+			groups = existing
+		}
+		return groups, canRefresh, errConfirming, updatedPrincipalID, nil
+	}
+
+	// User explicitly cannot log in (e.g. they no longer exist in the IdP).
+	// Blank their principal so login tokens get cleaned up.
+	updatedPrincipalID = ""
+	return nil, canRefresh, errConfirming, updatedPrincipalID, nil
+}
+
+func GetPrincipalIDForProvider(providerName string, user *apiv3.User) string {
 	prefix := providerName + "_user://"
 	if providerName == "local" {
 		prefix = "local://"
 	}
+
 	principalID := ""
 	for _, id := range user.PrincipalIDs {
 		if strings.HasPrefix(id, prefix) {
@@ -379,5 +424,6 @@ func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
 			break
 		}
 	}
+
 	return principalID
 }
