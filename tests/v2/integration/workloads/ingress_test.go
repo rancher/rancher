@@ -47,15 +47,27 @@ func (s *IngressTestSuite) ingressURL(project *management.Project) string {
 		s.client.WranglerContext.RESTConfig.Host, project.ID)
 }
 
-func (s *IngressTestSuite) schemaURL(typeName string) string {
-	return fmt.Sprintf("https://%s/v3/schemas/%s",
-		s.client.WranglerContext.RESTConfig.Host, typeName)
+func (s *IngressTestSuite) schemaURL(projectID, typeName string) string {
+	return fmt.Sprintf("https://%s/v3/project/%s/schemas/%s",
+		s.client.WranglerContext.RESTConfig.Host, projectID, typeName)
 }
 
 // TestIngressFields verifies that the Norman schema for ingress, ingressBackend,
 // ingressRule, and httpIngressPath exposes the expected fields with the correct
 // create/update permissions.
 func (s *IngressTestSuite) TestIngressFields() {
+	subSession := s.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := s.client.WithSession(subSession)
+	s.Require().NoError(err)
+
+	project, err := client.Management.Project.Create(&management.Project{
+		ClusterID: "local",
+		Name:      namegen.AppendRandomString("project-"),
+	})
+	s.Require().NoError(err)
+
 	httpClient := s.httpClient()
 
 	type fieldSpec struct {
@@ -64,7 +76,7 @@ func (s *IngressTestSuite) TestIngressFields() {
 	}
 
 	checkSchema := func(typeName string, expectedCRUD string, fields map[string]fieldSpec) {
-		resp, err := httpClient.Get(s.schemaURL(typeName))
+		resp, err := httpClient.Get(s.schemaURL(project.ID, typeName))
 		s.Require().NoError(err)
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
