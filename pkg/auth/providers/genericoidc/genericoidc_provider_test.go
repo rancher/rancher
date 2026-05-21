@@ -358,6 +358,55 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 				"logoutAllForced":    false,
 			},
 		},
+		{
+			name: "Test with PKCE Redirection (API Host provided)",
+			authConfig: map[string]any{
+				"metadata":       map[string]any{"name": "genericoidc"},
+				"rancherApiHost": "https://rancher.example.com",
+				"scope":          "openid profile email",
+			},
+			expected: map[string]any{
+				"id":                 "genericoidc",
+				"redirectUrl":        "https://rancher.example.com/v1-oidc/genericoidc?scope=openid+profile+email",
+				"scopes":             "openid profile email",
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+			},
+		},
+		{
+			name: "Test with PKCE Redirection and acrValue but no scope",
+			authConfig: map[string]any{
+				"metadata":       map[string]any{"name": "genericoidc"},
+				"rancherApiHost": "https://rancher.example.com",
+				"acrValue":       "testing",
+			},
+			expected: map[string]any{
+				"id":                 "genericoidc",
+				"redirectUrl":        "https://rancher.example.com/v1-oidc/genericoidc?acr_values=testing",
+				"scopes":             nil,
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+			},
+		},
+		{
+			name: "Test with PKCE Redirection, acrValue and scope",
+			authConfig: map[string]any{
+				"metadata":       map[string]any{"name": "genericoidc"},
+				"rancherApiHost": "https://rancher.example.com",
+				"scope":          "openid profile email",
+				"acrValue":       "testing",
+			},
+			expected: map[string]any{
+				"id":                 "genericoidc",
+				"redirectUrl":        "https://rancher.example.com/v1-oidc/genericoidc?scope=openid+profile+email&acr_values=testing",
+				"scopes":             "openid profile email",
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+			},
+		},
 	}
 
 	provider := &GenOIDCProvider{
