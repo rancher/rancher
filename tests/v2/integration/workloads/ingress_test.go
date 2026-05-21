@@ -81,20 +81,48 @@ func (s *IngressTestSuite) TestIngressFields() {
 		}
 		s.Require().NoError(json.Unmarshal(body, &schema))
 
+		wantCreate := false
+		wantRead := false
+		wantUpdate := false
+		wantDelete := false
 		for _, ch := range expectedCRUD {
 			switch ch {
 			case 'c':
-				s.Containsf(schema.CollectionMethods, "POST", "schema %s: expected POST in collectionMethods", typeName)
+				wantCreate = true
 			case 'r':
-				s.Truef(
-					contains(schema.CollectionMethods, "GET") || contains(schema.ResourceMethods, "GET"),
-					"schema %s: expected GET", typeName,
-				)
+				wantRead = true
 			case 'u':
-				s.Containsf(schema.ResourceMethods, "PUT", "schema %s: expected PUT in resourceMethods", typeName)
+				wantUpdate = true
 			case 'd':
-				s.Containsf(schema.ResourceMethods, "DELETE", "schema %s: expected DELETE in resourceMethods", typeName)
+				wantDelete = true
 			}
+		}
+
+		if wantCreate {
+			s.Containsf(schema.CollectionMethods, "POST", "schema %s: expected POST in collectionMethods", typeName)
+		} else {
+			s.NotContainsf(schema.CollectionMethods, "POST", "schema %s: unexpected POST in collectionMethods", typeName)
+		}
+		if wantRead {
+			s.Truef(
+				contains(schema.CollectionMethods, "GET") || contains(schema.ResourceMethods, "GET"),
+				"schema %s: expected GET", typeName,
+			)
+		} else {
+			s.Falsef(
+				contains(schema.CollectionMethods, "GET") || contains(schema.ResourceMethods, "GET"),
+				"schema %s: unexpected GET", typeName,
+			)
+		}
+		if wantUpdate {
+			s.Containsf(schema.ResourceMethods, "PUT", "schema %s: expected PUT in resourceMethods", typeName)
+		} else {
+			s.NotContainsf(schema.ResourceMethods, "PUT", "schema %s: unexpected PUT in resourceMethods", typeName)
+		}
+		if wantDelete {
+			s.Containsf(schema.ResourceMethods, "DELETE", "schema %s: expected DELETE in resourceMethods", typeName)
+		} else {
+			s.NotContainsf(schema.ResourceMethods, "DELETE", "schema %s: unexpected DELETE in resourceMethods", typeName)
 		}
 
 		for fieldName, want := range fields {

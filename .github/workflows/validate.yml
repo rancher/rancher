@@ -34,5 +34,5 @@ jobs:
           only-new-issues: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000') }}
           skip-cache: false
         # only use cache on pull requests
-      - name: Validate (modules and flake8)
+      - name: Validate (modules)
         run: ./scripts/validate

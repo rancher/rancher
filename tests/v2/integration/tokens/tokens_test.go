@@ -68,6 +68,7 @@ func (s *TokensTestSuite) TestCurrentToken() {
 			break
 		}
 	}
+	s.Require().NotEmpty(adminUserID, "no current token found for admin user")
 
 	currentCount := 0
 	for _, t := range tokens.Data {
@@ -163,8 +164,6 @@ func (s *TokensTestSuite) TestKubeconfigTokenTTL() {
 	_, err = client.Management.Setting.Update(origTTLSetting, &management.Setting{Value: "0.01"})
 	s.Require().NoError(err)
 
-	const kubeconfigTTLSecs = 0.01 * 60 // 0.01 minutes in seconds
-
 	// --- /v3-public endpoint ---
 	token1 := s.loginV3(httpClient, host, adminPassword)
 	s.NotEmpty(token1["token"])
@@ -175,8 +174,27 @@ func (s *TokensTestSuite) TestKubeconfigTokenTTL() {
 	s.Equal("token", token1["type"])
 	s.Equal("token", token1["baseType"])
 
+	// waitForTokenExpiry polls until the given bearer token is rejected with 401,
+	// confirming it has actually expired rather than relying on a fixed sleep.
+	waitForTokenExpiry := func(tokenValue string) {
+		s.Require().Eventually(func() bool {
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s/v3", host), nil)
+			if err != nil {
+				return false
+			}
+			req.Header.Set("Authorization", "Bearer "+tokenValue)
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				return false
+			}
+			io.ReadAll(resp.Body) //nolint:errcheck
+			resp.Body.Close()
+			return resp.StatusCode == http.StatusUnauthorized
+		}, 10*time.Second, 200*time.Millisecond, "timed out waiting for token to expire")
+	}
+
 	// Wait for the token to expire.
-	time.Sleep(time.Duration(kubeconfigTTLSecs * float64(time.Second)))
+	waitForTokenExpiry(token1["token"].(string))
 
 	// A new login should generate a different token.
 	token2 := s.loginV3(httpClient, host, adminPassword)
@@ -185,7 +203,7 @@ func (s *TokensTestSuite) TestKubeconfigTokenTTL() {
 	s.NotEqual(token1["token"], token2["token"])
 
 	// Wait for token2 to expire before testing the v1 endpoint.
-	time.Sleep(time.Duration(kubeconfigTTLSecs * float64(time.Second)))
+	waitForTokenExpiry(token2["token"].(string))
 
 	// --- /v1-public endpoint ---
 	token3 := s.loginV1(httpClient, host, adminPassword)
@@ -193,7 +211,7 @@ func (s *TokensTestSuite) TestKubeconfigTokenTTL() {
 	s.NotEmpty(token3["expiresAt"])
 
 	// Wait for the token to expire.
-	time.Sleep(time.Duration(kubeconfigTTLSecs * float64(time.Second)))
+	waitForTokenExpiry(token3["token"].(string))
 
 	token4 := s.loginV1(httpClient, host, adminPassword)
 	s.NotEmpty(token4["token"])

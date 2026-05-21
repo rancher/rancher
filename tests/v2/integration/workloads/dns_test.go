@@ -47,18 +47,30 @@ func (s *DNSTestSuite) dnsRecordURL(project *management.Project) string {
 		s.client.WranglerContext.RESTConfig.Host, project.ID)
 }
 
-func (s *DNSTestSuite) schemaURL() string {
-	return fmt.Sprintf("https://%s/v3/schemas/dnsRecord",
-		s.client.WranglerContext.RESTConfig.Host)
+func (s *DNSTestSuite) schemaURL(projectID string) string {
+	return fmt.Sprintf("https://%s/v3/project/%s/schemas/dnsRecord",
+		s.client.WranglerContext.RESTConfig.Host, projectID)
 }
 
 // TestDNSFields verifies that the dnsRecord Norman schema exposes full CRUD
 // access and that the expected resource fields are present with the correct
 // create/update permissions.
 func (s *DNSTestSuite) TestDNSFields() {
+	subSession := s.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := s.client.WithSession(subSession)
+	s.Require().NoError(err)
+
+	project, err := client.Management.Project.Create(&management.Project{
+		ClusterID: "local",
+		Name:      namegen.AppendRandomString("project-"),
+	})
+	s.Require().NoError(err)
+
 	httpClient := s.httpClient()
 
-	resp, err := httpClient.Get(s.schemaURL())
+	resp, err := httpClient.Get(s.schemaURL(project.ID))
 	s.Require().NoError(err)
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
