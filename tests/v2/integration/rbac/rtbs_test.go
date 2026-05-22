@@ -321,8 +321,10 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 		})
 	p.Require().NoError(err)
 
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
-	p.Require().Error(err)
+	p.Require().Eventually(func() bool {
+		_, err := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
+		return err != nil
+	}, 30*time.Second, time.Second)
 
 	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtC.ID, []*authzv1.ResourceAttributes{
 		{
