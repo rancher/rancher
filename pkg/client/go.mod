@@ -6,7 +6,7 @@ toolchain go1.26.3
 
 require (
 	github.com/rancher/norman v0.9.5
-	k8s.io/apimachinery v0.36.0
+	k8s.io/apimachinery v0.36.1
 )
 
 require (
