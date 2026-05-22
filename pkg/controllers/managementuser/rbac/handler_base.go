@@ -223,34 +223,49 @@ type manager struct {
 }
 
 func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
+	logrus.Debugf("ZZZZZZ ensure clusterRoles")
 	for _, rt := range rts {
 		if rt.External {
+			logrus.Debugf("ZZZZZZ ensure clusterRole %q: skip, external", rt.Name)
 			continue
 		}
 		if err := m.ensureClusterRoles(rt); err != nil {
+			logrus.Debugf("ZZZZZZ ensure clusterRoles FAIL: %v", err)
 			return err
 		}
 	}
+	logrus.Debugf("ZZZZZZ ensure clusterRoles, OK")
 	return nil
 }
 
 func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
+	logrus.Debugf("ZZZZZZ ensure clusterRole %q for roletemplate", rt.Name)
 	if clusterRole, err := m.crLister.Get(rt.Name); err == nil && clusterRole != nil {
 		err := m.compareAndUpdateClusterRole(clusterRole, rt)
 		if err == nil {
+			logrus.Debugf("ZZZZZZ ensure clusterRole %q, skip, present and matching", rt.Name)
 			return nil
 		}
 		if apierrors.IsConflict(err) {
+			logrus.Debugf("ZZZZZZ ensure clusterRole %q, conflict, retry", rt.Name)
 			// get object from etcd and retry
 			clusterRole, err := m.clusterRoles.Get(rt.Name, metav1.GetOptions{})
 			if err != nil {
+				logrus.Debugf("ZZZZZZ ensure clusterRole %q, FAIL to get: %v", rt.Name, err)
 				return errors.Wrapf(err, "error getting clusterRole %v", rt.Name)
 			}
-			return m.compareAndUpdateClusterRole(clusterRole, rt)
+			err = m.compareAndUpdateClusterRole(clusterRole, rt)
+			if err != nil {
+				logrus.Debugf("ZZZZZZ ensure clusterRole %q, FAIL to update: %v", rt.Name, err)
+			}
+			logrus.Debugf("ZZZZZZ ensure clusterRole %q, skip, present and matching", rt.Name)
+			return nil
 		}
+		logrus.Debugf("ZZZZZZ ensure clusterRole %q, FAIL to update: %v", rt.Name, err)
 		return errors.Wrapf(err, "couldn't update clusterRole %v", rt.Name)
 	}
 
+	logrus.Debugf("ZZZZZZ ensure clusterRole %q, missing, create", rt.Name)
 	return m.createClusterRole(rt)
 }
 
@@ -269,6 +284,7 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 }
 
 func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
+	logrus.Debugf("ZZZZZZ new clusterRole %q for roleTemplate %v (%v).", rt.Name, rt.DisplayName, rt.Name)
 	logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
@@ -278,8 +294,10 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 		Rules: rt.Rules,
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
+		logrus.Debugf("ZZZZZZ new clusterRole %q FAIL: %v", rt.Name, err)
 		return errors.Wrapf(err, "couldn't create clusterRole %v", rt.Name)
 	}
+	logrus.Debugf("ZZZZZZ new clusterRole %q OK", rt.Name)
 	return nil
 }
 
