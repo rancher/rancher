@@ -115,14 +115,14 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/rancher/aks-operator v1.14.2-rc.1
-	github.com/rancher/ali-operator v1.14.1-rc.1
+	github.com/rancher/aks-operator v1.14.2
+	github.com/rancher/ali-operator v1.14.1
 	github.com/rancher/apiserver v0.8.6
 	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
 	github.com/rancher/dynamiclistener v0.8.2
-	github.com/rancher/eks-operator v1.14.2-rc.2
+	github.com/rancher/eks-operator v1.14.2
 	github.com/rancher/fleet/pkg/apis v0.15.2
-	github.com/rancher/gke-operator v1.14.2-rc.1
+	github.com/rancher/gke-operator v1.14.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.8
@@ -378,7 +378,7 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.40.0 // indirect
+	github.com/onsi/gomega v1.41.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/procfs v0.19.2 // indirect
