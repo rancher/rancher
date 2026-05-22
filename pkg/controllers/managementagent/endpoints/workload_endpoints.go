@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+const k8sAnnotationLimit = 262144 // 256 KB
+
 // This controller is responsible for monitoring workloads
 // and setting public endpoints on them based on HostPort pods
 // and NodePort services backing up the workload
@@ -93,6 +95,8 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		}
 	}
 
+	numOverfilledAnnotations := 0
+	var firstOverfillError error
 	for _, w := range workloads {
 		// 1. Get endpoints from services
 		var newPublicEps []v32.PublicEndpoint
@@ -174,9 +178,33 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		annotations := map[string]string{
 			endpointsAnnotation: epsToUpdate,
 		}
-		if err = c.WorkloadController.UpdateWorkload(w, annotations); err != nil {
+
+		if err = checkAnnotationSize(annotations); err != nil {
+			numOverfilledAnnotations += 1
+			if firstOverfillError == nil {
+				firstOverfillError = err
+			}
+		} else if err = c.WorkloadController.UpdateWorkload(w, annotations); err != nil {
 			return err
 		}
 	}
-	return nil
+	if numOverfilledAnnotations == 0 {
+		return nil
+	}
+	pluralSuffix := ""
+	if numOverfilledAnnotations > 1 {
+		pluralSuffix = "s"
+	}
+	return fmt.Errorf("failed to update %d endpoint annotation%s: first error: %w", numOverfilledAnnotations, pluralSuffix, firstOverfillError)
+}
+
+func checkAnnotationSize(annotations map[string]string) error {
+	data, err := json.Marshal(annotations)
+	if err == nil {
+		if len(data) >= k8sAnnotationLimit {
+			return fmt.Errorf("annotation size exceeded: %d > %d", len(data), k8sAnnotationLimit)
+		}
+		return nil
+	}
+	return fmt.Errorf("couldn't convert annotation hash to a string: %w", err)
 }
