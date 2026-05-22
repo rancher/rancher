@@ -310,7 +310,11 @@ func (m *manager) createProjectMembershipRole(roleName, namespace string, projec
 	return nil
 }
 
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
+type objectCreator interface {
+	Create(o runtime.Object) (runtime.Object, error)
+}
+
+func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client objectCreator, clusterRole bool) error {
 	metaObj, err := meta.Accessor(ownerObject)
 	if err != nil {
 		return err
@@ -359,7 +363,11 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 		}
 	}
 	_, err = client.Create(toCreate)
-	return err
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+
+	return fmt.Errorf("failed to create role: %w", err)
 }
 
 // The CRTB has been deleted or modified, either delete or update the membership binding so that the subject
