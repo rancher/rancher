@@ -180,7 +180,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		}
 
 		if err = checkAnnotationSize(annotations); err != nil {
-			numOverfilledAnnotations += 1
+			numOverfilledAnnotations++
 			if firstOverfillError == nil {
 				firstOverfillError = err
 			}
