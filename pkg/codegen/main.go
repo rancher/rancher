@@ -112,6 +112,13 @@ func main() {
 					fleet.HelmOp{},
 				},
 			},
+			"operation.cattle.io": {
+				Types: []interface{}{
+					"./pkg/apis/operation.cattle.io/v1alpha1",
+				},
+				GenerateTypes:   true,
+				GenerateClients: true,
+			},
 			"rke.cattle.io": {
 				Types: []interface{}{
 					"./pkg/apis/rke.cattle.io/v1",
