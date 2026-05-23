@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
-	plancattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1"
+	v1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancattleiov1alpha1 "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 )
 

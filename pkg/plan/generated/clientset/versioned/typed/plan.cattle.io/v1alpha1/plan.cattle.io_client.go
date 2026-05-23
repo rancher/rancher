@@ -21,8 +21,8 @@ package v1alpha1
 import (
 	http "net/http"
 
-	plancattleiov1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
-	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
+	plancattleiov1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	scheme "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 

@@ -22,11 +22,7 @@ import (
 	fmt "fmt"
 	http "net/http"
 
-	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
-	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
-	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
-	telemetryv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1"
-	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -34,46 +30,18 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	CatalogV1() catalogv1.CatalogV1Interface
-	ProvisioningV1() provisioningv1.ProvisioningV1Interface
-	RkeV1() rkev1.RkeV1Interface
-	TelemetryV1() telemetryv1.TelemetryV1Interface
-	UpgradeV1() upgradev1.UpgradeV1Interface
+	PlanV1alpha1() planv1alpha1.PlanV1alpha1Interface
 }
 
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	catalogV1      *catalogv1.CatalogV1Client
-	provisioningV1 *provisioningv1.ProvisioningV1Client
-	rkeV1          *rkev1.RkeV1Client
-	telemetryV1    *telemetryv1.TelemetryV1Client
-	upgradeV1      *upgradev1.UpgradeV1Client
+	planV1alpha1 *planv1alpha1.PlanV1alpha1Client
 }
 
-// CatalogV1 retrieves the CatalogV1Client
-func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
-	return c.catalogV1
-}
-
-// ProvisioningV1 retrieves the ProvisioningV1Client
-func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {
-	return c.provisioningV1
-}
-
-// RkeV1 retrieves the RkeV1Client
-func (c *Clientset) RkeV1() rkev1.RkeV1Interface {
-	return c.rkeV1
-}
-
-// TelemetryV1 retrieves the TelemetryV1Client
-func (c *Clientset) TelemetryV1() telemetryv1.TelemetryV1Interface {
-	return c.telemetryV1
-}
-
-// UpgradeV1 retrieves the UpgradeV1Client
-func (c *Clientset) UpgradeV1() upgradev1.UpgradeV1Interface {
-	return c.upgradeV1
+// PlanV1alpha1 retrieves the PlanV1alpha1Client
+func (c *Clientset) PlanV1alpha1() planv1alpha1.PlanV1alpha1Interface {
+	return c.planV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -120,23 +88,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
-	cs.catalogV1, err = catalogv1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
-	cs.provisioningV1, err = provisioningv1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
-	cs.rkeV1, err = rkev1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
-	cs.telemetryV1, err = telemetryv1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
-	cs.upgradeV1, err = upgradev1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.planV1alpha1, err = planv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -161,11 +113,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.catalogV1 = catalogv1.New(c)
-	cs.provisioningV1 = provisioningv1.New(c)
-	cs.rkeV1 = rkev1.New(c)
-	cs.telemetryV1 = telemetryv1.New(c)
-	cs.upgradeV1 = upgradev1.New(c)
+	cs.planV1alpha1 = planv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

@@ -20,7 +20,7 @@ package plan
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
-	v1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io/v1alpha1"
+	v1alpha1 "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 )
 
 type Interface interface {
