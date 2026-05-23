@@ -37,6 +37,11 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 					ETCD: &rkev1.ETCD{
 						DisableSnapshots: true,
 					},
+					MachineGlobalConfig: rkev1.GenericMap{
+						Data: map[string]any{
+							"debug": true,
+						},
+					},
 				},
 			},
 		},

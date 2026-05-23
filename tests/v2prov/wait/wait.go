@@ -72,6 +72,16 @@ func retryWatch(ctx context.Context, watchFunc watchFunc, cb func(obj runtime.Ob
 	}
 }
 
+func retryWatchWithTimeout(ctx context.Context, timeout time.Duration, watchFunc watchFunc, cb func(obj runtime.Object) (bool, error)) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		if done, err := doWatch(ctx, watchFunc, cb); err != nil || done {
+			return err
+		}
+	}
+}
+
 func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb func(obj runtime.Object) (bool, error)) error {
 	if done, err := cb(obj); err != nil || done {
 		return err
@@ -84,6 +94,42 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 
 	return retryWatch(ctx, func() (watch.Interface, error) {
 		return watchFunc(meta.GetNamespace(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + meta.GetName(),
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+	}, cb)
+}
+
+func ObjectWithTimeout(ctx context.Context, timeout time.Duration, watchFunc WatchFunc, obj runtime.Object, cb func(obj runtime.Object) (bool, error)) error {
+	if done, err := cb(obj); err != nil || done {
+		return err
+	}
+
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+
+	return retryWatchWithTimeout(ctx, timeout, func() (watch.Interface, error) {
+		return watchFunc(meta.GetNamespace(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + meta.GetName(),
+			TimeoutSeconds: &[]int64{int64(timeout.Seconds())}[0],
+		})
+	}, cb)
+}
+
+func ClusterObject(ctx context.Context, watchFunc WatchClusterScopedFunc, obj runtime.Object, cb func(obj runtime.Object) (bool, error)) error {
+	if done, err := cb(obj); err != nil || done {
+		return err
+	}
+
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+
+	return retryWatch(ctx, func() (watch.Interface, error) {
+		return watchFunc(metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + meta.GetName(),
 			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
