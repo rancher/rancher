@@ -2,6 +2,14 @@ package plan
 
 import "hash"
 
+const (
+	// PlanLastUpdatedAnnotation is a constant representing the annotation storing the last updated time of a plan.
+	PlanLastUpdatedAnnotation = "rke.cattle.io/plan-last-updated"
+
+	// PlanProbesPassedAnnotation is a constant representing the annotation storing the last known time the probes passed for a plan.
+	PlanProbesPassedAnnotation = "rke.cattle.io/plan-probes-passed"
+)
+
 // Plan represents the basic unit of work performed by the system-agent.
 type Plan struct {
 	Files                []File                `json:"files,omitempty"`
