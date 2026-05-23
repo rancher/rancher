@@ -23,6 +23,7 @@ import (
 	http "net/http"
 
 	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
+	operationv1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/operation.cattle.io/v1alpha1"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1"
@@ -35,6 +36,7 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CatalogV1() catalogv1.CatalogV1Interface
+	OperationV1alpha1() operationv1alpha1.OperationV1alpha1Interface
 	ProvisioningV1() provisioningv1.ProvisioningV1Interface
 	RkeV1() rkev1.RkeV1Interface
 	TelemetryV1() telemetryv1.TelemetryV1Interface
@@ -44,16 +46,22 @@ type Interface interface {
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	catalogV1      *catalogv1.CatalogV1Client
-	provisioningV1 *provisioningv1.ProvisioningV1Client
-	rkeV1          *rkev1.RkeV1Client
-	telemetryV1    *telemetryv1.TelemetryV1Client
-	upgradeV1      *upgradev1.UpgradeV1Client
+	catalogV1         *catalogv1.CatalogV1Client
+	operationV1alpha1 *operationv1alpha1.OperationV1alpha1Client
+	provisioningV1    *provisioningv1.ProvisioningV1Client
+	rkeV1             *rkev1.RkeV1Client
+	telemetryV1       *telemetryv1.TelemetryV1Client
+	upgradeV1         *upgradev1.UpgradeV1Client
 }
 
 // CatalogV1 retrieves the CatalogV1Client
 func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
 	return c.catalogV1
+}
+
+// OperationV1alpha1 retrieves the OperationV1alpha1Client
+func (c *Clientset) OperationV1alpha1() operationv1alpha1.OperationV1alpha1Interface {
+	return c.operationV1alpha1
 }
 
 // ProvisioningV1 retrieves the ProvisioningV1Client
@@ -124,6 +132,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.operationV1alpha1, err = operationv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.provisioningV1, err = provisioningv1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -162,6 +174,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.catalogV1 = catalogv1.New(c)
+	cs.operationV1alpha1 = operationv1alpha1.New(c)
 	cs.provisioningV1 = provisioningv1.New(c)
 	cs.rkeV1 = rkev1.New(c)
 	cs.telemetryV1 = telemetryv1.New(c)
