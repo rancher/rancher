@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 	"time"
 
@@ -34,10 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
-)
-
-var (
-	InvalidKeyChars = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
 )
 
 const (
@@ -70,6 +65,7 @@ type handler struct {
 // Register sets up the v2provisioning snapshot backpopulate controller. This controller is responsible for monitoring
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
 func Register(ctx context.Context, userContext *config.UserContext, capi *wrangler.CAPIContext) {
+	logrus.Debugf("[snapshotbackpopulate] Registering controller for cluster %s", userContext.ClusterName)
 	h := handler{
 		clusterName:                userContext.ClusterName,
 		clusterCache:               userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
