@@ -19,17 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/rancher/rancher/pkg/generated/clientset/versioned"
-	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
-	fakecatalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1/fake"
-	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
-	fakeprovisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1/fake"
-	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
-	fakerkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1/fake"
-	telemetryv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1"
-	faketelemetryv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1/fake"
-	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
-	fakeupgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1/fake"
+	clientset "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1"
+	fakeplanv1alpha1 "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -87,7 +79,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-// IsWatchListSemanticsUnSupported informs the reflector that this client
+// IsWatchListSemanticsSupported informs the reflector that this client
 // doesn't support WatchList semantics.
 //
 // This is a synthetic method whose sole purpose is to satisfy the optional
@@ -103,27 +95,7 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// CatalogV1 retrieves the CatalogV1Client
-func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
-	return &fakecatalogv1.FakeCatalogV1{Fake: &c.Fake}
-}
-
-// ProvisioningV1 retrieves the ProvisioningV1Client
-func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {
-	return &fakeprovisioningv1.FakeProvisioningV1{Fake: &c.Fake}
-}
-
-// RkeV1 retrieves the RkeV1Client
-func (c *Clientset) RkeV1() rkev1.RkeV1Interface {
-	return &fakerkev1.FakeRkeV1{Fake: &c.Fake}
-}
-
-// TelemetryV1 retrieves the TelemetryV1Client
-func (c *Clientset) TelemetryV1() telemetryv1.TelemetryV1Interface {
-	return &faketelemetryv1.FakeTelemetryV1{Fake: &c.Fake}
-}
-
-// UpgradeV1 retrieves the UpgradeV1Client
-func (c *Clientset) UpgradeV1() upgradev1.UpgradeV1Interface {
-	return &fakeupgradev1.FakeUpgradeV1{Fake: &c.Fake}
+// PlanV1alpha1 retrieves the PlanV1alpha1Client
+func (c *Clientset) PlanV1alpha1() planv1alpha1.PlanV1alpha1Interface {
+	return &fakeplanv1alpha1.FakePlanV1alpha1{Fake: &c.Fake}
 }
