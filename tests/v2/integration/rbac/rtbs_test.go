@@ -201,8 +201,10 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 		})
 	p.Require().NoError(err)
 
-	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
-	p.Require().Error(err)
+	p.Require().Eventually(func() bool {
+		_, err := secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
+		return err != nil
+	}, 2*time.Minute, 2*time.Second, "waiting for secret access to be revoked after PRTB removal")
 
 	err = users.AddProjectMember(client, p.project, user, rtC.ID, []*authzv1.ResourceAttributes{
 		{
