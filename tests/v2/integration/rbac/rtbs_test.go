@@ -37,7 +37,6 @@ func init() {
 
 type RTBTestSuite struct {
 	suite.Suite
-	testUser            *management.User
 	client              *rancher.Client
 	project             *management.Project
 	session             *session.Session
@@ -63,18 +62,13 @@ func (p *RTBTestSuite) SetupSuite() {
 	p.Require().NoError(err)
 
 	p.project = testProject
-
-	p.testUser = p.createUser(client, "testuser", "user")
 }
 
 func (p *RTBTestSuite) TearDownSuite() {
 	client, err := p.client.WithSession(p.session)
 	p.Require().NoError(err)
 
-	// Clean up the project and user we created
 	err = client.Management.Project.Delete(p.project)
-	p.Require().NoError(err)
-	err = client.Management.User.Delete(p.testUser)
 	p.Require().NoError(err)
 	p.session.Cleanup()
 }
@@ -133,9 +127,11 @@ func (p *RTBTestSuite) assertClusterAccessRevoked(userClient *rancher.Client) {
 func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	client := p.newSubSession()
 
+	user := p.createUser(client, "testuser", "user")
+
 	createdNamespace := p.createNamespace(client, p.projectName(p.project))
 
-	testUser, err := client.AsUser(p.testUser)
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	// Test that user can get a specified secret once granted the permission to do so via roletemplate inheritance bounded
@@ -172,7 +168,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 
 	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
 		ProjectID:       p.project.ID,
-		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		UserPrincipalID: user.PrincipalIDs[0],
 		RoleTemplateID:  rtA.ID,
 	})
 	p.Require().NoError(err)
@@ -208,7 +204,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	_, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
 	p.Require().Error(err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, rtC.ID, []*authzv1.ResourceAttributes{
+	err = users.AddProjectMember(client, p.project, user, rtC.ID, []*authzv1.ResourceAttributes{
 		{
 			Verb:      "get",
 			Resource:  "secrets",
@@ -263,13 +259,15 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	client := p.newSubSession()
 
+	user := p.createUser(client, "testuser", "user")
+
 	// Test that user can get a specified namespace once granted the permission to do so via roletemplate inheritance bounded
 	// by a CRTB.
 
 	pn := p.projectName(p.project)
 	ns := p.createNamespace(client, pn)
 
-	testUser, err := client.AsUser(p.testUser)
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
@@ -303,7 +301,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 
 	crtb, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
 		ClusterID:       p.downstreamClusterID,
-		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		UserPrincipalID: user.PrincipalIDs[0],
 		RoleTemplateID:  rtA.ID,
 	})
 	p.Require().NoError(err)
@@ -341,7 +339,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 		})
 	p.Require().NoError(err)
 
-	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtC.ID, []*authzv1.ResourceAttributes{
+	err = users.AddClusterRoleToUser(client, localCluster, user, rtC.ID, []*authzv1.ResourceAttributes{
 		{
 			Verb:     "get",
 			Resource: "namespaces",
@@ -392,7 +390,9 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 func (p *RTBTestSuite) TestRemovingPRTBRevokesNamespaceAccess() {
 	client := p.newSubSession()
 
-	testUser, err := client.AsUser(p.testUser)
+	user := p.createUser(client, "testuser", "user")
+
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	// Helper function to create a project and add the user as project-member
@@ -406,7 +406,7 @@ func (p *RTBTestSuite) TestRemovingPRTBRevokesNamespaceAccess() {
 		p.Require().NoError(err)
 
 		prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-			UserID:         p.testUser.ID,
+			UserID:         user.ID,
 			RoleTemplateID: "project-member",
 			ProjectID:      project.ID,
 		})
@@ -466,7 +466,9 @@ func (p *RTBTestSuite) TestAPIGroupInRoleTemplate() {
 		p.T().Skip("no nodes in the cluster")
 	}
 
-	testUser, err := client.AsUser(p.testUser)
+	user := p.createUser(client, "testuser", "user")
+
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	// Validate the standard user cannot see any nodes initially.
@@ -500,9 +502,9 @@ func (p *RTBTestSuite) TestAPIGroupInRoleTemplate() {
 	}, 2*time.Minute, 2*time.Second, "role template never became available")
 
 	// Bind the user to the role template via a CRTB using the user's principal ID.
-	p.Require().NotEmpty(p.testUser.PrincipalIDs, "test user has no principal IDs")
+	p.Require().NotEmpty(user.PrincipalIDs, "test user has no principal IDs")
 	_, err = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
-		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		UserPrincipalID: user.PrincipalIDs[0],
 		RoleTemplateID:  rt.ID,
 		ClusterID:       p.downstreamClusterID,
 	})
@@ -527,14 +529,16 @@ func (p *RTBTestSuite) TestAPIGroupInRoleTemplate() {
 func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 	client := p.newSubSession()
 
-	testUser, err := client.AsUser(p.testUser)
+	user := p.createUser(client, "testuser", "user")
+
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	mbo := "membership-binding-owner"
 
 	// Admin creates a PRTB giving user project-member on the suite project.
 	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
+		UserID:         user.ID,
 		RoleTemplateID: "project-member",
 		ProjectID:      p.project.ID,
 	})
@@ -575,7 +579,9 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
 	client := p.newSubSession()
 
-	testUser, err := client.AsUser(p.testUser)
+	user := p.createUser(client, "testuser", "user")
+
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	mbo := "membership-binding-owner"
@@ -584,7 +590,7 @@ func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
 
 	// Admin creates a PRTB giving user project-member on the suite project.
 	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
+		UserID:         user.ID,
 		RoleTemplateID: "project-member",
 		ProjectID:      p.project.ID,
 	})
@@ -659,10 +665,12 @@ func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
 func (p *RTBTestSuite) TestCRTBCannotTargetUsersAndGroup() {
 	client := p.newSubSession()
 
+	user := p.createUser(client, "testuser", "user")
+
 	_, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
 		Name:             namegen.AppendRandomString("crtb-"),
 		ClusterID:        "local",
-		UserID:           p.testUser.ID,
+		UserID:           user.ID,
 		GroupPrincipalID: "someauthprovidergroupid",
 		RoleTemplateID:   "clustercatalogs-view",
 	})
@@ -693,10 +701,12 @@ func (p *RTBTestSuite) TestCRTBMustHaveTarget() {
 func (p *RTBTestSuite) TestCRTBCannotUpdateSubjectsOrCluster() {
 	client := p.newSubSession()
 
+	user := p.createUser(client, "testuser", "user")
+
 	oldCRTB, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
 		Name:           namegen.AppendRandomString("crtb-"),
 		ClusterID:      "local",
-		UserID:         p.testUser.ID,
+		UserID:         user.ID,
 		RoleTemplateID: "clustercatalogs-view",
 	})
 	p.Require().NoError(err)

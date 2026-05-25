@@ -30,10 +30,12 @@ import (
 func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 	client := p.newSubSession()
 
+	user := p.createUser(client, "testuser", "user")
+
 	// Grant user the cluster-member role on the local cluster.
 	crtb, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
 		ClusterID:       p.downstreamClusterID,
-		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		UserPrincipalID: user.PrincipalIDs[0],
 		RoleTemplateID:  "cluster-member",
 	})
 	p.Require().NoError(err)
@@ -43,7 +45,7 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 		p.Require().NoError(err)
 	})
 
-	testUser, err := client.AsUser(p.testUser)
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	// User creates a project, retrying until RBAC propagates.
@@ -90,7 +92,7 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 	rbRoles := []string{}
 	for _, rb := range rbs.Items {
 		for _, subject := range rb.Subjects {
-			if subject.Name == p.testUser.ID {
+			if subject.Name == user.ID {
 				rbRoles = append(rbRoles, rb.RoleRef.Name)
 			}
 		}
@@ -125,9 +127,11 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
 	client := p.newSubSession()
 
+	user := p.createUser(client, "testuser", "user")
+
 	// Create a PRTB giving the test user read-only access to the project.
 	_, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
+		UserID:         user.ID,
 		RoleTemplateID: "read-only",
 		ProjectID:      p.project.ID,
 	})
@@ -136,7 +140,7 @@ func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
 	// Create a namespace in the project for testing namespaced secrets.
 	ns := p.createNamespace(client, p.projectName(p.project))
 
-	testUser, err := client.AsUser(p.testUser)
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	// Read-only user should fail to create a secret.
@@ -164,6 +168,8 @@ func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
 func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 	client := p.newSubSession()
 
+	user := p.createUser(client, "testuser", "user")
+
 	// Create two projects.
 	p1, err := client.Management.Project.Create(&management.Project{
 		ClusterID: p.downstreamClusterID,
@@ -189,14 +195,14 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 
 	// Give the test user read-only access to both projects.
 	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
+		UserID:         user.ID,
 		RoleTemplateID: "read-only",
 		ProjectID:      p1.ID,
 	})
 	p.Require().NoError(err)
 
 	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
+		UserID:         user.ID,
 		RoleTemplateID: "read-only",
 		ProjectID:      p2.ID,
 	})
@@ -205,7 +211,7 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 	// Create a namespace in project 1.
 	ns := p.createNamespace(client, p.projectName(p1))
 
-	testUser, err := client.AsUser(p.testUser)
+	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
 	// Wait until the read-only user can see the namespace.
