@@ -16,10 +16,10 @@ import (
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	gomock "go.uber.org/mock/gomock"
-	action "helm.sh/helm/v3/pkg/action"
-	release "helm.sh/helm/v3/pkg/release"
-	repo "helm.sh/helm/v3/pkg/repo"
-	v10 "k8s.io/api/core/v1"
+	action "helm.sh/helm/v4/pkg/action"
+	v10 "helm.sh/helm/v4/pkg/release/v1"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
+	v11 "k8s.io/api/core/v1"
 	user "k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -87,10 +87,10 @@ func (m *MockOperationClient) EXPECT() *MockOperationClientMockRecorder {
 }
 
 // AddCpTaintsToTolerations mocks base method.
-func (m *MockOperationClient) AddCpTaintsToTolerations(tolerations []v10.Toleration) ([]v10.Toleration, error) {
+func (m *MockOperationClient) AddCpTaintsToTolerations(tolerations []v11.Toleration) ([]v11.Toleration, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddCpTaintsToTolerations", tolerations)
-	ret0, _ := ret[0].([]v10.Toleration)
+	ret0, _ := ret[0].([]v11.Toleration)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -156,10 +156,10 @@ func (m *MockHelmClient) EXPECT() *MockHelmClientMockRecorder {
 }
 
 // ListReleases mocks base method.
-func (m *MockHelmClient) ListReleases(namespace, name string, stateMask action.ListStates) ([]*release.Release, error) {
+func (m *MockHelmClient) ListReleases(namespace, name string, stateMask action.ListStates) ([]*v10.Release, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListReleases", namespace, name, stateMask)
-	ret0, _ := ret[0].([]*release.Release)
+	ret0, _ := ret[0].([]*v10.Release)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

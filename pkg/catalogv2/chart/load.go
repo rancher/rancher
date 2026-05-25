@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
+	chartutil "helm.sh/helm/v4/pkg/chart/v2/util"
 )
 
 type Archive struct {
@@ -58,19 +58,24 @@ func LoadArchive(path string) (*Archive, bool, error) {
 		return nil, false, err
 	}
 
+	ch, ok := c.(*chart.Chart)
+	if !ok {
+		return nil, false, fmt.Errorf("loaded chart is not of type *chart.Chart")
+	}
+
 	tempDir, err := os.MkdirTemp("", "chart-archive-")
 	if err != nil {
 		return nil, false, fmt.Errorf("creating archive for %s: %w", path, err)
 	}
 
-	file, err := chartutil.Save(c, tempDir)
+	file, err := chartutil.Save(ch, tempDir)
 	if err != nil {
 		_ = os.RemoveAll(tempDir)
 		return nil, false, err
 	}
 
 	return &Archive{
-		Metadata: c.Metadata,
+		Metadata: ch.Metadata,
 		Path:     file,
 		temp:     true,
 	}, true, nil
