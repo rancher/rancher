@@ -17,7 +17,6 @@ import (
 	extrbac "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
-	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/clientbase"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -32,14 +31,15 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 	client := p.newSubSession()
 
 	// Grant user the cluster-member role on the local cluster.
-	localCluster, err := client.Management.Cluster.ByID(p.downstreamClusterID)
-	p.Require().NoError(err)
-
-	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, "cluster-member", nil)
+	crtb, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		ClusterID:       p.downstreamClusterID,
+		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		RoleTemplateID:  "cluster-member",
+	})
 	p.Require().NoError(err)
 
 	p.T().Cleanup(func() {
-		err := users.RemoveClusterRoleFromUser(client, p.testUser)
+		err := client.Management.ClusterRoleTemplateBinding.Delete(crtb)
 		p.Require().NoError(err)
 	})
 

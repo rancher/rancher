@@ -170,7 +170,14 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 		})
 	p.Require().NoError(err)
 
-	err = users.AddProjectMember(client, p.project, p.testUser, rtA.ID, []*authzv1.ResourceAttributes{
+	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		ProjectID:       p.project.ID,
+		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		RoleTemplateID:  rtA.ID,
+	})
+	p.Require().NoError(err)
+
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
 		{
 			Verb:      "get",
 			Resource:  "secrets",
@@ -183,7 +190,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	secret, err = secrets.GetSecretByName(testUser, p.downstreamClusterID, createdNamespace.Name, secret.Name, metav1.GetOptions{})
 	p.Require().NoError(err)
 
-	err = users.RemoveProjectMember(client, p.testUser)
+	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
 	p.Require().NoError(err)
 
 	// Test that user can get a specified secret once granted the permission to do so via a chain of
@@ -294,7 +301,14 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	localCluster, err := p.client.Management.Cluster.ByID(p.downstreamClusterID)
 	p.Require().NoError(err)
 
-	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtA.ID, []*authzv1.ResourceAttributes{
+	crtb, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		ClusterID:       p.downstreamClusterID,
+		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		RoleTemplateID:  rtA.ID,
+	})
+	p.Require().NoError(err)
+
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
 		{
 			Verb:     "get",
 			Resource: "namespaces",
@@ -306,7 +320,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
 	p.Require().NoError(err)
 
-	err = users.RemoveClusterRoleFromUser(client, p.testUser)
+	err = client.Management.ClusterRoleTemplateBinding.Delete(crtb)
 	p.Require().NoError(err)
 
 	// Ensure the user can no longer access the namespace after the CRTB is removed.
