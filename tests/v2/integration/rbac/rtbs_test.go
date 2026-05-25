@@ -309,6 +309,10 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	err = users.RemoveClusterRoleFromUser(client, p.testUser)
 	p.Require().NoError(err)
 
+	// Ensure the user can no longer access the namespace after the CRTB is removed.
+	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
+	p.Require().Error(err)
+
 	// Test that user can get a specified namespace once granted the permission to do so via a chain of
 	// roletemplate inheritance bounded by a CRTB. Here a chain means the permission is not directly inherited from the
 	// parent.
@@ -320,9 +324,6 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 			RoleTemplateIDs: []string{rtA.ID},
 		})
 	p.Require().NoError(err)
-
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
-	p.Require().Error(err)
 
 	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, rtC.ID, []*authzv1.ResourceAttributes{
 		{
