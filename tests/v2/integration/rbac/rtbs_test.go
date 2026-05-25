@@ -310,8 +310,10 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	p.Require().NoError(err)
 
 	// Ensure the user can no longer access the namespace after the CRTB is removed.
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
-	p.Require().Error(err)
+	p.Require().Eventually(func() bool {
+		_, err := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
+		return err != nil
+	}, 2*time.Minute, 2*time.Second, "waiting for namespace access to be revoked after CRTB removal")
 
 	// Test that user can get a specified namespace once granted the permission to do so via a chain of
 	// roletemplate inheritance bounded by a CRTB. Here a chain means the permission is not directly inherited from the
