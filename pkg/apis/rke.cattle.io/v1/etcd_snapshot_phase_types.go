@@ -13,14 +13,8 @@ const (
 	// ETCDSnapshotPhaseRestore is the state assigned to the RKEControlPlane when the etcd restore operation is restoring etcd.
 	ETCDSnapshotPhaseRestore = ETCDSnapshotPhase("Restore")
 
-	// ETCDSnapshotPhasePostRestorePodCleanup is the state assigned to the RKEControlPlane when the etcd restore operation is removing old pods post-restore.
-	ETCDSnapshotPhasePostRestorePodCleanup = ETCDSnapshotPhase("PostRestorePodCleanup")
-
-	// ETCDSnapshotPhaseInitialRestartCluster is the state assigned to the RKEControlPlane when the etcd restore operation is performing the initial restart of the cluster.
-	ETCDSnapshotPhaseInitialRestartCluster = ETCDSnapshotPhase("InitialRestartCluster")
-
-	// ETCDSnapshotPhasePostRestoreNodeCleanup is the state assigned to the RKEControlPlane when the etcd restore operation is cleaning up resources on the downstream node post-restore operation.
-	ETCDSnapshotPhasePostRestoreNodeCleanup = ETCDSnapshotPhase("PostRestoreNodeCleanup")
+	// ETCDSnapshotPhasePostRestoreCleanup is the state assigned to the RKEControlPlane when the etcd restore operation is removing old pods post-restore.
+	ETCDSnapshotPhasePostRestoreCleanup = ETCDSnapshotPhase("PostRestoreCleanup")
 
 	// ETCDSnapshotPhaseRestartCluster is the state assigned to the RKEControlPlane when the etcd snapshot create/restore operation is restarting the cluster.
 	ETCDSnapshotPhaseRestartCluster = ETCDSnapshotPhase("RestartCluster")

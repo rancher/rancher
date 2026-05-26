@@ -226,7 +226,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, servers[0], restorePlan, joinedServer, 1, 1)
 }
 
-func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+func (p *Planner) runEtcdSnapshotPostRestoreCleanupPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
 	initNodes := collect(clusterPlan, isInitNode)
 	if len(initNodes) != 1 {
 		return fmt.Errorf("multiple init nodes found")
@@ -238,11 +238,25 @@ func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.R
 		return err
 	}
 
+	var allMachineUIDs, allNodeNames []string
+	for _, n := range collect(clusterPlan, isNotDeleting) {
+		if n.Machine != nil && n.Machine.UID != "" {
+			allMachineUIDs = append(allMachineUIDs, string(n.Machine.UID))
+		}
+		if n.Machine != nil && n.Machine.Status.NodeRef.IsDefined() {
+			allNodeNames = append(allNodeNames, n.Machine.Status.NodeRef.Name)
+		}
+	}
+
 	// If the init node is a controlplane node, deliver the desired plan + pod cleanup instruction
 	if isControlPlane(initNode) {
 		cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, []string{string(initNode.Machine.UID)})
 		initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFiles...)
 		initNodePlan.Instructions = append(initNodePlan.Instructions, cleanupInstructions...)
+
+		nodeCleanupScriptFiles, nodeCleanupInstructions := p.generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane, allMachineUIDs, allNodeNames)
+		initNodePlan.Files = append(initNodePlan.Files, nodeCleanupScriptFiles...)
+		initNodePlan.Instructions = append(initNodePlan.Instructions, nodeCleanupInstructions...)
 		return assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5)
 	}
 
@@ -273,35 +287,11 @@ func (p *Planner) runEtcdSnapshotPostRestorePodCleanupPlan(controlPlane *rkev1.R
 	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestorePodCleanupFilesAndInstruction(controlPlane, []string{string(initNode.Machine.UID), string(controlPlaneEntry.Machine.UID)})
 	firstControlPlanePlan.Files = append(firstControlPlanePlan.Files, cleanupScriptFiles...)
 	firstControlPlanePlan.Instructions = append(firstControlPlanePlan.Instructions, cleanupInstructions...)
+
+	nodeCleanupScriptFiles, nodeCleanupInstructions := p.generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane, allMachineUIDs, allNodeNames)
+	firstControlPlanePlan.Files = append(firstControlPlanePlan.Files, nodeCleanupScriptFiles...)
+	firstControlPlanePlan.Instructions = append(firstControlPlanePlan.Instructions, nodeCleanupInstructions...)
 	return assignAndCheckPlan(p.store, ETCDRestoreMessage, controlPlaneEntry, firstControlPlanePlan, joinedServer, 5, 5)
-}
-
-func (p *Planner) runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
-	initNodes := collect(clusterPlan, isInitNode)
-	if len(initNodes) != 1 {
-		return fmt.Errorf("multiple init nodes found")
-	}
-	initNode := initNodes[0]
-
-	initNodePlan, _, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
-	if err != nil {
-		return err
-	}
-
-	var allMachineUIDs, allNodeNames []string
-	for _, n := range collect(clusterPlan, isNotDeleting) {
-		if n.Machine != nil && n.Machine.UID != "" {
-			allMachineUIDs = append(allMachineUIDs, string(n.Machine.UID))
-		}
-		if n.Machine != nil && n.Machine.Status.NodeRef.IsDefined() {
-			allNodeNames = append(allNodeNames, n.Machine.Status.NodeRef.Name)
-		}
-	}
-
-	cleanupScriptFiles, cleanupInstructions := p.generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane, allMachineUIDs, allNodeNames)
-	initNodePlan.Files = append(initNodePlan.Files, cleanupScriptFiles...)
-	initNodePlan.Instructions = append(initNodePlan.Instructions, cleanupInstructions...)
-	return assignAndCheckPlan(p.store, ETCDRestoreMessage, initNode, initNodePlan, "", 5, 5)
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
@@ -853,24 +843,9 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 			return status, err
 		}
 		status.ConfigGeneration++ // Increment config generation to cause the restart_stamp to change
-		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestorePodCleanup)
-	case rkev1.ETCDSnapshotPhasePostRestorePodCleanup:
-		if err = p.runEtcdSnapshotPostRestorePodCleanupPlan(cp, tokensSecret, clusterPlan); err != nil {
-			return status, err
-		}
-		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseInitialRestartCluster)
-	case rkev1.ETCDSnapshotPhaseInitialRestartCluster:
-		if err := p.pauseCAPICluster(cp, false); err != nil {
-			return status, err
-		}
-		logrus.Infof("[planner] rkecluster %s/%s: running full reconcile during etcd restore to initially restart cluster", cp.Namespace, cp.Name)
-		// Run a full reconcile of the cluster at this point, ignoring drain and concurrency.
-		if status, err := p.fullReconcile(cp, status, tokensSecret, clusterPlan, true); err != nil {
-			return status, err
-		}
-		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestoreNodeCleanup)
-	case rkev1.ETCDSnapshotPhasePostRestoreNodeCleanup:
-		if err = p.runEtcdSnapshotPostRestoreNodeCleanupPlan(cp, tokensSecret, clusterPlan); err != nil {
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestoreCleanup)
+	case rkev1.ETCDSnapshotPhasePostRestoreCleanup:
+		if err = p.runEtcdSnapshotPostRestoreCleanupPlan(cp, tokensSecret, clusterPlan); err != nil {
 			return status, err
 		}
 		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)

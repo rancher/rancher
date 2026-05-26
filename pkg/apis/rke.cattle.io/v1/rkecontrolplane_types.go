@@ -125,7 +125,7 @@ type RKEControlPlaneStatus struct {
 
 	// ETCDSnapshotRestorePhase is the phase the etcd snapshot
 	// restore operation is currently executing.
-	// +kubebuilder:validation:Enum=Started;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster;Finished;Failed
+	// +kubebuilder:validation:Enum=Started;Shutdown;Restore;PostRestoreCleanup;RestartCluster;Finished;Failed
 	// +optional
 	ETCDSnapshotRestorePhase ETCDSnapshotPhase `json:"etcdSnapshotRestorePhase,omitempty"`
 
