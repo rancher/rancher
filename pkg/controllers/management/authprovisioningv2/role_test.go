@@ -13,6 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -377,6 +378,186 @@ func newDeletingMgmtCuster() *v3.Cluster {
 	c := &v3.Cluster{}
 	c.DeletionTimestamp = &metav1.Time{}
 	return c
+}
+
+func Test_crdToResourceMatch(t *testing.T) {
+	tests := []struct {
+		name string
+		crd  *apiextv1.CustomResourceDefinition
+		want *resourceMatch
+	}{
+		{
+			name: "nil when AcceptedNames.Kind is empty",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true},
+					},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "",
+						Plural: "examples",
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "nil when Versions is empty",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group:    "example.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "Example",
+						Plural: "examples",
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "selects first version when all deprecated or not served",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{Name: "v1alpha1", Served: false, Deprecated: true},
+						{Name: "v1beta1", Served: true, Deprecated: true},
+					},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "Example",
+						Plural: "examples",
+					},
+				},
+			},
+			want: &resourceMatch{
+				GVK: schema.GroupVersionKind{
+					Group:   "example.io",
+					Version: "v1alpha1",
+					Kind:    "Example",
+				},
+				Resource: "examples",
+			},
+		},
+		{
+			name: "selects first non-deprecated and served version",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{Name: "v1alpha1", Served: false, Deprecated: true},
+						{Name: "v1beta1", Served: true, Deprecated: true},
+						{Name: "v1", Served: true, Deprecated: false},
+						{Name: "v2", Served: true, Deprecated: false},
+					},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "Example",
+						Plural: "examples",
+					},
+				},
+			},
+			want: &resourceMatch{
+				GVK: schema.GroupVersionKind{
+					Group:   "example.io",
+					Version: "v1",
+					Kind:    "Example",
+				},
+				Resource: "examples",
+			},
+		},
+		{
+			name: "valid CRD with single version",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "test.cattle.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true},
+					},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "TestResource",
+						Plural: "testresources",
+					},
+				},
+			},
+			want: &resourceMatch{
+				GVK: schema.GroupVersionKind{
+					Group:   "test.cattle.io",
+					Version: "v1",
+					Kind:    "TestResource",
+				},
+				Resource: "testresources",
+			},
+		},
+		{
+			name: "prefers served over not served",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{Name: "v1alpha1", Served: false, Deprecated: false},
+						{Name: "v1", Served: true, Deprecated: false},
+					},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "Example",
+						Plural: "examples",
+					},
+				},
+			},
+			want: &resourceMatch{
+				GVK: schema.GroupVersionKind{
+					Group:   "example.io",
+					Version: "v1",
+					Kind:    "Example",
+				},
+				Resource: "examples",
+			},
+		},
+		{
+			name: "handles CRD with only not served versions",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{Name: "v1alpha1", Served: false, Deprecated: false},
+					},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "Example",
+						Plural: "examples",
+					},
+				},
+			},
+			want: &resourceMatch{
+				GVK: schema.GroupVersionKind{
+					Group:   "example.io",
+					Version: "v1alpha1",
+					Kind:    "Example",
+				},
+				Resource: "examples",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := crdToResourceMatch(tt.crd)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func Test_isProtectedRBACResource(t *testing.T) {

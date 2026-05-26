@@ -59,7 +59,7 @@ func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 	version := crd.Spec.Versions[0]
 
 	for _, ver := range crd.Spec.Versions {
-		if !ver.Deprecated {
+		if !ver.Deprecated && ver.Served {
 			version = ver
 			break
 		}
