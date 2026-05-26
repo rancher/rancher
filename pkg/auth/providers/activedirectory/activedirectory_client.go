@@ -149,6 +149,9 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	return groupPrincipals, err
 }
 
+func (p *adProvider) UsesUserSecrets() bool      { return false }
+func (p *adProvider) CanRefreshPrincipals() bool { return true }
+
 func (p *adProvider) getPrincipalsFromSearchResult(lConn ldapv3.Client, config *v3.ActiveDirectoryConfig, result *ldapv3.SearchResult) (v3.Principal, []v3.Principal, error) {
 	var (
 		groupPrincipals       []v3.Principal

@@ -17,6 +17,7 @@ import (
 	goidc "github.com/coreos/go-oidc/v3/oidc"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	providercommon "github.com/rancher/rancher/pkg/auth/providers/common"
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/management/oidcprovider"
@@ -210,7 +211,7 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 	// mock auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
 	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
-	providers.Providers[fakeAuthProvider] = mockProvider
+	providers.SetProviders(map[string]providercommon.AuthProvider{fakeAuthProvider: mockProvider})
 
 	// create OIDC client
 	oidcClient := &apimgmtv3.OIDCClient{

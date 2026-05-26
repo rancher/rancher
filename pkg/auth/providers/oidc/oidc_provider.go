@@ -304,6 +304,9 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 	return o.getGroupsFromClaimInfo(*claimInfo), nil
 }
 
+func (o *OpenIDCProvider) UsesUserSecrets() bool      { return true }
+func (o *OpenIDCProvider) CanRefreshPrincipals() bool { return true }
+
 func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
 	config, err := o.GetConfig()
 	if err != nil {

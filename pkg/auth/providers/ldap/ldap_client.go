@@ -582,3 +582,6 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 	}
 	return groupPrincipals, nil
 }
+
+func (p *ldapProvider) UsesUserSecrets() bool      { return false }
+func (p *ldapProvider) CanRefreshPrincipals() bool { return true }

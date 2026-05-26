@@ -635,4 +635,3 @@ func TestPrivateRegistryPullSecretsAsObjectReferences(t *testing.T) {
 		})
 	}
 }
-

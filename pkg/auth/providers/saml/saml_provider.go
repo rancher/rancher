@@ -365,6 +365,9 @@ func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 	return nil, errors.New("Not implemented")
 }
 
+func (s *Provider) UsesUserSecrets() bool      { return false }
+func (s *Provider) CanRefreshPrincipals() bool { return s.name == ShibbolethName }
+
 // SearchPrincipals searches for a principal by name using LDAP if configured.
 // Otherwise it returns a "fake" principal of a requested type with the name as the searchKey.
 // If the principalType is empty, both user and group principals are returned.
