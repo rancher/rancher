@@ -628,6 +628,21 @@ func TestUpdateStatus(t *testing.T) {
 			wantSkipUpdate: true,
 		},
 		{
+			name: "conditions unchanged but generation mismatch - triggers update",
+			localConditions: []metav1.Condition{
+				{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
+			},
+			grFromCluster: &v3.GlobalRole{
+				Status: v3.GlobalRoleStatus{
+					ObservedGeneration: 1,
+					Conditions: []metav1.Condition{
+						{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
+					},
+				},
+			},
+			wantSummary: status.SummaryCompleted,
+		},
+		{
 			name: "all conditions true - completed summary",
 			localConditions: []metav1.Condition{
 				{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
@@ -658,11 +673,9 @@ func TestUpdateStatus(t *testing.T) {
 			wantError:     true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			ctrl := gomock.NewController(t)
 			grCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
 			grCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(test.grFromCluster, test.grCacheErr)
 

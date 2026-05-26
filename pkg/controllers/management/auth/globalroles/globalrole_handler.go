@@ -459,7 +459,7 @@ func (gr *globalRoleLifecycle) updateStatus(globalRole *v3.GlobalRole, localCond
 		if err != nil {
 			return err
 		}
-		if status.CompareConditions(grFromCluster.Status.Conditions, localConditions) {
+		if status.CompareConditions(grFromCluster.Status.Conditions, localConditions) && grFromCluster.Status.ObservedGeneration == globalRole.ObjectMeta.Generation {
 			return nil
 		}
 
