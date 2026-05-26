@@ -32,15 +32,12 @@ func WebhookHelmValues(wdc *v3.WebhookDeploymentCustomization) (map[string]inter
 		return webhookDefaultResetValues, nil
 	}
 
-	// Start with defaults for every key we might set so that clearing a field
-	// (e.g. dropping PodDisruptionBudget) always produces a diff against the
+	// Start with a copy of the defaults so that clearing a field (e.g.
+	// dropping PodDisruptionBudget) always produces a diff against the
 	// currently-installed release config.
-	values := map[string]interface{}{
-		"replicaCount":        1,
-		"tolerations":         []interface{}{},
-		"affinity":            nil,
-		"resources":           map[string]interface{}{},
-		"podDisruptionBudget": map[string]interface{}{"enabled": false},
+	values := make(map[string]interface{}, len(webhookDefaultResetValues))
+	for k, v := range webhookDefaultResetValues {
+		values[k] = v
 	}
 
 	if wdc.ReplicaCount != nil {
