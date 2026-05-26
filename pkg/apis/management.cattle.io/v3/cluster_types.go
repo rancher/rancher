@@ -144,17 +144,6 @@ type PodDisruptionBudgetSpec struct {
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 }
 
-// WebhookDeploymentCustomization holds HA and resource configuration for the rancher-webhook deployment.
-type WebhookDeploymentCustomization struct {
-	// ReplicaCount sets the number of webhook pod replicas. The webhook natively supports
-	// multi-replica operation via leader election and shared TLS certificates.
-	ReplicaCount                 *int32                   `json:"replicaCount,omitempty"`
-	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
-	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
-	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
-	PodDisruptionBudget          *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
-}
-
 type ClusterSpec struct {
 	ClusterSpecBase
 	DisplayName                         string                      `json:"displayName" norman:"required"`
@@ -172,6 +161,17 @@ type ClusterSpec struct {
 	GKEConfig                           *gkev1.GKEClusterConfigSpec `json:"gkeConfig,omitempty"`
 	AliConfig                           *aliv1.AliClusterConfigSpec `json:"aliConfig,omitempty"`
 	FleetWorkspaceName                  string                      `json:"fleetWorkspaceName,omitempty"`
+}
+
+// WebhookDeploymentCustomization holds HA and resource configuration for the rancher-webhook deployment.
+type WebhookDeploymentCustomization struct {
+	// ReplicaCount sets the number of webhook pod replicas. The webhook natively supports
+	// multi-replica operation via leader election and shared TLS certificates.
+	ReplicaCount                 *int32                   `json:"replicaCount,omitempty"`
+	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
+	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+	PodDisruptionBudget          *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
 
 type ImportedConfig struct {
