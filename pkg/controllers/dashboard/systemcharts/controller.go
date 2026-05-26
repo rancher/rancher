@@ -288,6 +288,8 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				if err != nil && !errors.IsNotFound(err) {
 					logrus.Warnf("[systemcharts] failed to get local cluster for webhook values: %v", err)
 				} else {
+					// wdc is nil when the local cluster is not found; WebhookHelmValues
+					// handles nil by returning defaults that reset every customizable field.
 					helmValues, err := chart.WebhookHelmValues(wdc)
 					if err != nil {
 						logrus.Warnf("[systemcharts] failed to build webhook helm values: %v", err)
