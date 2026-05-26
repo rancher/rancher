@@ -592,11 +592,23 @@ func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.Own
 	if err != nil {
 		return nil, "", err
 	}
+
+	// find the controller-flagged owner reference
 	ref := metav1.GetControllerOf(objMeta)
-	if ref == nil || ref.Kind != kind || ref.APIVersion != groupVersion {
-		return nil, "", ErrNoMatchingControllerOwnerRef
+	if ref != nil && ref.Kind == kind && ref.APIVersion == groupVersion {
+		return ref, objMeta.GetNamespace(), nil
 	}
-	return ref, objMeta.GetNamespace(), nil
+
+	// Fallback: search for an owner reference that matches by kind and apiVersion
+	for _, owner := range objMeta.GetOwnerReferences() {
+		if owner.Kind == kind &&
+			owner.APIVersion == groupVersion {
+			ownerCopy := owner
+			return &ownerCopy, objMeta.GetNamespace(), nil
+		}
+	}
+
+	return nil, "", ErrNoMatchingControllerOwnerRef
 }
 
 // SafeConcatName takes a maximum length and set of strings, it returns a string
