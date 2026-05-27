@@ -69,7 +69,7 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 	// Only run this controller if the CRTB is for this cluster
 	if crtb.ClusterName != c.clusterName {
 		logrus.Debugf("ZZZZZZ rbac/rt/CRTB onchange %q, skip, cluster mismatch (have %q need %q)",
-			key, crtb.ClusterName != c.clusterName)
+			key, crtb.ClusterName, c.clusterName)
 		return nil, nil
 	}
 
