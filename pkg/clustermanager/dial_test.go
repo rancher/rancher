@@ -2,7 +2,6 @@ package clustermanager_test
 
 import (
 	"context"
-	"crypto/tls"
 	"net"
 	"net/http"
 	"sync/atomic"
@@ -23,40 +22,6 @@ type trackedTransport struct {
 
 func (t *trackedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.rt.RoundTrip(req)
-}
-
-// TestWrapTransportFailsWithWrappedTransport demonstrates why using
-// WrapTransport to set a custom dialer is broken when the transport
-// cache wraps *http.Transport in another type (as client-go 0.36 does
-// with trackedTransport and ClientsAllowTLSCacheGC).
-func TestWrapTransportFailsWithWrappedTransport(t *testing.T) {
-	var dialerCalled atomic.Bool
-
-	customDialer := func(ctx context.Context, network, address string) (net.Conn, error) {
-		dialerCalled.Store(true)
-		return nil, nil
-	}
-
-	baseTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	// Simulate client-go 0.36 wrapping the transport
-	wrapped := &trackedTransport{rt: baseTransport}
-
-	// This is what rancher's old WrapTransport did
-	wrapFn := func(rt http.RoundTripper) http.RoundTripper {
-		if ht, ok := rt.(*http.Transport); ok {
-			ht.DialContext = customDialer
-		}
-		return rt
-	}
-
-	wrapFn(wrapped)
-
-	// The dialer was NOT applied because the type assertion failed
-	assert.Nil(t, baseTransport.DialContext,
-		"WrapTransport should fail to set DialContext on a wrapped transport")
 }
 
 // TestDialFieldAppliedRegardlessOfWrapping shows that rest.Config.Dial
