@@ -271,8 +271,14 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 		userName := first(attr.ExtraByProvider[provider]["username"])
 		if strings.EqualFold(userName, payload.UserName) {
-			writeError(w, NewError(http.StatusConflict, fmt.Sprintf("User with username %s already exists", payload.UserName)))
-			return
+			// Allow fall-through for a disabled user whose externalId matches the payload.
+			// This handles retries after a partial failure in reprovisionUser where
+			// userAttributes was updated (new username) but the user wasn't re-enabled.
+			if user.GetEnabled() || payload.ExternalID == "" ||
+				!strings.EqualFold(first(attr.ExtraByProvider[provider]["externalid"]), payload.ExternalID) {
+				writeError(w, NewError(http.StatusConflict, fmt.Sprintf("User with username %s already exists", payload.UserName)))
+				return
+			}
 		}
 
 		if payload.ExternalID != "" {

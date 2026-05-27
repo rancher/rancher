@@ -1176,6 +1176,83 @@ func TestCreateUser(t *testing.T) {
 		assert.Equal(t, "new@example.com", email["value"])
 	})
 
+	t.Run("re-provisions disabled user after partial failure (attr already updated)", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+
+		disabledUserID := "u-disabled"
+		disabled := false
+
+		disabledUser := &v3.User{
+			ObjectMeta:  metav1.ObjectMeta{Name: disabledUserID},
+			Enabled:     &disabled,
+			DisplayName: "Old Name",
+		}
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: disabledUserID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":    {"new.name"},
+					"externalid":  {"ext-shared"},
+					"principalid": {provider + "_user://ext-shared"},
+				},
+			},
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{disabledUser}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(disabledUserID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			return attr, nil
+		})
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			assert.Equal(t, true, *u.Enabled)
+			assert.Equal(t, "New Name", u.DisplayName)
+			return u, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "new.name",
+			"displayName": "New Name",
+			"externalId": "ext-shared",
+			"emails": [{"value": "new@example.com", "primary": true}]
+		}`
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		w := httptest.NewRecorder()
+
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, disabledUserID, resp["id"])
+		assert.Equal(t, "new.name", resp["userName"])
+		assert.Equal(t, "ext-shared", resp["externalId"])
+		assert.Equal(t, true, resp["active"])
+	})
+
 	t.Run("does not re-provision in userName mode", func(t *testing.T) {
 		t.Parallel()
 		ctrl := gomock.NewController(t)
