@@ -30,12 +30,12 @@ import (
 )
 
 type handler struct {
-	secrets               corecontrollers.SecretController
-	secretCache           corecontrollers.SecretCache
-	project               mgmtcontrollers.ProjectController
-	projectCache          mgmtcontrollers.ProjectCache
-	mgmtClusterCache      mgmtcontrollers.ClusterCache
-	mgmtClusterController mgmtcontrollers.ClusterController
+	secrets          corecontrollers.SecretController
+	secretCache      corecontrollers.SecretCache
+	projects         mgmtcontrollers.ProjectController
+	projectCache     mgmtcontrollers.ProjectCache
+	mgmtClusters     mgmtcontrollers.ClusterController
+	mgmtClusterCache mgmtcontrollers.ClusterCache
 }
 
 const (
@@ -43,21 +43,24 @@ const (
 	clusterEnqueueBatchSize     = 10
 	clusterEnqueueDelay         = 2 * time.Second
 	clusterEnqueueJitterCeiling = 750 // milliseconds
+	// registrySecretUIHint is a label used by the UI to conditionally render special
+	// fields specific to registry credentials when viewed in the UI.
+	registrySecretUIHint = "management.cattle.io/registry-scoped-secret"
 )
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
 	h := &handler{
-		secrets:               wContext.Core.Secret(),
-		secretCache:           wContext.Core.Secret().Cache(),
-		project:               wContext.Mgmt.Project(),
-		projectCache:          wContext.Mgmt.Project().Cache(),
-		mgmtClusterCache:      wContext.Mgmt.Cluster().Cache(),
-		mgmtClusterController: wContext.Mgmt.Cluster(),
+		secrets:          wContext.Core.Secret(),
+		secretCache:      wContext.Core.Secret().Cache(),
+		projects:         wContext.Mgmt.Project(),
+		projectCache:     wContext.Mgmt.Project().Cache(),
+		mgmtClusters:     wContext.Mgmt.Cluster(),
+		mgmtClusterCache: wContext.Mgmt.Cluster().Cache(),
 	}
 
 	// maps cluster names to their system projects
 	h.projectCache.AddIndexer(clusterToSysProjIndex, func(obj *v3.Project) ([]string, error) {
-		if obj != nil && obj.Labels != nil && obj.ObjectMeta.Labels[project.SystemProjectLabelKey] == "true" {
+		if obj != nil && obj.Labels != nil && obj.Labels[project.SystemProjectLabelKey] == "true" {
 			if obj.Spec.ClusterName == "" {
 				return nil, fmt.Errorf("[private-registry] system project has empty cluster name")
 			}
@@ -95,18 +98,18 @@ func (h *handler) labelSystemProject(_ string, cluster *v3.Cluster) (*v3.Cluster
 		return cluster, nil
 	}
 
+	// Don't do this for provisioned clusters, the creds will be passed via prov2 and the system-agent.
+	if !util.MgmtNameRegexp.MatchString(cluster.Name) {
+		logrus.Tracef("[private-registry] cluster %q is provisioned, not imported/hosted; skipping system project label management", cluster.Name)
+		return cluster, nil
+	}
+
 	logrus.Tracef("[private-registry] syncing system project label for cluster %q", cluster.Name)
 	if !v3.ClusterConditionSystemProjectCreated.IsTrue(cluster) || !v3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		logrus.Debugf("[private-registry] cluster %q not ready (systemProjectCreated=%v, agentDeployed=%v), skipping",
 			cluster.Name,
 			v3.ClusterConditionSystemProjectCreated.IsTrue(cluster),
 			v3.ClusterConditionAgentDeployed.IsTrue(cluster))
-		return cluster, nil
-	}
-
-	// Don't do this for provisioned clusters, the creds will be passed via prov2 and the system-agent.
-	if !util.MgmtNameRegexp.MatchString(cluster.Name) {
-		logrus.Debugf("[private-registry] cluster %q is provisioned, not imported/hosted; skipping system project label management", cluster.Name)
 		return cluster, nil
 	}
 
@@ -128,7 +131,7 @@ func (h *handler) labelSystemProject(_ string, cluster *v3.Cluster) (*v3.Cluster
 		logrus.Debugf("[private-registry] removing global pull secret label from system project %q for cluster %q", sysProj.Name, cluster.Name)
 		sysProj = sysProj.DeepCopy()
 		delete(sysProj.Labels, secret.NeedsGlobalPrivateRegistryPullSecret)
-		_, err = h.project.Update(sysProj)
+		_, err = h.projects.Update(sysProj)
 		if err != nil {
 			logrus.Errorf("[private-registry] failed to remove global pull secret label from system project %q for cluster %q: %v", sysProj.Name, cluster.Name, err)
 			return cluster, err
@@ -143,7 +146,7 @@ func (h *handler) labelSystemProject(_ string, cluster *v3.Cluster) (*v3.Cluster
 			sysProj.Labels = map[string]string{}
 		}
 		sysProj.Labels[secret.NeedsGlobalPrivateRegistryPullSecret] = "true"
-		_, err = h.project.Update(sysProj)
+		_, err = h.projects.Update(sysProj)
 		if err != nil {
 			logrus.Errorf("[private-registry] failed to add global pull secret label to system project %q for cluster %q: %v", sysProj.Name, cluster.Name, err)
 			return cluster, err
@@ -237,13 +240,7 @@ func (h *handler) labelConfiguredSourceGlobalRegistryPullSecrets(_ string, setti
 // labelSourceGlobalRegistryPullSecret ensures that the secrets defined in the SystemDefaultRegistryPullSecrets global setting
 // always have the correct SourcePullSecretLabel label and PSS namespace ignore label values.
 func (h *handler) labelSourceGlobalRegistryPullSecret(_ string, s *kcorev1.Secret) (*corev1.Secret, error) {
-	if s == nil {
-		return s, nil
-	}
-	if s.Namespace != namespaces.System {
-		return s, nil
-	}
-	if s.Data == nil {
+	if s == nil || s.DeletionTimestamp != nil || s.Namespace != namespaces.System || s.Data == nil {
 		return s, nil
 	}
 
@@ -385,7 +382,6 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 			return cluster, err
 		}
 
-		// Compute the name the PSS will use in the backing namespace.
 		pssName := sourcePullSecret.Name
 		if cluster.Name != "local" {
 			pssName = util.GeneratePullSecretName(pssName)
@@ -419,6 +415,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 				existing.Data = map[string][]byte{}
 			}
 			existing.Labels[util.CopiedPullSecretLabel] = "true"
+			existing.Labels[registrySecretUIHint] = "true"
 			existing.Data[kcorev1.DockerConfigJsonKey] = data
 			logrus.Debugf("[private-registry] adopting existing PSS %q in namespace %q for cluster %q", pssName, backingNamespace, cluster.Name)
 			_, err = h.secrets.Update(existing)
@@ -433,8 +430,9 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 			existingSecret.Data = map[string][]byte{}
 		}
 
+		registrySecretValue, isRegistrySecret := existingSecret.Labels[registrySecretUIHint]
 		existingData := existingSecret.Data[kcorev1.DockerConfigJsonKey]
-		if bytes.Equal(existingData, data) {
+		if bytes.Equal(existingData, data) && isRegistrySecret && registrySecretValue == "true" {
 			logrus.Tracef("[private-registry] PSS %q in namespace %q is up to date", pssName, backingNamespace)
 			continue
 		}
@@ -442,6 +440,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 		logrus.Debugf("[private-registry] updating PSS %q in namespace %q for cluster %q", pssName, backingNamespace, cluster.Name)
 		existingSecret = existingSecret.DeepCopy()
 		existingSecret.Data[kcorev1.DockerConfigJsonKey] = data
+		existingSecret.Labels[registrySecretUIHint] = "true"
 		_, err = h.secrets.Update(existingSecret)
 		if err != nil {
 			logrus.Errorf("[private-registry] failed to update PSS %q in namespace %q: %v", pssName, backingNamespace, err)
@@ -473,7 +472,7 @@ func (h *handler) syncClusterOnGlobalPullSecretChange(_ string, _ string, obj ru
 	if err != nil {
 		return nil, err
 	}
-	enqueueStaggered(clusters, h.mgmtClusterController)
+	enqueueStaggered(clusters, h.mgmtClusters)
 	return nil, nil
 }
 
@@ -488,7 +487,7 @@ func (h *handler) syncClusterOnGlobalRegistrySettingChange(_ string, name string
 	if err != nil {
 		return nil, err
 	}
-	enqueueStaggered(clusters, h.mgmtClusterController)
+	enqueueStaggered(clusters, h.mgmtClusters)
 	return nil, nil
 }
 
@@ -517,9 +516,9 @@ func buildPSS(proj *v3.Project, systemProjectBackingNamespace, name string, dock
 				secret.PSSIgnoreNamespacesAnnotation: strings.Join(settings.SystemNamespacesIgnoringPullSecrets, ","),
 			},
 			Labels: map[string]string{
-				util.CopiedPullSecretLabel:                    "true",
-				secret.ProjectScopedSecretLabel:               proj.Name,
-				"management.cattle.io/registry-scoped-secret": "true",
+				util.CopiedPullSecretLabel:      "true",
+				secret.ProjectScopedSecretLabel: proj.Name,
+				registrySecretUIHint:            "true",
 			},
 		},
 		Data: map[string][]byte{

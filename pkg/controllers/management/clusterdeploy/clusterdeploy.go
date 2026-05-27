@@ -427,10 +427,14 @@ func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeCon
 // downstream to stay up to date with the version in the local cluster.
 // The value is generated using the secrets name, namespace, and the observed resource version.
 func (cd *clusterDeploy) manageImagePullSecretHash(cluster *apimgmtv3.Cluster) (string, bool, error) {
+	if !util.MgmtNameRegexp.MatchString(cluster.Name) {
+		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
+	}
+
 	registry, _ := util.GetPrivateRegistry(cluster)
 	// since provisioned clusters don't use pull secrets we don't need to track the hash. This also helps
 	// reduce unneeded agent redeployments.
-	if registry == nil || len(registry.PullSecrets) == 0 || !util.MgmtNameRegexp.MatchString(cluster.Name) {
+	if registry == nil || len(registry.PullSecrets) == 0 {
 		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
 	}
 
@@ -447,7 +451,7 @@ func (cd *clusterDeploy) manageImagePullSecretHash(cluster *apimgmtv3.Cluster) (
 	hashBytes := sha256.Sum256([]byte(strings.Join(secretReferences, ",")))
 	hash := hex.EncodeToString(hashBytes[:])
 	if hash != cluster.Status.AppliedClusterAgentImagePullSecretsHash {
-		logrus.Infof("clusterDeploy: manageImagePullSecretHash: returning true due to secret resource version hash change")
+		logrus.Debugf("clusterDeploy: manageImagePullSecretHash: returning true due to secret resource version hash change")
 		return hash, true, nil
 	}
 

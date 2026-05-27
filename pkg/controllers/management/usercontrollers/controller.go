@@ -59,8 +59,9 @@ and de-registering k8s controllers, on cluster.remove
 */
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
 	lifecycle := &ClusterLifecycleCleanup{
-		Manager: manager,
-		ctx:     ctx,
+		Manager:  manager,
+		mgmtCore: management.Core,
+		ctx:      ctx,
 	}
 
 	clusterClient := management.Management.Clusters("")
@@ -68,8 +69,9 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, ma
 }
 
 type ClusterLifecycleCleanup struct {
-	Manager *clustermanager.Manager
-	ctx     context.Context
+	Manager  *clustermanager.Manager
+	mgmtCore corev1.Interface
+	ctx      context.Context
 }
 
 func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error) {
@@ -285,18 +287,22 @@ func (c *ClusterLifecycleCleanup) createCleanupServiceAccount(userContext *confi
 }
 
 func (c *ClusterLifecycleCleanup) createCleanupImagePullSecrets(userContext *config.UserContext, cluster *v3.Cluster) ([]*corev1.Secret, error) {
-	registry, _ := util.GetPrivateRegistry(cluster)
+	registry, isGlobal := util.GetPrivateRegistry(cluster)
 	if registry == nil {
 		return nil, nil
 	}
 
+	ns := namespaces.System
+	if !isGlobal {
+		ns = "fleet-default"
+	}
+
 	var copiedSecrets []*corev1.Secret
 	for _, sec := range registry.PullSecrets {
-		downstreamPullSecretName := util.GeneratePullSecretName(sec.Name)
-		existingPullSec, err := userContext.K8sClient.CoreV1().Secrets(namespaces.System).Get(c.ctx, downstreamPullSecretName, metav1.GetOptions{})
+		existingPullSec, err := c.mgmtCore.Secrets(ns).Get(sec.Name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				logrus.Warnf("image pull secret %s/%s was not found, skipping copy", sec.Namespace, downstreamPullSecretName)
+				logrus.Warnf("image pull secret %s/%s was not found, skipping copy", sec.Namespace, sec.Name)
 				continue
 			}
 			return nil, err
@@ -307,7 +313,7 @@ func (c *ClusterLifecycleCleanup) createCleanupImagePullSecrets(userContext *con
 			return nil, err
 		}
 
-		defaultPullSecretName := name.SafeConcatName("cattle-cleanup", downstreamPullSecretName, cluster.Name)
+		defaultPullSecretName := name.SafeConcatName("cattle-cleanup", util.GeneratePullSecretName(sec.Name), cluster.Name)
 
 		s := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{

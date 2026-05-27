@@ -35,27 +35,26 @@ var (
 )
 
 type clusterAgentContext struct {
-	Features              string
-	CAChecksum            string
-	AgentImage            string
-	AgentEnvVars          string
-	AuthImage             string
-	TokenKey              string
-	Token                 string
-	URL                   string
-	Namespace             string
-	URLPlain              string
-	IsPreBootstrap        bool
-	PrivateRegistryConfig string
-	Tolerations           string
-	AppendTolerations     string
-	Affinity              string
-	ResourceRequirements  string
-	ClusterRegistry       string
-	EnablePriorityClass   bool
-	PodDisruptionBudget   string
-	SUCAppNameOverride    string
-	NamespaceOptions      namespace.Mutator
+	Features             string
+	CAChecksum           string
+	AgentImage           string
+	AgentEnvVars         string
+	AuthImage            string
+	TokenKey             string
+	Token                string
+	URL                  string
+	Namespace            string
+	URLPlain             string
+	IsPreBootstrap       bool
+	Tolerations          string
+	AppendTolerations    string
+	Affinity             string
+	ResourceRequirements string
+	ClusterRegistry      string
+	EnablePriorityClass  bool
+	PodDisruptionBudget  string
+	SUCAppNameOverride   string
+	NamespaceOptions     namespace.Mutator
 	// AgentDeploymentPullSecrets are pull secrets that are used exclusively for
 	// the cluster agent deployment
 	AgentDeploymentPullSecrets []util.AgentPullSecret

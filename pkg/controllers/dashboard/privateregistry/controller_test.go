@@ -277,7 +277,7 @@ func Test_handler_labelSystemProject(t *testing.T) {
 
 			h := &handler{
 				projectCache: projectCache,
-				project:      projectClient,
+				projects:     projectClient,
 			}
 
 			result, err := h.labelSystemProject("", tt.cluster)
@@ -811,7 +811,10 @@ func Test_handler_manageClusterSpecificPSS(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      cluster.GeneratePullSecretName("cluster-secret"),
 							Namespace: testBackingNS,
-							Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
+							Labels: map[string]string{
+								cluster.CopiedPullSecretLabel: "true",
+								registrySecretUIHint:          "true",
+							},
 						},
 						Data: map[string][]byte{corev1.DockerConfigJsonKey: existingData},
 					},
@@ -855,6 +858,83 @@ func Test_handler_manageClusterSpecificPSS(t *testing.T) {
 			setupSecretClient: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().Update(gomock.Any()).DoAndReturn(func(p *corev1.Secret) (*corev1.Secret, error) {
 					assert.Equal(t, p.Data[corev1.DockerConfigJsonKey], updatedData)
+					assert.Equal(t, "true", p.Labels[registrySecretUIHint])
+					return p, nil
+				})
+			},
+		},
+		{
+			name: "cluster-level registry, PSS data up to date but registrySecretUIHint label absent, update triggered to add label",
+			cluster: readyCluster(testCluster, &v3.ImportedConfig{
+				PrivateRegistryURL:         "cluster-registry.example.com",
+				PrivateRegistryPullSecrets: []string{"cluster-secret"},
+			}),
+			setupProjectCache: func(f *fake.MockCacheInterface[*v3.Project]) {
+				f.EXPECT().GetByIndex(clusterToSysProjIndex, testCluster).Return([]*v3.Project{
+					systemProject(testCluster, testProject, nil),
+				}, nil)
+			},
+			setupSecretCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
+				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      cluster.GeneratePullSecretName("cluster-secret"),
+							Namespace: testBackingNS,
+							// registrySecretUIHint label is intentionally absent
+							Labels: map[string]string{cluster.CopiedPullSecretLabel: "true"},
+						},
+						Data: map[string][]byte{corev1.DockerConfigJsonKey: existingData},
+					},
+				}, nil)
+				f.EXPECT().Get("fleet-default", "cluster-secret").Return(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "cluster-secret", Namespace: "fleet-default"},
+					Type:       corev1.SecretTypeDockerConfigJson,
+					Data:       map[string][]byte{corev1.DockerConfigJsonKey: existingData},
+				}, nil)
+			},
+			setupSecretClient: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().Update(gomock.Any()).DoAndReturn(func(p *corev1.Secret) (*corev1.Secret, error) {
+					assert.Equal(t, "true", p.Labels[registrySecretUIHint])
+					assert.Equal(t, existingData, p.Data[corev1.DockerConfigJsonKey])
+					return p, nil
+				})
+			},
+		},
+		{
+			name: "cluster-level registry, PSS data up to date but registrySecretUIHint label is wrong value, update triggered to correct label",
+			cluster: readyCluster(testCluster, &v3.ImportedConfig{
+				PrivateRegistryURL:         "cluster-registry.example.com",
+				PrivateRegistryPullSecrets: []string{"cluster-secret"},
+			}),
+			setupProjectCache: func(f *fake.MockCacheInterface[*v3.Project]) {
+				f.EXPECT().GetByIndex(clusterToSysProjIndex, testCluster).Return([]*v3.Project{
+					systemProject(testCluster, testProject, nil),
+				}, nil)
+			},
+			setupSecretCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
+				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      cluster.GeneratePullSecretName("cluster-secret"),
+							Namespace: testBackingNS,
+							Labels: map[string]string{
+								cluster.CopiedPullSecretLabel: "true",
+								registrySecretUIHint:          "false",
+							},
+						},
+						Data: map[string][]byte{corev1.DockerConfigJsonKey: existingData},
+					},
+				}, nil)
+				f.EXPECT().Get("fleet-default", "cluster-secret").Return(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "cluster-secret", Namespace: "fleet-default"},
+					Type:       corev1.SecretTypeDockerConfigJson,
+					Data:       map[string][]byte{corev1.DockerConfigJsonKey: existingData},
+				}, nil)
+			},
+			setupSecretClient: func(f *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				f.EXPECT().Update(gomock.Any()).DoAndReturn(func(p *corev1.Secret) (*corev1.Secret, error) {
+					assert.Equal(t, "true", p.Labels[registrySecretUIHint])
+					assert.Equal(t, existingData, p.Data[corev1.DockerConfigJsonKey])
 					return p, nil
 				})
 			},
@@ -1856,7 +1936,7 @@ func Test_handler_syncClusterOnGlobalPullSecretChange(t *testing.T) {
 				tt.setupController(clusterController)
 			}
 
-			h := &handler{mgmtClusterCache: clusterCache, mgmtClusterController: clusterController}
+			h := &handler{mgmtClusterCache: clusterCache, mgmtClusters: clusterController}
 			keys, err := h.syncClusterOnGlobalPullSecretChange("", "", tt.obj)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -1928,7 +2008,7 @@ func Test_handler_syncClusterOnGlobalRegistrySettingChange(t *testing.T) {
 				tt.setupController(clusterController)
 			}
 
-			h := &handler{mgmtClusterCache: clusterCache, mgmtClusterController: clusterController}
+			h := &handler{mgmtClusterCache: clusterCache, mgmtClusters: clusterController}
 			keys, err := h.syncClusterOnGlobalRegistrySettingChange("", tt.settingName, nil)
 			if tt.wantErr {
 				assert.Error(t, err)

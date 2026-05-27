@@ -133,12 +133,12 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 					logrus.Debugf("[planner] skipping global pull secret %q: nil data", secretName)
 					continue
 				}
-				username, password, _, err := cluster.UnwrapDockerConfigJson(GSDR, secret.Data)
+				username, password, auth, err := cluster.UnwrapDockerConfigJson(GSDR, secret.Data)
 				if err != nil {
 					logrus.Debugf("[planner] skipping global pull secret %q: does not contain credentials for registry %q: %v", secretName, GSDR, err)
 					continue
 				}
-				if username == "" && password == "" && string(secret.Data[rkev1.IdentityTokenAuthConfigSecretKey]) == "" {
+				if username == "" && password == "" && auth == "" && string(secret.Data[rkev1.IdentityTokenAuthConfigSecretKey]) == "" {
 					logrus.Debugf("[planner] skipping global pull secret %q: no credentials found for registry %q", secretName, GSDR)
 					continue
 				}
@@ -146,6 +146,7 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 				registryConfig.Auth = &authConfig{
 					Username:      username,
 					Password:      password,
+					Auth:          auth,
 					IdentityToken: string(secret.Data[rkev1.IdentityTokenAuthConfigSecretKey]),
 				}
 				configs[GSDR] = registryConfig
