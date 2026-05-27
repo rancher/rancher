@@ -488,6 +488,43 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+func (s *SCIMServer) checkUserConflict(provider, userName, externalID, excludeUser string) *Error {
+	if userName == "" && externalID == "" {
+		return nil
+	}
+
+	users, err := s.userCache.List(labels.Everything())
+	if err != nil {
+		logrus.Errorf("scim::checkUserConflict: failed to list users: %s", err)
+		return NewInternalError()
+	}
+
+	for _, u := range users {
+		if u.Name == excludeUser {
+			continue
+		}
+
+		attr, err := s.userAttributeCache.Get(u.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			logrus.Errorf("scim::checkUserConflict: failed to get user attributes for %s: %s", u.Name, err)
+			return NewInternalError()
+		}
+
+		if userName != "" && strings.EqualFold(first(attr.ExtraByProvider[provider]["username"]), userName) {
+			return NewError(http.StatusConflict, fmt.Sprintf("User with username %s already exists", userName))
+		}
+
+		if externalID != "" && strings.EqualFold(first(attr.ExtraByProvider[provider]["externalid"]), externalID) {
+			return NewError(http.StatusConflict, fmt.Sprintf("User with externalId %s already exists", externalID))
+		}
+	}
+
+	return nil
+}
+
 // UpdateUser updates an existing user.
 // Returns:
 //   - 200 on success
@@ -544,17 +581,27 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if attr.ExtraByProvider[provider] == nil {
 		attr.ExtraByProvider[provider] = map[string][]string{}
 	}
+
+	var changedUserName, changedExternalID string
+
 	if userName := first(attr.ExtraByProvider[provider]["username"]); userName != payload.UserName {
 		if cfg.UserIDAttribute != UserIDExternalID {
 			writeError(w, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier", "mutability"))
 			return
 		}
+		changedUserName = payload.UserName
 		attr.ExtraByProvider[provider]["username"] = []string{payload.UserName}
 		shouldUpdateAttr = true
 	}
-	if externalId := first(attr.ExtraByProvider[provider]["externalid"]); externalId != payload.ExternalID {
+	if externalID := first(attr.ExtraByProvider[provider]["externalid"]); externalID != payload.ExternalID {
+		changedExternalID = payload.ExternalID
 		attr.ExtraByProvider[provider]["externalid"] = []string{payload.ExternalID}
 		shouldUpdateAttr = true
+	}
+
+	if scimErr := s.checkUserConflict(provider, changedUserName, changedExternalID, user.Name); scimErr != nil {
+		writeError(w, scimErr)
+		return
 	}
 
 	payloadActive := payload.Active.Bool()
@@ -706,6 +753,9 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 
 	cfg := s.getConfig(provider)
 
+	origUserName := first(attr.ExtraByProvider[provider]["username"])
+	origExternalID := first(attr.ExtraByProvider[provider]["externalid"])
+
 	var shouldUpdateAttr, shouldUpdateUser bool
 	for _, op := range payload.Operations {
 		switch strings.ToLower(op.Op) {
@@ -731,6 +781,18 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 			writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported patch operation: %s", op.Op)))
 			return
 		}
+	}
+
+	var changedUserName, changedExternalID string
+	if newUserName := first(attr.ExtraByProvider[provider]["username"]); newUserName != origUserName {
+		changedUserName = newUserName
+	}
+	if newExternalID := first(attr.ExtraByProvider[provider]["externalid"]); newExternalID != origExternalID {
+		changedExternalID = newExternalID
+	}
+	if scimErr := s.checkUserConflict(provider, changedUserName, changedExternalID, user.Name); scimErr != nil {
+		writeError(w, scimErr)
+		return
 	}
 
 	if shouldUpdateAttr {
