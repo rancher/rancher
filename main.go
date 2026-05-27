@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
+	"github.com/moby/sys/reexec"
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/data/management"
@@ -26,9 +26,13 @@ var (
 	kubeConfig     string
 )
 
-func main() {
+func init() {
 	management.RegisterPasswordResetCommand()
 	management.RegisterEnsureDefaultAdminCommand()
+}
+
+func main() {
+	// This program supports multicall commands based on binary/symlink name
 	if reexec.Init() {
 		return
 	}

@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/docker/docker/pkg/reexec"
+	"github.com/moby/sys/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -21,8 +21,10 @@ import (
 )
 
 func RegisterPasswordResetCommand() {
-	reexec.Register("/usr/bin/reset-password", resetPassword)
 	reexec.Register("reset-password", resetPassword)
+
+	// NOTE: future versions of reexec (unreleased at the moment) may panic when registering a full path, so this line may need to be deleted:
+	reexec.Register("/usr/bin/reset-password", resetPassword)
 }
 
 const (
