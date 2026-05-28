@@ -5,6 +5,10 @@
 
 Rancher is an open source container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
 
+<a href="https://aws.amazon.com/marketplace/pp/prodview-yrzugbpzuukww">
+  <img src="https://github.com/jlsarry/rancher/blob/main/available-in-marketplace_white_bg.webp?raw=true" alt="SUSE Rancher for EKS available in AWS marketplace" width="15%">
+</a>
+
 ## Stable Release
 
 <!-- stable v2.14.1 DO NOT REMOVE THIS LINE -->
@@ -20,18 +24,18 @@ Open your browser to https://localhost
 
 ## Installation
 
-See [Installing/Upgrading Rancher](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-and-upgrade) for all installation options.
+See [Installing/Upgrading Rancher]([https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade]) for all installation options.
 
 ### Minimum Requirements
 
 * Operating Systems
   * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
 * Hardware & Software
-  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-requirements) for hardware and software requirements.
+  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements) for hardware and software requirements.
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [Rancher Documentation](https://ranchermanager.docs.rancher.com/v2.8).
+To learn more about using Rancher, please refer to our [Rancher Documentation](https://ranchermanager.docs.rancher.com/).
 
 ## Source Code
 
