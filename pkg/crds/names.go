@@ -211,6 +211,7 @@ func PlanCRDs() []string {
 func OperationCRDs() []string {
 	return []string{
 		"etcdsnapshotsaves.operation.cattle.io",
+		"etcdsnapshotrestores.operation.cattle.io",
 	}
 }
 
