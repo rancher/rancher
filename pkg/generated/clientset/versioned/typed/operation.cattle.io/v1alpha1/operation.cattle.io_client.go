@@ -29,6 +29,7 @@ import (
 type OperationV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ETCDSnapshotSavesGetter
+	EncryptionKeyRotationsGetter
 }
 
 // OperationV1alpha1Client is used to interact with features provided by the operation.cattle.io group.
@@ -38,6 +39,10 @@ type OperationV1alpha1Client struct {
 
 func (c *OperationV1alpha1Client) ETCDSnapshotSaves(namespace string) ETCDSnapshotSaveInterface {
 	return newETCDSnapshotSaves(c, namespace)
+}
+
+func (c *OperationV1alpha1Client) EncryptionKeyRotations(namespace string) EncryptionKeyRotationInterface {
+	return newEncryptionKeyRotations(c, namespace)
 }
 
 // NewForConfig creates a new OperationV1alpha1Client for the given config.

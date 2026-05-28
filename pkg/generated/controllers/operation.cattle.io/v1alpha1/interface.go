@@ -32,6 +32,7 @@ func init() {
 
 type Interface interface {
 	ETCDSnapshotSave() ETCDSnapshotSaveController
+	EncryptionKeyRotation() EncryptionKeyRotationController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -46,4 +47,8 @@ type version struct {
 
 func (v *version) ETCDSnapshotSave() ETCDSnapshotSaveController {
 	return generic.NewController[*v1alpha1.ETCDSnapshotSave, *v1alpha1.ETCDSnapshotSaveList](schema.GroupVersionKind{Group: "operation.cattle.io", Version: "v1alpha1", Kind: "ETCDSnapshotSave"}, "etcdsnapshotsaves", true, v.controllerFactory)
+}
+
+func (v *version) EncryptionKeyRotation() EncryptionKeyRotationController {
+	return generic.NewController[*v1alpha1.EncryptionKeyRotation, *v1alpha1.EncryptionKeyRotationList](schema.GroupVersionKind{Group: "operation.cattle.io", Version: "v1alpha1", Kind: "EncryptionKeyRotation"}, "encryptionkeyrotations", true, v.controllerFactory)
 }
