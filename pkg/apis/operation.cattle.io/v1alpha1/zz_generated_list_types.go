@@ -26,6 +26,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ETCDSnapshotRestoreList is a list of ETCDSnapshotRestore resources
+type ETCDSnapshotRestoreList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ETCDSnapshotRestore `json:"items"`
+}
+
+func NewETCDSnapshotRestore(namespace, name string, obj ETCDSnapshotRestore) *ETCDSnapshotRestore {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ETCDSnapshotRestore").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ETCDSnapshotSaveList is a list of ETCDSnapshotSave resources
 type ETCDSnapshotSaveList struct {
 	metav1.TypeMeta `json:",inline"`
