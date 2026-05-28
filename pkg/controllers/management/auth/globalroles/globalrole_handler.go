@@ -452,14 +452,14 @@ func (gr *globalRoleLifecycle) deleteInheritedNamespacedRoles(globalRole *v3.Glo
 }
 
 // updateStatus updates the Status field of the GlobalRole. localConditions are created in each reconciliation loop.
-// Status is only updated if any condition has changed.
+// Status is updated if any condition has changed or if the generation observed by the status is different from the current generation of the GlobalRole.
 func (gr *globalRoleLifecycle) updateStatus(globalRole *v3.GlobalRole, localConditions []metav1.Condition) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grFromCluster, err := gr.grCache.Get(globalRole.Name)
 		if err != nil {
 			return err
 		}
-		if status.CompareConditions(grFromCluster.Status.Conditions, localConditions) {
+		if status.CompareConditions(grFromCluster.Status.Conditions, localConditions) && grFromCluster.Status.ObservedGeneration == globalRole.ObjectMeta.Generation {
 			return nil
 		}
 
