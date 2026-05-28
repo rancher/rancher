@@ -110,6 +110,8 @@ var (
 	}
 )
 
+func int64ptr(i int64) *int64 { return &i }
+
 func TestReconcileGlobalRole(t *testing.T) {
 	t.Parallel()
 
@@ -604,14 +606,16 @@ func TestUpdateStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		localConditions []metav1.Condition
-		grFromCluster   *v3.GlobalRole
-		grCacheErr      error
-		updateErr       error
-		wantError       bool
-		wantSummary     string
-		wantSkipUpdate  bool
+		name                   string
+		localConditions        []metav1.Condition
+		grFromCluster          *v3.GlobalRole
+		grCacheErr             error
+		updateErr              error
+		wantError              bool
+		wantSummary            string
+		wantSkipUpdate         bool
+		inputGlobalRole        *v3.GlobalRole
+		wantObservedGeneration *int64
 	}{
 		{
 			name: "conditions unchanged - no update",
@@ -634,13 +638,15 @@ func TestUpdateStatus(t *testing.T) {
 			},
 			grFromCluster: &v3.GlobalRole{
 				Status: v3.GlobalRoleStatus{
-					ObservedGeneration: 1,
+					ObservedGeneration: 2,
 					Conditions: []metav1.Condition{
 						{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
 					},
 				},
 			},
-			wantSummary: status.SummaryCompleted,
+			inputGlobalRole:        &v3.GlobalRole{ObjectMeta: metav1.ObjectMeta{Generation: 3}},
+			wantSummary:            status.SummaryCompleted,
+			wantObservedGeneration: int64ptr(3),
 		},
 		{
 			name: "all conditions true - completed summary",
@@ -695,7 +701,11 @@ func TestUpdateStatus(t *testing.T) {
 				grCache:  grCacheMock,
 				status:   status.NewStatus(),
 			}
-			err := grLifecycle.updateStatus(&v3.GlobalRole{}, test.localConditions)
+			inputGR := test.inputGlobalRole
+			if inputGR == nil {
+				inputGR = &v3.GlobalRole{}
+			}
+			err := grLifecycle.updateStatus(inputGR, test.localConditions)
 			if test.wantError {
 				require.Error(t, err)
 			} else {
@@ -704,6 +714,10 @@ func TestUpdateStatus(t *testing.T) {
 			if test.wantSummary != "" {
 				require.NotNil(t, updatedGR)
 				require.Equal(t, test.wantSummary, updatedGR.Status.Summary)
+			}
+			if test.wantObservedGeneration != nil {
+				require.NotNil(t, updatedGR)
+				require.Equal(t, *test.wantObservedGeneration, updatedGR.Status.ObservedGeneration)
 			}
 		})
 	}
