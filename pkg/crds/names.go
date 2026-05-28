@@ -212,6 +212,7 @@ func OperationCRDs() []string {
 	return []string{
 		"encryptionkeyrotations.operation.cattle.io",
 		"etcdsnapshotsaves.operation.cattle.io",
+		"etcdsnapshotrestores.operation.cattle.io",
 	}
 }
 
