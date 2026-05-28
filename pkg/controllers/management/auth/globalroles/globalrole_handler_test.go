@@ -110,8 +110,6 @@ var (
 	}
 )
 
-func int64ptr(i int64) *int64 { return &i }
-
 func TestReconcileGlobalRole(t *testing.T) {
 	t.Parallel()
 
@@ -615,7 +613,7 @@ func TestUpdateStatus(t *testing.T) {
 		wantSummary            string
 		wantSkipUpdate         bool
 		inputGlobalRole        *v3.GlobalRole
-		wantObservedGeneration *int64
+		wantObservedGeneration int64
 	}{
 		{
 			name: "conditions unchanged - no update",
@@ -646,7 +644,7 @@ func TestUpdateStatus(t *testing.T) {
 			},
 			inputGlobalRole:        &v3.GlobalRole{ObjectMeta: metav1.ObjectMeta{Generation: 3}},
 			wantSummary:            status.SummaryCompleted,
-			wantObservedGeneration: int64ptr(3),
+			wantObservedGeneration: 3,
 		},
 		{
 			name: "all conditions true - completed summary",
@@ -714,10 +712,7 @@ func TestUpdateStatus(t *testing.T) {
 			if test.wantSummary != "" {
 				require.NotNil(t, updatedGR)
 				require.Equal(t, test.wantSummary, updatedGR.Status.Summary)
-			}
-			if test.wantObservedGeneration != nil {
-				require.NotNil(t, updatedGR)
-				require.Equal(t, *test.wantObservedGeneration, updatedGR.Status.ObservedGeneration)
+				require.Equal(t, test.wantObservedGeneration, updatedGR.Status.ObservedGeneration)
 			}
 		})
 	}
