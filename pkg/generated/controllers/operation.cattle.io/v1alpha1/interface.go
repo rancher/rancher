@@ -31,6 +31,7 @@ func init() {
 }
 
 type Interface interface {
+	ETCDSnapshotRestore() ETCDSnapshotRestoreController
 	ETCDSnapshotSave() ETCDSnapshotSaveController
 }
 
@@ -42,6 +43,10 @@ func New(controllerFactory controller.SharedControllerFactory) Interface {
 
 type version struct {
 	controllerFactory controller.SharedControllerFactory
+}
+
+func (v *version) ETCDSnapshotRestore() ETCDSnapshotRestoreController {
+	return generic.NewController[*v1alpha1.ETCDSnapshotRestore, *v1alpha1.ETCDSnapshotRestoreList](schema.GroupVersionKind{Group: "operation.cattle.io", Version: "v1alpha1", Kind: "ETCDSnapshotRestore"}, "etcdsnapshotrestores", true, v.controllerFactory)
 }
 
 func (v *version) ETCDSnapshotSave() ETCDSnapshotSaveController {

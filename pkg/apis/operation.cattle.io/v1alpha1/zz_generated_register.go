@@ -28,7 +28,8 @@ import (
 )
 
 var (
-	ETCDSnapshotSaveResourceName = "etcdsnapshotsaves"
+	ETCDSnapshotRestoreResourceName = "etcdsnapshotrestores"
+	ETCDSnapshotSaveResourceName    = "etcdsnapshotsaves"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -52,6 +53,8 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&ETCDSnapshotRestore{},
+		&ETCDSnapshotRestoreList{},
 		&ETCDSnapshotSave{},
 		&ETCDSnapshotSaveList{},
 	)
