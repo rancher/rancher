@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/roletemplates"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -21,6 +22,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// RegisterWranglerIndexers registers indexers for the management context wrangler.
+// These are registered early in the startup process so that they are available for use by controllers as soon as they start.
 func RegisterWranglerIndexers(config *wrangler.Context) {
 	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByClusterRoleAndSubject)
 	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *rbacv1.ClusterRoleBinding) ([]string, error) {
@@ -31,6 +34,14 @@ func RegisterWranglerIndexers(config *wrangler.Context) {
 	config.RBAC.RoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByRoleAndSubject)
 	config.RBAC.RoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *rbacv1.RoleBinding) ([]string, error) {
 		return indexByMembershipBindingOwner(obj)
+	})
+
+	config.Mgmt.GlobalRole().Cache().AddIndexer(pkgrbac.GRDownstreamNSIndex, func(gr *v3.GlobalRole) ([]string, error) {
+		result := []string{}
+		for ns := range gr.InheritedNamespacedRules {
+			result = append(result, ns)
+		}
+		return result, nil
 	})
 }
 
