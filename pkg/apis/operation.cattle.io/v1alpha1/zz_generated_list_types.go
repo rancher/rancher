@@ -40,3 +40,20 @@ func NewETCDSnapshotSave(namespace, name string, obj ETCDSnapshotSave) *ETCDSnap
 	obj.Namespace = namespace
 	return &obj
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EncryptionKeyRotationList is a list of EncryptionKeyRotation resources
+type EncryptionKeyRotationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []EncryptionKeyRotation `json:"items"`
+}
+
+func NewEncryptionKeyRotation(namespace, name string, obj EncryptionKeyRotation) *EncryptionKeyRotation {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("EncryptionKeyRotation").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
