@@ -169,6 +169,10 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 	}
 
 	idpSSOURL, idpSLOURL := extractIDPURLs(idpMetadata)
+	if idpSSOURL == "" {
+		return errors.New("SAML: unable to extract SAML SSO URL from metadata")
+	}
+
 	certStore, err := buildCertificateStore(idpMetadata)
 	if err != nil {
 		return err
