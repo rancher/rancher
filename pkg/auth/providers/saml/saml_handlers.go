@@ -42,13 +42,25 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		r.ParseForm()
 		assertionInfo, err := serviceProvider.RetrieveAssertionInfo(r.FormValue("SAMLResponse"))
-
 		if err != nil {
 			log.Debugf("SAML [ServeHTTP]: assertion validation failed: %q", err)
 
 			redirectURL := r.URL.Host + "/login?errorCode=403"
 			http.Redirect(w, r, redirectURL, http.StatusFound)
 			return
+		}
+
+		if warn := assertionInfo.WarningInfo; warn != nil {
+			if warn.InvalidTime {
+				log.Debugf("SAML [ServeHTTP]: assertion rejected: invalid time conditions")
+				http.Redirect(w, r, r.URL.Host+"/login?errorCode=403", http.StatusFound)
+				return
+			}
+			if warn.NotInAudience {
+				log.Debugf("SAML [ServeHTTP]: assertion rejected: not in audience")
+				http.Redirect(w, r, r.URL.Host+"/login?errorCode=403", http.StatusFound)
+				return
+			}
 		}
 
 		log.Debugf("SAML [ServeHTTP]: assertions validated ok")

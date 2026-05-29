@@ -67,7 +67,6 @@ func getRouteHandler(name string) http.HandlerFunc {
 // creates or updates the associated in-memory information. It is called from the
 // auth samlconfig controller when a SAML configuration was changed.
 func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) error {
-
 	initMu.Lock()
 	defer initMu.Unlock()
 
@@ -390,7 +389,7 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 	s.clientState.DeleteState(w, r, "Rancher_FinalRedirectURL")
 
 	r.ParseForm()
-	_, err := s.serviceProvider.ValidateEncodedLogoutResponsePOST(r.FormValue("SAMLResponse"))
+	resp, err := s.serviceProvider.ValidateEncodedLogoutResponsePOST(r.FormValue("SAMLResponse"))
 	if err != nil {
 		log.Debugf("SAML [FinalizeSamlLogout]: response validation failed: %v", err)
 
@@ -409,6 +408,25 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 
 			rURL.RawQuery = params.Encode()
 
+			redirectURL = rURL.String()
+		}
+
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+
+		log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
+		return
+	}
+
+	if !resp.SignatureValidated {
+		log.Debugf("SAML [FinalizeSamlLogout]: unsigned logout while IDP certificates are configured")
+		rURL, errParse := url.Parse(redirectURL)
+		if errParse != nil {
+			redirectURL += "&errorCode=500&err=" + url.QueryEscape("logout response signature not validated")
+		} else {
+			params := rURL.Query()
+			params.Add("errorCode", "500")
+			params.Add("err", "logout response signature not validated")
+			rURL.RawQuery = params.Encode()
 			redirectURL = rURL.String()
 		}
 
