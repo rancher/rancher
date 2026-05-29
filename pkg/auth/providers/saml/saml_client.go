@@ -210,6 +210,7 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 	provider.metadataURL = metadataURL
 	provider.acsURL = acsURL
 	provider.sloURL = sloURL
+	provider.hasIDPCerts = len(certStore.Roots) > 0
 
 	cookieStore := ClientCookies{
 		Name:   "token",
@@ -256,16 +257,24 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 	return nil
 }
 
-// Extract the IDP SSO / SLO URLs from the metadata.
+// Extract the IDP SSO / SLO URLs from the metadata, preferring the HTTP-Redirect binding.
+// Falls back to the first available entry if no HTTP-Redirect binding is found.
 func extractIDPURLs(idpMetadata *types.EntityDescriptor) (string, string) {
 	var idpSSOURL, idpSLOURL string
 
 	if idpMetadata.IDPSSODescriptor != nil {
-		if len(idpMetadata.IDPSSODescriptor.SingleSignOnServices) > 0 {
-			idpSSOURL = idpMetadata.IDPSSODescriptor.SingleSignOnServices[0].Location
+		for _, sso := range idpMetadata.IDPSSODescriptor.SingleSignOnServices {
+			if sso.Binding == saml2.BindingHttpRedirect {
+				idpSSOURL = sso.Location
+				break
+			}
 		}
-		if len(idpMetadata.IDPSSODescriptor.SingleLogoutServices) > 0 {
-			idpSLOURL = idpMetadata.IDPSSODescriptor.SingleLogoutServices[0].Location
+
+		for _, slo := range idpMetadata.IDPSSODescriptor.SingleLogoutServices {
+			if slo.Binding == saml2.BindingHttpRedirect {
+				idpSLOURL = slo.Location
+				break
+			}
 		}
 	}
 
@@ -401,7 +410,7 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !resp.SignatureValidated {
+	if s.hasIDPCerts && !resp.SignatureValidated {
 		log.Debugf("SAML [FinalizeSamlLogout]: unsigned logout while IDP certificates are configured")
 		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, "logout response signature not validated"), http.StatusFound)
 		log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
@@ -704,9 +713,9 @@ func newJWTParser() *jwt.Parser {
 
 // redirectURLWithError appends errorCode and, if non-empty, an err query parameter to baseURL.
 func redirectURLWithError(baseURL string, errorCode int, errMsg string) string {
-	parsed, parseErr := url.Parse(baseURL)
-	if parseErr != nil {
-		result := baseURL + "errorCode=" + strconv.Itoa(errorCode)
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		result := baseURL + "?errorCode=" + strconv.Itoa(errorCode)
 		if errMsg != "" {
 			result += "&err=" + url.QueryEscape(errMsg)
 		}
@@ -718,6 +727,7 @@ func redirectURLWithError(baseURL string, errorCode int, errMsg string) string {
 		params.Set("err", errMsg)
 	}
 	parsed.RawQuery = params.Encode()
+
 	return parsed.String()
 }
 
