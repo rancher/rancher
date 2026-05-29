@@ -392,46 +392,14 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 	resp, err := s.serviceProvider.ValidateEncodedLogoutResponsePOST(r.FormValue("SAMLResponse"))
 	if err != nil {
 		log.Debugf("SAML [FinalizeSamlLogout]: response validation failed: %v", err)
-
-		rURL, errParse := url.Parse(redirectURL)
-		if errParse != nil {
-			// The redirect url is bad. That is bad for error reporting.
-			// We go with the old string ops, and pray.
-
-			redirectURL += "&errorCode=500&err=" + url.QueryEscape(err.Error())
-		} else {
-			// Principled extension of a good url with the error information
-
-			params := rURL.Query()
-			params.Add("errorCode", "500")
-			params.Add("err", err.Error())
-
-			rURL.RawQuery = params.Encode()
-
-			redirectURL = rURL.String()
-		}
-
-		http.Redirect(w, r, redirectURL, http.StatusFound)
-
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, err.Error()), http.StatusFound)
 		log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
 		return
 	}
 
 	if !resp.SignatureValidated {
 		log.Debugf("SAML [FinalizeSamlLogout]: unsigned logout while IDP certificates are configured")
-		rURL, errParse := url.Parse(redirectURL)
-		if errParse != nil {
-			redirectURL += "&errorCode=500&err=" + url.QueryEscape("logout response signature not validated")
-		} else {
-			params := rURL.Query()
-			params.Add("errorCode", "500")
-			params.Add("err", "logout response signature not validated")
-			rURL.RawQuery = params.Encode()
-			redirectURL = rURL.String()
-		}
-
-		http.Redirect(w, r, redirectURL, http.StatusFound)
-
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, "logout response signature not validated"), http.StatusFound)
 		log.Debugf("SAML [FinalizeSamlLogout]: Redirected to (%s)", redirectURL)
 		return
 	}
@@ -462,11 +430,9 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		userID, err = s.getUserIdFromRelayStateCookie(r)
 		if err != nil {
 			log.Errorf("SAML: Error getting state from cookie: %v", err)
-			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+			http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 			return
 		}
-		// the first query param is config=saml_provider_name set by UI
-		redirectURL += "&"
 	default:
 	}
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
@@ -491,7 +457,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	config, err := s.getSamlConfig()
 	if err != nil {
 		log.Errorf("SAML: Error getting saml config %v", err)
-		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 		return
 	}
 
@@ -499,7 +465,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if err != nil {
 		log.Error(err)
 		// UI uses this translation key to get the error message
-		http.Redirect(w, r, redirectURL+"errorCode=422&err="+UITranslationKeyForErrorMessage, http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 422, UITranslationKeyForErrorMessage), http.StatusFound)
 		return
 	}
 	allowedPrincipals := config.AllowedPrincipalIDs
@@ -507,12 +473,12 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		log.Errorf("SAML: Error during login while checking access %v", err)
-		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 		return
 	}
 	if !allowed {
 		log.Errorf("SAML: User [%s] is not an authorized user or is not a member of an authorized group", userPrincipal.Name)
-		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 403, ""), http.StatusFound)
 		return
 	}
 
@@ -520,10 +486,10 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		user, err := s.userMGR.SetPrincipalOnCurrentUserByUserID(userID, userPrincipal)
 		if err != nil && user == nil {
 			log.Errorf("SAML: Error setting principal on current user %v", err)
-			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+			http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 			return
 		} else if err != nil && user != nil {
-			http.Redirect(w, r, redirectURL+"errorCode=422&err="+err.Error(), http.StatusFound)
+			http.Redirect(w, r, redirectURLWithError(redirectURL, 422, err.Error()), http.StatusFound)
 			return
 		}
 
@@ -531,7 +497,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		err = s.saveSamlConfig(config)
 		if err != nil {
 			log.Errorf("SAML: Error saving saml config %v", err)
-			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+			http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 			return
 		}
 
@@ -542,7 +508,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		err = s.setRancherToken(w, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
 		if err != nil {
 			log.Errorf("SAML: Failed creating token with error: %v", err)
-			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+			http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 		}
 		// delete the cookies
 		s.clientState.DeleteState(w, r, "Rancher_Action")
@@ -563,13 +529,13 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	user, err := s.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
 		log.Errorf("SAML: Failed getting user with error: %v", err)
-		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 		return
 	}
 
 	if user.Enabled != nil && !*user.Enabled {
 		log.Errorf("SAML: User %v permission denied", user.Name)
-		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 403, ""), http.StatusFound)
 		return
 	}
 
@@ -579,14 +545,14 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		return s.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
 	}); err != nil {
 		log.Errorf("SAML: Failed creating or updating userAttribute with error: %v", err)
-		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 		return
 	}
 
 	err = s.setRancherToken(w, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
 	if err != nil {
 		log.Errorf("SAML: Failed creating token with error: %v", err)
-		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 	}
 	redirectURL = s.clientState.GetState(r, "Rancher_FinalRedirectURL")
 
@@ -603,21 +569,21 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.tokenMGR, userPrincipal)
 			if err != nil {
 				log.Errorf("SAML: getToken error %v", err)
-				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 				return
 			}
 
 			keyBytes, err := base64.StdEncoding.DecodeString(publicKey)
 			if err != nil {
 				log.Errorf("SAML: base64 DecodeString error %v", err)
-				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 				return
 			}
 			pubKey := &rsa.PublicKey{}
 			err = json.Unmarshal(keyBytes, pubKey)
 			if err != nil {
 				log.Errorf("SAML: getPublicKey error %v", err)
-				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 				return
 			}
 			encryptedToken, err := rsa.EncryptOAEP(
@@ -628,7 +594,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 				nil)
 			if err != nil {
 				log.Errorf("SAML: getEncryptedToken error %v", err)
-				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 				return
 			}
 			encoded := base64.StdEncoding.EncodeToString(encryptedToken)
@@ -645,7 +611,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			_, err = s.samlTokens.Create(samlToken)
 			if err != nil {
 				log.Errorf("SAML: createToken err %v", err)
-				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+				http.Redirect(w, r, redirectURLWithError(redirectURL, 500, ""), http.StatusFound)
 			}
 
 			s.clientState.DeleteState(w, r, "Rancher_ConnToken")
@@ -712,6 +678,25 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 
 func newJWTParser() *jwt.Parser {
 	return jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+}
+
+// redirectURLWithError appends errorCode and, if non-empty, an err query parameter to baseURL.
+func redirectURLWithError(baseURL string, errorCode int, errMsg string) string {
+	parsed, parseErr := url.Parse(baseURL)
+	if parseErr != nil {
+		result := baseURL + "errorCode=" + strconv.Itoa(errorCode)
+		if errMsg != "" {
+			result += "&err=" + url.QueryEscape(errMsg)
+		}
+		return result
+	}
+	params := parsed.Query()
+	params.Set("errorCode", strconv.Itoa(errorCode))
+	if errMsg != "" {
+		params.Set("err", errMsg)
+	}
+	parsed.RawQuery = params.Encode()
+	return parsed.String()
 }
 
 func validateFinalRedirectURL(redirectURL string, rancherServerURL string) (string, error) {
