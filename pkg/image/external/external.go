@@ -127,12 +127,12 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 // semver is older. If semver is equal then metadata is alphanumerically compared.
 func isNewerVersion(prevVersion, updatedVersion string) (bool, error) {
 	parseErrMsg := "failed to parse version: %v"
-	prevVer, err := semver.NewVersion(prevVersion)
+	prevVer, err := semver.NewVersion(strings.TrimPrefix(prevVersion, "v"))
 	if err != nil {
 		return false, fmt.Errorf(parseErrMsg, err)
 	}
 
-	updatedVer, err := semver.NewVersion(updatedVersion)
+	updatedVer, err := semver.NewVersion(strings.TrimPrefix(updatedVersion, "v"))
 	if err != nil {
 		return false, fmt.Errorf(parseErrMsg, err)
 	}
