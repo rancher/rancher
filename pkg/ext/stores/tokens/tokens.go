@@ -885,6 +885,30 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
+// ListForProvider returns all ext tokens associated with the named auth
+// provider. It is an internal call invoked by other parts of Rancher.
+func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
+	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
+		SecretKindLabel: SecretKindLabelValue,
+	}).AsSelector())
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider %s: %w", provider, err))
+	}
+
+	var tokens []ext.Token
+	for _, secret := range secrets {
+		token, err := fromSecret(secret)
+		if err != nil {
+			continue
+		}
+		if token.Spec.UserPrincipal.Provider == provider {
+			tokens = append(tokens, *token)
+		}
+	}
+
+	return &ext.TokenList{Items: tokens}, nil
+}
+
 func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, options *metav1.ListOptions) (*ext.TokenList, error) {
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
