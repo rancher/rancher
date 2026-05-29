@@ -57,6 +57,7 @@ type Provider struct {
 	ldapProvider    common.AuthProvider
 	sloEnabled      bool
 	sloForced       bool
+	hasIDPCerts     bool // indicates whether the IDP metadata contains certificates.
 
 	getSamlConfig func() (*apiv3.SamlConfig, error)
 }
