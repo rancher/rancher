@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/sirupsen/logrus"
 )
@@ -61,7 +60,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 				continue
 			}
 
-			versionGTMin, err := nodesyncer.IsNewerVersion(minVersion, rancherVersion)
+			versionGTMin, err := isNewerVersion(minVersion, rancherVersion)
 			if err != nil {
 				continue
 			}
@@ -70,7 +69,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 				continue
 			}
 
-			versionLTMax, err := nodesyncer.IsNewerVersion(rancherVersion, maxVersion)
+			versionLTMax, err := isNewerVersion(rancherVersion, maxVersion)
 			if err != nil {
 				continue
 			}
@@ -122,6 +121,33 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 	sort.Strings(externalImages)
 	logrus.Infof("finished generating %s image list...", source)
 	return externalImages, nil
+}
+
+// isNewerVersion returns true if updated versions semver is newer and false if its
+// semver is older. If semver is equal then metadata is alphanumerically compared.
+func isNewerVersion(prevVersion, updatedVersion string) (bool, error) {
+	parseErrMsg := "failed to parse version: %v"
+	prevVer, err := semver.NewVersion(prevVersion)
+	if err != nil {
+		return false, fmt.Errorf(parseErrMsg, err)
+	}
+
+	updatedVer, err := semver.NewVersion(updatedVersion)
+	if err != nil {
+		return false, fmt.Errorf(parseErrMsg, err)
+	}
+
+	switch updatedVer.Compare(*prevVer) {
+	case -1:
+		return false, nil
+	case 1:
+		return true, nil
+	default:
+		// using metadata to determine precedence is against semver standards
+		// this is ignored because because k3s uses it to precedence between
+		// two versions based on same k8s version
+		return updatedVer.Metadata > prevVer.Metadata, nil
+	}
 }
 
 // downloadExternalSupportingImages downloads the list of images used by a Source from GitHub releases.
