@@ -426,6 +426,65 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
 			},
 		},
+		{
+			name: "test-kube-api-auth-enabled",
+
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-auth",
+				},
+				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "testing-kube-api-auth",
+					ImportedConfig: &apimgmtv3.ImportedConfig{},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
+			},
+
+			agentImage: "my/agent:image",
+			authImage:  "my/kube-api-auth:image",
+			url:        "https://example.com",
+			token:      "dummy-token",
+
+			expectedDeploymentHashes: map[string]string{
+				"cattle-cluster-agent": "e99508716bf42e1d9190e6957b5c7745d62d94a0e6b9f3d7ada4f656afcb6efe",
+			},
+
+			expectedDaemonSetHashes: map[string]string{
+				"kube-api-auth": "71cdcb54a60bab2f82a2f65c97d3ef2a133f1780256f6de6c34a50e9741e63fe",
+			},
+
+			expectedClusterRoleHashes: map[string]string{
+				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
+				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
+				"kube-api-auth":                   "5edba6ae199bce61bbbe1c8c689a6900981e3320e1c3b16b08cba8be1ea1b11b",
+			},
+
+			expectedClusterRoleBindingHashes: map[string]string{
+				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
+				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
+				"kube-api-auth":                        "50d6e64be34295d7631e5e25323146e8a9f009a992acc924a1109e4965c67193",
+			},
+
+			expectedNamespaceHashes: map[string]string{
+				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
+			},
+
+			expectedServiceHashes: map[string]string{
+				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
+			},
+
+			expectedServiceAccountHashes: map[string]string{
+				"cattle":        "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
+				"kube-api-auth": "0d766aa7dcaa099ce355d8baaab533beb33b7766e54fa74fac8f9393c4ed18de",
+			},
+
+			expectedSecretHashes: map[string]string{
+				"cattle-credentials-8f25b52916": "24570c6bceef80892243253fefb8ac4d8651e23808633d7b532ca04f8472caa8",
+			},
+		},
 	}
 
 	for _, tt := range tests {
