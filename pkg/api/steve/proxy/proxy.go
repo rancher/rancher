@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -170,6 +171,14 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+
+	// Block pod exec requests when the pod-shell feature is disabled.
+	if isPodExecRequest(req) && !features.PodShell.Enabled() {
+		rw.WriteHeader(http.StatusForbidden)
+		rw.Write([]byte("pod shell feature is disabled"))
+		return
+	}
+
 	prefix := "/k8s/clusters/" + clusterID
 	handler, err := h.next(clusterID, prefix)
 	if err != nil {
@@ -251,4 +260,14 @@ func (h *Handler) canAccess(ctx context.Context, user user.Info, clusterID strin
 	})
 
 	return err == nil && resp == authorizer.DecisionAllow
+}
+
+// isPodExecRequest returns true when the request path targets the pod exec subresource.
+func isPodExecRequest(req *http.Request) bool {
+	// Check if this is a pod exec request
+	// Pattern: /api/v1/namespaces/{namespace}/pods/{pod}/exec
+	path := req.URL.Path
+	return strings.Contains(path, "/api/v1/namespaces/") &&
+		strings.Contains(path, "/pods/") &&
+		strings.HasSuffix(path, "/exec")
 }
