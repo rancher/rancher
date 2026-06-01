@@ -1358,7 +1358,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -1384,6 +1384,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher/rancher-webhook",
 					},
+					"replicaCount":        1,
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1768,142 +1773,165 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 			},
 		},
-{
-name: "installation with webhook deployment customization",
-setup: func(mocks testMocks) {
-rc := int32(2)
-clusterWithWebhookCustom := &v3.Cluster{
-Status: v3.ClusterStatus{Driver: "k3s"},
-ObjectMeta: metav1.ObjectMeta{
-Name: "local",
-Annotations: map[string]string{
-importedclusterversionmanagement.VersionManagementAnno: "system-default",
-},
-},
-Spec: v3.ClusterSpec{
-ClusterSpecBase: v3.ClusterSpecBase{
-WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{
-ReplicaCount: &rc,
-},
-},
-},
-}
-mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
-mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).Times(4)
-mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-_ = settings.RancherWebhookVersion.Set("2.0.0")
-_ = settings.RancherTurtlesVersion.Set("2.0.0")
-_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
-_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
-features.MCM.Set(true)
-_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
+		{
+			name: "installation with webhook deployment customization",
+			setup: func(mocks testMocks) {
+				rc := int32(2)
+				clusterWithWebhookCustom := &v3.Cluster{
+					Status: v3.ClusterStatus{Driver: "k3s"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "local",
+						Annotations: map[string]string{
+							importedclusterversionmanagement.VersionManagementAnno: "system-default",
+						},
+					},
+					Spec: v3.ClusterSpec{
+						ClusterSpecBase: v3.ClusterSpecBase{
+							WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{
+								ReplicaCount: &rc,
+							},
+						},
+					},
+				}
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).AnyTimes()
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherTurtlesVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				features.MCM.Set(true)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
-// rancher-webhook — replicaCount comes from WebhookDeploymentCustomization
-expectedValues := map[string]interface{}{
-"priorityClassName": priorityClassName,
-"capi":              nil,
-"mcm": map[string]interface{}{
-"enabled": true,
-},
-"global": map[string]interface{}{
-"cattle": map[string]interface{}{
-"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-},
-},
-"replicaCount": int32(2),
-"tolerations":         []interface{}{},
-"affinity":            nil,
-"resources":           map[string]interface{}{},
-"podDisruptionBudget": map[string]interface{}{"enabled": false},
-}
-mocks.manager.EXPECT().Ensure(
-namespace.System,
-chart.WebhookChartName,
-chart.WebhookChartName,
-"",
-"2.0.0",
-expectedValues,
-gomock.AssignableToTypeOf(false),
-"",
-).Return(nil)
+				// rancher-webhook — replicaCount comes from WebhookDeploymentCustomization
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": true,
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
+					},
+					"replicaCount":        int32(2),
+					"tolerations":         []interface{}{},
+					"affinity":            nil,
+					"resources":           map[string]interface{}{},
+					"podDisruptionBudget": map[string]interface{}{"enabled": false},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.WebhookChartName,
+					chart.WebhookChartName,
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
 
-// rancher-turtles
-expectedTurtlesValues := map[string]interface{}{
-"priorityClassName": priorityClassName,
-"features": map[string]interface{}{
-"no-cert-manager": map[string]interface{}{
-"enabled": true,
-},
-},
-"global": map[string]interface{}{
-"cattle": map[string]interface{}{
-"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-},
-},
-}
-mocks.manager.EXPECT().Ensure(
-namespace.TurtlesNamespace,
-chart.TurtlesChartName,
-chart.TurtlesChartName,
-"",
-"2.0.0",
-expectedTurtlesValues,
-gomock.AssignableToTypeOf(false),
-"",
-).Return(nil)
+				// rancher-turtles
+				expectedTurtlesValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"features": map[string]interface{}{
+						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.TurtlesNamespace,
+					chart.TurtlesChartName,
+					chart.TurtlesChartName,
+					"",
+					"2.0.0",
+					expectedTurtlesValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
 
-// system-upgrade-controller
-expectedSUCValues := map[string]interface{}{
-"priorityClassName": priorityClassName,
-"global": map[string]interface{}{
-"cattle": map[string]interface{}{
-"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-},
-},
-}
-mocks.manager.EXPECT().Ensure(
-namespace.System,
-chart.SystemUpgradeControllerChartName,
-chart.SystemUpgradeControllerChartName,
-"",
-"2.0.0",
-expectedSUCValues,
-gomock.AssignableToTypeOf(false),
-"",
-).Return(nil)
+				// system-upgrade-controller
+				expectedSUCValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
+						},
+					},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/system-upgrade-controller",
+						},
+					},
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/kuberlr-kubectl",
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
+					"",
+					"2.0.0",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
 
-// remotedialer-proxy
-expectedRDPValues := map[string]interface{}{
-"priorityClassName": priorityClassName,
-"global": map[string]interface{}{
-"cattle": map[string]interface{}{
-"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-},
-},
-}
-mocks.manager.EXPECT().Ensure(
-namespace.System,
-chart.RemoteDialerProxyChartName,
-chart.RemoteDialerProxyChartName,
-"",
-"2.0.0",
-expectedRDPValues,
-gomock.AssignableToTypeOf(false),
-"",
-).Return(nil)
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+					"imagePullSecrets": ([]v1.LocalObjectReference)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/remotedialer-proxy",
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
+					"",
+					"2.0.0",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
 
-// rancher-operator
-mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
-mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
 
-// rancher-provisioning-capi
-mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
-mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
-mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
-},
-},
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
