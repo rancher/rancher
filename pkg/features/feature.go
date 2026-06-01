@@ -224,6 +224,20 @@ var (
 		false,
 		true,
 	)
+	NodeShell = newFeature(
+		"node-shell",
+		"Enable the Rancher node shell feature",
+		true,
+		false,
+		true,
+	)
+	PodShell = newFeature(
+		"pod-shell",
+		"Enable the Rancher pod shell feature",
+		true,
+		false,
+		true,
+	)
 	HideLocalAuthProvider = newFeature(
 		"hide-local-auth-provider",
 		"Hide the local auth provider when one or more external auth providers are active",
