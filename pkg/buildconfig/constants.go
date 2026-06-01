@@ -9,5 +9,5 @@ const (
 	FleetVersion             = "110.0.0+up0.16.0-alpha.9"
 	RemoteDialerProxyVersion = "110.0.0+up0.8.0-rc.5"
 	TurtlesVersion           = "110.0.0+up0.27.0-rc.1"
-	WebhookVersion           = "110.0.0+up0.11.0-rc.9"
+	WebhookVersion           = "110.0.0+up0.11.0-rc.10"
 )
