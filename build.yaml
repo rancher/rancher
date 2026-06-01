@@ -4,5 +4,5 @@ remoteDialerProxyVersion: 110.0.0+up0.8.0-rc.5
 turtlesVersion: 110.0.0+up0.27.0-rc.1
 cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
 defaultShellVersion: rancher/shell:v0.8.0-rc.2
-fleetVersion: 110.0.0+up0.16.0-alpha.5
+fleetVersion: 110.0.0+up0.16.0-alpha.9
 defaultSccOperatorImage: rancher/scc-operator:v0.4.1
