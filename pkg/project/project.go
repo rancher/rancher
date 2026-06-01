@@ -15,10 +15,11 @@ const (
 const (
 	SystemImageVersionAnnotation = "field.cattle.io/systemImageVersion"
 	ProjectIDAnnotation          = "field.cattle.io/projectId"
+	SystemProjectLabelKey        = "authz.management.cattle.io/system-project"
 )
 
 var (
-	SystemProjectLabel = map[string]string{"authz.management.cattle.io/system-project": "true"}
+	SystemProjectLabel = map[string]string{SystemProjectLabelKey: "true"}
 )
 
 func GetSystemProject(clusterName string, projectLister mgmtv3.ProjectLister) (*mgmtv3.Project, error) {

@@ -14,6 +14,7 @@ import (
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -61,8 +62,22 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 	}
 
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	if err = systemtemplate.SystemTemplate(resp, agentImage, authImage, "", token, url,
-		false, cluster, nil, nil, ch.SecretLister, false, namespace.GetMutator()); err != nil {
+	ops := &systemtemplate.TemplateOps{
+		AgentImage:     agentImage,
+		AuthImage:      authImage,
+		Namespace:      "",
+		Token:          token,
+		URL:            url,
+		IsPreBootstrap: false,
+		Cluster:        cluster,
+		AgentFeatures:  nil,
+		Taints:         nil,
+		SecretLister:   ch.SecretLister,
+		PcExists:       false,
+		Mutator:        namespace.GetMutator(),
+	}
+	if err = systemtemplate.SystemTemplate(resp, ops); err != nil {
+		logrus.Errorf("[cluster-registration-tokens] failed to generate template: %v", err)
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}

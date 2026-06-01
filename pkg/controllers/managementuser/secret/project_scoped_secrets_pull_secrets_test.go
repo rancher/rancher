@@ -80,7 +80,7 @@ func Test_usesGlobalSecrets(t *testing.T) {
 			name: "label set to true",
 			project: &v3.Project{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{needsGlobalPrivateRegistryPullSecret: "true"},
+					Labels: map[string]string{NeedsGlobalPrivateRegistryPullSecret: "true"},
 				},
 			},
 			want: true,
@@ -89,7 +89,7 @@ func Test_usesGlobalSecrets(t *testing.T) {
 			name: "label set to other value",
 			project: &v3.Project{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{needsGlobalPrivateRegistryPullSecret: "false"},
+					Labels: map[string]string{NeedsGlobalPrivateRegistryPullSecret: "false"},
 				},
 			},
 			want: false,
@@ -116,7 +116,7 @@ func Test_usesGlobalSecrets(t *testing.T) {
 func Test_namespaceHandler_getNamespacesFromGlobalPullSecret(t *testing.T) {
 	systemProjectLabels := map[string]string{
 		"authz.management.cattle.io/system-project": "true",
-		needsGlobalPrivateRegistryPullSecret:        "true",
+		NeedsGlobalPrivateRegistryPullSecret:        "true",
 	}
 
 	tests := []struct {
@@ -198,7 +198,7 @@ func Test_namespaceHandler_getNamespacesFromGlobalPullSecret(t *testing.T) {
 			},
 			setupProjectCache: func(f *fake.MockCacheInterface[*v3.Project]) {
 				f.EXPECT().List("c-abc", gomock.Any()).Return([]*v3.Project{
-					{ObjectMeta: metav1.ObjectMeta{Name: "p-abc", Labels: map[string]string{needsGlobalPrivateRegistryPullSecret: "true"}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "p-abc", Labels: map[string]string{NeedsGlobalPrivateRegistryPullSecret: "true"}}},
 				}, nil)
 			},
 			want: nil,
@@ -318,7 +318,7 @@ func Test_namespaceHandler_secretEnqueueNamespace(t *testing.T) {
 							Name: "p-system",
 							Labels: map[string]string{
 								"authz.management.cattle.io/system-project": "true",
-								needsGlobalPrivateRegistryPullSecret:        "true",
+								NeedsGlobalPrivateRegistryPullSecret:        "true",
 							},
 						},
 					},
@@ -347,7 +347,7 @@ func Test_namespaceHandler_secretEnqueueNamespace(t *testing.T) {
 							Name: "p-system",
 							Labels: map[string]string{
 								"authz.management.cattle.io/system-project": "true",
-								needsGlobalPrivateRegistryPullSecret:        "true",
+								NeedsGlobalPrivateRegistryPullSecret:        "true",
 							},
 						},
 					},
@@ -355,7 +355,7 @@ func Test_namespaceHandler_secretEnqueueNamespace(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "n-system",
 							Labels: map[string]string{
-								needsGlobalPrivateRegistryPullSecret: "true",
+								NeedsGlobalPrivateRegistryPullSecret: "true",
 							},
 						},
 					},
@@ -401,7 +401,7 @@ func Test_namespaceHandler_secretEnqueueNamespace(t *testing.T) {
 func Test_namespaceHandler_onSettingEnqueueNamespace(t *testing.T) {
 	systemProjectLabels := map[string]string{
 		"authz.management.cattle.io/system-project": "true",
-		needsGlobalPrivateRegistryPullSecret:        "true",
+		NeedsGlobalPrivateRegistryPullSecret:        "true",
 	}
 
 	tests := []struct {
@@ -447,7 +447,7 @@ func Test_namespaceHandler_onSettingEnqueueNamespace(t *testing.T) {
 			},
 			setupProjectCache: func(f *fake.MockCacheInterface[*v3.Project]) {
 				f.EXPECT().List("c-abc", gomock.Any()).Return([]*v3.Project{
-					{ObjectMeta: metav1.ObjectMeta{Name: "p-user", Labels: map[string]string{needsGlobalPrivateRegistryPullSecret: "true"}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "p-user", Labels: map[string]string{NeedsGlobalPrivateRegistryPullSecret: "true"}}},
 				}, nil)
 			},
 			wantKeys: []relatedresource.Key{},
@@ -523,7 +523,7 @@ func Test_namespaceHandler_onSettingEnqueueNamespace(t *testing.T) {
 			},
 			setupProjectCache: func(f *fake.MockCacheInterface[*v3.Project]) {
 				f.EXPECT().List("c-abc", gomock.Any()).Return([]*v3.Project{
-					{ObjectMeta: metav1.ObjectMeta{Name: "p-user", Labels: map[string]string{needsGlobalPrivateRegistryPullSecret: "true"}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "p-user", Labels: map[string]string{NeedsGlobalPrivateRegistryPullSecret: "true"}}},
 				}, nil)
 			},
 			wantKeys: []relatedresource.Key{},
@@ -620,7 +620,7 @@ func Test_namespaceHandler_onSettingEnqueueNamespace(t *testing.T) {
 func Test_namespaceHandler_onSystemProjectEnqueueNamespace(t *testing.T) {
 	systemProjectLabels := map[string]string{
 		"authz.management.cattle.io/system-project": "true",
-		needsGlobalPrivateRegistryPullSecret:        "true",
+		NeedsGlobalPrivateRegistryPullSecret:        "true",
 	}
 
 	tests := []struct {
@@ -787,7 +787,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pull-secret-1",
+						Name:      "pull-secret-1-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -839,7 +839,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "valid-secret",
+						Name:      "valid-secret-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -873,7 +873,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pull-secret-1",
+						Name:      "pull-secret-1-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -881,7 +881,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pull-secret-2",
+						Name:      "pull-secret-2-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -915,7 +915,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 			want: []*corev1.Secret{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "exists",
+						Name:      "exists-rancher-managed-pull-secret",
 						Namespace: "cattle-system",
 						Labels:    map[string]string{cluster.CopiedPullSecretLabel: "true"},
 					},
@@ -928,16 +928,7 @@ func Test_namespaceHandler_getGlobalPullSecrets(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set the settings for the test — when provider is nil, Set modifies the default in the settings map.
-			origRegistry := settings.SystemDefaultRegistry.Get()
-			origPullSecrets := settings.SystemDefaultRegistryPullSecrets.Get()
-			t.Cleanup(func() {
-				settings.SystemDefaultRegistry.Set(origRegistry)
-				settings.SystemDefaultRegistryPullSecrets.Set(origPullSecrets)
-			})
-			settings.SystemDefaultRegistry.Set(tt.registryURL)
-			settings.SystemDefaultRegistryPullSecrets.Set(tt.pullSecretNames)
-
+			withSettings(t, tt.registryURL, tt.pullSecretNames)
 			managementSecretCacheMock := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			if tt.setupManagementCache != nil {
 				tt.setupManagementCache(managementSecretCacheMock)
@@ -969,7 +960,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 
 	systemProjectLabels := map[string]string{
 		"authz.management.cattle.io/system-project": "true",
-		needsGlobalPrivateRegistryPullSecret:        "true",
+		NeedsGlobalPrivateRegistryPullSecret:        "true",
 	}
 
 	tests := []struct {
@@ -1015,9 +1006,9 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 				}, nil)
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().Get(testNamespace, "global-pull-secret", gomock.Any()).Return(nil, errNotFound)
+				f.EXPECT().Get(testNamespace, "global-pull-secret-rancher-managed-pull-secret", gomock.Any()).Return(nil, errNotFound)
 				f.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
-					assert.Equal(t, "global-pull-secret", s.Name)
+					assert.Equal(t, "global-pull-secret-rancher-managed-pull-secret", s.Name)
 					assert.Equal(t, testNamespace, s.Namespace)
 					assert.Equal(t, "true", s.Annotations[pssCopyAnnotation])
 					assert.Equal(t, "true", s.Labels[cluster.CopiedPullSecretLabel])
@@ -1026,7 +1017,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 				f.EXPECT().List(testNamespace, metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
 				f.EXPECT().List(testNamespace, metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
-						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret", Namespace: testNamespace}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret-rancher-managed-pull-secret", Namespace: testNamespace}},
 					},
 				}, nil)
 			},
@@ -1047,7 +1038,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 						Name: testProjectName,
 						Labels: map[string]string{
 							"authz.management.cattle.io/system-project": "true",
-							// needsGlobalPrivateRegistryPullSecret is NOT set
+							// NeedsGlobalPrivateRegistryPullSecret is NOT set
 						},
 					},
 					Spec:   v3.ProjectSpec{ClusterName: testClusterName},
@@ -1115,9 +1106,9 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 					return s, nil
 				})
 				// CreateOrUpdateNamespacedResource for global pull secret
-				f.EXPECT().Get(testNamespace, "global-pull-secret", gomock.Any()).Return(nil, errNotFound)
+				f.EXPECT().Get(testNamespace, "global-pull-secret-rancher-managed-pull-secret", gomock.Any()).Return(nil, errNotFound)
 				f.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
-					assert.Equal(t, "global-pull-secret", s.Name)
+					assert.Equal(t, "global-pull-secret-rancher-managed-pull-secret", s.Name)
 					assert.Equal(t, testNamespace, s.Namespace)
 					return s, nil
 				})
@@ -1129,7 +1120,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 				}, nil)
 				f.EXPECT().List(testNamespace, metav1.ListOptions{LabelSelector: cluster.CopiedPullSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
-						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret", Namespace: testNamespace}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "global-pull-secret-rancher-managed-pull-secret", Namespace: testNamespace}},
 					},
 				}, nil)
 			},
@@ -1197,14 +1188,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			origRegistry := settings.SystemDefaultRegistry.Get()
-			origPullSecrets := settings.SystemDefaultRegistryPullSecrets.Get()
-			t.Cleanup(func() {
-				settings.SystemDefaultRegistry.Set(origRegistry)
-				settings.SystemDefaultRegistryPullSecrets.Set(origPullSecrets)
-			})
-			settings.SystemDefaultRegistry.Set(tt.registryURL)
-			settings.SystemDefaultRegistryPullSecrets.Set(tt.pullSecretNames)
+			withSettings(t, tt.registryURL, tt.pullSecretNames)
 
 			projectCache := fake.NewMockCacheInterface[*v3.Project](ctrl)
 			if tt.setupProjectCache != nil {
@@ -1241,4 +1225,15 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 			}
 		})
 	}
+}
+
+func withSettings(t *testing.T, sdr, pullSecrets string) {
+	curSdr := settings.SystemDefaultRegistry.Get()
+	curSdrPull := settings.SystemDefaultRegistryPullSecrets.Get()
+	settings.SystemDefaultRegistry.Set(sdr)
+	settings.SystemDefaultRegistryPullSecrets.Set(pullSecrets)
+	t.Cleanup(func() {
+		settings.SystemDefaultRegistry.Set(curSdr)
+		settings.SystemDefaultRegistryPullSecrets.Set(curSdrPull)
+	})
 }
