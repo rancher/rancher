@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
+	"github.com/rancher/rancher/pkg/features"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
 	"github.com/stretchr/testify/assert"
@@ -269,6 +270,153 @@ func addUserToRequest(username string, request *http.Request) *http.Request {
 		Name: username,
 	}
 	return request.WithContext(k8sRequest.WithUser(currentContext, user))
+}
+
+func TestPodShellFeatureFlag(t *testing.T) {
+	t.Parallel()
+	const defaultToken = "01020305081321345589"
+	const testUserUsername = "test-user"
+	const testClusterID = "c-test-cluster"
+
+	tests := []struct {
+		name                 string
+		requestPath          string
+		podShellEnabled      bool
+		userCanAccessCluster bool
+		expectBlocked        bool   // expect 403 from pod-shell check
+		expectedCode         int    // expected status code
+		expectedMessage      string // expected response message
+		checkMessageContains bool   // if true, check that message contains expectedMessage
+	}{
+		{
+			name:                 "pod exec blocked when pod-shell disabled",
+			requestPath:          "/k8s/clusters/" + testClusterID + "/v1/api/v1/namespaces/default/pods/test-pod/exec",
+			podShellEnabled:      false,
+			userCanAccessCluster: true,
+			expectBlocked:        true,
+			expectedCode:         http.StatusForbidden,
+			expectedMessage:      "pod shell feature is disabled",
+		},
+		{
+			name:                 "pod exec blocked when user lacks cluster access",
+			requestPath:          "/k8s/clusters/" + testClusterID + "/v1/api/v1/namespaces/default/pods/test-pod/exec",
+			podShellEnabled:      true,
+			userCanAccessCluster: false,
+			expectBlocked:        false,
+			expectedCode:         http.StatusUnauthorized,
+			expectedMessage:      "",
+		},
+		{
+			name:                 "pod exec in cattle-system namespace blocked when pod-shell disabled",
+			requestPath:          "/k8s/clusters/" + testClusterID + "/v1/api/v1/namespaces/cattle-system/pods/rancher-webhook-abc123/exec",
+			podShellEnabled:      false,
+			userCanAccessCluster: true,
+			expectBlocked:        true,
+			expectedCode:         http.StatusForbidden,
+			expectedMessage:      "pod shell feature is disabled",
+		},
+		{
+			name:                 "pod exec passes feature check when pod-shell enabled",
+			requestPath:          "/k8s/clusters/" + testClusterID + "/v1/api/v1/namespaces/default/pods/test-pod/exec",
+			podShellEnabled:      true,
+			userCanAccessCluster: true,
+			expectBlocked:        false,
+			// Will fail later with 500 due to mock dialer, but should NOT be 403
+			expectedCode:         http.StatusInternalServerError,
+			expectedMessage:      "unable to construct dialer",
+			checkMessageContains: true,
+		},
+		{
+			name:                 "non-exec pod request not blocked when pod-shell disabled",
+			requestPath:          "/k8s/clusters/" + testClusterID + "/v1/api/v1/namespaces/default/pods/test-pod",
+			podShellEnabled:      false,
+			userCanAccessCluster: true,
+			expectBlocked:        false,
+			// Will fail with 500 due to dialer, but should NOT be 403
+			expectedCode:         http.StatusInternalServerError,
+			expectedMessage:      "unable to construct dialer",
+			checkMessageContains: true,
+		},
+		{
+			name:                 "pod logs request not blocked when pod-shell disabled",
+			requestPath:          "/k8s/clusters/" + testClusterID + "/v1/api/v1/namespaces/default/pods/test-pod/log",
+			podShellEnabled:      false,
+			userCanAccessCluster: true,
+			expectBlocked:        false,
+			expectedCode:         http.StatusInternalServerError,
+			expectedMessage:      "unable to construct dialer",
+			checkMessageContains: true,
+		},
+		{
+			name:                 "pod list not blocked when pod-shell disabled",
+			requestPath:          "/k8s/clusters/" + testClusterID + "/v1/api/v1/namespaces/default/pods",
+			podShellEnabled:      false,
+			userCanAccessCluster: true,
+			expectBlocked:        false,
+			expectedCode:         http.StatusInternalServerError,
+			expectedMessage:      "unable to construct dialer",
+			checkMessageContains: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Set the pod-shell feature flag
+			features.PodShell.Set(test.podShellEnabled)
+			defer features.PodShell.Unset()
+
+			responder := DefaultHandler{
+				ResponseCode:    http.StatusOK,
+				ResponseMessage: "proxied successfully",
+			}
+
+			localHandler := DefaultHandler{
+				ResponseCode:    http.StatusNotFound,
+				ResponseMessage: "local cluster routed",
+			}
+
+			reviewer := testReviewer{}
+			if test.userCanAccessCluster {
+				clusterGVR := schema.GroupVersionResource{
+					Group:    managementv3.GroupName,
+					Version:  managementv3.Version,
+					Resource: "clusters",
+				}
+				reviewer.AddPermissionForUser(testUserUsername, "get", "", testClusterID, clusterGVR)
+			}
+
+			// Note: Grants must be added before this next call
+			server, err := NewSARServer(&reviewer, "/webhook")
+			assert.NoError(t, err, "error when creating sar server")
+			client, err := RestClientForURL(server.URL, defaultToken)
+			assert.NoError(t, err, "error when creating rest client")
+			sarWrapper := Authv1ClientInterface{Client: client}
+
+			proxyMiddleware, err := proxy.NewProxyMiddleware(&sarWrapper, defaultDialer, nil, true, &localHandler)
+			assert.NoError(t, err, "unable to construct proxy middleware")
+
+			// construct the middleware with our default handler
+			testHandler := proxyMiddleware(&responder)
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest("get", test.requestPath, bytes.NewReader([]byte{}))
+			request = addUserToRequest(testUserUsername, request)
+			testHandler.ServeHTTP(recorder, request)
+
+			assert.Equal(t, test.expectedCode, recorder.Code, "actual response code was different than expected")
+
+			if test.checkMessageContains {
+				assert.Contains(t, recorder.Body.String(), test.expectedMessage, "body should contain expected message")
+			} else {
+				assert.Equal(t, test.expectedMessage, recorder.Body.String(), "body was different than expected")
+			}
+
+			// Verify that pod exec requests are blocked by the feature flag, not by something else
+			if test.expectBlocked {
+				assert.Equal(t, http.StatusForbidden, recorder.Code, "pod exec should be blocked with 403 Forbidden")
+				assert.Contains(t, recorder.Body.String(), "pod shell feature is disabled", "blocked message should mention pod shell feature")
+			}
+		})
+	}
 }
 
 type DefaultHandler struct {

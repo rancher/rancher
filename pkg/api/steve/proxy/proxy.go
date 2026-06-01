@@ -264,8 +264,6 @@ func (h *Handler) canAccess(ctx context.Context, user user.Info, clusterID strin
 
 // isPodExecRequest returns true when the request path targets the pod exec subresource.
 func isPodExecRequest(req *http.Request) bool {
-	// Check if this is a pod exec request
-	// Pattern: /api/v1/namespaces/{namespace}/pods/{pod}/exec
 	path := req.URL.Path
 	return strings.Contains(path, "/api/v1/namespaces/") &&
 		strings.Contains(path, "/pods/") &&
