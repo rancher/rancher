@@ -115,7 +115,7 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.15.0-rc.1
 	github.com/rancher/ali-operator v1.15.0-rc.1
-	github.com/rancher/apiserver v0.9.5
+	github.com/rancher/apiserver v0.9.6
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/dynamiclistener v0.9.0-rc.1
 	github.com/rancher/eks-operator v1.15.0-rc.1
@@ -133,7 +133,7 @@ require (
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.8.0-rc.5
 	github.com/rancher/shepherd v0.0.0-20260528164728-7b9b5fa89ab8
-	github.com/rancher/steve v0.9.10
+	github.com/rancher/steve v0.9.12
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260519183600-f1362a3fe1a8
 	github.com/rancher/wrangler/v3 v3.7.0
 	github.com/robfig/cron v1.2.0
