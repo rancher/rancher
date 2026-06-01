@@ -272,8 +272,114 @@ func addUserToRequest(username string, request *http.Request) *http.Request {
 	return request.WithContext(k8sRequest.WithUser(currentContext, user))
 }
 
+func TestLocalClusterPodShellFeatureFlag(t *testing.T) {
+	// Note: Cannot use t.Parallel() because tests mutate the global features.PodShell flag
+	const defaultResponseCode = 210
+	const defaultResponseMessage = "Default response"
+	const defaultToken = "01020305081321345589"
+	const testUserUsername = "test-user"
+
+	tests := []struct {
+		name                 string
+		requestPath          string
+		podShellEnabled      bool
+		userCanAccessLocal   bool
+		expectedCode         int
+		expectedMessage      string
+		checkMessageContains bool
+	}{
+		{
+			name:                 "local cluster pod exec blocked when pod-shell disabled",
+			requestPath:          "/api/v1/namespaces/cattle-system/pods/rancher-webhook-abc/exec",
+			podShellEnabled:      false,
+			userCanAccessLocal:   true,
+			expectedCode:         http.StatusForbidden,
+			expectedMessage:      "pod shell feature is disabled",
+			checkMessageContains: false,
+		},
+		{
+			name:                 "local cluster pod exec allowed when pod-shell enabled",
+			requestPath:          "/api/v1/namespaces/default/pods/test-pod/exec",
+			podShellEnabled:      true,
+			userCanAccessLocal:   true,
+			expectedCode:         defaultResponseCode,
+			expectedMessage:      defaultResponseMessage,
+			checkMessageContains: false,
+		},
+		{
+			name:                 "local cluster pod list not blocked when pod-shell disabled",
+			requestPath:          "/api/v1/namespaces/default/pods",
+			podShellEnabled:      false,
+			userCanAccessLocal:   true,
+			expectedCode:         defaultResponseCode,
+			expectedMessage:      defaultResponseMessage,
+			checkMessageContains: false,
+		},
+		{
+			name:                 "local cluster pod get not blocked when pod-shell disabled",
+			requestPath:          "/api/v1/namespaces/default/pods/test-pod",
+			podShellEnabled:      false,
+			userCanAccessLocal:   true,
+			expectedCode:         defaultResponseCode,
+			expectedMessage:      defaultResponseMessage,
+			checkMessageContains: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Set the pod-shell feature flag
+			features.PodShell.Set(test.podShellEnabled)
+			defer features.PodShell.Unset()
+
+			responder := DefaultHandler{
+				ResponseCode:    defaultResponseCode,
+				ResponseMessage: defaultResponseMessage,
+			}
+
+			localHandler := DefaultHandler{
+				ResponseCode:    http.StatusNotFound,
+				ResponseMessage: "local cluster routed",
+			}
+
+			reviewer := testReviewer{}
+			if test.userCanAccessLocal {
+				clusterGVR := schema.GroupVersionResource{
+					Group:    managementv3.GroupName,
+					Version:  managementv3.Version,
+					Resource: "clusters",
+				}
+				reviewer.AddPermissionForUser(testUserUsername, "get", "", "local", clusterGVR)
+			}
+
+			server, err := NewSARServer(&reviewer, "/webhook")
+			assert.NoError(t, err, "error when creating sar server")
+			client, err := RestClientForURL(server.URL, defaultToken)
+			assert.NoError(t, err, "error when creating rest client")
+			sarWrapper := Authv1ClientInterface{Client: client}
+
+			proxyMiddleware, err := proxy.NewProxyMiddleware(&sarWrapper, defaultDialer, nil, true, &localHandler)
+			assert.NoError(t, err, "unable to construct proxy middleware")
+
+			testHandler := proxyMiddleware(&responder)
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest("get", test.requestPath, bytes.NewReader([]byte{}))
+			request = addUserToRequest(testUserUsername, request)
+			testHandler.ServeHTTP(recorder, request)
+
+			assert.Equal(t, test.expectedCode, recorder.Code, "actual response code was different than expected")
+
+			if test.checkMessageContains {
+				assert.Contains(t, recorder.Body.String(), test.expectedMessage, "body should contain expected message")
+			} else {
+				assert.Equal(t, test.expectedMessage, recorder.Body.String(), "body was different than expected")
+			}
+		})
+	}
+}
+
 func TestPodShellFeatureFlag(t *testing.T) {
-	t.Parallel()
+	// Note: Cannot use t.Parallel() because tests mutate the global features.PodShell flag
 	const defaultToken = "01020305081321345589"
 	const testUserUsername = "test-user"
 	const testClusterID = "c-test-cluster"
