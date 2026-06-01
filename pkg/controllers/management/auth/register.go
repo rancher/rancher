@@ -22,8 +22,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// RegisterWranglerIndexers registers indexers for the management context wrangler.
-// These are registered early in the startup process so that they are available for use by controllers as soon as they start.
 func RegisterWranglerIndexers(config *wrangler.Context) {
 	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByClusterRoleAndSubject)
 	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *rbacv1.ClusterRoleBinding) ([]string, error) {
@@ -34,14 +32,6 @@ func RegisterWranglerIndexers(config *wrangler.Context) {
 	config.RBAC.RoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByRoleAndSubject)
 	config.RBAC.RoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *rbacv1.RoleBinding) ([]string, error) {
 		return indexByMembershipBindingOwner(obj)
-	})
-
-	config.Mgmt.GlobalRole().Cache().AddIndexer(pkgrbac.GRDownstreamNSIndex, func(gr *v3.GlobalRole) ([]string, error) {
-		result := []string{}
-		for ns := range gr.InheritedNamespacedRules {
-			result = append(result, ns)
-		}
-		return result, nil
 	})
 }
 
@@ -72,6 +62,21 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	}
 
 	roletemplates.RegisterIndexers(scaledContext.Wrangler)
+
+	grInformer := scaledContext.Management.GlobalRoles("").Controller().Informer()
+	grInformer.AddIndexers(map[string]cache.IndexFunc{
+		pkgrbac.GRDownstreamNSIndex: func(obj any) ([]string, error) {
+			gr, ok := obj.(*v3.GlobalRole)
+			if !ok {
+				return nil, nil
+			}
+			result := []string{}
+			for ns := range gr.InheritedNamespacedRules {
+				result = append(result, ns)
+			}
+			return result, nil
+		},
+	})
 
 	grbInformer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
 	return grbInformer.AddIndexers(map[string]cache.IndexFunc{
