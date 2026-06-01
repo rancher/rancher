@@ -14,7 +14,7 @@ import (
 // stubURLBuilder is a minimal implementation of types.URLBuilder for testing.
 type stubURLBuilder struct{}
 
-func (s *stubURLBuilder) Current() string { return "http://rancher.test" }
+func (s *stubURLBuilder) Current() string                                        { return "http://rancher.test" }
 func (s *stubURLBuilder) Collection(_ *types.Schema, _ *types.APIVersion) string { return "" }
 func (s *stubURLBuilder) CollectionAction(_ *types.Schema, _ *types.APIVersion, _ string) string {
 	return ""
@@ -22,25 +22,25 @@ func (s *stubURLBuilder) CollectionAction(_ *types.Schema, _ *types.APIVersion, 
 func (s *stubURLBuilder) SubContextCollection(_ *types.Schema, _ string, _ *types.Schema) string {
 	return ""
 }
-func (s *stubURLBuilder) SchemaLink(_ *types.Schema) string                        { return "" }
+func (s *stubURLBuilder) SchemaLink(_ *types.Schema) string { return "" }
 func (s *stubURLBuilder) ResourceLink(resource *types.RawResource) string {
 	return "http://rancher.test/v3/clusters/" + resource.ID
 }
 func (s *stubURLBuilder) Link(linkName string, resource *types.RawResource) string {
 	return "http://rancher.test/v3/clusters/" + resource.ID + "/" + linkName
 }
-func (s *stubURLBuilder) RelativeToRoot(path string) string            { return path }
-func (s *stubURLBuilder) Version(_ types.APIVersion) string            { return "" }
-func (s *stubURLBuilder) Marker(marker string) string                  { return marker }
-func (s *stubURLBuilder) ReverseSort(_ types.SortOrder) string         { return "" }
-func (s *stubURLBuilder) Sort(_ string) string                         { return "" }
-func (s *stubURLBuilder) SetSubContext(_ string)                        {}
+func (s *stubURLBuilder) RelativeToRoot(path string) string              { return path }
+func (s *stubURLBuilder) Version(_ types.APIVersion) string              { return "" }
+func (s *stubURLBuilder) Marker(marker string) string                    { return marker }
+func (s *stubURLBuilder) ReverseSort(_ types.SortOrder) string           { return "" }
+func (s *stubURLBuilder) Sort(_ string) string                           { return "" }
+func (s *stubURLBuilder) SetSubContext(_ string)                         {}
 func (s *stubURLBuilder) FilterLink(_ *types.Schema, _, _ string) string { return "" }
 func (s *stubURLBuilder) Action(action string, resource *types.RawResource) string {
 	return "http://rancher.test/v3/clusters/" + resource.ID + "?action=" + action
 }
-func (s *stubURLBuilder) ResourceLinkByID(_ *types.Schema, _ string) string         { return "" }
-func (s *stubURLBuilder) ActionLinkByID(_ *types.Schema, _, _ string) string        { return "" }
+func (s *stubURLBuilder) ResourceLinkByID(_ *types.Schema, _ string) string  { return "" }
+func (s *stubURLBuilder) ActionLinkByID(_ *types.Schema, _, _ string) string { return "" }
 
 func TestFormatter_ShellLink(t *testing.T) {
 	tests := []struct {

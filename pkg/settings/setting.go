@@ -66,6 +66,16 @@ var (
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
+	SystemNamespacesIgnoringPullSecrets = []string{
+		"cattle-system",
+		"cattle-global-data",
+		"cattle-local-user-passwords",
+		"cattle-tokens",
+		"cattle-oidc-codes",
+		"cattle-oidc-client-secrets",
+		"cattle-impersonation-system",
+	}
+
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
 	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
 	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeStrict).WithDefaultOnUpgrade(AgentTLSModeSystemStore)
@@ -141,7 +151,7 @@ var (
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	AlibabaUpstreamRefresh              = NewSetting("alibaba-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher142")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher143")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)

@@ -112,8 +112,8 @@ var (
 		true)
 	ProvisioningV2FleetWorkspaceBackPopulation = newFeature(
 		"provisioningv2-fleet-workspace-back-population",
-		"[Experimental]: Allow Fleet workspace name to be changed on clusters administrated by provisioning v2",
-		false,
+		"Allow Fleet workspace name to be changed on clusters administrated by provisioning v2",
+		true,
 		false,
 		true)
 	UIExtension = newFeature(

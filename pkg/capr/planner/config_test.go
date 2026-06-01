@@ -67,10 +67,10 @@ func TestPrimaryAddressFamily(t *testing.T) {
 
 func TestReorderAddressesByFamily(t *testing.T) {
 	tests := []struct {
-		name           string
-		addresses      []string
-		primaryFamily  int
-		expected       []string
+		name          string
+		addresses     []string
+		primaryFamily int
+		expected      []string
 	}{
 		{
 			name:          "no-op when fewer than two addresses",

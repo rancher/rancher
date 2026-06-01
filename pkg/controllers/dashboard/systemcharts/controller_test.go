@@ -28,11 +28,11 @@ import (
 )
 
 var (
-	errTest                     = fmt.Errorf("test error")
-	priorityClassName           = "rancher-critical"
-	operatorNamespace           = "rancher-operator-system"
-	provisioningCapiNamespace   = "cattle-provisioning-capi-system"
-	priorityConfig    = &v1.ConfigMap{
+	errTest                   = fmt.Errorf("test error")
+	priorityClassName         = "rancher-critical"
+	operatorNamespace         = "rancher-operator-system"
+	provisioningCapiNamespace = "cattle-provisioning-capi-system"
+	priorityConfig            = &v1.ConfigMap{
 		Data: map[string]string{
 			"priorityClassName": priorityClassName,
 		},
@@ -43,15 +43,17 @@ var (
 			chart.WebhookChartName: testYAML,
 		},
 	}
-	emptyConfig                            = &v1.ConfigMap{}
-	originalWebhookVersion                 = settings.RancherWebhookVersion.Get()
-	originalSUCVersion                     = settings.SystemUpgradeControllerChartVersion.Get()
-	originalImportedVersionManagement      = settings.ImportedClusterVersionManagement.Get()
-	originalMCM                            = features.MCM.Enabled()
-	originalMCMAgent                       = features.MCMAgent.Enabled()
-	originalManagedSystemUpgradeController = features.ManagedSystemUpgradeController.Enabled()
-	originalTurtles                        = features.Turtles.Enabled()
-	sucDeployment                          = &appsv1.Deployment{
+	emptyConfig                              = &v1.ConfigMap{}
+	originalWebhookVersion                   = settings.RancherWebhookVersion.Get()
+	originalSUCVersion                       = settings.SystemUpgradeControllerChartVersion.Get()
+	originalImportedVersionManagement        = settings.ImportedClusterVersionManagement.Get()
+	originalSystemDefaultRegistry            = settings.SystemDefaultRegistry.Get()
+	originalSystemDefaultRegistryPullSecrets = settings.SystemDefaultRegistryPullSecrets.Get()
+	originalMCM                              = features.MCM.Enabled()
+	originalMCMAgent                         = features.MCMAgent.Enabled()
+	originalManagedSystemUpgradeController   = features.ManagedSystemUpgradeController.Enabled()
+	originalTurtles                          = features.Turtles.Enabled()
+	sucDeployment                            = &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
@@ -171,7 +173,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -198,6 +204,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.TurtlesNamespace,
@@ -216,6 +226,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
+						},
+					},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/system-upgrade-controller",
+						},
+					},
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/kuberlr-kubectl",
 						},
 					},
 				}
@@ -265,7 +286,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -292,6 +317,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.TurtlesNamespace,
@@ -310,6 +339,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
+						},
+					},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/system-upgrade-controller",
+						},
+					},
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/kuberlr-kubectl",
 						},
 					},
 				}
@@ -359,7 +399,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -385,6 +429,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -436,7 +484,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -462,6 +514,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -513,7 +569,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -539,6 +599,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -589,7 +653,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -615,6 +683,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -666,7 +738,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -693,6 +769,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.TurtlesNamespace,
@@ -711,6 +791,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
+						},
+					},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/system-upgrade-controller",
+						},
+					},
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/kuberlr-kubectl",
 						},
 					},
 				}
@@ -732,6 +823,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]v1.LocalObjectReference)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/remotedialer-proxy",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -779,7 +874,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -806,6 +905,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.TurtlesNamespace,
@@ -825,6 +928,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]v1.LocalObjectReference)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/remotedialer-proxy",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -877,7 +984,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -904,6 +1015,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.TurtlesNamespace,
@@ -923,6 +1038,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]v1.LocalObjectReference)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/remotedialer-proxy",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -975,7 +1094,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -1001,6 +1124,10 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -1050,7 +1177,11 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -1076,6 +1207,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.TurtlesNamespace,
@@ -1093,6 +1228,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
+						},
+					},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/system-upgrade-controller",
+						},
+					},
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/kuberlr-kubectl",
 						},
 					},
 				}
@@ -1113,6 +1259,154 @@ func Test_ChartInstallation(t *testing.T) {
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
+					},
+					"imagePullSecrets": ([]v1.LocalObjectReference)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/remotedialer-proxy",
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
+					"",
+					"2.0.0",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
+			},
+		},
+		{
+			name: "installation with global pull secrets",
+			setup: func(mocks testMocks) {
+				_ = settings.SystemDefaultRegistry.Set("registry.example.com")
+				_ = settings.SystemDefaultRegistryPullSecrets.Set("pull-secret-a,pull-secret-b")
+
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherTurtlesVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
+
+				pullSecrets := []string{"pull-secret-a", "pull-secret-b"}
+
+				// rancher-webhook: global.cattle.imagePullSecrets set; no top-level imagePullSecrets
+				expectedWebhookValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "registry.example.com",
+							"imagePullSecrets":      pullSecrets,
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.WebhookChartName,
+					chart.WebhookChartName,
+					"",
+					"2.0.0",
+					expectedWebhookValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-turtles: global.cattle.imagePullSecrets set; top-level imagePullSecrets as []string
+				expectedTurtlesValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"features": map[string]interface{}{
+						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "registry.example.com",
+						},
+					},
+					"imagePullSecrets": pullSecrets,
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.TurtlesNamespace,
+					chart.TurtlesChartName,
+					chart.TurtlesChartName,
+					"",
+					"2.0.0",
+					expectedTurtlesValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller: global.cattle.imagePullSecrets set; no top-level imagePullSecrets
+				expectedSUCValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "registry.example.com",
+							"imagePullSecrets":      pullSecrets,
+						},
+					},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/system-upgrade-controller",
+						},
+					},
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/kuberlr-kubectl",
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
+					"",
+					"2.0.0",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// remotedialer-proxy: global.cattle.imagePullSecrets set; top-level imagePullSecrets as []v1.LocalObjectReference
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "registry.example.com",
+						},
+					},
+					"imagePullSecrets": []v1.LocalObjectReference{
+						{Name: "pull-secret-a"},
+						{Name: "pull-secret-b"},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher/remotedialer-proxy",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
@@ -1159,6 +1453,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": "",
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"image": map[string]interface{}{
@@ -1188,6 +1483,7 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": "",
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
 					"image": map[string]interface{}{
 						"repository": "rancher-test.io/rancher/turtles",
 					},
@@ -1208,6 +1504,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": "",
+							"imagePullSecrets":      ([]string)(nil),
 						}},
 					"systemUpgradeController": map[string]interface{}{
 						"image": map[string]interface{}{
@@ -1241,6 +1538,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"image": map[string]interface{}{
 						"repository": "rancher-test.io/rancher/remotedialer-proxy",
 					},
+					"imagePullSecrets": ([]v1.LocalObjectReference)(nil),
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1287,6 +1585,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 						},
 					},
+					"imagePullSecrets": ([]v1.LocalObjectReference)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/remotedialer-proxy",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1308,6 +1610,9 @@ func Test_ChartInstallation(t *testing.T) {
 					},
 					"global": "",
 					"newKey": "newValue",
+					"image": map[string]interface{}{
+						"repository": "rancher/rancher-webhook",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
@@ -1342,6 +1647,10 @@ func Test_ChartInstallation(t *testing.T) {
 							"systemDefaultRegistry": "",
 						},
 					},
+					"imagePullSecrets": ([]string)(nil),
+					"image": map[string]interface{}{
+						"repository": "rancher/turtles",
+					},
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.TurtlesNamespace,
@@ -1360,6 +1669,17 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": "",
+							"imagePullSecrets":      ([]string)(nil),
+						},
+					},
+					"systemUpgradeController": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/system-upgrade-controller",
+						},
+					},
+					"kubectl": map[string]interface{}{
+						"image": map[string]interface{}{
+							"repository": "rancher/kuberlr-kubectl",
 						},
 					},
 				}
@@ -1383,6 +1703,8 @@ func Test_ChartInstallation(t *testing.T) {
 			_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
 			_ = settings.SystemUpgradeControllerChartVersion.Set(originalSUCVersion)
 			_ = settings.ImportedClusterVersionManagement.Set(originalImportedVersionManagement)
+			_ = settings.SystemDefaultRegistry.Set(originalSystemDefaultRegistry)
+			_ = settings.SystemDefaultRegistryPullSecrets.Set(originalSystemDefaultRegistryPullSecrets)
 			features.MCM.Set(originalMCM)
 			features.MCMAgent.Set(originalMCMAgent)
 			features.ManagedSystemUpgradeController.Set(originalManagedSystemUpgradeController)
@@ -1450,7 +1772,10 @@ func Test_TurtlesInstallation(t *testing.T) {
 		"capi":              nil,
 		"mcm":               map[string]interface{}{"enabled": features.MCM.Enabled()},
 		"global": map[string]interface{}{
-			"cattle": map[string]interface{}{"systemDefaultRegistry": settings.SystemDefaultRegistry.Get()},
+			"cattle": map[string]interface{}{"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(), "imagePullSecrets": ([]string)(nil)},
+		},
+		"image": map[string]interface{}{
+			"repository": "rancher/rancher-webhook",
 		},
 	}
 	expectedTurtlesValues := map[string]interface{}{
@@ -1461,7 +1786,13 @@ func Test_TurtlesInstallation(t *testing.T) {
 			},
 		},
 		"global": map[string]interface{}{
-			"cattle": map[string]interface{}{"systemDefaultRegistry": settings.SystemDefaultRegistry.Get()},
+			"cattle": map[string]interface{}{
+				"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+			},
+		},
+		"imagePullSecrets": ([]string)(nil),
+		"image": map[string]interface{}{
+			"repository": "rancher/turtles",
 		},
 	}
 	gomock.InOrder(
@@ -1520,7 +1851,13 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 			},
 		},
 		"global": map[string]interface{}{
-			"cattle": map[string]interface{}{"systemDefaultRegistry": settings.SystemDefaultRegistry.Get()},
+			"cattle": map[string]interface{}{
+				"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+			},
+		},
+		"imagePullSecrets": ([]string)(nil),
+		"image": map[string]interface{}{
+			"repository": "rancher/turtles",
 		},
 	}
 	gomock.InOrder(
@@ -1674,6 +2011,13 @@ func Test_relatedSettings(t *testing.T) {
 			name: "shell image",
 			changedObj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{
 				Name: settings.ShellImage.Name,
+			}},
+			want: []relatedresource.Key{{Name: repoName, Namespace: ""}},
+		},
+		{
+			name: "system default registry pull secrets",
+			changedObj: &v3.Setting{ObjectMeta: metav1.ObjectMeta{
+				Name: settings.SystemDefaultRegistryPullSecrets.Name,
 			}},
 			want: []relatedresource.Key{{Name: repoName, Namespace: ""}},
 		},

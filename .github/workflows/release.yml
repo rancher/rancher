@@ -6,7 +6,8 @@ on:
       - "!v*-hotfix*"
       - "!v*-rcs*"
 
-permissions: {}
+permissions:
+  contents: read
 
 env:
   COMMIT: ${{ github.sha }}

@@ -233,7 +233,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			expectedURL: registryURL,
 			expectedPullSecrets: func(t *testing.T) []AgentPullSecret {
 				return []AgentPullSecret{{
-					Name:             "imported-secret",
+					Name:             "imported-secret-rancher-managed-pull-secret",
 					DockerConfigJSON: dockerConfigForCreds(t, "importuser", "importpass"),
 				}}
 			},
@@ -635,4 +635,3 @@ func TestPrivateRegistryPullSecretsAsObjectReferences(t *testing.T) {
 		})
 	}
 }
-

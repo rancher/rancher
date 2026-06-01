@@ -25,6 +25,7 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
+	"github.com/rancher/rancher/pkg/cluster"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -1041,6 +1042,11 @@ func (s *Operations) createPod(secretData map[string][]byte, imageOverride strin
 				},
 			},
 		},
+	}
+
+	registry, _ := cluster.GetPrivateRegistry(nil)
+	if registry != nil && len(registry.PullSecrets) > 0 {
+		pod.Spec.ImagePullSecrets = registry.PullSecretsAsObjectReferences()
 	}
 
 	return pod, &podimpersonation.PodOptions{

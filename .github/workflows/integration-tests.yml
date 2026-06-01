@@ -6,7 +6,7 @@ env:
   GIT_TAG: v2.14-${{ github.sha }}-head
   HOST_ARCH: amd64
   ARCH: amd64
-  GOLANG_VERSION: '1.25'
+  GOLANG_VERSION: '1.26'
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}

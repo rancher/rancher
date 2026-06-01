@@ -157,7 +157,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-etcd"] = true
 	}
 
-	if pr := image.GetPrivateRepoURLFromControlPlane(controlPlane); pr != "" && !isOnlyWorker(entry) {
+	if pr, _ := image.GetPrivateRepoURLFromControlPlane(controlPlane); pr != "" && !isOnlyWorker(entry) {
 		config["system-default-registry"] = pr
 	}
 

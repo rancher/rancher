@@ -196,6 +196,9 @@ func (g *Provider) RefetchGroupPrincipals(principalID string, _ string) ([]apiv3
 	return g.getGroupPrincipals(principalID, config)
 }
 
+func (g *Provider) UsesUserSecrets() bool      { return false }
+func (g *Provider) CanRefreshPrincipals() bool { return true }
+
 func (g *Provider) getGroupPrincipals(principalID string, config *apiv3.GithubAppConfig) ([]apiv3.Principal, error) {
 	_, id, err := parsePrincipalID(principalID)
 	if err != nil {

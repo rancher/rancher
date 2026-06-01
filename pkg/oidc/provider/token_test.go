@@ -23,6 +23,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/oidc/mocks"
@@ -620,7 +621,7 @@ func TestTokenEndpoint(t *testing.T) {
 	// register auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
 	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
-	providers.Providers[fakeAuthProvider] = mockProvider
+	providers.SetProviders(map[string]common.AuthProvider{fakeAuthProvider: mockProvider})
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
