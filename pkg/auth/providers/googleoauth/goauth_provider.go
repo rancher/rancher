@@ -3,6 +3,7 @@ package googleoauth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -192,7 +193,8 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 		if err != nil {
 			if config.ServiceAccountCredential == "" {
 				// used client creds, try get again with viewType=domain_public
-				if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusForbidden {
+				var gErr *googleapi.Error
+				if errors.As(err, &gErr) && gErr.Code == http.StatusForbidden {
 					user, err = adminSvc.Users.Get(externalID).ViewType(domainPublicViewType).Do()
 					if err != nil {
 						return principal, wrapGoogleNonTransient(err)
@@ -222,7 +224,8 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 			if config.ServiceAccountCredential == "" {
 				// used client creds, getting group for non-admin might fail with forbidden, if that's the case don't throw
 				// error
-				if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusForbidden {
+				var gErr *googleapi.Error
+				if errors.As(err, &gErr) && gErr.Code == http.StatusForbidden {
 					return principal, nil
 				}
 			}
@@ -445,7 +448,16 @@ func (g *googleOauthProvider) IsDisabledProvider() (bool, error) {
 }
 
 func wrapGoogleNonTransient(err error) error {
-	if gErr, ok := err.(*googleapi.Error); ok && gErr.Code == http.StatusNotFound {
+	var gErr *googleapi.Error
+	if errors.As(err, &gErr) && gErr.Code == http.StatusNotFound {
+		return &common.NonTransientError{Err: err}
+	}
+	// invalid_grant means the per-user refresh token was revoked at Google
+	// (user deleted in Workspace, OAuth consent withdrawn). The TokenSource
+	// surfaces this when an API call drives a token refresh, so it can also
+	// reach us wrapped inside a googleapi request error.
+	var retrieveErr *oauth2.RetrieveError
+	if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant" {
 		return &common.NonTransientError{Err: err}
 	}
 	return err
