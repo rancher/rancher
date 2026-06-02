@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"go.uber.org/mock/gomock"
@@ -167,11 +168,31 @@ func (s *autoscalerSuite) expectHelmOpDelete(namespace, name string, err error) 
 	s.helmOp.EXPECT().Delete(namespace, name, &metav1.DeleteOptions{}).Return(err)
 }
 
+// expectManageHelmOpSecrets sets up the mock expectations that manageHelmOpSecrets produces
+// when the cluster has no per-cluster registry auth configured (the common test scenario).
+func (s *autoscalerSuite) expectManageHelmOpSecrets(clusterName, clusterNamespace string) {
+	provCluster := &provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNamespace}}
+	s.clusterCache.EXPECT().Get(clusterNamespace, clusterName).Return(provCluster, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	// cleanupClusterScopedSecrets
+	s.secretClient.EXPECT().Delete(clusterNamespace, helmOpSecretName(clusterName, clusterNamespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(clusterNamespace, autoscalerClusterScopedImagePullSecretName(clusterName), gomock.Any()).Return(notFound)
+	// ensureRootHelmOpSecrets — no global registry → attempt to delete both root secrets
+	s.secretClient.EXPECT().Delete("fleet-default", autoscalerHelmSecretResourceName, gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete("fleet-default", autoscalerChartImagePullSecretName, gomock.Any()).Return(notFound)
+}
+
+func (s *autoscalerSuite) expectCleanupFleetProvisioningClusterNotFound(clusterNamespace, clusterName string) {
+	s.clusterCache.EXPECT().Get(clusterNamespace, clusterName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "cluster"))
+}
+
 // Test cases for ensureFleetHelmOp method
 
 func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_CreateNewHelmOp() {
 	cluster := s.createTestCluster("test-cluster", "default")
 
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.expectHelmOpCreate()
 
@@ -194,6 +215,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_UpdateExistingHelmOp()
 		},
 	}
 
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", existingHelmOp, nil)
 	s.expectHelmOpUpdate("default", "cluster-autoscaler-test-cluster")
 
@@ -226,7 +248,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 						Values: &fleet.GenericMap{
 							Data: map[string]any{
 								"replicaCount": 3,
-								"image":        s.h.getChartImageSettings(cluster),
+								"image":        s.h.getChartImageSettings(cluster, ""),
 								"autoDiscovery": map[string]any{
 									"clusterName": cluster.Name,
 									"namespace":   cluster.Namespace,
@@ -254,6 +276,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 		},
 	}
 
+	s.expectManageHelmOpSecrets("test-cluster", "default")
 	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", existingHelmOp, nil)
 	s.helmOp.EXPECT().Update(gomock.Any()).Times(0)
 
@@ -289,7 +312,7 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_NoOverride() {
 	cluster := s.createTestCluster("test-cluster", "default")
 
-	result := s.h.getChartImageSettings(cluster)
+	result := s.h.getChartImageSettings(cluster, "")
 	s.Equal(map[string]any{}, result)
 }
 
@@ -302,7 +325,7 @@ func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_WithValidImage() {
 
 	cluster := s.createTestCluster("test-cluster", "default")
 
-	result := s.h.getChartImageSettings(cluster)
+	result := s.h.getChartImageSettings(cluster, "")
 	expected := map[string]any{
 		"repository": "cluster-autoscaler",
 		"registry":   "registry.example.com",
@@ -366,6 +389,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_HelmOpExists() {
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err)
@@ -376,6 +400,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_HelmOpDoesNotExist() {
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, ""))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err)
@@ -387,6 +412,7 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_DeleteError() {
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, fmt.Errorf("delete failed"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err)
@@ -400,6 +426,7 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_GetError() {
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, fmt.Errorf("get failed"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err)
@@ -414,6 +441,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_SuccessfulHelmOpDeletion() 
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when successfully cleaning up HelmOp")
@@ -424,9 +452,31 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_NoHelmOpExists() {
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when HelmOp doesn't exist")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_HappyPath_CleansClusterScopedSecrets() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		},
+	}
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+
+	// HelmOp does not exist, so only cluster-scoped secret cleanup should run.
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(notFound)
+
+	err := s.h.cleanupFleet(cluster)
+	s.NoError(err, "Expected no error when cluster-scoped cleanup secrets are absent")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteHelmOp() {
@@ -436,6 +486,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteHelmOp() {
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, deleteError)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err, "Expected error when HelmOp deletion fails")
@@ -452,6 +503,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckHelmOpExistence() 
 	checkError := fmt.Errorf("failed to check HelmOp existence: network timeout")
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, checkError)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err, "Expected error when HelmOp existence check fails")
@@ -462,11 +514,77 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckHelmOpExistence() 
 	}
 }
 
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckProvisioningClusterExistence() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	checkError := fmt.Errorf("failed to check provisioning cluster existence: network timeout")
+
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(nil, checkError)
+
+	err := s.h.cleanupFleet(cluster)
+	s.Error(err, "Expected error when provisioning cluster existence check fails")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
+		s.Contains(err.Error(), "failed to check existence of Cluster "+cluster.Namespace+" in namespace "+cluster.Name)
+		s.Contains(err.Error(), "network timeout")
+	}
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCleanupClusterScopedSecrets() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		},
+	}
+	cleanupError := fmt.Errorf("failed to delete cluster-scoped helm secret")
+
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(cleanupError)
+
+	err := s.h.cleanupFleet(cluster)
+	s.Error(err, "Expected error when cluster-scoped secret cleanup fails")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
+		s.Contains(err.Error(), "failed to delete cluster-scoped helm secret")
+	}
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteClusterScopedImagePullSecret() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		},
+	}
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	cleanupError := fmt.Errorf("failed to delete cluster-scoped image pull secret")
+
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
+	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(cleanupError)
+
+	err := s.h.cleanupFleet(cluster)
+	s.Error(err, "Expected error when cluster-scoped image pull secret cleanup fails")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
+		s.Contains(err.Error(), "failed to delete cluster-scoped image pull secret")
+	}
+}
+
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyName() {
 	cluster := s.createTestCluster("", "default")
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has empty name")
@@ -477,6 +595,7 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyNamespace() 
 	helmOpName := helmOpName(cluster)
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has empty namespace")
@@ -488,6 +607,7 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
 	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")

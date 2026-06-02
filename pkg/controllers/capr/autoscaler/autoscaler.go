@@ -12,6 +12,7 @@ import (
 	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
@@ -23,12 +24,16 @@ import (
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const helmSecretSync = "autoscaler-helm-secret-sync"
 
 // dynamicGetter defines the interface for the Get method from dynamic.Controller
 type dynamicGetter interface {
@@ -100,6 +105,10 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	// only run the "create" handlers if autoscaling is enabled. otherwise only run the cleanup handler
 	// (in case the user disabled autoscaling after having it enabled
 	if !features.ClusterAutoscaling.Enabled() {
+		// Clean up the shared root helm-op secret in fleet-default
+		if err := h.secretClient.Delete("fleet-default", autoscalerHelmSecretResourceName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			logrus.Errorf("[autoscaler] failed to clean up root helm-op secret in fleet-default: %v", err)
+		}
 		clients.CAPI.Cluster().OnChange(ctx, "autoscaler-cleanup", h.ensureCleanup)
 		return
 	}
@@ -107,7 +116,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	// warn the user if they have the autoscaling feature-flag enabled but no chart repo set,
 	// then do not run the controller.
 	if settings.ClusterAutoscalerChartRepository.Get() == "" {
-		logrus.Warnf("[autoscaler] no value is set for the cluster-autoscaler-chart-repo Setting  - cannot enable autoscaling!")
+		logrus.Warnf("[autoscaler] no value is set for the cluster-autoscaler-chart-repo Setting - cannot enable autoscaling!")
 		return
 	}
 
@@ -116,6 +125,19 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.CAPI.Cluster().OnChange(ctx, "autoscaler-mgr", h.OnChange)
 	clients.Fleet.HelmOp().OnChange(ctx, "autoscaler-status-sync", h.syncHelmOpStatus)
+	clients.Mgmt.Setting().OnChange(ctx, helmSecretSync, h.syncRootHelmOpSecret)
+}
+
+// syncRootHelmOpSecret manages root HelmOp and image pull secrets in the fleet-default namespace. This secret
+// is used by the fleet agent to authenticate with the OCI registry containing the autoscaler chart, and to pull the
+// actual autoscaler image, respectively. This function ensures that the root secrets are kept up to date with
+// the current image pull secret value defined in the first value of the settings.SystemDefaultRegistryPullSecrets setting.
+func (h *autoscalerHandler) syncRootHelmOpSecret(_ string, setting *v3.Setting) (*v3.Setting, error) {
+	if setting == nil || (setting.Name != settings.SystemDefaultRegistryPullSecrets.Name && setting.Name != settings.SystemDefaultRegistry.Name) {
+		return setting, nil
+	}
+	_, _, err := h.ensureRootHelmOpSecrets()
+	return setting, err
 }
 
 // OnChange handles changes to CAPI clusters and manages autoscaler deployment.

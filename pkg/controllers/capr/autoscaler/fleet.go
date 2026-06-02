@@ -51,6 +51,11 @@ var defaultChartVersionConfigs = k8sVersionToAutoscalerChartVersions[34]
 // one key parameter here is the kubeconfigVersion which is legitimately just involved to
 // force a re-rollout of the downstream cluster-autoscaler deployment on token-rotation.
 func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigVersion string, replicaCount int) error {
+	helmOpSecretName, imagePullSecretName, err := h.manageHelmOpSecrets(cluster)
+	if err != nil {
+		return err
+	}
+
 	bundle := fleet.HelmOpSpec{
 		BundleSpec: fleet.BundleSpec{
 			Targets: []fleet.BundleTarget{
@@ -68,7 +73,7 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 					Values: &fleet.GenericMap{
 						Data: map[string]any{
 							"replicaCount": replicaCount,
-							"image":        h.getChartImageSettings(cluster),
+							"image":        h.getChartImageSettings(cluster, imagePullSecretName),
 							"autoDiscovery": map[string]any{
 								"clusterName": cluster.Name,
 								"namespace":   cluster.Namespace,
@@ -95,6 +100,24 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 				},
 			},
 		},
+	}
+
+	if helmOpSecretName != "" {
+		bundle.DownstreamResources = append(bundle.DownstreamResources, fleet.DownstreamResource{
+			Kind: "secret",
+			Name: helmOpSecretName,
+		})
+		bundle.HelmSecretName = helmOpSecretName
+		bundle.HelmOpOptions = &fleet.BundleHelmOptions{
+			SecretName: helmOpSecretName,
+		}
+	}
+
+	if imagePullSecretName != "" {
+		bundle.DownstreamResources = append(bundle.DownstreamResources, fleet.DownstreamResource{
+			Kind: "secret",
+			Name: imagePullSecretName,
+		})
 	}
 
 	helmOp, err := h.helmOpCache.Get(cluster.Namespace, helmOpName(cluster))
@@ -141,18 +164,23 @@ func (h *autoscalerHandler) chartVersionsForCluster(cluster *capi.Cluster) *k8sT
 }
 
 // getChartImageSettings returns a map of the image settings to pass to the chart, this is based on the kubernetes minor version
-func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[string]any {
-	// if we don't specify an image - just use whatever is in the chart
+func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster, pullSecretName string) map[string]any {
+	imageSettings := map[string]any{}
+	if pullSecretName != "" {
+		imageSettings["pullSecrets"] = []string{pullSecretName}
+	}
+
 	autoscalerImage := settings.ClusterAutoscalerImage.Get()
+	// if we don't specify an image - just use whatever is in the chart
 	if autoscalerImage == "" {
-		return map[string]any{}
+		return imageSettings
 	}
 
 	// parse out the image to properly set all the values in the chart
 	imageRef, err := reference.ParseNamed(autoscalerImage)
 	if err != nil {
 		logrus.Debugf("[autoscaler] failed to parse autoscaler image '%s': %v", autoscalerImage, err)
-		return map[string]any{}
+		return imageSettings
 	}
 
 	registry := reference.Domain(imageRef)
@@ -161,13 +189,11 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[str
 
 	// if we are not overriding all the image settings fall back to whatever is in the chart by default
 	if registry == "" && image == "" {
-		return map[string]any{}
+		return imageSettings
 	}
 
-	imageSettings := map[string]any{
-		"repository": image,
-		"registry":   registry,
-	}
+	imageSettings["repository"] = image
+	imageSettings["registry"] = registry
 
 	// this handles if the image setting was set with a tag - we just use that
 	// instead of the hardcoded version for the k8s version
@@ -247,6 +273,17 @@ func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
 		}
 	} else if !errors.IsNotFound(err) {
 		errs = append(errs, fmt.Errorf("failed to check existence of Helm operation %s in namespace %s: %w", helmOpName, cluster.Namespace, err))
+	}
+
+	// Delete the cluster scoped autoscaler secrets if they exist
+	provCluster, err := h.clusterCache.Get(cluster.Namespace, cluster.Name)
+	if err == nil {
+		err = h.cleanupClusterScopedSecrets(provCluster, cluster)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of Cluster %s in namespace %s when cleaning up Helm operation secrets: %w", cluster.Namespace, cluster.Name, err))
 	}
 
 	// Return combined errors if any occurred

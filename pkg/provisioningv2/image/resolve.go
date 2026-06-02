@@ -33,12 +33,12 @@ func resolve(reg, image string) string {
 }
 
 // GetPrivateRepoSecretFromCluster returns the name of the secret containing the credentials for the cluster level system-default-registry.
-func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) string {
+func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) (string, bool) {
 	url, isGlobalDefault := GetPrivateRepoURLFromCluster(cluster)
 	if cluster != nil && cluster.Spec.RKEConfig != nil && cluster.Spec.RKEConfig.Registries != nil {
 		config, ok := cluster.Spec.RKEConfig.Registries.Configs[url]
 		if ok {
-			return config.AuthConfigSecretName
+			return config.AuthConfigSecretName, false
 		}
 	}
 
@@ -49,11 +49,23 @@ func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) string {
 		for _, entry := range strings.Split(globalPullSecrets, ",") {
 			secret := strings.TrimSpace(entry)
 			if secret != "" {
-				return secret
+				return secret, true
 			}
 		}
 	}
 
+	return "", false
+}
+
+func GetRegistryAuthSecretForHostname(cluster *v1.Cluster, url string) string {
+	if cluster == nil || cluster.Spec.RKEConfig == nil || cluster.Spec.RKEConfig.Registries == nil {
+		return ""
+	}
+	for regUrl, registry := range cluster.Spec.RKEConfig.Registries.Configs {
+		if regUrl == url {
+			return registry.AuthConfigSecretName
+		}
+	}
 	return ""
 }
 

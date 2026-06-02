@@ -26,34 +26,7 @@ const (
 // ConvertToDockerConfigJson converts various types of secrets into a proper .dockerconfigjson format. Specifically, rke.cattle.io/auth-config, kubernetes.io/basic-auth,
 // and kubernetes.io/dockerconfigjson secrets are supported. This is required as the Rancher UI may specify non-dockerconfigjson secrets on the management cluster.
 func ConvertToDockerConfigJson(registryHost string, secret *kcorev1.Secret) ([]byte, error) {
-	switch secret.Type {
-	case v1.AuthConfigSecretType:
-		if secret.Data == nil {
-			return nil, fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
-		}
-		auth, ok := secret.Data["auth"]
-		if !ok {
-			return nil, fmt.Errorf(ErrAuthKeyNotFound, secret.Name, registryHost)
-		}
-		username, password, found := strings.Cut(string(auth), ":")
-		if !found {
-			return nil, fmt.Errorf(ErrAuthMalformed, secret.Name, registryHost)
-		}
-		return BuildDockerConfigJson(registryHost, username, password)
-	case kcorev1.SecretTypeBasicAuth:
-		if secret.Data == nil {
-			return nil, fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
-		}
-		username, ok := secret.Data["username"]
-		if !ok {
-			return nil, fmt.Errorf(ErrUsernameNotFound, secret.Name, registryHost)
-		}
-		password, ok := secret.Data["password"]
-		if !ok {
-			return nil, fmt.Errorf(ErrPasswordNotFound, secret.Name, registryHost)
-		}
-		return BuildDockerConfigJson(registryHost, string(username), string(password))
-	case kcorev1.SecretTypeDockerConfigJson:
+	if secret.Type == kcorev1.SecretTypeDockerConfigJson {
 		if secret.Data == nil {
 			return nil, fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
 		}
@@ -62,8 +35,52 @@ func ConvertToDockerConfigJson(registryHost string, secret *kcorev1.Secret) ([]b
 			return nil, fmt.Errorf(ErrDockerConfigKeyNotFound, secret.Name, registryHost)
 		}
 		return cfg, nil
+	}
+
+	username, password, err := ExtractUsernamePasswordFromPullSecret(registryHost, secret)
+	if err != nil {
+		return nil, err
+	}
+
+	return BuildDockerConfigJson(registryHost, username, password)
+}
+
+func ExtractUsernamePasswordFromPullSecret(registryHost string, secret *kcorev1.Secret) (string, string, error) {
+	switch secret.Type {
+	case v1.AuthConfigSecretType:
+		if secret.Data == nil {
+			return "", "", fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
+		}
+		auth, ok := secret.Data["auth"]
+		if !ok {
+			return "", "", fmt.Errorf(ErrAuthKeyNotFound, secret.Name, registryHost)
+		}
+		username, password, found := strings.Cut(string(auth), ":")
+		if !found {
+			return "", "", fmt.Errorf(ErrAuthMalformed, secret.Name, registryHost)
+		}
+		return username, password, nil
+	case kcorev1.SecretTypeBasicAuth:
+		if secret.Data == nil {
+			return "", "", fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
+		}
+		username, ok := secret.Data["username"]
+		if !ok {
+			return "", "", fmt.Errorf(ErrUsernameNotFound, secret.Name, registryHost)
+		}
+		password, ok := secret.Data["password"]
+		if !ok {
+			return "", "", fmt.Errorf(ErrPasswordNotFound, secret.Name, registryHost)
+		}
+		return string(username), string(password), nil
+	case kcorev1.SecretTypeDockerConfigJson:
+		if secret.Data == nil {
+			return "", "", fmt.Errorf(ErrSecretDataNil, secret.Name, registryHost)
+		}
+		username, password, _, err := UnwrapDockerConfigJson(registryHost, secret.Data)
+		return username, password, err
 	default:
-		return nil, fmt.Errorf(ErrUnsupportedSecretType, secret.Name, registryHost, secret.Type)
+		return "", "", fmt.Errorf(ErrUnsupportedSecretType, secret.Name, registryHost, secret.Type)
 	}
 }
 

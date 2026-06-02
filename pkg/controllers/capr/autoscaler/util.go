@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -16,6 +16,22 @@ import (
 	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+const (
+	autoscalerHelmSecretResourceName   = "autoscaler-helm-secret"
+	autoscalerChartImagePullSecretName = "autoscaler-chart-image-pull-secret"
+)
+
+func helmOpSecretName(clusterName, clusterNamespace string) string {
+	if clusterNamespace == "fleet-default" {
+		return autoscalerHelmSecretResourceName
+	}
+	return name.SafeConcatName(autoscalerHelmSecretResourceName, clusterName)
+}
+
+func autoscalerClusterScopedImagePullSecretName(clusterName string) string {
+	return name.SafeConcatName(autoscalerChartImagePullSecretName, clusterName)
+}
 
 // autoscalerUserName generates the autoscaler-specific name for a cluster
 func autoscalerUserName(cluster *capi.Cluster) string {
@@ -39,6 +55,20 @@ func kubeconfigSecretName(cluster *capi.Cluster) string {
 
 func helmOpName(cluster *capi.Cluster) string {
 	return name.SafeConcatName("autoscaler", cluster.Namespace, cluster.Name)
+}
+
+// autoScalerChartRepositoryHost trims away the protocol and chart path
+// from the configured settings.ClusterAutoscalerChartRepository to return just the host.
+// This is then used to identify the correct dockerconfigjson auth entry defined within the
+// first configured pull secret in the settings.SystemDefaultRegistryPullSecrets list.
+func autoScalerChartRepositoryHost() string {
+	host := settings.ClusterAutoscalerChartRepository.Get()
+	_, hostWithoutProto, found := strings.Cut(host, "://")
+	if !found {
+		hostWithoutProto = host
+	}
+	hostWithoutPath, _, found := strings.Cut(hostWithoutProto, "/")
+	return hostWithoutPath
 }
 
 // ownerReference creates an owner reference from a cluster
