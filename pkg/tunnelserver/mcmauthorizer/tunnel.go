@@ -16,6 +16,7 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kontainerdriver"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/utils"
 
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -297,7 +298,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 		}
 	}
 
-	apiEndpoint := "https://" + inCluster.Address
+	apiEndpoint := "https://" + formatAddress(inCluster.Address)
 	token := inCluster.Token
 	caCert := inCluster.CACert
 
@@ -418,4 +419,29 @@ func (t *Authorizer) toCustomConfig(machine *client.Node) *v32.CustomConfig {
 		return nil
 	}
 	return result
+}
+
+// formatAddress ensures that an address containing a bare IPv6 host (without brackets)
+// is properly formatted with brackets for use in a URL. Addresses that are already
+// bracketed or are IPv4 are returned as-is.
+func formatAddress(address string) string {
+	// Already bracketed
+	if strings.HasPrefix(address, "[") {
+		return address
+	}
+
+	// Find the last colon - for IPv6 addresses there will be multiple colons
+	lastColon := strings.LastIndex(address, ":")
+	if lastColon < 0 {
+		return address
+	}
+
+	host := address[:lastColon]
+	port := address[lastColon+1:]
+
+	if utils.IsPlainIPV6(host) {
+		return "[" + host + "]:" + port
+	}
+
+	return address
 }
