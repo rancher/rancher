@@ -138,6 +138,9 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}
+	if secret.Annotations == nil {
+		secret.Annotations = map[string]string{}
+	}
 
 	result := &PlanStatus{}
 

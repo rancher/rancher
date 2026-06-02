@@ -115,7 +115,7 @@ func handleError(t *testing.T, clients *clients.Clients, name string, err error)
 			logrus.Error(newErr)
 		}
 		//nolint:revive
-		err = fmt.Errorf("cluster %s creation wait failed on: %w\ncluster %s test data bundle: \n%s\n", c.Name, err, c.Name, data)
+		err = fmt.Errorf("cluster %s creation wait failed on: %w\ncluster %s test data bundle: \n%s\n", name, err, name, data)
 		t.Fatal(err)
 	}
 }

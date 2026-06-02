@@ -185,13 +185,11 @@ func (c *collector) WithSorter(s SorterFunc) SortedBuilder {
 func (c *collector) Collect(cache SecretCache, namespace string) ([]*corev1.Secret, error) {
 	var secrets []*corev1.Secret
 
-	// 1. Compile Selectors
-	queries := []labels.Selector{} // Default to empty selector (fetch all) if none provided
+	queries := []labels.Selector{} // Fetch nothing if none provided
 	if c.selector != nil {
 		queries = c.selector.ToK8sSelectors()
 	}
 
-	// 2. Fetch from Cache
 	for _, sel := range queries {
 		list, err := cache.List(namespace, sel)
 		if err != nil {
@@ -200,8 +198,9 @@ func (c *collector) Collect(cache SecretCache, namespace string) ([]*corev1.Secr
 		secrets = append(secrets, list...)
 	}
 
-	// 3. Remove by Uniqueness
 	// Use UID to deduplicate secrets fetched by overlapping OR queries
+	// The top-most selector should always be "And" with the cluster name label, and then an OR to prevent selecting
+	// secrets from other clusters unintentionally.
 	uniqueMap := make(map[string]*corev1.Secret)
 	for _, s := range secrets {
 		key := string(s.UID)
@@ -216,7 +215,7 @@ func (c *collector) Collect(cache SecretCache, namespace string) ([]*corev1.Secr
 		uniqueSecrets = append(uniqueSecrets, s)
 	}
 
-	// 4. Run Filters
+	// Filter secrets that cannot be excluded by labels
 	var filteredSecrets []*corev1.Secret
 	for _, s := range uniqueSecrets {
 		keep := true
@@ -231,7 +230,6 @@ func (c *collector) Collect(cache SecretCache, namespace string) ([]*corev1.Secr
 		}
 	}
 
-	// 5. Run Sorters
 	result := filteredSecrets
 	for _, sortFunc := range c.sorters {
 		result = sortFunc(result)

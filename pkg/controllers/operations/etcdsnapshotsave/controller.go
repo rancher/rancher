@@ -273,7 +273,11 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\"]", status.Step, opv1alpha1.ETCDSnapshotSaveStepSave, opv1alpha1.ETCDSnapshotSaveStepSave))
+	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf(
+		"current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\"]",
+		status.Step,
+		opv1alpha1.ETCDSnapshotSaveStepSave,
+		opv1alpha1.ETCDSnapshotSaveStepRestart))
 
 	return status, nil
 }
@@ -498,7 +502,7 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapsho
 	} else if status.Phase == opv1alpha1.OperationPhaseFailed {
 		opv1alpha1.PendingCondition.False(&status)
 		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation completed successfully")
+		opv1alpha1.PendingCondition.Message(&status, "Operation failed")
 		opv1alpha1.InProgressCondition.False(&status)
 		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
 		opv1alpha1.InProgressCondition.Message(&status, "Operation failed")

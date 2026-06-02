@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/ptr"
 )
 
 type WatchFunc func(namespace string, opts metav1.ListOptions) (watch.Interface, error)
@@ -113,7 +114,7 @@ func ObjectWithTimeout(ctx context.Context, timeout time.Duration, watchFunc Wat
 	return retryWatchWithTimeout(ctx, timeout, func() (watch.Interface, error) {
 		return watchFunc(meta.GetNamespace(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + meta.GetName(),
-			TimeoutSeconds: &[]int64{int64(timeout.Seconds())}[0],
+			TimeoutSeconds: ptr.To(int64(timeout.Seconds())),
 		})
 	}, cb)
 }
