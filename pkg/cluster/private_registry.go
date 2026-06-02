@@ -208,9 +208,30 @@ func generateProvisionedClusterDockerConfig(cluster *v3.Cluster, secretLister v1
 		return v2ProvRegistryURL, nil, err
 	}
 
-	configJson, err := ConvertToDockerConfigJson(v2ProvRegistryURL, registrySecret)
-	if err != nil {
-		return "", nil, fmt.Errorf("clusterDeploy: failed to convert pull secret to json for cluster %s: %w", cluster.Name, err)
+	var configJson []byte
+	if registrySecret.Type == kcorev1.SecretTypeDockerConfigJson {
+		if registrySecret.Data == nil {
+			return v2ProvRegistryURL, nil, nil
+		}
+		_, _, _, err := UnwrapDockerConfigJson(v2ProvRegistryURL, registrySecret.Data)
+		if err != nil {
+			// A .dockerconfigjson may contain credentials for a number of registry hostnames,
+			// ensure that we are only delivering credentials for the configured hostname.
+			if err.Error() == fmt.Sprintf(ErrRegistryHostnameNotFound, v2ProvRegistryURL) {
+				return v2ProvRegistryURL, nil, nil
+			}
+			return v2ProvRegistryURL, nil, err
+		}
+		configJson, _ = registrySecret.Data[kcorev1.DockerConfigJsonKey]
+	} else {
+		configJson, err = ConvertToDockerConfigJson(v2ProvRegistryURL, registrySecret)
+		if err != nil {
+			return "", nil, fmt.Errorf("clusterDeploy: failed to convert pull secret to json for cluster %s: %w", cluster.Name, err)
+		}
+	}
+
+	if configJson == nil {
+		return v2ProvRegistryURL, nil, nil
 	}
 
 	// note:
