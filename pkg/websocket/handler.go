@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/features"
+	httprequest "github.com/rancher/rancher/pkg/http/request"
 )
 
 const (
@@ -29,6 +31,11 @@ func (h websocketHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if isWebsocket(req) && isBrowserUserAgent(req.Header) {
 		if !checkSameOrigin(req) {
 			response(rw, httperror.PermissionDenied, "origin not allowed")
+			return
+		}
+		// Block pod exec WebSocket requests when the pod-shell feature is disabled
+		if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
+			response(rw, httperror.PermissionDenied, "pod shell feature is disabled")
 			return
 		}
 	}
@@ -89,8 +96,8 @@ func isBrowserUserAgent(header http.Header) bool {
 }
 
 func response(rw http.ResponseWriter, code httperror.ErrorCode, message string) {
-	rw.WriteHeader(code.Status)
 	rw.Header().Set("content-type", "application/json")
+	rw.WriteHeader(code.Status)
 	json.NewEncoder(rw).Encode(httperror.NewAPIError(code, message))
 }
 

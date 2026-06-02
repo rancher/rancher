@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	httprequest "github.com/rancher/rancher/pkg/http/request"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
@@ -81,7 +82,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 			}
 			// Block pod exec requests when the pod-shell feature is disabled.
 			// This check applies to local cluster pod exec requests that don't go through the cluster proxy handler.
-			if isPodExecRequest(req) && !features.PodShell.Enabled() {
+			if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
 				rw.WriteHeader(http.StatusForbidden)
 				rw.Write([]byte("pod shell feature is disabled"))
 				return
@@ -180,7 +181,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Block pod exec requests when the pod-shell feature is disabled.
-	if isPodExecRequest(req) && !features.PodShell.Enabled() {
+	if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
 		rw.WriteHeader(http.StatusForbidden)
 		rw.Write([]byte("pod shell feature is disabled"))
 		return
@@ -267,12 +268,4 @@ func (h *Handler) canAccess(ctx context.Context, user user.Info, clusterID strin
 	})
 
 	return err == nil && resp == authorizer.DecisionAllow
-}
-
-// isPodExecRequest returns true when the request path targets the pod exec subresource.
-func isPodExecRequest(req *http.Request) bool {
-	path := req.URL.Path
-	return strings.Contains(path, "/api/v1/namespaces/") &&
-		strings.Contains(path, "/pods/") &&
-		strings.HasSuffix(path, "/exec")
 }
