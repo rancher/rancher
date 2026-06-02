@@ -219,8 +219,7 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 	tests := []struct {
 		name            string
 		chartBaseValues map[string]any
-		wantSupports    bool
-		wantErr         bool
+		wantSupported   bool
 	}{
 		{
 			name: "supports global.cattle.imagePullSecrets",
@@ -231,7 +230,7 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 					},
 				},
 			},
-			wantSupports: true,
+			wantSupported: true,
 		},
 		{
 			name: "supports global.imagePullSecrets",
@@ -240,14 +239,14 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 					"imagePullSecrets": []any{},
 				},
 			},
-			wantSupports: true,
+			wantSupported: true,
 		},
 		{
 			name: "supports top-level imagePullSecrets",
 			chartBaseValues: map[string]any{
 				"imagePullSecrets": []any{},
 			},
-			wantSupports: true,
+			wantSupported: true,
 		},
 		{
 			name: "supports none of the paths",
@@ -258,17 +257,17 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 					},
 				},
 			},
-			wantSupports: false,
+			wantSupported: false,
 		},
 		{
 			name:            "empty values",
 			chartBaseValues: map[string]any{},
-			wantSupports:    false,
+			wantSupported:   false,
 		},
 		{
 			name:            "nil values",
 			chartBaseValues: nil,
-			wantSupports:    false,
+			wantSupported:   false,
 		},
 		{
 			name: "global key exists but imagePullSecrets missing underneath",
@@ -279,7 +278,7 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 					},
 				},
 			},
-			wantSupports: false,
+			wantSupported: false,
 		},
 		{
 			name: "imagePullSecrets declared with non-empty list value",
@@ -288,7 +287,7 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 					map[string]any{"name": "my-secret"},
 				},
 			},
-			wantSupports: true,
+			wantSupported: true,
 		},
 		{
 			name: "multiple paths declared, first match wins",
@@ -301,19 +300,14 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 				},
 				"imagePullSecrets": []any{},
 			},
-			wantSupports: true,
+			wantSupported: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := h.chartSupportsImagePullSecrets(tt.chartBaseValues)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-			assert.Equal(t, tt.wantSupports, got)
+			got := h.chartSupportsImagePullSecrets(tt.chartBaseValues)
+			assert.Equal(t, tt.wantSupported, got)
 		})
 	}
 }

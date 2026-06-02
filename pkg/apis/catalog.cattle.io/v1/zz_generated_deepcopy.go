@@ -475,6 +475,11 @@ func (in *RepoSpec) DeepCopyInto(out *RepoSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.DefaultImagePullSecrets != nil {
+		in, out := &in.DefaultImagePullSecrets, &out.DefaultImagePullSecrets
+		*out = make([]SecretReference, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/fleet"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -53,6 +54,16 @@ func (p *PrivateRegistry) PullSecretsAsObjectReferences() []kcorev1.LocalObjectR
 	var out []kcorev1.LocalObjectReference
 	for _, secret := range p.PullSecrets {
 		out = append(out, kcorev1.LocalObjectReference{
+			Name: secret.Name,
+		})
+	}
+	return out
+}
+
+func (p *PrivateRegistry) PullSecretsAsSecretReferences() []catalogv1.SecretReference {
+	var out []catalogv1.SecretReference
+	for _, secret := range p.PullSecrets {
+		out = append(out, catalogv1.SecretReference{
 			Name: secret.Name,
 		})
 	}

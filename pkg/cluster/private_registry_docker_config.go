@@ -118,3 +118,31 @@ func UnwrapDockerConfigJson(registryHostname string, configJson map[string][]byt
 	auth = fmt.Sprintf("%s:%s", entry.Username, entry.Password)
 	return entry.Username, entry.Password, base64.StdEncoding.EncodeToString([]byte(auth)), nil
 }
+
+// FilterDockerConfigJson extracts the specific Auth entry for the given registry hostname from a .dockerconfigjson
+// secret and returns a new .dockerconfigjson containing only that entry.
+func FilterDockerConfigJson(registryHostname string, configJson map[string][]byte) ([]byte, error) {
+	credJson, ok := configJson[kcorev1.DockerConfigJsonKey]
+	if !ok {
+		return nil, fmt.Errorf(ErrDockerConfigJsonNotFound, registryHostname)
+	}
+
+	var cred credentialprovider.DockerConfigJSON
+	err := json.Unmarshal(credJson, &cred)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, ok := cred.Auths[registryHostname]
+	if !ok {
+		return nil, fmt.Errorf(ErrRegistryHostnameNotFound, registryHostname)
+	}
+
+	filtered := credentialprovider.DockerConfigJSON{
+		Auths: credentialprovider.DockerConfig{
+			registryHostname: entry,
+		},
+	}
+
+	return json.Marshal(filtered)
+}

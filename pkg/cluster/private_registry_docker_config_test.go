@@ -207,6 +207,98 @@ func TestBuildDockerConfigJson(t *testing.T) {
 	}
 }
 
+func TestFilterDockerConfigJson(t *testing.T) {
+	t.Parallel()
+
+	const host = "registry.example.com"
+
+	makeConfigJSON := func(entries map[string]credentialprovider.DockerConfigEntry) map[string][]byte {
+		raw, _ := json.Marshal(credentialprovider.DockerConfigJSON{
+			Auths: credentialprovider.DockerConfig(entries),
+		})
+		return map[string][]byte{corev1.DockerConfigJsonKey: raw}
+	}
+
+	tests := []struct {
+		name           string
+		host           string
+		data           map[string][]byte
+		expectedErrMsg string
+		validate       func(t *testing.T, got []byte)
+	}{
+		{
+			name: "valid config with single entry returns that entry",
+			host: host,
+			data: makeConfigJSON(map[string]credentialprovider.DockerConfigEntry{
+				host: {Username: "myuser", Password: "mypass"},
+			}),
+			validate: func(t *testing.T, got []byte) {
+				var parsed credentialprovider.DockerConfigJSON
+				require.NoError(t, json.Unmarshal(got, &parsed))
+				require.Len(t, parsed.Auths, 1)
+				entry, ok := parsed.Auths[host]
+				require.True(t, ok)
+				assert.Equal(t, "myuser", entry.Username)
+				assert.Equal(t, "mypass", entry.Password)
+			},
+		},
+		{
+			name: "multi-entry config returns only requested hostname",
+			host: host,
+			data: makeConfigJSON(map[string]credentialprovider.DockerConfigEntry{
+				host:                 {Username: "myuser", Password: "mypass"},
+				"other.registry.com": {Username: "otheruser", Password: "otherpass"},
+			}),
+			validate: func(t *testing.T, got []byte) {
+				var parsed credentialprovider.DockerConfigJSON
+				require.NoError(t, json.Unmarshal(got, &parsed))
+				require.Len(t, parsed.Auths, 1)
+				entry, ok := parsed.Auths[host]
+				require.True(t, ok, "expected entry for %q", host)
+				assert.Equal(t, "myuser", entry.Username)
+				assert.Equal(t, "mypass", entry.Password)
+				_, hasOther := parsed.Auths["other.registry.com"]
+				assert.False(t, hasOther, "filtered config should not contain other registry entries")
+			},
+		},
+		{
+			name:           "missing .dockerconfigjson key",
+			host:           host,
+			data:           map[string][]byte{},
+			expectedErrMsg: fmt.Sprintf(ErrDockerConfigJsonNotFound, host),
+		},
+		{
+			name:           "invalid JSON",
+			host:           host,
+			data:           map[string][]byte{corev1.DockerConfigJsonKey: []byte("not-json")},
+			expectedErrMsg: "invalid character",
+		},
+		{
+			name: "hostname not found in auths",
+			host: "other.registry.example.com",
+			data: makeConfigJSON(map[string]credentialprovider.DockerConfigEntry{
+				host: {Username: "myuser", Password: "mypass"},
+			}),
+			expectedErrMsg: fmt.Sprintf(ErrRegistryHostnameNotFound, "other.registry.example.com"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := FilterDockerConfigJson(tt.host, tt.data)
+			if tt.expectedErrMsg != "" {
+				assert.ErrorContains(t, err, tt.expectedErrMsg)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			tt.validate(t, got)
+		})
+	}
+}
+
 func TestUnwrapDockerConfigJson(t *testing.T) {
 	t.Parallel()
 

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"k8s.io/apimachinery/pkg/api/equality"
 
@@ -51,6 +52,7 @@ type repoHandler struct {
 	clusterRepos   catalogcontrollers.ClusterRepoController
 	configMaps     corev1controllers.ConfigMapClient
 	configMapCache corev1controllers.ConfigMapCache
+	settings       v3.SettingController
 	apply          apply.Apply
 }
 
