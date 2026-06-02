@@ -34,6 +34,17 @@ func TestIsPodExecRequest(t *testing.T) {
 			expected: true,
 		},
 
+		{
+			name:     "remote cluster pod exec with steve version",
+			path:     "/k8s/clusters/c-m-abc123/v1/api/v1/namespaces/default/pods/nginx/exec",
+			expected: true,
+		},
+		{
+			name:     "remote cluster pod exec with steve version and complex namespace",
+			path:     "/k8s/clusters/c-m-abc123/v1/api/v1/namespaces/cattle-system/pods/rancher-xyz/exec",
+			expected: true,
+		},
+
 		// Invalid requests - different subresources
 		{
 			name:     "pod logs request",

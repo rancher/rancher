@@ -9,7 +9,8 @@ import (
 // This matches requests to execute commands in pods via WebSocket.
 // Matches patterns like:
 //   - /api/v1/namespaces/{namespace}/pods/{pod}/exec (local cluster)
-//   - /k8s/clusters/{cluster}/api/v1/namespaces/{namespace}/pods/{pod}/exec (remote cluster)
+//   - /k8s/clusters/{cluster}/api/v1/namespaces/{namespace}/pods/{pod}/exec (remote cluster without steve version)
+//   - /k8s/clusters/{cluster}/v1/api/v1/namespaces/{namespace}/pods/{pod}/exec (remote cluster with steve version)
 func IsPodExecRequest(req *http.Request) bool {
 	if req == nil || req.URL == nil {
 		return false
@@ -29,9 +30,20 @@ func IsPodExecRequest(req *http.Request) bool {
 
 	hasLocalPrefix := segments[0] == "api" && segments[1] == "v1"
 
-	hasRemotePrefix := n >= 6 &&
-		segments[0] == "k8s" && segments[1] == "clusters" &&
-		segments[3] == "api" && segments[4] == "v1"
+	// Remote cluster paths can have an optional steve version (e.g., /v1/) after the cluster ID
+	// Pattern 1: /k8s/clusters/{cluster}/api/v1/...
+	// Pattern 2: /k8s/clusters/{cluster}/v1/api/v1/... (with steve version)
+	hasRemotePrefix := false
+	if n >= 6 && segments[0] == "k8s" && segments[1] == "clusters" {
+		// Check for pattern without steve version: /k8s/clusters/{cluster}/api/v1/...
+		if segments[3] == "api" && segments[4] == "v1" {
+			hasRemotePrefix = true
+		}
+		// Check for pattern with steve version: /k8s/clusters/{cluster}/v1/api/v1/...
+		if n >= 7 && segments[4] == "api" && segments[5] == "v1" {
+			hasRemotePrefix = true
+		}
+	}
 
 	hasExecSuffix := segments[n-5] == "namespaces" &&
 		segments[n-3] == "pods" &&
