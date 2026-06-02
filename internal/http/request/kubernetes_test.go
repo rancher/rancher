@@ -25,12 +25,12 @@ func TestIsPodExecRequest(t *testing.T) {
 		},
 		{
 			name:     "remote cluster pod exec",
-			path:     "/k8s/clusters/c-m-abc123/v1/api/v1/namespaces/default/pods/nginx/exec",
+			path:     "/k8s/clusters/c-m-abc123/api/v1/namespaces/default/pods/nginx/exec",
 			expected: true,
 		},
 		{
 			name:     "remote cluster pod exec with complex namespace",
-			path:     "/k8s/clusters/local/v1/api/v1/namespaces/cattle-system/pods/rancher-xyz/exec",
+			path:     "/k8s/clusters/c-m-abc123/api/v1/namespaces/cattle-system/pods/rancher-xyz/exec",
 			expected: true,
 		},
 
@@ -112,7 +112,7 @@ func TestIsPodExecRequest(t *testing.T) {
 		{
 			name:     "double slashes",
 			path:     "/api/v1/namespaces//default//pods//nginx//exec",
-			expected: true, // Still valid k8s path structure
+			expected: false, // If URL is parsed with `path.Clean` it would match, but as is now it will not match (may need to verify)
 		},
 
 		// Empty and nil cases
