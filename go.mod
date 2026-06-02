@@ -36,6 +36,7 @@ replace (
 	k8s.io/controller-manager => k8s.io/controller-manager v0.36.1
 	k8s.io/cri-api => k8s.io/cri-api v0.36.1
 	k8s.io/cri-client => k8s.io/cri-client v0.36.1
+	k8s.io/cri-streaming => k8s.io/cri-streaming v0.36.1
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.36.1
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.36.1
 	k8s.io/endpointslice => k8s.io/endpointslice v0.36.1

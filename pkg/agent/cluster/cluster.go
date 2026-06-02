@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/wrangler/v3/pkg/kubeconfig"
 	coreV1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,6 +98,10 @@ func Params() (map[string]interface{}, error) {
 	kubernetesServicePort, err := getenv(kubernetesServicePortKey)
 	if err != nil {
 		return nil, err
+	}
+
+	if utils.IsPlainIPV6(kubernetesServiceHost) {
+		kubernetesServiceHost = "[" + kubernetesServiceHost + "]"
 	}
 
 	return map[string]interface{}{
