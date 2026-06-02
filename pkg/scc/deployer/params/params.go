@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"maps"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/version"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type SCCOperatorParams struct {
@@ -22,7 +22,8 @@ type SCCOperatorParams struct {
 
 	RefreshHash string
 
-	SCCOperatorImage string
+	SCCOperatorImage       string
+	SCCOperatorPullSecrets []corev1.LocalObjectReference
 }
 
 func ExtractSccOperatorParams() (*SCCOperatorParams, error) {
@@ -39,6 +40,11 @@ func ExtractSccOperatorParams() (*SCCOperatorParams, error) {
 		rancherGitCommit:    version.GitCommit,
 		SCCOperatorImage:    settings.FullSCCOperatorImage(),
 	}
+
+	if globalRegistry, _ := cluster.GetPrivateRegistry(nil); globalRegistry != nil {
+		params.SCCOperatorPullSecrets = globalRegistry.PullSecretsAsObjectReferences()
+	}
+
 	if err := params.setConfigHash(); err != nil {
 		return nil, err
 	}
@@ -61,6 +67,10 @@ func (p *SCCOperatorParams) setConfigHash() error {
 		hashInputData = append(hashInputData, []byte(p.SCCOperatorImage)...)
 	} else {
 		hashInputData = append(hashInputData, podSpecBytes...)
+	}
+
+	for _, pullSecret := range p.SCCOperatorPullSecrets {
+		hashInputData = append(hashInputData, []byte(pullSecret.Name)...)
 	}
 
 	// Generate the hash...
@@ -131,7 +141,7 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 
 	// TODO: We should support the "extra tolerations" feature users are asking for
 	// ref: https://github.com/rancher/rancher/issues/48541
-	return &appsv1.Deployment{
+	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: consts.DefaultSCCNamespace,
 			Name:      consts.DeploymentName,
@@ -150,6 +160,12 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 			},
 		},
 	}
+
+	if len(p.SCCOperatorPullSecrets) > 0 {
+		dep.Spec.Template.Spec.ImagePullSecrets = p.SCCOperatorPullSecrets
+	}
+
+	return dep
 }
 
 func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
