@@ -91,10 +91,12 @@ tests:
     auditLog:
       enabled: true
       destination: sidecar
+      image:
+        tag: 16.0-15.11
   asserts:
   - equal:
       path: spec.template.spec.containers[1].image
-      value: rancher/mirrored-bci-micro:15.6.24.2
+      value: rancher/mirrored-bci-micro:16.0-15.11
 - it: should override auditLog.image.repository value when auditLog.destination is sidecar and auditLog.enabled == true and both auditLog.image.repository and auditLog.image.tag are set
   set:
     systemDefaultRegistry: ""
