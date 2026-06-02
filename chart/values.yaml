@@ -37,7 +37,7 @@ auditLog:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/mirrored-bci-micro"
-    tag: 15.6.24.2
+    tag: 16.0-15.11
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     pullPolicy: "IfNotPresent"
