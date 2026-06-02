@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
@@ -53,6 +54,10 @@ const (
 	grbByUserRefKey   = "auth.management.cattle.io/grb-by-user-ref"
 	tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
 	userController    = "mgmt-auth-users-controller"
+
+	userLifecycleAnnotation = "lifecycle.cattle.io/create.mgmt-auth-users-controller"
+	userLifecycleFinalizer  = "controller.cattle.io/mgmt-auth-users-controller"
+	legacyUserFinalizer     = "controller.cattle.io/cat-user-controller"
 )
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
@@ -140,16 +145,37 @@ func hasLocalPrincipalID(user *v3.User) bool {
 	return match
 }
 
-// Create creates a new user role binding and sets the Status.Conditions.Type = "InitialRolesPopulated",
-// and then returns the object. Otherwise returns an error.
-func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
+func (l *userLifecycle) onChange(_ string, user *v3.User) (*v3.User, error) {
+	if user == nil {
+		return nil, nil
+	}
+
+	if user.DeletionTimestamp != nil {
+		if !slices.Contains(user.GetFinalizers(), userLifecycleFinalizer) {
+			return user, nil
+		}
+		return l.onRemove(user)
+	}
+
+	if user.Annotations[userLifecycleAnnotation] != "true" {
+		return l.onCreate(user)
+	}
+
+	return l.onUpdate(user)
+}
+
+func (l *userLifecycle) onCreate(user *v3.User) (*v3.User, error) {
+	user = user.DeepCopy()
+
+	if !slices.Contains(user.Finalizers, userLifecycleFinalizer) {
+		user.Finalizers = append(user.Finalizers, userLifecycleFinalizer)
+	}
+
 	if !hasLocalPrincipalID(user) {
 		user.PrincipalIDs = append(user.PrincipalIDs, "local://"+user.Name)
 	}
 
-	// creatorIDAnn indicates it was created through the API, create the new
-	// user bindings and add the annotation UserConditionInitialRolesPopulated
-	if user.ObjectMeta.Annotations[project_cluster.CreatorIDAnnotation] != "" {
+	if user.Annotations[project_cluster.CreatorIDAnnotation] != "" {
 		u, err := v3.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
 			err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 			if err != nil {
@@ -163,11 +189,15 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 		user = u.(*v3.User)
 	}
 
-	return user, nil
+	if user.Annotations == nil {
+		user.Annotations = map[string]string{}
+	}
+	user.Annotations[userLifecycleAnnotation] = "true"
+
+	return l.users.Update(user)
 }
 
-func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
-	// Migrate local users as part of the password field deprecation in the User resource. Password are now stored in secrets.
+func (l *userLifecycle) onUpdate(user *v3.User) (*v3.User, error) {
 	if user.Password != "" {
 		if err := l.passwordMigrator.Migrate(user); err != nil {
 			return nil, err
@@ -180,9 +210,6 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	}
 
 	if user.Enabled != nil && !*user.Enabled {
-		// New functionality. Not done for norman tokens, here. See refresher.go which
-		// deletes/disables tokens when a user is disabled. Having it here makes it a more
-		// immediate response to the user's change of status.
 		extTokens, err := l.getExtTokensByUserName(user.Name)
 		if err != nil {
 			return nil, err
@@ -190,7 +217,6 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 
 		for _, token := range extTokens {
 			if token.GetIsDerived() {
-				// Non-login tokens are disabled
 				logrus.Infof("[%v] Disabling ext token %v for user %v",
 					userController, token.GetName(), token.GetUserID())
 				err := l.extTokenStore.Disable(token.GetName())
@@ -198,7 +224,6 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 					return nil, fmt.Errorf("error updating ext token: %v", err)
 				}
 			} else {
-				// Login tokens are deleted.
 				logrus.Infof("[%v] Deleting token %v for user %v",
 					userController, token.GetName(), token.GetUserID())
 				err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
@@ -212,7 +237,7 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	return user, nil
 }
 
-func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
+func (l *userLifecycle) onRemove(user *v3.User) (*v3.User, error) {
 	clusterRoles, err := l.getCRTBByUserName(user.Name)
 	if err != nil {
 		return nil, err
@@ -276,12 +301,7 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 		return nil, err
 	}
 
-	user, err = l.removeLegacyFinalizers(user)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return l.removeFinalizer(user)
 }
 
 func (l *userLifecycle) getCRTBByUserName(username string) ([]*v3.ClusterRoleTemplateBinding, error) {
@@ -511,19 +531,14 @@ func (l *userLifecycle) deleteUserSecret(username string) error {
 	return l.secrets.Delete("cattle-system", username+"-secret", &metav1.DeleteOptions{})
 }
 
-func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) {
-	finalizers := user.GetFinalizers()
-	for i, finalizer := range finalizers {
-		if finalizer == "controller.cattle.io/cat-user-controller" {
-			finalizers = append(finalizers[:i], finalizers[i+1:]...)
-			user = user.DeepCopy()
-			user.SetFinalizers(finalizers)
-			updatedUser, err := l.users.Update(user)
-			if err != nil {
-				return nil, err
-			}
-			return updatedUser, err
+func (l *userLifecycle) removeFinalizer(user *v3.User) (*v3.User, error) {
+	user = user.DeepCopy()
+	finalizers := make([]string, 0, len(user.Finalizers))
+	for _, f := range user.Finalizers {
+		if f != userLifecycleFinalizer && f != legacyUserFinalizer {
+			finalizers = append(finalizers, f)
 		}
 	}
-	return user, nil
+	user.SetFinalizers(finalizers)
+	return l.users.Update(user)
 }

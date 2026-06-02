@@ -106,7 +106,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	relatedresource.Watch(ctx, "aggregation-feature-crtb-enqueuer", aggregationEnqueuer.enqueueCRTBs, management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), management.Wrangler.Mgmt.Feature())
 	relatedresource.Watch(ctx, "aggregation-feature-prtb-enqueuer", aggregationEnqueuer.enqueuePRTBs, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), management.Wrangler.Mgmt.Feature())
 
-	management.Management.Users("").AddLifecycle(ctx, userController, u)
+	management.Wrangler.Mgmt.User().OnChange(ctx, userController, u.onChange)
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
