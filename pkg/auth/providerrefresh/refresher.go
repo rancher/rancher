@@ -21,6 +21,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 )
 
@@ -137,22 +138,35 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 		return
 	}
 
-	attribs.NeedsRefresh = true
 	if needCreate {
-		_, err := r.userAttributes.Create(attribs)
-		if err != nil {
+		attribs.NeedsRefresh = true
+		if _, err := r.userAttributes.Create(attribs); err != nil {
 			logrus.Errorf("Error creating user attribute to trigger refresh: %v", err)
 		}
-	} else {
-		_, err = r.userAttributes.Update(attribs)
+		return
+	}
+
+	// Re-fetch from the API server (not the lister) inside the retry so the
+	// ResourceVersion is fresh; the initial read above came from the informer
+	// cache and can be stale, which has caused frequent 409 conflicts under
+	// contention with the refresh-consumer writeback.
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := r.userAttributes.Get(userName, metav1.GetOptions{})
 		if err != nil {
-			if apierrors.IsConflict(err) {
-				// User attribute has just been updated, triggering the refresh.
-				logrus.Debugf("Error updating user attribute to trigger refresh: %v", err)
-			} else {
-				logrus.Errorf("Error updating user attribute to trigger refresh: %v", err)
-			}
+			return err
 		}
+		if _, ok := latest.Annotations[common.ProviderRefreshErrorAnnotation]; ok {
+			return nil
+		}
+		if latest.NeedsRefresh {
+			return nil
+		}
+		latest.NeedsRefresh = true
+		_, err = r.userAttributes.Update(latest)
+		return err
+	})
+	if err != nil {
+		logrus.Errorf("Error updating user attribute to trigger refresh: %v", err)
 	}
 }
 

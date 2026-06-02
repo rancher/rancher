@@ -57,7 +57,16 @@ func TestSync(t *testing.T) {
 			userAttributes[userAttribute.Name] = userAttribute.DeepCopy()
 			return userAttribute, nil
 		},
-	)
+	).AnyTimes()
+	userAttributesMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+			userAttribute, ok := userAttributes[name]
+			if ok {
+				return userAttribute, nil
+			}
+			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+		},
+	).AnyTimes()
 
 	// setup userAttributesLister mock instance
 	userAttributesListerMock := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
@@ -184,7 +193,16 @@ func TestSync(t *testing.T) {
 		func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
 			return nil, errors.NewServiceUnavailable("test reason")
 		},
-	)
+	).AnyTimes()
+	userAttributesMock.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+			userAttribute, ok := userAttributes[name]
+			if ok {
+				return userAttribute, nil
+			}
+			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+		},
+	).AnyTimes()
 
 	// setup userAttributesLister mock instance
 	userAttributesListerMock = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
