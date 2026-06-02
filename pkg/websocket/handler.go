@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/httperror"
+	httprequest "github.com/rancher/rancher/internal/http/request"
 	"github.com/rancher/rancher/pkg/features"
-	httprequest "github.com/rancher/rancher/pkg/http/request"
 )
 
 const (

@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
+	httprequest "github.com/rancher/rancher/internal/http/request"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	httprequest "github.com/rancher/rancher/pkg/http/request"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
