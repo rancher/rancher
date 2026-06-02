@@ -25,10 +25,10 @@ spec:
     - jsonPath: .spec.paused
       name: Paused
       type: string
-    - jsonPath: .status.Phase
+    - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.Step
+    - jsonPath: .status.step
       name: Step
       type: string
     - jsonPath: .metadata.creationTimestamp
