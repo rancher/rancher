@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 )
 
 // Adapter is an interface for different types of cluster objects.
@@ -30,14 +31,22 @@ type Adapter interface {
 	// all expected nodes.
 	WaitForRegister() (bool, error)
 
+	PauseCluster(bool) error
+
 	// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
 	RuntimeCommand() string
+
+	DataDirectory(*corev1.Secret) string
 
 	// ServerUnit returns the systemd unit name for a distro server node.
 	ServerUnit() string
 
 	// RenderProbes renders the probes for a given machine-plan secret based on its role.
 	RenderProbes(*corev1.Secret) (map[string]plan.Probe, error)
+
+	KubectlPath(*corev1.Secret) string
+
+	KubeconfigPath(*corev1.Secret) string
 }
 
 // NewAdapter returns an Adapter for the given cluster object.
@@ -328,6 +337,38 @@ func (a *CAPRAdapter) renderConfig(secret *corev1.Secret) (map[string]any, error
 	}
 
 	return config, nil
+}
+
+func (a *CAPRAdapter) DataDirectory(_ *corev1.Secret) string {
+	return capr.GetDistroDataDir(a.controlPlane)
+}
+
+func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/usr/local/bin/kubectl"
+	}
+	return path.Join(a.DataDirectory(secret), "bin", "kubectl")
+}
+
+func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/etc/rancher/k3s/k3s.yaml"
+	}
+	return "/etc/rancher/rke2/rke2.yaml"
+}
+
+func (a *CAPRAdapter) PauseCluster(paused bool) error {
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return err
+	}
+	if ptr.Equal(cluster.Spec.Paused, &paused) {
+		return nil
+	}
+	cluster = cluster.DeepCopy()
+	cluster.Spec.Paused = &paused
+	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
 }
 
 func filterConfigData(config map[string]any, controlPlane *rkev1.RKEControlPlane, secret *corev1.Secret) error {
@@ -669,4 +710,29 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret) (map[string]plan.P
 	probes = replaceURLForProbes(probes, loopbackAddress)
 
 	return probes, nil
+}
+
+func (a *ImportedAdapter) PauseCluster(_ bool) error {
+	return nil
+}
+
+func (a *ImportedAdapter) DataDirectory(_ *corev1.Secret) string {
+	if a.cluster.Status.Provider == "rke2" {
+		return "/var/lib/rancher/rke2/server"
+	}
+	return "/var/lib/rancher/k3s"
+}
+
+func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) string {
+	if a.cluster.Status.Provider == "k3s" {
+		return "/usr/local/bin/kubectl"
+	}
+	return path.Join(a.DataDirectory(secret), "bin", "kubectl")
+}
+
+func (a *ImportedAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	if a.cluster.Status.Provider == "k3s" {
+		return "/etc/rancher/k3s/k3s.yaml"
+	}
+	return "/etc/rancher/rke2/rke2.yaml"
 }
