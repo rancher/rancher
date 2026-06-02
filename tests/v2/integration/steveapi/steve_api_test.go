@@ -780,13 +780,21 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test1": 5, "test2": 5, "test3": 5, "test4": 5, "test5": 5,
+					"test1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test2": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test3": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test4": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-1": 5, "test-ns-2": 5, "test-ns-3": 5, "test-ns-4": 5, "test-ns-5": 5,
+					"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-3": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-4": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-5": clientv1.SteveSummaryWithBreakdown{Total: 5},
 				},
 			},
 		},
@@ -810,13 +818,18 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test1": 2, "test2": 2, "test3": 2, "test4": 1, "test5": 1,
+					"test1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test2": clientv1.SteveSummaryWithBreakdown{Total: 2},
+					"test3": clientv1.SteveSummaryWithBreakdown{Total: 2},
+					"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
+					"test5": clientv1.SteveSummaryWithBreakdown{Total: 1},
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-1": 5, "test-ns-2": 3,
+					"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 3},
 				},
 			},
 		},
@@ -838,8 +851,8 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test4": 1,
-					"test5": 5,
+					"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
+					"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
 				},
 			},
 		},
@@ -856,13 +869,13 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test2": 1,
+					"test2": clientv1.SteveSummaryWithBreakdown{Total: 1},
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-2": 1,
+					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 1},
 				},
 			},
 		},
@@ -903,7 +916,7 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.state.name",
 				Counts: map[string]int{
-					"active": 25,
+					"active": clientv1.SteveSummaryWithBreakdown{Total: 25},
 				},
 			},
 		},
