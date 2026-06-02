@@ -349,7 +349,7 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 		logrus.Tracef("[private-registry] resolved source pull secret %q/%q for cluster %q", ds.Namespace, ds.Name, cluster.Name)
 		sourceAuthSecrets = append(sourceAuthSecrets, s)
 	}
-	logrus.Debugf("[private-registry] resolved %d source pull secrets and found %d existing PSS(s) for cluster %q", len(sourceAuthSecrets), len(createdPSS), cluster.Name)
+	logrus.Tracef("[private-registry] resolved %d source pull secrets and found %d existing PSS(s) for cluster %q", len(sourceAuthSecrets), len(createdPSS), cluster.Name)
 
 	// Delete any PSS's that were created for secrets no longer specified on the cluster object.
 	for _, pss := range createdPSS {
@@ -456,7 +456,6 @@ func (h *handler) manageClusterSpecificPSS(_ string, cluster *v3.Cluster) (*v3.C
 func (h *handler) syncClusterOnGlobalPullSecretChange(_ string, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
 	sec, ok := obj.(*kcorev1.Secret)
 	if !ok {
-		logrus.Errorf("[private-registry] failed to convert to secret")
 		return nil, nil
 	}
 	if sec.Labels == nil || sec.Labels[util.SourcePullSecretLabel] != "true" {

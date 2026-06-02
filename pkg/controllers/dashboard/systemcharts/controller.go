@@ -157,7 +157,7 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 		logrus.Tracef("[system-charts] processing chart %q (namespace=%q, release=%q, uninstall=%v)", chartDef.ChartName, chartDef.ReleaseNamespace, chartDef.ReleaseName, chartDef.Uninstall)
 
 		if chartDef.Uninstall {
-			logrus.Debugf("[system-charts] uninstalling chart %q (removeNamespace=%v)", chartDef.ChartName, chartDef.RemoveNamespace)
+			logrus.Tracef("[system-charts] uninstalling chart %q (removeNamespace=%v)", chartDef.ChartName, chartDef.RemoveNamespace)
 			// it is important to remove the chart from the desired chart list
 			h.manager.Remove(chartDef.ReleaseNamespace, chartDef.ChartName)
 			if err := h.manager.Uninstall(chartDef.ReleaseNamespace, chartDef.ChartName); err != nil {
@@ -165,7 +165,7 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 				return repo, err
 			}
 			if chartDef.RemoveNamespace {
-				logrus.Debugf("[system-charts] deleting namespace %q for chart %q", chartDef.ReleaseNamespace, chartDef.ChartName)
+				logrus.Tracef("[system-charts] deleting namespace %q for chart %q", chartDef.ReleaseNamespace, chartDef.ChartName)
 				if err := h.namespaces.Delete(chartDef.ReleaseNamespace, nil); err != nil && !errors.IsNotFound(err) {
 					logrus.Errorf("[system-charts] failed to delete namespace %q: %v", chartDef.ReleaseNamespace, err)
 					return repo, err
@@ -227,7 +227,7 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 			return repo, err
 		}
 
-		logrus.Debugf("[system-charts] ensured chart %q in namespace %q", chartDef.ChartName, chartDef.ReleaseNamespace)
+		logrus.Tracef("[system-charts] ensured chart %q in namespace %q", chartDef.ChartName, chartDef.ReleaseNamespace)
 		if chartDef.ChartName == chart.WebhookChartName {
 			if err := h.updateAppliedWebhookCustomization(); err != nil {
 				logrus.Warnf("[systemcharts] failed to update applied webhook customization status: %v", err)
