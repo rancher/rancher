@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -502,7 +503,18 @@ func secretIgnoresNamespace(annos map[string]string, namespace string) bool {
 		return false
 	}
 	for _, ignoredNs := range strings.Split(v, ",") {
+		// If special characters are identified, treat the value as a regexp
 		ignoredNs = strings.TrimSpace(ignoredNs)
+		if strings.Contains(ignoredNs, "*") {
+			exp, err := regexp.Compile(ignoredNs)
+			if err != nil {
+				logrus.Warnf("Invalid regular expression '%s' in annotation %s: %v. Skipping regex evaluation and treating as literal string.", ignoredNs, PSSIgnoreNamespacesAnnotation, err)
+			} else {
+				if exp.MatchString(namespace) {
+					return true
+				}
+			}
+		}
 		if ignoredNs == namespace {
 			return true
 		}
