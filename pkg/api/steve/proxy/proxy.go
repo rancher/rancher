@@ -81,8 +81,8 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 				return
 			}
 			// Block pod exec requests when the pod-shell feature is disabled.
-			// This check applies to local cluster pod exec requests that don't go through the cluster proxy handler.
 			if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
+				rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 				rw.WriteHeader(http.StatusForbidden)
 				rw.Write([]byte("pod shell feature is disabled"))
 				return
@@ -182,6 +182,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Block pod exec requests when the pod-shell feature is disabled.
 	if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
+		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		rw.WriteHeader(http.StatusForbidden)
 		rw.Write([]byte("pod shell feature is disabled"))
 		return

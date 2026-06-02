@@ -76,7 +76,7 @@ func TestIsPodExecRequest(t *testing.T) {
 		{
 			name:     "wrong order - pods before namespaces",
 			path:     "/api/v1/pods/nginx/namespaces/default/exec",
-			expected: false, // Currently may return true due to Contains check
+			expected: false, // Should be false - segment order does not match the pod exec pattern
 		},
 		{
 			name:     "exec in middle of path, not at end",

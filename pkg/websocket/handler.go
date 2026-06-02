@@ -28,14 +28,14 @@ type websocketHandler struct {
 }
 
 func (h websocketHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if isWebsocket(req) && isBrowserUserAgent(req.Header) {
-		if !checkSameOrigin(req) {
+	if isWebsocket(req) {
+		if isBrowserUserAgent(req.Header) && !checkSameOrigin(req) {
 			response(rw, httperror.PermissionDenied, "origin not allowed")
 			return
 		}
 		// Block pod exec WebSocket requests when the pod-shell feature is disabled
 		if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
-			response(rw, httperror.PermissionDenied, "pod shell feature is disabled")
+			response(rw, httperror.PermissionDenied, "pod-shell feature is disabled")
 			return
 		}
 	}
