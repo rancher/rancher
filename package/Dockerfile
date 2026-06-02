@@ -495,6 +495,7 @@ ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X git
 ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
+COPY internal/ internal/
 COPY pkg/ pkg/
 COPY main.go ./
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
@@ -513,6 +514,7 @@ ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
 COPY cmd/ cmd/
+COPY internal/ internal/
 COPY pkg/ pkg/
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
