@@ -133,21 +133,34 @@ type Adapter interface {
 	// ServerUnit returns the systemd unit name for a distro server node.
 	ServerUnit() string
 
+	// DistroDataDirectory returns the path to the RKE2/K3s data-dir on the host machine.
+	DistroDataDirectory(secret *corev1.Secret) string
+
+	// ProvisioningDataDirectory returns the path to the data directory used for operations.
+	// Scripts created for commands are typically stored here.
+	ProvisioningDataDirectory(secret *corev1.Secret) string
+
 	// RenderProbes renders the probes for a given machine-plan secret based on its role.
 	// `supervisor` controls whether the supervisor probe should be rendered.
 	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
 	// supervisor probe to fail.
 	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
 
+	// PauseCluster pauses or unpauses the owning cluster's control-plane activity.
+	// ImportedAdapter implements this as a no-op since imported clusters have no CAPI cluster.
+	PauseCluster(paused bool) error
+
+	// KubectlPath returns the path to the kubectl binary on the host relative to the machine-plan secret.
+	KubectlPath(secret *corev1.Secret) string
+
+	// KubeconfigPath returns the path to the kubeconfig file on the host relative to the machine-plan secret.
+	KubeconfigPath(secret *corev1.Secret) string
+
 	// FindOrElectLeader finds an existing elected leader for the given operation or elects one
 	// from candidates passing filter. The elected leader is marked with an annotation on the
 	// machine-plan secret so the same node is reused across reconciles. Returns nil, nil when
 	// no suitable candidate exists yet.
 	FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error)
-
-	// PauseClusterActivity pauses or unpauses the owning cluster's control-plane activity.
-	// ImportedAdapter implements this as a no-op since imported clusters have no CAPI cluster.
-	PauseClusterActivity(paused bool) error
 }
 
 // NewAdapter returns an Adapter for the given cluster object.

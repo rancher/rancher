@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
@@ -311,8 +312,8 @@ func (a *CAPRAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation str
 	})
 }
 
-// PauseClusterActivity sets spec.paused on the owning CAPI cluster.
-func (a *CAPRAdapter) PauseClusterActivity(paused bool) error {
+// PauseCluster sets spec.paused on the owning CAPI cluster.
+func (a *CAPRAdapter) PauseCluster(paused bool) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cluster, err := capr.GetOwnerCAPICluster(a.controlPlane, a.clients.CAPI.Cluster().Cache())
 		if err != nil {
@@ -480,4 +481,26 @@ func convertInterfaceSliceToStringSlice(input []any) []string {
 		stringArr = append(stringArr, fmt.Sprintf("%v", v))
 	}
 	return stringArr
+}
+
+func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {
+	return capr.GetDistroDataDir(a.controlPlane)
+}
+
+func (a *CAPRAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
+	return capr.GetProvisioningDataDir(&a.controlPlane.Spec.ClusterConfiguration)
+}
+
+func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/usr/local/bin/kubectl"
+	}
+	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+}
+
+func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/etc/rancher/k3s/k3s.yaml"
+	}
+	return "/etc/rancher/rke2/rke2.yaml"
 }

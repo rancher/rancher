@@ -333,7 +333,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 
 	// Pause the CAPI cluster while rotate-keys is active so unrelated activity
 	// does not race with the encryption-key rotation plan.
-	if err := s.adapter.PauseClusterActivity(true); err != nil {
+	if err := s.adapter.PauseCluster(true); err != nil {
 		return status, err
 	}
 
@@ -658,7 +658,7 @@ func (h *handler) reconcileRestartNode(
 func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
-	if err := s.adapter.PauseClusterActivity(false); err != nil {
+	if err := s.adapter.PauseCluster(false); err != nil {
 		return status, err
 	}
 
@@ -675,7 +675,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotation
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
-	if err := s.adapter.PauseClusterActivity(false); err != nil {
+	if err := s.adapter.PauseCluster(false); err != nil {
 		return status, err
 	}
 
