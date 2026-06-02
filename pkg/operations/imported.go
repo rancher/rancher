@@ -1,13 +1,17 @@
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
+	"path"
+	"strings"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -103,6 +107,18 @@ func (a *ImportedAdapter) ServerUnit() string {
 	return "k3s"
 }
 
+func (a *ImportedAdapter) DistroDataDirectory(_ *corev1.Secret) string {
+	if a.cluster.Status.Provider == "rke2" {
+		return "/var/lib/rancher/rke2"
+	}
+	return "/var/lib/rancher/k3s"
+}
+
+func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
+	// Imported clusters do not expose the provisioning data directory; fall back to the default.
+	return "/var/lib/rancher/capr"
+}
+
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // Currently custom data directories, probes, and using ipv4 as the primary ip family are not supported.
 func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
@@ -167,4 +183,107 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	probes = ReplaceURLForProbes(probes, loopbackAddress)
 
 	return probes, nil
+}
+
+func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) string {
+	if a.cluster.Status.Provider == "k3s" {
+		return "/usr/local/bin/kubectl"
+	}
+	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+}
+
+func (a *ImportedAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	if a.cluster.Status.Provider == "k3s" {
+		return "/etc/rancher/k3s/k3s.yaml"
+	}
+	return "/etc/rancher/rke2/rke2.yaml"
+}
+
+// ElectLeader picks a leader from the imported cluster's machine-plan secrets. Eligibility excludes
+// secrets whose backing v3.Node has a non-nil DeletionTimestamp (or whose Node is gone). Init
+// detection parses the distro's node-args annotation off the v3.Node status — k3s init nodes pass
+// --cluster-init; rke2 servers are init when they have no --server flag pointing elsewhere.
+func (a *ImportedAdapter) ElectLeader(role LeaderRole, namespace string) (*corev1.Secret, error) {
+	secrets, err := a.clients.Core.Secret().Cache().List(namespace, labels.SelectorFromSet(labels.Set{
+		capr.ClusterNameLabel: a.cluster.Name,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	runtime := a.RuntimeCommand()
+
+	candidates := make([]LeaderCandidate, 0, len(secrets))
+	for _, secret := range secrets {
+		c := LeaderCandidate{Secret: secret, Eligible: true}
+
+		nodeName := secret.Labels[capr.MachineNameLabel]
+		if nodeName != "" {
+			node, err := a.clients.Mgmt.Node().Cache().Get(a.cluster.Name, nodeName)
+			switch {
+			case apierrors.IsNotFound(err):
+				c.Eligible = false
+			case err != nil:
+				return nil, err
+			case node.DeletionTimestamp != nil:
+				c.Eligible = false
+			default:
+				c.Init = isImportedInitNode(node, runtime)
+			}
+		}
+		candidates = append(candidates, c)
+	}
+	return electLeader(role, candidates), nil
+}
+
+// isImportedInitNode infers whether the downstream Node was started as the cluster's init server,
+// based on the distro's node-args annotation kept on the v3.Node status by the nodesyncer.
+//
+//   - k3s: the init node passes --cluster-init.
+//   - rke2: there is no explicit init flag; the first server has no --server <url>, so absence of
+//     --server in a server-mode args list signals init.
+//
+// Returns false if the annotation is missing or unparseable; downstream tiers (etcd-only, etcd+cp)
+// still apply.
+func isImportedInitNode(node *mgmtv3.Node, runtime string) bool {
+	if node == nil || node.Status.NodeAnnotations == nil {
+		return false
+	}
+	raw := node.Status.NodeAnnotations[runtime+".io/node-args"]
+	if raw == "" {
+		return false
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(raw), &args); err != nil {
+		return false
+	}
+
+	isServer := false
+	for _, arg := range args {
+		if arg == "server" {
+			isServer = true
+			break
+		}
+	}
+	if !isServer {
+		return false
+	}
+
+	switch runtime {
+	case capr.RuntimeK3S:
+		for _, arg := range args {
+			if arg == "--cluster-init" || strings.HasPrefix(arg, "--cluster-init=") {
+				return true
+			}
+		}
+		return false
+	case capr.RuntimeRKE2:
+		for _, arg := range args {
+			if arg == "--server" || strings.HasPrefix(arg, "--server=") {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
