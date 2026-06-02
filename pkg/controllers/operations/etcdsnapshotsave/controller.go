@@ -236,7 +236,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 
 	status.Phase = opv1alpha1.OperationPhaseInProgress
 	status.LastUpdated = metav1.Now()
-	status.Step = opv1alpha1.ETCDSnapshotCreateStepSave
+	status.Step = opv1alpha1.ETCDSnapshotSaveStepSave
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
@@ -262,9 +262,9 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	}
 
 	switch s.op.Status.Step {
-	case opv1alpha1.ETCDSnapshotCreateStepSave:
+	case opv1alpha1.ETCDSnapshotSaveStepSave:
 		return h.reconcileSave(s, status)
-	case opv1alpha1.ETCDSnapshotCreateStepRestart:
+	case opv1alpha1.ETCDSnapshotSaveStepRestart:
 		return h.reconcileRestart(s, status)
 	}
 
@@ -273,7 +273,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\"]", status.Step, opv1alpha1.ETCDSnapshotCreateStepSave, opv1alpha1.ETCDSnapshotCreateStepSave))
+	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\"]", status.Step, opv1alpha1.ETCDSnapshotSaveStepSave, opv1alpha1.ETCDSnapshotSaveStepSave))
 
 	return status, nil
 }
@@ -357,7 +357,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to restart", s.op.Namespace, s.op.Name)
 
-	status.Step = opv1alpha1.ETCDSnapshotCreateStepRestart
+	status.Step = opv1alpha1.ETCDSnapshotSaveStepRestart
 	return status, nil
 }
 

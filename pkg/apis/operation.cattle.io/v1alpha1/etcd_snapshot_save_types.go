@@ -31,15 +31,15 @@ type ETCDSnapshotSaveSpec struct {
 	Args ETCDSnapshotSaveArgs `json:"args,omitempty"`
 }
 
-// ETCDSnapshotCreateStep is the step of the ETCDSnapshotSave operation.
-type ETCDSnapshotCreateStep string
+// ETCDSnapshotSaveStep is the step of the ETCDSnapshotSave operation.
+type ETCDSnapshotSaveStep string
 
 const (
-	// ETCDSnapshotCreateStepSave indicates the step is to save the snapshot.
-	ETCDSnapshotCreateStepSave ETCDSnapshotCreateStep = "Save"
+	// ETCDSnapshotSaveStepSave indicates the step is to save the snapshot.
+	ETCDSnapshotSaveStepSave ETCDSnapshotSaveStep = "Save"
 
-	// ETCDSnapshotCreateStepRestart indicates the step is to restart the cluster.
-	ETCDSnapshotCreateStepRestart ETCDSnapshotCreateStep = "Restart"
+	// ETCDSnapshotSaveStepRestart indicates the step is to restart the cluster.
+	ETCDSnapshotSaveStepRestart ETCDSnapshotSaveStep = "Restart"
 )
 
 // ETCDSnapshotSaveStatus defines the observed state of ETCDSnapshotSave.
@@ -51,7 +51,7 @@ type ETCDSnapshotSaveStatus struct {
 	// Step is typically only valid during the InProgress phase.
 	// +kubebuilder:validation:Enum=Save;Restart
 	// +optional
-	Step ETCDSnapshotCreateStep `json:"step,omitempty"`
+	Step ETCDSnapshotSaveStep `json:"step,omitempty"`
 }
 
 // +genclient
@@ -62,8 +62,8 @@ type ETCDSnapshotSaveStatus struct {
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"
-// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.Phase"
-// +kubebuilder:printcolumn:name="Step",type=string,JSONPath=".spec.Step"
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Step",type=string,JSONPath=".status.step"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
 // ETCDSnapshotSave is the mechanism for initiating an RKE2 or K3s etcd-snapshot save operation for v2prov, CAPI, and
