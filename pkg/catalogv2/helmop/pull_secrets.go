@@ -87,7 +87,7 @@ func (s *Operations) createNamespaceAndPullSecrets(ctx context.Context, status c
 func (s *Operations) SystemDefaultRegistryConfigured(values map[string]any) (string, bool) {
 	v, defined := getValueAtPath(values, "global", "cattle", "systemDefaultRegistry")
 	sdr, ok := v.(string)
-	return sdr, defined && ok
+	return sdr, defined && ok && v != ""
 }
 
 func (s *Operations) chartSupportsImagePullSecrets(baseValues map[string]any) bool {
