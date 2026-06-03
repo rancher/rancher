@@ -1165,3 +1165,44 @@ func TestGetOIDCRedirectionURL(t *testing.T) {
 		})
 	}
 }
+
+func TestCookieSecurityAttributes(t *testing.T) {
+	tests := map[string]struct {
+		setCookie  func(req *http.Request, w http.ResponseWriter)
+		cookieName string
+	}{
+		"SetPKCEVerifier": {
+			setCookie:  func(req *http.Request, w http.ResponseWriter) { SetPKCEVerifier(req, w, "verifier-value") },
+			cookieName: pkceVerifierCookieName,
+		},
+		"deletePKCEVerifier": {
+			setCookie:  deletePKCEVerifier,
+			cookieName: pkceVerifierCookieName,
+		},
+		"setIDToken": {
+			setCookie:  func(req *http.Request, w http.ResponseWriter) { setIDToken(req, w, "id-token-value") },
+			cookieName: IDTokenCookie,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/", nil)
+			w := httptest.NewRecorder()
+
+			tc.setCookie(req, w)
+
+			var got *http.Cookie
+			for _, c := range w.Result().Cookies() {
+				if c.Name == tc.cookieName {
+					got = c
+					break
+				}
+			}
+			require.NotNil(t, got, "expected cookie %q to be set", tc.cookieName)
+			assert.True(t, got.HttpOnly, "HttpOnly must be true")
+			assert.Equal(t, "/", got.Path, "Path must be /")
+			assert.Equal(t, http.SameSiteLaxMode, got.SameSite, "SameSite must be Lax")
+		})
+	}
+}

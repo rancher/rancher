@@ -353,6 +353,9 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 			Secure:   true,
 			Path:     "/",
 			HttpOnly: true,
+			// Lax is the default in most browsers; setting it
+			// explicitly is a good security measure.
+			SameSite: http.SameSiteLaxMode,
 		}
 		http.SetCookie(w, tokenCookie)
 

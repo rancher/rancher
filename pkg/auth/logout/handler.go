@@ -49,6 +49,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Secure:   isSecure,
 			Path:     "/",
 			HttpOnly: true,
+			// Lax is the default in most browsers; setting it
+			// explicitly is a good security measure.
+			SameSite: http.SameSiteLaxMode,
 			MaxAge:   -1,
 			Expires:  cookieUnsetTimestamp,
 		}
