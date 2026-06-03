@@ -33,6 +33,7 @@ func resolve(reg, image string) string {
 }
 
 // GetPrivateRepoSecretFromCluster returns the name of the secret containing the credentials for the cluster level system-default-registry.
+// It returns the configured registry hostname and a boolean which indicates if the specified cluster inherits the global configuration.
 func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) (string, bool) {
 	url, isGlobalDefault := GetPrivateRepoURLFromCluster(cluster)
 	if cluster != nil && cluster.Spec.RKEConfig != nil && cluster.Spec.RKEConfig.Registries != nil {
