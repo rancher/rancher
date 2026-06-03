@@ -3,6 +3,8 @@ package endpoints
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
@@ -190,6 +192,13 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	}
 	if numOverfilledAnnotations == 0 {
 		return nil
+	}
+	ignoreOverfillErrorStr := os.Getenv("CATTLE_IGNORE_ENDPOINT_ANNOTATION_OVERFLOW")
+	if ignoreOverfillErrorStr != "" {
+		ignoreOverfillError, err := strconv.ParseBool(ignoreOverfillErrorStr)
+		if err == nil && ignoreOverfillError {
+			return nil
+		}
 	}
 	pluralSuffix := ""
 	if numOverfilledAnnotations > 1 {
