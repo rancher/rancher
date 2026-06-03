@@ -294,7 +294,7 @@ func TestLocalClusterPodShellFeatureFlag(t *testing.T) {
 			podShellEnabled:      false,
 			userCanAccessLocal:   true,
 			expectedCode:         http.StatusForbidden,
-			expectedMessage:      "pod shell feature is disabled",
+			expectedMessage:      "pod-shell feature is disabled",
 			checkMessageContains: false,
 		},
 		{
@@ -401,7 +401,7 @@ func TestPodShellFeatureFlag(t *testing.T) {
 			userCanAccessCluster: true,
 			expectBlocked:        true,
 			expectedCode:         http.StatusForbidden,
-			expectedMessage:      "pod shell feature is disabled",
+			expectedMessage:      "pod-shell feature is disabled",
 		},
 		{
 			name:                 "pod exec blocked when user lacks cluster access",
@@ -419,7 +419,7 @@ func TestPodShellFeatureFlag(t *testing.T) {
 			userCanAccessCluster: true,
 			expectBlocked:        true,
 			expectedCode:         http.StatusForbidden,
-			expectedMessage:      "pod shell feature is disabled",
+			expectedMessage:      "pod-shell feature is disabled",
 		},
 		{
 			name:                 "pod exec passes feature check when pod-shell enabled",
@@ -519,7 +519,7 @@ func TestPodShellFeatureFlag(t *testing.T) {
 			// Verify that pod exec requests are blocked by the feature flag, not by something else
 			if test.expectBlocked {
 				assert.Equal(t, http.StatusForbidden, recorder.Code, "pod exec should be blocked with 403 Forbidden")
-				assert.Contains(t, recorder.Body.String(), "pod shell feature is disabled", "blocked message should mention pod shell feature")
+				assert.Contains(t, recorder.Body.String(), "pod-shell feature is disabled", "blocked message should mention pod-shell feature")
 			}
 		})
 	}

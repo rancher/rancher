@@ -84,7 +84,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 			if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
 				rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 				rw.WriteHeader(http.StatusForbidden)
-				rw.Write([]byte("pod shell feature is disabled"))
+				rw.Write([]byte("pod-shell feature is disabled"))
 				return
 			}
 			next.ServeHTTP(rw, req)
@@ -184,7 +184,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		rw.WriteHeader(http.StatusForbidden)
-		rw.Write([]byte("pod shell feature is disabled"))
+		rw.Write([]byte("pod-shell feature is disabled"))
 		return
 	}
 
