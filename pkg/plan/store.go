@@ -205,6 +205,7 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 				if failureCount < failureThreshold || failureThreshold == -1 {
 					// the plan hasn't actually failed to be applied because we haven't passed the failure threshold or failure threshold is set to -1.
 					result.Failed = false
+					result.Failing = true
 				}
 			}
 		}

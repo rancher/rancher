@@ -50,8 +50,6 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		ns = configMap.Namespace
 	}
 
-	t.Log()
-
 	_, err = clientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), &configMap, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)

@@ -23,7 +23,7 @@ type OperationSpec struct {
 	// This TTL is only enforced when the operation is not paused and has reached a terminal state.
 	// Setting a value < 0 represents +infinity, i.e. an operation which does not expire.
 	// The default value is `0`.
-	// A value <= 0 enables non-expiring operations.
+	// A value == 0 expires immediately.
 	// +optional
 	TTL int64 `json:"ttl,omitempty"`
 }

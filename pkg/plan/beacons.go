@@ -9,6 +9,9 @@ import (
 // If the beacon is already owned by the desired owner, it is returned.
 // Otherwise, the beacon is updated to be owned by the desired owner and returned.
 // If the beacon is owned by another controller, it returns without error, deferring to the caller.
+// During the pending phase, the beacon may not necessarily exist yet, and the webhook should prevent duplicate
+// operations from being created.
+// The InProgressPhase should instead ensure the beacon is still held and return an error as a result.
 func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, desiredOwner string) (*planv1alpha1.Beacon, error) {
 	if beacon == nil {
 		return nil, nil
