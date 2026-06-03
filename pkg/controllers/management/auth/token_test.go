@@ -345,6 +345,46 @@ func TestSync(t *testing.T) {
 	assert.Nil(t, err, "handler should not return err when userattribute lister's get function returns notfound error")
 }
 
+// TestTriggerUserAttributesRefreshIgnoresNotFound covers the case where the
+// user attribute is deleted between the lister-based gating check and the
+// fresh API Get inside the retry loop. The trigger must no-op silently
+// instead of bubbling an error that would cause the token sync to requeue.
+func TestTriggerUserAttributesRefreshIgnoresNotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	userAttribute := &v3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: "abcd"},
+		// ExtraByProvider == nil so the gating check returns true and we
+		// enter triggerUserAttributesRefresh.
+	}
+
+	userAttributesMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttributesMock.EXPECT().Get(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+		func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+			return nil, errors.NewNotFound(schema.GroupResource{}, name)
+		},
+	)
+	// No Update expectation: NotFound on the Get must short-circuit.
+
+	userAttributesListerMock := wranglerfake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	userAttributesListerMock.EXPECT().Get(gomock.Any()).Return(userAttribute, nil).AnyTimes()
+
+	tokensMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.Token, *v3.TokenList](ctrl)
+
+	controller := TokenController{
+		tokens:               tokensMock,
+		userAttributes:       userAttributesMock,
+		userAttributesLister: userAttributesListerMock,
+	}
+
+	token := &v3.Token{
+		ObjectMeta: metav1.ObjectMeta{Name: "testtoken"},
+		UserID:     "abcd",
+	}
+	_, err := controller.sync(token.Name, token)
+	assert.NoError(t, err, "Must not error when the user attribute is gone")
+}
+
 func populateTestCases(tokens map[string]*v3.Token, userAttributes map[string]*v3.UserAttribute) []tokenTestCase {
 	timeNow := metav1.NewTime(time.Now())
 	hashedToken, _ := hashers.GetHasher().CreateHash("1234")

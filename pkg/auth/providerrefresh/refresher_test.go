@@ -726,6 +726,42 @@ func TestTriggerUserRefreshNoopsWhenAlreadyPending(t *testing.T) {
 		"Update should be skipped when the fresh copy already has NeedsRefresh=true")
 }
 
+func TestTriggerUserRefreshIgnoresUserAttributeNotFound(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	cachedAttribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: userID},
+	}
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return cachedAttribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+				return nil, apierrors.NewNotFound(
+					schema.GroupResource{Group: "management.cattle.io", Resource: "userattributes"},
+					name)
+			},
+		},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	mock := r.userAttributes.(*fakes.UserAttributeInterfaceMock)
+	assert.Empty(t, mock.UpdateCalls(),
+		"Update must not be called when the user attribute is gone")
+}
+
 func TestTriggerUserRefreshRetriesOnConflict(t *testing.T) {
 	t.Parallel()
 

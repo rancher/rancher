@@ -122,6 +122,11 @@ func (t *TokenController) triggerUserAttributesRefresh(user string) error {
 	// writers (e.g. the refresh consumer) touch the object concurrently.
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		userAttribute, err := t.userAttributes.Get(user, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			// The user attribute was deleted under us.
+			// Nothing to refresh, no point in requeuing.
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -130,6 +135,9 @@ func (t *TokenController) triggerUserAttributesRefresh(user string) error {
 		}
 		userAttribute.NeedsRefresh = true
 		_, err = t.userAttributes.Update(userAttribute)
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	})
 }

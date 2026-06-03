@@ -145,6 +145,11 @@ func (c *UserAttributeController) skipRefresh(name string, reason error) (runtim
 	// writeback under contention.
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		attribs, err := c.userAttributes.Get(name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			// The user attribute was deleted under us.
+			// The annotation would have no reader. No point in requeuing.
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -154,6 +159,9 @@ func (c *UserAttributeController) skipRefresh(name string, reason error) (runtim
 		attribs.Annotations[common.ProviderRefreshErrorAnnotation] = reason.Error()
 		attribs.NeedsRefresh = false
 		_, err = c.userAttributes.Update(attribs)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	})
 	if err != nil {

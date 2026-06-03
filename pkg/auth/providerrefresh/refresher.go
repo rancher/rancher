@@ -152,6 +152,11 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	// contention with the refresh-consumer writeback.
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest, err := r.userAttributes.Get(userName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			// The user attribute was deleted between the cache read and this
+			// retry (user cleanup, provider disable). Nothing to refresh.
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -161,8 +166,13 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 		if latest.NeedsRefresh {
 			return nil
 		}
+
 		latest.NeedsRefresh = true
 		_, err = r.userAttributes.Update(latest)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
 		return err
 	})
 	if err != nil {
