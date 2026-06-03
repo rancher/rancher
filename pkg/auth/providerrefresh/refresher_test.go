@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ktypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -681,6 +682,126 @@ func TestTriggerUserRefreshSkipsAnnotatedUser(t *testing.T) {
 
 	assert.Empty(t, r.userAttributes.(*fakes.UserAttributeInterfaceMock).UpdateCalls(),
 		"Update should not be called for annotated user attribute")
+}
+
+func TestTriggerUserRefreshNoopsWhenAlreadyPending(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	cachedAttribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: userID},
+	}
+	// Stale lister copy: NeedsRefresh=false. Fresh API copy: already true
+	// (a concurrent trigger won the race). triggerUserRefresh should re-read
+	// from the API, see NeedsRefresh already set, and skip Update.
+	freshAttribs := &apiv3.UserAttribute{
+		ObjectMeta:   metav1.ObjectMeta{Name: userID},
+		NeedsRefresh: true,
+	}
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return cachedAttribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+				return freshAttribs.DeepCopy(), nil
+			},
+		},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	mock := r.userAttributes.(*fakes.UserAttributeInterfaceMock)
+	assert.Len(t, mock.GetCalls(), 1, "Get should be called to re-read from the API server")
+	assert.Empty(t, mock.UpdateCalls(),
+		"Update should be skipped when the fresh copy already has NeedsRefresh=true")
+}
+
+func TestTriggerUserRefreshIgnoresUserAttributeNotFound(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	cachedAttribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: userID},
+	}
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return cachedAttribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+				return nil, apierrors.NewNotFound(
+					schema.GroupResource{Group: "management.cattle.io", Resource: "userattributes"},
+					name)
+			},
+		},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	mock := r.userAttributes.(*fakes.UserAttributeInterfaceMock)
+	assert.Empty(t, mock.UpdateCalls(),
+		"Update must not be called when the user attribute is gone")
+}
+
+func TestTriggerUserRefreshRetriesOnConflict(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	cachedAttribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: userID},
+	}
+	var updateAttempts int
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return cachedAttribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+				return cachedAttribs.DeepCopy(), nil
+			},
+			UpdateFunc: func(ua *apiv3.UserAttribute) (*apiv3.UserAttribute, error) {
+				updateAttempts++
+				if updateAttempts == 1 {
+					return nil, apierrors.NewConflict(
+						schema.GroupResource{Group: "management.cattle.io", Resource: "userattributes"},
+						userID, errors.New("the object has been modified"))
+				}
+				return ua, nil
+			},
+		},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	assert.Equal(t, 2, updateAttempts, "Update should retry after a 409 conflict and then succeed")
 }
 
 func TestRefreshAttributesNonTransientError(t *testing.T) {
