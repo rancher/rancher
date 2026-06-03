@@ -8,11 +8,15 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/googleapi"
 )
 
 func TestWrapGoogleNonTransient(t *testing.T) {
 	t.Parallel()
+
+	invalidGrant := &oauth2.RetrieveError{ErrorCode: "invalid_grant"}
+	wrappedInvalidGrant := fmt.Errorf("token refresh failed: %w", invalidGrant)
 
 	tests := []struct {
 		name             string
@@ -32,6 +36,21 @@ func TestWrapGoogleNonTransient(t *testing.T) {
 		{
 			name:             "Google API 500 error",
 			err:              &googleapi.Error{Code: http.StatusInternalServerError},
+			wantNonTransient: false,
+		},
+		{
+			name:             "OAuth2 invalid_grant",
+			err:              invalidGrant,
+			wantNonTransient: true,
+		},
+		{
+			name:             "OAuth2 invalid_grant wrapped",
+			err:              wrappedInvalidGrant,
+			wantNonTransient: true,
+		},
+		{
+			name:             "OAuth2 other retrieve error",
+			err:              &oauth2.RetrieveError{ErrorCode: "temporarily_unavailable"},
 			wantNonTransient: false,
 		},
 		{
