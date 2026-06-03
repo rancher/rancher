@@ -70,7 +70,7 @@ func (p *SCCOperatorParams) setConfigHash() error {
 	}
 
 	for _, pullSecret := range p.SCCOperatorPullSecrets {
-		hashInputData = append(hashInputData, []byte(pullSecret.Name)...)
+		hashInputData = append(hashInputData, []byte(pullSecret.Name+",")...)
 	}
 
 	// Generate the hash...

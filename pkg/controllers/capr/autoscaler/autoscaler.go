@@ -109,6 +109,9 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		if err := h.secretClient.Delete("fleet-default", autoscalerHelmSecretResourceName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			logrus.Errorf("[autoscaler] failed to clean up root helm-op secret in fleet-default: %v", err)
 		}
+		if err := h.secretClient.Delete("fleet-default", autoscalerChartImagePullSecretName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			logrus.Errorf("[autoscaler] failed to clean up root image pull secret in fleet-default: %v", err)
+		}
 		clients.CAPI.Cluster().OnChange(ctx, "autoscaler-cleanup", h.ensureCleanup)
 		return
 	}

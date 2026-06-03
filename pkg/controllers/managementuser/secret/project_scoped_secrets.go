@@ -503,7 +503,7 @@ func secretIgnoresNamespace(annos map[string]string, namespace string) bool {
 		return false
 	}
 	for _, ignoredNs := range strings.Split(v, ",") {
-		// If special characters are identified, treat the value as a regexp
+		// If an asterisk ("*") is present, treat the value as a regexp
 		ignoredNs = strings.TrimSpace(ignoredNs)
 		if strings.Contains(ignoredNs, "*") {
 			exp, err := regexp.Compile(ignoredNs)

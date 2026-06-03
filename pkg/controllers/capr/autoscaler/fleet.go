@@ -283,7 +283,7 @@ func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
 			errs = append(errs, err)
 		}
 	} else if !errors.IsNotFound(err) {
-		errs = append(errs, fmt.Errorf("failed to check existence of Cluster %s in namespace %s when cleaning up Helm operation secrets: %w", cluster.Namespace, cluster.Name, err))
+		errs = append(errs, fmt.Errorf("failed to check existence of Cluster %s in namespace %s when cleaning up Helm operation secrets: %w", cluster.Name, cluster.Namespace, err))
 	}
 
 	// Return combined errors if any occurred

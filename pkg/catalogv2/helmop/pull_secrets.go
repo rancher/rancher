@@ -28,8 +28,8 @@ const helmOpManagedPullSecretLabel = "management.cattle.io/helm-op-pull-secret"
 // pull secrets to the specific Helm release that created them, preventing cross-release cleanup.
 const helmOpReleaseLabelKey = "management.cattle.io/helm-op-release"
 
-// createNamespaceAndPullSecrets is responsible for creating the release namespace for chart on install/upgrade operations and managing the default image pull
-// secrets to be used by that chart. It checks if the chart supports image pull secrets and if it does, and that is has a system-default-registry configure. If so,
+// createNamespaceAndPullSecrets is responsible for creating the release namespace for the charts on install/upgrade operations and managing the default image pull
+// secrets to be used by the charts. It checks if each chart supports image pull secrets and that it has a system-default-registry configured. If so,
 // it creates/updates the pull secrets in the release namespace and injects them in the charts values.yaml if the user has not already configured them. The management
 // of pull secrets may also be skipped if the provided ctx includes a valid apiRequest, and that request specifies the 'skipPullSecrets' query parameter as 'true'.
 func (s *Operations) createNamespaceAndPullSecrets(ctx context.Context, status catalog.OperationStatus, cmds Commands, clusterRepoName string) error {
@@ -137,18 +137,11 @@ func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace s
 		return nil, err
 	}
 
-	if systemDefaultRegistry == "" {
+	if systemDefaultRegistry == "" || len(repo.Spec.DefaultImagePullSecrets) == 0 {
 		if err := s.deleteStaleHelmOpSecrets([]string{}, namespace, releaseName); err != nil {
 			return nil, err
 		}
 		return []string{}, nil
-	}
-
-	if len(repo.Spec.DefaultImagePullSecrets) == 0 {
-		if err := s.deleteStaleHelmOpSecrets([]string{}, namespace, releaseName); err != nil {
-			return nil, err
-		}
-		return nil, nil
 	}
 
 	var secretNames []string
@@ -163,6 +156,8 @@ func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace s
 			continue
 		}
 
+		// only allow secrets which are currently configured as global pull secrets (source),
+		// or have been delivered downstream by Rancher (agent).
 		_, isSourceSecret := pullSec.Labels[cluster.SourcePullSecretLabel]
 		_, isAgentSecret := pullSec.Labels[cluster.AgentPullSecretLabel]
 		if !isSourceSecret && !isAgentSecret {
@@ -227,7 +222,7 @@ func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace s
 		}
 
 		// Only manage secrets that we created, skip user-created secrets that happen to share the name.
-		if existingSec.Labels[helmOpManagedPullSecretLabel] != "true" {
+		if existingSec.Labels != nil && existingSec.Labels[helmOpManagedPullSecretLabel] != "true" {
 			log.Debugf("[helmop] managePullSecrets: secret %q in namespace %q is not Rancher-managed, skipping update", secretName, namespace)
 			continue
 		}

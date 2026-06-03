@@ -2,11 +2,13 @@ package clean
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +34,7 @@ func UnusedPullSecrets(ctx context.Context) {
 	}
 	secret := k8s.CoreV1().Secrets("cattle-system")
 	copiedPullSecrets, err := secret.List(ctx, metav1.ListOptions{
-		LabelSelector: "management.cattle.io/cattle-cluster-agent-pull-secret=true",
+		LabelSelector: fmt.Sprintf("%s=true", cluster.AgentPullSecretLabel),
 	})
 	if err != nil {
 		logrus.Errorf("Error listing cattle-cluster-agent-pull-secrets: %v", err)

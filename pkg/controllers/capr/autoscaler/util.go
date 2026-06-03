@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -67,7 +67,7 @@ func autoScalerChartRepositoryHost() string {
 	if !found {
 		hostWithoutProto = host
 	}
-	hostWithoutPath, _, found := strings.Cut(hostWithoutProto, "/")
+	hostWithoutPath, _, _ := strings.Cut(hostWithoutProto, "/")
 	return hostWithoutPath
 }
 

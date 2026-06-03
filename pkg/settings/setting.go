@@ -74,7 +74,7 @@ var (
 		"cattle-oidc-codes",
 		"cattle-oidc-client-secrets",
 		"cattle-impersonation-system",
-		"cluster-fleet-*",
+		"cluster-fleet-.*",
 		"cattle-fleet-local-system",
 		"cattle-fleet-clusters-system",
 	}

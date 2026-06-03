@@ -526,7 +526,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckProvisioningCluste
 	s.Error(err, "Expected error when provisioning cluster existence check fails")
 	if err != nil {
 		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
-		s.Contains(err.Error(), "failed to check existence of Cluster "+cluster.Namespace+" in namespace "+cluster.Name)
+		s.Contains(err.Error(), "failed to check existence of Cluster "+cluster.Name+" in namespace "+cluster.Namespace)
 		s.Contains(err.Error(), "network timeout")
 	}
 }
