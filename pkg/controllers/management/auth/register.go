@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/roletemplates"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -61,6 +62,21 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	}
 
 	roletemplates.RegisterIndexers(scaledContext.Wrangler)
+
+	grInformer := scaledContext.Management.GlobalRoles("").Controller().Informer()
+	grInformer.AddIndexers(map[string]cache.IndexFunc{
+		pkgrbac.GRDownstreamNSIndex: func(obj any) ([]string, error) {
+			gr, ok := obj.(*v3.GlobalRole)
+			if !ok {
+				return nil, nil
+			}
+			result := []string{}
+			for ns := range gr.InheritedNamespacedRules {
+				result = append(result, ns)
+			}
+			return result, nil
+		},
+	})
 
 	grbInformer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
 	return grbInformer.AddIndexers(map[string]cache.IndexFunc{
