@@ -158,8 +158,9 @@ var (
 	// Rke2ProvisioningPrimeDefault controls whether newly provisioned RKE2 clusters automatically get
 	// the --prime server argument. When "true", all new RKE2 clusters will have prime=true added to
 	// server args (unless overridden by the per-cluster provisioning.cattle.io/rke2-prime-enabled annotation).
-	// Defaults to "false" in standard builds; Prime builds override this to "true".
-	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", "false")
+	// Defaults to empty (treated as "false") in standard builds; Prime builds set
+	// CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=true to override.
+	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", os.Getenv("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT"))
 
 	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
