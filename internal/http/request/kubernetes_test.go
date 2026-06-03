@@ -123,7 +123,9 @@ func TestIsPodExecRequest(t *testing.T) {
 		{
 			name:     "double slashes",
 			path:     "/api/v1/namespaces//default//pods//nginx//exec",
-			expected: false, // If URL is parsed with `path.Clean` it would match, but as is now it will not match (may need to verify)
+			expected: false,
+			// stdlib http.Mux will automatically normalize paths, so double slashes are not a concern
+			// Test case left here for completeness of unit-testing the func
 		},
 
 		// Empty and nil cases
