@@ -1,14 +1,14 @@
 package autoscaler
 
 import (
-	"bytes"
-	"fmt"
+	"errors"
+	"reflect"
 
-	provv2 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -98,7 +98,7 @@ func (h *autoscalerHandler) ensureRootHelmOpSecrets() (string, string, error) {
 // that may have been created when the cluster previously used a per-cluster registry configuration.
 // This is called when a cluster transitions back to the global-default registry, to avoid
 // leaving orphaned secrets behind in the cluster's namespace.
-func (h *autoscalerHandler) cleanupClusterScopedSecrets(provCluster *provv2.Cluster, capiCluster *capi.Cluster) error {
+func (h *autoscalerHandler) cleanupClusterScopedSecrets(provCluster *provv1.Cluster, capiCluster *capi.Cluster) error {
 	if err := h.deleteSecretIfExists(capiCluster.Namespace, helmOpSecretName(capiCluster.Name, capiCluster.Namespace)); err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (h *autoscalerHandler) cleanupClusterScopedSecrets(provCluster *provv2.Clus
 
 // ensureClusterScopedHelmOpSecretInNamespace creates or updates a basic-auth Helm secret in the
 // provisioning cluster's namespace using the cluster-level autoscaler chart credentials.
-func (h *autoscalerHandler) ensureClusterScopedHelmOpSecretInNamespace(provCluster *provv2.Cluster, capiCluster *capi.Cluster) (string, error) {
+func (h *autoscalerHandler) ensureClusterScopedHelmOpSecretInNamespace(provCluster *provv1.Cluster, capiCluster *capi.Cluster) (string, error) {
 	username, password, err := h.findClusterLevelAutoScalerHostnameCreds(provCluster)
 	if err != nil {
 		return "", err
@@ -124,7 +124,7 @@ func (h *autoscalerHandler) ensureClusterScopedHelmOpSecretInNamespace(provClust
 // secret in the provisioning cluster's namespace for pulling the autoscaler chart image.
 // If the chart host matches the cluster's system default registry, no secret is created because
 // credentials are already configured at provisioning time.
-func (h *autoscalerHandler) ensureClusterScopedImagePullSecretInNamespace(provCluster *provv2.Cluster, capiCluster *capi.Cluster) (string, error) {
+func (h *autoscalerHandler) ensureClusterScopedImagePullSecretInNamespace(provCluster *provv1.Cluster, capiCluster *capi.Cluster) (string, error) {
 	chartHost := autoScalerChartRepositoryHost()
 	sdrURL, _ := image.GetPrivateRepoURLFromCluster(provCluster)
 	if chartHost == sdrURL {
@@ -170,7 +170,7 @@ func dockerConfigSecretData(host, username, password string) (map[string][]byte,
 // deleteSecretIfExists deletes the secret at namespace/name, silently ignoring NotFound errors.
 func (h *autoscalerHandler) deleteSecretIfExists(namespace, secretName string) error {
 	err := h.secretClient.Delete(namespace, secretName, &metav1.DeleteOptions{})
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	return err
@@ -180,15 +180,12 @@ func (h *autoscalerHandler) deleteSecretIfExists(namespace, secretName string) e
 // and its data is identical to the provided data, no write is performed.
 func (h *autoscalerHandler) upsertSecret(namespace, secretName string, secretType v1.SecretType, data map[string][]byte, owner []metav1.OwnerReference) (*v1.Secret, error) {
 	existing, err := h.secretCache.Get(namespace, secretName)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	if existing != nil {
-		if !secretDataEqual(existing.Data, data) {
+		if !reflect.DeepEqual(existing.Data, data) {
 			updated := existing.DeepCopy()
-			if secretType != "" {
-				updated.Type = secretType
-			}
 			updated.Data = data
 			return h.secretClient.Update(updated)
 		}
@@ -205,19 +202,6 @@ func (h *autoscalerHandler) upsertSecret(namespace, secretName string, secretTyp
 	})
 }
 
-// secretDataEqual reports whether two secret data maps are identical.
-func secretDataEqual(a, b map[string][]byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if !bytes.Equal(v, b[k]) {
-			return false
-		}
-	}
-	return true
-}
-
 // findGlobalClusterAutoScalerHostnameCreds iterates over globally configured pull secrets and
 // returns the first username/password pair that covers the autoscaler chart repository host.
 // Returns empty strings (no error) when no matching credentials are found.
@@ -228,15 +212,14 @@ func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds() (string, 
 	}
 	for _, ps := range registry.PullSecrets {
 		sec, err := h.secretCache.Get(ps.Namespace, ps.Name)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				continue
-			}
+		if apierrors.IsNotFound(err) {
+			continue
+		} else if err != nil {
 			return "", "", err
 		}
 		username, password, err := cluster.ExtractUsernamePasswordFromPullSecret(autoScalerChartRepositoryHost(), sec)
 		if err != nil {
-			if err.Error() == fmt.Sprintf(cluster.ErrRegistryHostnameNotFound, autoScalerChartRepositoryHost()) {
+			if errors.Is(err, cluster.ErrRegistryHostnameNotFound) {
 				continue
 			}
 			return "", "", err
@@ -247,8 +230,9 @@ func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds() (string, 
 }
 
 // findClusterLevelAutoScalerHostnameCreds looks up the credentials for the autoscaler chart host
-// from the provisioning cluster's registry configuration.
-func (h *autoscalerHandler) findClusterLevelAutoScalerHostnameCreds(provCluster *provv2.Cluster) (string, string, error) {
+// from the provisioning cluster's registry configuration. The username and password is extracted from the first
+// Auth secret found on the cluster which contains credentials for the autoscaler host.
+func (h *autoscalerHandler) findClusterLevelAutoScalerHostnameCreds(provCluster *provv1.Cluster) (string, string, error) {
 	chartHost := autoScalerChartRepositoryHost()
 	ps := image.GetRegistryAuthSecretForHostname(provCluster, chartHost)
 	if ps == "" {

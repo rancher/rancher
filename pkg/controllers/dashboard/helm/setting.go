@@ -26,6 +26,9 @@ func RegisterRepoSettings(ctx context.Context,
 	settingController.OnChange(ctx, "synchronize-rancher-repo-pull-secrets", h.onRegistryPullSecretsSettingsChange)
 }
 
+// onRegistryPullSecretsSettingsChange ensures that the DefaultImagePullSecrets field set on the rancher-charts ClusterRepo is kept up to date
+// with the pull secrets defined in the global or cluster level registry settings. This ensures that the repo has an up-to-date reference on the pull
+// secrets that can be used when deploying rancher-managed charts.
 func (r *repoHandler) onRegistryPullSecretsSettingsChange(_ string, setting *apimgmtv3.Setting) (*apimgmtv3.Setting, error) {
 	if setting == nil || (setting.Name != settings.SystemDefaultRegistryPullSecrets.Name && setting.Name != settings.SystemDefaultRegistry.Name) {
 		return setting, nil

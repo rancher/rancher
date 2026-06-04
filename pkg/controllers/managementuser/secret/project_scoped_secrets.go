@@ -509,10 +509,8 @@ func secretIgnoresNamespace(annos map[string]string, namespace string) bool {
 			exp, err := regexp.Compile(ignoredNs)
 			if err != nil {
 				logrus.Warnf("Invalid regular expression '%s' in annotation %s: %v. Skipping regex evaluation and treating as literal string.", ignoredNs, PSSIgnoreNamespacesAnnotation, err)
-			} else {
-				if exp.MatchString(namespace) {
-					return true
-				}
+			} else if exp.MatchString(namespace) {
+				return true
 			}
 		}
 		if ignoredNs == namespace {

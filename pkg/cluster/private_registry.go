@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -278,7 +279,7 @@ func generateConfigJson(clusterSystemDefaultURL string, secret *kcorev1.Secret) 
 		// we need to ensure that we are only delivering credentials for the configured hostname.
 		configJson, err = FilterDockerConfigJson(clusterSystemDefaultURL, secret.Data)
 		if err != nil {
-			if err.Error() == fmt.Sprintf(ErrRegistryHostnameNotFound, clusterSystemDefaultURL) {
+			if errors.Is(err, ErrRegistryHostnameNotFound) {
 				return nil, nil
 			}
 			return nil, err

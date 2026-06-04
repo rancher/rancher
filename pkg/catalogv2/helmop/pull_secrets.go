@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
@@ -14,7 +14,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/name"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/yaml"
@@ -175,7 +175,7 @@ func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace s
 		// Filter the source secret to only the entry matching the configured SDR.
 		filteredData, err := cluster.FilterDockerConfigJson(systemDefaultRegistry, pullSec.Data)
 		if err != nil {
-			if err.Error() == fmt.Sprintf(cluster.ErrRegistryHostnameNotFound, systemDefaultRegistry) {
+			if errors.Is(err, cluster.ErrRegistryHostnameNotFound) {
 				continue
 			}
 			log.Errorf("[helmop] managePullSecrets: failed to filter docker config for registry %q from secret %q: %v", systemDefaultRegistry, secret.Name, err)
@@ -192,7 +192,7 @@ func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace s
 		secretName := name.SafeConcatName(releaseName, secret.Name)
 
 		existingSec, err := s.secretCache.Get(namespace, secretName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			log.Errorf("[helmop] managePullSecrets: unexpected error looking up existing secret %q in namespace %q: %v", secretName, namespace, err)
 			return nil, err
 		}
@@ -276,7 +276,7 @@ func (s *Operations) deleteStaleHelmOpSecrets(activeSecretNames []string, namesp
 		}
 
 		log.Debugf("[helmop] deleteStaleHelmOpSecrets: deleting stale managed secret %q from namespace %q (release %q)", secret.Name, namespace, releaseName)
-		if err := s.secrets.Delete(namespace, secret.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := s.secrets.Delete(namespace, secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			log.Errorf("[helmop] deleteStaleHelmOpSecrets: failed to delete stale secret %q in namespace %q: %v", secret.Name, namespace, err)
 			return err
 		}

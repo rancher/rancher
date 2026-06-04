@@ -3,7 +3,6 @@ package cluster
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -27,10 +26,10 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		secret         *corev1.Secret
-		expectedErrMsg string
-		validate       func(t *testing.T, got []byte)
+		name        string
+		secret      *corev1.Secret
+		expectedErr error
+		validate    func(t *testing.T, got []byte)
 	}{
 		{
 			name: "rke auth-config: valid",
@@ -49,7 +48,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "auth-secret"},
 				Type:       v1.AuthConfigSecretType,
 			},
-			expectedErrMsg: fmt.Sprintf(ErrSecretDataNil, "auth-secret", host),
+			expectedErr: ErrSecretDataNil,
 		},
 		{
 			name: "rke auth-config: missing auth key",
@@ -58,7 +57,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				Type:       v1.AuthConfigSecretType,
 				Data:       map[string][]byte{},
 			},
-			expectedErrMsg: fmt.Sprintf(ErrAuthKeyNotFound, "auth-secret", host),
+			expectedErr: ErrAuthKeyNotFound,
 		},
 		{
 			name: "rke auth-config: malformed auth value (no colon delimiter)",
@@ -67,7 +66,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				Type:       v1.AuthConfigSecretType,
 				Data:       map[string][]byte{"auth": []byte("myusermypass")},
 			},
-			expectedErrMsg: fmt.Sprintf(ErrAuthMalformed, "auth-secret", host),
+			expectedErr: ErrAuthMalformed,
 		},
 		{
 			name: "basic-auth: valid",
@@ -89,7 +88,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "basic-secret"},
 				Type:       corev1.SecretTypeBasicAuth,
 			},
-			expectedErrMsg: fmt.Sprintf(ErrSecretDataNil, "basic-secret", host),
+			expectedErr: ErrSecretDataNil,
 		},
 		{
 			name: "basic-auth: missing username",
@@ -98,7 +97,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				Type:       corev1.SecretTypeBasicAuth,
 				Data:       map[string][]byte{"password": []byte("mypass")},
 			},
-			expectedErrMsg: fmt.Sprintf(ErrUsernameNotFound, "basic-secret", host),
+			expectedErr: ErrUsernameNotFound,
 		},
 		{
 			name: "basic-auth: missing password",
@@ -107,7 +106,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				Type:       corev1.SecretTypeBasicAuth,
 				Data:       map[string][]byte{"username": []byte("myuser")},
 			},
-			expectedErrMsg: fmt.Sprintf(ErrPasswordNotFound, "basic-secret", host),
+			expectedErr: ErrPasswordNotFound,
 		},
 		{
 			name: "dockerconfigjson: valid passthrough",
@@ -128,7 +127,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "docker-secret"},
 				Type:       corev1.SecretTypeDockerConfigJson,
 			},
-			expectedErrMsg: fmt.Sprintf(ErrSecretDataNil, "docker-secret", host),
+			expectedErr: ErrSecretDataNil,
 		},
 		{
 			name: "dockerconfigjson: missing key",
@@ -137,7 +136,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				Type:       corev1.SecretTypeDockerConfigJson,
 				Data:       map[string][]byte{},
 			},
-			expectedErrMsg: fmt.Sprintf(ErrDockerConfigKeyNotFound, "docker-secret", host),
+			expectedErr: ErrDockerConfigKeyNotFound,
 		},
 		{
 			name: "unsupported secret type",
@@ -146,7 +145,7 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 				Type:       "some.other/type",
 				Data:       map[string][]byte{},
 			},
-			expectedErrMsg: fmt.Sprintf(ErrUnsupportedSecretType, "other-secret", host, "some.other/type"),
+			expectedErr: ErrUnsupportedSecretType,
 		},
 	}
 
@@ -155,8 +154,8 @@ func TestConvertToDockerConfigJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := ConvertToDockerConfigJson(host, tt.secret)
-			if tt.expectedErrMsg != "" {
-				assert.ErrorContains(t, err, tt.expectedErrMsg)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
 				assert.Nil(t, got)
 				return
 			}
@@ -220,11 +219,12 @@ func TestFilterDockerConfigJson(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		host           string
-		data           map[string][]byte
-		expectedErrMsg string
-		validate       func(t *testing.T, got []byte)
+		name        string
+		host        string
+		data        map[string][]byte
+		expectedErr error
+		wantErr     bool
+		validate    func(t *testing.T, got []byte)
 	}{
 		{
 			name: "valid config with single entry returns that entry",
@@ -262,16 +262,16 @@ func TestFilterDockerConfigJson(t *testing.T) {
 			},
 		},
 		{
-			name:           "missing .dockerconfigjson key",
-			host:           host,
-			data:           map[string][]byte{},
-			expectedErrMsg: fmt.Sprintf(ErrDockerConfigJsonNotFound, host),
+			name:        "missing .dockerconfigjson key",
+			host:        host,
+			data:        map[string][]byte{},
+			expectedErr: ErrDockerConfigJsonNotFound,
 		},
 		{
-			name:           "invalid JSON",
-			host:           host,
-			data:           map[string][]byte{corev1.DockerConfigJsonKey: []byte("not-json")},
-			expectedErrMsg: "invalid character",
+			name:    "invalid JSON",
+			host:    host,
+			data:    map[string][]byte{corev1.DockerConfigJsonKey: []byte("not-json")},
+			wantErr: true,
 		},
 		{
 			name: "hostname not found in auths",
@@ -279,7 +279,7 @@ func TestFilterDockerConfigJson(t *testing.T) {
 			data: makeConfigJSON(map[string]credentialprovider.DockerConfigEntry{
 				host: {Username: "myuser", Password: "mypass"},
 			}),
-			expectedErrMsg: fmt.Sprintf(ErrRegistryHostnameNotFound, "other.registry.example.com"),
+			expectedErr: ErrRegistryHostnameNotFound,
 		},
 	}
 
@@ -288,9 +288,13 @@ func TestFilterDockerConfigJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := FilterDockerConfigJson(tt.host, tt.data)
-			if tt.expectedErrMsg != "" {
-				assert.ErrorContains(t, err, tt.expectedErrMsg)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
 				assert.Nil(t, got)
+				return
+			}
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
@@ -323,7 +327,8 @@ func TestUnwrapDockerConfigJson(t *testing.T) {
 		expectedUsername string
 		expectedPassword string
 		expectedAuth     string
-		expectedErrMsg   string
+		expectedErr      error
+		wantErr          bool
 	}{
 		{
 			name:             "valid config with matching hostname",
@@ -334,22 +339,22 @@ func TestUnwrapDockerConfigJson(t *testing.T) {
 			expectedAuth:     base64.StdEncoding.EncodeToString([]byte("myuser:mypass")),
 		},
 		{
-			name:           "missing .dockerconfigjson key",
-			host:           host,
-			data:           map[string][]byte{},
-			expectedErrMsg: fmt.Sprintf(ErrDockerConfigJsonNotFound, host),
+			name:        "missing .dockerconfigjson key",
+			host:        host,
+			data:        map[string][]byte{},
+			expectedErr: ErrDockerConfigJsonNotFound,
 		},
 		{
-			name:           "invalid JSON",
-			host:           host,
-			data:           map[string][]byte{corev1.DockerConfigJsonKey: []byte("not-json")},
-			expectedErrMsg: "invalid character",
+			name:    "invalid JSON",
+			host:    host,
+			data:    map[string][]byte{corev1.DockerConfigJsonKey: []byte("not-json")},
+			wantErr: true,
 		},
 		{
-			name:           "hostname not found in auths",
-			host:           "other.registry.example.com",
-			data:           makeConfigJSON(host, "myuser", "mypass"),
-			expectedErrMsg: fmt.Sprintf(ErrRegistryHostnameNotFound, "other.registry.example.com"),
+			name:        "hostname not found in auths",
+			host:        "other.registry.example.com",
+			data:        makeConfigJSON(host, "myuser", "mypass"),
+			expectedErr: ErrRegistryHostnameNotFound,
 		},
 	}
 
@@ -358,8 +363,12 @@ func TestUnwrapDockerConfigJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			username, password, auth, err := UnwrapDockerConfigJson(tt.host, tt.data)
-			if tt.expectedErrMsg != "" {
-				assert.ErrorContains(t, err, tt.expectedErrMsg)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+				return
+			}
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
