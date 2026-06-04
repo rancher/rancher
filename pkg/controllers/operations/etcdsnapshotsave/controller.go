@@ -88,8 +88,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	}
 
 	if status.Phase == "" {
-		status.Phase = opv1alpha1.OperationPhasePending
-		status.LastUpdated = metav1.Now()
+		status.SetPhase(opv1alpha1.OperationPhasePending)
 	}
 
 	gvk := schema.FromAPIVersionAndKind(op.Spec.ClusterRef.APIVersion, op.Spec.ClusterRef.Kind)
@@ -106,8 +105,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.ClusterNotFoundReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("cluster %s not found", key))
 
-		status.Phase = opv1alpha1.OperationPhaseFailed
-		status.LastUpdated = metav1.Now()
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 		return status, nil
 	}
 	if err != nil {
@@ -168,20 +166,26 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		adapter:    a,
 	}
 
-	if status.Phase == opv1alpha1.OperationPhasePending {
-		return h.handlePending(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseInProgress {
-		return h.handleInProgress(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseCanceled {
+	switch status.Phase {
+	case opv1alpha1.OperationPhasePending:
+		status, err = h.handlePending(s, status)
+	case opv1alpha1.OperationPhaseInProgress:
+		status, err = h.handleInProgress(s, status)
+	case opv1alpha1.OperationPhaseCanceled:
+		// canceled assumes that the beacon is released, so we can safely skip the rest of the processing
 		return status, nil
+	case opv1alpha1.OperationPhaseFailed:
+		status, err = h.handleFailed(s, status)
+	case opv1alpha1.OperationPhaseSucceeded:
+		status, err = h.handleSucceeded(s, status)
+	default:
+		// Should be prevented via validation, but just in case
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
 	}
-	if status.Phase == opv1alpha1.OperationPhaseFailed {
-		return h.handleFailed(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseSucceeded {
-		return h.handleSucceeded(s, status)
+	if err != nil {
+		return status, err
 	}
 
 	// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
@@ -192,10 +196,6 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		}
 		return status, generic.ErrSkip
 	}
-
-	opv1alpha1.FailedCondition.True(&status)
-	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
 
 	return status, nil
 }
@@ -234,9 +234,8 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to save", s.op.Namespace, s.op.Name)
 
-	status.Phase = opv1alpha1.OperationPhaseInProgress
-	status.LastUpdated = metav1.Now()
-	status.Step = opv1alpha1.ETCDSnapshotSaveStepSave
+	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
+	status.SetStep(opv1alpha1.ETCDSnapshotSaveStepSave)
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
@@ -245,8 +244,8 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	if !planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
-		status.Phase = opv1alpha1.OperationPhaseFailed
-		status.LastUpdated = metav1.Now()
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
@@ -268,8 +267,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		return h.reconcileRestart(s, status)
 	}
 
-	status.Phase = opv1alpha1.OperationPhaseFailed
-	status.LastUpdated = metav1.Now()
+	status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
@@ -338,8 +336,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			status.Phase = opv1alpha1.OperationPhaseFailed
-			status.LastUpdated = metav1.Now()
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 			opv1alpha1.FailedCondition.True(&status)
 			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
@@ -361,7 +358,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to restart", s.op.Namespace, s.op.Name)
 
-	status.Step = opv1alpha1.ETCDSnapshotSaveStepRestart
+	status.SetStep(opv1alpha1.ETCDSnapshotSaveStepRestart)
 	return status, nil
 }
 
@@ -409,8 +406,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			status.Phase = opv1alpha1.OperationPhaseFailed
-			status.LastUpdated = metav1.Now()
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 			opv1alpha1.FailedCondition.True(&status)
 			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
@@ -432,8 +428,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
-	status.Phase = opv1alpha1.OperationPhaseSucceeded
-	status.LastUpdated = metav1.Now()
+	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
 
 	opv1alpha1.SucceededCondition.True(&status)
 	opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.FinishedReason)

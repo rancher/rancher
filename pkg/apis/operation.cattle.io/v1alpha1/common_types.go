@@ -60,15 +60,22 @@ type OperationStatus struct {
 	// +kubebuilder:validation:MaxItems=32
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
 
-	// lastUpdated identifies when the phase of the Operation last transitioned.
+	// LastUpdated identifies when the phase of the Operation last transitioned.
+	// LastUpdated will also be updated during step transitions, if applicable.
 	// +optional
 	LastUpdated metav1.Time `json:"lastUpdated,omitempty,omitzero"`
 
+	// Phase represents the current phase of the Operation.
+	// A Pending operation is one that is currently waiting to acquire the beacon, active it, and begin execution.
+	// An InProgress operation is one that is currently executing.
+	// A Succeeded operation is one that completed successfully.
+	// A Failed operation is one that failed to complete successfully.
+	// A Canceled operation is one that was canceled by the user or system.
 	// +kubebuilder:validation:Enum=Pending;InProgress;Succeeded;Failed;Canceled
 	// +optional
 	Phase OperationPhase `json:"phase,omitempty"`
 
-	// observedGeneration is the latest generation observed by the controller.
+	// ObservedGeneration is the latest generation observed by the controller.
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
