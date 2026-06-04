@@ -74,6 +74,20 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
 {{- end }}
+      initContainers:
+        - name: rancher-charts-copy
+          image: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
+          imagePullPolicy: {{ .Values.chartsImage.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Copying charts to shared volume..."
+              cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
+              echo "Charts copied successfully"
+          volumeMounts:
+            - name: rancher-charts
+              mountPath: /charts
       containers:
       - image: "{{ template "rancher.image" . }}:{{ template "rancher.imageTag" . }}"
         imagePullPolicy: {{ include "rancher.imagePullPolicy" . }}
@@ -177,6 +191,10 @@ spec:
         - name: CATTLE_BASE_REGISTRY_PULL_SECRETS
           value: "{{ range $i, $v := .Values.imagePullSecrets }}{{- if $i }},{{ end }}{{ $v.name }}{{ end }}"
 {{- end }}
+        # TODO: should this be conditional? We need it for consistency if the user changes the values ever.
+        # maybe just check for empty values on .Values.chartsImage.repository and tag and set if both set?
+        - name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
@@ -211,6 +229,9 @@ spec:
         resources: {{- toYaml .Values.resources | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - mountPath: /var/lib/rancher-data/local-catalogs/v2
+          name: rancher-charts
+          readOnly: true
 {{- if .Values.additionalTrustedCAs }}
         - mountPath: /etc/pki/trust/anchors/ca-additional.pem
           name: tls-ca-additional-volume
@@ -258,6 +279,8 @@ spec:
   {{- end }}
 {{- end }}
       volumes:
+      - name: rancher-charts
+        emptyDir: {}
 {{- if .Values.additionalTrustedCAs }}
       - name: tls-ca-additional-volume
         secret:

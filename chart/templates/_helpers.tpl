@@ -67,6 +67,29 @@ Prepare the Rancher Image Pull Policy value w/ new fields as opt-in for now.
 {{ end -}}
 
 {{/*
+Prepare the Rancher Charts Image value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancherCharts.image" -}}
+{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . (default "" .Values.chartsImage.registry))) (include "rancherCharts.imageRepo" .) }}
+{{ end -}}
+
+{{/*
+Prepare the Rancher Charts Image repo value
+*/}}
+{{ define "rancherCharts.imageRepo" -}}
+{{ default "rancher/rancher-charts" .Values.chartsImage.repository -}}
+{{ end -}}
+
+
+{{/*
+Prepare the Rancher Charts Image Pull Policy value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancherCharts.imagePullPolicy" -}}
+{{ default "IfNotPresent" .Values.chartsImage.pullPolicy -}}
+{{ end -}}
+
+
+{{/*
 Render Values in configurationSnippet
 */}}
 {{- define "configurationSnippet" -}}

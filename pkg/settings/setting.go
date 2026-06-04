@@ -65,7 +65,7 @@ var (
 		"cattle-capi-system",
 	}
 
-	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
+	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:head")
 	SystemNamespacesIgnoringPullSecrets = []string{
 		"cattle-system",
 		"cattle-global-data",
@@ -445,7 +445,7 @@ var (
 	ImportedClusterDay2OpsEnabledDefault = NewSetting("imported-cluster-day2-ops-enabled", "true")
 
 	// ChartsImage is the image used for Rancher's `ClusterRepo` assets on downstream clusters.
-	ChartsImage = NewSetting("charts-image", buildconfig.DefaultChartsImage)
+	ChartsImage = NewSetting("charts-image", defaultChartsImageValue())
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
@@ -743,4 +743,11 @@ func GetMachineProvisionImagePullPolicy() v1.PullPolicy {
 		logrus.Warnf("failed to parse setting machine-provision-image-pull-policy value: %s defaulting to: %s", machineProvisionImagePullPolicy, v1.PullAlways)
 		return v1.PullAlways
 	}
+}
+
+func defaultChartsImageValue() string {
+	if chartsImage := os.Getenv("CATTLE_CHARTS_IMAGE_DEFAULT"); chartsImage != "" {
+		return chartsImage
+	}
+	return buildconfig.DefaultChartsImage
 }
