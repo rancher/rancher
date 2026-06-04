@@ -77,7 +77,7 @@ spec:
       initContainers:
         - name: rancher-charts-copy
           image: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
-          imagePullPolicy: {{ .Values.chartsImage.pullPolicy }}
+          imagePullPolicy: {{ include "rancherCharts.imagePullPolicy" . }}
           command:
             - sh
             - -c
