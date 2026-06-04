@@ -57,4 +57,10 @@ const (
 
 	// InProgressReason surfaces when an operation is currently in progress.
 	InProgressReason = "InProgress"
+
+	// PausedReason surfaces when an operation is paused.
+	PausedReason = "Paused"
+
+	// NotPausedReason surfaces when an operation is not paused.
+	NotPausedReason = "NotPaused"
 )

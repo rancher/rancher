@@ -123,7 +123,7 @@ func (a *CAPRAdapter) ServerUnit() string {
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // If the cluster is using a custom data directory or secure probes, this information is extracted from the cluster object and rendered in.
-func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret) (map[string]plan.Probe, error) {
+func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
 		probeNames []string
@@ -159,6 +159,15 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret) (map[string]plan.Probe
 	config, err := a.renderConfig(secret)
 	if err != nil {
 		return nil, err
+	}
+
+	if supervisor && (IsEtcd(secret) || IsControlPlane(secret)) {
+		supervisorProbe := probes[SupervisorProbeName]
+		port := 9345
+		if runtime == capr.RuntimeK3S {
+			port = 6443
+		}
+		supervisorProbe.HTTPGetAction.URL = fmt.Sprintf(supervisorProbe.HTTPGetAction.URL, loopbackAddress, port, runtime)
 	}
 
 	if IsControlPlane(secret) {

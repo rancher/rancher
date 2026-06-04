@@ -210,6 +210,7 @@ type scope struct {
 }
 
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
+	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling pending", s.op.Namespace, s.op.Name)
 	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 	if err != nil {
 		return status, err
@@ -220,7 +221,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
 		return status, nil
 	}
-	logrus.Infof("[etcdsnapshotsave] %s/%s: acquired beacon, waiting for agents to register", s.op.Namespace, s.op.Name)
+	logrus.Debugf("[etcdsnapshotsave] %s/%s: acquired beacon, waiting for agents to register", s.op.Namespace, s.op.Name)
 
 	if ok, err := s.adapter.WaitForRegister(); err != nil {
 		return status, err
@@ -243,6 +244,8 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
+	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling in-progress", s.op.Namespace, s.op.Name)
+
 	if !planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -295,7 +298,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	}
 
 	for _, secret := range secrets {
-		probes, err := s.adapter.RenderProbes(secret)
+		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
 			return status, err
 		}
@@ -377,7 +380,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	}
 
 	for _, secret := range secrets {
-		probes, err := s.adapter.RenderProbes(secret)
+		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
 			return status, err
 		}
@@ -438,7 +441,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 }
 
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
-	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
+	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
 	err := planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 	if err != nil {
@@ -448,7 +451,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 }
 
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
-	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
+	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
 	if planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
 		var err error
@@ -477,6 +480,15 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapsho
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: updating conditions", op.Namespace, op.Name)
 
 	status.ObservedGeneration = op.Generation
+	if op.Spec.Paused {
+		opv1alpha1.PausedCondition.True(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.PausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "Operation is paused")
+	} else {
+		opv1alpha1.PausedCondition.False(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.NotPausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "")
+	}
 
 	if status.Phase == opv1alpha1.OperationPhasePending {
 		opv1alpha1.PendingCondition.True(&status)
