@@ -107,7 +107,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.15")
+	KDMBranch                           = NewSetting("kdm-branch", getEnvOrDefault("CATTLE_KDM_BRANCH", "dev-v2.15"))
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -140,7 +140,7 @@ var (
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	// ATTENTION: This file and the following line are used in the rancher/webhook CI to extract the default branch they need
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.15")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", getEnvOrDefault("CATTLE_CHART_DEFAULT_BRANCH", "dev-v2.15"))
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
@@ -249,7 +249,7 @@ var (
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
-	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", "main")
+	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", getEnvOrDefault("CATTLE_PARTNER_CHART_DEFAULT_BRANCH", "main"))
 
 	// PartnerChartDefaultURL represents the default URL for the partner charts repo. It should only be set for test
 	// or debug purposes.
@@ -272,7 +272,7 @@ var (
 	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", os.Getenv("CATTLE_CLUSTER_AUTOSCALER_IMAGE"))
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
-	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
+	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", getEnvOrDefault("CATTLE_RKE2_CHART_DEFAULT_BRANCH", "main"))
 
 	// RKE2ChartDefaultURL represents the default URL for the RKE2 charts repo. It should only be set for test or
 	// debug purposes.
@@ -658,6 +658,14 @@ func getVersionType() string {
 		return "dev"
 	}
 	return versionType
+}
+
+// getEnvOrDefault returns the value of the environment variable if set, otherwise returns the default value
+func getEnvOrDefault(envVar, defaultValue string) string {
+	if val := os.Getenv(envVar); val != "" {
+		return val
+	}
+	return defaultValue
 }
 
 // GetSettingByID returns a setting that is stored with the given id.
