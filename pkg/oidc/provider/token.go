@@ -3,6 +3,7 @@ package provider
 import (
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -30,8 +31,7 @@ import (
 const bearerTokenType = "Bearer"
 
 type sessionGetterRemover interface {
-	Get(code string) (*session.Session, error)
-	Remove(code string) error
+	GetAndRemove(code string) (*session.Session, error)
 }
 
 type signingKeyGetter interface {
@@ -64,10 +64,10 @@ type TokenResponse struct {
 	IDToken string `json:"id_token"`
 	// AccessToken is the access token generated.
 	AccessToken string `json:"access_token"`
-	// AccessToken is the refresh token generated.
+	// RefreshToken is the refresh token generated.
 	RefreshToken string `json:"refresh_token,omitempty"`
-	// ExpiresIn indicates when id_token and access_token expire.
-	ExpiresIn time.Duration `json:"expires_in"`
+	// ExpiresIn indicates when id_token and access_token expire, in seconds.
+	ExpiresIn int64 `json:"expires_in"`
 	// TokenType is the OAuth 2.0 Token Type value. The value must be Bearer.
 	TokenType string `json:"token_type"`
 }
@@ -123,6 +123,8 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
 		err = json.NewEncoder(w).Encode(tokenResponse)
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to encode token response", http.StatusInternalServerError, w)
@@ -136,6 +138,8 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
 		err = json.NewEncoder(w).Encode(tokenResponse)
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to encode refresh token response", http.StatusInternalServerError, w)
@@ -151,12 +155,12 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 // provided), access_token and refresh_token
 func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oidcerror.Error) {
 	code := r.FormValue("code")
-	session, err := h.sessionClient.Get(code)
+	session, err := h.sessionClient.GetAndRemove(code)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return TokenResponse{}, oidcerror.New(oidcerror.InvalidRequest, "invalid code")
 		}
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "error retrieving session :"+err.Error())
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "error retrieving session: %s", err)
 	}
 
 	// verify clientID and secret. They can be set in the Authorization header or as a form param as specified in the OIDC spec.
@@ -191,12 +195,6 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "failed to get Rancher token: "+err.Error())
 	}
 	resp, oidcErr := h.createTokenResponse(rancherToken, oidcClient, session.Nonce, session.Scope)
-	if oidcErr == nil {
-		err := h.sessionClient.Remove(code)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logrus.Warnf("[OIDC provider] error removing session: %v", err)
-		}
-	}
 
 	return resp, oidcErr
 }
@@ -209,7 +207,7 @@ func (h *tokenHandler) isValidClientSecret(clientSecret string, oidcClient *v3.O
 
 	clientSecretFound := false
 	for key, cs := range secret.Data {
-		if clientSecret == string(cs) {
+		if subtle.ConstantTimeCompare([]byte(clientSecret), cs) == 1 {
 			clientSecretFound = true
 			if err := h.updateClientSecretUsedTimeStamp(oidcClient, key); err != nil {
 				logrus.Errorf("[OIDC provider] failed to update client secret's used timestamp: %v", err)
@@ -388,7 +386,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		}
 	}
 
-	resp.ExpiresIn = time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second
+	resp.ExpiresIn = int64(oidcClient.Spec.TokenExpirationSeconds)
 
 	return resp, nil
 }
@@ -408,7 +406,7 @@ func createIDToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes []s
 	if nonce != "" {
 		idClaims["nonce"] = nonce
 	}
-	if groups != nil {
+	if slices.Contains(scopes, "groups") && groups != nil {
 		idClaims["groups"] = groups
 	}
 	if rancherToken.AuthProvider != "" {
