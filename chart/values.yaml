@@ -220,6 +220,12 @@ systemRegistryInheritsPullSecrets: false
 # Set to use the packaged system charts
 useBundledSystemChart: false
 
+# Charts image used for bundled Helm charts
+# Important: update build.yaml when this default image needs to be changed, then run `go generate`.
+chartsImage:
+  repository: rancher/rancher-charts
+  tag: v0.1.0-rc.1
+
 # Certmanager version compatibility
 certmanager:
   version: ""
