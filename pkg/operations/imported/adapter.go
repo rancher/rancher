@@ -1,9 +1,9 @@
 package imported
 
+//revive:disable:dot-imports
 import (
 	"fmt"
 
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/operations"
@@ -17,8 +17,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+//revive:enable:dot-imports
+
 type ImportedAdapter struct {
-	cluster *v3.Cluster
+	cluster *mgmtv3.Cluster
 	clients *wrangler.CAPIContext
 }
 

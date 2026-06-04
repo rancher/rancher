@@ -43,11 +43,11 @@ func NewAdapter(clients *wrangler.CAPIContext, ustr *unstructured.Unstructured) 
 	// controlplane and provisioning cluster always have the same name
 	gvk := schema.FromAPIVersionAndKind(ustr.GetAPIVersion(), ustr.GetKind())
 
-	if adapter, ok := adapterFactory[gvk.GroupKind().String()]; !ok {
+	adapter, ok := adapterFactory[gvk.GroupKind().String()]
+	if !ok {
 		return nil, fmt.Errorf("unsupported cluster type: %s", gvk.GroupKind().String())
-	} else {
-		return adapter(clients, ustr)
 	}
+	return adapter(clients, ustr)
 }
 
 const (

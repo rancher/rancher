@@ -1,5 +1,6 @@
 package capr
 
+//revive:disable:dot-imports
 import (
 	"context"
 	"fmt"
@@ -20,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+//revive:enable:dot-imports
 
 func init() {
 	RegisterAdapter(rkev1.SchemeGroupVersion.WithKind("RKEControlPlane"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
