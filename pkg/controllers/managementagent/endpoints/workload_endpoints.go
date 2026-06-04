@@ -14,10 +14,18 @@ import (
 	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const k8sAnnotationLimit = 262144 // 256 KB
+var ignoreOverfillError bool
+
+func init() {
+	ignoreOverfillErrorStr := os.Getenv("CATTLE_IGNORE_ENDPOINT_ANNOTATION_OVERFLOW")
+	if ignoreOverfillErrorStr != "" {
+		ignoreOverfillError, _ = strconv.ParseBool(ignoreOverfillErrorStr)
+	}
+}
 
 // This controller is responsible for monitoring workloads
 // and setting public endpoints on them based on HostPort pods
@@ -181,7 +189,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			endpointsAnnotation: epsToUpdate,
 		}
 
-		if err = checkAnnotationSize(annotations); err != nil {
+		if err = validation.ValidateAnnotationsSize(annotations); err != nil {
 			numOverfilledAnnotations++
 			if firstOverfillError == nil {
 				firstOverfillError = err
@@ -190,30 +198,12 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 			return err
 		}
 	}
-	if numOverfilledAnnotations == 0 {
+	if numOverfilledAnnotations == 0 || ignoreOverfillError {
 		return nil
-	}
-	ignoreOverfillErrorStr := os.Getenv("CATTLE_IGNORE_ENDPOINT_ANNOTATION_OVERFLOW")
-	if ignoreOverfillErrorStr != "" {
-		ignoreOverfillError, err := strconv.ParseBool(ignoreOverfillErrorStr)
-		if err == nil && ignoreOverfillError {
-			return nil
-		}
 	}
 	pluralSuffix := ""
 	if numOverfilledAnnotations > 1 {
 		pluralSuffix = "s"
 	}
 	return fmt.Errorf("failed to update %d endpoint annotation%s: first error: %w", numOverfilledAnnotations, pluralSuffix, firstOverfillError)
-}
-
-func checkAnnotationSize(annotations map[string]string) error {
-	data, err := json.Marshal(annotations)
-	if err == nil {
-		if len(data) >= k8sAnnotationLimit {
-			return fmt.Errorf("annotation size exceeded: %d > %d", len(data), k8sAnnotationLimit)
-		}
-		return nil
-	}
-	return fmt.Errorf("couldn't convert annotation hash to a string: %w", err)
 }
