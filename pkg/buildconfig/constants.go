@@ -3,13 +3,16 @@
 package buildconfig
 
 const (
-	ChartAuditLogImage       = "rancher/mirrored-bci-micro:16.0-15.11"
-	CspAdapterMinVersion     = "109.0.0+up9.0.0-rc.3"
-	DefaultChartsImage       = "rancher/rancher-charts:v0.1.0-rc.1"
-	DefaultSccOperatorImage  = "rancher/scc-operator:v0.4.1"
-	DefaultShellVersion      = "rancher/shell:v0.8.0-rc.2"
-	FleetVersion             = "110.0.0+up0.16.0-alpha.9"
-	RemoteDialerProxyVersion = "110.0.0+up0.8.0-rc.5"
-	TurtlesVersion           = "110.0.0+up0.27.0-rc.2"
-	WebhookVersion           = "110.0.0+up0.11.0-rc.11"
+	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-15.11"
+	ChartDefaultBranch        = "dev-v2.15"
+	CspAdapterMinVersion      = "109.0.0+up9.0.0-rc.3"
+	DefaultChartsImage        = "rancher/rancher-charts:v0.1.0-rc.1"
+	DefaultSccOperatorImage   = "rancher/scc-operator:v0.4.1"
+	DefaultShellVersion       = "rancher/shell:v0.8.0-rc.2"
+	FleetVersion              = "110.0.0+up0.16.0-alpha.9"
+	PartnerChartDefaultBranch = "main"
+	RemoteDialerProxyVersion  = "110.0.0+up0.8.0-rc.5"
+	Rke2ChartDefaultBranch    = "main"
+	TurtlesVersion            = "110.0.0+up0.27.0-rc.2"
+	WebhookVersion            = "110.0.0+up0.11.0-rc.11"
 )

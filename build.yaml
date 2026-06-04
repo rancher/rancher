@@ -7,4 +7,7 @@ defaultShellVersion: rancher/shell:v0.8.0-rc.2
 fleetVersion: 110.0.0+up0.16.0-alpha.9
 defaultSccOperatorImage: rancher/scc-operator:v0.4.1
 defaultChartsImage: rancher/rancher-charts:v0.1.0-rc.1
+chartDefaultBranch: dev-v2.15
+partnerChartDefaultBranch: main
+rke2ChartDefaultBranch: main
 chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11

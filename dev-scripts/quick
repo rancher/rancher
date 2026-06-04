@@ -20,6 +20,9 @@ CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cu
 CATTLE_RANCHER_TURTLES_VERSION=$(grep -m1 'turtlesVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
+CHART_DEFAULT_BRANCH=$(grep -m1 'chartDefaultBranch' build.yaml | cut -d ' ' -f2)
+PARTNER_CHART_DEFAULT_BRANCH=$(grep -m1 'partnerChartDefaultBranch' build.yaml | cut -d ' ' -f2)
+RKE2_CHART_DEFAULT_BRANCH=$(grep -m1 'rke2ChartDefaultBranch' build.yaml | cut -d ' ' -f2)
 
 # download kontainer driver metadata
 curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json >./data.json
@@ -38,6 +41,9 @@ BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_HELM_VERSION=${CATTLE_HELM_VERSION}")
 BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
 BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
+BUILD_ARGS+=("--build-arg=CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH}")
+BUILD_ARGS+=("--build-arg=PARTNER_CHART_DEFAULT_BRANCH=${PARTNER_CHART_DEFAULT_BRANCH}")
+BUILD_ARGS+=("--build-arg=RKE2_CHART_DEFAULT_BRANCH=${RKE2_CHART_DEFAULT_BRANCH}")
 if [ "$BINARY_DEBUG" = true ]; then
   # Remove -s (strip symbols)
   BUILD_ARGS+=("--build-arg=LINKFLAGS=-extldflags -static")
@@ -152,6 +158,19 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
 
   if [ "$PUSH" = "true" ]; then
     docker push "${REPO}"/rancher-agent:"${TAG}" &
+  fi
+fi
+
+if [ "$TARGET" = "charts" ]; then
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    --tag "${REPO}"/rancher-charts:"${TAG}" \
+    --platform="${OS}/${ARCH}" \
+    --target charts \
+    --file ./package/Dockerfile-charts .
+
+  if [ "$PUSH" = "true" ]; then
+    docker push "${REPO}"/rancher-charts:"${TAG}" &
   fi
 fi
 
