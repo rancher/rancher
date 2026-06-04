@@ -16,28 +16,44 @@ import (
 
 var (
 	scriptMap = map[string]string{
-		"linux-save":     linuxSaveScript,
-		"linux-load":     linuxLoadScript,
-		"linux-mirror":   linuxMirrorScript,
-		"windows-save":   windowsSaveScript,
-		"windows-load":   windowsLoadScript,
-		"windows-mirror": windowsMirrorScript,
+		"linux-save":            linuxSaveScript,
+		"linux-load":            linuxLoadScript,
+		"linux-mirror":          linuxMirrorScript,
+		"windows-save":          windowsSaveScript,
+		"windows-load":          windowsLoadScript,
+		"windows-mirror":        windowsMirrorScript,
+		"charts-save":           linuxSaveScript,
+		"charts-load":           linuxLoadScript,
+		"charts-mirror":         linuxMirrorScript,
+		"charts-windows-save":   windowsSaveScript,
+		"charts-windows-load":   windowsLoadScript,
+		"charts-windows-mirror": windowsMirrorScript,
 	}
 	scriptNameMap = map[string]string{
-		"linux-save":     "rancher-save-images.sh",
-		"linux-load":     "rancher-load-images.sh",
-		"linux-mirror":   "rancher-mirror-to-rancher-org.sh",
-		"windows-save":   "rancher-save-images.ps1",
-		"windows-load":   "rancher-load-images.ps1",
-		"windows-mirror": "rancher-mirror-to-rancher-org.ps1",
+		"linux-save":            "rancher-save-images.sh",
+		"linux-load":            "rancher-load-images.sh",
+		"linux-mirror":          "rancher-mirror-to-rancher-org.sh",
+		"windows-save":          "rancher-save-images.ps1",
+		"windows-load":          "rancher-load-images.ps1",
+		"windows-mirror":        "rancher-mirror-to-rancher-org.ps1",
+		"charts-save":           "rancher-charts-save-images.sh",
+		"charts-load":           "rancher-charts-load-images.sh",
+		"charts-mirror":         "rancher-charts-mirror-to-rancher-org.sh",
+		"charts-windows-save":   "rancher-charts-windows-save-images.ps1",
+		"charts-windows-load":   "rancher-charts-windows-load-images.ps1",
+		"charts-windows-mirror": "rancher-charts-windows-mirror-to-rancher-org.ps1",
 	}
 	filenameMap = map[string]string{
-		"linux":   "rancher-images.txt",
-		"windows": "rancher-windows-images.txt",
+		"linux":          "rancher-images.txt",
+		"windows":        "rancher-windows-images.txt",
+		"charts":         "rancher-charts-images.txt",
+		"charts-windows": "rancher-charts-windows-images.txt",
 	}
 	sourcesFilenameMap = map[string]string{
-		"linux":   "rancher-images-sources.txt",
-		"windows": "rancher-windows-images-sources.txt",
+		"linux":          "rancher-images-sources.txt",
+		"windows":        "rancher-windows-images-sources.txt",
+		"charts":         "rancher-charts-images-sources.txt",
+		"charts-windows": "rancher-charts-windows-images-sources.txt",
 	}
 )
 
