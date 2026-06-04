@@ -63,9 +63,10 @@ func (s *Operations) createNamespaceAndPullSecrets(ctx context.Context, status c
 			continue
 		}
 
-		sdr, sdrDefined := s.SystemDefaultRegistryConfigured(values)
+		sdr, sdrDefined := s.systemDefaultRegistryConfigured(values)
+		pullSecretsPreConfigured := s.chartHasConfiguredPullSecrets(values)
 
-		pullSecrets, err := s.managePullSecrets(sdr, ns.Name, clusterRepoName, cmds[i].ReleaseName)
+		pullSecrets, err := s.managePullSecrets(sdr, ns.Name, clusterRepoName, cmds[i].ReleaseName, pullSecretsPreConfigured)
 		if err != nil {
 			return err
 		}
@@ -84,7 +85,7 @@ func (s *Operations) createNamespaceAndPullSecrets(ctx context.Context, status c
 	return nil
 }
 
-func (s *Operations) SystemDefaultRegistryConfigured(values map[string]any) (string, bool) {
+func (s *Operations) systemDefaultRegistryConfigured(values map[string]any) (string, bool) {
 	v, defined := getValueAtPath(values, "global", "cattle", "systemDefaultRegistry")
 	sdr, ok := v.(string)
 	return sdr, defined && ok && v != ""
@@ -98,6 +99,22 @@ func (s *Operations) chartSupportsImagePullSecrets(baseValues map[string]any) bo
 		}
 		log.Tracef("[helmop] injectPullSecrets: path %q is declared in chart base values", pathStr)
 		return true
+	}
+	return false
+}
+
+func (*Operations) chartHasConfiguredPullSecrets(values map[string]any) bool {
+	for _, path := range imagePullSecretPaths {
+		pathStr := strings.Join(path, ".")
+		v, declared := getValueAtPath(values, path...)
+		if !declared {
+			continue
+		}
+		pullSecret, ok := v.([]any)
+		log.Tracef("[helmop] injectPullSecrets: path %q is declared in chart base values", pathStr)
+		if ok && len(pullSecret) != 0 {
+			return true
+		}
 	}
 	return false
 }
@@ -130,14 +147,14 @@ func (s *Operations) injectPullSecrets(releaseName string, baseValues map[string
 	return result, nil
 }
 
-func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace string, repoName string, releaseName string) ([]string, error) {
+func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace string, repoName string, releaseName string, pullSecretsPreConfigured bool) ([]string, error) {
 	repo, err := s.clusterReposCache.Get(repoName)
 	if err != nil {
 		log.Errorf("[helmop] managePullSecrets: failed to get cluster repo %q from cache: %v", repoName, err)
 		return nil, err
 	}
 
-	if systemDefaultRegistry == "" || len(repo.Spec.DefaultImagePullSecrets) == 0 {
+	if systemDefaultRegistry == "" || len(repo.Spec.DefaultImagePullSecrets) == 0 || pullSecretsPreConfigured {
 		if err := s.deleteStaleHelmOpSecrets([]string{}, namespace, releaseName); err != nil {
 			return nil, err
 		}
