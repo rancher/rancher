@@ -1,0 +1,184 @@
+name: Create Charts Update PR
+
+on:
+  release:
+    types: [published]  # Triggers when draft release is published (undrafted)
+    # Note: GitHub Actions doesn't support tag filtering at workflow level for release events
+    # Filtering happens at job level below
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-update-pr:
+    runs-on: ubuntu-latest
+    # IMPORTANT: Only run for charts-v* releases (not Rancher v* releases)
+    if: startsWith(github.event.release.tag_name, 'charts-v')
+    steps:
+      - name: Extract charts version and target branch
+        id: release_info
+        run: |
+          # Extract version from tag (charts-v1.0.0 → v1.0.0)
+          FULL_TAG="${{ github.event.release.tag_name }}"
+          VERSION="${FULL_TAG#charts-}"
+
+          echo "full_tag=${FULL_TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "charts_image=rancher/rancher-charts:${VERSION}" >> $GITHUB_OUTPUT
+
+          # Read source branch from image labels (where the tag was created from)
+          # Use this as the target branch for PR creation
+          docker pull rancher/rancher-charts:${VERSION} 2>/dev/null || true
+          TARGET_BRANCH=$(docker inspect rancher/rancher-charts:${VERSION} 2>/dev/null | jq -r '.[0].Config.Labels["io.rancher.source-branch"] // "unknown"')
+
+          echo "target_branch=${TARGET_BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Validate target branch
+        id: validate
+        run: |
+          TARGET_BRANCH="${{ steps.release_info.outputs.target_branch }}"
+
+          if [ "$TARGET_BRANCH" = "unknown" ] || [ -z "$TARGET_BRANCH" ]; then
+            echo "⚠️  Could not determine source branch from image labels."
+            echo "This usually means the charts tag was created from main or an ambiguous commit."
+            echo ""
+            echo "To create the PR manually:"
+            echo "1. Checkout the intended release branch (e.g., release/v2.15)"
+            echo "2. Update build.yaml: defaultChartsImage: ${{ steps.release_info.outputs.charts_image }}"
+            echo "3. Run: go generate"
+            echo "4. Commit and create PR"
+            exit 1
+          fi
+
+          # Validate branch looks like a release branch
+          if [[ ! "$TARGET_BRANCH" =~ ^release/v[0-9]+\.[0-9]+ ]]; then
+            echo "⚠️  Target branch '${TARGET_BRANCH}' doesn't look like a release branch."
+            echo "Expected format: release/vX.Y"
+            echo ""
+            echo "Skipping automatic PR creation for safety."
+            echo "Please create PR manually if needed."
+            exit 1
+          fi
+
+          echo "✅ Target branch validated: ${TARGET_BRANCH}"
+          echo "valid=true" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release_info.outputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Create update branch
+        if: steps.validate.outputs.valid == 'true'
+        run: |
+          BRANCH_NAME="charts-update-${{ steps.release_info.outputs.version }}"
+          git checkout -b "${BRANCH_NAME}"
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_ENV
+
+      - name: Update build.yaml
+        if: steps.validate.outputs.valid == 'true'
+        run: |
+          # Update defaultChartsImage in build.yaml
+          sed -i 's|^defaultChartsImage:.*|defaultChartsImage: ${{ steps.release_info.outputs.charts_image }}|' build.yaml
+
+          # Verify the change
+          echo "Updated build.yaml:"
+          grep "defaultChartsImage:" build.yaml
+
+      - name: Run go generate
+        if: steps.validate.outputs.valid == 'true'
+        run: |
+          go generate
+
+          # Verify chart/values.yaml was updated
+          echo "Updated chart/values.yaml:"
+          grep -A 3 "chartsImage:" chart/values.yaml
+
+      - name: Commit changes
+        if: steps.validate.outputs.valid == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add build.yaml chart/values.yaml
+          git commit -m "Update to charts image ${{ steps.release_info.outputs.version }}" \
+                     -m "Automatically generated PR for charts release ${{ steps.release_info.outputs.full_tag }}" \
+                     -m "" \
+                     -m "This updates:" \
+                     -m "- build.yaml: defaultChartsImage = ${{ steps.release_info.outputs.charts_image }}" \
+                     -m "- chart/values.yaml: chartsImage.tag (auto-updated via go generate)" \
+                     -m "" \
+                     -m "Release: ${{ github.event.release.html_url }}"
+
+      - name: Push branch
+        if: steps.validate.outputs.valid == 'true'
+        run: |
+          git push origin "${{ env.branch_name }}"
+
+      - name: Create Pull Request
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const targetBranch = '${{ steps.release_info.outputs.target_branch }}';
+            const branchName = '${{ env.branch_name }}';
+            const version = '${{ steps.release_info.outputs.version }}';
+            const fullTag = '${{ steps.release_info.outputs.full_tag }}';
+            const releaseUrl = '${{ github.event.release.html_url }}';
+
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Update to charts image ${version}`,
+              head: branchName,
+              base: targetBranch,
+              body: `## Charts Image Update
+
+            This PR updates Rancher to use the newly released charts image.
+
+            ### Changes
+            - \`build.yaml\`: Updated \`defaultChartsImage\` to \`rancher/rancher-charts:${version}\`
+            - \`chart/values.yaml\`: Auto-updated via \`go generate\`
+
+            ### Release Information
+            - **Charts Release**: [${fullTag}](${releaseUrl})
+            - **Target Branch**: \`${targetBranch}\`
+
+            ### Image Lists
+            Download air-gap image lists from the [charts release](${releaseUrl}):
+            - \`rancher-charts-images.txt\` (Linux)
+            - \`rancher-charts-windows-images.txt\` (Windows)
+
+            ### Next Steps
+            1. Review the changes
+            2. Test with the updated charts image
+            3. Merge when ready to adopt charts ${version}
+
+            ---
+            🤖 *Automatically created by the charts release workflow*
+            `
+            });
+
+            console.log(\`✅ Pull request created: \${pr.html_url}\`);
+
+            // Add labels if they exist
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['automation', 'charts-update']
+              });
+            } catch (error) {
+              console.log('Note: Could not add labels (they may not exist)');
+            }

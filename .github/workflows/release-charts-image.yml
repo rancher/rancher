@@ -1,0 +1,226 @@
+name: Release Rancher Charts Image
+
+on:
+  push:
+    tags:
+      - 'charts-v*'  # Only trigger for charts releases (e.g., charts-v1.0.0)
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  create-draft-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+      - name: Extract charts version from tag
+        id: charts_version
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/charts-}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create draft release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.charts_version.outputs.tag }}
+          release_name: Rancher Charts ${{ steps.charts_version.outputs.version }}
+          draft: true
+          prerelease: false
+          body: |
+            ## Rancher Charts Image ${{ steps.charts_version.outputs.version }}
+
+            Bundled Helm charts for Rancher Manager.
+
+            ### Docker Images
+            - `rancher/rancher-charts:${{ steps.charts_version.outputs.version }}`
+
+            ### Artifacts
+            - `rancher-charts-images.txt` - Linux image list
+            - `rancher-charts-windows-images.txt` - Windows image list
+            - `rancher-charts-images-sources.txt` - Image sources for mirroring
+
+            ---
+            *This release is being built. It will be published automatically when all jobs complete successfully.*
+
+  build-charts-image:
+    needs: create-draft-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract charts version and source branch
+        id: charts_version
+        run: |
+          # Extract full tag name for labels
+          FULL_TAG=${GITHUB_REF#refs/tags/}
+          # Strip charts- prefix for image tag (charts-v1.0.0 → v1.0.0)
+          VERSION=${FULL_TAG#charts-}
+
+          # Detect source release branch (which branch this tag was created from)
+          # Used for Rancher version correlation and automatic PR targeting
+          # Looks for release/vX.Y branch containing this commit
+          TARGET_BRANCH=$(git branch -r --contains ${{ github.sha }} | grep -E 'origin/release/v[0-9]+\.[0-9]+' | head -1 | sed 's/.*origin\///' | xargs)
+
+          # Fallback to branch from which tag was pushed (if detectable)
+          if [ -z "$TARGET_BRANCH" ]; then
+            TARGET_BRANCH=$(git branch -r --contains ${{ github.sha }} | grep -v HEAD | head -1 | sed 's/.*origin\///' | xargs)
+          fi
+
+          # Final fallback
+          if [ -z "$TARGET_BRANCH" ]; then
+            TARGET_BRANCH="unknown"
+          fi
+
+          echo "full_tag=${FULL_TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "target_branch=${TARGET_BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push charts image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./package/Dockerfile-charts
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: rancher/rancher-charts:${{ steps.charts_version.outputs.version }}-${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            io.rancher.source-tag=${{ steps.charts_version.outputs.full_tag }}
+            io.rancher.source-branch=${{ steps.charts_version.outputs.target_branch }}
+            io.rancher.build-url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          build-args: |
+            VERSION=${{ steps.charts_version.outputs.version }}
+            CHART_DEFAULT_BRANCH=dev-v2.15
+            PARTNER_CHART_DEFAULT_BRANCH=main
+            RKE2_CHART_DEFAULT_BRANCH=main
+
+      - name: Extract charts and generate image lists
+        run: |
+          # Create temp directory
+          mkdir -p /tmp/charts-extract
+
+          # Pull the image we just built
+          docker pull rancher/rancher-charts:${{ steps.charts_version.outputs.version }}-${{ matrix.arch }}
+
+          # Extract charts to scan for image references
+          CONTAINER_ID=$(docker create rancher/rancher-charts:${{ steps.charts_version.outputs.version }}-${{ matrix.arch }})
+          docker export $CONTAINER_ID | tar -x -C /tmp/charts-extract
+          docker rm $CONTAINER_ID
+
+          # Generate image lists (Linux and Windows)
+          CHARTS_TAG=${{ steps.charts_version.outputs.version }} \
+            go run ./pkg/image/export/charts/main.go \
+            /tmp/charts-extract/var/lib/rancher-data/local-catalogs/v2
+
+      - name: Upload image lists as artifacts (for publish job)
+        uses: actions/upload-artifact@v4
+        with:
+          name: charts-image-lists-${{ matrix.arch }}
+          path: |
+            rancher-charts-images.txt
+            rancher-charts-windows-images.txt
+            rancher-charts-images-sources.txt
+
+  create-manifest:
+    needs: [create-draft-release, build-charts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract charts version from tag
+        id: charts_version
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/charts-}" >> $GITHUB_OUTPUT
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker manifest create rancher/rancher-charts:${{ steps.charts_version.outputs.version }} \
+            rancher/rancher-charts:${{ steps.charts_version.outputs.version }}-amd64 \
+            rancher/rancher-charts:${{ steps.charts_version.outputs.version }}-arm64
+          docker manifest push rancher/rancher-charts:${{ steps.charts_version.outputs.version }}
+
+  publish-release:
+    needs: [create-draft-release, create-manifest]
+    runs-on: ubuntu-latest
+    if: success()  # Only run if all previous jobs succeeded
+    steps:
+      - name: Extract charts version from tag
+        id: charts_version
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/charts-}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download image lists from amd64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: charts-image-lists-amd64
+          path: ./artifacts
+
+      - name: Upload image lists to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-draft-release.outputs.upload_url }}
+          asset_path: ./artifacts/rancher-charts-images.txt
+          asset_name: rancher-charts-images.txt
+          asset_content_type: text/plain
+
+      - name: Upload Windows image list to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-draft-release.outputs.upload_url }}
+          asset_path: ./artifacts/rancher-charts-windows-images.txt
+          asset_name: rancher-charts-windows-images.txt
+          asset_content_type: text/plain
+
+      - name: Upload image sources to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-draft-release.outputs.upload_url }}
+          asset_path: ./artifacts/rancher-charts-images-sources.txt
+          asset_name: rancher-charts-images-sources.txt
+          asset_content_type: text/plain
+
+      - name: Publish release (undraft)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-draft-release.outputs.release_id }},
+              draft: false
+            });
+            console.log('Release published successfully!');
