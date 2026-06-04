@@ -35,12 +35,12 @@ func DefaultSorter() SorterFunc {
 			aScore := getNodeScore(a.Labels)
 			bScore := getNodeScore(b.Labels)
 
-			// 1. Compare combination score
+			// Compare combination score
 			if aScore != bScore {
 				return aScore < bScore // Lower score means higher priority
 			}
 
-			// 2. Fallback to lexicographical sort by Name
+			// Fallback to lexicographical sort by Name
 			return a.Name < b.Name
 		})
 
