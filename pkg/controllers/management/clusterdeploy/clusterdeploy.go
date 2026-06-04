@@ -133,6 +133,9 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 		toUpdate.Status.AppliedAgentEnvVars = modified.Status.AppliedAgentEnvVars
 		toUpdate.Status.AppliedClusterAgentDeploymentCustomization = modified.Status.AppliedClusterAgentDeploymentCustomization
 		toUpdate.Status.AppliedClusterAgentImagePullSecretsHash = modified.Status.AppliedClusterAgentImagePullSecretsHash
+		if !modified.Spec.Internal {
+			toUpdate.Status.AppliedWebhookDeploymentCustomization = modified.Status.AppliedWebhookDeploymentCustomization
+		}
 		// Copy conditions this controller owns
 		util.CopyCondition(apimgmtv3.ClusterConditionAgentDeployed, modified, toUpdate)
 		util.CopyCondition(apimgmtv3.ClusterConditionSystemAccountCreated, modified, toUpdate)
@@ -199,6 +202,10 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 
 	err = cd.managePodDisruptionBudget(cluster)
 	if err != nil {
+		return err
+	}
+
+	if err = cd.manageWebhookConfig(cluster); err != nil {
 		return err
 	}
 
@@ -329,6 +336,48 @@ func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) e
 		}
 	}
 
+	return nil
+}
+
+// manageWebhookConfig pushes webhook deployment customization to a downstream cluster's
+// rancher-config ConfigMap so the embedded systemcharts controller can configure the
+// rancher-webhook chart without bouncing the cluster-agent. When the customization is
+// cleared, a ConfigMap with an empty value is applied so the chart reverts to defaults.
+// This follows the same pattern as managePriorityClass: detect change → get kubeconfig →
+// kubectl.Apply() the resource directly.
+func (cd *clusterDeploy) manageWebhookConfig(cluster *apimgmtv3.Cluster) error {
+	if cluster.Spec.Internal {
+		return nil
+	}
+
+	if !util.WebhookDeploymentCustomizationChanged(cluster) {
+		return nil
+	}
+
+	logrus.Infof("clusterDeploy: manageWebhookConfig: webhook deployment customization changed for cluster [%s], pushing ConfigMap", cluster.Name)
+
+	cmYAML, err := systemtemplate.WebhookConfigMapTemplate(cluster)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to generate webhook ConfigMap for cluster [%s]: %w", cluster.Name, err)
+	}
+
+	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to get kubeconfig for cluster [%s]: %w", cluster.Name, err)
+	}
+	defer func() {
+		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
+
+	output, err := kubectl.Apply(cmYAML, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to apply webhook ConfigMap to cluster [%s]: %s: %w", cluster.Name, string(output), err)
+	}
+
+	logrus.Infof("clusterDeploy: manageWebhookConfig: successfully applied webhook ConfigMap to cluster [%s]", cluster.Name)
+	util.UpdateAppliedWebhookDeploymentCustomization(cluster)
 	return nil
 }
 

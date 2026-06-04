@@ -10,7 +10,7 @@ import (
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/cluster"
+	clusterutil "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
@@ -85,6 +85,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		deploymentCache:                wContext.Apps.Deployment().Cache(),
 		clusterRepo:                    wContext.Catalog.ClusterRepo(),
 		clusterCache:                   wContext.Mgmt.Cluster().Cache(),
+		clusters:                       wContext.Mgmt.Cluster(),
 		plan:                           wContext.Upgrade.Plan(),
 		planCache:                      wContext.Upgrade.Plan().Cache(),
 		secrets:                        wContext.Core.Secret(),
@@ -127,6 +128,7 @@ type handler struct {
 	validatingWebhookConfiguration admissionregcontrollers.ValidatingWebhookConfigurationController
 	chartsConfig                   chart.RancherConfigGetter
 	clusterCache                   mgmtcontrollers.ClusterCache
+	clusters                       mgmtcontrollers.ClusterController
 	plan                           plancontrolers.PlanController
 	planCache                      plancontrolers.PlanCache
 	registryOverride               string
@@ -226,6 +228,11 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 		}
 
 		logrus.Debugf("[system-charts] ensured chart %q in namespace %q", chartDef.ChartName, chartDef.ReleaseNamespace)
+		if chartDef.ChartName == chart.WebhookChartName {
+			if err := h.updateAppliedWebhookCustomization(); err != nil {
+				logrus.Warnf("[systemcharts] failed to update applied webhook customization status: %v", err)
+			}
+		}
 	}
 
 	logrus.Tracef("[system-charts] reconciliation complete for repo %q", repoName)
@@ -275,7 +282,22 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				}
 				// add priority class value
 				h.setPriorityClass(values, chart.WebhookChartName)
-				// get custom values for the rancher-webhook
+				// merge per-cluster webhook customization from the local cluster spec;
+				// this is overridden by any values set in the rancher-config ConfigMap below.
+				wdc, err := h.getLocalWebhookCustomization()
+				if err != nil && !errors.IsNotFound(err) {
+					logrus.Warnf("[systemcharts] failed to get local cluster for webhook values: %v", err)
+				} else {
+					// wdc is nil when the local cluster is not found; WebhookHelmValues
+					// handles nil by returning defaults that reset every customizable field.
+					helmValues, err := chart.WebhookHelmValues(wdc)
+					if err != nil {
+						logrus.Warnf("[systemcharts] failed to build webhook helm values: %v", err)
+					} else {
+						values = data.MergeMaps(values, helmValues)
+					}
+				}
+				// get custom values for the rancher-webhook; ConfigMap values take highest precedence
 				configMapValues := h.getChartValues(chart.WebhookChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
@@ -589,10 +611,15 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 // It ensures the timely installation or uninstallation of the system-upgrade-controller app in the local cluster
 // when the "rancher.io/imported-cluster-version-management" annotation is changed.
 func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
-	if !features.MCM.Enabled() {
+	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
 		return obj, nil
 	}
-	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
+	// Always re-sync when webhook deployment customization has drifted from applied state.
+	if clusterutil.WebhookDeploymentCustomizationChanged(obj) {
+		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
+		return obj, nil
+	}
+	if !features.MCM.Enabled() {
 		return obj, nil
 	}
 	h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
@@ -613,7 +640,7 @@ func (h *handler) setImagePullSecrets(values map[string]interface{}, useObjectRe
 	var pullSecretsAsStrings []string
 	var pullSecretsAsObjectReferences []kcorev1.LocalObjectReference
 
-	registry, _ := cluster.GetPrivateRegistry(nil)
+	registry, _ := clusterutil.GetPrivateRegistry(nil)
 	if registry != nil {
 		pullSecretsAsObjectReferences = registry.PullSecretsAsObjectReferences()
 		pullSecretsAsStrings = registry.PullSecretNamesAsSlice()
@@ -633,6 +660,51 @@ func (h *handler) getChartValues(chartName string) map[string]interface{} {
 		logrus.Warnf("[system-charts] failed to get chart values for chart %q: %v", chartName, err)
 	}
 	return configMapValues
+}
+
+// getLocalWebhookCustomization returns the WebhookDeploymentCustomization from the local
+// management cluster, or nil if the cluster has no customization set.
+// On downstream clusters (MCMAgent enabled), webhook customization is delivered via a
+// rancher-config ConfigMap pushed by the management server's clusterdeploy controller.
+// The systemcharts controller reads those values through the existing getChartValues()
+// path, so this function returns nil in that context.
+func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomization, error) {
+	if features.MCMAgent.Enabled() {
+		// Downstream: values come from rancher-config ConfigMap, not from
+		// the cluster spec. Return nil so they are merged in getChartValues().
+		return nil, nil
+	}
+	cluster, err := h.clusterCache.Get("local")
+	if err != nil {
+		return nil, err
+	}
+	return cluster.Spec.WebhookDeploymentCustomization, nil
+}
+
+// updateAppliedWebhookCustomization reads the local cluster from cache, copies the webhook
+// customization from Spec to Status, and persists the status via UpdateStatus.
+// On downstream clusters (MCMAgent enabled), this is a no-op because the management server
+// tracks applied state via the clusterdeploy controller's manageWebhookConfig().
+func (h *handler) updateAppliedWebhookCustomization() error {
+	if features.MCMAgent.Enabled() {
+		return nil
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Read from the informer cache which is available immediately at startup,
+		// rather than h.clusters.Get() which can return "not found" for several
+		// minutes while the wrangler controller client initializes.
+		cached, err := h.clusterCache.Get("local")
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		cluster := cached.DeepCopy()
+		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
+		_, err = h.clusters.UpdateStatus(cluster)
+		return err
+	})
 }
 
 func relatedFeatures(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
