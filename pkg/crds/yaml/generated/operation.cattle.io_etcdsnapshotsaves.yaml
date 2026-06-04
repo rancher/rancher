@@ -182,18 +182,25 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               lastUpdated:
-                description: lastUpdated identifies when the phase of the Operation
-                  last transitioned.
+                description: |-
+                  LastUpdated identifies when the phase of the Operation last transitioned.
+                  LastUpdated will also be updated during step transitions, if applicable.
                 format: date-time
                 type: string
               observedGeneration:
-                description: observedGeneration is the latest generation observed
+                description: ObservedGeneration is the latest generation observed
                   by the controller.
                 format: int64
                 minimum: 1
                 type: integer
               phase:
-                description: OperationPhase represents the current phase of the operation.
+                description: |-
+                  Phase represents the current phase of the Operation.
+                  A Pending operation is one that is currently waiting to acquire the beacon, active it, and begin execution.
+                  An InProgress operation is one that is currently executing.
+                  A Succeeded operation is one that completed successfully.
+                  A Failed operation is one that failed to complete successfully.
+                  A Canceled operation is one that was canceled by the user or system.
                 enum:
                 - Pending
                 - InProgress
