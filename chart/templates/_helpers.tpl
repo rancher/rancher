@@ -70,7 +70,7 @@ Prepare the Rancher Image Pull Policy value w/ new fields as opt-in for now.
 Prepare the Rancher Charts Image value w/ new fields as opt-in for now.
 */}}
 {{ define "rancherCharts.image" -}}
-{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . (default "" .Values.chartsImage.registry))) (include "rancherCharts.imageRepo" .) }}
+{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . (default "" .Values.chartsImage.registry))) (include "rancherCharts.imageRepo" .) -}}
 {{ end -}}
 
 {{/*

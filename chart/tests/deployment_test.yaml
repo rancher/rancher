@@ -44,6 +44,7 @@ tests:
 - it: should Just have default env vars with default values.yaml
   set:
     systemDefaultRegistry: ""
+    chartsImage.tag: testing # needed to ensure changing versions doesn't break tests
   asserts:
     - equal:
         path: spec.template.spec.containers[0].env
@@ -56,9 +57,12 @@ tests:
             value: "true"
           - name: IMPERATIVE_API_APP_SELECTOR
             value: RELEASE-NAME-rancher
+          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+            value: rancher/rancher-charts:testing
 - it: should have systemDefaultRegistry env var set when value is not empty
   set:
     systemDefaultRegistry: "suseregistry"
+    chartsImage.tag: testing # needed to ensure changing versions doesn't break tests
   asserts:
     - equal:
         path: spec.template.spec.containers[0].env
@@ -73,6 +77,8 @@ tests:
             value: "true"
           - name: IMPERATIVE_API_APP_SELECTOR
             value: RELEASE-NAME-rancher
+          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+            value: suseregistry/rancher/rancher-charts:testing
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
   - equal:
@@ -199,14 +205,18 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.volumes
+      content:
+        name: custom-logos
 - it: should not create custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.volumes
+      content:
+        name: custom-logos
 - it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim
   set:
     customLogos.enabled: true
@@ -325,14 +335,18 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.containers[0].volumeMounts
+      content:
+        name: custom-logos
 - it: should not mount custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.containers[0].volumeMounts
+      content:
+        name: custom-logos
 - it: should set priorityClassName=system-node-critical
   set:
     priorityClassName: "system-node-critical"
@@ -700,6 +714,7 @@ tests:
   set:
     systemDefaultRegistry: ""
     cacheSyncTimeout: 10m
+    chartsImage.tag: testing # needed to ensure changing versions doesn't break tests
   asserts:
   - equal:
       path: spec.template.spec.containers[0].env
@@ -714,6 +729,8 @@ tests:
           value: RELEASE-NAME-rancher
         - name: CACHE_SYNC_TIMEOUT
           value: 10m
+        - name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: rancher/rancher-charts:testing
 - it: should enable hostNetwork and set dnsPolicy when hostNetwork is true
   set:
     hostNetwork: true
@@ -738,6 +755,7 @@ tests:
         foo: bar
       annotations:
         foo: bar
+    chartsImage.tag: testing # needed to ensure changing versions doesn't break tests
   asserts:
     - equal:
         path: spec.template.spec.containers[0].env
@@ -752,6 +770,8 @@ tests:
             value: RELEASE-NAME-rancher
           - name: RANCHER_NAMESPACES_OPTIONS
             value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"}}"
+          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+            value: rancher/rancher-charts:testing
 - it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when imagePullSecrets is empty
   asserts:
     - notContains:
@@ -794,3 +814,127 @@ tests:
         content:
           name: CATTLE_BASE_REGISTRY_PULL_SECRETS
           value: "secret-one,secret-two,secret-three"
+# Charts image init container tests
+- it: should create rancher-charts-copy init container
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].name
+        value: rancher-charts-copy
+- it: should use default charts image in init container
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].image
+        value: rancher/rancher-charts:v0.1.0-rc.1
+- it: should use custom charts image tag in init container
+  set:
+    chartsImage.tag: v2.0.0
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].image
+        value: rancher/rancher-charts:v2.0.0
+- it: should use custom charts image repository in init container
+  set:
+    chartsImage.repository: my.registry.com/custom-charts
+    chartsImage.tag: v1.5.0
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].image
+        value: my.registry.com/custom-charts:v1.5.0
+- it: should use systemDefaultRegistry for charts init container image
+  set:
+    systemDefaultRegistry: registry.example.com
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].image
+        value: registry.example.com/rancher/rancher-charts:v0.1.0-rc.1
+- it: should use chartsImage.registry override for charts init container image
+  set:
+    systemDefaultRegistry: registry.example.com
+    chartsImage.registry: custom.registry.io
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].image
+        value: custom.registry.io/rancher/rancher-charts:v0.1.0-rc.1
+- it: should default charts init container imagePullPolicy to IfNotPresent
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].imagePullPolicy
+        value: IfNotPresent
+- it: should have correct command in charts init container
+  asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].command
+        value:
+          - sh
+          - -c
+          - |
+            echo "Copying charts to shared volume..."
+            cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
+            echo "Charts copied successfully"
+- it: should mount rancher-charts volume in init container
+  asserts:
+    - contains:
+        path: spec.template.spec.initContainers[0].volumeMounts
+        content:
+          name: rancher-charts
+          mountPath: /charts
+- it: should mount rancher-charts volume in main container
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].volumeMounts
+        content:
+          mountPath: /var/lib/rancher-data/local-catalogs/v2
+          name: rancher-charts
+          readOnly: true
+- it: should create rancher-charts emptyDir volume
+  asserts:
+    - contains:
+        path: spec.template.spec.volumes
+        content:
+          name: rancher-charts
+          emptyDir: {}
+- it: should set CATTLE_CHARTS_IMAGE_DEFAULT env var with default values
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: rancher/rancher-charts:v0.1.0-rc.1
+- it: should set CATTLE_CHARTS_IMAGE_DEFAULT env var with custom tag
+  set:
+    chartsImage.tag: v2.0.0
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: rancher/rancher-charts:v2.0.0
+- it: should set CATTLE_CHARTS_IMAGE_DEFAULT env var with custom repository and tag
+  set:
+    chartsImage.repository: my.registry.com/custom-charts
+    chartsImage.tag: v1.5.0
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: my.registry.com/custom-charts:v1.5.0
+- it: should include systemDefaultRegistry in CATTLE_CHARTS_IMAGE_DEFAULT env var
+  set:
+    systemDefaultRegistry: registry.example.com
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: registry.example.com/rancher/rancher-charts:v0.1.0-rc.1
+- it: should use chartsImage.registry override in CATTLE_CHARTS_IMAGE_DEFAULT env var
+  set:
+    systemDefaultRegistry: registry.example.com
+    chartsImage.registry: custom.registry.io
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: custom.registry.io/rancher/rancher-charts:v0.1.0-rc.1
