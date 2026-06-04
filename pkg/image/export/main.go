@@ -27,6 +27,11 @@ func run(chartsPath string, imagesFromArgs []string, ociChartsPath string, ociRe
 		return fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
 	}
 
+	// Add charts image from build.yaml (via CATTLE_DEFAULT_CHARTS_IMAGE env var set by scripts/export-config)
+	if chartsImage := os.Getenv("CATTLE_DEFAULT_CHARTS_IMAGE"); chartsImage != "" {
+		imagesFromArgs = append(imagesFromArgs, chartsImage)
+	}
+
 	targetsAndSources, err := utilities.GatherTargetArtifactsAndSources(chartsPath, ociChartsPath, imagesFromArgs, ociRepositoryURL, rancherVersion)
 	if err != nil {
 		return err
