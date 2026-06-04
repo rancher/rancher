@@ -109,6 +109,8 @@ type ClusterSpecBase struct {
 	DesiredAgentImage                                    string                        `json:"desiredAgentImage"`
 	DesiredAuthImage                                     string                        `json:"desiredAuthImage"`
 	AgentImageOverride                                   string                        `json:"agentImageOverride"`
+	DesiredChartsImage                                   string                        `json:"desiredChartsImage"`
+	ChartsImageOverride                                  string                        `json:"chartsImageOverride"`
 	AgentEnvVars                                         []v1.EnvVar                   `json:"agentEnvVars,omitempty"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                        `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                        `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`

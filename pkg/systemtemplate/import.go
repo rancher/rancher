@@ -40,6 +40,7 @@ type clusterAgentContext struct {
 	AgentImage           string
 	AgentEnvVars         string
 	AuthImage            string
+	ChartsImage          string
 	TokenKey             string
 	Token                string
 	URL                  string
@@ -273,6 +274,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		AgentImage:                 ops.AgentImage,
 		AgentEnvVars:               agentEnvVars,
 		AuthImage:                  ops.AuthImage,
+		ChartsImage:                GetDesiredChartsImage(ops.Cluster),
 		TokenKey:                   tokenKey,
 		Token:                      base64.StdEncoding.EncodeToString([]byte(ops.Token)),
 		URL:                        base64.StdEncoding.EncodeToString([]byte(ops.URL)),
@@ -400,6 +402,19 @@ func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
 	return desiredAuth
+}
+
+func GetDesiredChartsImage(cluster *apimgmtv3.Cluster) string {
+	logrus.Tracef("clusterDeploy: getting desired charts image for [%s]", cluster.Name)
+	desiredCharts := cluster.Spec.DesiredChartsImage
+	if cluster.Spec.ChartsImageOverride != "" {
+		desiredCharts = cluster.Spec.ChartsImageOverride
+	}
+	if desiredCharts == "" || desiredCharts == "fixed" {
+		desiredCharts = image.ResolveWithCluster(settings.ChartsImage.Get(), cluster)
+	}
+	logrus.Tracef("clusterDeploy: desiredCharts is [%s] for cluster [%s]", desiredCharts, cluster.Name)
+	return desiredCharts
 }
 
 func toYAML(v interface{}) string {
