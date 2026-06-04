@@ -173,6 +173,10 @@ spec:
         - name: RANCHER_NAMESPACES_OPTIONS
           value: {{ .Values.rancherNamespaces | mustToJson | quote }}
 {{- end }}
+{{- if and .Values.systemRegistryInheritsPullSecrets .Values.imagePullSecrets }}
+        - name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "{{ range $i, $v := .Values.imagePullSecrets }}{{- if $i }},{{ end }}{{ $v.name }}{{ end }}"
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
@@ -241,7 +245,7 @@ spec:
   {{- if .Values.auditLog.enabled }}
       # Make audit logs available for Rancher log collector tools.
       - image: "{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . (default "" .Values.auditLog.image.registry))) (include "auditLog.image" .) }}"
-        imagePullPolicy: {{ default .Values.auditLog.image.pullPolicy .Values.busyboxImagePullPolicy }}
+        imagePullPolicy: {{ .Values.auditLog.image.pullPolicy }}
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]
         args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]

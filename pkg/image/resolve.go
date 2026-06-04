@@ -140,8 +140,7 @@ func setRequiredImages(osType OSType, imagesSet map[string]map[string]struct{}) 
 		addSourceToImage(imagesSet, settings.SCCOperatorImage.Get(), imageSourceCore)
 		addSourceToImage(imagesSet, settings.ShellImage.Get(), imageSourceCore)
 		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), imageSourceCore)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-busybox:15.6.24.2", imageSourceCore)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-micro:15.6.24.2", imageSourceCore)
+		addSourceToImage(imagesSet, "rancher/mirrored-bci-micro:16.0-15.11", imageSourceCore) // Used by Audit Log feature - must match version in `chart/values.yaml`
 		// kube-api-auth is required for ACE.
 		addSourceToImage(imagesSet, apisv3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth, imageSourceSystem)
 	}

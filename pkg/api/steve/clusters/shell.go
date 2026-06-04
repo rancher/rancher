@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
@@ -118,7 +119,8 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 	if imageName == "" {
 		imageName = settings.FullShellImage()
 	}
-	return &v1.Pod{
+
+	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "dashboard-shell-",
 			Namespace:    s.namespace,
@@ -237,4 +239,10 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 			},
 		},
 	}
+
+	if registry, _ := cluster.GetPrivateRegistry(nil); registry != nil {
+		p.Spec.ImagePullSecrets = registry.PullSecretsAsObjectReferences()
+	}
+
+	return p
 }

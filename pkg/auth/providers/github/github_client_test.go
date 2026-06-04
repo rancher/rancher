@@ -83,6 +83,22 @@ func TestGetFromGithubReturnsNonTransientErrorOn404(t *testing.T) {
 	assert.ErrorAs(t, err, &nte)
 }
 
+func TestGetFromGithubReturnsNonTransientErrorOn401(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	gcClient := &GClient{httpClient: srv.Client()}
+	_, _, err := gcClient.getFromGithub("token", srv.URL)
+
+	require.Error(t, err)
+	var nte *common.NonTransientError
+	assert.ErrorAs(t, err, &nte)
+}
+
 func TestGetFromGithubReturnsGenericErrorOnOtherFailure(t *testing.T) {
 	t.Parallel()
 

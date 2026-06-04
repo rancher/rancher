@@ -8,7 +8,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/docker/distribution/reference"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -18,17 +17,35 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
-// hardcoded k8s minor <-> image tag mapping, adding new versions here will automatically
-// rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version)
-//
-// NOTE: When updating the chart version in build.yaml you will need to update this mapping
-// if adding support for a new minor k8s version
-var imageTagVersions = map[int]string{
-	35: "1.35.0-4.1",
-	34: "1.34.0-3.4",
-	33: "1.33.0-3.3",
-	32: "1.32.3-1.5",
+type k8sToAutoscalerVersion struct {
+	imageTag     string
+	chartVersion string
 }
+
+// hardcoded k8s minor <-> imageTag tag + chartVersion version mapping, adding new versions here will automatically
+// rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version for imageTag or chartVersion)
+var k8sVersionToAutoscalerChartVersions = map[int]*k8sToAutoscalerVersion{
+	35: {
+		imageTag:     "1.35.0-4.1",
+		chartVersion: "9.56.0",
+	},
+	34: {
+		imageTag:     "1.34.0-3.4",
+		chartVersion: "9.50.1",
+	},
+	33: {
+		imageTag:     "1.33.0-3.3",
+		chartVersion: "9.50.1",
+	},
+	32: {
+		imageTag:     "1.32.3-1.5",
+		chartVersion: "9.50.1",
+	},
+}
+
+// this is a default value - so we never actually fall back to what is in the chart. this ensures
+// that we're running a vetted image that exists in the prime registry
+var defaultChartVersionConfigs = k8sVersionToAutoscalerChartVersions[34]
 
 // ensureFleetHelmOp creates or updates a Helm operation for cluster autoscaler.
 // one key parameter here is the kubeconfigVersion which is legitimately just involved to
@@ -45,7 +62,7 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 				DefaultNamespace: "kube-system",
 				Helm: &fleet.HelmOptions{
 					Chart:       getChartName(),
-					Version:     buildconfig.ClusterAutoscalerChartVersion,
+					Version:     h.chartVersionsForCluster(cluster).chartVersion,
 					Repo:        settings.ClusterAutoscalerChartRepository.Get(),
 					ReleaseName: "cluster-autoscaler",
 					Values: &fleet.GenericMap{
@@ -105,15 +122,22 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 	return err
 }
 
-// resolveImageTagVersion returns the cluster-autoscaler image version for cluster autoscaler based on the Kubernetes minor version of the cluster.
-func (h *autoscalerHandler) resolveImageTagVersion(cluster *capi.Cluster) string {
-	minorVersion := h.getKubernetesMinorVersion(cluster)
-	version, exists := imageTagVersions[minorVersion]
-	if !exists || version == "" {
-		logrus.Debugf("[autoscaler] no chart version found for kubernetes minor version %d - latest version of cluster-autoscaler chart will be installed", minorVersion)
-		return ""
+func (h *autoscalerHandler) chartVersionsForCluster(cluster *capi.Cluster) *k8sToAutoscalerVersion {
+	v := h.getKubernetesMinorVersion(cluster)
+	versions, ok := k8sVersionToAutoscalerChartVersions[v]
+	if !ok {
+		logrus.Warnf(
+			"[autoscaler] no chart versions found for cluster %s/%s with kubernetes minor=%d, using default chartVersion=%s imageTag=%s",
+			cluster.Namespace,
+			cluster.Name,
+			v,
+			defaultChartVersionConfigs.chartVersion,
+			defaultChartVersionConfigs.imageTag,
+		)
+		return defaultChartVersionConfigs
 	}
-	return version
+
+	return versions
 }
 
 // getChartImageSettings returns a map of the image settings to pass to the chart, this is based on the kubernetes minor version
@@ -145,13 +169,12 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[str
 		"registry":   registry,
 	}
 
-	// this handles if we don't have a specific validated tag for the given k8s version - fall back to
-	// the default helm chart tag OR whatever was set on the image (if present)
-	configuredTag := h.resolveImageTagVersion(cluster)
-	if configuredTag != "" {
-		imageSettings["tag"] = configuredTag
-	} else if isTagged { // tag defaults to latest if not set
+	// this handles if the image setting was set with a tag - we just use that
+	// instead of the hardcoded version for the k8s version
+	if isTagged {
 		imageSettings["tag"] = tag.Tag()
+	} else {
+		imageSettings["tag"] = h.chartVersionsForCluster(cluster).imageTag
 	}
 
 	return imageSettings

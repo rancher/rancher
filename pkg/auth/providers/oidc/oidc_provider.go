@@ -304,6 +304,9 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 	return o.getGroupsFromClaimInfo(*claimInfo), nil
 }
 
+func (o *OpenIDCProvider) UsesUserSecrets() bool      { return true }
+func (o *OpenIDCProvider) CanRefreshPrincipals() bool { return true }
+
 func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
 	config, err := o.GetConfig()
 	if err != nil {
@@ -892,10 +895,15 @@ func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
 func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {
 	isSecure := req.URL.Scheme == "https"
 	pkceCookie := &http.Cookie{
-		Name:    pkceVerifierCookieName,
-		Value:   "",
-		Secure:  isSecure,
-		Expires: time.Now().Add(time.Second * -10),
+		Name:     pkceVerifierCookieName,
+		Value:    "",
+		Secure:   isSecure,
+		Path:     "/",
+		HttpOnly: true,
+		// Lax is the default in most browsers; setting it
+		// explicitly is a good security measure.
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Now().Add(time.Second * -10),
 	}
 
 	http.SetCookie(w, pkceCookie)
@@ -911,6 +919,9 @@ func SetPKCEVerifier(req *http.Request, w http.ResponseWriter, value string) {
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		// Lax is the default in most browsers; setting it
+		// explicitly is a good security measure.
+		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(time.Minute * 10),
 	}
 
@@ -925,6 +936,9 @@ func setIDToken(req *http.Request, w http.ResponseWriter, token string) {
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		// Lax is the default in most browsers; setting it
+		// explicitly is a good security measure.
+		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, tokenCookie)
 }

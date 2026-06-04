@@ -91,10 +91,12 @@ tests:
     auditLog:
       enabled: true
       destination: sidecar
+      image:
+        tag: 16.0-15.11
   asserts:
   - equal:
       path: spec.template.spec.containers[1].image
-      value: rancher/mirrored-bci-micro:15.6.24.2
+      value: rancher/mirrored-bci-micro:16.0-15.11
 - it: should override auditLog.image.repository value when auditLog.destination is sidecar and auditLog.enabled == true and both auditLog.image.repository and auditLog.image.tag are set
   set:
     systemDefaultRegistry: ""
@@ -108,20 +110,6 @@ tests:
   - equal:
       path: spec.template.spec.containers[1].image
       value: my.private.repo:5000/rancher/busybox:1.0.1
-- it: deprecated busyboxImage should override auditLog.image.repository image when auditLog.destination is sidecar and auditLog.enabled == true and auditLog.image.repository  and busyboxImage are set
-  set:
-    systemDefaultRegistry: ""
-    auditLog:
-      enabled: true
-      destination: sidecar
-      image:
-        repository: my.private.repo:5000/rancher/busybox
-        tag : 1.0.1
-    busyboxImage: busybox
-  asserts:
-  - equal:
-      path: spec.template.spec.containers[1].image
-      value: busybox
 - it: should override sidecar audit log imagePullPolicy when auditLog.destination is sidecar and auditLog.enabled == true and auditLog.imagePullPolicy is set
   set:
     auditLog:
@@ -133,18 +121,6 @@ tests:
   - equal:
       path: spec.template.spec.containers[1].imagePullPolicy
       value: Never
-- it: deprecated busyboxImagePullPolicy should override sidecar audit log imagePullPolicy when auditLog.destination is sidecar, auditLog.enabled == true, and busyboxImagePullPolicy and auditLog.imagePullPolicy are set
-  set:
-    auditLog:
-      destination: sidecar
-      enabled: true
-      image:
-        pullPolicy: Never
-    busyboxImagePullPolicy: Always
-  asserts:
-  - equal:
-      path: spec.template.spec.containers[1].imagePullPolicy
-      value: Always
 - it: should not have command arg "--no-cacerts" when using private CA
   set:
     privateCA: "true"
@@ -776,3 +752,45 @@ tests:
             value: RELEASE-NAME-rancher
           - name: RANCHER_NAMESPACES_OPTIONS
             value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"}}"
+- it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when imagePullSecrets is empty
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: ""
+- it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when systemRegistryInheritsPullSecrets is false
+  set:
+    systemRegistryInheritsPullSecrets: false
+    imagePullSecrets:
+      - name: my-pull-secret
+  asserts:
+    - notContains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "my-pull-secret"
+- it: should add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when a single imagePullSecret is set and systemRegistryInheritsPullSecrets is true
+  set:
+    systemRegistryInheritsPullSecrets: true
+    imagePullSecrets:
+      - name: my-pull-secret
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "my-pull-secret"
+- it: should add CATTLE_BASE_REGISTRY_PULL_SECRETS as a comma-delimited list when multiple imagePullSecrets are set and systemRegistryInheritsPullSecrets is true
+  set:
+    systemRegistryInheritsPullSecrets: true
+    imagePullSecrets:
+      - name: secret-one
+      - name: secret-two
+      - name: secret-three
+  asserts:
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: CATTLE_BASE_REGISTRY_PULL_SECRETS
+          value: "secret-one,secret-two,secret-three"

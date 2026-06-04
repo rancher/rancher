@@ -112,8 +112,8 @@ var (
 		true)
 	ProvisioningV2FleetWorkspaceBackPopulation = newFeature(
 		"provisioningv2-fleet-workspace-back-population",
-		"[Experimental]: Allow Fleet workspace name to be changed on clusters administrated by provisioning v2",
-		false,
+		"Allow Fleet workspace name to be changed on clusters administrated by provisioning v2",
+		true,
 		false,
 		true)
 	UIExtension = newFeature(
@@ -215,6 +215,34 @@ var (
 		"Enable day 2 ops for imported clusters",
 		false,
 		false,
+		true,
+	)
+	ClusterShell = newFeature(
+		"cluster-shell",
+		"Enable the Rancher cluster shell feature",
+		true,
+		false,
+		true,
+	)
+	NodeShell = newFeature(
+		"node-shell",
+		"Enable the Rancher node shell feature",
+		true,
+		false,
+		true,
+	)
+	PodShell = newFeature(
+		"pod-shell",
+		"Enable the Rancher pod shell feature",
+		true,
+		false,
+		true,
+	)
+	HideLocalAuthProvider = newFeature(
+		"hide-local-auth-provider",
+		"Hide the local auth provider when one or more external auth providers are active",
+		false,
+		true,
 		true,
 	)
 )

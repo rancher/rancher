@@ -11,7 +11,6 @@ import (
 	"github.com/coreos/go-semver/semver"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
-	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
 )
 
@@ -76,7 +75,7 @@ func GatherTargetArtifactsAndSources(
 	if err != nil {
 		return ArtifactTargetsAndSources{}, fmt.Errorf("could not read data.json: %w", err)
 	}
-	data, err := kontainerdrivermetadata.FromData(b)
+	data, err := img.KDMFromData(b)
 	if err != nil {
 		return ArtifactTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
 	}

@@ -12,6 +12,7 @@ const (
 	AzureADConfigFieldCreatorID             = "creatorId"
 	AzureADConfigFieldDeviceAuthEndpoint    = "deviceAuthEndpoint"
 	AzureADConfigFieldEnabled               = "enabled"
+	AzureADConfigFieldEndSessionEndpoint    = "endSessionEndpoint"
 	AzureADConfigFieldEndpoint              = "endpoint"
 	AzureADConfigFieldGraphEndpoint         = "graphEndpoint"
 	AzureADConfigFieldGroupMembershipFilter = "groupMembershipFilter"
@@ -19,7 +20,6 @@ const (
 	AzureADConfigFieldLogoutAllEnabled      = "logoutAllEnabled"
 	AzureADConfigFieldLogoutAllForced       = "logoutAllForced"
 	AzureADConfigFieldLogoutAllSupported    = "logoutAllSupported"
-	AzureADConfigFieldLogoutEndpoint        = "logoutEndpoint"
 	AzureADConfigFieldName                  = "name"
 	AzureADConfigFieldOwnerReferences       = "ownerReferences"
 	AzureADConfigFieldRancherURL            = "rancherUrl"
@@ -42,6 +42,7 @@ type AzureADConfig struct {
 	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DeviceAuthEndpoint    string            `json:"deviceAuthEndpoint,omitempty" yaml:"deviceAuthEndpoint,omitempty"`
 	Enabled               bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	EndSessionEndpoint    string            `json:"endSessionEndpoint,omitempty" yaml:"endSessionEndpoint,omitempty"`
 	Endpoint              string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	GraphEndpoint         string            `json:"graphEndpoint,omitempty" yaml:"graphEndpoint,omitempty"`
 	GroupMembershipFilter string            `json:"groupMembershipFilter,omitempty" yaml:"groupMembershipFilter,omitempty"`
@@ -49,7 +50,6 @@ type AzureADConfig struct {
 	LogoutAllEnabled      bool              `json:"logoutAllEnabled,omitempty" yaml:"logoutAllEnabled,omitempty"`
 	LogoutAllForced       bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported    bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
-	LogoutEndpoint        string            `json:"logoutEndpoint,omitempty" yaml:"logoutEndpoint,omitempty"`
 	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherURL            string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`

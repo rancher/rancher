@@ -59,6 +59,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -112,6 +113,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -169,6 +171,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -226,6 +229,7 @@ bootstrap:
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"imagePullSecrets":      ([]string)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -270,9 +274,73 @@ bootstrap:
 				return manager
 			},
 		},
+		{
+			name: "installation with global pull secrets",
+			newManager: func(ctrl *gomock.Controller) chart.Manager {
+				settings.ConfigMapName.Set("pass")
+				settings.FleetMinVersion.Set("")
+				settings.SystemDefaultRegistry.Set("registry.example.com")
+				settings.SystemDefaultRegistryPullSecrets.Set("pull-secret-a,pull-secret-b")
+
+				manager := fake.NewMockManager(ctrl)
+				expectedValues := map[string]interface{}{
+					"agentTLSMode": settings.AgentTLSMode.Get(),
+					"apiServerURL": settings.ServerURL.Get(),
+					"apiServerCA":  settings.CACerts.Get(),
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "registry.example.com",
+							"imagePullSecrets":      []string{"pull-secret-a", "pull-secret-b"},
+						},
+					},
+					"bootstrap": map[string]interface{}{
+						"enabled":        false,
+						"agentNamespace": fleetconst.ReleaseLocalNamespace,
+					},
+					"gitops": map[string]interface{}{
+						"enabled": features.Gitops.Enabled(),
+					},
+					"priorityClassName": priorityClassName,
+				}
+
+				exactVersion := "0.7.0"
+				settings.FleetVersion.Set(exactVersion)
+
+				var b bool
+				manager.EXPECT().Ensure(
+					fleetconst.ReleaseNamespace,
+					fleetconst.CRDChartName,
+					fleetconst.CRDChartName,
+					exactVersion,
+					"",
+					nil,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil).Times(len(stgs))
+				manager.EXPECT().Ensure(
+					fleetconst.ReleaseNamespace,
+					fleetconst.ChartName,
+					fleetconst.ChartName,
+					exactVersion,
+					"",
+					expectedValues,
+					gomock.AssignableToTypeOf(b),
+					"",
+				).Return(nil).Times(len(stgs))
+
+				manager.EXPECT().Uninstall(fleetconst.ReleaseLegacyNamespace, fleetconst.ChartName).Return(nil).Times(len(stgs))
+				return manager
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			initialSDR := settings.SystemDefaultRegistry.Get()
+			initialSDRPull := settings.SystemDefaultRegistryPullSecrets.Get()
+			t.Cleanup(func() {
+				settings.SystemDefaultRegistry.Set(initialSDR)
+				settings.SystemDefaultRegistryPullSecrets.Set(initialSDRPull)
+			})
 			ctrl := gomock.NewController(t)
 			configCache := ctrlfake.NewMockCacheInterface[*v1.ConfigMap](ctrl)
 			configCache.EXPECT().

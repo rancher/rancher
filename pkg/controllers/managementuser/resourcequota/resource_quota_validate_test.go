@@ -71,9 +71,9 @@ func TestReconcileNamespaces(t *testing.T) {
 				nsMock := wranglerfake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
 				nsMock.EXPECT().
 					Enqueue(gomock.Any()).
-					DoAndReturn(func (_ string) {
+					DoAndReturn(func(_ string) {
 						*enqCounter = *enqCounter + 1
-				})
+					})
 
 				return &reconcileController{
 					namespaces: nsMock,

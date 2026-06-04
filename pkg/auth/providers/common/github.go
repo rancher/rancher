@@ -41,5 +41,9 @@ func stringFromMap(m map[string]any, key string) string {
 		return ""
 	}
 
-	return r.(string)
+	s, ok := r.(string)
+	if !ok {
+		return ""
+	}
+	return s
 }

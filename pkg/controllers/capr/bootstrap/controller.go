@@ -236,7 +236,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		return nil, fmt.Errorf("error marshaling userdata")
 	}
 
-	userdataBytes = append([]byte("#cloud-config\n"), userdataBytes...)
+	userdataBytes = append([]byte("## template: jinja\n#cloud-config\n"), userdataBytes...)
 
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
