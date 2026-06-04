@@ -5,6 +5,7 @@ package buildconfig
 const (
 	ChartAuditLogImage       = "rancher/mirrored-bci-micro:16.0-15.11"
 	CspAdapterMinVersion     = "109.0.0+up9.0.0-rc.3"
+	DefaultChartsImage       = "rancher/rancher-charts:v0.1.0-rc.1"
 	DefaultSccOperatorImage  = "rancher/scc-operator:v0.4.1"
 	DefaultShellVersion      = "rancher/shell:v0.8.0-rc.2"
 	FleetVersion             = "110.0.0+up0.16.0-alpha.9"
