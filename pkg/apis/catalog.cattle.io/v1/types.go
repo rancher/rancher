@@ -74,7 +74,8 @@ type RepoSpec struct {
 	// GitBranch is the git branch where the helm repository is hosted.
 	GitBranch string `json:"gitBranch,omitempty"`
 
-	// RefreshInterval is the interval at which the Helm repository should be refreshed.
+	// RefreshInterval is the interval, in seconds, at which the Helm repository should be refreshed.
+	// Default value is 1 hour. Using a negative value disables periodic updates completely.
 	RefreshInterval int `json:"refreshInterval,omitempty"`
 
 	// ExponentialBackOffValues are values given to the Rancher manager to handle
