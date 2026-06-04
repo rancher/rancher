@@ -3,6 +3,7 @@ package operations
 import (
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -11,44 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-// Adapter is an interface for different types of cluster objects.
-// the Adapter interface exposes all methods required for constructing a node plan for the supported types.
-// The adapter currently supports v2prov, CAPR and imported clusters.
-type Adapter interface {
-	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
-	// all expected nodes.
-	WaitForRegister() (bool, error)
-
-	// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
-	RuntimeCommand() string
-
-	// ServerUnit returns the systemd unit name for a distro server node.
-	ServerUnit() string
-
-	// RenderProbes renders the probes for a given machine-plan secret based on its role.
-	// `supervisor` controls whether the supervisor probe should be rendered.
-	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
-	// supervisor probe to fail.
-	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
-}
-
-// NewAdapter returns an Adapter for the given cluster object.
-// For Provisioning clusters the controlPlane object is extracted and then a CAPR Adapter is used to prevent duplication.
-// The wrangler.CAPIContext is used in order to allow the adapter to access specific typed caches for ease of use.
-func NewAdapter(clients *wrangler.CAPIContext, ustr *unstructured.Unstructured) (Adapter, error) {
-	if ustr == nil {
-		return nil, errors.New("nil unstructured")
-	}
-	// controlplane and provisioning cluster always have the same name
-	gvk := schema.FromAPIVersionAndKind(ustr.GetAPIVersion(), ustr.GetKind())
-
-	adapter, ok := adapterFactory[gvk.GroupKind().String()]
-	if !ok {
-		return nil, fmt.Errorf("unsupported cluster type: %s", gvk.GroupKind().String())
-	}
-	return adapter(clients, ustr)
-}
 
 const (
 	SecurePortArgument  = "secure-port"
@@ -153,6 +116,52 @@ var (
 	ErrEmptyAddress = errors.New("address cannot be empty")
 )
 
+// Adapter is an interface for different types of cluster objects.
+// the Adapter interface exposes all methods required for constructing a node plan for the supported types.
+// The adapter currently supports v2prov, CAPR and imported clusters.
+type Adapter interface {
+	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
+	// all expected nodes.
+	WaitForRegister() (bool, error)
+
+	// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
+	RuntimeCommand() string
+
+	// ServerUnit returns the systemd unit name for a distro server node.
+	ServerUnit() string
+
+	// RenderProbes renders the probes for a given machine-plan secret based on its role.
+	// `supervisor` controls whether the supervisor probe should be rendered.
+	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
+	// supervisor probe to fail.
+	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
+}
+
+// NewAdapter returns an Adapter for the given cluster object.
+// For Provisioning clusters the controlPlane object is extracted and then a CAPR Adapter is used to prevent duplication.
+// The wrangler.CAPIContext is used in order to allow the adapter to access specific typed caches for ease of use.
+func NewAdapter(clients *wrangler.CAPIContext, ustr *unstructured.Unstructured) (Adapter, error) {
+	if ustr == nil {
+		return nil, errors.New("nil unstructured")
+	}
+	// controlplane and provisioning cluster always have the same name
+	gvk := schema.FromAPIVersionAndKind(ustr.GetAPIVersion(), ustr.GetKind())
+
+	adapter, ok := adapterFactory[gvk.String()]
+	if !ok {
+		return nil, fmt.Errorf("unsupported cluster type: %s", gvk.String())
+	}
+	return adapter(clients, ustr)
+}
+
+type AdapterFactory func(*wrangler.CAPIContext, *unstructured.Unstructured) (Adapter, error)
+
+var adapterFactory = map[string]AdapterFactory{}
+
+func RegisterAdapter(gvk schema.GroupVersionKind, factory AdapterFactory) {
+	adapterFactory[gvk.String()] = factory
+}
+
 // ReplaceCACertAndPortForProbes adds/replaces the CACert and URL with rendered values based on the values provided.
 func ReplaceCACertAndPortForProbes(probe plan.Probe, cacert, host, port string) (plan.Probe, error) {
 	if cacert == "" {
@@ -199,10 +208,26 @@ func replaceIfFormatSpecifier(str string, runtime string) string {
 	return fmt.Sprintf(str, runtime)
 }
 
-type AdapterFactory func(*wrangler.CAPIContext, *unstructured.Unstructured) (Adapter, error)
-
-var adapterFactory = map[string]AdapterFactory{}
-
-func RegisterAdapter(gvk schema.GroupVersionKind, factory AdapterFactory) {
-	adapterFactory[gvk.String()] = factory
+// renderSecureProbe takes the existing argument value and renders a secure probe using the argument values and an error
+// if one occurred.
+func renderSecureProbe(arg any, probe plan.Probe, dataDir string, loopbackAddress, defaultSecurePort string, defaultCertDir string, defaultCert string) (plan.Probe, error) {
+	securePort := getArgValue(arg, SecurePortArgument, "=")
+	if securePort == "" {
+		// If the user set a custom --secure-port, set --secure-port to an empty string, so we don't override
+		// their custom value
+		securePort = defaultSecurePort
+	}
+	TLSCert := getArgValue(arg, TLSCertFileArgument, "=")
+	if TLSCert == "" {
+		// If the --tls-cert-file Argument was not set in the config for this component, we can look to see if
+		// the --cert-dir was set. --tls-cert-file (if set) will take precedence over --cert-dir
+		certDir := getArgValue(arg, CertDirArgument, "=")
+		if certDir == "" {
+			// If --cert-dir was not set, we use defaultCertDir value that was passed in, but must prefix the data-dir
+			certDir = path.Join(dataDir, defaultCertDir)
+		}
+		// Our goal here is to generate the tlsCert. If we get to this point, we know we will be using the defaultCert
+		TLSCert = certDir + "/" + defaultCert
+	}
+	return ReplaceCACertAndPortForProbes(probe, TLSCert, loopbackAddress, securePort)
 }

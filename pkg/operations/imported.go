@@ -1,13 +1,10 @@
-package imported
+package operations
 
-//revive:disable:dot-imports
 import (
 	"fmt"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/operations"
-	. "github.com/rancher/rancher/pkg/operations"
 	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
@@ -16,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
-
-//revive:enable:dot-imports
 
 type ImportedAdapter struct {
 	cluster *mgmtv3.Cluster
@@ -139,13 +134,13 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	}
 
 	if IsControlPlane(secret) {
-		kcmProbe, err := renderSecureProbe(probes[KubeControllerManagerProbeName], loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmProbe, err := renderSecureProbe("", probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksProbe, err := renderSecureProbe(probes[KubeSchedulerProbeName], loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbe("", probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
@@ -157,15 +152,8 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	return probes, nil
 }
 
-// renderSecureProbe takes the existing argument value and renders a secure probe using the argument values and an error
-// if one occurred.
-func renderSecureProbe(probe plan.Probe, loopbackAddress, securePort string, certDir string, cert string) (plan.Probe, error) {
-	TLSCert := certDir + "/" + cert
-	return ReplaceCACertAndPortForProbes(probe, TLSCert, loopbackAddress, securePort)
-}
-
 func init() {
-	operations.RegisterAdapter(mgmtv3.SchemeGroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (operations.Adapter, error) {
+	RegisterAdapter(mgmtv3.SchemeGroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
 		var cluster *mgmtv3.Cluster
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, &cluster)
 		if err != nil {

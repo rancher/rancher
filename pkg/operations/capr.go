@@ -1,17 +1,14 @@
-package capr
+package operations
 
-//revive:disable:dot-imports
 import (
 	"context"
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	. "github.com/rancher/rancher/pkg/operations"
 	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
@@ -21,8 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 )
-
-//revive:enable:dot-imports
 
 func init() {
 	RegisterAdapter(rkev1.SchemeGroupVersion.WithKind("RKEControlPlane"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
@@ -341,28 +336,4 @@ func convertInterfaceSliceToStringSlice(input []any) []string {
 		stringArr = append(stringArr, fmt.Sprintf("%v", v))
 	}
 	return stringArr
-}
-
-// renderSecureProbe takes the existing argument value and renders a secure probe using the argument values and an error
-// if one occurred.
-func renderSecureProbe(arg any, probe plan.Probe, dataDir string, loopbackAddress, defaultSecurePort string, defaultCertDir string, defaultCert string) (plan.Probe, error) {
-	securePort := getArgValue(arg, SecurePortArgument, "=")
-	if securePort == "" {
-		// If the user set a custom --secure-port, set --secure-port to an empty string, so we don't override
-		// their custom value
-		securePort = defaultSecurePort
-	}
-	TLSCert := getArgValue(arg, TLSCertFileArgument, "=")
-	if TLSCert == "" {
-		// If the --tls-cert-file Argument was not set in the config for this component, we can look to see if
-		// the --cert-dir was set. --tls-cert-file (if set) will take precedence over --cert-dir
-		certDir := getArgValue(arg, CertDirArgument, "=")
-		if certDir == "" {
-			// If --cert-dir was not set, we use defaultCertDir value that was passed in, but must prefix the data-dir
-			certDir = path.Join(dataDir, defaultCertDir)
-		}
-		// Our goal here is to generate the tlsCert. If we get to this point, we know we will be using the defaultCert
-		TLSCert = certDir + "/" + defaultCert
-	}
-	return ReplaceCACertAndPortForProbes(probe, TLSCert, loopbackAddress, securePort)
 }

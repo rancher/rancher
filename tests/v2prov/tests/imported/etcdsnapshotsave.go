@@ -31,6 +31,7 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 		Spec: opv1alpha1.ETCDSnapshotSaveSpec{
 			OperationSpec: opv1alpha1.OperationSpec{
 				ClusterRef: &clusterRef,
+				TTL:        60,
 			},
 		},
 	}
