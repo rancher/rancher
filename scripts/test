@@ -189,10 +189,4 @@ CGO_ENABLED=0 go test -v -failfast -p 1 ./tests/v2/integration/... || {
   exit 1
 }
 
-echo Running tox tests
-INT_TESTS_STARTED=true
-cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
-
 tail -f /tmp/rancher-test.log &

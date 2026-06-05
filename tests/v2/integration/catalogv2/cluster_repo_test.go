@@ -24,7 +24,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/rancher/rancher/tests/v2/integration/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
