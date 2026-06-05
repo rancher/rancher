@@ -15,7 +15,6 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
 	k3scontrollers "github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io/v1"
-	"github.com/rancher/lasso/pkg/dynamic"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
@@ -53,10 +52,14 @@ const (
 	Local Storage = "local"
 )
 
+type dynamicClient interface {
+	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
+}
+
 type handler struct {
 	clusterRef corev1.ObjectReference
 
-	dynamic                *dynamic.Controller
+	dynamic                dynamicClient
 	etcdSnapshotCache      rkev1controllers.ETCDSnapshotCache
 	etcdSnapshotController rkev1controllers.ETCDSnapshotController
 
@@ -480,19 +483,6 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 	}
 
 	return upstream, nil
-}
-
-func localOwnerReference(cluster *unstructured.Unstructured) (metav1.OwnerReference, error) {
-	if cluster.GetAPIVersion() == "provisioning.cattle.io/v1" && cluster.GetKind() == "Cluster" ||
-		cluster.GetAPIVersion() == "rke.cattle.io/v1" && cluster.GetKind() == "RKEControlPlane" {
-
-	}
-
-	return metav1.OwnerReference{
-		APIVersion: cluster.GetAPIVersion(),
-		Kind:       cluster.GetKind(),
-		Name:       cluster.GetName(),
-	}, nil
 }
 
 // getCluster returns the provisioning cluster associated with the current userContext.
