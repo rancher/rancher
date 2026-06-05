@@ -194,7 +194,7 @@ spec:
         # TODO: should this be conditional? We need it for consistency if the user changes the values ever.
         # maybe just check for empty values on .Values.chartsImage.repository and tag and set if both set?
         - name: CATTLE_CHARTS_IMAGE_DEFAULT
-          value: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
+          value: "{{ template "rancherCharts.image" . }}:{{ default .Chart.appVersion .Values.chartsImage.tag }}"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
