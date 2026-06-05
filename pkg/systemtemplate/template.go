@@ -251,7 +251,6 @@ spec:
           volumeMounts:
           - name: rancher-charts
             mountPath: /var/lib/rancher-data/local-catalogs/v2
-            readOnly: true
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true

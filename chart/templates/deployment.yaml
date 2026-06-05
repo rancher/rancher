@@ -231,7 +231,6 @@ spec:
         volumeMounts:
         - mountPath: /var/lib/rancher-data/local-catalogs/v2
           name: rancher-charts
-          readOnly: true
 {{- if .Values.additionalTrustedCAs }}
         - mountPath: /etc/pki/trust/anchors/ca-additional.pem
           name: tls-ca-additional-volume
