@@ -78,7 +78,7 @@ func (s *ETCDSnapshotRestoreStatus) SetStep(step ETCDSnapshotRestoreStep) {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:path=ETCDSnapshotRestores,scope=Namespaced,categories=operations
+// +kubebuilder:resource:path=etcdsnapshotrestores,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
