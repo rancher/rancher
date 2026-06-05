@@ -15,7 +15,7 @@ func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 	} else if beacon.Labels == nil {
 		beacon = beacon.DeepCopy()
 		beacon.Labels = map[string]string{}
-	} else if owner, ok := beacon.Labels[planv1alpha1.OwnerLabel]; !ok || owner == "" {
+	} else if owner, ok := beacon.Labels[planv1alpha1.BeaconOwnerLabel]; !ok || owner == "" {
 		beacon = beacon.DeepCopy()
 	} else if owner != desiredOwner {
 		return nil, nil
@@ -23,7 +23,7 @@ func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 		return beacon, nil
 	}
 
-	beacon.Labels[planv1alpha1.OwnerLabel] = desiredOwner
+	beacon.Labels[planv1alpha1.BeaconOwnerLabel] = desiredOwner
 	return beacons.Update(beacon)
 }
 
@@ -33,9 +33,9 @@ func ReleaseBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 	if beacon == nil || beacon.Labels == nil {
 		return nil
 	}
-	if beacon.Labels[planv1alpha1.OwnerLabel] == expectedOwner {
+	if beacon.Labels[planv1alpha1.BeaconOwnerLabel] == expectedOwner {
 		beacon = beacon.DeepCopy()
-		delete(beacon.Labels, planv1alpha1.OwnerLabel)
+		delete(beacon.Labels, planv1alpha1.BeaconOwnerLabel)
 		_, err := beacons.Update(beacon)
 		return err
 	}
@@ -59,5 +59,5 @@ func HoldingBeacon(beacon *planv1alpha1.Beacon, desiredOwner string) bool {
 	if beacon == nil || beacon.Labels == nil {
 		return false
 	}
-	return beacon.Labels[planv1alpha1.OwnerLabel] == desiredOwner
+	return beacon.Labels[planv1alpha1.BeaconOwnerLabel] == desiredOwner
 }

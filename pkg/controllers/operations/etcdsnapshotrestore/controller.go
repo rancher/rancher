@@ -306,10 +306,6 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	return status, nil
 }
 
-func handleStep() {
-
-}
-
 func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling shutdown", s.op.Namespace, s.op.Name)
 
@@ -662,7 +658,8 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling cluster restart", s.op.Namespace, s.op.Name)
 
 	secrets, err := planapi.NewLabeler().
-		And(planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName())).
+		And(planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName()),
+			planapi.Label(capr.CattleOSLabel, capr.DefaultMachineOS)).
 		WithSorter(planapi.DefaultSorter()).
 		Collect(h.secretCache, s.namespace)
 	if err != nil {
@@ -670,10 +667,6 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	}
 
 	for _, secret := range secrets {
-		if secret.Labels[capr.CattleOSLabel] == "windows" {
-			continue
-		}
-
 		probes, err := s.adapter.RenderProbes(secret)
 		if err != nil {
 			return status, err
