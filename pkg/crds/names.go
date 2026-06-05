@@ -246,6 +246,7 @@ var MigratedResources = map[string]bool{
 	"dynamicschemas.management.cattle.io":                             true,
 	"etcdsnapshots.rke.cattle.io":                                     true,
 	"etcdsnapshotsaves.operation.cattle.io":                           true,
+	"etcdsnapshotrestores.operation.cattle.io":                        true,
 	"extensionconfigs.runtime.cluster.x-k8s.io":                       false,
 	"features.management.cattle.io":                                   false,
 	"fleetworkspaces.management.cattle.io":                            false,
