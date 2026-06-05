@@ -691,6 +691,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling cluster restart", s.op.Namespace, s.op.Name)
 
 	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithLabels(planapi.Label(capr.CattleOSLabel, capr.DefaultMachineOS)).
 		WithSorter(planapi.DefaultSorter()).
 		Collect()
 	if planapi.IsTransient(err) {
@@ -707,10 +708,6 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	}
 
 	for _, secret := range secrets {
-		if secret.Labels[capr.CattleOSLabel] == "windows" {
-			continue
-		}
-
 		probes, err := s.adapter.RenderProbes(secret, false)
 		if err != nil {
 			return status, err
