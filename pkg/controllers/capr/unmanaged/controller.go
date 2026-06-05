@@ -17,6 +17,7 @@ import (
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -215,6 +216,11 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 		labels[capr.WorkerRoleLabel] = "true"
 	}
 
+
+	cluster, err := h.mgmtClusterCache.Get(secret.Namespace)
+	if err != nil {
+		return nil, err
+	}
 	var machine *apimgmtv3.Node
 
 	if val := data.String("node-name"); val != "" {
@@ -237,6 +243,26 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 		machine, err = h.mgmtNodeClient.Update(machine)
 		if err != nil {
 			return nil, err
+		}
+
+		// copy cluster lifecycle labels to secret
+		lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range lifecycleLabels {
+			labels[k] = v
+		}
+
+		// copy machine lifecycle labels to secret
+		lifecycleLabels, err = planv1alpha1.ObjToMachineLifecycleLabels(machine)
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range lifecycleLabels {
+			labels[k] = v
 		}
 
 		labels[capr.MachineIDLabel] = data.String("id")
@@ -315,7 +341,7 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 
 	objs := []runtime.Object{sa, planSecret, role, roleBinding}
 
-	err := h.apply.WithOwner(secret).ApplyObjects(objs...)
+	err = h.apply.WithOwner(secret).ApplyObjects(objs...)
 	if err != nil {
 		return secret, err
 	}
