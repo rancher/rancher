@@ -84,7 +84,7 @@ require (
 	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.0.0-00010101000000-000000000000
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/docker/docker v25.0.13+incompatible
+	github.com/docker/docker v28.5.2+incompatible
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/evanphx/json-patch/v5 v5.9.11
@@ -126,7 +126,7 @@ require (
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.8
-	github.com/rancher/machine v0.15.0-rancher142
+	github.com/rancher/machine v0.15.0-rancher142.1
 	github.com/rancher/muchang v0.1.0
 	github.com/rancher/norman v0.8.7
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -212,6 +212,7 @@ require (
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
+	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
@@ -252,6 +253,8 @@ require (
 	github.com/microsoft/kiota-serialization-json-go v1.0.8 // indirect
 	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
 	github.com/microsoft/kiota-serialization-text-go v1.0.0 // indirect
+	github.com/moby/docker-image-spec v1.3.1 // indirect
+	github.com/moby/sys/reexec v0.1.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
