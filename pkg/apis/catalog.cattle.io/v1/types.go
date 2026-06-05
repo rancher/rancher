@@ -122,6 +122,15 @@ type RepoSpec struct {
 	// Defaults to false, which keeps the SameOrigin check enabled. Setting this to true is not recommended
 	// in production environments due to the security implications.
 	DisableSameOriginCheck bool `json:"disableSameOriginCheck,omitempty"`
+
+	// DefaultImagePullSecrets specifies one or more image pull secrets which will be used by default
+	// when deploying charts from this repository. If a chart supports image pull secrets in its values.yaml
+	// in an expected path (.Values.ImagePullSecrets, .Values.global.ImagePullSecrets, or .Values.global.cattle.imagePullSecrets)
+	// the secrets listed in this field will be automatically copied into the charts release namespace. Additionally,
+	// Rancher will inject these secret references into the charts values.yaml if no user provided value is set.
+	// Currently, this field is only honored by the "rancher-charts" repository, and can only copy secrets from the
+	// cattle-system namespace which have the appropriate labels.
+	DefaultImagePullSecrets []SecretReference `json:"defaultImagePullSecrets,omitempty"`
 }
 
 type RepoCondition string

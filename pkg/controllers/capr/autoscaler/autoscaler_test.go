@@ -725,6 +725,7 @@ func (s *autoscalerSuite) TestPauseAutoscaling_HappyPath_SuccessfulScaling() {
 
 	// Set up mock expectations
 	s.secretCache.EXPECT().Get(cluster.Namespace, kubeconfigSecretName(cluster)).Return(secret, nil)
+	s.expectManageHelmOpSecrets("test-cluster", "test-namespace")
 	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName(cluster)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.helmOp.EXPECT().Create(gomock.Any()).DoAndReturn(func(helmOp *fleet.HelmOp) (*fleet.HelmOp, error) {
 		s.Equal(0, helmOp.Spec.BundleDeploymentOptions.Helm.Values.Data["replicaCount"], "HelmOp should be scaled to 0 replicas")
@@ -778,6 +779,7 @@ func (s *autoscalerSuite) TestPauseAutoscaling_Error_FailedToScaleHelmOp() {
 
 	// Set up mock expectations
 	s.secretCache.EXPECT().Get(cluster.Namespace, kubeconfigSecretName(cluster)).Return(secret, nil)
+	s.expectManageHelmOpSecrets("test-cluster", "test-namespace")
 	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName(cluster)).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.helmOp.EXPECT().Create(gomock.Any()).DoAndReturn(func(helmOp *fleet.HelmOp) (*fleet.HelmOp, error) {
 		s.Equal(0, helmOp.Spec.BundleDeploymentOptions.Helm.Values.Data["replicaCount"], "HelmOp should be scaled to 0 replicas")
@@ -837,6 +839,8 @@ func (s *autoscalerSuite) TestEnsureCleanup_HappyPath_SuccessfulCleanup() {
 	secretName := kubeconfigSecretName(cluster)
 	helmOpName := helmOpName(cluster)
 
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
+
 	// User doesn't exist (should not cause error)
 	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 
@@ -877,6 +881,8 @@ func (s *autoscalerSuite) TestEnsureCleanup_Error_HandleUninstallFails() {
 	globalRoleBindingName := globalRoleBindingName(cluster)
 	secretName := kubeconfigSecretName(cluster)
 	helmOpName := helmOpName(cluster)
+
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	// User doesn't exist
 	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
@@ -923,6 +929,7 @@ func (s *autoscalerSuite) TestEnsureCleanup_EdgeCase_ClusterWithEmptyName() {
 	secretName := kubeconfigSecretName(cluster)
 
 	// All resources don't exist (should handle empty names gracefully)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
@@ -953,6 +960,7 @@ func (s *autoscalerSuite) TestEnsureCleanup_EdgeCase_ClusterWithEmptyNamespace()
 	secretName := kubeconfigSecretName(cluster)
 
 	// All resources don't exist (should handle empty namespace gracefully)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
@@ -983,6 +991,7 @@ func (s *autoscalerSuite) TestEnsureCleanup_EdgeCase_ClusterWithSpecialCharacter
 	secretName := kubeconfigSecretName(cluster)
 
 	// All resources don't exist (should handle special characters gracefully)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
@@ -1031,6 +1040,8 @@ func (s *autoscalerSuite) TestEnsureCleanup_Error_MultipleCleanupFailures() {
 	globalRoleBindingName := globalRoleBindingName(cluster)
 	secretName := kubeconfigSecretName(cluster)
 	helmOpName := helmOpName(cluster)
+
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 
 	// User exists but deletion fails
 	userDeleteError := fmt.Errorf("failed to delete user: access denied")
@@ -1082,6 +1093,7 @@ func (s *autoscalerSuite) TestEnsureCleanup_EdgeCase_EmptyKeyParameter() {
 	secretName := kubeconfigSecretName(cluster)
 
 	// All resources don't exist (should handle empty key gracefully)
+	s.expectCleanupFleetProvisioningClusterNotFound(cluster.Namespace, cluster.Name)
 	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))

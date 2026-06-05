@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -114,10 +115,10 @@ func (h *handler) onSetting(_ string, setting *v3.Setting) (*v3.Setting, error) 
 		},
 	}
 
-	var pullSecrets []string
+	var pullSecrets []v1.LocalObjectReference
 	registry, _ := cluster.GetPrivateRegistry(nil)
 	if registry != nil {
-		pullSecrets = registry.PullSecretNamesAsSlice()
+		pullSecrets = registry.PullSecretsAsObjectReferences()
 	}
 	systemGlobalRegistry["cattle"].(map[string]interface{})["imagePullSecrets"] = pullSecrets
 

@@ -521,7 +521,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	spec.DesiredAuthImage = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
 
-	spec.ClusterSecrets.PrivateRegistrySecret = image.GetPrivateRepoSecretFromCluster(cluster)
+	spec.ClusterSecrets.PrivateRegistrySecret, _ = image.GetPrivateRepoSecretFromCluster(cluster)
 	spec.ClusterSecrets.PrivateRegistryURL, _ = image.GetPrivateRepoURLFromCluster(cluster)
 
 	spec.AgentEnvVars = nil

@@ -1227,6 +1227,104 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 	}
 }
 
+func Test_secretIgnoresNamespace(t *testing.T) {
+	tests := []struct {
+		name      string
+		annos     map[string]string
+		namespace string
+		want      bool
+	}{
+		{
+			name:      "annotation absent, never ignored",
+			annos:     map[string]string{},
+			namespace: "cattle-system",
+			want:      false,
+		},
+		{
+			name:      "nil annotations, never ignored",
+			annos:     nil,
+			namespace: "cattle-system",
+			want:      false,
+		},
+		{
+			name:      "literal exact match, namespace is ignored",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "cattle-system"},
+			namespace: "cattle-system",
+			want:      true,
+		},
+		{
+			name:      "literal, no match",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "cattle-system"},
+			namespace: "kube-system",
+			want:      false,
+		},
+		{
+			name:      "multiple literals, one matches",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "kube-system,cattle-system,cattle-fleet-system"},
+			namespace: "cattle-system",
+			want:      true,
+		},
+		{
+			name:      "multiple literals, none match",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "kube-system,cattle-fleet-system"},
+			namespace: "cattle-system",
+			want:      false,
+		},
+		{
+			name:      "literal with surrounding whitespace, trimmed and matches",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "kube-system, cattle-system"},
+			namespace: "cattle-system",
+			want:      true,
+		},
+		{
+			name:      "regex with wildcard matches namespace",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "cattle-.*"},
+			namespace: "cattle-system",
+			want:      true,
+		},
+		{
+			name:      "regex with wildcard does not match namespace",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "cattle-.*"},
+			namespace: "kube-system",
+			want:      false,
+		},
+		{
+			name:      "regex with wildcard matches one of multiple namespaces",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "kube-system,cattle-.*"},
+			namespace: "cattle-fleet-system",
+			want:      true,
+		},
+		{
+			name:      "regex matches prefix pattern",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "cattle-[a-z-]*"},
+			namespace: "cattle-monitoring-system",
+			want:      true,
+		},
+		{
+			name: "invalid regex containing asterisk, falls through to literal check, no match",
+			// "*cattle" starts with a quantifier, which is invalid in Go's regexp.
+			// The implementation logs a warning and skips the regex eval, then
+			// falls through to a trimmed literal comparison which also won't match.
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: "*cattle"},
+			namespace: "cattle-system",
+			want:      false,
+		},
+		{
+			name:      "empty annotation value, no match",
+			annos:     map[string]string{PSSIgnoreNamespacesAnnotation: ""},
+			namespace: "cattle-system",
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := secretIgnoresNamespace(tt.annos, tt.namespace)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func withSettings(t *testing.T, sdr, pullSecrets string) {
 	curSdr := settings.SystemDefaultRegistry.Get()
 	curSdrPull := settings.SystemDefaultRegistryPullSecrets.Get()

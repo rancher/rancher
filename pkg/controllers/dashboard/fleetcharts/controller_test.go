@@ -59,7 +59,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
+							"imagePullSecrets":      ([]v1.LocalObjectReference)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -113,7 +113,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
+							"imagePullSecrets":      ([]v1.LocalObjectReference)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -171,7 +171,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
+							"imagePullSecrets":      ([]v1.LocalObjectReference)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -229,7 +229,7 @@ bootstrap:
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-							"imagePullSecrets":      ([]string)(nil),
+							"imagePullSecrets":      ([]v1.LocalObjectReference)(nil),
 						},
 					},
 					"bootstrap": map[string]interface{}{
@@ -290,7 +290,7 @@ bootstrap:
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": "registry.example.com",
-							"imagePullSecrets":      []string{"pull-secret-a", "pull-secret-b"},
+							"imagePullSecrets":      []v1.LocalObjectReference{{Name: "pull-secret-a"}, {Name: "pull-secret-b"}},
 						},
 					},
 					"bootstrap": map[string]interface{}{

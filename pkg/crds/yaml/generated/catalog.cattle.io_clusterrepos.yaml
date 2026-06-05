@@ -97,6 +97,27 @@ spec:
                     description: Namespace is the namespace where the secret resides.
                     type: string
                 type: object
+              defaultImagePullSecrets:
+                description: |-
+                  DefaultImagePullSecrets specifies one or more image pull secrets which will be used by default
+                  when deploying charts from this repository. If a chart supports image pull secrets in its values.yaml
+                  in an expected path (.Values.ImagePullSecrets, .Values.global.ImagePullSecrets, or .Values.global.cattle.imagePullSecrets)
+                  the secrets listed in this field will be automatically copied into the charts release namespace. Additionally,
+                  Rancher will inject these secret references into the charts values.yaml if no user provided value is set.
+                  Currently, this field is only honored by the "rancher-charts" repository, and can only copy secrets from the
+                  cattle-system namespace which have the appropriate labels.
+                items:
+                  description: SecretReference references a Secret object which contains
+                    the credentials.
+                  properties:
+                    name:
+                      description: Name is the name of the secret.
+                      type: string
+                    namespace:
+                      description: Namespace is the namespace where the secret resides.
+                      type: string
+                  type: object
+                type: array
               disableSameOriginCheck:
                 description: |-
                   DisableSameOriginCheck if true attaches the Basic Auth Header to all Helm client API calls

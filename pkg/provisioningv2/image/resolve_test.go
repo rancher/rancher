@@ -431,7 +431,7 @@ func TestGetPrivateRepoSecretFromCluster(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			withGlobalRegistry(t, tt.globalRegistry)
 			withGlobalPullSecrets(t, tt.globalSecrets)
-			got := GetPrivateRepoSecretFromCluster(tt.cluster)
+			got, _ := GetPrivateRepoSecretFromCluster(tt.cluster)
 			assert.Equal(t, tt.expectedSecret, got)
 		})
 	}

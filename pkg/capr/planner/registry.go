@@ -28,8 +28,15 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 
 	GSDR := settings.SystemDefaultRegistry.Get()
 	foundExistingGSDRConfiguration := false
+	registryConfigs := map[string]rkev1.RegistryConfig{}
+	registryMirrors := map[string]rkev1.Mirror{}
 
-	for registryName, config := range controlPlane.Spec.Registries.Configs {
+	if controlPlane.Spec.Registries != nil {
+		registryConfigs = controlPlane.Spec.Registries.Configs
+		registryMirrors = controlPlane.Spec.Registries.Mirrors
+	}
+
+	for registryName, config := range registryConfigs {
 		if registryName == GSDR {
 			foundExistingGSDRConfiguration = true
 		}
@@ -85,7 +92,10 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 
 			username := string(secret.Data[rkev1.UsernameAuthConfigSecretKey])
 			password := string(secret.Data[rkev1.PasswordAuthConfigSecretKey])
-			auth := string(secret.Data[rkev1.AuthAuthConfigSecretKey])
+			// we need to re-encode the auth block for containerd to leverage it properly.
+			// The secret cache automatically decodes data values for us to make them easier to work with,
+			// but containerd will refuse to work with an unencoded auth block.
+			auth := base64.StdEncoding.EncodeToString(secret.Data[rkev1.AuthAuthConfigSecretKey])
 			identityToken := string(secret.Data[rkev1.IdentityTokenAuthConfigSecretKey])
 
 			// need to pull out the username, password, auth, from the .dockerconfigjson key
@@ -160,7 +170,7 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 	}
 
 	data.registriesFileRaw, err = json.Marshal(map[string]interface{}{
-		"mirrors": controlPlane.Spec.Registries.Mirrors,
+		"mirrors": registryMirrors,
 		"configs": configs,
 	})
 	if err != nil {
