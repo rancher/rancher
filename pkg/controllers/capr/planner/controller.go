@@ -163,14 +163,14 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	if beacon.Labels == nil {
 		beacon = beacon.DeepCopy()
 		beacon.Labels = map[string]string{}
-		beacon.Labels[planv1alpha1.OwnerLabel] = PlannerOwnerKey
+		beacon.Labels[planv1alpha1.BeaconOwnerLabel] = PlannerOwnerKey
 		beacon, err = h.beacons.Update(beacon)
 		if err != nil {
 			return status, err
 		}
-	} else if owner, ok := beacon.Labels[planv1alpha1.OwnerLabel]; !ok || owner == "" {
+	} else if owner, ok := beacon.Labels[planv1alpha1.BeaconOwnerLabel]; !ok || owner == "" {
 		beacon = beacon.DeepCopy()
-		beacon.Labels[planv1alpha1.OwnerLabel] = PlannerOwnerKey
+		beacon.Labels[planv1alpha1.BeaconOwnerLabel] = PlannerOwnerKey
 		beacon, err = h.beacons.Update(beacon)
 		if err != nil {
 			return status, err
@@ -244,7 +244,7 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
 
 	beacon = beacon.DeepCopy()
-	delete(beacon.Labels, planv1alpha1.OwnerLabel)
+	delete(beacon.Labels, planv1alpha1.BeaconOwnerLabel)
 	_, err = h.beacons.Update(beacon)
 	if err != nil {
 		return status, err
