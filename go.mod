@@ -117,7 +117,7 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.14.2
 	github.com/rancher/ali-operator v1.14.1
-	github.com/rancher/apiserver v0.8.6
+	github.com/rancher/apiserver v0.8.7
 	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
 	github.com/rancher/dynamiclistener v0.8.2
 	github.com/rancher/eks-operator v1.14.2
@@ -128,13 +128,13 @@ require (
 	github.com/rancher/lasso v0.2.8
 	github.com/rancher/machine v0.15.0-rancher142
 	github.com/rancher/muchang v0.1.0
-	github.com/rancher/norman v0.8.7
+	github.com/rancher/norman v0.8.8
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.7.2
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20260528164738-9dd51ca067d1
-	github.com/rancher/steve v0.8.24
+	github.com/rancher/steve v0.8.25
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.6.0
@@ -150,7 +150,7 @@ require (
 	golang.org/x/net v0.53.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/text v0.36.0
+	golang.org/x/text v0.37.0
 	google.golang.org/api v0.275.0
 	google.golang.org/grpc v1.80.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
