@@ -6,7 +6,7 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.20.1
   labels:
     auth.cattle.io/cluster-indexed: "true"
-  name: ETCDSnapshotRestores.operation.cattle.io
+  name: etcdsnapshotrestores.operation.cattle.io
 spec:
   group: operation.cattle.io
   names:
@@ -14,7 +14,7 @@ spec:
     - operations
     kind: ETCDSnapshotRestore
     listKind: ETCDSnapshotRestoreList
-    plural: ETCDSnapshotRestores
+    plural: etcdsnapshotrestores
     singular: etcdsnapshotrestore
   scope: Namespaced
   versions:
