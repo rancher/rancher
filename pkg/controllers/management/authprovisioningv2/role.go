@@ -52,31 +52,40 @@ func (h *handler) initializeCRDs(crdClient apiextcontrollers.CustomResourceDefin
 	return nil
 }
 
-// crdToResourceMatch returns the first served and not deprecated version of the CRD as a resourceMatch,
-// or nil if there are no served versions or the CRD is not valid
+// crdToResourceMatch returns the first served non-deprecated version of the CRD as a resourceMatch.
+// If none exists, it falls back to the first served deprecated version.
+// It returns nil if there are no served versions or the CRD is not valid.
 func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 	if crd.Status.AcceptedNames.Kind == "" || len(crd.Spec.Versions) == 0 {
 		logrus.Debugf("[authprovisioningv2] CRD %s does not have any versions or accepted names, skipping", crd.Name)
 		return nil
 	}
 
-	version := crd.Spec.Versions[0]
-
+	versionName := ""
 	for _, ver := range crd.Spec.Versions {
 		if !ver.Deprecated && ver.Served {
-			version = ver
+			versionName = ver.Name
 			break
 		}
 	}
 
-	if !version.Served {
+	if versionName == "" {
+		for _, ver := range crd.Spec.Versions {
+			if ver.Served {
+				versionName = ver.Name
+				break
+			}
+		}
+	}
+
+	if versionName == "" {
 		logrus.Debugf("[authprovisioningv2] CRD %s does not have served version, skipping", crd.Name)
 		return nil
 	}
 
 	gvk := schema.GroupVersionKind{
 		Group:   crd.Spec.Group,
-		Version: version.Name,
+		Version: versionName,
 		Kind:    crd.Status.AcceptedNames.Kind,
 	}
 

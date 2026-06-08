@@ -421,7 +421,7 @@ func Test_crdToResourceMatch(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "nil when no served non-deprecated and fallback version is not served",
+			name: "falls back to served deprecated when no served non-deprecated exists",
 			crd: &apiextv1.CustomResourceDefinition{
 				Spec: apiextv1.CustomResourceDefinitionSpec{
 					Group: "example.io",
@@ -437,7 +437,14 @@ func Test_crdToResourceMatch(t *testing.T) {
 					},
 				},
 			},
-			want: nil,
+			want: &resourceMatch{
+				GVK: schema.GroupVersionKind{
+					Group:   "example.io",
+					Version: "v1beta1",
+					Kind:    "Example",
+				},
+				Resource: "examples",
+			},
 		},
 		{
 			name: "falls back to first version when no served non-deprecated exists and first is served",
