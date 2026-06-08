@@ -767,20 +767,6 @@ func (l *globalRoleBindingLifecycle) purgeInvalidInheritedRoleBindingsInCluster(
 
 // deleteInheritedNamespacedRoleBindings removes all RoleBindings in downstream clusters that are owned by this GlobalRoleBinding
 func (l *globalRoleBindingLifecycle) deleteInheritedNamespacedRoleBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
-	gr, err := l.grLister.Get(globalRoleBinding.GlobalRoleName)
-	if err != nil || gr == nil {
-		// If we can't get the GlobalRole, we can't determine what to clean up
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("couldn't get global role %s: %w", globalRoleBinding.GlobalRoleName, err)
-		}
-		logrus.Warnf("[%v] GlobalRole %s not found during cleanup of GlobalRoleBinding %s", grbController, globalRoleBinding.GlobalRoleName, globalRoleBinding.Name)
-		return nil
-	}
-	// If there are no InheritedNamespacedRules, nothing to do
-	if len(gr.InheritedNamespacedRules) == 0 {
-		return nil
-	}
-
 	var returnError error
 	grbName := wrangler.SafeConcatName(globalRoleBinding.Name)
 
