@@ -41,6 +41,9 @@ func (a *stubAdapter) RenderProbes(_ *corev1.Secret) (map[string]rkeplan.Probe, 
 }
 func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectlPath }
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
+func (a *stubAdapter) ElectLeader(_ ops.LeaderRole, _ string) (*corev1.Secret, error) {
+	return nil, nil
+}
 
 func newTestScope(adapter *stubAdapter, uid types.UID) *scope {
 	cluster := &unstructured.Unstructured{}

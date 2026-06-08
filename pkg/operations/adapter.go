@@ -127,6 +127,9 @@ type Adapter interface {
 	// all expected nodes.
 	WaitForRegister() (bool, error)
 
+	// Pause edits the related cluster object to indicate it should not be reconciled (if supported, mostly relevant for CAPI).
+	PauseCluster(pause bool) error
+
 	// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
 	RuntimeCommand() string
 

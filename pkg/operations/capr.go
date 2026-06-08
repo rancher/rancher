@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -312,26 +313,6 @@ func (a *CAPRAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation str
 	})
 }
 
-// PauseCluster sets spec.paused on the owning CAPI cluster.
-func (a *CAPRAdapter) PauseCluster(paused bool) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cluster, err := capr.GetOwnerCAPICluster(a.controlPlane, a.clients.CAPI.Cluster().Cache())
-		if err != nil {
-			return err
-		}
-		if cluster == nil {
-			return fmt.Errorf("CAPI cluster does not exist for %s/%s", a.controlPlane.Namespace, a.controlPlane.Name)
-		}
-		cluster = cluster.DeepCopy()
-		if cluster.Spec.Paused != nil && *cluster.Spec.Paused == paused {
-			return nil
-		}
-		cluster.Spec.Paused = &paused
-		_, err = a.clients.CAPI.Cluster().Update(cluster)
-		return err
-	})
-}
-
 // Note: most of this functionally has been copied from the planner 1:1.
 // The intention is to split 100% of the planner code to both the plan package and the operations package.
 // This will ideally be performed before 2.15 is released; however, migrating piecemeal provides us with the flexibility
@@ -503,4 +484,18 @@ func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
 		return "/etc/rancher/k3s/k3s.yaml"
 	}
 	return "/etc/rancher/rke2/rke2.yaml"
+}
+
+func (a *CAPRAdapter) PauseCluster(pause bool) error {
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return err
+	}
+	if ptr.Equal(cluster.Spec.Paused, &pause) {
+		return nil
+	}
+	cluster = cluster.DeepCopy()
+	cluster.Spec.Paused = &pause
+	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
 }

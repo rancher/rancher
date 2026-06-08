@@ -306,6 +306,13 @@ func etcdRestoreScriptPath(s *scope, secret *corev1.Secret, name string) string 
 	return path.Join(s.adapter.ProvisioningDataDirectory(secret), etcdRestoreBinSubdir, name)
 }
 
+// nonWindowsSecret returns true for any secret whose cattle.io/os label is not "windows". Imported
+// clusters do not set this label at all; treating absent label as non-Windows keeps the shutdown
+// and restart paths from no-oping on them.
+func nonWindowsSecret(secret *corev1.Secret) bool {
+	return secret != nil && secret.Labels[capr.CattleOSLabel] != capr.WindowsMachineOS
+}
+
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 	if err != nil {
@@ -516,17 +523,8 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(
-			planapi.And(
-				planapi.Label(capr.EtcdRoleLabel, "true"),
-				planapi.Label(capr.InitNodeLabel, "true"))).
-		WithSorter(planapi.DefaultSorter()).
-		WithValidator(planapi.AtLeast(1, "")).
-		Collect()
-	if planapi.IsTransient(err) {
-		return status, err
-	} else if err != nil {
+	secret, err := s.adapter.ElectLeader(ops.LeaderRoleEtcd, s.namespace)
+	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -537,19 +535,17 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	if len(secrets) == 0 {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no etcd nodes found for restore", s.op.Namespace, s.op.Name)
+	if secret == nil {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, "no etcd nodes found for restore")
+		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for restore")
 
 		return status, nil
 	}
-
-	secret := secrets[0]
 
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	value := s.idempotencyValue()
@@ -684,7 +680,17 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 	value := s.idempotencyValue()
 	waitScriptPath := etcdRestoreScriptPath(s, secret, waitForPodListScriptName)
 
+	// After `--cluster-reset` the distro process exits — it's a one-shot mode — so we need to
+	// bring the service back up before waiting for the apiserver. systemctl start is a no-op when
+	// the service is already running, so this is safe on retries.
+	unit := s.adapter.ServerUnit()
+	if secret.Labels[capr.EtcdRoleLabel] != "true" && secret.Labels[capr.ControlPlaneRoleLabel] != "true" {
+		unit = s.adapter.RuntimeCommand() + "-agent"
+	}
+
 	instructions := []planapi.OneTimeInstruction{
+		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/post-restore-start-service", value, "systemctl",
+			[]string{"start", unit}, nil),
 		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/wait-for-api-server", value, "/bin/sh",
 			[]string{
 				"-x",
@@ -922,15 +928,8 @@ func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSec
 func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling post-restore node cleanup", s.op.Namespace, s.op.Name)
 
-	initSecrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(planapi.And(
-			planapi.Label(capr.EtcdRoleLabel, "true"),
-			planapi.Label(capr.InitNodeLabel, "true"))).
-		WithSorter(planapi.DefaultSorter()).
-		Collect()
-	if planapi.IsTransient(err) {
-		return status, err
-	} else if err != nil {
+	initSecret, err := s.adapter.ElectLeader(ops.LeaderRoleEtcd, s.namespace)
+	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -941,12 +940,11 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	if len(initSecrets) == 0 {
-		logrus.Warnf("[etcdsnapshotrestore] %s/%s: no init node found for node cleanup, skipping", s.op.Namespace, s.op.Name)
+	if initSecret == nil {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for node cleanup, skipping", s.op.Namespace, s.op.Name)
 		status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepRestartCluster)
 		return status, nil
 	}
-	initSecret := initSecrets[0]
 
 	allSecrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithSorter(planapi.DefaultSorter()).
