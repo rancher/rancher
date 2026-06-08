@@ -14,6 +14,7 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,6 +64,7 @@ const (
 	failedToDeleteClusterMembershipBinding                           = "FailedToDeleteClusterMembershipBinding"
 	failedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace      = "FailedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace"
 	failedToDeleteAuthV2Permissions                                  = "FailedToDeleteAuthV2Permissions"
+	failedToRevokeManagementPlanePrivileges                          = "FailedToRevokeManagementPlanePrivileges"
 )
 
 var clusterManagementPlaneResources = map[string]string{
@@ -118,6 +120,18 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	if err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj); err != nil {
 		c.s.AddCondition(&obj.Status.LocalConditions, condition, failedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace, err)
 		return nil, errors.Join(err, c.updateStatus(obj, obj.Status.LocalConditions))
+	}
+
+	// Clean up CRT token reader RoleBinding
+	subject, err := pkgrbac.BuildSubjectFromRTB(obj)
+	if err != nil {
+		logrus.Warnf("[%v] Failed to build subject for cleanup of CRT token reader RoleBinding: %v", ctrbMGMTController, err)
+	} else {
+		if err := c.removeCRTTokenReaderRoleBinding(obj, subject); err != nil {
+			logrus.Warnf("[%v] Failed to remove CRT token reader RoleBinding during deletion of %s: %v",
+				ctrbMGMTController, obj.Name, err)
+			// Don't fail deletion for cleanup errors - owner references will GC it anyway
+		}
 	}
 
 	if err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj); err != nil {
@@ -227,6 +241,29 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 
+	// Check if RoleTemplate grants CRT access, and if so, grant access to CRT token secrets
+	grantsCRT, err := c.mgr.checkIfRoleTemplateGrantsCRTAccess(binding.RoleTemplateName)
+	if err != nil {
+		c.s.AddCondition(localConditions, condition, failedToCheckReferencedRole, err)
+		return err
+	}
+
+	if grantsCRT {
+		if err := c.ensureCRTTokenReaderRoleBinding(binding, subject); err != nil {
+			c.s.AddCondition(localConditions, condition, failedToGrantManagementPlanePrivileges, err)
+			return err
+		}
+	} else {
+		// Role doesn't grant CRT access - ensure RoleBinding is removed if it exists
+		// (handles case where RoleTemplate was updated to remove CRT permissions)
+		// Unlike the CRTB deletion path, the CRTB is still alive here so owner reference GC
+		// will not clean this up - we must return the error to trigger a re-enqueue.
+		if err := c.removeCRTTokenReaderRoleBinding(binding, subject); err != nil {
+			c.s.AddCondition(localConditions, condition, failedToRevokeManagementPlanePrivileges, err)
+			return err
+		}
+	}
+
 	projects, err := c.projectLister.List(binding.Namespace, labels.Everything())
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToListProjects, err)
@@ -267,6 +304,131 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// grantsCRTAccessFromRoleTemplate checks if a RoleTemplate grants read/create access
+// to clusterregistrationtokens. Handles both External and non-External RoleTemplates.
+func grantsCRTAccessFromRoleTemplate(rt *v3.RoleTemplate, crLister typesrbacv1.ClusterRoleLister) bool {
+	readOrCreateVerbs := map[string]bool{
+		"get": true, "list": true, "watch": true, "create": true, "*": true,
+	}
+
+	var rules []v1.PolicyRule
+	if rt.External {
+		if rt.ExternalRules != nil {
+			rules = rt.ExternalRules
+		} else {
+			externalRole, err := crLister.Get("", rt.Name)
+			if err != nil || externalRole == nil {
+				return false
+			}
+			rules = externalRole.Rules
+		}
+	} else {
+		rules = rt.Rules
+	}
+
+	for _, rule := range rules {
+		hasCRTResource := false
+		hasManagementAPI := false
+		hasReadOrCreate := false
+
+		for _, resource := range rule.Resources {
+			if resource == "clusterregistrationtokens" || resource == "*" {
+				hasCRTResource = true
+				break
+			}
+		}
+		if !hasCRTResource {
+			continue
+		}
+
+		for _, apiGroup := range rule.APIGroups {
+			if apiGroup == "management.cattle.io" || apiGroup == "*" {
+				hasManagementAPI = true
+				break
+			}
+		}
+		if !hasManagementAPI {
+			continue
+		}
+
+		for _, verb := range rule.Verbs {
+			if readOrCreateVerbs[verb] {
+				hasReadOrCreate = true
+				break
+			}
+		}
+
+		if hasReadOrCreate {
+			return true
+		}
+	}
+	return false
+}
+
+// ensureCRTTokenReaderRoleBinding ensures RoleBinding to crt-token-reader exists
+func (c *crtbLifecycle) ensureCRTTokenReaderRoleBinding(binding *v3.ClusterRoleTemplateBinding, subject v1.Subject) error {
+	roleRef := v1.RoleRef{Kind: "Role", Name: "crt-token-reader", APIGroup: "rbac.authorization.k8s.io"}
+	rbName := pkgrbac.NameForRoleBinding(binding.Namespace, roleRef, subject)
+
+	// Check if already exists
+	existing, err := c.rbLister.Get(binding.Namespace, rbName)
+	if err == nil {
+		// Already exists - verify it's correct
+		if len(existing.Subjects) == 1 &&
+			existing.Subjects[0] == subject &&
+			existing.RoleRef.Name == "crt-token-reader" {
+			return nil
+		}
+
+		// Exists but incorrect - update
+		updated := existing.DeepCopy()
+		updated.Subjects = []v1.Subject{subject}
+		updated.RoleRef = roleRef
+		_, err = c.rbClient.Update(updated)
+		return err
+	}
+
+	if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Create new RoleBinding
+	rb := &v1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: binding.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "ClusterRoleTemplateBinding",
+					Name:       binding.Name,
+					UID:        binding.UID,
+				},
+			},
+		},
+		Subjects: []v1.Subject{subject},
+		RoleRef:  roleRef,
+	}
+
+	_, err = c.rbClient.Create(rb)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+// removeCRTTokenReaderRoleBinding deletes the RoleBinding to crt-token-reader if it exists
+func (c *crtbLifecycle) removeCRTTokenReaderRoleBinding(binding *v3.ClusterRoleTemplateBinding, subject v1.Subject) error {
+	roleRef := v1.RoleRef{Kind: "Role", Name: "crt-token-reader", APIGroup: "rbac.authorization.k8s.io"}
+	rbName := pkgrbac.NameForRoleBinding(binding.Namespace, roleRef, subject)
+
+	err := c.rbClient.DeleteNamespaced(binding.Namespace, rbName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
 	}
 	return nil
 }
