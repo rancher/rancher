@@ -216,7 +216,6 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 		labels[capr.WorkerRoleLabel] = "true"
 	}
 
-
 	cluster, err := h.mgmtClusterCache.Get(secret.Namespace)
 	if err != nil {
 		return nil, err

@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -537,7 +536,7 @@ func (h *handler) getSnapshotsFromSnapshotFile(cluster *unstructured.Unstructure
 	if namespace == "" {
 		namespace = cluster.GetName()
 	}
-	snapshots, err := h.etcdSnapshotCache.GetByIndex(cluster2.ByETCDSnapshotName, fmt.Sprintf("%s/%s/%s", namespace, cluster.GetName(), snapshotFile.Name))
+	snapshots, err := h.etcdSnapshotCache.GetByIndex(provcluster.ByETCDSnapshotName, fmt.Sprintf("%s/%s/%s", namespace, cluster.GetName(), snapshotFile.Name))
 	if err != nil {
 		return nil, err
 	}
@@ -576,10 +575,7 @@ func (h *handler) hasMachineLifecycleLabels(upstream *rkev1.ETCDSnapshot) bool {
 		return false
 	}
 	name := upstream.Labels[planv1alpha1.MachineLifecycleName]
-	if name == "" {
-		return false
-	}
-	return true
+	return name != ""
 }
 
 func MachineLifecycleLabelsToObjectReference(obj metav1.Object) (*corev1.ObjectReference, error) {
