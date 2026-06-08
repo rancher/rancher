@@ -16,11 +16,11 @@ import (
 	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
 	k3scontrollers "github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -29,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,18 +74,31 @@ type handler struct {
 func Register(ctx context.Context, userContext *config.UserContext, cluster *apimgmtv3.Cluster) {
 	logrus.Debugf("[snapshotbackpopulate] Registering controller for cluster %s", userContext.ClusterName)
 	h := handler{
+		dynamic:                    userContext.Management.Wrangler.Dynamic,
 		etcdSnapshotCache:          userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
 		etcdSnapshotController:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
 		nodeCache:                  userContext.Corew.Node().Cache(),
 		etcdSnapshotFileController: userContext.K3s.V1().ETCDSnapshotFile(),
 		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
 	}
+
+	// todo: find a better way to do this
 	if cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+		provCluster, err := userContext.Management.Wrangler.Provisioning.Cluster().Cache().GetByIndex(provcluster.ByCluster, cluster.Name)
+		if err != nil {
+			logrus.Errorf("error getting provisioning cluster %s: %v", cluster.Name, err)
+			return
+		}
+		if len(provCluster) != 1 {
+			logrus.Errorf("expected 1 provisioning cluster for cluster %s, got %d", cluster.Name, len(provCluster))
+			return
+		}
+		// get provisioning cluster
 		h.clusterRef = corev1.ObjectReference{
-			APIVersion: provv1.SchemeGroupVersion.String(),
-			Kind:       provv1.Kind("Cluster").Kind,
-			Namespace:  cluster.Namespace,
-			Name:       cluster.Name,
+			APIVersion: provCluster[0].APIVersion,
+			Kind:       provCluster[0].Kind,
+			Namespace:  provCluster[0].GetNamespace(),
+			Name:       provCluster[0].GetName(),
 		}
 	} else {
 		h.clusterRef = corev1.ObjectReference{
@@ -454,12 +468,25 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 				return nil, err
 			}
 
+			o, err := h.dynamic.Get(ref.GroupVersionKind(), ref.Namespace, ref.Name)
+			if err != nil {
+				logrus.Errorf("error getting node %s for snapshot %s/%s: %v", downstream.Spec.NodeName, namespace, snapshotName, err)
+				return nil, err
+			}
+
+			metaObj, err := meta.Accessor(o)
+			if err != nil {
+				logrus.Errorf("error getting node %s for snapshot %s/%s: %v", downstream.Spec.NodeName, namespace, snapshotName, err)
+				return nil, err
+			}
+
 			// set owner reference to local cluster machine representation
 			upstream.OwnerReferences = []metav1.OwnerReference{
 				{
 					APIVersion: ref.APIVersion,
 					Kind:       ref.Kind,
 					Name:       ref.Name,
+					UID:        metaObj.GetUID(),
 				},
 			}
 		}
@@ -470,6 +497,7 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 				APIVersion: cluster.GetAPIVersion(),
 				Kind:       cluster.GetKind(),
 				Name:       cluster.GetName(),
+				UID:        cluster.GetUID(),
 			},
 		}
 		upstream.SnapshotFile.S3 = &rkev1.ETCDSnapshotS3{
@@ -555,34 +583,39 @@ func (h *handler) hasMachineLifecycleLabels(upstream *rkev1.ETCDSnapshot) bool {
 }
 
 func MachineLifecycleLabelsToObjectReference(obj metav1.Object) (*corev1.ObjectReference, error) {
+	prefix := fmt.Sprintf("object %s", obj.GetName())
+	if obj.GetNamespace() != "" {
+		prefix = fmt.Sprintf("object %s/%s", obj.GetNamespace(), obj.GetName())
+	}
+
 	labels := obj.GetLabels()
 	if labels == nil {
-		return nil, fmt.Errorf("object %s/%s has no labels", obj.GetNamespace(), obj.GetName())
+		return nil, fmt.Errorf("%s has no labels", prefix)
 	}
 
 	group := labels[planv1alpha1.MachineLifecycleGroup]
 	if group == "" {
-		return nil, fmt.Errorf("object %s/%s has no group label", obj.GetNamespace(), obj.GetName())
+		return nil, fmt.Errorf("%s has no group label", prefix)
 	}
 
 	version := labels[planv1alpha1.MachineLifecycleVersion]
 	if version == "" {
-		return nil, fmt.Errorf("object %s/%s has no version label", obj.GetNamespace(), obj.GetName())
+		return nil, fmt.Errorf("%s has no version label", prefix)
 	}
 
 	kind := labels[planv1alpha1.MachineLifecycleKind]
 	if kind == "" {
-		return nil, fmt.Errorf("object %s/%s has no kind label", obj.GetNamespace(), obj.GetName())
+		return nil, fmt.Errorf("%s has no kind label", prefix)
 	}
 
 	namespace := labels[planv1alpha1.MachineLifecycleNamespace]
 	if namespace == "" {
-		return nil, fmt.Errorf("object %s/%s has no namespace label", obj.GetNamespace(), obj.GetName())
+		return nil, fmt.Errorf("%s has no namespace label", prefix)
 	}
 
 	name := labels[planv1alpha1.MachineLifecycleName]
 	if name == "" {
-		return nil, fmt.Errorf("object %s/%s has no name label", obj.GetNamespace(), obj.GetName())
+		return nil, fmt.Errorf("%s has no name label", prefix)
 	}
 
 	gvr := schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
