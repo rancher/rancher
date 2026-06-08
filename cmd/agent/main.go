@@ -20,7 +20,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
@@ -325,7 +325,7 @@ func exitCertWriter(ctx context.Context) {
 
 	args := filters.NewArgs()
 	args.Add("label", "io.rancher.rke.container.name=share-mnt")
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+	containers, err := c.ContainerList(ctx, container.ListOptions{
 		All:     true,
 		Filters: args,
 	})
