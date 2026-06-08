@@ -210,6 +210,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		go adunmigration.UnmigrateAdGUIDUsersOnce(m.ScaledContext)
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(m.ScaledContext, management)
+		managementdata.RefreshGitHubAppUsersOnce(ctx, m.wranglerContext.Mgmt.AuthConfig())
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
 		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)

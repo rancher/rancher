@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.1
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: clusterrepos.catalog.cattle.io
 spec:
   group: catalog.cattle.io
@@ -97,6 +97,27 @@ spec:
                     description: Namespace is the namespace where the secret resides.
                     type: string
                 type: object
+              defaultImagePullSecrets:
+                description: |-
+                  DefaultImagePullSecrets specifies one or more image pull secrets which will be used by default
+                  when deploying charts from this repository. If a chart supports image pull secrets in its values.yaml
+                  in an expected path (.Values.ImagePullSecrets, .Values.global.ImagePullSecrets, or .Values.global.cattle.imagePullSecrets)
+                  the secrets listed in this field will be automatically copied into the charts release namespace. Additionally,
+                  Rancher will inject these secret references into the charts values.yaml if no user provided value is set.
+                  Currently, this field is only honored by the "rancher-charts" repository, and can only copy secrets from the
+                  cattle-system namespace which have the appropriate labels.
+                items:
+                  description: SecretReference references a Secret object which contains
+                    the credentials.
+                  properties:
+                    name:
+                      description: Name is the name of the secret.
+                      type: string
+                    namespace:
+                      description: Namespace is the namespace where the secret resides.
+                      type: string
+                  type: object
+                type: array
               disableSameOriginCheck:
                 description: |-
                   DisableSameOriginCheck if true attaches the Basic Auth Header to all Helm client API calls
@@ -145,8 +166,9 @@ spec:
                   Defaults is false. Enabling this is not recommended for production due to the security implications.
                 type: boolean
               refreshInterval:
-                description: RefreshInterval is the interval at which the Helm repository
-                  should be refreshed.
+                description: |-
+                  RefreshInterval is the interval, in seconds, at which the Helm repository should be refreshed.
+                  Default value is 1 hour. Using a negative value disables periodic updates completely.
                 type: integer
               serviceAccount:
                 description: |-

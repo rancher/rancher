@@ -508,3 +508,55 @@ func TestGetNodeCount(t *testing.T) {
 		})
 	}
 }
+
+func TestGetKubernetesProvider(t *testing.T) {
+	h := &handler{}
+
+	tests := []struct {
+		name                   string
+		cluster                *v3.Cluster
+		provisioningClusterRef *corev1.ObjectReference
+		kubernetesVersion      string
+		want                   string
+	}{
+		{
+			name:                   "v2prov rke2 cluster",
+			cluster:                &v3.Cluster{},
+			provisioningClusterRef: &corev1.ObjectReference{Name: "test-cluster", Namespace: "fleet-default"},
+			kubernetesVersion:      "v1.28.10+rke2r1",
+			want:                   "rke2",
+		},
+		{
+			name:                   "v2prov k3s cluster",
+			cluster:                &v3.Cluster{},
+			provisioningClusterRef: &corev1.ObjectReference{Name: "test-cluster", Namespace: "fleet-default"},
+			kubernetesVersion:      "v1.28.10+k3s1",
+			want:                   "k3s",
+		},
+		{
+			name:                   "non-v2prov cluster does not set provider early",
+			cluster:                &v3.Cluster{},
+			provisioningClusterRef: nil,
+			kubernetesVersion:      "v1.28.10+rke2r1",
+			want:                   "",
+		},
+		{
+			name: "already set provider is preserved",
+			cluster: &v3.Cluster{
+				Status: v3.ClusterStatus{
+					Provider: "harvester",
+				},
+			},
+			provisioningClusterRef: &corev1.ObjectReference{Name: "test-cluster", Namespace: "fleet-default"},
+			kubernetesVersion:      "v1.28.10+rke2r1",
+			want:                   "harvester",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := h.getKubernetesProvider(tt.cluster, tt.provisioningClusterRef, tt.kubernetesVersion)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

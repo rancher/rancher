@@ -28,6 +28,7 @@ func TestCRTBHandlerReconcileSubject(t *testing.T) {
 	type controllers struct {
 		userMGR        *userMocks.MockManager
 		userController *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]
+		crtbController *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
 	}
 	tests := []struct {
 		name             string
@@ -100,6 +101,9 @@ func TestCRTBHandlerReconcileSubject(t *testing.T) {
 				c.userMGR.EXPECT().EnsureUser("principal-name", "test-name").Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-user"},
 				}, nil)
+				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					return crtb, nil
+				})
 			},
 			wantedCondition: &reducedCondition{
 				reason: subjectExists,
@@ -147,6 +151,9 @@ func TestCRTBHandlerReconcileSubject(t *testing.T) {
 				c.userController.EXPECT().Get("test-user", metav1.GetOptions{}).Return(&v3.User{
 					PrincipalIDs: []string{"principal/test-user"},
 				}, nil)
+				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					return crtb, nil
+				})
 			},
 			wantedCondition: &reducedCondition{
 				reason: subjectExists,
@@ -183,6 +190,7 @@ func TestCRTBHandlerReconcileSubject(t *testing.T) {
 			controllers := controllers{
 				userMGR:        userMocks.NewMockManager(ctrl),
 				userController: fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl),
+				crtbController: fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl),
 			}
 
 			if tt.setupControllers != nil {
@@ -192,6 +200,7 @@ func TestCRTBHandlerReconcileSubject(t *testing.T) {
 				s:              status.NewStatus(),
 				userMGR:        controllers.userMGR,
 				userController: controllers.userController,
+				crtbClient:     controllers.crtbController,
 			}
 			localConditions := []metav1.Condition{}
 

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -1410,6 +1411,116 @@ func TestStoreCreate(t *testing.T) {
 	}
 }
 
+func TestSystemStoreCreateClusterScoped(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		authorizer authorizer.Authorizer
+		cluster    *v3.Cluster
+		clusterErr error
+		err        string
+	}{
+		{
+			name:       "nil authorizer returns error",
+			authorizer: nil,
+			cluster:    &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+			err:        "authorizer is required for cluster-scoped tokens",
+		},
+		{
+			name:       "cluster not found",
+			authorizer: nil,
+			clusterErr: apierrors.NewNotFound(GVR.GroupResource(), "c-m-missing"),
+			err:        "cluster c-m-missing not found",
+		},
+		{
+			name: "authorizer denies access",
+			authorizer: authorizer.AuthorizerFunc(func(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "denied", nil
+			}),
+			cluster: &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+			err:     "is not allowed to access cluster",
+		},
+		{
+			name: "authorizer allows access",
+			authorizer: authorizer.AuthorizerFunc(func(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			cluster: &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secrets.EXPECT().Cache().Return(scache)
+
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			users.EXPECT().Cache().Return(ucache)
+
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			nsCache.EXPECT().Get(TokenNamespace).AnyTimes()
+
+			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
+			ccache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+
+			timer := NewMocktimeHandler(ctrl)
+			hasher := NewMockhashHandler(ctrl)
+			auth := NewMockauthHandler(ctrl)
+
+			store := NewSystem(nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth, test.authorizer)
+
+			ucache.EXPECT().Get("world").Return(&v3.User{Enabled: ptr.To(true)}, nil)
+
+			auth.EXPECT().SessionID(gomock.Any()).Return("session-token", nil)
+			tcache.EXPECT().Get("session-token").Return(&v3.Token{
+				AuthProvider: "local",
+				UserPrincipal: v3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+				},
+			}, nil)
+
+			if test.clusterErr != nil {
+				ccache.EXPECT().Get("c-m-missing").Return(nil, test.clusterErr)
+			} else {
+				ccache.EXPECT().Get(test.cluster.Name).Return(test.cluster, nil)
+			}
+
+			if test.err == "" {
+				hasher.EXPECT().MakeAndHashSecret().Return("secretval", "hashval", nil)
+				timer.EXPECT().Now().Return("fake-now")
+
+				secrets.EXPECT().Create(gomock.Any()).Return(&properSecret, nil)
+			}
+
+			token := &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID:      "world",
+					ClusterName: "c-m-test",
+				},
+			}
+			if test.clusterErr != nil {
+				token.Spec.ClusterName = "c-m-missing"
+			}
+
+			userInfo := &mockUser{name: "world"}
+			_, err := store.Create(context.Background(), GVR.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
+
+			if test.err != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSystemStoreList(t *testing.T) {
 	tests := []struct {
 		name       string              // test name
@@ -2362,3 +2473,123 @@ func (w *mockWatch) ResultChan() <-chan watch.Event {
 }
 
 func (w *mockWatch) Stop() {}
+
+func TestSystemStoreListForProvider(t *testing.T) {
+	t.Parallel()
+
+	otherPrincipal := ext.TokenPrincipal{
+		Name:     "other-user",
+		Provider: "otherprovider",
+	}
+	otherPrincipalBytes, _ := json.Marshal(otherPrincipal)
+
+	otherSecret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "token-other",
+			Labels: map[string]string{
+				UserIDLabel:     "otheruser",
+				SecretKindLabel: SecretKindLabelValue,
+			},
+			UID: "other-uid",
+		},
+		Data: map[string][]byte{
+			FieldDescription:    []byte(""),
+			FieldEnabled:        []byte("true"),
+			FieldHash:           []byte("otherhash"),
+			FieldKind:           []byte(IsLogin),
+			FieldLastUpdateTime: []byte("14:00:00"),
+			FieldPrincipal:      otherPrincipalBytes,
+			FieldTTL:            []byte("5000"),
+			FieldUID:            []byte("other-kube-uid"),
+			FieldUserID:         []byte("otheruser"),
+		},
+	}
+
+	tests := []struct {
+		name       string
+		provider   string
+		err        error
+		wantCount  int
+		storeSetup func(scache *fake.MockCacheInterface[*corev1.Secret])
+	}{
+		{
+			name:     "cache error propagates",
+			provider: "somebody",
+			err:      apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider somebody: %w", errSomeError)),
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(nil, errSomeError)
+			},
+		},
+		{
+			name:      "empty result",
+			provider:  "somebody",
+			wantCount: 0,
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(nil, nil)
+			},
+		},
+		{
+			name:      "returns only matching provider",
+			provider:  "somebody",
+			wantCount: 1,
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return([]*corev1.Secret{&properSecret, &otherSecret}, nil)
+			},
+		},
+		{
+			name:      "no match returns empty",
+			provider:  "nonexistent",
+			wantCount: 0,
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return([]*corev1.Secret{&properSecret, &otherSecret}, nil)
+			},
+		},
+		{
+			name:      "skips broken secrets",
+			provider:  "somebody",
+			wantCount: 1,
+			storeSetup: func(scache *fake.MockCacheInterface[*corev1.Secret]) {
+				scache.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return([]*corev1.Secret{&properSecret, &badSecret}, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+
+			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+			tt.storeSetup(scache)
+
+			toks, err := store.ListForProvider(tt.provider)
+			if tt.err != nil {
+				assert.Equal(t, tt.err, err)
+				assert.Nil(t, toks)
+			} else {
+				require.NoError(t, err)
+				assert.Len(t, toks.Items, tt.wantCount)
+				for _, tok := range toks.Items {
+					assert.Equal(t, tt.provider, tok.Spec.UserPrincipal.Provider)
+				}
+			}
+		})
+	}
+}

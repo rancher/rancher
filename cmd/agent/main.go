@@ -56,12 +56,7 @@ func main() {
 
 	initFeatures()
 
-	// The cleanup is only performed by the cattle-cluster-agent,
-	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
-	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
-		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
-		go clean.UnusedCattleCredentials()
-	}
+	runCleanup(ctx)
 
 	if os.Getenv("CLUSTER_CLEANUP") == "true" {
 		err = clean.Cluster()
@@ -93,6 +88,17 @@ func getParams() (map[string]interface{}, error) {
 
 func getTokenAndURL() (string, string, error) {
 	return cluster.TokenAndURL()
+}
+
+func runCleanup(ctx context.Context) {
+	// The cleanup is only performed by the cattle-cluster-agent,
+	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
+	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
+		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
+		go clean.UnusedCattleCredentials()
+		// Run once on startup to make sure that there are no lingering pull secrets in the cattle-system namespace
+		go clean.UnusedPullSecrets(ctx)
+	}
 }
 
 func isConnect() bool {
@@ -142,10 +148,8 @@ func run(ctx context.Context) error {
 	topContext = context.WithValue(topContext, cavalidator.CACertsValidKey, false)
 
 	// Perform root CA verification
-	var transport *http.Transport
 	systemStoreConnectionCheckRequired := true
-	transport = rootCATransport()
-	if transport != nil {
+	if transport := rootCATransport(caFileLocation); transport != nil {
 		logrus.Infof("Testing connection to %s using trusted certificate authorities within: %s", server, caFileLocation)
 		var httpClient = &http.Client{
 			Timeout:   time.Second * 5,
@@ -160,6 +164,7 @@ func run(ctx context.Context) error {
 			topContext = context.WithValue(topContext, cavalidator.CACertsValidKey, true)
 			systemStoreConnectionCheckRequired = false
 		}
+		transport.CloseIdleConnections()
 	} else if cluster.CAStrictVerify() {
 		logrus.Errorf("Strict CA verification is enabled but encountered error finding root CA")
 		os.Exit(1)
@@ -376,21 +381,21 @@ func configureLogrus() {
 	}
 }
 
-// rootCATransport generates a http.Transport that contains the contents of the CA file as the Root CA for strict validation.
-func rootCATransport() *http.Transport {
-	caFile, err := os.ReadFile(caFileLocation)
+// rootCATransport returns a clone of http.DefaultTransport with a custom root CA for strict TLS validation.
+func rootCATransport(caFilePath string) *http.Transport {
+	caFile, err := os.ReadFile(caFilePath)
 	if err != nil {
-		logrus.Errorf("unable to read CA file from %s: %v", caFileLocation, err)
+		logrus.Errorf("unable to read CA file from %s: %v", caFilePath, err)
 		return nil
 	}
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(caFile); !ok {
-		logrus.Errorf("unable to parse CA file %s", caFileLocation)
+		logrus.Errorf("unable to parse CA file %s", caFilePath)
 		return nil
 	}
-	return &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
-		},
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: certPool,
 	}
+	return transport
 }

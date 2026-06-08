@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -100,6 +101,9 @@ func (p *fakeProvider) TransformToAuthProvider(map[string]interface{}) (map[stri
 	panic("not implemented")
 }
 
+func (p *fakeProvider) UsesUserSecrets() bool      { return false }
+func (p *fakeProvider) CanRefreshPrincipals() bool { return true }
+
 func (p *fakeProvider) RefetchGroupPrincipals(_, _ string) ([]v3.Principal, error) {
 	panic("not implemented")
 }
@@ -125,17 +129,14 @@ func (p *fakeProvider) CleanupResources(*v3.AuthConfig) error {
 
 func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	// This test cannot run in parallel.
-	existingProviders := providers.Providers
-	defer func() {
-		providers.Providers = existingProviders
-	}()
+	defer providers.SetProviders(nil)
 
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	now := time.Now()
 	userID := "u-abcdef"
@@ -207,7 +208,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 				common.UserAttributePrincipalID: {userPrincipalID},
 				common.UserAttributeUserName:    {user.Username},
 			},
-			providers.LocalProvider: {
+			local.Name: {
 				common.UserAttributePrincipalID: {"local://" + userID},
 				common.UserAttributeUserName:    {"local-user"},
 			},
@@ -636,17 +637,14 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 }
 
 func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
-	existingProviders := providers.Providers
-	defer func() {
-		providers.Providers = existingProviders
-	}()
+	defer providers.SetProviders(nil)
 
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	now := time.Now()
 	userID := "u-abcdef"
@@ -738,7 +736,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 				common.UserAttributePrincipalID: {userPrincipalID},
 				common.UserAttributeUserName:    {user.Username},
 			},
-			providers.LocalProvider: {
+			local.Name: {
 				common.UserAttributePrincipalID: {"local://" + userID},
 				common.UserAttributeUserName:    {"local-user"},
 			},
@@ -1199,9 +1197,8 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	// This test cannot run in parallel.
 	existingServerURL := settings.ServerURL.Get()
-	existingProviders := providers.Providers
 	t.Cleanup(func() {
-		providers.Providers = existingProviders
+		providers.SetProviders(nil)
 		_ = settings.ServerURL.Set(existingServerURL)
 	})
 	_ = settings.ServerURL.Set("https://rancher.example.com")
@@ -1215,9 +1212,9 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	userID := "u-abcdef"
 	userPrincipalID := "fake_user://12345"
@@ -1301,7 +1298,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 					common.UserAttributePrincipalID: {userPrincipalID},
 					common.UserAttributeUserName:    {user.Username},
 				},
-				providers.LocalProvider: {
+				local.Name: {
 					common.UserAttributePrincipalID: {"local://" + userID},
 					common.UserAttributeUserName:    {"local-user"},
 				},
@@ -1427,7 +1424,7 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 					common.UserAttributePrincipalID: {userPrincipalID},
 					common.UserAttributeUserName:    {user.Username},
 				},
-				providers.LocalProvider: {
+				local.Name: {
 					common.UserAttributePrincipalID: {"local://" + userID},
 					common.UserAttributeUserName:    {"local-user"},
 				},
@@ -1486,9 +1483,8 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	// This test cannot run in parallel.
 	existingServerURL := settings.ServerURL.Get()
-	existingProviders := providers.Providers
 	t.Cleanup(func() {
-		providers.Providers = existingProviders
+		providers.SetProviders(nil)
 		_ = settings.ServerURL.Set(existingServerURL)
 	})
 	_ = settings.ServerURL.Set("https://rancher.example.com")
@@ -1502,9 +1498,9 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	fakeProvider := &fakeProvider{
 		name: "fake",
 	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		fakeProvider.name: fakeProvider,
-	}
+	})
 
 	userID := "u-abcdef"
 	userPrincipalID := "fake_user://12345"
@@ -1587,7 +1583,7 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 				common.UserAttributePrincipalID: {userPrincipalID},
 				common.UserAttributeUserName:    {user.Username},
 			},
-			providers.LocalProvider: {
+			local.Name: {
 				common.UserAttributePrincipalID: {"local://" + userID},
 				common.UserAttributeUserName:    {"local-user"},
 			},

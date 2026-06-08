@@ -105,25 +105,26 @@ func TestHasLocalPrincipalID(t *testing.T) {
 	}
 }
 
-func TestCreate(t *testing.T) {
+func TestOnCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockUserManager := userMocks.NewMockManager(ctrl)
+	usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 
 	ul := &userLifecycle{
 		userManager: mockUserManager,
+		users:       usersMock,
 	}
 
 	tests := []struct {
 		name          string
 		inputUser     *v3.User
 		mockSetup     func()
-		expectedUser  *v3.User
 		expectedError bool
 	}{
 		{
-			name: "User without local principal IDs",
+			name: "user without local principal IDs",
 			inputUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
@@ -131,18 +132,18 @@ func TestCreate(t *testing.T) {
 				},
 				PrincipalIDs: []string{},
 			},
-			mockSetup: func() {},
-			expectedUser: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testuser",
-					Annotations: map[string]string{},
-				},
-				PrincipalIDs: []string{"local://testuser"},
+			mockSetup: func() {
+				usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.Contains(t, u.PrincipalIDs, "local://testuser")
+					assert.Contains(t, u.Finalizers, userLifecycleFinalizer)
+					assert.Equal(t, "true", u.Annotations[userLifecycleAnnotation])
+					return u, nil
+				})
 			},
 			expectedError: false,
 		},
 		{
-			name: "User with creatorID annotation and successful role binding",
+			name: "user with creatorID annotation and successful role binding",
 			inputUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
@@ -153,18 +154,17 @@ func TestCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(nil)
-			},
-			expectedUser: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "testuser",
-					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
-				},
-				PrincipalIDs: []string{"local://testuser"},
+				usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.Contains(t, u.PrincipalIDs, "local://testuser")
+					assert.Contains(t, u.Finalizers, userLifecycleFinalizer)
+					assert.Equal(t, "true", u.Annotations[userLifecycleAnnotation])
+					return u, nil
+				})
 			},
 			expectedError: false,
 		},
 		{
-			name: "User with creatorID annotation and role binding error",
+			name: "user with creatorID annotation and role binding error",
 			inputUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
@@ -175,7 +175,6 @@ func TestCreate(t *testing.T) {
 			mockSetup: func() {
 				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(fmt.Errorf("role binding error"))
 			},
-			expectedUser:  nil,
 			expectedError: true,
 		},
 	}
@@ -184,7 +183,7 @@ func TestCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockSetup()
 
-			_, err := ul.Create(tt.inputUser)
+			_, err := ul.onCreate(tt.inputUser)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -195,7 +194,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-func TestUpdated(t *testing.T) {
+func TestOnUpdate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	mockUserManager := userMocks.NewMockManager(ctrl)
@@ -580,7 +579,7 @@ func TestUpdated(t *testing.T) {
 				Users:   users,
 			}
 
-			_, err := ul.Updated(tt.inputUser)
+			_, err := ul.onUpdate(tt.inputUser)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -984,9 +983,8 @@ func TestDeleteUserSecret(t *testing.T) {
 	}
 }
 
-func TestRemoveLegacyFinalizers(t *testing.T) {
+func TestRemoveFinalizer(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	//usersMock := &managementFakes.UserInterfaceMock{}
 	usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 
 	ul := &userLifecycle{
@@ -1000,50 +998,54 @@ func TestRemoveLegacyFinalizers(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name: "no need to remove finalizers",
+			name: "removes lifecycle finalizer",
 			user: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "testuser",
 					Finalizers: []string{
 						"controller.cattle.io/test-finalizer",
-					},
-				},
-			},
-			mockSetup:     func() {},
-			expectedError: false,
-		},
-		{
-			name: "remove desired finalizer",
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "testuser",
-					Finalizers: []string{
-						"controller.cattle.io/test-finalizer",
-						"controller.cattle.io/cat-user-controller",
+						userLifecycleFinalizer,
 					},
 				},
 			},
 			mockSetup: func() {
-				usersMock.EXPECT().Update(gomock.Any()).Return(
-					&v3.User{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "testuser",
-							Finalizers: []string{
-								"controller.cattle.io/test-finalizer",
-							},
-						},
-					}, nil)
+				usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.NotContains(t, u.Finalizers, userLifecycleFinalizer)
+					assert.Contains(t, u.Finalizers, "controller.cattle.io/test-finalizer")
+					return u, nil
+				})
 			},
 			expectedError: false,
 		},
 		{
-			name: "got error when updating user",
+			name: "removes both lifecycle and legacy finalizers",
 			user: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "testuser",
 					Finalizers: []string{
 						"controller.cattle.io/test-finalizer",
-						"controller.cattle.io/cat-user-controller",
+						userLifecycleFinalizer,
+						legacyUserFinalizer,
+					},
+				},
+			},
+			mockSetup: func() {
+				usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.NotContains(t, u.Finalizers, userLifecycleFinalizer)
+					assert.NotContains(t, u.Finalizers, legacyUserFinalizer)
+					assert.Contains(t, u.Finalizers, "controller.cattle.io/test-finalizer")
+					return u, nil
+				})
+			},
+			expectedError: false,
+		},
+		{
+			name: "update error",
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testuser",
+					Finalizers: []string{
+						userLifecycleFinalizer,
 					},
 				},
 			},
@@ -1058,14 +1060,90 @@ func TestRemoveLegacyFinalizers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockSetup()
 
-			user, err := ul.removeLegacyFinalizers(tt.user)
+			_, err := ul.removeFinalizer(tt.user)
 
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.NotContains(t, user.Finalizers, "controller.cattle.io/cat-user-controller")
 			}
 		})
 	}
+}
+
+func TestOnChange(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+
+	t.Run("nil user returns nil", func(t *testing.T) {
+		t.Parallel()
+		ul := &userLifecycle{}
+		got, err := ul.onChange("", nil)
+		assert.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("deleted user without finalizer is skipped", func(t *testing.T) {
+		t.Parallel()
+		ul := &userLifecycle{}
+		user := &v3.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "u-abc",
+				DeletionTimestamp: &now,
+			},
+		}
+		got, err := ul.onChange("u-abc", user)
+		assert.NoError(t, err)
+		assert.Equal(t, user, got)
+	})
+
+	t.Run("uninitialized user dispatches to onCreate", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+		usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			assert.Equal(t, "true", u.Annotations[userLifecycleAnnotation])
+			assert.Contains(t, u.Finalizers, userLifecycleFinalizer)
+			assert.Contains(t, u.PrincipalIDs, "local://u-new")
+			return u, nil
+		})
+
+		ul := &userLifecycle{users: usersMock}
+		user := &v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-new"},
+		}
+		_, err := ul.onChange("u-new", user)
+		assert.NoError(t, err)
+	})
+
+	t.Run("initialized user dispatches to onUpdate", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+		mockUserManager := userMocks.NewMockManager(ctrl)
+		mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("u-existing", k8stypes.UID("")).Return(nil)
+
+		secrets := wranglerfake.NewMockControllerInterface[*v1.Secret, *v1.SecretList](ctrl)
+		scache := wranglerfake.NewMockCacheInterface[*v1.Secret](ctrl)
+		secrets.EXPECT().Cache().Return(scache)
+		users := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		users.EXPECT().Cache().Return(nil)
+		timer := exttokens.NewMocktimeHandler(ctrl)
+		secrets.EXPECT().List("cattle-tokens", gomock.Any()).Return(&v1.SecretList{}, nil).AnyTimes()
+		store := exttokens.NewSystem(nil, nil, secrets, users, nil, nil, timer, nil, nil)
+
+		ul := &userLifecycle{
+			userManager:   mockUserManager,
+			extTokenStore: store,
+		}
+		user := &v3.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "u-existing",
+				Annotations: map[string]string{userLifecycleAnnotation: "true"},
+			},
+		}
+		got, err := ul.onChange("u-existing", user)
+		assert.NoError(t, err)
+		assert.Equal(t, user, got)
+	})
 }

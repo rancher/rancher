@@ -88,19 +88,11 @@ jobs:
             echo "Running updatecli on all targets"
             updatecli apply --clean --values updatecli/values.d/values.yaml \
                                     --config updatecli/updatecli.d/
-            updatecli apply         --values updatecli/values.d/values.yaml \
-                                    --config updatecli/extras/run-go-generate/
           elif [[ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]];
           then
             echo "Running updatecli on ${{ inputs.target }} target"
             updatecli apply --clean --values updatecli/values.d/values.yaml \
                                     --config "updatecli/updatecli.d/update-${{ inputs.target }}/"
-            if [[ "${{ inputs.target }}" = "k8s" ]];
-            then
-              updatecli apply       --values updatecli/values.d/values.yaml \
-                                    --config updatecli/extras/run-go-generate/
-
-            fi
           else
             echo "Invalid event name or target"
           fi

@@ -54,6 +54,8 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 	}
 
 	kubernetesVersion := h.getKubernetesVersion(cluster, provCluster)
+	k8sProvider := h.getKubernetesProvider(cluster, provisioningClusterRef, kubernetesVersion)
+
 	nodeCount, err := h.getNodeCount(cluster, provCluster)
 	if err != nil {
 		return nil, err
@@ -80,12 +82,13 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 		ProvisioningClusterRef: provisioningClusterRef,
 	}
 
-	if reflect.DeepEqual(cluster.Status.Info, desiredInfo) {
+	if reflect.DeepEqual(cluster.Status.Info, desiredInfo) && cluster.Status.Provider == k8sProvider {
 		return cluster, nil
 	}
 
 	clusterCopy := cluster.DeepCopy()
 	clusterCopy.Status.Info = desiredInfo
+	clusterCopy.Status.Provider = k8sProvider
 	return h.mgmtClusters.UpdateStatus(clusterCopy)
 }
 
@@ -191,6 +194,23 @@ func (h *handler) getMachineProvider(cluster *v3.Cluster, provCluster *v1.Cluste
 
 	if cluster.Status.Driver == "" || (cluster.Status.Provider == cluster.Status.Driver && (cluster.Status.Driver == "rke2" || cluster.Status.Driver == "k3s")) {
 		return "imported"
+	}
+	return ""
+}
+
+func (h *handler) getKubernetesProvider(cluster *v3.Cluster, provisioningClusterRef *corev1.ObjectReference, kubernetesVersion string) string {
+	if cluster.Status.Provider != "" {
+		return cluster.Status.Provider
+	}
+	// provisioningClusterRef is set only for v2prov custom/provisioned clusters, so we can reasonably detect provider based on kubernetesVersion.
+	// For other cluster types, provider will be set by kubernetesProvider controller after cluster is ready.
+	if provisioningClusterRef != nil && kubernetesVersion != "" {
+		if strings.Contains(kubernetesVersion, "+rke2") {
+			return "rke2"
+		}
+		if strings.Contains(kubernetesVersion, "+k3s") {
+			return "k3s"
+		}
 	}
 	return ""
 }

@@ -86,7 +86,7 @@ func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acce
 		return fmt.Errorf("azure AD [logout-all]: provider not configured for SSO logout")
 	}
 
-	endSessionEndpoint := cfg.LogoutEndpoint
+	endSessionEndpoint := cfg.EndSessionEndpoint
 	if endSessionEndpoint == "" {
 		endSessionEndpoint, err = url.JoinPath(cfg.Endpoint, cfg.TenantID, "/oauth2/v2.0/logout")
 		if err != nil {
@@ -195,6 +195,9 @@ func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.
 
 	return groupPrincipals, nil
 }
+
+func (ap *Provider) UsesUserSecrets() bool      { return false }
+func (ap *Provider) CanRefreshPrincipals() bool { return true }
 
 func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	cfg, err := ap.GetAzureConfigK8s()

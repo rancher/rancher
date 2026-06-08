@@ -77,7 +77,7 @@ func TestGetTokenByIDLegacy(t *testing.T) {
 		UserID:       "u-mo12345",
 	}
 	di := &dummyIndexer{
-		Store: &cache.FakeCustomStore{},
+		Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
 	di.Empty()
 	tokenManager := Manager{
@@ -150,7 +150,7 @@ func TestGetTokenByIDExt(t *testing.T) {
 		UserID:       "u-mo12345",
 	}
 	di := &dummyIndexer{
-		Store: &cache.FakeCustomStore{},
+		Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
 	di.Empty()
 	ctrl := gomock.NewController(t)
@@ -219,7 +219,7 @@ func TestGetTokenLegacy(t *testing.T) {
 		UserID:       "u-mo12345",
 	}
 	di := &dummyIndexer{
-		Store: &cache.FakeCustomStore{},
+		Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
 	di.Empty()
 	tokenManager := Manager{
@@ -316,7 +316,7 @@ func TestListTokens(t *testing.T) {
 	token = mustGenerateRandomToken(t)
 	tokenManager := Manager{
 		tokenIndexer: &dummyIndexer{
-			Store: &cache.FakeCustomStore{},
+			Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		},
 		tokens: &fakeTokenClient{
 			// Two tokens one matches the token and is current
@@ -405,7 +405,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 		assert: assert.New(t),
 		tokenManager: Manager{
 			tokenIndexer: &dummyIndexer{
-				Store: &cache.FakeCustomStore{},
+				Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 			},
 		},
 		apiCtx: &types.APIContext{
@@ -466,7 +466,7 @@ func (t *TestManager) runtestCases(hashingEnabled bool) {
 	features.TokenHashing.Set(hashingEnabled)
 	t.tokenManager = Manager{
 		tokenIndexer: &dummyIndexer{
-			Store:         &cache.FakeCustomStore{},
+			Store:         cache.NewStore(cache.MetaNamespaceKeyFunc),
 			hashedEnabled: hashingEnabled,
 		},
 	}
@@ -512,6 +512,10 @@ type dummyIndexer struct {
 
 	hashedEnabled bool
 	empty         bool
+}
+
+func (d *dummyIndexer) Empty() {
+	d.empty = true
 }
 
 type testCase struct {
@@ -564,10 +568,6 @@ func (d *dummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
 
 func (d *dummyIndexer) SetTokenHashed(enabled bool) {
 	d.hashedEnabled = enabled
-}
-
-func (d *dummyIndexer) Empty() {
-	d.empty = true
 }
 
 func mustGenerateRandomToken(t *testing.T) string {

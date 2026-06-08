@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/capr"
@@ -54,6 +55,20 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	return io.ReadAll(resp.Body)
+}
+
+// validShellVarName validates that a variable name is a valid POSIX shell identifier.
+var validShellVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// isValidShellVarName returns true if name is a valid POSIX shell variable name.
+func isValidShellVarName(name string) bool {
+	return validShellVarName.MatchString(name)
+}
+
+// escapeShellValue safely escapes a value for use in a POSIX shell script.
+func escapeShellValue(value string) string {
+	escaped := strings.ReplaceAll(value, "'", "'\\''")
+	return "'" + escaped + "'"
 }
 
 func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, _ string) ([]byte, error) {
@@ -110,7 +125,11 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 		if envVar.Value == "" {
 			continue
 		}
-		envVarBuf.WriteString(fmt.Sprintf("%s=\"%s\"\n", envVar.Name, envVar.Value))
+		if !isValidShellVarName(envVar.Name) {
+			logrus.Warnf("skipping invalid shell variable name: %q", envVar.Name)
+			continue
+		}
+		envVarBuf.WriteString(fmt.Sprintf("export %s=%s\n", envVar.Name, escapeShellValue(envVar.Value)))
 	}
 	server := ""
 	if settings.ServerURL.Get() != "" {

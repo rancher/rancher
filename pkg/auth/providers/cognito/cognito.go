@@ -52,6 +52,13 @@ func (p *CognitoProvider) GetName() string {
 	return Name
 }
 
+func (p *CognitoProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	return p.OpenIDCProvider.RefetchGroupPrincipals(principalID, secret)
+}
+
+func (p *CognitoProvider) UsesUserSecrets() bool      { return true }
+func (p *CognitoProvider) CanRefreshPrincipals() bool { return true }
+
 func (p *CognitoProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 	logrus.Debugf("CognitoProvider [logout]: triggered by provider %s", providerName)

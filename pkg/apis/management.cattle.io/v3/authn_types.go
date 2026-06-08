@@ -460,9 +460,9 @@ type AzureADConfig struct {
 	RancherURL            string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
 	GroupMembershipFilter string `json:"groupMembershipFilter,omitempty"`
 
-	// LogoutEndpoint overrides the Azure AD end_session_endpoint used for SSO logout.
+	// EndSessionEndpoint overrides the Azure AD end_session_endpoint used for SSO logout.
 	// If empty, defaults to {Endpoint}/{TenantID}/oauth2/v2.0/logout.
-	LogoutEndpoint string `json:"logoutEndpoint,omitempty"`
+	EndSessionEndpoint string `json:"endSessionEndpoint,omitempty"`
 
 	// LogoutAllEnabled enables SSO logout (RP-Initiated Logout) for this provider.
 	// Can be set only if AuthConfig.LogoutAllSupported is true.
@@ -761,10 +761,6 @@ type OIDCApplyInput struct {
 	Enabled    bool       `json:"enabled,omitempty"`
 }
 
-type KeyCloakOIDCConfig struct {
-	OIDCConfig `json:",inline" mapstructure:",squash"`
-}
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -794,6 +790,11 @@ type GenericOIDCTestOutput struct {
 // the configuration for the OIDC provider as well as an auth code.
 type GenericOIDCApplyInput struct {
 	OIDCApplyInput `json:",inline" mapstructure:",squash"`
+}
+
+// KeyCloakOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
+type KeyCloakOIDCConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
 }
 
 // GenericOIDCConfig is a wrapper for the AWS Cognito provider holding the OIDC Configuration

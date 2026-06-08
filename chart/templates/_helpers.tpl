@@ -155,11 +155,7 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
     Select correct auditLog image
 */}}
 {{ define "auditLog.image" -}}
-  {{ if .Values.busyboxImage -}}
-    {{ .Values.busyboxImage -}}
-  {{ else -}}
-    {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
-  {{ end -}}
+  {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
 {{ end -}}
 
 {{- define "rancher.certmanager.notes" -}}

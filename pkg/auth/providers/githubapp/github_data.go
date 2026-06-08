@@ -119,9 +119,13 @@ func (g *gitHubAppData) listOrgs() []common.GitHubAccount {
 func (g *gitHubAppData) listTeamsForUser(username string) []common.GitHubAccount {
 	var accounts []common.GitHubAccount
 
-	for orgName := range g.members[username].orgs {
+	for orgName, teamNames := range g.members[username].orgs {
 		org := g.orgs[orgName]
-		for teamName, team := range org.teams {
+		for _, teamName := range teamNames {
+			team, ok := org.teams[teamName]
+			if !ok {
+				continue
+			}
 			accounts = append(accounts, common.GitHubAccount{Name: teamName, Login: team.login, AvatarURL: org.avatarURL, ID: team.id, HTMLURL: team.htmlURL})
 		}
 	}

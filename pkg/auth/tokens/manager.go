@@ -500,7 +500,11 @@ func (m *Manager) UpdateSecret(userID, provider, secret string) error {
 	return err
 }
 
-// PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
+// PerUserCacheProviders is a set of provider names for which the token manager
+// creates and stores a per-user OAuth secret during login. The read-side
+// equivalent is AuthProvider.UsesUserSecrets(); these two must agree on which
+// providers use per-user secrets. They are maintained separately because the
+// tokens package cannot import providers (circular dependency).
 var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (*apiv3.Token, string, error) {
@@ -550,6 +554,9 @@ func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Pri
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		// Lax is the default in most browsers; setting it
+		// explicitly is a good security measure.
+		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(request.Response, tokenCookie)
 	request.WriteResponse(http.StatusOK, nil)

@@ -29,7 +29,10 @@ const (
 	clusterContext                  = "cluster"
 )
 
-var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+var (
+	crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+	allNonCustomVerbs           = []string{"get", "update", "delete", "patch", "create", "list", "watch", "deletecollection"}
+)
 
 func deleteNamespace(controller string, nsName string, nsClient corev1.NamespaceClient) error {
 	ns, err := nsClient.Get(nsName, metav1.GetOptions{})
@@ -108,7 +111,7 @@ func createProjectMembershipRoles(project *apisv3.Project, roleController crbacv
 				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
 				Resources:     []string{apisv3.ProjectResourceName},
 				ResourceNames: []string{project.Name},
-				Verbs:         []string{rbacv1.VerbAll},
+				Verbs:         allNonCustomVerbs,
 			},
 		},
 	}
@@ -157,7 +160,7 @@ func createClusterMembershipRoles(cluster *apisv3.Cluster, crClient crbacv1.Clus
 				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
 				Resources:     []string{apisv3.ClusterResourceName},
 				ResourceNames: []string{cluster.Name},
-				Verbs:         []string{rbacv1.VerbAll},
+				Verbs:         allNonCustomVerbs,
 			},
 		},
 	}

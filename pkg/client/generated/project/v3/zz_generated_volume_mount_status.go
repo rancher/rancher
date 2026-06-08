@@ -6,11 +6,13 @@ const (
 	VolumeMountStatusFieldName              = "name"
 	VolumeMountStatusFieldReadOnly          = "readOnly"
 	VolumeMountStatusFieldRecursiveReadOnly = "recursiveReadOnly"
+	VolumeMountStatusFieldVolumeStatus      = "volumeStatus"
 )
 
 type VolumeMountStatus struct {
-	MountPath         string `json:"mountPath,omitempty" yaml:"mountPath,omitempty"`
-	Name              string `json:"name,omitempty" yaml:"name,omitempty"`
-	ReadOnly          bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
-	RecursiveReadOnly string `json:"recursiveReadOnly,omitempty" yaml:"recursiveReadOnly,omitempty"`
+	MountPath         string        `json:"mountPath,omitempty" yaml:"mountPath,omitempty"`
+	Name              string        `json:"name,omitempty" yaml:"name,omitempty"`
+	ReadOnly          bool          `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+	RecursiveReadOnly string        `json:"recursiveReadOnly,omitempty" yaml:"recursiveReadOnly,omitempty"`
+	VolumeStatus      *VolumeStatus `json:"volumeStatus,omitempty" yaml:"volumeStatus,omitempty"`
 }

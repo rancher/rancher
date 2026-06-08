@@ -17,6 +17,94 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPrimaryAddressFamily(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   map[string]interface{}
+		expected int
+	}{
+		{
+			name:     "returns 0 when service-cidr is missing",
+			config:   map[string]interface{}{},
+			expected: 0,
+		},
+		{
+			name: "returns 4 for IPv4-first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "10.43.0.0/16,2001:db8:43::/112",
+			},
+			expected: 4,
+		},
+		{
+			name: "returns 6 for IPv6-first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "2001:db8:43::/112,10.43.0.0/16",
+			},
+			expected: 6,
+		},
+		{
+			name: "handles whitespace and multiple list entries",
+			config: map[string]interface{}{
+				"service-cidr": []string{"   ", "  2001:db8:43::/112  ,10.43.0.0/16"},
+			},
+			expected: 6,
+		},
+		{
+			name: "returns 0 for invalid first CIDR",
+			config: map[string]interface{}{
+				"service-cidr": "not-a-cidr,10.43.0.0/16",
+			},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, primaryAddressFamily(tt.config))
+		})
+	}
+}
+
+func TestReorderAddressesByFamily(t *testing.T) {
+	tests := []struct {
+		name          string
+		addresses     []string
+		primaryFamily int
+		expected      []string
+	}{
+		{
+			name:          "no-op when fewer than two addresses",
+			addresses:     []string{"10.0.0.1"},
+			primaryFamily: 4,
+			expected:      []string{"10.0.0.1"},
+		},
+		{
+			name:          "no-op when primary family is unset",
+			addresses:     []string{"2001:db8::1", "10.0.0.1"},
+			primaryFamily: 0,
+			expected:      []string{"2001:db8::1", "10.0.0.1"},
+		},
+		{
+			name:          "reorders IPv4 first and keeps group order stable",
+			addresses:     []string{"2001:db8::1", "10.0.0.1", "eth0", "10.0.0.2", "iface0", "2001:db8::2"},
+			primaryFamily: 4,
+			expected:      []string{"10.0.0.1", "10.0.0.2", "2001:db8::1", "2001:db8::2", "eth0", "iface0"},
+		},
+		{
+			name:          "reorders IPv6 first and keeps non-IP values at the end",
+			addresses:     []string{"10.0.0.2", "2001:db8::b", "eth0", "2001:db8::a", "10.0.0.1"},
+			primaryFamily: 6,
+			expected:      []string{"2001:db8::b", "2001:db8::a", "10.0.0.2", "10.0.0.1", "eth0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, reorderAddressesByFamily(tt.addresses, tt.primaryFamily))
+		})
+	}
+}
+
 func TestUpdateConfigWithAddresses(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -30,6 +118,7 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			initialConfig: map[string]interface{}{
 				"node-ip":             []string{},
 				"node-external-ip":    []string{},
+				"service-cidr":        "10.43.0.0/16,2001:db8:43::/112",
 				"cloud-provider-name": "",
 			},
 			info: &machineNetworkInfo{
@@ -39,6 +128,23 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 				DriverName:        management.Amazonec2driver,
 			},
 			expectedNodeIPs:         []string{"10.0.0.5", "2001:db8::1"},
+			expectedNodeExternalIPs: []string{"1.2.3.4"},
+		},
+		{
+			name: "AWS dual-stack node with IPv6-first service-cidr",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "2001:db8:43::/112,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Amazonec2driver,
+			},
+			expectedNodeIPs:         []string{"2001:db8::1", "10.0.0.5"},
 			expectedNodeExternalIPs: []string{"1.2.3.4"},
 		},
 		{
@@ -264,6 +370,38 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			expectedNodeIPs:         []string{"10.0.0.5"},
 			expectedNodeExternalIPs: []string{"2001:db8::dead:beef"},
 		},
+		{
+			name: "node-external-ip is reordered to match IPv6-first service-cidr",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "2001:db8:43::/112,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4", "2001:db8::dead:beef"},
+			},
+			expectedNodeIPs:         []string{"10.0.0.5"},
+			expectedNodeExternalIPs: []string{"2001:db8::dead:beef", "1.2.3.4"},
+		},
+		{
+			name: "invalid service-cidr preserves existing node-ip order",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"service-cidr":        "not-a-cidr,10.43.0.0/16",
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"1.2.3.4"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Amazonec2driver,
+			},
+			expectedNodeIPs:         []string{"10.0.0.5", "2001:db8::1"},
+			expectedNodeExternalIPs: []string{"1.2.3.4"},
+		},
 		// Azure (and other drivers that only populate Driver.IPAddress with no PrivateIPAddress):
 		// node-ip and node-external-ip must both remain unset when there is no internal IP.
 		{
@@ -387,139 +525,125 @@ func TestUpdateConfigWithAdvertiseAddresses(t *testing.T) {
 		expectedConfig map[string]interface{}
 	}{
 		{
-			name:          "control-plane node with different internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with different node-ip and node-external-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1", "tls-san": []string{"192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with same internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"192.168.1.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with same node-ip and node-external-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"192.168.1.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"192.168.1.1"}, "node-external-ip": []string{"192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with same set of node-ip and node-external-ip in different order",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"192.168.1.1", "192.168.1.2"},
+				"node-external-ip": []string{"192.168.1.2", "192.168.1.1"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"192.168.1.1", "192.168.1.2"}, "node-external-ip": []string{"192.168.1.2", "192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with empty node-ip returns early",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{},
+				"node-external-ip": []string{"192.168.1.1"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{}, "node-external-ip": []string{"192.168.1.1"}},
+		},
+		{
+			name: "control-plane node with empty node-external-ip returns early",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  false,
+			expectedConfig: map[string]interface{}{"node-ip": []string{"10.0.0.1"}, "node-external-ip": []string{}},
+		},
+		{
+			name:           "control-plane node with absent node-ip returns early",
+			initialConfig:  map[string]interface{}{},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  false,
 			expectedConfig: map[string]interface{}{},
 		},
 		{
-			name:          "control-plane node with same set of internal and external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"192.168.1.1", "192.168.1.2"},
-				ExternalAddresses: []string{"192.168.1.2", "192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "worker-only node should be skipped",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1"},
 			},
+			info:           &machineNetworkInfo{Entry: workerEntry},
 			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
+			expectedConfig: map[string]interface{}{"node-ip": []string{"10.0.0.1"}, "node-external-ip": []string{"192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with no internal IP",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with multiple different IPs uses first node-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.2", "10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.2", "192.168.1.1"},
 			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with no external IP",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with no internal or external IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{},
-				ExternalAddresses: []string{},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "worker-only node should be skipped",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             workerEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with multiple different IPs",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.2", "10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.2", "192.168.1.1"},
-				Entry:             controlPlaneEntry,
-			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.2", "tls-san": []string{"192.168.1.2", "192.168.1.1"}},
 		},
 		{
-			name:          "control-plane node with different internal and external interface names",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"eth1"},
-				Entry:             controlPlaneEntry,
+			name: "control-plane node with interface names uses first node-ip",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"eth0"},
+				"node-external-ip": []string{"eth1"},
 			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet:  true,
 			expectedConfig: map[string]interface{}{"advertise-address": "eth0", "tls-san": []string{"eth1"}},
 		},
 		{
-			name:          "control-plane node with same internal and external interface names",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"eth0"},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  false,
-			expectedConfig: map[string]interface{}{},
-		},
-		{
-			name:          "control-plane node with mixed different ip and interface name",
-			initialConfig: map[string]interface{}{},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"eth0"},
-				ExternalAddresses: []string{"192.168.1.1"},
-				Entry:             controlPlaneEntry,
-			},
-			expectAddrSet:  true,
-			expectedConfig: map[string]interface{}{"advertise-address": "eth0", "tls-san": []string{"192.168.1.1"}},
-		},
-		{
-			name: "control-plane node with pre-existing tls-san",
+			name: "control-plane node with pre-existing tls-san appends node-external-ip",
 			initialConfig: map[string]interface{}{
-				"tls-san": []string{"existing-san", "192.168.1.1"},
+				"node-ip":          []string{"10.0.0.1"},
+				"node-external-ip": []string{"192.168.1.1", "192.168.1.2"},
+				"tls-san":          []string{"existing-san", "192.168.1.1"},
 			},
-			info: &machineNetworkInfo{
-				InternalAddresses: []string{"10.0.0.1"},
-				ExternalAddresses: []string{"192.168.1.1", "192.168.1.2"},
-				Entry:             controlPlaneEntry,
-			},
+			info:          &machineNetworkInfo{Entry: controlPlaneEntry},
 			expectAddrSet: true,
-			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1",
-				"tls-san": []string{"existing-san", "192.168.1.1", "192.168.1.2"}},
+			expectedConfig: map[string]interface{}{
+				"advertise-address": "10.0.0.1",
+				"tls-san":           []string{"existing-san", "192.168.1.1", "192.168.1.2"},
+			},
+		},
+		{
+			name: "IPv6-first node-ip uses first (IPv6) as advertise-address",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"2001:db8::1", "10.0.0.1"},
+				"node-external-ip": []string{"1.2.3.4"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  true,
+			expectedConfig: map[string]interface{}{"advertise-address": "2001:db8::1", "tls-san": []string{"1.2.3.4"}},
+		},
+		{
+			name: "IPv4-first node-ip uses first (IPv4) as advertise-address",
+			initialConfig: map[string]interface{}{
+				"node-ip":          []string{"10.0.0.1", "2001:db8::1"},
+				"node-external-ip": []string{"1.2.3.4"},
+			},
+			info:           &machineNetworkInfo{Entry: controlPlaneEntry},
+			expectAddrSet:  true,
+			expectedConfig: map[string]interface{}{"advertise-address": "10.0.0.1", "tls-san": []string{"1.2.3.4"}},
 		},
 	}
 

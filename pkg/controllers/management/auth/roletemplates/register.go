@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -22,6 +23,8 @@ const (
 	crtbByUsernameIndex         = "auth.management.cattle.io/crtb-by-username"
 	rbByPRTBOwnerReferenceIndex = "auth.management.cattle.io/rb-by-prtb-owner-reference"
 	rbByCRTBOwnerReferenceIndex = "auth.management.cattle.io/rb-by-crtb-owner-reference"
+	prtbByRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-roletemplate-name"
+	crtbByRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-roletemplate-name"
 
 	roleTemplateChangeHandler = "mgmt-roletemplate-change-handler"
 	roleTemplateRemoveHandler = "mgmt-roletemplate-remove-handler"
@@ -29,10 +32,12 @@ const (
 	crtbChangeHandler        = "mgmt-crtb-change-handler"
 	crtbRemoveHandler        = "mgmt-crtb-remove-handler"
 	crtbRoleTemplateEnqueuer = "cluster-crtb-roletemplate-enqueuer"
+	crtbClusterRoleEnqueuer  = "cluster-crtb-clusterrole-enqueuer"
 
 	prtbChangeHandler        = "mgmt-prtb-change-handler"
 	prtbRemoveHandler        = "mgmt-prtb-remove-handler"
 	prtbRoleTemplateEnqueuer = "cluster-prtb-roletemplate-enqueuer"
+	prtbClusterRoleEnqueuer  = "cluster-prtb-clusterrole-enqueuer"
 )
 
 func RegisterIndexers(wranglerContext *wrangler.Context) {
@@ -40,6 +45,8 @@ func RegisterIndexers(wranglerContext *wrangler.Context) {
 	wranglerContext.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(prtbByUsernameIndex, getPRTBByUsername)
 	wranglerContext.RBAC.RoleBinding().Cache().AddIndexer(rbByPRTBOwnerReferenceIndex, getRBByPRTBOwnerReference)
 	wranglerContext.RBAC.RoleBinding().Cache().AddIndexer(rbByCRTBOwnerReferenceIndex, getRBByCRTBOwnerReference)
+	wranglerContext.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(prtbByRoleTemplateNameIndex, getPRTBByRoleTemplateName)
+	wranglerContext.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbByRoleTemplateNameIndex, getCRTBByRoleTemplateName)
 }
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
@@ -64,6 +71,8 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	}
 	relatedresource.Watch(ctx, crtbRoleTemplateEnqueuer, roletemplateEnqueuer.roletemplateEnqueueCRTBs, management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), management.Wrangler.Mgmt.RoleTemplate())
 	relatedresource.Watch(ctx, prtbRoleTemplateEnqueuer, roletemplateEnqueuer.roletemplateEnqueuePRTBs, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), management.Wrangler.Mgmt.RoleTemplate())
+	relatedresource.Watch(ctx, crtbClusterRoleEnqueuer, roletemplateEnqueuer.clusterRoleEnqueueCRTBs, management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), management.Wrangler.RBAC.ClusterRole())
+	relatedresource.Watch(ctx, prtbClusterRoleEnqueuer, roletemplateEnqueuer.clusterRoleEnqueuePRTBs, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), management.Wrangler.RBAC.ClusterRole())
 }
 
 type roletemplateEnqueuer struct {
@@ -71,6 +80,64 @@ type roletemplateEnqueuer struct {
 	crtbCache    mgmtv3.ClusterRoleTemplateBindingCache
 	projectCache mgmtv3.ProjectCache
 	prtbCache    mgmtv3.ProjectRoleTemplateBindingCache
+}
+
+// clusterRoleEnqueue extracts the owner from an aggregation ClusterRole and calls lookupKeys to resolve the related resource keys.
+func clusterRoleEnqueue(obj runtime.Object, lookupKeys func(owner string) ([]relatedresource.Key, error)) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	clusterRole, ok := obj.(*rbacv1.ClusterRole)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert object %T to *ClusterRole", obj)
+	}
+
+	// If it's not an aggregation cluster role, ignore it
+	if clusterRole.AggregationRule == nil {
+		return nil, nil
+	}
+
+	if owner, ok := clusterRole.Labels[rbac.ClusterRoleOwnerLabel]; ok {
+		return lookupKeys(owner)
+	}
+
+	return nil, nil
+}
+
+// clusterRoleEnqueuePRTBs enqueues PRTBs when the aggregation ClusterRole owned by the PRTB is changed.
+func (r *roletemplateEnqueuer) clusterRoleEnqueuePRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	return clusterRoleEnqueue(obj, func(owner string) ([]relatedresource.Key, error) {
+		prtbs, err := r.prtbCache.GetByIndex(prtbByRoleTemplateNameIndex, owner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list PRTBs for role template %s: %w", owner, err)
+		}
+		var keys []relatedresource.Key
+		for _, prtb := range prtbs {
+			keys = append(keys, relatedresource.Key{
+				Name:      prtb.Name,
+				Namespace: prtb.Namespace,
+			})
+		}
+		return keys, nil
+	})
+}
+
+// clusterRoleEnqueueCRTBs enqueues CRTBs when the aggregation ClusterRole owned by the CRTB is changed.
+func (r *roletemplateEnqueuer) clusterRoleEnqueueCRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	return clusterRoleEnqueue(obj, func(owner string) ([]relatedresource.Key, error) {
+		crtbs, err := r.crtbCache.GetByIndex(crtbByRoleTemplateNameIndex, owner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list CRTBs for role template %s: %w", owner, err)
+		}
+		var keys []relatedresource.Key
+		for _, crtb := range crtbs {
+			keys = append(keys, relatedresource.Key{
+				Name:      crtb.Name,
+				Namespace: crtb.Namespace,
+			})
+		}
+		return keys, nil
+	})
 }
 
 // roletemplateEnqueuePRTBs enqueues PRTBs that reference the changed RoleTemplate.
@@ -187,6 +254,26 @@ func getRBByCRTBOwnerReference(rb *rbacv1.RoleBinding) ([]string, error) {
 				return []string{ownerRef.Name}, nil
 			}
 		}
+	}
+	return []string{}, nil
+}
+
+func getPRTBByRoleTemplateName(prtb *v3.ProjectRoleTemplateBinding) ([]string, error) {
+	if prtb == nil {
+		return []string{}, nil
+	}
+	if prtb.RoleTemplateName != "" {
+		return []string{prtb.RoleTemplateName}, nil
+	}
+	return []string{}, nil
+}
+
+func getCRTBByRoleTemplateName(crtb *v3.ClusterRoleTemplateBinding) ([]string, error) {
+	if crtb == nil {
+		return []string{}, nil
+	}
+	if crtb.RoleTemplateName != "" {
+		return []string{crtb.RoleTemplateName}, nil
 	}
 	return []string{}, nil
 }

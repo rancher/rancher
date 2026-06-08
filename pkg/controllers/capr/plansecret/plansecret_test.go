@@ -1,9 +1,11 @@
 package plansecret
 
 import (
-	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPurgePeriodicInstructionOutput(t *testing.T) {
@@ -42,7 +44,9 @@ func TestPurgePeriodicInstructionOutput(t *testing.T) {
 				Plan: plan.NodePlan{
 					PeriodicInstructions: []plan.PeriodicInstruction{
 						{
-							Name: "test-instruction",
+							CommonInstruction: planapi.CommonInstruction{
+								Name: "test-instruction",
+							},
 						},
 					},
 				},
@@ -56,7 +60,9 @@ func TestPurgePeriodicInstructionOutput(t *testing.T) {
 				Plan: plan.NodePlan{
 					PeriodicInstructions: []plan.PeriodicInstruction{
 						{
-							Name: "test-instruction",
+							CommonInstruction: planapi.CommonInstruction{
+								Name: "test-instruction",
+							},
 						},
 					},
 				},
@@ -79,7 +85,9 @@ func TestPurgePeriodicInstructionOutput(t *testing.T) {
 				Plan: plan.NodePlan{
 					PeriodicInstructions: []plan.PeriodicInstruction{
 						{
-							Name: "test-instruction",
+							CommonInstruction: planapi.CommonInstruction{
+								Name: "test-instruction",
+							},
 						},
 					},
 				},

@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
@@ -371,12 +372,15 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 			controlPlane,
 			"etcd-restore/clean-etcd-dir",
 			fmt.Sprintf("%v", controlPlane.Status.ETCDSnapshotRestore), plan.OneTimeInstruction{
-				Name:    "remove-etcd-db-dir",
-				Command: "rm",
-				Args: []string{
-					"-rf",
-					path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd"),
-				}}),
+				CommonInstruction: planapi.CommonInstruction{
+					Name:    "remove-etcd-db-dir",
+					Command: "rm",
+					Args: []string{
+						"-rf",
+						path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd"),
+					},
+				},
+			}),
 		idempotentInstruction(
 			controlPlane,
 			"etcd-restore/restore",
@@ -412,24 +416,28 @@ func generateKillAllInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTim
 	killAllScript := runtime + "-killall.sh"
 
 	return plan.OneTimeInstruction{
-		Name:    "shutdown",
-		Command: "/bin/sh",
-		Env: []string{
-			fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(runtime), capr.GetDistroDataDir(controlPlane)),
-		},
-		Args: []string{
-			"-c",
-			fmt.Sprintf("if [ -z $(command -v %s) ] && [ -z $(command -v %s) ]; then echo %s does not appear to be installed; exit 0; else %s; fi", runtime, killAllScript, runtime, killAllScript),
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "shutdown",
+			Command: "/bin/sh",
+			Env: []string{
+				fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(runtime), capr.GetDistroDataDir(controlPlane)),
+			},
+			Args: []string{
+				"-c",
+				fmt.Sprintf("if [ -z $(command -v %s) ] && [ -z $(command -v %s) ]; then echo %s does not appear to be installed; exit 0; else %s; fi", runtime, killAllScript, runtime, killAllScript),
+			},
 		},
 	}
 }
 
 func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
-		Name:    "create-etcd-tombstone",
-		Command: "touch",
-		Args: []string{
-			path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/tombstone"),
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "create-etcd-tombstone",
+			Command: "touch",
+			Args: []string{
+				path.Join(capr.GetDistroDataDir(controlPlane), "server/db/etcd/tombstone"),
+			},
 		},
 	}
 }
@@ -594,19 +602,23 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane) []plan.OneTimeInstruction {
 	return []plan.OneTimeInstruction{
 		{
-			Name:    "remove-tls-directory",
-			Command: "rm",
-			Args: []string{
-				"-rf",
-				path.Join(capr.GetDistroDataDir(controlPlane), "server/tls"),
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    "remove-tls-directory",
+				Command: "rm",
+				Args: []string{
+					"-rf",
+					path.Join(capr.GetDistroDataDir(controlPlane), "server/tls"),
+				},
 			},
 		},
 		{
-			Name:    "remove-cred-directory",
-			Command: "rm",
-			Args: []string{
-				"-rf",
-				path.Join(capr.GetDistroDataDir(controlPlane), "server/cred"),
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    "remove-cred-directory",
+				Command: "rm",
+				Args: []string{
+					"-rf",
+					path.Join(capr.GetDistroDataDir(controlPlane), "server/cred"),
+				},
 			},
 		},
 	}

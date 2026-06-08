@@ -13,7 +13,7 @@ import (
 const DriverNameField = "driverName"
 
 func (p *Provisioner) driverCreate(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.ConfigMaps, cluster, apimgmtv3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
@@ -45,7 +45,7 @@ func (p *Provisioner) driverUpdate(
 	cluster *apimgmtv3.Cluster,
 	spec apimgmtv3.ClusterSpec,
 ) (api string, token string, cert string, updateTriggered bool, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
@@ -62,7 +62,7 @@ func (p *Provisioner) driverUpdate(
 }
 
 func (p *Provisioner) driverRemove(cluster *apimgmtv3.Cluster, forceRemove bool) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.ConfigMaps, cluster, apimgmtv3.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	_, err := apimgmtv3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
@@ -86,7 +86,7 @@ func (p *Provisioner) driverRemove(cluster *apimgmtv3.Cluster, forceRemove bool)
 }
 
 func (p *Provisioner) generateServiceAccount(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec) (string, error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	kontainerDriver, err := p.getKontainerDriver(spec)
@@ -98,7 +98,7 @@ func (p *Provisioner) generateServiceAccount(cluster *apimgmtv3.Cluster, spec ap
 }
 
 func (p *Provisioner) removeLegacyServiceAccount(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.ConfigMaps, cluster, apimgmtv3.ClusterConditionUpdated)
 	defer logger.Close()
 
 	kontainerDriver, err := p.getKontainerDriver(spec)
