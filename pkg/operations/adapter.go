@@ -38,6 +38,10 @@ type Adapter interface {
 
 	DataDirectory(*corev1.Secret) string
 
+	// ProvisioningDataDirectory returns the absolute path to the provisioning data directory on the node.
+	// This is where the idempotent action script and its tracking state live.
+	ProvisioningDataDirectory() string
+
 	// ServerUnit returns the systemd unit name for a distro server node.
 	ServerUnit() string
 
@@ -341,6 +345,10 @@ func (a *CAPRAdapter) renderConfig(secret *corev1.Secret) (map[string]any, error
 
 func (a *CAPRAdapter) DataDirectory(_ *corev1.Secret) string {
 	return capr.GetDistroDataDir(a.controlPlane)
+}
+
+func (a *CAPRAdapter) ProvisioningDataDirectory() string {
+	return capr.GetProvisioningDataDir(&a.controlPlane.Spec.ClusterConfiguration)
 }
 
 func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) string {
@@ -721,6 +729,11 @@ func (a *ImportedAdapter) DataDirectory(_ *corev1.Secret) string {
 		return "/var/lib/rancher/rke2/server"
 	}
 	return "/var/lib/rancher/k3s"
+}
+
+func (a *ImportedAdapter) ProvisioningDataDirectory() string {
+	// Imported clusters do not expose the provisioning data directory; fall back to the default.
+	return "/var/lib/rancher/capr"
 }
 
 func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) string {

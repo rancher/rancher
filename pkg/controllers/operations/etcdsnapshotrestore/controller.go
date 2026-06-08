@@ -21,6 +21,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +31,19 @@ import (
 )
 
 const ControllerOwnerKey = "etcd-snapshot-restore"
+
+// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
+// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
+const idempotencyKey = "etcd-restore"
+
+// etcdRestoreBinSubdir is the relative path (under the distro data directory) that holds the
+// helper scripts the controller writes to nodes during the restore.
+const etcdRestoreBinSubdir = "capr/etcd-restore/bin"
+
+const (
+	waitForPodListScriptName = "wait_for_pod_list.sh"
+	nodeCleanupScriptName    = "clean_up_nodes.sh"
+)
 
 const waitForPodListScript = `#!/bin/sh
 
@@ -43,6 +57,57 @@ while [ $i -lt 30 ]; do
 	i=$((i + 1))
 done
 exit 1
+`
+
+const nodeCleanupScript = `#!/bin/sh
+
+if [ -z "$KUBECTL" ]; then
+        echo "Must define KUBECTL environment variable"
+        exit 1
+fi
+
+if [ -z "$KUBECONFIG" ]; then
+        echo "Must define KUBECONFIG environment variable"
+        exit 1
+fi
+
+NODENAMESFILE="$1"
+
+if [ -z "$NODENAMESFILE" ]; then
+        echo "Must define nodenames file"
+        exit 1
+fi
+
+TMPALLNODES=$(mktemp)
+
+if ! ${KUBECTL} get nodes --no-headers -o=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' > "$TMPALLNODES"; then
+        echo "Error listing all nodes"
+        rm "$TMPALLNODES"
+        exit 1
+fi
+
+echo "Saving nodes:"
+cat "$NODENAMESFILE"
+
+while IFS='' read -r NODE; do
+        if [ "${NODE}" = "" ]; then
+                continue
+        fi
+        FOUND=false
+        while IFS='' read -r KEEP; do
+                if [ "${NODE}" = "${KEEP}" ]; then
+                        FOUND=true
+                        break
+                fi
+        done < "$NODENAMESFILE"
+        if [ "${FOUND}" != "true" ]; then
+                echo "Deleting node ${NODE}"
+                ${KUBECTL} delete node "${NODE}" --wait=false
+        fi
+done < "$TMPALLNODES"
+
+rm "$TMPALLNODES"
+rm "$NODENAMESFILE"
 `
 
 type handler struct {
@@ -222,6 +287,18 @@ type scope struct {
 	adapter    ops.Adapter
 }
 
+// idempotencyValue returns the value the idempotency tracker hashes to determine whether to re-run
+// a given instruction. The UID of the operation never changes for a single CR, so all instructions
+// associated with the same restore CR run exactly once.
+func (s *scope) idempotencyValue() string {
+	return string(s.op.UID)
+}
+
+// etcdRestoreScriptPath returns the absolute path on the node where the named etcd-restore script lives.
+func etcdRestoreScriptPath(s *scope, secret *corev1.Secret, name string) string {
+	return path.Join(s.adapter.DataDirectory(secret), etcdRestoreBinSubdir, name)
+}
+
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 	if err != nil {
@@ -318,8 +395,13 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 		return status, err
 	}
 
+	provisioningDir := s.adapter.ProvisioningDataDirectory()
+
 	for _, secret := range secrets {
+		// Clear any prior idempotency tracking under the restore key before starting; subsequent
+		// reconciles see the cleanup already applied and skip it.
 		instructions := []planapi.OneTimeInstruction{
+			ops.GenerateIdempotencyCleanupInstruction(provisioningDir, idempotencyKey),
 			{
 				CommonInstruction: planapi.CommonInstruction{
 					Name:    "shutdown",
@@ -367,6 +449,7 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 		}
 
 		nodePlan := &planapi.Plan{
+			Files:               []planapi.File{ops.IdempotentScriptFile(provisioningDir)},
 			OneTimeInstructions: instructions,
 		}
 
@@ -449,29 +532,28 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 
 	secret := secrets[0]
 
+	provisioningDir := s.adapter.ProvisioningDataDirectory()
+	value := s.idempotencyValue()
+
 	nodePlan := &planapi.Plan{
+		Files: []planapi.File{ops.IdempotentScriptFile(provisioningDir)},
 		OneTimeInstructions: []planapi.OneTimeInstruction{
-			{
+			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, planapi.OneTimeInstruction{
 				CommonInstruction: planapi.CommonInstruction{
 					Name:    "remove-etcd-db-dir",
 					Command: "rm",
 					Args:    []string{"-rf", path.Join(s.adapter.DataDirectory(secret), "server/db/etcd")},
 				},
-			},
-			{
-				CommonInstruction: planapi.CommonInstruction{
-					Name:    "restore",
-					Command: s.adapter.RuntimeCommand(),
-					Args: []string{
-						"server",
-						"--cluster-reset",
-						"--etcd-arg=advertise-client-urls=https://127.0.0.1:2379",
-						"--etcd-disable-snapshots=false",
-						fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName),
-						"--etcd-s3=false",
-					},
-				},
-			},
+			}),
+			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(),
+				[]string{
+					"server",
+					"--cluster-reset",
+					"--etcd-arg=advertise-client-urls=https://127.0.0.1:2379",
+					"--etcd-disable-snapshots=false",
+					fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName),
+					"--etcd-s3=false",
+				}, nil),
 		},
 	}
 
@@ -565,51 +647,44 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		)
 	}
 
-	waitScriptPath := path.Join(s.adapter.DataDirectory(secret), "capr/etcd-restore/bin/wait_for_pod_list.sh")
+	provisioningDir := s.adapter.ProvisioningDataDirectory()
+	value := s.idempotencyValue()
+	waitScriptPath := etcdRestoreScriptPath(s, secret, waitForPodListScriptName)
 
 	instructions := []planapi.OneTimeInstruction{
-		{
-			CommonInstruction: planapi.CommonInstruction{
-				Name:    "wait-for-api-server",
-				Command: "/bin/sh",
-				Args: []string{
-					"-x",
-					waitScriptPath,
-					kubectl,
-					"--kubeconfig",
-					kubeconfig,
-					"get",
-					"pods",
-					"--all-namespaces",
-				},
-			},
-		},
+		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/wait-for-api-server", value, "/bin/sh",
+			[]string{
+				"-x",
+				waitScriptPath,
+				kubectl,
+				"--kubeconfig",
+				kubeconfig,
+				"get",
+				"pods",
+				"--all-namespaces",
+			}, nil),
 	}
 
 	for i, podSelector := range podSelectors {
 		if namespace, labelSelector, ok := strings.Cut(podSelector, ":"); ok {
-			instructions = append(instructions, planapi.OneTimeInstruction{
-				CommonInstruction: planapi.CommonInstruction{
-					Name:    fmt.Sprintf("cleanup-pods-%d", i),
-					Command: kubectl,
-					Args: []string{
-						"--kubeconfig",
-						kubeconfig,
-						"delete",
-						"pods",
-						"-n",
-						namespace,
-						"-l",
-						labelSelector,
-						"--wait=false",
-					},
-				},
-			})
+			instructions = append(instructions, ops.IdempotentInstruction(provisioningDir, fmt.Sprintf("%s/cleanup-pods-%d", idempotencyKey, i), value, kubectl,
+				[]string{
+					"--kubeconfig",
+					kubeconfig,
+					"delete",
+					"pods",
+					"-n",
+					namespace,
+					"-l",
+					labelSelector,
+					"--wait=false",
+				}, nil))
 		}
 	}
 
 	nodePlan := &planapi.Plan{
 		Files: []planapi.File{
+			ops.IdempotentScriptFile(provisioningDir),
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(waitForPodListScript)),
 				Path:    waitScriptPath,
@@ -666,6 +741,16 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		return status, err
 	}
 
+	provisioningDir := s.adapter.ProvisioningDataDirectory()
+	// The two restart phases must use distinct values; otherwise the second phase would skip the
+	// restart as already-reconciled.
+	value := s.idempotencyValue()
+	if nextStep != "" {
+		value = value + "/initial"
+	} else {
+		value = value + "/final"
+	}
+
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret)
 		if err != nil {
@@ -678,14 +763,10 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		}
 
 		nodePlan := &planapi.Plan{
+			Files: []planapi.File{ops.IdempotentScriptFile(provisioningDir)},
 			OneTimeInstructions: []planapi.OneTimeInstruction{
-				{
-					CommonInstruction: planapi.CommonInstruction{
-						Name:    "restart",
-						Command: "systemctl",
-						Args:    []string{"restart", unit},
-					},
-				},
+				ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restart", value, "systemctl",
+					[]string{"restart", unit}, nil),
 			},
 			Probes: probes,
 		}
@@ -738,8 +819,131 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	return status, nil
 }
 
+// buildPostRestoreNodeCleanupPlan assembles the plan that runs the node-cleanup script on the init
+// node. A non-empty skipReason signals that the caller should skip the cleanup phase entirely (the
+// returned plan is nil in that case).
+func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSecrets []*corev1.Secret) (plan *planapi.Plan, skipReason string) {
+	kubectl := s.adapter.KubectlPath(initSecret)
+	kubeconfig := s.adapter.KubeconfigPath(initSecret)
+	if kubectl == "" || kubeconfig == "" {
+		return nil, "adapter did not provide kubectl/kubeconfig paths"
+	}
+
+	var nodeNamesBuf []byte
+	for _, secret := range allSecrets {
+		if name := secret.Labels[capr.NodeNameLabel]; name != "" {
+			nodeNamesBuf = fmt.Appendf(nodeNamesBuf, "%s\n", name)
+		}
+	}
+
+	// With no node names to preserve, the cleanup script would delete every node — bail out instead
+	// so we don't strand the cluster.
+	if len(nodeNamesBuf) == 0 {
+		return nil, "no node names available from machine-plan secrets"
+	}
+
+	provisioningDir := s.adapter.ProvisioningDataDirectory()
+	value := s.idempotencyValue()
+
+	cleanupScriptPath := etcdRestoreScriptPath(s, initSecret, nodeCleanupScriptName)
+	nodeNamesPath := etcdRestoreScriptPath(s, initSecret, fmt.Sprintf("node-names-%s", string(s.op.UID)))
+
+	return &planapi.Plan{
+		Files: []planapi.File{
+			ops.IdempotentScriptFile(provisioningDir),
+			{
+				Content: base64.StdEncoding.EncodeToString([]byte(nodeCleanupScript)),
+				Path:    cleanupScriptPath,
+				Dynamic: true,
+			},
+			{
+				Content: base64.StdEncoding.EncodeToString(nodeNamesBuf),
+				Path:    nodeNamesPath,
+				Dynamic: true,
+			},
+		},
+		OneTimeInstructions: []planapi.OneTimeInstruction{
+			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/cleanup-nodes", value, "/bin/sh",
+				[]string{cleanupScriptPath, nodeNamesPath},
+				[]string{
+					fmt.Sprintf("KUBECTL=%s", kubectl),
+					fmt.Sprintf("KUBECONFIG=%s", kubeconfig),
+				}),
+		},
+	}, ""
+}
+
+// reconcilePostRestoreNodeCleanup deletes Node objects from the restored cluster that no longer
+// correspond to a machine still in the cluster. A snapshot taken before a node was removed will
+// re-introduce the stale Node on restore; this step prunes those nodes so they don't block readiness.
+//
+// We assemble the keep-list (node names that should survive) from the currently-present machine-plan
+// secrets, which carry the node name as a label. The cleanup script runs on the init node and deletes
+// any Node not in the keep-list.
 func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-	logrus.Debugf("[etcdsnapshotrestore] %s/%s: node cleanup deferred to cluster reconciliation", s.op.Namespace, s.op.Name)
+	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling post-restore node cleanup", s.op.Namespace, s.op.Name)
+
+	initSecrets, err := planapi.NewLabeler().
+		And(
+			planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName()),
+			planapi.Label(capr.EtcdRoleLabel, "true"),
+			planapi.Label(capr.InitNodeLabel, "true")).
+		WithSorter(planapi.DefaultSorter()).
+		Collect(h.secretCache, s.namespace)
+	if err != nil {
+		return status, err
+	}
+
+	if len(initSecrets) == 0 {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: no init node found for node cleanup, skipping", s.op.Namespace, s.op.Name)
+		status.Step = opv1alpha1.ETCDSnapshotRestoreStepRestartCluster
+		return status, nil
+	}
+	initSecret := initSecrets[0]
+
+	allSecrets, err := planapi.NewLabeler().
+		And(planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName())).
+		WithSorter(planapi.DefaultSorter()).
+		Collect(h.secretCache, s.namespace)
+	if err != nil {
+		return status, err
+	}
+
+	nodePlan, skipReason := buildPostRestoreNodeCleanupPlan(s, initSecret, allSecrets)
+	if skipReason != "" {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: %s, skipping node cleanup", s.op.Namespace, s.op.Name, skipReason)
+		status.Step = opv1alpha1.ETCDSnapshotRestoreStepRestartCluster
+		return status, nil
+	}
+
+	planStatus, err := h.store.AssignPlan(initSecret, nodePlan, 1, -1)
+	if err != nil {
+		return status, err
+	}
+
+	if planStatus.Failure() {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: node cleanup failed for %s/%s",
+			s.op.Namespace, s.op.Name, initSecret.Namespace, initSecret.Name)
+
+		status.Phase = opv1alpha1.OperationPhaseFailed
+		status.LastUpdated = metav1.Now()
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("post-restore node cleanup failed for %s/%s", initSecret.Namespace, initSecret.Name))
+
+		return status, nil
+	}
+
+	if wait, msg := planStatus.Wait(); wait {
+		logrus.Infof("[etcdsnapshotrestore] %s/%s: waiting for node cleanup: %s", s.op.Namespace, s.op.Name, msg)
+
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
+		opv1alpha1.InProgressCondition.Message(&status, msg)
+
+		return status, nil
+	}
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to final restart", s.op.Namespace, s.op.Name)
 
