@@ -31,6 +31,10 @@ var (
 	settings       = map[string]Setting{}
 	provider       Provider
 	InjectDefaults string
+	// Set via -ldflags "-X github.com/rancher/rancher/pkg/settings.defaultClusterAutoscalerChartRepository=..."
+	defaultClusterAutoscalerChartRepository string
+	// Set via -ldflags "-X github.com/rancher/rancher/pkg/settings.defaultClusterAutoscalerImage=..."
+	defaultClusterAutoscalerImage string
 
 	systemNamespaces = []string{
 		"kube-system",
@@ -269,10 +273,10 @@ var (
 
 	// ClusterAutoscalerChartRepository represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
 	// can be an OCI image path or a regular helm repo.
-	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", os.Getenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY"))
+	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", defaultClusterAutoscalerChartRepository)
 
 	// ClusterAutoscalerImage represents the default image repository for the cluster autoscaler
-	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", os.Getenv("CATTLE_CLUSTER_AUTOSCALER_IMAGE"))
+	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", defaultClusterAutoscalerImage)
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
 	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")

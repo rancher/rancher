@@ -365,9 +365,9 @@ ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
 
-# Cluster Autoscaler related settings, only set in prime installs
-ENV CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
-ENV CATTLE_CLUSTER_AUTOSCALER_IMAGE=
+# Cluster Autoscaler related base defaults, only set in prime installs
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION=1.1.11
@@ -491,7 +491,13 @@ ARG VERSION
 ARG COMMIT
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
+ARG CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} \
+  -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} \
+  -X github.com/rancher/rancher/pkg/settings.defaultClusterAutoscalerChartRepository=${CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY} \
+  -X github.com/rancher/rancher/pkg/settings.defaultClusterAutoscalerImage=${CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE} \
+  ${LINKFLAGS}"
 ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
@@ -524,17 +530,12 @@ ARG VERSION
 ARG BASE_REGISTRY
 ARG BASE_UI_BRAND
 ARG RANCHER_VERSION_TYPE
-ARG CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
-ARG CATTLE_CLUSTER_AUTOSCALER_IMAGE
-
 ENV CATTLE_BASE_REGISTRY=$BASE_REGISTRY
 ENV CATTLE_BASE_UI_BRAND=$BASE_UI_BRAND
 ENV RANCHER_VERSION_TYPE=$RANCHER_VERSION_TYPE
 ENV CATTLE_SERVER_VERSION=${VERSION}
 ENV CATTLE_AGENT_IMAGE=${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE=${IMAGE_REPO}/${IMAGE_NAME}
-ENV CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=$CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
-ENV CATTLE_CLUSTER_AUTOSCALER_IMAGE=$CATTLE_CLUSTER_AUTOSCALER_IMAGE
 
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
