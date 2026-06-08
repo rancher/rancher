@@ -6,8 +6,8 @@ if [ "${DRONE_BUILD_EVENT}" = "push" ] || [ "${DRONE_BUILD_EVENT}" = "pull_reque
     # Check if there is only one changed file and if its 'package/Dockerfile'
     if [ $(git diff HEAD~1 --name-only | wc -l) -eq 1 ] && [ $(git diff HEAD~1 --name-only) = "package/Dockerfile" ]; then
         echo "Only package/Dockerfile changes found"
-        # Check if only CATTLE_UI_VERSION and CATTLE_DASHBOARD_UI_VERSION are changed in 'package/Dockerfile'
-        if [ -z "$(git diff -U0 HEAD~1 -- package/Dockerfile | tail -n +5 | grep -v ^@@ | egrep -v "CATTLE_UI_VERSION|CATTLE_DASHBOARD_UI_VERSION")" ]; then
+        # Check if only CATTLE_DASHBOARD_UI_VERSION is changed in 'package/Dockerfile'
+        if [ -z "$(git diff -U0 HEAD~1 -- package/Dockerfile | tail -n +5 | grep -v ^@@ | egrep -v "CATTLE_DASHBOARD_UI_VERSION")" ]; then
             echo "Skipping CI because it is only UI/dashboard change"
             exit 0
         fi
