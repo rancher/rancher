@@ -287,3 +287,7 @@ func isImportedInitNode(node *mgmtv3.Node, runtime string) bool {
 	}
 	return false
 }
+
+func (a *ImportedAdapter) PauseCluster(_ bool) error {
+	return nil
+}
