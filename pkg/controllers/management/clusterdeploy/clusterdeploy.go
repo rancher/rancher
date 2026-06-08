@@ -3,6 +3,8 @@ package clusterdeploy
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -10,21 +12,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/namespace"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/capr"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	rancherFeatures "github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -41,8 +43,9 @@ import (
 )
 
 const (
-	AgentForceDeployAnn = "io.cattle.agent.force.deploy"
-	clusterImage        = "clusterImage"
+	AgentForceDeployAnn        = "io.cattle.agent.force.deploy"
+	AgentRegistrationTokenHash = "io.cattle.agent.registration-token-hash"
+	clusterImage               = "clusterImage"
 )
 
 var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
@@ -69,6 +72,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 		secretLister:         management.Core.Secrets("").Controller().Lister(),
+		crtLister:            management.Management.ClusterRegistrationTokens("").Controller().Lister(),
 		ctx:                  ctx,
 	}
 
@@ -83,6 +87,7 @@ type clusterDeploy struct {
 	mgmt                 *config.ManagementContext
 	nodeLister           v3.NodeLister
 	secretLister         v1.SecretLister
+	crtLister            v3.ClusterRegistrationTokenLister
 	ctx                  context.Context
 }
 
@@ -411,8 +416,14 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
+	tokenHashChanged, err := cd.registrationTokenHashChanged(cluster)
+	if err != nil {
+		return err
+	}
+
 	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
-	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated
+	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated || tokenHashChanged
+
 	if !agentManifestChanged && !pcChanged {
 		return nil
 	}
@@ -512,6 +523,9 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 	if cluster.Annotations[AgentForceDeployAnn] == "true" {
 		cluster.Annotations[AgentForceDeployAnn] = "false"
+	}
+	if tokenHashChanged {
+		cd.updateRegistrationTokenHash(cluster)
 	}
 
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
@@ -702,4 +716,53 @@ func formatKubectlApplyOutput(log string) string {
 		log = strings.Replace(log, token[1], "REDACTED", 1)
 	}
 	return log
+}
+
+func (cd *clusterDeploy) getSystemCRTToken(clusterName string) (string, error) {
+	systemCRT, err := cd.crtLister.Get(clusterName, "system")
+	if apierrors.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return crt.GetTokenFromSecret(cd.secretLister, systemCRT)
+}
+
+func (cd *clusterDeploy) registrationTokenHashChanged(cluster *apimgmtv3.Cluster) (bool, error) {
+	token, err := cd.getSystemCRTToken(cluster.Name)
+	if err != nil {
+		return false, err
+	}
+	if token == "" {
+		return false, nil
+	}
+
+	hash := sha256.Sum256([]byte(token))
+	desired := hex.EncodeToString(hash[:])[:10]
+	current := cluster.Annotations[AgentRegistrationTokenHash]
+
+	if current == "" {
+		return true, nil
+	}
+
+	if current == desired {
+		return false, nil
+	}
+
+	logrus.Infof("clusterDeploy: registration token hash changed for cluster [%s]: was [%s], now [%s]", cluster.Name, current, desired)
+	return true, nil
+}
+
+func (cd *clusterDeploy) updateRegistrationTokenHash(cluster *apimgmtv3.Cluster) {
+	token, err := cd.getSystemCRTToken(cluster.Name)
+	if err != nil || token == "" {
+		return
+	}
+
+	hash := sha256.Sum256([]byte(token))
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	cluster.Annotations[AgentRegistrationTokenHash] = hex.EncodeToString(hash[:])[:10]
 }

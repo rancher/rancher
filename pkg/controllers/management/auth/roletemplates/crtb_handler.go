@@ -281,11 +281,79 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 			return nil, err
 		}
 		desiredRBs[rb.Name] = rb
+
+		// If the cluster management role grants CRT access, also create a RoleBinding to crt-token-reader
+		if grantsCRTAccess(cr) {
+			crtTokenRB, err := c.buildCRTTokenReaderRoleBinding(crtb)
+			if err != nil {
+				return nil, err
+			}
+			desiredRBs[crtTokenRB.Name] = crtTokenRB
+		}
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
 	return desiredRBs, nil
+}
+
+// grantsCRTAccess checks if a ClusterRole has rules that grant read or create access to
+// clusterregistrationtokens. Read verbs (get, list, watch) and create are included because
+// those principals legitimately need to read the token value. Pure write/delete verbs
+// (update, patch, delete, deletecollection) do not warrant Secret read access.
+func grantsCRTAccess(cr *rbacv1.ClusterRole) bool {
+	readOrCreateVerbs := map[string]bool{
+		"get":    true,
+		"list":   true,
+		"watch":  true,
+		"create": true,
+		"*":      true,
+	}
+	for _, rule := range cr.Rules {
+		for _, resource := range rule.Resources {
+			if resource != "clusterregistrationtokens" && resource != "*" {
+				continue
+			}
+			for _, apiGroup := range rule.APIGroups {
+				if apiGroup != "management.cattle.io" && apiGroup != "*" {
+					continue
+				}
+				for _, verb := range rule.Verbs {
+					if readOrCreateVerbs[verb] {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// buildCRTTokenReaderRoleBinding creates a RoleBinding to the crt-token-reader Role
+func (c *crtbHandler) buildCRTTokenReaderRoleBinding(crtb *v3.ClusterRoleTemplateBinding) (*rbacv1.RoleBinding, error) {
+	subject, err := rbac.BuildSubjectFromRTB(crtb)
+	if err != nil {
+		return nil, err
+	}
+
+	rb := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbac.NameForRoleBinding(crtb.Namespace, rbacv1.RoleRef{Kind: "Role", Name: "crt-token-reader"}, subject),
+			Namespace: crtb.Namespace,
+			Labels: map[string]string{
+				rbac.GetCRTBOwnerLabel(crtb.Name):      "true",
+				rbac.AggregationManagementFeatureLabel: "true",
+			},
+		},
+		Subjects: []rbacv1.Subject{subject},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     "crt-token-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	return rb, nil
 }
 
 // deleteLegacyRoleBindings deletes any management plane RoleBindings that were created for this CRTB before the aggregation feature was enabled.
