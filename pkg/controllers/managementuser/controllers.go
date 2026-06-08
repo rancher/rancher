@@ -108,6 +108,11 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 			cluster.ClusterName,
 			cluster.Catalog.V1().App(),
 			cluster.Management.Wrangler.RKE.RKEControlPlane())
+	} else {
+		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+			cluster.K3s = k3s.New(cluster.ControllerFactory)
+			snapshotbackpopulate.Register(ctx, cluster, clusterRec)
+		}
 	}
 	machinerole.Register(ctx, cluster)
 }
