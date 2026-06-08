@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -16,6 +17,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,6 +53,20 @@ type Adapter interface {
 	KubectlPath(*corev1.Secret) string
 
 	KubeconfigPath(*corev1.Secret) string
+
+	// ElectLeader picks the most suitable machine-plan secret to lead operations for the given
+	// role(s) within the given namespace. Returns nil if no eligible candidate holds all requested
+	// roles.
+	//
+	// Adapters apply implementation-specific eligibility (CAPR: CAPI machine not deleting;
+	// imported: v3.Node not deleting) and init-node detection (CAPR: capr.InitNodeLabel; imported:
+	// parsed from v3.Node.Status.NodeAnnotations server args). The shared preference order is:
+	//   1. Init candidate holding all requested roles
+	//   2. Candidate whose role set EXACTLY matches the requested roles
+	//   3. Candidate whose role set is a strict superset of the requested roles
+	// Tied candidates within a tier are broken lexicographically by secret name, so re-elections
+	// against the same inputs do not reshuffle leaders.
+	ElectLeader(role LeaderRole, namespace string) (*corev1.Secret, error)
 }
 
 // NewAdapter returns an Adapter for the given cluster object.
@@ -363,6 +379,41 @@ func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
 		return "/etc/rancher/k3s/k3s.yaml"
 	}
 	return "/etc/rancher/rke2/rke2.yaml"
+}
+
+// ElectLeader picks a leader from the CAPR cluster's machine-plan secrets. Eligibility excludes
+// secrets whose CAPI machine has a non-nil DeletionTimestamp (or whose machine is gone). Init
+// detection uses capr.InitNodeLabel, which the planner sets during init-node election.
+func (a *CAPRAdapter) ElectLeader(role LeaderRole, namespace string) (*corev1.Secret, error) {
+	secrets, err := a.clients.Core.Secret().Cache().List(namespace, labels.SelectorFromSet(labels.Set{
+		capr.ClusterNameLabel: a.controlPlane.Name,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	candidates := make([]LeaderCandidate, 0, len(secrets))
+	for _, secret := range secrets {
+		c := LeaderCandidate{Secret: secret, Eligible: true}
+		c.Init = secret.Labels[capr.InitNodeLabel] == "true"
+
+		machineName := secret.Labels[capr.MachineNameLabel]
+		machineNamespace := secret.Labels[capr.MachineNamespaceLabel]
+		if machineName != "" && machineNamespace != "" {
+			machine, err := a.clients.CAPI.Machine().Cache().Get(machineNamespace, machineName)
+			switch {
+			case apierrors.IsNotFound(err):
+				// The plan secret outlives its machine briefly during deletion; treat as ineligible.
+				c.Eligible = false
+			case err != nil:
+				return nil, err
+			case machine.DeletionTimestamp != nil:
+				c.Eligible = false
+			}
+		}
+		candidates = append(candidates, c)
+	}
+	return electLeader(role, candidates), nil
 }
 
 func (a *CAPRAdapter) PauseCluster(paused bool) error {
@@ -748,4 +799,93 @@ func (a *ImportedAdapter) KubeconfigPath(_ *corev1.Secret) string {
 		return "/etc/rancher/k3s/k3s.yaml"
 	}
 	return "/etc/rancher/rke2/rke2.yaml"
+}
+
+// ElectLeader picks a leader from the imported cluster's machine-plan secrets. Eligibility excludes
+// secrets whose backing v3.Node has a non-nil DeletionTimestamp (or whose Node is gone). Init
+// detection parses the distro's node-args annotation off the v3.Node status — k3s init nodes pass
+// --cluster-init; rke2 servers are init when they have no --server flag pointing elsewhere.
+func (a *ImportedAdapter) ElectLeader(role LeaderRole, namespace string) (*corev1.Secret, error) {
+	secrets, err := a.clients.Core.Secret().Cache().List(namespace, labels.SelectorFromSet(labels.Set{
+		capr.ClusterNameLabel: a.cluster.Name,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	runtime := a.RuntimeCommand()
+
+	candidates := make([]LeaderCandidate, 0, len(secrets))
+	for _, secret := range secrets {
+		c := LeaderCandidate{Secret: secret, Eligible: true}
+
+		nodeName := secret.Labels[capr.MachineNameLabel]
+		if nodeName != "" {
+			node, err := a.clients.Mgmt.Node().Cache().Get(a.cluster.Name, nodeName)
+			switch {
+			case apierrors.IsNotFound(err):
+				c.Eligible = false
+			case err != nil:
+				return nil, err
+			case node.DeletionTimestamp != nil:
+				c.Eligible = false
+			default:
+				c.Init = isImportedInitNode(node, runtime)
+			}
+		}
+		candidates = append(candidates, c)
+	}
+	return electLeader(role, candidates), nil
+}
+
+// isImportedInitNode infers whether the downstream Node was started as the cluster's init server,
+// based on the distro's node-args annotation kept on the v3.Node status by the nodesyncer.
+//
+//   - k3s: the init node passes --cluster-init.
+//   - rke2: there is no explicit init flag; the first server has no --server <url>, so absence of
+//     --server in a server-mode args list signals init.
+//
+// Returns false if the annotation is missing or unparseable; downstream tiers (etcd-only, etcd+cp)
+// still apply.
+func isImportedInitNode(node *mgmtv3.Node, runtime string) bool {
+	if node == nil || node.Status.NodeAnnotations == nil {
+		return false
+	}
+	raw := node.Status.NodeAnnotations[runtime+".io/node-args"]
+	if raw == "" {
+		return false
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(raw), &args); err != nil {
+		return false
+	}
+
+	isServer := false
+	for _, arg := range args {
+		if arg == "server" {
+			isServer = true
+			break
+		}
+	}
+	if !isServer {
+		return false
+	}
+
+	switch runtime {
+	case capr.RuntimeK3S:
+		for _, arg := range args {
+			if arg == "--cluster-init" || strings.HasPrefix(arg, "--cluster-init=") {
+				return true
+			}
+		}
+		return false
+	case capr.RuntimeRKE2:
+		for _, arg := range args {
+			if arg == "--server" || strings.HasPrefix(arg, "--server=") {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
