@@ -63,6 +63,16 @@ func (p *PrivateRegistry) PullSecretsAsObjectReferences() []kcorev1.LocalObjectR
 	return out
 }
 
+func (p *PrivateRegistry) DownstreamPullSecretsAsObjectReferences() []kcorev1.LocalObjectReference {
+	var out []kcorev1.LocalObjectReference
+	for _, secret := range p.PullSecrets {
+		out = append(out, kcorev1.LocalObjectReference{
+			Name: GeneratePullSecretName(secret.Name),
+		})
+	}
+	return out
+}
+
 // GetPrivateRegistryURL returns the URL of the private registry specified. It will return the cluster level registry if
 // one is found, or the global system default registry if no cluster level registry is found. If neither is found, it will
 // return an empty string.
