@@ -12,6 +12,7 @@ import (
 	apiextcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -51,8 +52,11 @@ func (h *handler) initializeCRDs(crdClient apiextcontrollers.CustomResourceDefin
 	return nil
 }
 
+// crdToResourceMatch returns the first served and not deprecated version of the CRD as a resourceMatch,
+// or nil if there are no served versions or the CRD is not valid
 func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 	if crd.Status.AcceptedNames.Kind == "" || len(crd.Spec.Versions) == 0 {
+		logrus.Debugf("[authprovisioningv2] CRD %s does not have any versions or accepted names, skipping", crd.Name)
 		return nil
 	}
 
@@ -63,6 +67,11 @@ func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 			version = ver
 			break
 		}
+	}
+
+	if !version.Served {
+		logrus.Debugf("[authprovisioningv2] CRD %s does not have served version, skipping", crd.Name)
+		return nil
 	}
 
 	gvk := schema.GroupVersionKind{

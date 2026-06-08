@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -421,12 +421,31 @@ func Test_crdToResourceMatch(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "selects first version when all deprecated or not served",
+			name: "nil when no served non-deprecated and fallback version is not served",
 			crd: &apiextv1.CustomResourceDefinition{
 				Spec: apiextv1.CustomResourceDefinitionSpec{
 					Group: "example.io",
 					Versions: []apiextv1.CustomResourceDefinitionVersion{
 						{Name: "v1alpha1", Served: false, Deprecated: true},
+						{Name: "v1beta1", Served: true, Deprecated: true},
+					},
+				},
+				Status: apiextv1.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextv1.CustomResourceDefinitionNames{
+						Kind:   "Example",
+						Plural: "examples",
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "falls back to first version when no served non-deprecated exists and first is served",
+			crd: &apiextv1.CustomResourceDefinition{
+				Spec: apiextv1.CustomResourceDefinitionSpec{
+					Group: "example.io",
+					Versions: []apiextv1.CustomResourceDefinitionVersion{
+						{Name: "v1alpha1", Served: true, Deprecated: true},
 						{Name: "v1beta1", Served: true, Deprecated: true},
 					},
 				},
@@ -526,7 +545,7 @@ func Test_crdToResourceMatch(t *testing.T) {
 			},
 		},
 		{
-			name: "handles CRD with only not served versions",
+			name: "nil for CRD with only not served versions",
 			crd: &apiextv1.CustomResourceDefinition{
 				Spec: apiextv1.CustomResourceDefinitionSpec{
 					Group: "example.io",
@@ -541,14 +560,7 @@ func Test_crdToResourceMatch(t *testing.T) {
 					},
 				},
 			},
-			want: &resourceMatch{
-				GVK: schema.GroupVersionKind{
-					Group:   "example.io",
-					Version: "v1alpha1",
-					Kind:    "Example",
-				},
-				Resource: "examples",
-			},
+			want: nil,
 		},
 	}
 
