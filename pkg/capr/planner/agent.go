@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 )
 
@@ -37,5 +38,10 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, err
 	}
 
-	return systemtemplate.ForCluster(mgmtCluster, tokens[0].Status.Token, taints, p.secretCache)
+	token, err := crt.GetTokenFromSecret(p.secretCache, tokens[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return systemtemplate.ForCluster(mgmtCluster, token, taints, p.secretCache)
 }

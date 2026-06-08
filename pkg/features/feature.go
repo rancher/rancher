@@ -245,6 +245,13 @@ var (
 		true,
 		true,
 	)
+	CRTTokenTTLRotation = newFeature(
+		"crt-token-ttl-rotation",
+		"Enable TTL-based automatic rotation of ClusterRegistrationToken credentials",
+		true,
+		true,
+		true,
+	)
 )
 
 func ListEnabled() []string {

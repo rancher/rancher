@@ -6,13 +6,14 @@ import (
 	"github.com/rancher/apiserver/pkg/parse"
 	"github.com/rancher/rancher/pkg/cacerts"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 )
 
-func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrationTokenCache) http.Handler {
+func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrationTokenCache, secretCache corecontrollers.SecretCache) http.Handler {
 	router := http.NewServeMux()
 
 	router.Handle("/{$}", PreferredIndex())
-	router.Handle("/cacerts", cacerts.Handler(clusterRegistrationTokenCache))
+	router.Handle("/cacerts", cacerts.Handler(clusterRegistrationTokenCache, secretCache))
 	router.Handle("/dashboard", http.RedirectHandler("/dashboard/", http.StatusFound))
 	router.Handle("/humans.txt", vue.ServeAsset())
 	router.Handle("/robots.txt", vue.ServeAsset())
