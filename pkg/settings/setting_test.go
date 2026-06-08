@@ -77,6 +77,11 @@ func TestSystemDefaultRegistryDefault(t *testing.T) {
 	}
 }
 
+func TestClusterAutoscalerDefaultsUseBuildTimeVariables(t *testing.T) {
+	assert.Equal(t, defaultClusterAutoscalerChartRepository, ClusterAutoscalerChartRepository.Default)
+	assert.Equal(t, defaultClusterAutoscalerImage, ClusterAutoscalerImage.Default)
+}
+
 // TestSystemFeatureChartRefreshSecondsDefault tests that the default refresh time is either
 // the default value of 21600 seconds or the build time value set through InjectDefaults.
 func TestSystemFeatureChartRefreshSecondsDefault(t *testing.T) {
