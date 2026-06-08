@@ -125,7 +125,9 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 			} else {
 				userControllerMock.EXPECT().List(gomock.Any()).Return(&v3.UserList{}, test.principalError).AnyTimes()
 			}
-			userControllerMock.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(user *v3.User) (*v3.User, error) {
+			impClientMock := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+			userControllerMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil).AnyTimes()
+			impClientMock.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(user *v3.User) (*v3.User, error) {
 				u := user.DeepCopy()
 				return u, nil
 			})
