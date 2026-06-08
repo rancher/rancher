@@ -46,10 +46,12 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch")
-
-	clusterCreateRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create").
-		addNamespacedRule("fleet-default").addRule().apiGroups("").resources("secrets").verbs("create")
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch").
+		addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("awsclusterstaticidentities").verbs("create")
+	clusterCreateRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
+	clusterCreateFleetDefault := clusterCreateRole.addNamespacedRule("fleet-default")
+	clusterCreateFleetDefault.addRule().apiGroups("").resources("secrets").verbs("create")
+	clusterCreateFleetDefault.addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("*").verbs("create")
 
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
@@ -83,8 +85,11 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	userRole := addUserRules(rb.addRole("User", "user"))
-	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create").
-		addNamespacedRule("fleet-default").addRule().apiGroups("").resources("secrets").verbs("create")
+	userRole.addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("awsclusterstaticidentities").verbs("create")
+	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
+	userFleetDefault := userRole.addNamespacedRule("fleet-default")
+	userFleetDefault.addRule().apiGroups("").resources("secrets").verbs("create")
+	userFleetDefault.addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("*").verbs("create")
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "update", "patch").
@@ -372,7 +377,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in
-	//rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
+	// rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
 	//	addRule().apiGroups("").resources("events").verbs("get", "list", "watch").
 	//	addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 
