@@ -2,6 +2,7 @@ package authprovisioningv2
 
 import (
 	"fmt"
+	"strings"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
@@ -31,15 +32,35 @@ func getObjectClusterNames(obj runtime.Object) ([]string, error) {
 	}
 
 	gvk := obj.GetObjectKind().GroupVersionKind()
-	if gvk.Group == dynamicschema.MachineConfigAPIGroup {
-		objMeta, err := meta.Accessor(obj)
-		// If there is an error, skip this block
-		if err == nil {
+
+	objMeta, err := meta.Accessor(obj)
+	// If there is an error, skip this block
+	if err == nil {
+		if gvk.Group == dynamicschema.MachineConfigAPIGroup {
 			for _, owner := range objMeta.GetOwnerReferences() {
 				if owner.APIVersion == "provisioning.cattle.io/v1" && owner.Kind == "Cluster" {
 					return []string{owner.Name}, nil
 				}
 			}
+		}
+
+		// Infrastructure/bootstrap/controlplane provider objects (e.g. AWSMachineTemplate)
+		// may have an ownerRef to a cluster.x-k8s.io/Cluster but no spec.clusterName field.
+		// Since the CAPI Cluster name equals the provisioning Cluster name, the ownerRef
+		// name is directly usable as the cluster name. Match on the group prefix to be
+		// version-agnostic (v1beta1, v1beta2, future v1, etc.).
+		for _, owner := range objMeta.GetOwnerReferences() {
+			if strings.HasPrefix(owner.APIVersion, "cluster.x-k8s.io/") && owner.Kind == "Cluster" {
+				return []string{owner.Name}, nil
+			}
+		}
+
+		// Infrastructure provider objects (e.g. AWSCluster, AWSMachine) carry the
+		// CAPI-standard label cluster.x-k8s.io/cluster-name set by CAPI controllers.
+		// AWSMachine for example has no spec.clusterName and its ownerRef points to a
+		// Machine (not a Cluster directly), so the label is the most reliable fallback.
+		if clusterName := objMeta.GetLabels()["cluster.x-k8s.io/cluster-name"]; clusterName != "" {
+			return []string{clusterName}, nil
 		}
 	}
 
