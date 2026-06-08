@@ -175,6 +175,25 @@ tests:
           path: spec.gatewayClassName
           value: nginx
 
+  - it: shoulde set additional annotations on Gateway
+    template: templates/ingate/gateway.yaml
+    set:
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          extraAnnotations:
+            annotation1: value1
+            annotation2: value2
+    asserts:
+      - equal:
+          path: metadata.annotations.annotation1
+          value: value1
+      - equal:
+          path: metadata.annotations.annotation2
+          value: value2
+
+
   - it: should render HTTPRoute when networkExposure type is gateway
     template: templates/ingate/httproute.yaml
     set:

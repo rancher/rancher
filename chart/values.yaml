@@ -126,7 +126,7 @@ gateway:
     #      certificateRefs:
     #        - name: app-tls
     #          kind: Secret
-
+    extraAnnotations: {}
     tls:
       # options: rancher, letsEncrypt, secret
       source: rancher

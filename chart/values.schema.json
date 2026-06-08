@@ -116,6 +116,13 @@
                 }
               }
             },
+            "extraAnnotations": {
+              "type": "object",
+              "description": "Additional annotations to add to the Gateway resource",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
             "tls": {
               "type": "object",
               "description": "The default rancher gateway class tls configuration",
