@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -397,4 +398,18 @@ func (a *CAPRAdapter) ElectLeader(role LeaderRole, namespace string) (*corev1.Se
 		candidates = append(candidates, c)
 	}
 	return electLeader(role, candidates), nil
+}
+
+func (a *CAPRAdapter) PauseCluster(pause bool) error {
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return err
+	}
+	if ptr.Equal(cluster.Spec.Paused, &pause) {
+		return nil
+	}
+	cluster = cluster.DeepCopy()
+	cluster.Spec.Paused = &pause
+	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
 }
