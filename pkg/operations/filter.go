@@ -38,6 +38,10 @@ func IsWindows(secret *corev1.Secret) bool {
 	return secret != nil && secret.Labels != nil && secret.Labels[capr.CattleOSLabel] == "windows"
 }
 
+func IsInitNode(s *corev1.Secret) bool {
+	return s.Labels[capr.InitNodeLabel] == "true"
+}
+
 // And returns a Filter that requires both l and r to return true. Short-circuits on the first
 // false — if l(secret) is false, r is not evaluated.
 func And(l, r Filter) Filter {
