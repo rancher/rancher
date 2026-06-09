@@ -169,9 +169,19 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 }
 
 func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
-	// TODO: should pass in some relevant ENVs to the container
 	t := true
 	u1000 := int64(1000)
+
+	// Collect whitelisted environment variables from the whitelist-envvars setting.
+	// By default, this includes HTTP_PROXY, HTTPS_PROXY, and NO_PROXY.
+	var envVars []corev1.EnvVar
+	settings.IterateWhitelistedEnvVars(func(name, value string) {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  name,
+			Value: value,
+		})
+	})
+
 	return corev1.PodSpec{
 		ServiceAccountName: consts.ServiceAccountName,
 		Containers: []corev1.Container{
@@ -179,6 +189,7 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 				Name:            "scc-operator",
 				Image:           p.SCCOperatorImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env:             envVars,
 				SecurityContext: &corev1.SecurityContext{
 					RunAsNonRoot:   &t,
 					RunAsGroup:     &u1000,
