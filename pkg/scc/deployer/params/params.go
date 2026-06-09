@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"maps"
-	"regexp"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/scc/consts"
@@ -15,6 +15,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type SCCOperatorParams struct {
@@ -206,19 +207,11 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 	}
 }
 
-// envVarNameRegex matches valid Kubernetes environment variable names.
-// According to Kubernetes, env var names must be valid C identifiers:
-// - Must match [A-Za-z_][A-Za-z0-9_]*
-// - Must start with a letter or underscore
-// - Can contain letters, digits, and underscores
-var envVarNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-
 // isValidEnvVarName checks if a name is a valid Kubernetes environment variable name.
-// Invalid names are logged as warnings to help administrators identify misconfigurations.
 func isValidEnvVarName(name string) bool {
-	if !envVarNameRegex.MatchString(name) {
-		logrus.Warnf("Skipping invalid environment variable name '%s' in whitelist-envvars setting. "+
-			"Kubernetes env var names must match [A-Za-z_][A-Za-z0-9_]* (C identifier format)", name)
+	if errs := validation.IsEnvVarName(name); len(errs) > 0 {
+		logrus.Warnf("Skipping invalid environment variable name '%s' in whitelist-envvars setting: %s",
+			name, strings.Join(errs, "; "))
 		return false
 	}
 	return true

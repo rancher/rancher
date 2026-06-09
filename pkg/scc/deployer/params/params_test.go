@@ -255,11 +255,12 @@ func TestIsValidEnvVarName(t *testing.T) {
 		{"valid starting with underscore", "_PRIVATE_VAR", true},
 		{"valid single letter", "X", true},
 		{"valid single underscore", "_", true},
+		{"valid with hyphen", "HTTP-PROXY", true},          // K8s allows hyphens
+		{"valid with dot", "MY.VAR", true},                 // K8s allows dots
+		{"valid with multiple parts", "my.env-name", true}, // K8s example format
 
 		// Invalid names
-		{"invalid with hyphen", "HTTP-PROXY", false},
 		{"invalid starting with number", "1VAR", false},
-		{"invalid with dot", "MY.VAR", false},
 		{"invalid with space", "MY VAR", false},
 		{"invalid with special char", "VAR!", false},
 		{"invalid with at sign", "VAR@HOST", false},
@@ -284,13 +285,14 @@ func TestPreparePodSpec_SkipsInvalidEnvVarNames(t *testing.T) {
 	}()
 
 	// Set whitelist with both valid and invalid variable names
-	settings.WhitelistEnvironmentVars.Set("HTTP_PROXY,INVALID-NAME,VALID_VAR,ANOTHER-INVALID")
+	settings.WhitelistEnvironmentVars.Set("HTTP_PROXY,INVALID@NAME,VALID_VAR,1STARTS_WITH_DIGIT,SPACE VAR")
 
 	// Set environment variables (including invalid names)
 	t.Setenv("HTTP_PROXY", "http://proxy.example.com:8080")
-	t.Setenv("INVALID-NAME", "should-be-skipped")
+	t.Setenv("INVALID@NAME", "should-be-skipped")
 	t.Setenv("VALID_VAR", "valid-value")
-	t.Setenv("ANOTHER-INVALID", "also-skipped")
+	t.Setenv("1STARTS_WITH_DIGIT", "also-skipped")
+	t.Setenv("SPACE VAR", "has-space")
 
 	params := &SCCOperatorParams{
 		SCCOperatorImage: "rancher/scc-operator:test",
@@ -315,8 +317,10 @@ func TestPreparePodSpec_SkipsInvalidEnvVarNames(t *testing.T) {
 	assert.Equal(t, "valid-value", envMap["VALID_VAR"], "VALID_VAR should be set")
 
 	// Verify invalid names are NOT included
-	_, hasInvalidName := envMap["INVALID-NAME"]
-	assert.False(t, hasInvalidName, "INVALID-NAME should be skipped")
-	_, hasAnotherInvalid := envMap["ANOTHER-INVALID"]
-	assert.False(t, hasAnotherInvalid, "ANOTHER-INVALID should be skipped")
+	_, hasInvalidName := envMap["INVALID@NAME"]
+	assert.False(t, hasInvalidName, "INVALID@NAME should be skipped")
+	_, hasDigitStart := envMap["1STARTS_WITH_DIGIT"]
+	assert.False(t, hasDigitStart, "1STARTS_WITH_DIGIT should be skipped")
+	_, hasSpace := envMap["SPACE VAR"]
+	assert.False(t, hasSpace, "SPACE VAR should be skipped")
 }
