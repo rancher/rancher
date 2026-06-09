@@ -31,8 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// ControllerOwnerKey is the value used to identify that the encryption-key-rotation handler currently owns the beacon.
+// ControllerOwnerKey is the shared operation-type key for encryption key rotation coordination.
+// Beacon ownership uses a per-operation key derived from the operation UID.
 const ControllerOwnerKey = "encryption-key-rotation"
+const beaconOwnerRefAnnotation = "rke.cattle.io/operation-owner-ref"
 
 type handler struct {
 	encryptionkeyrotations operationcontrollers.EncryptionKeyRotationController
@@ -215,7 +217,12 @@ type scope struct {
 }
 
 func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	ownerKey := beaconOwnerKey(s.op)
+	if err := h.reclaimStaleBeaconOwnerIfNeeded(s); err != nil {
+		return status, err
+	}
+
+	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ownerKey)
 	if err != nil {
 		return status, err
 	}
@@ -225,6 +232,21 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon acquisition")
 		return status, nil
 	}
+
+	desiredOwnerRef := fmt.Sprintf("%s/%s/%s", s.op.Namespace, s.op.Name, s.op.UID)
+	if beacon.Annotations == nil || beacon.Annotations[beaconOwnerRefAnnotation] != desiredOwnerRef {
+		beacon = beacon.DeepCopy()
+		if beacon.Annotations == nil {
+			beacon.Annotations = map[string]string{}
+		}
+		beacon.Annotations[beaconOwnerRefAnnotation] = desiredOwnerRef
+		beacon, err = h.beacons.Update(beacon)
+		if err != nil {
+			return status, err
+		}
+	}
+	s.beacon = beacon
+
 	logrus.Infof("[encryptionkeyrotation] %s/%s: acquired beacon, waiting for agents to register", s.op.Namespace, s.op.Name)
 
 	if ok, err := s.adapter.WaitForRegister(); err != nil {
@@ -249,7 +271,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	if !planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if !planapi.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
 		status.Phase = opv1alpha1.OperationPhaseFailed
 		status.LastUpdated = metav1.Now()
 
@@ -673,7 +695,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotation
 		return status, err
 	}
 
-	err := planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	err := planapi.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op))
 	if err != nil {
 		return status, err
 	}
@@ -687,14 +709,14 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotat
 		return status, err
 	}
 
-	if planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if planapi.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
 		var err error
 		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {
 			return status, err
 		}
 
-		err = planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+		err = planapi.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op))
 		if err != nil {
 			return status, err
 		}
@@ -754,6 +776,77 @@ func markFailed(status *opv1alpha1.EncryptionKeyRotationStatus, reason, condMsg 
 	opv1alpha1.FailedCondition.True(status)
 	opv1alpha1.FailedCondition.Reason(status, reason)
 	opv1alpha1.FailedCondition.Message(status, condMsg)
+}
+
+// beaconOwnerKey returns the per-operation beacon owner key used for
+// EKR beacon ownership checks and lifecycle cleanup.
+func beaconOwnerKey(op *opv1alpha1.EncryptionKeyRotation) string {
+	if op == nil {
+		return ControllerOwnerKey
+	}
+	if op.UID != "" {
+		return fmt.Sprintf("%s-%s", ControllerOwnerKey, op.UID)
+	}
+	return fmt.Sprintf("%s-%s-%s", ControllerOwnerKey, op.Namespace, op.Name)
+}
+
+// reclaimStaleBeaconOwnerIfNeeded clears stale EKR beacon ownership when the
+// recorded owner reference is invalid, missing, deleted, or terminal.
+// Non-EKR owners are left untouched so this controller only reclaims its own
+// operation type.
+func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
+	if s.beacon == nil || s.beacon.Labels == nil {
+		return nil
+	}
+
+	currentOwnerKey := s.beacon.Labels[planv1alpha1.OwnerLabel]
+	newOwnerKey := beaconOwnerKey(s.op)
+	// No owner, or we already own it
+	if currentOwnerKey == "" || currentOwnerKey == newOwnerKey {
+		return nil
+	}
+	// Another controller type owns it
+	if currentOwnerKey != ControllerOwnerKey && !strings.HasPrefix(currentOwnerKey, ControllerOwnerKey+"-") {
+		return nil
+	}
+
+	reclaim := false
+
+	ownerRef := ""
+	if s.beacon.Annotations != nil {
+		ownerRef = s.beacon.Annotations[beaconOwnerRefAnnotation]
+	}
+	parts := strings.SplitN(ownerRef, "/", 3)
+	// Missing or broken owner ref means we cannot trust this owner
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		reclaim = true
+	} else {
+		currentOp, err := h.encryptionkeyrotations.Get(parts[0], parts[1], metav1.GetOptions{})
+		// Owner object is gone
+		if apierrors.IsNotFound(err) {
+			reclaim = true
+		} else if err != nil {
+			return err
+			// UID changed or owner finished
+		} else if string(currentOp.UID) != parts[2] || ops.IsTerminal(currentOp.Status.Phase) {
+			reclaim = true
+		}
+	}
+	if !reclaim {
+		return nil
+	}
+
+	beacon := s.beacon.DeepCopy()
+	delete(beacon.Labels, planv1alpha1.OwnerLabel)
+	if beacon.Annotations != nil {
+		delete(beacon.Annotations, beaconOwnerRefAnnotation)
+	}
+	updated, err := h.beacons.Update(beacon)
+	if err != nil {
+		return err
+	}
+	s.beacon = updated
+	return nil
 }
 
 // encryptionKeyRotationOperationUIDEnv returns an env var that embeds the operation UID into machine plan
