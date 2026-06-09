@@ -5,7 +5,6 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/plan"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
@@ -109,11 +108,11 @@ func (a *ImportedAdapter) ServerUnit() string {
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // Currently custom data directories, probes, and using ipv4 as the primary ip family are not supported.
-func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
+func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]planapi.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
 		probeNames []string
-		probes     = map[string]plan.Probe{}
+		probes     = map[string]planapi.Probe{}
 	)
 
 	if runtime != capr.RuntimeK3S && IsEtcd(secret) {
