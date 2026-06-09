@@ -68,6 +68,15 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	status = updateStatus(op, status)
 
 	if reflect.DeepEqual(op.Status, status) {
+		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
+		if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
+			err = h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				return status, err
+			}
+			return status, generic.ErrSkip
+		}
+
 		h.etcdsnapshotsaves.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
 	}
 	return status, nil
@@ -188,15 +197,6 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		return status, err
 	}
 
-	// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
-	if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
-		err = h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			return status, err
-		}
-		return status, generic.ErrSkip
-	}
-
 	return status, nil
 }
 
@@ -211,6 +211,7 @@ type scope struct {
 
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling pending", s.op.Namespace, s.op.Name)
+
 	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 	if err != nil {
 		return status, err
@@ -221,6 +222,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
 		return status, nil
 	}
+
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: acquired beacon, waiting for agents to register", s.op.Namespace, s.op.Name)
 
 	if ok, err := s.adapter.WaitForRegister(); err != nil {
@@ -265,20 +267,21 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 
 	switch s.op.Status.Step {
 	case opv1alpha1.ETCDSnapshotSaveStepSave:
-		return h.reconcileSave(s, status)
+		status, err = h.reconcileSave(s, status)
 	case opv1alpha1.ETCDSnapshotSaveStepRestart:
-		return h.reconcileRestart(s, status)
+		status, err = h.reconcileRestart(s, status)
+	default:
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf(
+			"current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\"]",
+			status.Step,
+			opv1alpha1.ETCDSnapshotSaveStepSave,
+			opv1alpha1.ETCDSnapshotSaveStepRestart))
+
 	}
-
-	status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-	opv1alpha1.FailedCondition.True(&status)
-	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf(
-		"current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\"]",
-		status.Step,
-		opv1alpha1.ETCDSnapshotSaveStepSave,
-		opv1alpha1.ETCDSnapshotSaveStepRestart))
 
 	return status, nil
 }
@@ -295,6 +298,15 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		Collect(h.secretCache, s.namespace)
 	if err != nil {
 		return status, err
+	}
+	if len(secrets) == 0 {
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, "failed to find etcd node to perform etcd snapshot")
+
+		return status, nil
 	}
 
 	for _, secret := range secrets {
@@ -443,10 +455,19 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
-	err := planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
-	if err != nil {
-		return status, err
+	if planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+		var err error
+		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
+		if err != nil {
+			return status, err
+		}
+
+		err = planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+		if err != nil {
+			return status, err
+		}
 	}
+
 	return status, nil
 }
 
