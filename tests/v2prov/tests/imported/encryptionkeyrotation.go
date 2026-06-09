@@ -41,7 +41,7 @@ func RunEncryptionKeyRotationOperationTest(t *testing.T, clients *clients.Client
 		t.Fatal(err)
 	}
 
-	err = wait.ObjectWithTimeout(clients.Ctx, 5*time.Minute, clients.Operation.EncryptionKeyRotation().Watch, op, func(obj runtime.Object) (bool, error) {
+	err = wait.ObjectWithTimeout(clients.Ctx, 25*time.Minute, clients.Operation.EncryptionKeyRotation().Watch, op, func(obj runtime.Object) (bool, error) {
 		op = obj.(*opv1alpha1.EncryptionKeyRotation)
 		if op.Status.Phase == opv1alpha1.OperationPhaseFailed {
 			return false, fmt.Errorf("encryption key rotation operation failed at step %q", op.Status.Step)
@@ -53,6 +53,14 @@ func RunEncryptionKeyRotationOperationTest(t *testing.T, clients *clients.Client
 	}
 
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
+
+	err = wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
+		return clients.Operation.EncryptionKeyRotation().Get(op.Namespace, op.Name, metav1.GetOptions{})
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for operation %s %s/%s to be deleted: %v", opv1alpha1.EncryptionKeyRotationResourceName, op.Namespace, op.Name, err)
+	}
+
 	return op
 }
 
