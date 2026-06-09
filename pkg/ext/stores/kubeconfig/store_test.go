@@ -555,6 +555,7 @@ func TestStoreCreate(t *testing.T) {
 		require.Len(t, createdTokens, 2)
 		for _, tok := range createdTokens {
 			assert.Equal(t, created.Name, tok.Labels["authn.management.cattle.io/kubeconfig-id"])
+			assert.Equal(t, KindLabelValue, tok.Labels["authn.management.cattle.io/kind"])
 		}
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
@@ -2751,6 +2752,163 @@ func TestStoreDelete(t *testing.T) {
 		assert.True(t, deleteValidationCalled)
 		assert.Len(t, deletedTokens, 2)
 	})
+	t.Run("admin deletes a pre-migration kubeconfig with v3 tokens", func(t *testing.T) {
+		deleteOptions := &metav1.DeleteOptions{
+			GracePeriodSeconds: ptr.To(int64(60)),
+		}
+
+		v3TokenID1 := "kubeconfig-" + adminID + "agc66"
+		v3TokenID2 := "kubeconfig-" + adminID + "d12fg"
+
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["` + v3TokenID1 + `","` + v3TokenID2 + `"]`
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return cm, nil
+		}).Times(1)
+		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
+
+		var probed []string
+		extTokenStore := &fakeTokenStore{
+			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
+				probed = append(probed, name)
+				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+			},
+			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
+				require.Fail(t, "ext token store delete should not be called for v3 tokens")
+				return nil
+			},
+		}
+
+		var deletedV3 []string
+		v3TokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+		v3TokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
+			deletedV3 = append(deletedV3, name)
+			assert.Contains(t, []string{v3TokenID1, v3TokenID2}, name)
+			assert.Equal(t, deleteOptions.GracePeriodSeconds, options.GracePeriodSeconds)
+			assert.Equal(t, deleteOptions.PropagationPolicy, options.PropagationPolicy)
+			assert.Equal(t, deleteOptions.DryRun, options.DryRun)
+			return nil
+		}).Times(2)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      extTokenStore,
+			v3Tokens:        v3TokenClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminID,
+		})
+
+		obj, _, err := store.Delete(ctx, kubeconfigID, nil, deleteOptions)
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		assert.ElementsMatch(t, []string{v3TokenID1, v3TokenID2}, probed)
+		assert.ElementsMatch(t, []string{v3TokenID1, v3TokenID2}, deletedV3)
+	})
+	t.Run("admin deletes a kubeconfig with mixed ext and v3 tokens", func(t *testing.T) {
+		extTokenID := "token-extabc"
+		v3TokenID := "kubeconfig-" + adminID + "v3xyz"
+
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["` + extTokenID + `","` + v3TokenID + `"]`
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return cm, nil
+		}).Times(1)
+		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
+
+		var probed []string
+		var deletedExt []string
+		extTokenStore := &fakeTokenStore{
+			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
+				probed = append(probed, name)
+				if name == extTokenID {
+					return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
+				}
+				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+			},
+			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
+				deletedExt = append(deletedExt, name)
+				return nil
+			},
+		}
+
+		var deletedV3 []string
+		v3TokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+		v3TokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
+			deletedV3 = append(deletedV3, name)
+			return nil
+		}).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      extTokenStore,
+			v3Tokens:        v3TokenClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminID,
+		})
+
+		_, _, err := store.Delete(ctx, kubeconfigID, nil, &metav1.DeleteOptions{})
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{extTokenID, v3TokenID}, probed)
+		assert.Equal(t, []string{extTokenID}, deletedExt)
+		assert.Equal(t, []string{v3TokenID}, deletedV3)
+	})
+	t.Run("error probing the ext token store fails the delete", func(t *testing.T) {
+		tokenID := "token-probefail"
+
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["` + tokenID + `"]`
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return cm, nil
+		}).Times(1)
+		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
+
+		extTokenStore := &fakeTokenStore{
+			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
+				return nil, apierrors.NewInternalError(fmt.Errorf("boom"))
+			},
+			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
+				require.Fail(t, "ext token store delete should not be called when probe fails")
+				return nil
+			},
+		}
+
+		// No v3 deletes expected — the unset mock will fail loudly if called.
+		v3TokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      extTokenStore,
+			v3Tokens:        v3TokenClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminID,
+		})
+
+		obj, _, err := store.Delete(ctx, kubeconfigID, nil, &metav1.DeleteOptions{})
+		require.Error(t, err)
+		require.Nil(t, obj)
+		assert.True(t, apierrors.IsInternalError(err))
+	})
 	t.Run("user can't delete other user's kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
@@ -2907,6 +3065,60 @@ func TestStoreDeleteCollection(t *testing.T) {
 
 		assert.Equal(t, deleteValidationCalledTimes, 1)
 		assert.Len(t, deletedTokens, 2)
+	})
+	t.Run("admin deletes a pre-migration kubeconfig collection with v3 tokens", func(t *testing.T) {
+		deleteOptions := &metav1.DeleteOptions{
+			GracePeriodSeconds: ptr.To(int64(60)),
+		}
+		listOptions := &metainternalversion.ListOptions{
+			LabelSelector: labels.Set{UserIDLabel: userID}.AsSelector(),
+		}
+
+		v3TokenID := "kubeconfig-" + userID + "v3only"
+
+		cmWithV3 := configMap.DeepCopy()
+		cmWithV3.Data[StatusTokensField] = `["` + v3TokenID + `"]`
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().List(namespace, gomock.Any()).Return(&corev1.ConfigMapList{
+			ListMeta: metav1.ListMeta{ResourceVersion: "1"},
+			Items:    []corev1.ConfigMap{*cmWithV3},
+		}, nil).Times(1)
+		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
+
+		extTokenStore := &fakeTokenStore{
+			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
+				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+			},
+			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
+				require.Fail(t, "ext token store delete should not be called for v3 tokens")
+				return nil
+			},
+		}
+
+		var deletedV3 []string
+		v3TokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+		v3TokenClient.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, options *metav1.DeleteOptions) error {
+			deletedV3 = append(deletedV3, name)
+			return nil
+		}).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      extTokenStore,
+			v3Tokens:        v3TokenClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminID,
+		})
+
+		_, err := store.DeleteCollection(ctx, nil, deleteOptions, listOptions)
+		require.NoError(t, err)
+		assert.Equal(t, []string{v3TokenID}, deletedV3)
 	})
 }
 
