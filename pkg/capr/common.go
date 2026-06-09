@@ -184,6 +184,13 @@ const (
 	// it triggers a scale-down of the cluster-autoscaler chart in the downstream cluster
 	ClusterAutoscalerPausedAnnotation = "provisioning.cattle.io/cluster-autoscaler-paused"
 
+	// RKE2PrimeEnabledAnnotation is a per-cluster annotation that overrides the global
+	// rke2-provisioning-prime-default setting. When explicitly set to "true" or "false", it takes
+	// precedence over the global setting. If absent, the global setting applies.
+	// On upgrade, existing RKE2 clusters receive this annotation set to "false" so their behavior
+	// is unchanged.
+	RKE2PrimeEnabledAnnotation = "provisioning.cattle.io/rke2-prime-enabled"
+
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
 
