@@ -177,24 +177,21 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 
 	switch status.Phase {
 	case opv1alpha1.OperationPhasePending:
-		status, err = h.handlePending(s, status)
+		return h.handlePending(s, status)
 	case opv1alpha1.OperationPhaseInProgress:
-		status, err = h.handleInProgress(s, status)
+		return h.handleInProgress(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
 		// canceled assumes that the beacon is released, so we can safely skip the rest of the processing
 		return status, nil
 	case opv1alpha1.OperationPhaseFailed:
-		status, err = h.handleFailed(s, status)
+		return h.handleFailed(s, status)
 	case opv1alpha1.OperationPhaseSucceeded:
-		status, err = h.handleSucceeded(s, status)
+		return h.handleSucceeded(s, status)
 	default:
 		// Should be prevented via validation, but just in case
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
-	}
-	if err != nil {
-		return status, err
 	}
 
 	return status, nil
@@ -267,9 +264,9 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 
 	switch s.op.Status.Step {
 	case opv1alpha1.ETCDSnapshotSaveStepSave:
-		status, err = h.reconcileSave(s, status)
+		return h.reconcileSave(s, status)
 	case opv1alpha1.ETCDSnapshotSaveStepRestart:
-		status, err = h.reconcileRestart(s, status)
+		return h.reconcileRestart(s, status)
 	default:
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
