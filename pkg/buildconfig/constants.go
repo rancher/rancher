@@ -11,5 +11,5 @@ const (
 	ProvisioningCAPIVersion       = "108.0.0+up0.9.0"
 	RemoteDialerProxyVersion      = "108.0.2+up0.6.2-rc.1"
 	TurtlesVersion                = "108.0.4+up0.25.4"
-	WebhookVersion                = "108.0.6+up0.9.6-rc.2"
+	WebhookVersion                = "108.0.6+up0.9.6-rc.3"
 )
