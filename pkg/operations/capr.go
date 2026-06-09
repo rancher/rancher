@@ -9,7 +9,6 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/plan"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
@@ -124,11 +123,11 @@ func (a *CAPRAdapter) ServerUnit() string {
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // If the cluster is using a custom data directory or secure probes, this information is extracted from the cluster object and rendered in.
-func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
+func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]planapi.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
 		probeNames []string
-		probes     = map[string]plan.Probe{}
+		probes     = map[string]planapi.Probe{}
 	)
 
 	if runtime != capr.RuntimeK3S && IsEtcd(secret) {

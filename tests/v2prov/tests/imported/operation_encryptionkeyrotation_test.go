@@ -2,6 +2,8 @@ package imported
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +22,10 @@ import (
 )
 
 func Test_Operation_SetD_ImportedEncryptionKeyRotation(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) != "rke2" {
+		t.Skip("encryption key rotation")
+	}
+
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
