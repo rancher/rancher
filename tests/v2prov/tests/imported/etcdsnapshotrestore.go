@@ -69,6 +69,7 @@ func RunETCDSnapshotRestoreOperationTest(t *testing.T, clients *clients.Clients,
 		Spec: opv1alpha1.ETCDSnapshotRestoreSpec{
 			OperationSpec: opv1alpha1.OperationSpec{
 				ClusterRef: &clusterRef,
+				TTL:        60,
 			},
 			Args: opv1alpha1.ETCDSnapshotRestoreArgs{
 				Name: snapshotName,
