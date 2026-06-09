@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"maps"
+	"regexp"
 
 	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/version"
+	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -174,12 +176,15 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 
 	// Collect whitelisted environment variables from the whitelist-envvars setting.
 	// By default, this includes HTTP_PROXY, HTTPS_PROXY, and NO_PROXY.
+	// Note: Invalid Kubernetes env var names are skipped to prevent deployment rejection.
 	var envVars []corev1.EnvVar
 	settings.IterateWhitelistedEnvVars(func(name, value string) {
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  name,
-			Value: value,
-		})
+		if isValidEnvVarName(name) {
+			envVars = append(envVars, corev1.EnvVar{
+				Name:  name,
+				Value: value,
+			})
+		}
 	})
 
 	return corev1.PodSpec{
@@ -199,4 +204,22 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 			},
 		},
 	}
+}
+
+// envVarNameRegex matches valid Kubernetes environment variable names.
+// According to Kubernetes, env var names must be valid C identifiers:
+// - Must match [A-Za-z_][A-Za-z0-9_]*
+// - Must start with a letter or underscore
+// - Can contain letters, digits, and underscores
+var envVarNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// isValidEnvVarName checks if a name is a valid Kubernetes environment variable name.
+// Invalid names are logged as warnings to help administrators identify misconfigurations.
+func isValidEnvVarName(name string) bool {
+	if !envVarNameRegex.MatchString(name) {
+		logrus.Warnf("Skipping invalid environment variable name '%s' in whitelist-envvars setting. "+
+			"Kubernetes env var names must match [A-Za-z_][A-Za-z0-9_]* (C identifier format)", name)
+		return false
+	}
+	return true
 }
