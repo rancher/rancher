@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/gotools/mockery
 
-go 1.26.0
+go 1.26.4
 
 tool github.com/vektra/mockery/v2
 
