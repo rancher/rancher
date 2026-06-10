@@ -6,7 +6,7 @@ import (
 
 // EncryptionKeyRotationSpec defines the desired state of EncryptionKeyRotation.
 type EncryptionKeyRotationSpec struct {
-	// +optional
+	// OperationSpec contains the shared operation inputs, including the required ClusterRef.
 	OperationSpec `json:",inline"`
 }
 
