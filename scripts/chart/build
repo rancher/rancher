@@ -16,21 +16,8 @@ cp -rf ${1} build/chart/rancher
 sed -i -e "s/%VERSION%/${CHART_VERSION}/g" build/chart/rancher/Chart.yaml
 sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" build/chart/rancher/Chart.yaml
 
-rancher_shell_base=$CATTLE_DEFAULT_SHELL_VERSION
-rancher_shell_image_name=$(echo "${rancher_shell_base}" | cut -d ":" -f 1) || ""
-rancher_shell_image_tag=$(echo "${rancher_shell_base}" | cut -d ":" -f 2) || ""
-if [[ ! ${rancher_shell_image_name} =~ ^rancher\/.+ ]]; then
-  echo "The image name [$rancher_shell_image_name] is invalid. Its prefix should be rancher/"
-  exit 1
-fi
-if [[ ! ${rancher_shell_image_tag} =~ ^v.+ ]]; then
-  echo "The image tag [$rancher_shell_image_tag] is invalid. It should start with the letter v"
-  exit 1
-fi
-sed -i -e "s@%POST_DELETE_IMAGE_NAME%@${rancher_shell_image_name}@g" build/chart/rancher/values.yaml
-sed -i -e "s/%POST_DELETE_IMAGE_TAG%/${rancher_shell_image_tag}/g" build/chart/rancher/values.yaml
-sed -i -e "s@%PRE_UPGRADE_IMAGE_NAME%@${rancher_shell_image_name}@g" build/chart/rancher/values.yaml
-sed -i -e "s/%PRE_UPGRADE_IMAGE_TAG%/${rancher_shell_image_tag}/g" build/chart/rancher/values.yaml
+# Note: Image versions (auditLog, postDelete, preUpgrade) are now managed by
+# `go generate` from build.yaml. They are kept in sync automatically in chart/values.yaml.
 
 if [[ -v REGISTRY ]]; then
   sed -i "s|systemDefaultRegistry: .*|systemDefaultRegistry: ${REGISTRY}|g" build/chart/rancher/values.yaml
