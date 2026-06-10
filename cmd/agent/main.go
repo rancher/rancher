@@ -19,10 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
+	"github.com/moby/moby/client"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -322,9 +320,8 @@ func exitCertWriter(ctx context.Context) {
 		os.Exit(0)
 	}
 
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=share-mnt")
-	containers, err := c.ContainerList(ctx, container.ListOptions{
+	args := client.Filters{}.Add("label", "io.rancher.rke.container.name=share-mnt")
+	containers, err := c.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: args,
 	})
@@ -333,9 +330,9 @@ func exitCertWriter(ctx context.Context) {
 		os.Exit(0)
 	}
 
-	for _, container := range containers {
+	for _, container := range containers.Items {
 		if len(container.Names) > 0 && strings.Contains(container.Names[0], "share-mnt") {
-			err := c.ContainerKill(ctx, container.ID, "SIGTERM")
+			_, err := c.ContainerKill(ctx, container.ID, client.ContainerKillOptions{Signal: "SIGTERM"})
 			if err != nil {
 				logrus.Error(err)
 				os.Exit(0) // only need to write certs so exit cleanly
