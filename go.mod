@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.25.10
+go 1.25.11
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
