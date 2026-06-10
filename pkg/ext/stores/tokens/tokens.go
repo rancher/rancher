@@ -339,6 +339,9 @@ func (t *Store) DeleteCollection(
 	for _, secret := range secrets.Items {
 		token, _, err := t.deleteCore(ctx, &secret, deleteValidation, options)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
 				secret.Name, err))
 		}
