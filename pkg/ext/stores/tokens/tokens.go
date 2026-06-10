@@ -788,7 +788,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 		return nil
 	}
 	if apierrors.IsNotFound(err) {
-		return nil
+		return apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))

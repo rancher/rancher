@@ -1694,7 +1694,7 @@ func TestSystemStoreDelete(t *testing.T) {
 			name:  "secret not found is ok",
 			token: "bogus",
 			opts:  &metav1.DeleteOptions{},
-			err:   nil,
+			err:   apierrors.NewNotFound(GVR.GroupResource(), "bogus"),
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					Delete("cattle-tokens", "bogus", gomock.Any()).
