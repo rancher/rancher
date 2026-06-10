@@ -42,7 +42,7 @@ type handler struct {
 	beacons     plancontrollers.BeaconClient
 	beaconCache plancontrollers.BeaconCache
 
-	secretCache corecontrollers.SecretCache
+	secrets corecontrollers.SecretClient
 
 	store *planapi.Store
 
@@ -56,7 +56,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		encryptionkeyrotations: clients.Operation.EncryptionKeyRotation(),
 		beacons:                clients.Plan.Beacon(),
 		beaconCache:            clients.Plan.Beacon().Cache(),
-		secretCache:            clients.Core.Secret().Cache(),
+		secrets:                clients.Core.Secret(),
 		dynamic:                clients.Dynamic,
 		store:                  planapi.NewStore(clients.Core.Secret()),
 		clients:                clients,
@@ -156,7 +156,7 @@ func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 		return status, err
 	}
 
-	ekrAdapter, err := ops.NewAdapter(h.clients, &ustr)
+	adapter, err := ops.NewAdapter(h.clients, &ustr)
 	if err != nil {
 		return status, err
 	}
@@ -166,7 +166,7 @@ func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 		beacon:     beacon,
 		namespace:  namespace,
 		clusterObj: &ustr,
-		adapter:    ekrAdapter,
+		adapter:    adapter,
 	}
 
 	if status.Phase == opv1alpha1.OperationPhasePending {
@@ -306,11 +306,11 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	return status, nil
 }
 
+// reconcileRotate runs `secrets-encrypt rotate-keys` on the elected leader and
+// stays in Rotate until status reports `reencrypt_finished` on that node.
 func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling secrets-encrypt rotate-keys", s.op.Namespace, s.op.Name)
 
-	// FindOrElectLeader persists the elected node via annotation so the same
-	// node is reused across Rancher restarts and cache churn.
 	leader, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsControlPlane)
 	if err != nil {
 		return status, err
@@ -324,14 +324,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 		return status, nil
 	}
 
-	logrus.Debugf("[encryptionkeyrotation] %s/%s: using leader %s for rotate-keys", s.op.Namespace, s.op.Name, leader.Name)
-	return h.assignRotateKeysPlan(s, status, leader)
-}
-
-// assignRotateKeysPlan assigns the rotate-keys plan to the leader and waits for runtime
-// completion. The plan uses a shell wrapper so the controller classifies timeout vs failure
-// itself from saved output, advancing to Restart requires reencrypt_finished in periodic status.
-func (h *handler) assignRotateKeysPlan(s *scope, status opv1alpha1.EncryptionKeyRotationStatus, leader *corev1.Secret) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	// Pause the CAPI cluster while rotate-keys is active so unrelated activity
 	// does not race with the encryption-key rotation plan.
 	if err := s.adapter.PauseClusterActivity(true); err != nil {
@@ -343,8 +335,7 @@ func (h *handler) assignRotateKeysPlan(s *scope, status opv1alpha1.EncryptionKey
 		return status, err
 	}
 
-	uid := encryptionKeyRotationOperationUIDEnv(s.op)
-	step := encryptionKeyRotationStepEnv(status.Step)
+	env := operationEnv(s.op, status.Step)
 	runtime := s.adapter.RuntimeCommand()
 
 	nodePlan := &planapi.Plan{
@@ -352,10 +343,10 @@ func (h *handler) assignRotateKeysPlan(s *scope, status opv1alpha1.EncryptionKey
 			// 1. Run rotate-keys via wrapper that always exits 0; captures real exit code in output.
 			{
 				CommonInstruction: planapi.CommonInstruction{
-					Name:    ekrRotateKeysInstructionName,
+					Name:    rotateKeysInstructionName,
 					Command: "/bin/sh",
 					Args:    []string{"-c", rotateKeysScript(runtime)},
-					Env:     []string{uid, step},
+					Env:     env,
 				},
 				SaveOutput: true,
 			},
@@ -366,17 +357,17 @@ func (h *handler) assignRotateKeysPlan(s *scope, status opv1alpha1.EncryptionKey
 					Name:    "wait-for-secrets-encrypt-status",
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
-					Env:     []string{uid, step},
+					Env:     env,
 				},
 			},
 			// 3. One-time status snapshot captured when the plan is applied; provides an
 			// observability anchor and confirms the endpoint is stable.
 			{
 				CommonInstruction: planapi.CommonInstruction{
-					Name:    ekrStatusPeriodicName,
+					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     []string{uid, step},
+					Env:     env,
 				},
 				SaveOutput: true,
 			},
@@ -385,10 +376,10 @@ func (h *handler) assignRotateKeysPlan(s *scope, status opv1alpha1.EncryptionKey
 			// Runs every 5s independently; used for stage/hash convergence checking.
 			{
 				CommonInstruction: planapi.CommonInstruction{
-					Name:    ekrStatusPeriodicName,
+					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     []string{uid, step},
+					Env:     env,
 				},
 				PeriodSeconds: 5,
 			},
@@ -461,7 +452,7 @@ func (h *handler) assignRotateKeysPlan(s *scope, status opv1alpha1.EncryptionKey
 	}
 
 	// Check periodic secrets-encrypt status. Stay in Rotate until reencrypt_finished.
-	waitMsg, err := ekrConvergenceWaitMessage(leader, false)
+	waitMsg, err := convergenceWaitMessage(leader, false)
 	if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: convergence check failed on leader %s: %v", s.op.Namespace, s.op.Name, leader.Name, err)
 		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on leader %s; please perform an etcd restore", leader.Name))
@@ -480,46 +471,50 @@ func (h *handler) assignRotateKeysPlan(s *scope, status opv1alpha1.EncryptionKey
 	return status, nil
 }
 
+// reconcileRestart walks the server nodes in sorted order, restarting each one
+// and requiring strict hash convergence only on the final control-plane node.
 func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
 
-	pool, err := planapi.NewLabeler().
-		And(
+	// Restart order comes from planapi.DefaultSorter(): init+etcd first, then
+	// etcd-only, then mixed etcd/control-plane, then control-plane-only. That
+	// keeps etcd nodes ahead of pure control-plane nodes.
+	pool, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithLabels(
 			planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName()),
 			planapi.Or(
 				planapi.Label(capr.EtcdRoleLabel, "true"),
 				planapi.Label(capr.ControlPlaneRoleLabel, "true"),
 			)).
 		WithSorter(planapi.DefaultSorter()).
-		Collect(h.secretCache, s.namespace)
-	if err != nil {
-		return status, err
-	}
+		WithValidator(planapi.AtLeast(1, "")).
+		Collect()
 
-	if len(pool) == 0 || !ops.IsControlPlane(pool[len(pool)-1]) {
+	if planapi.IsTransient(err) {
+		return status, err
+	} else if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: no control-plane nodes found at restart step", s.op.Namespace, s.op.Name)
 		markFailed(&status, opv1alpha1.UnknownStepReason, "no control-plane nodes found; cannot verify post-restart encryption status")
 		return status, nil
 	}
+	if !ops.IsControlPlane(pool[len(pool)-1]) {
+		logrus.Errorf("[encryptionkeyrotation] %s/%s: nodes are not correctly ordered at restart step", s.op.Namespace, s.op.Name)
+		markFailed(&status, opv1alpha1.UnknownStepReason, "last control plane node not found; cannot verify hash convergence after restart")
+		return status, nil
+	}
 
-	uid := encryptionKeyRotationOperationUIDEnv(s.op)
+	env := operationEnv(s.op, status.Step)
 	serverUnit := s.adapter.ServerUnit()
 	runtime := s.adapter.RuntimeCommand()
 
+	// pool is ordered with planapi.DefaultSorter(), so the final element is the
+	// last control-plane node. For the new k3s rotate-keys flow, strict "All
+	// hashes match" validation only makes sense after every control-plane node
+	// has restarted; before that, k3s may legitimately report
+	// reencrypt_finished while hashes still differ across servers.
 	for i, secret := range pool {
-		if !ops.IsControlPlane(secret) {
-			status, done, err := h.reconcileEtcdOnlyRestartNode(s, status, secret, uid, serverUnit)
-			if err != nil {
-				return status, err
-			}
-			if !done {
-				return status, nil
-			}
-			continue
-		}
-
-		isLastCP := i == len(pool)-1
-		status, done, err := h.reconcileCPRestartNode(s, status, secret, uid, serverUnit, runtime, isLastCP)
+		requireHashMatch := i == len(pool)-1
+		status, done, err := h.reconcileRestartNode(s, status, secret, env, serverUnit, runtime, requireHashMatch)
 		if err != nil {
 			return status, err
 		}
@@ -540,117 +535,78 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 	return status, nil
 }
 
-// reconcileEtcdOnlyRestartNode assigns the restart plan for an etcd-only node.
-// Returns done=true when the node is finished; done=false when reconciliation should stop and retry.
-func (h *handler) reconcileEtcdOnlyRestartNode(s *scope, status opv1alpha1.EncryptionKeyRotationStatus, secret *corev1.Secret, uid, serverUnit string) (opv1alpha1.EncryptionKeyRotationStatus, bool, error) {
+// reconcileRestartNode assigns and tracks the restart plan for one node. For
+// control-plane nodes it also waits for post-restart secrets-encrypt status,
+// and on the final control-plane node it enforces the cluster-wide hash check
+// required by the k3s rotate-keys flow.
+func (h *handler) reconcileRestartNode(
+	s *scope,
+	status opv1alpha1.EncryptionKeyRotationStatus,
+	secret *corev1.Secret,
+	env []string,
+	serverUnit string,
+	runtime string,
+	requireHashMatch bool,
+) (opv1alpha1.EncryptionKeyRotationStatus, bool, error) {
 	probes, err := s.adapter.RenderProbes(secret, true)
 	if err != nil {
 		return status, false, err
 	}
 
-	step := encryptionKeyRotationStepEnv(status.Step)
-	nodePlan := &planapi.Plan{
-		OneTimeInstructions: []planapi.OneTimeInstruction{
-			{
-				CommonInstruction: planapi.CommonInstruction{
-					Name:    "restart",
-					Command: "systemctl",
-					Args:    []string{"restart", serverUnit},
-					Env:     []string{uid, step},
-				},
-			},
-			{
-				CommonInstruction: planapi.CommonInstruction{
-					Name:    "wait-for-systemctl-status",
-					Command: "/bin/sh",
-					Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
-					Env:     []string{uid, step},
-				},
+	oneTimeInstructions := []planapi.OneTimeInstruction{
+		{
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    "restart",
+				Command: "systemctl",
+				Args:    []string{"restart", serverUnit},
+				Env:     env,
 			},
 		},
-		Probes: probes,
+		{
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    "wait-for-systemctl-status",
+				Command: "/bin/sh",
+				Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
+				Env:     env,
+			},
+		},
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, nodePlan, 5, 5)
-	if err != nil {
-		return status, false, err
-	}
-
-	if planStatus.Failure() {
-		logrus.Errorf("[encryptionkeyrotation] %s/%s: restart plan failed for %s", s.op.Namespace, s.op.Name, secret.Name)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s; please perform an etcd restore", secret.Name))
-		return status, false, nil
-	}
-
-	if wait, msg := planStatus.Wait(); wait {
-		logrus.Debugf("[encryptionkeyrotation] %s/%s: waiting for restart on %s: %s", s.op.Namespace, s.op.Name, secret.Name, msg)
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
-		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("waiting for restart on %s: %s", secret.Name, msg))
-		return status, false, nil
-	}
-
-	return status, true, nil
-}
-
-// reconcileCPRestartNode assigns the restart plan for a control-plane node, including post-restart
-// secrets-encrypt convergence. requireHashMatch should be true for the last CP node.
-// Returns done=true when the node is finished; done=false when reconciliation should stop and retry.
-func (h *handler) reconcileCPRestartNode(s *scope, status opv1alpha1.EncryptionKeyRotationStatus, secret *corev1.Secret, uid, serverUnit, runtime string, requireHashMatch bool) (opv1alpha1.EncryptionKeyRotationStatus, bool, error) {
-	probes, err := s.adapter.RenderProbes(secret, true)
-	if err != nil {
-		return status, false, err
-	}
-
-	step := encryptionKeyRotationStepEnv(status.Step)
 	nodePlan := &planapi.Plan{
-		OneTimeInstructions: []planapi.OneTimeInstruction{
-			{
-				CommonInstruction: planapi.CommonInstruction{
-					Name:    "restart",
-					Command: "systemctl",
-					Args:    []string{"restart", serverUnit},
-					Env:     []string{uid, step},
-				},
-			},
-			{
-				CommonInstruction: planapi.CommonInstruction{
-					Name:    "wait-for-systemctl-status",
-					Command: "/bin/sh",
-					Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
-					Env:     []string{uid, step},
-				},
-			},
-			{
+		OneTimeInstructions: oneTimeInstructions,
+		Probes:              probes,
+	}
+	if ops.IsControlPlane(secret) {
+		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions,
+			planapi.OneTimeInstruction{
 				CommonInstruction: planapi.CommonInstruction{
 					Name:    "wait-for-secrets-encrypt-status",
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
-					Env:     []string{uid, step},
+					Env:     env,
 				},
 			},
-			{
+			planapi.OneTimeInstruction{
 				CommonInstruction: planapi.CommonInstruction{
-					Name:    ekrStatusPeriodicName,
+					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     []string{uid, step},
+					Env:     env,
 				},
 				SaveOutput: true,
 			},
-		},
-		PeriodicInstructions: []planapi.PeriodicInstruction{
+		)
+		nodePlan.PeriodicInstructions = []planapi.PeriodicInstruction{
 			{
 				CommonInstruction: planapi.CommonInstruction{
-					Name:    ekrStatusPeriodicName,
+					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     []string{uid, step},
+					Env:     env,
 				},
 				PeriodSeconds: 5,
 			},
-		},
-		Probes: probes,
+		}
 	}
 
 	planStatus, err := h.store.AssignPlan(secret, nodePlan, 5, 5)
@@ -672,22 +628,26 @@ func (h *handler) reconcileCPRestartNode(s *scope, status opv1alpha1.EncryptionK
 		return status, false, nil
 	}
 
-	waitMsg, err := ekrConvergenceWaitMessage(secret, requireHashMatch)
-	if err != nil {
-		logrus.Errorf("[encryptionkeyrotation] %s/%s: convergence check failed on %s: %v", s.op.Namespace, s.op.Name, secret.Name, err)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on %s; please perform an etcd restore", secret.Name))
-		return status, false, nil
-	}
-	if waitMsg != "" {
-		logrus.Debugf("[encryptionkeyrotation] %s/%s: waiting for convergence on %s: %s", s.op.Namespace, s.op.Name, secret.Name, waitMsg)
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForEncryptionKeyRotationReason)
-		opv1alpha1.InProgressCondition.Message(&status, waitMsg)
-		return status, false, nil
+	if ops.IsControlPlane(secret) {
+		waitMsg, err := convergenceWaitMessage(secret, requireHashMatch)
+		if err != nil {
+			logrus.Errorf("[encryptionkeyrotation] %s/%s: convergence check failed on %s: %v", s.op.Namespace, s.op.Name, secret.Name, err)
+			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on %s; please perform an etcd restore", secret.Name))
+			return status, false, nil
+		}
+		if waitMsg != "" {
+			logrus.Debugf("[encryptionkeyrotation] %s/%s: waiting for convergence on %s: %s", s.op.Namespace, s.op.Name, secret.Name, waitMsg)
+			opv1alpha1.InProgressCondition.True(&status)
+			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForEncryptionKeyRotationReason)
+			opv1alpha1.InProgressCondition.Message(&status, waitMsg)
+			return status, false, nil
+		}
 	}
 	return status, true, nil
 }
 
+// handleFailed releases the beacon and unpauses cluster activity after the
+// operation has already been marked terminal.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
@@ -702,6 +662,9 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotation
 	return status, nil
 }
 
+// handleSucceeded clears the active beacon state, releases ownership, unpauses
+// cluster activity, and re-enqueues the backing cluster so downstream
+// controllers observe the final beacon transition.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
@@ -779,7 +742,7 @@ func markFailed(status *opv1alpha1.EncryptionKeyRotationStatus, reason, condMsg 
 }
 
 // beaconOwnerKey returns the per-operation beacon owner key used for
-// EKR beacon ownership checks and lifecycle cleanup.
+// beacon ownership checks and lifecycle cleanup.
 func beaconOwnerKey(op *opv1alpha1.EncryptionKeyRotation) string {
 	if op == nil {
 		return ControllerOwnerKey
@@ -790,9 +753,9 @@ func beaconOwnerKey(op *opv1alpha1.EncryptionKeyRotation) string {
 	return fmt.Sprintf("%s-%s-%s", ControllerOwnerKey, op.Namespace, op.Name)
 }
 
-// reclaimStaleBeaconOwnerIfNeeded clears stale EKR beacon ownership when the
+// reclaimStaleBeaconOwnerIfNeeded clears stale beacon ownership when the
 // recorded owner reference is invalid, missing, deleted, or terminal.
-// Non-EKR owners are left untouched so this controller only reclaims its own
+// Non-matching owners are left untouched so this controller only reclaims its own
 // operation type.
 func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 	if s.beacon == nil || s.beacon.Labels == nil {
@@ -849,19 +812,14 @@ func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 	return nil
 }
 
-// encryptionKeyRotationOperationUIDEnv returns an env var that embeds the operation UID into machine plan
-// instructions. This ensures that two distinct EncryptionKeyRotation CRs targeting the same cluster produce
-// different serialized plan bytes, so system-agent reruns the operation rather than treating it as already applied.
-func encryptionKeyRotationOperationUIDEnv(op *opv1alpha1.EncryptionKeyRotation) string {
-	return fmt.Sprintf("ENCRYPTION_KEY_ROTATION_OPERATION_UID=%s", op.UID)
-}
-
-// encryptionKeyRotationStepEnv returns an env var that embeds the current operation step into
-// plan instructions. This ensures that rotate-phase and restart-phase plans have different
-// serialized bytes, so system-agent reruns them and clears stale applied output rather than
-// treating the new plan as already applied.
-func encryptionKeyRotationStepEnv(step opv1alpha1.EncryptionKeyRotationStep) string {
-	return fmt.Sprintf("ENCRYPTION_KEY_ROTATION_STEP=%s", step)
+// operationEnv returns env vars that tie plan content to the operation UID and
+// current step. This keeps rotate and restart plans byte-distinct so
+// system-agent reruns them instead of reusing stale applied output.
+func operationEnv(op *opv1alpha1.EncryptionKeyRotation, step opv1alpha1.EncryptionKeyRotationStep) []string {
+	return []string{
+		fmt.Sprintf("ENCRYPTION_KEY_ROTATION_OPERATION_UID=%s", op.UID),
+		fmt.Sprintf("ENCRYPTION_KEY_ROTATION_STEP=%s", step),
+	}
 }
 
 // errRotateKeysOutputNotYet is returned by readRotateKeysResult when the rotate-keys output
@@ -869,40 +827,40 @@ func encryptionKeyRotationStepEnv(step opv1alpha1.EncryptionKeyRotationStep) str
 // Corrupt/unparse-able exit codes return a different error so callers can fail the operation.
 var errRotateKeysOutputNotYet = errors.New("rotate-keys output not yet available")
 
-// errEKRStatusTimeout is returned by ekrStatusFromOutput when a transient CLI timeout is
+// errStatusTimeout is returned by statusFromOutput when a transient CLI timeout is
 // detected in the secrets-encrypt status output. Callers should wait for the next periodic
 // run rather than failing the operation.
-var errEKRStatusTimeout = errors.New("secrets-encrypt status timed out")
+var errStatusTimeout = errors.New("secrets-encrypt status timed out")
 
 const (
-	ekrRotateKeysInstructionName = "rotate-keys"
-	ekrStatusPeriodicName        = "secrets-encrypt-status"
-	ekrStageReencryptFinished    = "reencrypt_finished"
-	ekrHashesMatch               = "All hashes match"
-	ekrExitCodePrefix            = "rancher-rotate-keys-exit-code="
+	rotateKeysInstructionName = "rotate-keys"
+	statusPeriodicName        = "secrets-encrypt-status"
+	stageReencryptFinished    = "reencrypt_finished"
+	hashesMatchMessage        = "All hashes match"
+	exitCodePrefix            = "rancher-rotate-keys-exit-code="
 
-	// ekrRotateKeysTimeoutMessage and ekrRotateKeysTimeoutEndpoint are combined with
-	// ekrTimeoutMarkers to identify CLI timeouts from the rotate-keys wrapper output.
-	ekrRotateKeysTimeoutMessage  = "see server log for details"
-	ekrRotateKeysTimeoutEndpoint = "/encrypt/config"
+	// rotateKeysTimeoutMessage and rotateKeysTimeoutEndpoint are combined with
+	// timeoutMarkers to identify CLI timeouts from the rotate-keys wrapper output.
+	rotateKeysTimeoutMessage  = "see server log for details"
+	rotateKeysTimeoutEndpoint = "/encrypt/config"
 
-	// ekrStatusTimeoutEndpoint identifies a transient timeout from secrets-encrypt status.
-	ekrStatusTimeoutEndpoint = "/encrypt/status"
+	// statusTimeoutEndpoint identifies a transient timeout from secrets-encrypt status.
+	statusTimeoutEndpoint = "/encrypt/status"
 )
 
-// ekrTimeoutMarkers are the known CLI timeout signatures from secrets-encrypt calls.
-var ekrTimeoutMarkers = []string{
+// timeoutMarkers are the known CLI timeout signatures from secrets-encrypt calls.
+var timeoutMarkers = []string{
 	"Client.Timeout exceeded while awaiting headers",
 	"timeout awaiting response headers",
 	"context deadline exceeded",
 }
 
-type ekrCommandResult struct {
+type commandResult struct {
 	output   string
 	exitCode int
 }
 
-type ekrRuntimeStatus struct {
+type runtimeStatus struct {
 	stage         string
 	hashesMatch   bool
 	hashesPresent bool // false when the output omits the "Server Encryption Hashes:" line
@@ -934,7 +892,7 @@ func rotateKeysScript(runtime string) string {
 		fmt.Sprintf(`output="$(%s secrets-encrypt rotate-keys 2>&1)"`, runtime),
 		"exitCode=$?",
 		`printf '%s\n' "$output"`,
-		fmt.Sprintf(`printf '%s%%s\n' "$exitCode"`, ekrExitCodePrefix),
+		fmt.Sprintf(`printf '%s%%s\n' "$exitCode"`, exitCodePrefix),
 		"exit 0",
 	}, "\n")
 }
@@ -943,42 +901,42 @@ func rotateKeysScript(runtime string) string {
 // output. Returns errRotateKeysOutputNotYet when the key or exit-code line is not yet written
 // (callers should wait). Returns a non-sentinel error when the exit code is present but
 // corrupt (callers should fail the operation).
-func readRotateKeysResult(appliedOutput map[string][]byte) (ekrCommandResult, error) {
-	raw, ok := appliedOutput[ekrRotateKeysInstructionName]
+func readRotateKeysResult(appliedOutput map[string][]byte) (commandResult, error) {
+	raw, ok := appliedOutput[rotateKeysInstructionName]
 	if !ok {
-		return ekrCommandResult{}, errRotateKeysOutputNotYet
+		return commandResult{}, errRotateKeysOutputNotYet
 	}
 	message := string(raw)
 	for _, line := range strings.Split(message, "\n") {
 		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, ekrExitCodePrefix) {
+		if !strings.HasPrefix(line, exitCodePrefix) {
 			continue
 		}
-		exitCode, err := strconv.Atoi(strings.TrimPrefix(line, ekrExitCodePrefix))
+		exitCode, err := strconv.Atoi(strings.TrimPrefix(line, exitCodePrefix))
 		if err != nil {
-			return ekrCommandResult{}, fmt.Errorf("corrupt rotate-keys exit code in output: %w", err)
+			return commandResult{}, fmt.Errorf("corrupt rotate-keys exit code in output: %w", err)
 		}
-		return ekrCommandResult{output: message, exitCode: exitCode}, nil
+		return commandResult{output: message, exitCode: exitCode}, nil
 	}
-	return ekrCommandResult{}, errRotateKeysOutputNotYet
+	return commandResult{}, errRotateKeysOutputNotYet
 }
 
 // rotateKeysCommandTimedOut returns true when the rotate-keys output matches the known CLI
 // timeout signature for the encrypt/config endpoint.
 func rotateKeysCommandTimedOut(output string) bool {
-	return ekrCommandTimedOut(output, ekrRotateKeysTimeoutEndpoint)
+	return commandTimedOut(output, rotateKeysTimeoutEndpoint)
 }
 
-// ekrCommandTimedOut returns true when the output contains a known CLI timeout signature
+// commandTimedOut returns true when the output contains a known CLI timeout signature
 // for the given endpoint.
-func ekrCommandTimedOut(output, endpoint string) bool {
+func commandTimedOut(output, endpoint string) bool {
 	if output == "" || endpoint == "" {
 		return false
 	}
-	if !strings.Contains(output, ekrRotateKeysTimeoutMessage) || !strings.Contains(output, endpoint) {
+	if !strings.Contains(output, rotateKeysTimeoutMessage) || !strings.Contains(output, endpoint) {
 		return false
 	}
-	for _, marker := range ekrTimeoutMarkers {
+	for _, marker := range timeoutMarkers {
 		if strings.Contains(output, marker) {
 			return true
 		}
@@ -986,7 +944,7 @@ func ekrCommandTimedOut(output, endpoint string) bool {
 	return false
 }
 
-// ekrConvergenceWaitMessage checks whether the periodic secrets-encrypt status on secret has
+// convergenceWaitMessage checks whether the periodic secrets-encrypt status on secret has
 // reached reencrypt_finished (and, when requireHashMatch is true, hash convergence).
 //
 // Return values:
@@ -994,7 +952,7 @@ func ekrCommandTimedOut(output, endpoint string) bool {
 //   - (msg, nil)   — still waiting, msg describes the reason
 //   - ("", err)    — hard error: corrupt payload, plan instruction missing, parse failure,
 //     or hash field absent when requireHashMatch is true at reencrypt_finished
-func ekrConvergenceWaitMessage(secret *corev1.Secret, requireHashMatch bool) (string, error) {
+func convergenceWaitMessage(secret *corev1.Secret, requireHashMatch bool) (string, error) {
 	periodicOutput, err := planapi.ReadAppliedPeriodicOutput(secret)
 	if err != nil {
 		// gzip decode or JSON unmarshal failure — corrupt payload, not a normal wait.
@@ -1004,13 +962,13 @@ func ekrConvergenceWaitMessage(secret *corev1.Secret, requireHashMatch bool) (st
 	var entry planapi.PeriodicInstructionOutput
 	var entryOK bool
 	if periodicOutput != nil {
-		entry, entryOK = periodicOutput[ekrStatusPeriodicName]
+		entry, entryOK = periodicOutput[statusPeriodicName]
 	}
 
 	if !entryOK {
 		// No output yet, only a wait if the instruction is actually in the assigned plan.
 		// Missing instruction means a malformed/regressed plan so fail immediately.
-		if err := validateEKRPlanHasPeriodicStatus(secret); err != nil {
+		if err := validatePlanHasPeriodicStatus(secret); err != nil {
 			return "", fmt.Errorf("failed reading assigned plan from %s: %w", secret.Name, err)
 		}
 		return fmt.Sprintf("waiting for secrets-encrypt status on %s", secret.Name), nil
@@ -1021,9 +979,9 @@ func ekrConvergenceWaitMessage(secret *corev1.Secret, requireHashMatch bool) (st
 		return fmt.Sprintf("waiting for secrets-encrypt status output on %s", secret.Name), nil
 	}
 
-	rotStatus, err := ekrStatusFromOutput(stdout)
+	rotStatus, err := statusFromOutput(stdout)
 	if err != nil {
-		if errors.Is(err, errEKRStatusTimeout) {
+		if errors.Is(err, errStatusTimeout) {
 			// Transient CLI timeout: wait for the next periodic run.
 			return fmt.Sprintf("secrets-encrypt status timed out on %s; waiting for next run", secret.Name), nil
 		}
@@ -1032,14 +990,14 @@ func ekrConvergenceWaitMessage(secret *corev1.Secret, requireHashMatch bool) (st
 		return "", fmt.Errorf("unable to parse secrets-encrypt status on %s: %w", secret.Name, err)
 	}
 
-	if rotStatus.stage != ekrStageReencryptFinished {
+	if rotStatus.stage != stageReencryptFinished {
 		return fmt.Sprintf("waiting for reencrypt_finished on %s, current stage: %s", secret.Name, rotStatus.stage), nil
 	}
 	if requireHashMatch {
 		if !rotStatus.hashesPresent {
 			// Hash field absent at reencrypt_finished: the runtime output does not satisfy the
 			// convergence contract. Fail rather than waiting indefinitely.
-			return "", fmt.Errorf("secrets-encrypt status on %s reached %s but hash field is absent; runtime output may be incompatible", secret.Name, ekrStageReencryptFinished)
+			return "", fmt.Errorf("secrets-encrypt status on %s reached %s but hash field is absent; runtime output may be incompatible", secret.Name, stageReencryptFinished)
 		}
 		if !rotStatus.hashesMatch {
 			return fmt.Sprintf("waiting for encryption key rotation hashes to converge on %s", secret.Name), nil
@@ -1048,10 +1006,10 @@ func ekrConvergenceWaitMessage(secret *corev1.Secret, requireHashMatch bool) (st
 	return "", nil
 }
 
-// validateEKRPlanHasPeriodicStatus reports whether the plan currently assigned to secret includes a
-// periodic instruction named ekrStatusPeriodicName. Returns an error when the plan data is
+// validatePlanHasPeriodicStatus reports whether the plan currently assigned to secret includes a
+// periodic instruction named statusPeriodicName. Returns an error when the plan data is
 // absent or not decodable.
-func validateEKRPlanHasPeriodicStatus(secret *corev1.Secret) error {
+func validatePlanHasPeriodicStatus(secret *corev1.Secret) error {
 	raw := secret.Data["plan"]
 	if len(raw) == 0 {
 		return fmt.Errorf("plan data absent from %s", secret.Name)
@@ -1061,23 +1019,23 @@ func validateEKRPlanHasPeriodicStatus(secret *corev1.Secret) error {
 		return fmt.Errorf("decoding plan from %s: %w", secret.Name, err)
 	}
 	for _, inst := range p.PeriodicInstructions {
-		if inst.Name == ekrStatusPeriodicName {
+		if inst.Name == statusPeriodicName {
 			return nil
 		}
 	}
-	return fmt.Errorf("periodic instruction %s not present in plan for %s", ekrStatusPeriodicName, secret.Name)
+	return fmt.Errorf("periodic instruction %s not present in plan for %s", statusPeriodicName, secret.Name)
 }
 
-// ekrStatusFromOutput parses the human-readable secrets-encrypt status output.
-// Returns errEKRStatusTimeout for transient CLI timeouts.
+// statusFromOutput parses the human-readable secrets-encrypt status output.
+// Returns errStatusTimeout for transient CLI timeouts.
 // Returns a non-sentinel error when the rotation stage is missing.
-func ekrStatusFromOutput(output string) (ekrRuntimeStatus, error) {
+func statusFromOutput(output string) (runtimeStatus, error) {
 	// A timed-out status call is transient; wait for the next periodic run.
-	if ekrCommandTimedOut(output, ekrStatusTimeoutEndpoint) {
-		return ekrRuntimeStatus{}, fmt.Errorf("%w; waiting for next run", errEKRStatusTimeout)
+	if commandTimedOut(output, statusTimeoutEndpoint) {
+		return runtimeStatus{}, fmt.Errorf("%w; waiting for next run", errStatusTimeout)
 	}
 
-	var result ekrRuntimeStatus
+	var result runtimeStatus
 	for _, line := range strings.Split(output, "\n") {
 		key, value, ok := strings.Cut(line, ":")
 		if !ok {
@@ -1088,12 +1046,12 @@ func ekrStatusFromOutput(output string) (ekrRuntimeStatus, error) {
 			result.stage = strings.TrimSpace(value)
 		case "Server Encryption Hashes":
 			result.hashesPresent = true
-			result.hashesMatch = strings.TrimSpace(value) == ekrHashesMatch
+			result.hashesMatch = strings.TrimSpace(value) == hashesMatchMessage
 		}
 	}
 
 	if result.stage == "" {
-		return ekrRuntimeStatus{}, fmt.Errorf("unable to parse rotation stage from secrets-encrypt status output")
+		return runtimeStatus{}, fmt.Errorf("unable to parse rotation stage from secrets-encrypt status output")
 	}
 	return result, nil
 }

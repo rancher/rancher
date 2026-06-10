@@ -53,7 +53,7 @@ const (
 	NotFailedReason = "NotFailed"
 
 	// NotSuccessfulReason surfaces when an operation has not completed successfully.
-	NotSuccessfulReason = "notSuccessful"
+	NotSuccessfulReason = "NotSuccessful"
 
 	// InProgressReason surfaces when an operation is currently in progress.
 	InProgressReason = "InProgress"
