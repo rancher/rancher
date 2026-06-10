@@ -132,10 +132,10 @@ func (h *handler) reconcileNodeMetadata(machine *capi.Machine, node *corev1.Node
 	if newNode.Labels == nil {
 		newNode.Labels = make(map[string]string)
 	}
-	hasWorkerLabel := newNode.Labels[workerLabel] == "true"
+	workerLabelVal, hasWorkerLabel := newNode.Labels[workerLabel]
 
-	if hasWorkerRole && !hasWorkerLabel {
-		// Add worker label
+	if hasWorkerRole && (!hasWorkerLabel || workerLabelVal != "true") {
+		// Add/normalize worker label
 		newNode.Labels[workerLabel] = "true"
 		needsUpdate = true
 		logrus.Infof("[%s] machine %s/%s: adding worker label to node %s",
@@ -239,7 +239,9 @@ func (h *handler) getRuntime(machine *capi.Machine) (string, error) {
 	}
 
 	// Verify it's an RKE control plane
-	if capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
+	if !capiCluster.Spec.ControlPlaneRef.IsDefined() ||
+		capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" ||
+		capiCluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup {
 		return "", fmt.Errorf("cluster %s/%s does not have an RKEControlPlane", machine.Namespace, clusterName)
 	}
 

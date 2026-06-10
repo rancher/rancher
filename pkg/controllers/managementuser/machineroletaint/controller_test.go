@@ -158,8 +158,8 @@ func TestApplyTaintChanges(t *testing.T) {
 			assert.Equal(t, len(tt.expectedTaints), len(result), "result length mismatch")
 
 			for i, expected := range tt.expectedTaints {
-				assert.Equal(t, expected.Key, result[i].Key, "taint key mismatch at index %d", i)
-				assert.Equal(t, expected.Effect, result[i].Effect, "taint effect mismatch at index %d", i)
+				assert.Equalf(t, expected.Key, result[i].Key, "taint key mismatch at index %d", i)
+				assert.Equalf(t, expected.Effect, result[i].Effect, "taint effect mismatch at index %d", i)
 			}
 		})
 	}
@@ -169,37 +169,58 @@ func TestWorkerLabelLogic(t *testing.T) {
 	tests := []struct {
 		name               string
 		machineHasWorker   bool
-		nodeHasWorker      bool
+		nodeWorkerValue    string // empty means label not present
 		shouldAddLabel     bool
 		shouldRemoveLabel  bool
+		shouldNormalize    bool
 	}{
 		{
 			name:               "add worker label",
 			machineHasWorker:   true,
-			nodeHasWorker:      false,
+			nodeWorkerValue:    "",
 			shouldAddLabel:     true,
 			shouldRemoveLabel:  false,
+			shouldNormalize:    false,
 		},
 		{
 			name:               "remove worker label",
 			machineHasWorker:   false,
-			nodeHasWorker:      true,
+			nodeWorkerValue:    "true",
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  true,
+			shouldNormalize:    false,
 		},
 		{
-			name:               "no change - both have",
+			name:               "no change - both have correct value",
 			machineHasWorker:   true,
-			nodeHasWorker:      true,
+			nodeWorkerValue:    "true",
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  false,
+			shouldNormalize:    false,
 		},
 		{
 			name:               "no change - neither have",
 			machineHasWorker:   false,
-			nodeHasWorker:      false,
+			nodeWorkerValue:    "",
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  false,
+			shouldNormalize:    false,
+		},
+		{
+			name:               "normalize empty value to true",
+			machineHasWorker:   true,
+			nodeWorkerValue:    "", // label exists but empty
+			shouldAddLabel:     false,
+			shouldRemoveLabel:  false,
+			shouldNormalize:    true,
+		},
+		{
+			name:               "normalize wrong value to true",
+			machineHasWorker:   true,
+			nodeWorkerValue:    "yes", // wrong value
+			shouldAddLabel:     false,
+			shouldRemoveLabel:  false,
+			shouldNormalize:    true,
 		},
 	}
 
@@ -211,15 +232,16 @@ func TestWorkerLabelLogic(t *testing.T) {
 				node.Labels = make(map[string]string)
 			}
 
-			if tt.nodeHasWorker {
-				node.Labels[workerLabel] = "true"
+			if tt.nodeWorkerValue != "" {
+				node.Labels[workerLabel] = tt.nodeWorkerValue
 			}
 
-			hasWorkerLabel := node.Labels[workerLabel] == "true"
+			// Apply the actual controller logic
+			workerLabelVal, hasWorkerLabel := node.Labels[workerLabel]
 			needsUpdate := false
 
-			if tt.machineHasWorker && !hasWorkerLabel {
-				// Add worker label
+			if tt.machineHasWorker && (!hasWorkerLabel || workerLabelVal != "true") {
+				// Add/normalize worker label
 				node.Labels[workerLabel] = "true"
 				needsUpdate = true
 			} else if !tt.machineHasWorker && hasWorkerLabel {
@@ -228,7 +250,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 				needsUpdate = true
 			}
 
-			if tt.shouldAddLabel || tt.shouldRemoveLabel {
+			if tt.shouldAddLabel || tt.shouldRemoveLabel || tt.shouldNormalize {
 				assert.True(t, needsUpdate, "expected update but needsUpdate was false")
 			} else {
 				assert.False(t, needsUpdate, "expected no update but needsUpdate was true")
@@ -236,7 +258,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 
 			// Verify final state
 			if tt.machineHasWorker {
-				assert.Equal(t, "true", node.Labels[workerLabel], "worker label should be present")
+				assert.Equal(t, "true", node.Labels[workerLabel], "worker label should be 'true'")
 			} else {
 				_, exists := node.Labels[workerLabel]
 				assert.False(t, exists, "worker label should not be present")
