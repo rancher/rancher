@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/crewjam/saml"
 )
 
 // ClientState implements client side storage for state.
@@ -25,12 +23,15 @@ type ClientToken interface {
 
 const stateCookiePrefix = "saml_"
 
+// maxIssueDelay is the maximum time allowed between issuing a SAML request and
+// receiving the corresponding response.
+const maxIssueDelay = 90 * time.Second
+
 type ClientCookies struct {
-	ServiceProvider *saml.ServiceProvider
-	Name            string
-	Domain          string
-	Secure          bool
-	Path            string
+	Name   string
+	Domain string
+	Secure bool
+	Path   string
 }
 
 // SetPath declares the path to use for the cookies
@@ -40,21 +41,13 @@ func (c *ClientCookies) SetPath(path string) {
 
 // SetState stores the named state value by setting a cookie.
 func (c ClientCookies) SetState(w http.ResponseWriter, r *http.Request, id string, value string) {
-	var path string
-	if c.Path != "" {
-		path = c.Path
-	} else {
-		// Fallback, default
-		path = c.ServiceProvider.AcsURL.Path
-	}
-
 	http.SetCookie(w, &http.Cookie{
 		Name:     stateCookiePrefix + id,
 		Value:    value,
-		MaxAge:   int(saml.MaxIssueDelay.Seconds()),
+		MaxAge:   int(maxIssueDelay.Seconds()),
 		HttpOnly: true,
 		Secure:   c.Secure || r.URL.Scheme == "https",
-		Path:     path,
+		Path:     c.Path,
 	})
 }
 

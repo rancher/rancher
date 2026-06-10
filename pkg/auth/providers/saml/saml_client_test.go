@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/russellhaering/gosaml2/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -126,9 +126,7 @@ func TestGetUserIdFromRelayState(t *testing.T) {
 			}
 			p := Provider{
 				clientState: cookieStore,
-				serviceProvider: &saml.ServiceProvider{
-					Key: privateKey,
-				},
+				spKey:       privateKey,
 			}
 
 			userID, err := p.getUserIdFromRelayStateCookie(test.createRequest())
@@ -189,6 +187,175 @@ func TestValidateFinalRedirectURL(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRedirectURLWithError(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		baseURL   string
+		errorCode int
+		errMsg    string
+		wantURL   string
+	}{
+		"error code only, no existing query params": {
+			baseURL:   "https://rancher.example.com/login",
+			errorCode: 403,
+			errMsg:    "",
+			wantURL:   "https://rancher.example.com/login?errorCode=403",
+		},
+		"error code and message": {
+			baseURL:   "https://rancher.example.com/login",
+			errorCode: 500,
+			errMsg:    "something went wrong",
+			wantURL:   "https://rancher.example.com/login?err=something+went+wrong&errorCode=500",
+		},
+		"preserves existing query params": {
+			baseURL:   "https://rancher.example.com/login?token=abc",
+			errorCode: 422,
+			errMsg:    "",
+			wantURL:   "https://rancher.example.com/login?errorCode=422&token=abc",
+		},
+		"preserves existing query params with message": {
+			baseURL:   "https://rancher.example.com/login?token=abc",
+			errorCode: 422,
+			errMsg:    "user not found",
+			wantURL:   "https://rancher.example.com/login?err=user+not+found&errorCode=422&token=abc",
+		},
+		"error message with special characters is encoded": {
+			baseURL:   "https://rancher.example.com/login",
+			errorCode: 500,
+			errMsg:    "error: bad request & more",
+			wantURL:   "https://rancher.example.com/login?err=error%3A+bad+request+%26+more&errorCode=500",
+		},
+		"403 error code": {
+			baseURL:   "https://rancher.example.com/login",
+			errorCode: 403,
+			errMsg:    "",
+			wantURL:   "https://rancher.example.com/login?errorCode=403",
+		},
+		"unparseable base URL falls back to string concatenation": {
+			baseURL:   "http://[::1",
+			errorCode: 500,
+			errMsg:    "",
+			wantURL:   "http://[::1?errorCode=500",
+		},
+		"unparseable base URL with error message uses QueryEscape": {
+			baseURL:   "http://[::1",
+			errorCode: 403,
+			errMsg:    "access denied",
+			wantURL:   "http://[::1?errorCode=403&err=access+denied",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := redirectURLWithError(tt.baseURL, tt.errorCode, tt.errMsg)
+			assert.Equal(t, tt.wantURL, got)
+		})
+	}
+}
+
+func TestExtractIDPURLs(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		metadata *types.EntityDescriptor
+		wantSSO  string
+		wantSLO  string
+	}{
+		"nil IDPSSODescriptor returns empty strings": {
+			metadata: &types.EntityDescriptor{IDPSSODescriptor: nil},
+			wantSSO:  "",
+			wantSLO:  "",
+		},
+		"empty SSO and SLO service lists return empty strings": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleSignOnServices: []types.SingleSignOnService{},
+					SingleLogoutServices: []types.SingleLogoutService{},
+				},
+			},
+			wantSSO: "",
+			wantSLO: "",
+		},
+		"SSO URL extracted, no SLO service": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleSignOnServices: []types.SingleSignOnService{
+						{
+							Location: "https://idp.example.com/sso",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+						},
+					},
+				},
+			},
+			wantSSO: "https://idp.example.com/sso",
+			wantSLO: "",
+		},
+		"SSO URL extracted - multiple bindings": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleSignOnServices: []types.SingleSignOnService{
+						{
+							Location: "https://idp.example.com/sso",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+						},
+						{
+							Location: "https://idp.example.com/sso/post",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:POST",
+						},
+					},
+				},
+			},
+			wantSSO: "https://idp.example.com/sso",
+			wantSLO: "",
+		},
+		"SLO URL extracted, no SSO service": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleLogoutServices: []types.SingleLogoutService{
+						{
+							Location: "https://idp.example.com/slo",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+						},
+					},
+				},
+			},
+			wantSSO: "",
+			wantSLO: "https://idp.example.com/slo",
+		},
+		"both SSO and SLO URLs extracted": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleSignOnServices: []types.SingleSignOnService{
+						{
+							Location: "https://idp.example.com/sso",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+						},
+					},
+					SingleLogoutServices: []types.SingleLogoutService{
+						{
+							Location: "https://idp.example.com/slo",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+						},
+					},
+				},
+			},
+			wantSSO: "https://idp.example.com/sso",
+			wantSLO: "https://idp.example.com/slo",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			gotSSO, gotSLO := extractIDPURLs(tt.metadata)
+			assert.Equal(t, tt.wantSSO, gotSSO)
+			assert.Equal(t, tt.wantSLO, gotSLO)
 		})
 	}
 }
