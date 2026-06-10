@@ -287,23 +287,13 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling snapshot save", s.op.Namespace, s.op.Name)
 
 	// collect etcd nodes belonging to cluster
-	secrets, err := planapi.NewLabeler().
-		And(
-			planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName()),
-			planapi.Label(capr.EtcdRoleLabel, "true")).
+	secrets, err := planapi.NewCollector(h.secretCache, s.clusterObj, s.namespace).
+		WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
 		WithSorter(planapi.DefaultSorter()).
-		Collect(h.secretCache, s.namespace)
+		WithValidator(planapi.AtLeast(1, "")).
+		Collect()
 	if err != nil {
 		return status, err
-	}
-	if len(secrets) == 0 {
-		status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, "failed to find etcd node to perform etcd snapshot")
-
-		return status, nil
 	}
 
 	for _, secret := range secrets {
@@ -378,12 +368,11 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
 
 	// collect etcd nodes belonging to cluster
-	secrets, err := planapi.NewLabeler().
-		And(
-			planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName()),
-			planapi.Label(capr.EtcdRoleLabel, "true")).
+	secrets, err := planapi.NewCollector(h.secretCache, s.clusterObj, s.namespace).
+		WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
 		WithSorter(planapi.DefaultSorter()).
-		Collect(h.secretCache, s.namespace)
+		WithValidator(planapi.AtLeast(1, "")).
+		Collect()
 	if err != nil {
 		return status, err
 	}
