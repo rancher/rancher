@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/moby/sys/reexec"
 	"github.com/ehazlett/simplelog"
+	"github.com/moby/sys/reexec"
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/data/management"
