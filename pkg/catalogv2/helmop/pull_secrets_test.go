@@ -312,18 +312,150 @@ func Test_chartSupportsImagePullSecrets(t *testing.T) {
 	}
 }
 
+func Test_chartHasOnlyUserConfiguredPullSecrets(t *testing.T) {
+	h := &Operations{}
+
+	tests := []struct {
+		name               string
+		baseValues         map[string]any
+		values             map[string]any
+		managedSecretNames []string
+		want               bool
+	}{
+		{
+			name: "all user secrets at single supported path",
+			baseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			values: map[string]any{
+				"imagePullSecrets": []any{map[string]any{"name": "user-secret"}},
+			},
+			managedSecretNames: []string{"release-foo"},
+			want:               true,
+		},
+		{
+			name: "path contains a managed secret",
+			baseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			values: map[string]any{
+				"imagePullSecrets": []any{map[string]any{"name": "release-foo"}},
+			},
+			managedSecretNames: []string{"release-foo"},
+			want:               false,
+		},
+		{
+			name: "supported path is empty in values",
+			baseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			values:             map[string]any{},
+			managedSecretNames: []string{"release-foo"},
+			want:               false,
+		},
+		{
+			name: "chart has no supported pull-secret paths",
+			baseValues: map[string]any{
+				"someOtherKey": "value",
+			},
+			values: map[string]any{
+				"imagePullSecrets": []any{map[string]any{"name": "user-secret"}},
+			},
+			managedSecretNames: []string{},
+			want:               false,
+		},
+		{
+			name: "multiple supported paths, all user-only",
+			baseValues: map[string]any{
+				"global": map[string]any{
+					"imagePullSecrets": []any{},
+				},
+				"imagePullSecrets": []any{},
+			},
+			values: map[string]any{
+				"global": map[string]any{
+					"imagePullSecrets": []any{map[string]any{"name": "user-secret"}},
+				},
+				"imagePullSecrets": []any{map[string]any{"name": "user-secret"}},
+			},
+			managedSecretNames: []string{"release-foo"},
+			want:               true,
+		},
+		{
+			name: "multiple supported paths, one path has a managed secret",
+			baseValues: map[string]any{
+				"global": map[string]any{
+					"imagePullSecrets": []any{},
+				},
+				"imagePullSecrets": []any{},
+			},
+			values: map[string]any{
+				"global": map[string]any{
+					"imagePullSecrets": []any{map[string]any{"name": "user-secret"}},
+				},
+				"imagePullSecrets": []any{map[string]any{"name": "release-foo"}},
+			},
+			managedSecretNames: []string{"release-foo"},
+			want:               false,
+		},
+		{
+			name: "mixed path with user and managed secret",
+			baseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			values: map[string]any{
+				"imagePullSecrets": []any{
+					map[string]any{"name": "user-secret"},
+					map[string]any{"name": "release-foo"},
+				},
+			},
+			managedSecretNames: []string{"release-foo"},
+			want:               false,
+		},
+		{
+			name: "string entry matching managed name is detected as managed",
+			baseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			values: map[string]any{
+				"imagePullSecrets": []any{"release-foo"},
+			},
+			managedSecretNames: []string{"release-foo"},
+			want:               false,
+		},
+		{
+			name: "string entry not matching any managed name is treated as user-owned",
+			baseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			values: map[string]any{
+				"imagePullSecrets": []any{"user-secret"},
+			},
+			managedSecretNames: []string{"release-foo"},
+			want:               true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := h.chartHasOnlyUserConfiguredPullSecrets(tt.baseValues, tt.values, tt.managedSecretNames)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func Test_injectPullSecrets(t *testing.T) {
 	h := &Operations{}
 	tests := []struct {
-		name             string
-		chartBaseValues  map[string]any
-		configuredValues map[string]any
-		expected         map[string]any
-		pullSecretNames  []string
-		wantErr          bool
+		name              string
+		chartBaseValues   map[string]any
+		configuredValues  map[string]any
+		expected          map[string]any
+		pullSecretNames   []string
+		knownManagedNames []string
+		wantErr           bool
 	}{
 		{
-			// No imagePullSecrets paths declared in base values; secrets should not be injected.
 			name:             "no paths declared in chart base values",
 			chartBaseValues:  map[string]any{"someOtherKey": "value"},
 			configuredValues: map[string]any{},
@@ -331,7 +463,6 @@ func Test_injectPullSecrets(t *testing.T) {
 			expected:         map[string]any{},
 		},
 		{
-			// The chart declares global.cattle.imagePullSecrets; secrets should be injected there.
 			name: "inject at global.cattle.imagePullSecrets",
 			chartBaseValues: map[string]any{
 				"global": map[string]any{
@@ -351,7 +482,6 @@ func Test_injectPullSecrets(t *testing.T) {
 			},
 		},
 		{
-			// The chart declares global.imagePullSecrets; secrets should be injected there.
 			name: "inject at global.imagePullSecrets",
 			chartBaseValues: map[string]any{
 				"global": map[string]any{
@@ -367,7 +497,6 @@ func Test_injectPullSecrets(t *testing.T) {
 			},
 		},
 		{
-			// The chart declares imagePullSecrets at root; secrets should be injected there.
 			name: "inject at root imagePullSecrets",
 			chartBaseValues: map[string]any{
 				"imagePullSecrets": []any{},
@@ -379,22 +508,21 @@ func Test_injectPullSecrets(t *testing.T) {
 			},
 		},
 		{
-			// User has already configured secrets at the path; injection should be skipped to preserve them.
-			name: "skip injection when user secrets already configured",
+			name: "skip injection when path has only user secrets",
 			chartBaseValues: map[string]any{
 				"imagePullSecrets": []any{},
 			},
 			configuredValues: map[string]any{
 				"imagePullSecrets": []any{map[string]any{"name": "user-secret"}},
 			},
-			pullSecretNames: []string{"injected-secret"},
+			pullSecretNames:   []string{"injected-secret"},
+			knownManagedNames: []string{"injected-secret"},
 			expected: map[string]any{
 				"imagePullSecrets": []any{map[string]any{"name": "user-secret"}},
 			},
 		},
 		{
-			// Chart declares multiple paths; all declared paths without existing user secrets should be injected.
-			name: "inject at multiple declared paths",
+			name: "injects at multiple declared paths",
 			chartBaseValues: map[string]any{
 				"global": map[string]any{
 					"imagePullSecrets": []any{},
@@ -411,22 +539,99 @@ func Test_injectPullSecrets(t *testing.T) {
 			},
 		},
 		{
-			// No secret names provided; an empty list should be injected at declared paths.
-			name: "empty secret names injects empty list",
+			name: "no secrets and no existing values leaves path untouched",
 			chartBaseValues: map[string]any{
 				"imagePullSecrets": []any{},
 			},
 			configuredValues: map[string]any{},
 			pullSecretNames:  []string{},
-			expected: map[string]any{
+			expected:         map[string]any{},
+		},
+		{
+			name: "upgrade: managed secret already in values is kept",
+			chartBaseValues: map[string]any{
 				"imagePullSecrets": []any{},
+			},
+			configuredValues: map[string]any{
+				"imagePullSecrets": []any{map[string]any{"name": "release-secret-a"}},
+			},
+			pullSecretNames:   []string{"release-secret-a"},
+			knownManagedNames: []string{"release-secret-a"},
+			expected: map[string]any{
+				"imagePullSecrets": []any{map[string]any{"name": "release-secret-a"}},
+			},
+		},
+		{
+			name: "stale managed secret cleared when cluster repo removes it",
+			chartBaseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			configuredValues: map[string]any{
+				"imagePullSecrets": []any{map[string]any{"name": "release-secret-a"}},
+			},
+			pullSecretNames:   []string{},
+			knownManagedNames: []string{"release-secret-a"},
+			expected: map[string]any{
+				// All entries were managed and have been removed, path is set to null.
+				"imagePullSecrets": nil,
+			},
+		},
+		{
+			name: "mixed path: user secrets preserved, stale managed replaced",
+			chartBaseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			configuredValues: map[string]any{
+				"imagePullSecrets": []any{
+					map[string]any{"name": "user-secret"},
+					map[string]any{"name": "release-old"},
+				},
+			},
+			pullSecretNames:   []string{"release-new"},
+			knownManagedNames: []string{"release-old", "release-new"},
+			expected: map[string]any{
+				"imagePullSecrets": []any{
+					map[string]any{"name": "user-secret"},
+					map[string]any{"name": "release-new"},
+				},
+			},
+		},
+		{
+			name: "user string entries normalized to LocalObjectReference",
+			chartBaseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			configuredValues: map[string]any{
+				"imagePullSecrets": []any{"user-secret", map[string]any{"name": "release-managed"}},
+			},
+			pullSecretNames:   []string{"release-new"},
+			knownManagedNames: []string{"release-managed", "release-new"},
+			expected: map[string]any{
+				"imagePullSecrets": []any{
+					map[string]any{"name": "user-secret"},
+					map[string]any{"name": "release-new"},
+				},
+			},
+		},
+		{
+			name: "user-provided string matching managed name treated as managed",
+			chartBaseValues: map[string]any{
+				"imagePullSecrets": []any{},
+			},
+			configuredValues: map[string]any{
+				"imagePullSecrets": []any{"release-managed"},
+			},
+			pullSecretNames:   []string{"release-managed"},
+			knownManagedNames: []string{"release-managed"},
+			expected: map[string]any{
+				"imagePullSecrets": []any{map[string]any{"name": "release-managed"}},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rawResult, err := h.injectPullSecrets("test", tt.chartBaseValues, tt.configuredValues, tt.pullSecretNames)
+			rawResult, err := h.injectPullSecrets("test", tt.chartBaseValues, tt.configuredValues, tt.pullSecretNames, tt.knownManagedNames)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -437,6 +642,74 @@ func Test_injectPullSecrets(t *testing.T) {
 			var got map[string]any
 			assert.NoError(t, json.Unmarshal(rawResult, &got))
 			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func Test_extractUserPullSecrets(t *testing.T) {
+	managed := map[string]struct{}{"release-foo": {}}
+
+	tests := []struct {
+		name             string
+		secretList       []any
+		wantUserEntries  []any
+		wantManagedFound bool
+	}{
+		{
+			name:             "string entry not in known is normalized to LocalObjectReference",
+			secretList:       []any{"user-secret"},
+			wantUserEntries:  []any{map[string]string{"name": "user-secret"}},
+			wantManagedFound: false,
+		},
+		{
+			name:             "string entry matching managed name is treated as managed",
+			secretList:       []any{"release-foo"},
+			wantUserEntries:  nil,
+			wantManagedFound: true,
+		},
+		{
+			name:             "map entry in known is treated as managed",
+			secretList:       []any{map[string]any{"name": "release-foo"}},
+			wantUserEntries:  nil,
+			wantManagedFound: true,
+		},
+		{
+			name:             "map entry not in known is preserved as-is",
+			secretList:       []any{map[string]any{"name": "user-secret"}},
+			wantUserEntries:  []any{map[string]any{"name": "user-secret"}},
+			wantManagedFound: false,
+		},
+		{
+			name: "mixed string user + managed map: string normalized, managed removed",
+			secretList: []any{
+				"user-secret",
+				map[string]any{"name": "release-foo"},
+			},
+			wantUserEntries:  []any{map[string]string{"name": "user-secret"}},
+			wantManagedFound: true,
+		},
+		{
+			name: "string matching managed name alongside a user map entry",
+			secretList: []any{
+				"release-foo",
+				map[string]any{"name": "user-secret"},
+			},
+			wantUserEntries:  []any{map[string]any{"name": "user-secret"}},
+			wantManagedFound: true,
+		},
+		{
+			name:             "empty list returns nil user entries and no managed found",
+			secretList:       []any{},
+			wantUserEntries:  nil,
+			wantManagedFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotEntries, gotManaged := extractUserPullSecrets(tt.secretList, managed)
+			assert.Equal(t, tt.wantUserEntries, gotEntries)
+			assert.Equal(t, tt.wantManagedFound, gotManaged)
 		})
 	}
 }
