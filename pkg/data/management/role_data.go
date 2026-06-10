@@ -46,8 +46,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch").
-		addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("awsclusterstaticidentities").verbs("create")
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch")
 	clusterCreateRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
 	clusterCreateFleetDefault := clusterCreateRole.addNamespacedRule("fleet-default")
 	clusterCreateFleetDefault.addRule().apiGroups("").resources("secrets").verbs("create")
@@ -85,7 +84,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	userRole := addUserRules(rb.addRole("User", "user"))
-	userRole.addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("awsclusterstaticidentities").verbs("create")
 	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
 	userFleetDefault := userRole.addNamespacedRule("fleet-default")
 	userFleetDefault.addRule().apiGroups("").resources("secrets").verbs("create")
