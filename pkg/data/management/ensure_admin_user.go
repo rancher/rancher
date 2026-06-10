@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/docker/pkg/reexec"
+	"github.com/moby/sys/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/api/user"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
