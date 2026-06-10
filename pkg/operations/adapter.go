@@ -777,7 +777,7 @@ func (a *ImportedAdapter) PauseCluster(_ bool) error {
 
 func (a *ImportedAdapter) DataDirectory(_ *corev1.Secret) string {
 	if a.cluster.Status.Provider == "rke2" {
-		return "/var/lib/rancher/rke2/server"
+		return "/var/lib/rancher/rke2"
 	}
 	return "/var/lib/rancher/k3s"
 }
