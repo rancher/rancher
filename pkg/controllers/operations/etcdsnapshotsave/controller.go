@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/lasso/pkg/dynamic"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
@@ -29,6 +28,17 @@ import (
 // ControllerOwnerKey is the value used to identify the etcd-snapshot-save handler currently owns the beacon.
 const ControllerOwnerKey = "etcd-snapshot-save"
 
+// dynamicResolver is the subset of *dynamic.Controller this handler needs: Get for cluster
+// lookup during onChange dispatch, and Enqueue for nudging the parent cluster controller after a
+// successful operation. It's an interface so tests can substitute a stub — *dynamic.Controller
+// satisfies it directly.
+type dynamicResolver interface {
+	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
+	Enqueue(gvk schema.GroupVersionKind, namespace, name string) error
+}
+
+// handler is the per-cluster reconciliation state for the ETCDSnapshotSave controller. All fields
+// are populated at Register time; the handler itself is stateless across reconciles.
 type handler struct {
 	etcdsnapshotsaves operationcontrollers.ETCDSnapshotSaveController
 
@@ -40,11 +50,13 @@ type handler struct {
 
 	store *planapi.Store
 
-	dynamic *dynamic.Controller
+	dynamic dynamicResolver
 
 	clients *wrangler.CAPIContext
 }
 
+// Register wires the ETCDSnapshotSave controller into the given wrangler context. It must be
+// called exactly once per process; subsequent calls would clobber the registered status handler.
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		etcdsnapshotsaves: clients.Operation.ETCDSnapshotSave(),
@@ -60,6 +72,14 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	operationcontrollers.RegisterETCDSnapshotSaveStatusHandler(ctx, clients.Operation.ETCDSnapshotSave(), "", "etcd-snapshot-create-handler", h.OnChange)
 }
 
+// OnChange is the status handler entrypoint invoked by the wrangler-registered controller. It
+// delegates the phase-specific work to onChange, then runs the common condition refresh through
+// updateStatus.
+//
+// When the resulting status is byte-identical to the prior status (no state moved this tick), the
+// handler either deletes the operation (terminal phase past its TTL — frees the beacon as a side
+// effect of the watcher seeing the deletion) or re-enqueues itself after 5 seconds so the next
+// poll can pick up any out-of-band changes (plan secret state, beacon transitions, etc.).
 func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	status, err := h.onChange(op, status)
 	if err != nil {
@@ -82,6 +102,17 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	return status, nil
 }
 
+// onChange resolves the parent cluster reference, locates the cluster's beacon, builds an Adapter
+// for the cluster kind, and dispatches to the phase-specific handler. Returns the unmodified
+// status when:
+//
+//   - op is nil, being deleted, or paused;
+//   - the beacon has not yet been created during the Pending phase (allows the system-agent watcher
+//     to create it before we fail the operation);
+//   - the operation has reached a terminal phase (handleSucceeded/handleFailed perform their own
+//     beacon cleanup).
+//
+// Marks the operation Failed when the parent cluster is missing or the current phase is unknown.
 func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	if op == nil {
 		return status, nil
@@ -197,6 +228,9 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	return status, nil
 }
 
+// scope bundles the per-reconcile values derived from the operation, parent cluster, and beacon.
+// It is built fresh on every invocation and threaded through the phase handlers so they don't
+// each have to re-derive the same data.
 type scope struct {
 	op        *opv1alpha1.ETCDSnapshotSave
 	namespace string
@@ -206,6 +240,11 @@ type scope struct {
 	adapter    ops.Adapter
 }
 
+// handlePending advances a Pending operation through the prerequisite checks: acquire the
+// cluster's beacon, then wait for every expected system-agent to register a machine-plan secret.
+// On success the operation transitions to InProgress at the Save step. Otherwise it remains
+// Pending with a condition explaining what we're still waiting on (beacon ownership or agent
+// registration).
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling pending", s.op.Namespace, s.op.Name)
 
@@ -242,6 +281,10 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	return status, nil
 }
 
+// handleInProgress is invoked once the operation is past Pending. It re-verifies beacon ownership
+// (defends against another controller swooping in mid-operation), marks the beacon active so the
+// system-agent will keep polling, and then dispatches to the step-specific reconciler. An unknown
+// step marks the operation Failed.
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling in-progress", s.op.Namespace, s.op.Name)
 
@@ -283,6 +326,18 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	return status, nil
 }
 
+// reconcileSave assigns the `<runtime> etcd-snapshot save` plan to every etcd-labeled
+// machine-plan secret in the cluster. The snapshot Args (Name/Compress/Dir) are appended to the
+// command verbatim when set.
+//
+// Per-secret outcomes:
+//   - the plan is still applying → returns InProgress with a waiting-for-plan message and lets
+//     the next reconcile poll the agent's feedback;
+//   - the plan failed (system-agent saturated the retry budget) → marks the entire operation
+//     Failed with the offending secret in the message;
+//   - the plan applied successfully → continues to the next etcd secret.
+//
+// Once every etcd secret has applied the plan, transitions to the Restart step.
 func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling snapshot save", s.op.Namespace, s.op.Name)
 
@@ -364,6 +419,12 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	return status, nil
 }
 
+// reconcileRestart issues `systemctl restart <server-unit>` against every etcd-labeled
+// machine-plan secret. The restart is required because some snapshot configmaps need the etcd
+// server to roll before they're visible (per the K3s/RKE2 snapshot bug referenced upstream).
+//
+// On per-secret failure marks the operation Failed; on per-secret pending returns InProgress with
+// a wait message. After all secrets have applied the restart, marks the operation Succeeded.
 func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
 
@@ -438,6 +499,10 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	return status, nil
 }
 
+// handleFailed releases the beacon when the operation has reached the Failed terminal phase, so
+// the next operation in line can acquire it. The toggle-off step pairs with handleSucceeded's
+// behaviour so the beacon's Active flag accurately reflects whether any operation is currently
+// running.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
@@ -457,6 +522,10 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 	return status, nil
 }
 
+// handleSucceeded mirrors handleFailed for the Succeeded terminal phase: toggles the beacon off,
+// releases ownership, and then nudges the parent cluster controller (snapshotbackpopulate, RKE
+// controlplane, etc.) by enqueueing the cluster object so any post-operation reconciliation runs
+// promptly rather than waiting for the next periodic resync.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
