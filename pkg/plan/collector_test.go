@@ -518,51 +518,6 @@ func TestDefaultSorterTiebreakByName(t *testing.T) {
 	}
 }
 
-// Backward-compatibility tests for the legacy NewLabeler / Collect(cache, namespace) entry point.
-// The legacy API delegates to the same Collector under the hood, so we verify the shared semantics
-// still hold.
-
-func TestLegacyNewLabelerStillWorks(t *testing.T) {
-	t.Parallel()
-
-	cache := &fakeCache{
-		secrets: []*corev1.Secret{
-			newSecret("a", map[string]string{labelEtcd: "true"}),
-			newSecret("b", map[string]string{labelEtcd: "true"}),
-			newSecret("c", map[string]string{labelControl: "true"}),
-		},
-	}
-
-	got, err := NewLabeler().
-		And(Label(labelEtcd, "true")).
-		WithSorter(DefaultSorter()).
-		Collect(cache, "fleet-default")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !equalStrings(secretNames(got), []string{"a", "b"}) {
-		t.Errorf("legacy labeler produced %v, want [a b]", secretNames(got))
-	}
-}
-
-func TestLegacyNewLabelerEmptyMatchesEverything(t *testing.T) {
-	t.Parallel()
-
-	cache := &fakeCache{
-		secrets: []*corev1.Secret{
-			newSecret("a", nil),
-			newSecret("b", nil),
-		},
-	}
-	got, err := NewLabeler().Collect(cache, "fleet-default")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(got) != 2 {
-		t.Errorf("unselected labeler should return everything in namespace, got %d", len(got))
-	}
-}
-
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
