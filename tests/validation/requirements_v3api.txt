@@ -6,7 +6,7 @@ invoke==1.2.0
 Jinja2==3.1.6
 kubernetes==12.0.1
 netaddr==0.8.0
-paramiko==3.4.0
+paramiko==3.5.1
 PyJWT==2.4.0
 pytest==6.2.5
 pytest-repeat==0.8.0
