@@ -371,12 +371,6 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		if s.op.Spec.Args.Name != "" {
 			saveInstruction.CommonInstruction.Args = append(saveInstruction.CommonInstruction.Args, "--name", s.op.Spec.Args.Name)
 		}
-		if s.op.Spec.Args.ETCDSnapshotCompress {
-			saveInstruction.CommonInstruction.Args = append(saveInstruction.CommonInstruction.Args, "--compress")
-		}
-		if s.op.Spec.Args.ETCDSnapshotDir != "" {
-			saveInstruction.CommonInstruction.Args = append(saveInstruction.CommonInstruction.Args, "--dir", s.op.Spec.Args.ETCDSnapshotDir)
-		}
 
 		nodePlan := &planapi.Plan{
 			OneTimeInstructions: []planapi.OneTimeInstruction{

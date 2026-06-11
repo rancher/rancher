@@ -12,21 +12,14 @@ type ETCDSnapshotSaveArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
 	// +optional
 	Name string `json:"name,omitempty"`
-
-	// ETCDSnapshotCompress determines if the snapshot will be compressed.
-	// +optional
-	ETCDSnapshotCompress bool `json:"etcd_snapshot_compress,omitempty"`
-
-	// ETCDSnapshotDir specifies the directory where the snapshot will be saved.
-	// +optional
-	ETCDSnapshotDir string `json:"etcd_snapshot_dir,omitempty"`
 }
 
 // ETCDSnapshotSaveSpec defines the desired state of ETCDSnapshotSave.
 type ETCDSnapshotSaveSpec struct {
-	// +optional
+	// OperationSpec is the shared spec common to all operations.
 	OperationSpec `json:",inline"`
 
+	// Args contains parameters for saving an ETCD snapshot.
 	// +optional
 	Args ETCDSnapshotSaveArgs `json:"args,omitempty"`
 }
