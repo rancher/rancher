@@ -6,10 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -17,16 +14,14 @@ const (
 )
 
 type TokenController struct {
-	tokens               wrangmgmtv3.TokenController
-	userAttributes       wrangmgmtv3.UserAttributeController
-	userAttributesLister wrangmgmtv3.UserAttributeCache
+	tokens            wrangmgmtv3.TokenController
+	userAttrRefresher UserAttributeRefresher
 }
 
 func newTokenController(mgmt *config.ManagementContext) *TokenController {
 	n := &TokenController{
-		tokens:               mgmt.Wrangler.Mgmt.Token(),
-		userAttributes:       mgmt.Wrangler.Mgmt.UserAttribute(),
-		userAttributesLister: mgmt.Wrangler.Mgmt.UserAttribute().Cache(),
+		tokens:            mgmt.Wrangler.Mgmt.Token(),
+		userAttrRefresher: newUserAttributeRefresher(mgmt),
 	}
 	return n
 }
@@ -68,15 +63,8 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 
 	// trigger corresponding UserAttribute resource to refresh if token potentially
 	// provides new information that is missing from the UserAttribute resource
-	refreshUserAttributes, err := t.userAttributesNeedsRefresh(obj.UserID)
-	if err != nil {
+	if err := t.userAttrRefresher.CheckAndRefresh(obj.UserID); err != nil {
 		return obj, err
-	}
-
-	if refreshUserAttributes {
-		if err = t.triggerUserAttributesRefresh(obj.UserID); err != nil {
-			return obj, err
-		}
 	}
 
 	// DO NOT remove until tokenHashing is always
@@ -99,45 +87,4 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 	}
 
 	return obj, nil
-}
-
-func (t *TokenController) userAttributesNeedsRefresh(user string) (bool, error) {
-	if user == "" {
-		return false, nil
-	}
-
-	userAttribute, err := t.userAttributesLister.Get(user)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return userAttribute.ExtraByProvider == nil, nil
-}
-
-func (t *TokenController) triggerUserAttributesRefresh(user string) error {
-	// Re-fetch from the API server inside the retry; the lister cache used
-	// for the gating check can be stale and lead to 409 conflicts when other
-	// writers (e.g. the refresh consumer) touch the object concurrently.
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		userAttribute, err := t.userAttributes.Get(user, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			// The user attribute was deleted under us.
-			// Nothing to refresh, no point in requeuing.
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if userAttribute.NeedsRefresh {
-			return nil
-		}
-		userAttribute.NeedsRefresh = true
-		_, err = t.userAttributes.Update(userAttribute)
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	})
 }
