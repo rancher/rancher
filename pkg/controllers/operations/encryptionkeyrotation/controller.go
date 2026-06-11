@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/lasso/pkg/dynamic"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
@@ -36,6 +35,14 @@ import (
 const ControllerOwnerKey = "encryption-key-rotation"
 const beaconOwnerRefAnnotation = "rke.cattle.io/operation-owner-ref"
 
+// dynamicResolver is the subset of *dynamic.Controller this handler needs:
+// Get for resolving cluster refs and Enqueue for nudging the backing cluster
+// after terminal beacon transitions.
+type dynamicResolver interface {
+	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
+	Enqueue(gvk schema.GroupVersionKind, namespace, name string) error
+}
+
 type handler struct {
 	encryptionkeyrotations operationcontrollers.EncryptionKeyRotationController
 
@@ -46,7 +53,7 @@ type handler struct {
 
 	store *planapi.Store
 
-	dynamic *dynamic.Controller
+	dynamic dynamicResolver
 
 	clients *wrangler.CAPIContext
 }

@@ -8,16 +8,188 @@ import (
 	"testing"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
+	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+type stubAdapter struct {
+	waitForRegisterOK  bool
+	waitForRegisterErr error
+	pauseCalls         []bool
+}
+
+func (a *stubAdapter) WaitForRegister() (bool, error) {
+	return a.waitForRegisterOK, a.waitForRegisterErr
+}
+
+func (a *stubAdapter) RuntimeCommand() string {
+	return "rke2"
+}
+
+func (a *stubAdapter) ServerUnit() string {
+	return "rke2-server"
+}
+
+func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
+	return map[string]rkeplan.Probe{}, nil
+}
+
+func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
+	return nil, nil
+}
+
+func (a *stubAdapter) PauseClusterActivity(paused bool) error {
+	a.pauseCalls = append(a.pauseCalls, paused)
+	return nil
+}
+
+type enqueueCall struct {
+	gvk       schema.GroupVersionKind
+	namespace string
+	name      string
+}
+
+type fakeDynamic struct {
+	getObj       runtime.Object
+	getErr       error
+	enqueueErr   error
+	enqueueCalls []enqueueCall
+}
+
+func (d *fakeDynamic) Get(_ schema.GroupVersionKind, _, _ string) (runtime.Object, error) {
+	if d.getErr != nil {
+		return nil, d.getErr
+	}
+	return d.getObj, nil
+}
+
+func (d *fakeDynamic) Enqueue(gvk schema.GroupVersionKind, namespace, name string) error {
+	d.enqueueCalls = append(d.enqueueCalls, enqueueCall{
+		gvk:       gvk,
+		namespace: namespace,
+		name:      name,
+	})
+	return d.enqueueErr
+}
+
+func newOp() *opv1alpha1.EncryptionKeyRotation {
+	return &opv1alpha1.EncryptionKeyRotation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ekr-1",
+			Namespace: "fleet-default",
+			UID:       types.UID("ekr-uid"),
+		},
+	}
+}
+
+func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
+	labels := map[string]string{}
+	if owner != "" {
+		labels[planv1alpha1.OwnerLabel] = owner
+	}
+	return &planv1alpha1.Beacon{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "fleet-default",
+			Namespace: "fleet-default",
+			Labels:    labels,
+		},
+		Status: planv1alpha1.BeaconStatus{Active: active},
+	}
+}
+
+func newScope(op *opv1alpha1.EncryptionKeyRotation, beacon *planv1alpha1.Beacon, adapter ops.Adapter) *scope {
+	cluster := &unstructured.Unstructured{}
+	cluster.SetAPIVersion("provisioning.cattle.io/v1")
+	cluster.SetKind("Cluster")
+	cluster.SetNamespace("fleet-default")
+	cluster.SetName("test")
+	return &scope{
+		op:         op,
+		beacon:     beacon,
+		namespace:  "fleet-default",
+		clusterObj: cluster,
+		adapter:    adapter,
+	}
+}
+
+type fakeEncryptionKeyRotationController struct {
+	operationcontrollers.EncryptionKeyRotationController
+	getFn func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error)
+}
+
+func (f *fakeEncryptionKeyRotationController) Get(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
+	if f.getFn == nil {
+		return nil, nil
+	}
+	return f.getFn(namespace, name, opts)
+}
+
+type fakeBeaconClient struct {
+	plancontrollers.BeaconClient
+	updateCalls     int
+	updates         []*planv1alpha1.Beacon
+	statusUpdates   []*planv1alpha1.Beacon
+	updateErr       error
+	updateStatusErr error
+}
+
+func (f *fakeBeaconClient) Update(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
+	f.updateCalls++
+	f.updates = append(f.updates, beacon.DeepCopy())
+	return beacon, f.updateErr
+}
+
+func (f *fakeBeaconClient) UpdateStatus(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
+	f.statusUpdates = append(f.statusUpdates, beacon.DeepCopy())
+	return beacon, f.updateStatusErr
+}
+
+func newPeriodicStatusSecret(secretName, stdout string) *corev1.Secret {
+	periodicOutput := map[string]planapi.PeriodicInstructionOutput{
+		statusPeriodicName: {
+			Name:   statusPeriodicName,
+			Stdout: []byte(stdout),
+		},
+	}
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: "fleet-default",
+		},
+		Data: map[string][]byte{
+			"applied-periodic-output": mustGzipJSON(periodicOutput),
+		},
+	}
+}
+
+func mustGzipJSON(v any) []byte {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+
+	var buffer bytes.Buffer
+	writer := gzip.NewWriter(&buffer)
+	if _, err := writer.Write(raw); err != nil {
+		panic(err)
+	}
+	if err := writer.Close(); err != nil {
+		panic(err)
+	}
+
+	return buffer.Bytes()
+}
 
 func TestConvergenceWaitMessage(t *testing.T) {
 	secretName := "leader-node"
@@ -222,6 +394,228 @@ func TestStatusFromOutput(t *testing.T) {
 				t.Fatalf("expected hashesPresent %t, got %t", tt.wantHashesPresent, status.hashesPresent)
 			}
 		})
+	}
+}
+
+func TestUpdateStatusByPhase(t *testing.T) {
+	tests := []struct {
+		name  string
+		phase opv1alpha1.OperationPhase
+		check func(t *testing.T, status opv1alpha1.EncryptionKeyRotationStatus)
+	}{
+		{
+			name:  "pending sets Pending=true",
+			phase: opv1alpha1.OperationPhasePending,
+			check: func(t *testing.T, s opv1alpha1.EncryptionKeyRotationStatus) {
+				if string(opv1alpha1.PendingCondition.GetStatus(&s)) != "True" {
+					t.Fatalf("expected PendingCondition=True")
+				}
+			},
+		},
+		{
+			name:  "in-progress clears pending with in-progress reason",
+			phase: opv1alpha1.OperationPhaseInProgress,
+			check: func(t *testing.T, s opv1alpha1.EncryptionKeyRotationStatus) {
+				if string(opv1alpha1.PendingCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected PendingCondition=False")
+				}
+				if opv1alpha1.PendingCondition.GetReason(&s) != opv1alpha1.InProgressReason {
+					t.Fatalf("expected PendingCondition reason %q, got %q", opv1alpha1.InProgressReason, opv1alpha1.PendingCondition.GetReason(&s))
+				}
+			},
+		},
+		{
+			name:  "succeeded clears pending in-progress and failed",
+			phase: opv1alpha1.OperationPhaseSucceeded,
+			check: func(t *testing.T, s opv1alpha1.EncryptionKeyRotationStatus) {
+				if string(opv1alpha1.PendingCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected PendingCondition=False")
+				}
+				if string(opv1alpha1.InProgressCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected InProgressCondition=False")
+				}
+				if string(opv1alpha1.FailedCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected FailedCondition=False")
+				}
+				if opv1alpha1.FailedCondition.GetReason(&s) != opv1alpha1.NotFailedReason {
+					t.Fatalf("expected FailedCondition reason %q, got %q", opv1alpha1.NotFailedReason, opv1alpha1.FailedCondition.GetReason(&s))
+				}
+			},
+		},
+		{
+			name:  "failed clears pending in-progress and succeeded",
+			phase: opv1alpha1.OperationPhaseFailed,
+			check: func(t *testing.T, s opv1alpha1.EncryptionKeyRotationStatus) {
+				if string(opv1alpha1.PendingCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected PendingCondition=False")
+				}
+				if string(opv1alpha1.InProgressCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected InProgressCondition=False")
+				}
+				if string(opv1alpha1.SucceededCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected SucceededCondition=False")
+				}
+				if opv1alpha1.SucceededCondition.GetReason(&s) != opv1alpha1.NotSuccessfulReason {
+					t.Fatalf("expected SucceededCondition reason %q, got %q", opv1alpha1.NotSuccessfulReason, opv1alpha1.SucceededCondition.GetReason(&s))
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := newOp()
+			op.Generation = 42
+
+			status := updateStatus(op, opv1alpha1.EncryptionKeyRotationStatus{
+				OperationStatus: opv1alpha1.OperationStatus{Phase: tt.phase},
+			})
+			if status.ObservedGeneration != 42 {
+				t.Fatalf("expected ObservedGeneration=42, got %d", status.ObservedGeneration)
+			}
+			tt.check(t, status)
+		})
+	}
+}
+
+func TestHandleFailed_HoldingBeaconReleasesAndUnpauses(t *testing.T) {
+	op := newOp()
+	adapter := &stubAdapter{waitForRegisterOK: true}
+	beacons := &fakeBeaconClient{}
+
+	h := &handler{beacons: beacons}
+	s := newScope(op, newBeacon(beaconOwnerKey(op), true), adapter)
+
+	_, err := h.handleFailed(s, opv1alpha1.EncryptionKeyRotationStatus{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
+		t.Fatalf("expected PauseClusterActivity(false), got %+v", adapter.pauseCalls)
+	}
+	if len(beacons.updates) != 1 {
+		t.Fatalf("expected one beacon release update, got %d", len(beacons.updates))
+	}
+	if _, ok := beacons.updates[0].Labels[planv1alpha1.OwnerLabel]; ok {
+		t.Fatalf("expected owner label to be cleared on release")
+	}
+}
+
+func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
+	op := newOp()
+	adapter := &stubAdapter{waitForRegisterOK: true}
+	beacons := &fakeBeaconClient{}
+	dynamic := &fakeDynamic{}
+
+	h := &handler{
+		beacons: beacons,
+		dynamic: dynamic,
+	}
+	s := newScope(op, newBeacon(beaconOwnerKey(op), true), adapter)
+
+	_, err := h.handleSucceeded(s, opv1alpha1.EncryptionKeyRotationStatus{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
+		t.Fatalf("expected PauseClusterActivity(false), got %+v", adapter.pauseCalls)
+	}
+	if len(beacons.statusUpdates) != 1 {
+		t.Fatalf("expected one beacon status update, got %d", len(beacons.statusUpdates))
+	}
+	if beacons.statusUpdates[0].Status.Active {
+		t.Fatalf("expected beacon to be toggled inactive")
+	}
+	if len(beacons.updates) != 1 {
+		t.Fatalf("expected one beacon release update, got %d", len(beacons.updates))
+	}
+	if _, ok := beacons.updates[0].Labels[planv1alpha1.OwnerLabel]; ok {
+		t.Fatalf("expected owner label to be cleared on release")
+	}
+
+	if len(dynamic.enqueueCalls) != 1 {
+		t.Fatalf("expected one cluster enqueue, got %d", len(dynamic.enqueueCalls))
+	}
+	expectedGVK := schema.FromAPIVersionAndKind("provisioning.cattle.io/v1", "Cluster")
+	if dynamic.enqueueCalls[0].gvk != expectedGVK || dynamic.enqueueCalls[0].namespace != "fleet-default" || dynamic.enqueueCalls[0].name != "test" {
+		t.Fatalf("unexpected enqueue call: %#v", dynamic.enqueueCalls[0])
+	}
+}
+
+func TestHandleSucceeded_NotHoldingOnlyUnpauses(t *testing.T) {
+	op := newOp()
+	adapter := &stubAdapter{waitForRegisterOK: true}
+	beacons := &fakeBeaconClient{}
+	dynamic := &fakeDynamic{}
+
+	h := &handler{
+		beacons: beacons,
+		dynamic: dynamic,
+	}
+	s := newScope(op, newBeacon("other-controller", true), adapter)
+
+	_, err := h.handleSucceeded(s, opv1alpha1.EncryptionKeyRotationStatus{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
+		t.Fatalf("expected PauseClusterActivity(false), got %+v", adapter.pauseCalls)
+	}
+	if len(beacons.statusUpdates) != 0 {
+		t.Fatalf("expected no beacon status updates, got %d", len(beacons.statusUpdates))
+	}
+	if len(beacons.updates) != 0 {
+		t.Fatalf("expected no beacon release updates, got %d", len(beacons.updates))
+	}
+	if len(dynamic.enqueueCalls) != 0 {
+		t.Fatalf("expected no enqueue calls, got %d", len(dynamic.enqueueCalls))
+	}
+}
+
+func TestHandleInProgress_BeaconLost(t *testing.T) {
+	op := newOp()
+	op.Status.Step = opv1alpha1.EncryptionKeyRotationStepRotate
+
+	h := &handler{beacons: &fakeBeaconClient{}}
+	s := newScope(op, newBeacon("other-controller", true), &stubAdapter{waitForRegisterOK: true})
+
+	got, err := h.handleInProgress(s, opv1alpha1.EncryptionKeyRotationStatus{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Phase != opv1alpha1.OperationPhaseFailed {
+		t.Fatalf("expected phase failed, got %q", got.Phase)
+	}
+	if opv1alpha1.FailedCondition.GetReason(&got) != opv1alpha1.BeaconLostReason {
+		t.Fatalf("expected failed reason %q, got %q", opv1alpha1.BeaconLostReason, opv1alpha1.FailedCondition.GetReason(&got))
+	}
+}
+
+func TestHandleInProgress_UnknownStep(t *testing.T) {
+	op := newOp()
+	op.Status.Step = "mystery-step"
+	beacons := &fakeBeaconClient{}
+	h := &handler{beacons: beacons}
+
+	s := newScope(op, newBeacon(beaconOwnerKey(op), false), nil)
+	got, err := h.handleInProgress(s, opv1alpha1.EncryptionKeyRotationStatus{Step: "mystery-step"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Phase != opv1alpha1.OperationPhaseFailed {
+		t.Fatalf("expected phase failed, got %q", got.Phase)
+	}
+	if opv1alpha1.FailedCondition.GetReason(&got) != opv1alpha1.UnknownStepReason {
+		t.Fatalf("expected failed reason %q, got %q", opv1alpha1.UnknownStepReason, opv1alpha1.FailedCondition.GetReason(&got))
+	}
+	if len(beacons.statusUpdates) != 1 {
+		t.Fatalf("expected one beacon status update before step handling, got %d", len(beacons.statusUpdates))
+	}
+	if !beacons.statusUpdates[0].Status.Active {
+		t.Fatalf("expected beacon to be toggled active while operation is in progress")
 	}
 }
 
@@ -455,62 +849,4 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 			}
 		})
 	}
-}
-
-type fakeEncryptionKeyRotationController struct {
-	operationcontrollers.EncryptionKeyRotationController
-	getFn func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error)
-}
-
-func (f *fakeEncryptionKeyRotationController) Get(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
-	if f.getFn == nil {
-		return nil, nil
-	}
-	return f.getFn(namespace, name, opts)
-}
-
-type fakeBeaconClient struct {
-	plancontrollers.BeaconClient
-	updateCalls int
-}
-
-func (f *fakeBeaconClient) Update(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
-	f.updateCalls++
-	return beacon, nil
-}
-
-func newPeriodicStatusSecret(secretName, stdout string) *corev1.Secret {
-	periodicOutput := map[string]planapi.PeriodicInstructionOutput{
-		statusPeriodicName: {
-			Name:   statusPeriodicName,
-			Stdout: []byte(stdout),
-		},
-	}
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: "fleet-default",
-		},
-		Data: map[string][]byte{
-			"applied-periodic-output": mustGzipJSON(periodicOutput),
-		},
-	}
-}
-
-func mustGzipJSON(v any) []byte {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-
-	var buffer bytes.Buffer
-	writer := gzip.NewWriter(&buffer)
-	if _, err := writer.Write(raw); err != nil {
-		panic(err)
-	}
-	if err := writer.Close(); err != nil {
-		panic(err)
-	}
-
-	return buffer.Bytes()
 }
