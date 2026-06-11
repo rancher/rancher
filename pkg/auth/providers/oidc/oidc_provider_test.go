@@ -150,7 +150,11 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				FullGroupPath: []string{"/admingroup"},
 				Roles:         []string{"adminrole"},
 			},
-			expectedClaimInfo: &ClaimInfo{},
+			expectedClaimInfo: &ClaimInfo{
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
+			},
 		},
 		"get groups with GroupsClaims": {
 			config: func(port string) *apiv3.OIDCConfig {
@@ -346,6 +350,61 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			expectedClaimInfo: &ClaimInfo{
 				Email: "test.dev@example.com",
+			},
+		},
+		"custom groupsClaim takes precedence over userinfo groups": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "custom:groups"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":           "test",
+					"exp":           time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+					"iss":           "http://localhost:" + port,
+					"custom:groups": []string{"id-token-group"},
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute), // expires in the future
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"groups": ["userinfo-group"],
+				"full_group_path": ["/userinfo-group"],
+				"roles": ["userinfo-role"]
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"userinfo-group"},
+				FullGroupPath: []string{"/userinfo-group"},
+				Roles:         []string{"userinfo-role"},
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Groups:        []string{"id-token-group"},
+				FullGroupPath: []string{"/userinfo-group"},
+				Roles:         []string{"userinfo-role"},
 			},
 		},
 	}
