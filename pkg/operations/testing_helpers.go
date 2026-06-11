@@ -75,4 +75,3 @@ type stubNodeController struct {
 func (s *stubNodeController) Cache() generic.CacheInterface[*mgmtv3.Node] {
 	return s.cache
 }
-

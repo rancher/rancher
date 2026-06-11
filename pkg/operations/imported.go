@@ -119,8 +119,6 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		dataDir = "/var/lib/rancher/k3s"
 	}
 
-	probes = InsertDataDirForProbes(dataDir, probes)
-
 	// only support ipv4, need to implement per-node extraction mechanism
 	loopbackAddress := "127.0.0.1"
 
@@ -134,6 +132,8 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		supervisorProbe.HTTPGetAction.URL = fmt.Sprintf(supervisorProbe.HTTPGetAction.URL, loopbackAddress, port, runtime)
 		probes[SupervisorProbeName] = supervisorProbe
 	}
+
+	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
 		kcmProbe, err := renderSecureProbe("", probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)

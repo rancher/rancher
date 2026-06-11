@@ -100,11 +100,11 @@ var (
 		},
 		SupervisorProbeName: {
 			InitialDelaySeconds: 1,
-			TimeoutSeconds:      5,
+			TimeoutSeconds:      30,
 			SuccessThreshold:    1,
-			FailureThreshold:    2,
+			FailureThreshold:    30,
 			HTTPGetAction: plan.HTTPGetAction{
-				URL:        "http://%s:%d/v1-%s/readyz",
+				URL:        "https://%s:%d/v1-%s/readyz",
 				CACert:     "%s/agent/server-ca.crt",
 				ClientCert: "%s/agent/client-kubelet.crt",
 				ClientKey:  "%s/agent/client-kubelet.key",

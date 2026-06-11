@@ -150,8 +150,6 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 
 	dataDir := capr.GetDistroDataDir(a.controlPlane)
 
-	probes = InsertDataDirForProbes(dataDir, probes)
-
 	loopbackAddress := capr.GetLoopbackAddress(a.controlPlane)
 
 	config, err := a.renderConfig(secret)
@@ -169,6 +167,8 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 		supervisorProbe.HTTPGetAction.URL = fmt.Sprintf(supervisorProbe.HTTPGetAction.URL, loopbackAddress, port, runtime)
 		probes[SupervisorProbeName] = supervisorProbe
 	}
+
+	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
 		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
