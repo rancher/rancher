@@ -106,19 +106,21 @@ type Cluster struct {
 }
 
 type ClusterSpecBase struct {
-	DesiredAgentImage                                    string                         `json:"desiredAgentImage"`
-	DesiredAuthImage                                     string                         `json:"desiredAuthImage"`
-	AgentImageOverride                                   string                         `json:"agentImageOverride"`
-	AgentEnvVars                                         []v1.EnvVar                    `json:"agentEnvVars,omitempty"`
-	DefaultPodSecurityAdmissionConfigurationTemplateName string                         `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultClusterRoleForProjectMembers                  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
-	DockerRootDir                                        string                         `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
-	EnableNetworkPolicy                                  *bool                          `json:"enableNetworkPolicy" norman:"default=false"`
-	WindowsPreferedCluster                               bool                           `json:"windowsPreferedCluster" norman:"noupdate"`
-	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint       `json:"localClusterAuthEndpoint,omitempty"`
-	ClusterSecrets                                       ClusterSecrets                 `json:"clusterSecrets" norman:"nocreate,noupdate"`
-	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization  `json:"clusterAgentDeploymentCustomization,omitempty"`
-	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization  `json:"fleetAgentDeploymentCustomization,omitempty"`
+	DesiredAgentImage                                    string                          `json:"desiredAgentImage"`
+	DesiredAuthImage                                     string                          `json:"desiredAuthImage"`
+	AgentImageOverride                                   string                          `json:"agentImageOverride"`
+	AgentEnvVars                                         []v1.EnvVar                     `json:"agentEnvVars,omitempty"`
+	DesiredChartsImage                                   string                          `json:"desiredChartsImage"`
+	ChartsImageOverride                                  string                          `json:"chartsImageOverride"`
+	DefaultPodSecurityAdmissionConfigurationTemplateName string                          `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
+	DefaultClusterRoleForProjectMembers                  string                          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
+	EnableNetworkPolicy                                  *bool                           `json:"enableNetworkPolicy" norman:"default=false"`
+	WindowsPreferedCluster                               bool                            `json:"windowsPreferedCluster" norman:"noupdate"`
+	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint        `json:"localClusterAuthEndpoint,omitempty"`
+	ClusterSecrets                                       ClusterSecrets                  `json:"clusterSecrets" norman:"nocreate,noupdate"`
+	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization   `json:"clusterAgentDeploymentCustomization,omitempty"`
+	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization   `json:"fleetAgentDeploymentCustomization,omitempty"`
 	WebhookDeploymentCustomization                       *WebhookDeploymentCustomization `json:"webhookDeploymentCustomization,omitempty"`
 }
 
