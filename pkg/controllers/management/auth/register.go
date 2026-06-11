@@ -123,6 +123,11 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	relatedresource.Watch(ctx, "aggregation-feature-prtb-enqueuer", aggregationEnqueuer.enqueuePRTBs, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), management.Wrangler.Mgmt.Feature())
 
 	management.Wrangler.Mgmt.User().OnChange(ctx, userController, u.onChange)
+
+	management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
+		n := newExtTokenController(management.WithAgent(extTokenController))
+		w.Client.Token().OnChange(ctx, extTokenController, n.onChange)
+	})
 }
 
 func RegisterLate(ctx context.Context, management *config.ManagementContext) {
