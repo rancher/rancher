@@ -791,6 +791,8 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 		return nil
 	}
 	if apierrors.IsNotFound(err) {
+		// Convert not found for secret to not found for token
+		// Returned to match k8s behaviour for resource deletion
 		return apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 

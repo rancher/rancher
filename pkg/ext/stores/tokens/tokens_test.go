@@ -314,7 +314,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 
 		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
 
-		obj, err := store.DeleteCollection(context.Background(), deleteValidation,
+		obj, err := store.DeleteCollection(t.Context(), deleteValidation,
 			deleteOptions, listOptions)
 
 		require.NoError(t, err)
@@ -377,7 +377,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 
 		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
 
-		obj, err := store.DeleteCollection(context.Background(), deleteValidation,
+		obj, err := store.DeleteCollection(t.Context(), deleteValidation,
 			deleteOptions, listOptions)
 
 		require.NoError(t, err)
@@ -1573,7 +1573,7 @@ func TestSystemStoreCreateClusterScoped(t *testing.T) {
 			}
 
 			userInfo := &mockUser{name: "world"}
-			_, err := store.Create(context.Background(), GVR.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
+			_, err := store.Create(t.Context(), GVR.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
 
 			if test.err != "" {
 				require.Error(t, err)
