@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// fakeCache is an in-memory SecretCache for tests. It records every List call so we can assert
+// fakeCache is an in-memory SecretClient for tests. It records every List call so we can assert
 // the exact selectors a Collector evaluates against the cache.
 type fakeCache struct {
 	secrets []*corev1.Secret

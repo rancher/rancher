@@ -104,7 +104,7 @@ func newOp() *opv1alpha1.ETCDSnapshotSave {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "save-1",
 			Namespace: "fleet-default",
-			UID:       types.UID("op-uid"),
+			UID:       "op-uid",
 		},
 		Spec: opv1alpha1.ETCDSnapshotSaveSpec{
 			OperationSpec: opv1alpha1.OperationSpec{},
@@ -141,6 +141,7 @@ func newPlanSecret(name string) *corev1.Secret {
 				capr.EtcdRoleLabel:    "true",
 			},
 		},
+		Type: planapi.SecretTypeMachinePlan,
 	}
 }
 
@@ -179,11 +180,20 @@ func withFailedPlan(secret *corev1.Secret, plan *planapi.Plan) *corev1.Secret {
 	return out
 }
 
-func newSecretCache(t *testing.T, ctrl *gomock.Controller, items ...*corev1.Secret) *ctrlfake.MockCacheInterface[*corev1.Secret] {
+// newSecretClient mocks the SecretClient used by planapi.Store.AssignPlan. Update echoes the
+// passed-in secret back to the caller so the store treats it as the "post-update" state.
+func newSecretClient(t *testing.T, ctrl *gomock.Controller, items ...*corev1.Secret) *ctrlfake.MockClientInterface[*corev1.Secret, *corev1.SecretList] {
 	t.Helper()
-	m := ctrlfake.NewMockCacheInterface[*corev1.Secret](ctrl)
-	m.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(ns string, sel labels.Selector) ([]*corev1.Secret, error) {
-		var out []*corev1.Secret
+	m := ctrlfake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	m.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+		return s, nil
+	}).AnyTimes()
+	m.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
+		sel, err := labels.Parse(opts.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
+		var out corev1.SecretList
 		for _, s := range items {
 			if s.Namespace != ns {
 				continue
@@ -191,20 +201,9 @@ func newSecretCache(t *testing.T, ctrl *gomock.Controller, items ...*corev1.Secr
 			if !sel.Matches(labels.Set(s.Labels)) {
 				continue
 			}
-			out = append(out, s)
+			out.Items = append(out.Items, *s)
 		}
-		return out, nil
-	}).AnyTimes()
-	return m
-}
-
-// newSecretClient mocks the SecretClient used by planapi.Store.AssignPlan. Update echoes the
-// passed-in secret back to the caller so the store treats it as the "post-update" state.
-func newSecretClient(t *testing.T, ctrl *gomock.Controller) *ctrlfake.MockClientInterface[*corev1.Secret, *corev1.SecretList] {
-	t.Helper()
-	m := ctrlfake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-	m.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
-		return s, nil
+		return &out, nil
 	}).AnyTimes()
 	return m
 }
@@ -266,7 +265,7 @@ func TestUpdateStatusByPhase(t *testing.T) {
 			name:  "in-progress clears Pending",
 			phase: opv1alpha1.OperationPhaseInProgress,
 			check: func(t *testing.T, s opv1alpha1.ETCDSnapshotSaveStatus) {
-				assert.Equal(t, "False", string(opv1alpha1.PendingCondition.GetStatus(&s)))
+				assert.Equal(t, "False", opv1alpha1.PendingCondition.GetStatus(&s))
 				assert.Equal(t, opv1alpha1.InProgressReason, opv1alpha1.PendingCondition.GetReason(&s))
 			},
 		},
@@ -274,9 +273,9 @@ func TestUpdateStatusByPhase(t *testing.T) {
 			name:  "succeeded clears Pending+InProgress+Failed",
 			phase: opv1alpha1.OperationPhaseSucceeded,
 			check: func(t *testing.T, s opv1alpha1.ETCDSnapshotSaveStatus) {
-				assert.Equal(t, "False", string(opv1alpha1.PendingCondition.GetStatus(&s)))
-				assert.Equal(t, "False", string(opv1alpha1.InProgressCondition.GetStatus(&s)))
-				assert.Equal(t, "False", string(opv1alpha1.FailedCondition.GetStatus(&s)))
+				assert.Equal(t, "False", opv1alpha1.PendingCondition.GetStatus(&s))
+				assert.Equal(t, "False", opv1alpha1.InProgressCondition.GetStatus(&s))
+				assert.Equal(t, "False", opv1alpha1.FailedCondition.GetStatus(&s))
 				assert.Equal(t, opv1alpha1.NotFailedReason, opv1alpha1.FailedCondition.GetReason(&s))
 			},
 		},
@@ -284,9 +283,9 @@ func TestUpdateStatusByPhase(t *testing.T) {
 			name:  "failed clears Pending+InProgress+Succeeded",
 			phase: opv1alpha1.OperationPhaseFailed,
 			check: func(t *testing.T, s opv1alpha1.ETCDSnapshotSaveStatus) {
-				assert.Equal(t, "False", string(opv1alpha1.PendingCondition.GetStatus(&s)))
-				assert.Equal(t, "False", string(opv1alpha1.InProgressCondition.GetStatus(&s)))
-				assert.Equal(t, "False", string(opv1alpha1.SucceededCondition.GetStatus(&s)))
+				assert.Equal(t, "False", opv1alpha1.PendingCondition.GetStatus(&s))
+				assert.Equal(t, "False", opv1alpha1.InProgressCondition.GetStatus(&s))
+				assert.Equal(t, "False", opv1alpha1.SucceededCondition.GetStatus(&s))
 				assert.Equal(t, opv1alpha1.NotSuccessfulReason, opv1alpha1.SucceededCondition.GetReason(&s))
 			},
 		},
@@ -511,8 +510,7 @@ func TestReconcileSave_NoSecrets(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -531,8 +529,7 @@ func TestReconcileSave_WaitsForPlanApply(t *testing.T) {
 
 	secret := newPlanSecret("etcd-1") // no plan applied yet → first dispatch
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, secret),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -553,8 +550,7 @@ func TestReconcileSave_TransitionsToRestartWhenApplied(t *testing.T) {
 
 	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedSavePlan(op, adapter))
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, secret),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -573,8 +569,7 @@ func TestReconcileSave_PlanFailureMarksFailed(t *testing.T) {
 
 	secret := withFailedPlan(newPlanSecret("etcd-1"), expectedSavePlan(op, adapter))
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, secret),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -597,8 +592,7 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	plan := expectedSavePlan(op, adapter)
 	secret := withAppliedPlan(newPlanSecret("etcd-1"), plan)
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, secret),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -622,8 +616,7 @@ func TestReconcileRestart_MarksSucceededWhenApplied(t *testing.T) {
 
 	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(adapter))
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, secret),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -642,8 +635,7 @@ func TestReconcileRestart_WaitsForPlanApply(t *testing.T) {
 
 	secret := newPlanSecret("etcd-1") // no plan applied yet
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, secret),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -662,8 +654,7 @@ func TestReconcileRestart_PlanFailureMarksFailed(t *testing.T) {
 
 	secret := withFailedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(adapter))
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, secret),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
@@ -692,10 +683,10 @@ func TestReconcileRestart_FiltersToEtcdSecrets(t *testing.T) {
 				capr.WorkerRoleLabel:  "true",
 			},
 		},
+		Type: planapi.SecretTypeMachinePlan,
 	}
 	h := &handler{
-		secretCache: newSecretCache(t, ctrl, etcd, worker),
-		secrets:     newSecretClient(t, ctrl),
+		secrets: newSecretClient(t, ctrl, etcd, worker),
 	}
 	h.store = planapi.NewStore(h.secrets)
 

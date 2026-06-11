@@ -45,8 +45,7 @@ type handler struct {
 	beacons     plancontrollers.BeaconClient
 	beaconCache plancontrollers.BeaconCache
 
-	secrets     corecontrollers.SecretClient
-	secretCache corecontrollers.SecretCache
+	secrets corecontrollers.SecretClient
 
 	store *planapi.Store
 
@@ -63,7 +62,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		beacons:           clients.Plan.Beacon(),
 		beaconCache:       clients.Plan.Beacon().Cache(),
 		secrets:           clients.Core.Secret(),
-		secretCache:       clients.Core.Secret().Cache(),
 		dynamic:           clients.Dynamic,
 		store:             planapi.NewStore(clients.Core.Secret()),
 		clients:           clients,
@@ -342,7 +340,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling snapshot save", s.op.Namespace, s.op.Name)
 
 	// collect etcd nodes belonging to cluster
-	secrets, err := planapi.NewCollector(h.secretCache, s.clusterObj, s.namespace).
+	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
 		WithSorter(planapi.DefaultSorter()).
 		WithValidator(planapi.AtLeast(1, "")).
@@ -432,7 +430,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
 
 	// collect etcd nodes belonging to cluster
-	secrets, err := planapi.NewCollector(h.secretCache, s.clusterObj, s.namespace).
+	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
 		WithSorter(planapi.DefaultSorter()).
 		WithValidator(planapi.AtLeast(1, "")).

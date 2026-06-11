@@ -6,12 +6,26 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// SecretCache defines the contract for fetching secrets.
-type SecretCache interface {
-	List(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
+const (
+	labelClusterName = "rke.cattle.io/cluster-name"
+	labelInitNode    = "rke.cattle.io/init-node"
+	labelEtcd        = "rke.cattle.io/etcd-role"
+	labelControl     = "rke.cattle.io/controlplane-role"
+	labelWorker      = "rke.cattle.io/worker-role"
+	labelOS          = "cattle.io/os"
+
+	osWindows = "windows"
+
+	SecretTypeMachinePlan = "rke.cattle.io/machine-plan"
+)
+
+// SecretClient defines the contract for fetching secrets.
+type SecretClient interface {
+	List(namespace string, opts metav1.ListOptions) (*corev1.SecretList, error)
 }
 
 // FilterFunc decides whether to keep a single secret in a result set. It runs after the cache
@@ -33,17 +47,6 @@ type Validator func(s []*corev1.Secret) error
 type ClusterRef interface {
 	GetName() string
 }
-
-const (
-	labelClusterName = "rke.cattle.io/cluster-name"
-	labelInitNode    = "rke.cattle.io/init-node"
-	labelEtcd        = "rke.cattle.io/etcd-role"
-	labelControl     = "rke.cattle.io/controlplane-role"
-	labelWorker      = "rke.cattle.io/worker-role"
-	labelOS          = "cattle.io/os"
-
-	osWindows = "windows"
-)
 
 // DefaultSorter returns a SorterFunc that orders machine-plan secrets by a priority derived from
 // their role+OS labels (init-etcd first, plain etcd next, then mixed roles, with Windows workers
@@ -186,7 +189,7 @@ func Or(selectors ...Selector) Selector { return orSelector{selectors: selectors
 //
 // Collector is not safe for concurrent use — build one per query.
 type Collector struct {
-	cache       SecretCache
+	client      SecretClient
 	namespace   string
 	clusterName string
 	selectors   []Selector
@@ -204,9 +207,9 @@ type Collector struct {
 // Passing a nil cluster returns a Collector that matches every secret in the namespace (no
 // auto-filter), which is occasionally useful for cluster-list operations but is rarely what you
 // want — prefer passing the cluster object explicitly.
-func NewCollector(cache SecretCache, cluster ClusterRef, namespace string) *Collector {
+func NewCollector(cache SecretClient, cluster ClusterRef, namespace string) *Collector {
 	c := &Collector{
-		cache:     cache,
+		client:    cache,
 		namespace: namespace,
 	}
 	if cluster != nil {
@@ -279,10 +282,11 @@ func (c CollectorError) Error() string {
 
 // IsTransient returns true if the CollectorError is transient (e.g. cache failure).
 // By default, all non-CollectorError errors are transient.
+// A `nil` error is considered not transient.
 // The primary use case for this is to distinguish between cache failures and validation failures.
 func IsTransient(err error) bool {
 	if err == nil {
-		return true
+		return false
 	}
 	if e, ok := errors.AsType[CollectorError](err); ok {
 		return e.Transient
@@ -298,7 +302,7 @@ func IsTransient(err error) bool {
 // Any nested OR is expanded into multiple cache queries and the results are deduplicated by UID
 // before filtering.
 func (c *Collector) Collect() ([]*corev1.Secret, error) {
-	if c.cache == nil {
+	if c.client == nil {
 		return nil, errors.New("plan: Collector has no SecretCache")
 	}
 
@@ -311,11 +315,18 @@ func (c *Collector) Collect() ([]*corev1.Secret, error) {
 
 	var secrets []*corev1.Secret
 	for _, sel := range queries {
-		list, err := c.cache.List(c.namespace, sel)
+		list, err := c.client.List(c.namespace, metav1.ListOptions{
+			LabelSelector: sel.String(),
+			FieldSelector: SecretTypeMachinePlan,
+		})
 		if err != nil {
 			return nil, err
+		} else if list == nil {
+			continue
 		}
-		secrets = append(secrets, list...)
+		for secret := range list.Items {
+			secrets = append(secrets, &list.Items[secret])
+		}
 	}
 
 	// Deduplicate by UID. Overlapping OR branches can surface the same secret more than once.
