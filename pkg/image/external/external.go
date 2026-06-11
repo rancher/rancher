@@ -206,10 +206,9 @@ func downloadExternalImageListFromURL(url string) (string, error) {
 // filterLatestPatchReleases returns only the latest patch release for each minor version.
 // For example, given [v1.28.1+k3s1, v1.28.2+k3s1, v1.28.3+k3s1, v1.29.0+k3s1] it returns
 // [v1.28.3+k3s1, v1.29.0+k3s1]. Comparison order for same major.minor:
-//  1. Higher patch wins (v1.28.3 > v1.28.2).
-//  2. For equal patches, a release beats an RC and a higher RC number beats a lower one
-//     (v1.28.3+k3s1 > v1.28.3-rc.1+k3s1; v1.28.3-rc.2+k3s1 > v1.28.3-rc.1+k3s1).
-//  3. For equal patch+prerelease, the higher build number wins (k3s2 > k3s1, rke2r2 > rke2r1).
+//  1. RC pre-release versions (e.g. v1.28.3-rc.1+k3s1) are skipped entirely.
+//  2. Higher patch wins (v1.28.3 > v1.28.2).
+//  3. For equal patches, the higher build number wins (k3s2 > k3s1, rke2r2 > rke2r1).
 //
 // Releases whose versions cannot be parsed are logged as warnings and dropped.
 func filterLatestPatchReleases(releases []string) []string {
@@ -228,6 +227,11 @@ func filterLatestPatchReleases(releases []string) []string {
 			continue
 		}
 
+		if sv.PreRelease != "" {
+			logrus.Debugf("filterLatestPatchReleases: skipping RC release %q", release)
+			continue
+		}
+
 		key := fmt.Sprintf("%d.%d", sv.Major, sv.Minor)
 		existing, ok := latestByMinor[key]
 		if !ok {
@@ -242,13 +246,8 @@ func filterLatestPatchReleases(releases []string) []string {
 		if sv.Patch < existing.sv.Patch {
 			continue
 		}
-		// Same patch: use semver pre-release comparison (release > RC per semver spec).
-		// sv.Compare ignores build metadata per semver spec, so we fall through to
-		// extractBuildNumber only when major.minor.patch.prerelease are all equal.
-		cmp := sv.Compare(*existing.sv)
-		if cmp > 0 {
-			latestByMinor[key] = entry{original: release, sv: sv}
-		} else if cmp == 0 && extractBuildNumber(sv.Metadata) > extractBuildNumber(existing.sv.Metadata) {
+		// Same patch: higher build number wins (k3s2 > k3s1, rke2r2 > rke2r1).
+		if extractBuildNumber(sv.Metadata) > extractBuildNumber(existing.sv.Metadata) {
 			latestByMinor[key] = entry{original: release, sv: sv}
 		}
 	}
