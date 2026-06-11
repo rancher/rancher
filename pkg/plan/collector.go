@@ -317,7 +317,7 @@ func (c *Collector) Collect() ([]*corev1.Secret, error) {
 	for _, sel := range queries {
 		list, err := c.client.List(c.namespace, metav1.ListOptions{
 			LabelSelector: sel.String(),
-			FieldSelector: SecretTypeMachinePlan,
+			FieldSelector: fmt.Sprintf("type=%s", SecretTypeMachinePlan),
 		})
 		if err != nil {
 			return nil, err
