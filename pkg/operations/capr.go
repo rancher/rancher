@@ -213,12 +213,11 @@ func (a *CAPRAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 // otherwise a new leader is elected and the annotation written with retry-on-conflict.
 // Returns nil, nil when no suitable candidate exists yet.
 func (a *CAPRAdapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
-	cache := a.clients.Core.Secret().Cache()
-	candidates, err := planapi.NewLabeler().
-		And(planapi.Label(capr.ClusterNameLabel, a.controlPlane.Name)).
+	secrets := a.clients.Core.Secret()
+	candidates, err := planapi.NewCollector(secrets, a.controlPlane, a.controlPlane.Namespace).
 		WithFilter(planapi.FilterFunc(filter)).
 		WithSorter(planapi.DefaultSorter()).
-		Collect(cache, a.controlPlane.Namespace)
+		Collect()
 	if err != nil {
 		return nil, err
 	}
