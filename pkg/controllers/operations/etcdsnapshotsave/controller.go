@@ -347,7 +347,16 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		WithSorter(planapi.DefaultSorter()).
 		WithValidator(planapi.AtLeast(1, "")).
 		Collect()
-	if err != nil {
+	if planapi.IsTransient(err) {
+		return status, err
+	} else if err != nil {
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, err
 	}
 
@@ -428,7 +437,16 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		WithSorter(planapi.DefaultSorter()).
 		WithValidator(planapi.AtLeast(1, "")).
 		Collect()
-	if err != nil {
+	if planapi.IsTransient(err) {
+		return status, err
+	} else if err != nil {
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, err
 	}
 

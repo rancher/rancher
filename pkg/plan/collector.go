@@ -268,6 +268,28 @@ func (c *Collector) WithValidator(validators ...Validator) *Collector {
 	return c
 }
 
+type CollectorError struct {
+	Err       error
+	Transient bool
+}
+
+func (c CollectorError) Error() string {
+	return c.Err.Error()
+}
+
+// IsTransient returns true if the CollectorError is transient (e.g. cache failure).
+// By default, all non-CollectorError errors are transient.
+// The primary use case for this is to distinguish between cache failures and validation failures.
+func IsTransient(err error) bool {
+	if err == nil {
+		return true
+	}
+	if e, ok := errors.AsType[CollectorError](err); ok {
+		return e.Transient
+	}
+	return true
+}
+
 // Collect executes the query pipeline: fetch by selector → deduplicate by UID → filter → sort →
 // validate. Returns the resulting secrets, or the first error encountered (cache failure or
 // validator failure).
@@ -335,7 +357,7 @@ func (c *Collector) Collect() ([]*corev1.Secret, error) {
 	// Run validators against the final set. First failure wins.
 	for _, v := range c.validators {
 		if err := v(result); err != nil {
-			return nil, err
+			return nil, CollectorError{Err: err, Transient: false}
 		}
 	}
 
