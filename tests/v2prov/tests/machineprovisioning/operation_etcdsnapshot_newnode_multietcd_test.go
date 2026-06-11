@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher/pkg/capr"
-
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
@@ -17,6 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,20 +27,14 @@ import (
 // It then creates a new etcd node and restores from local snapshot file, then scales the cluster back up to desired state.
 func Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t *testing.T) {
 	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer clients.Close()
 
 	newNs, err := namespace.Random(clients)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	osInfo, err := objectstore.GetObjectStore(clients, newNs.Name, "store0", "s3snapshots")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -75,14 +69,10 @@ func Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t 
 			},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	c, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -93,35 +83,28 @@ func Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t 
 		},
 	}
 
-	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "s3")
-	assert.NotNil(t, snapshot)
+	snapshots := operations.RunSnapshotCreateTest(t, clients, c, cm, "s3", 1)
+	require.Len(t, snapshots, 1, "expected 1 snapshot to be created")
+	snapshot := snapshots[0]
 	// Scale controlplane/etcd nodes to 0
 	c, err = operations.Scale(clients, c, 0, 0, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating insane cluster", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Scale etcd nodes to 1
 	c, err = operations.Scale(clients, c, 0, 1, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating restoration required", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 3)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 3, rkev1.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
