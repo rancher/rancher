@@ -504,6 +504,9 @@ ENV CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=$CATTLE_CLUSTER_AUTOSCALER_CHART_
 ENV CATTLE_CLUSTER_AUTOSCALER_IMAGE=$CATTLE_CLUSTER_AUTOSCALER_IMAGE
 ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=$CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT
 
+# We still create the catalogs dir
+RUN mkdir -p /var/lib/rancher-data/local-catalogs
+
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
@@ -513,6 +516,7 @@ COPY --chown=root:root --chmod=0755 \
     package/entrypoint.sh \
     package/jailer.sh /usr/bin/
 
+VOLUME /var/lib/rancher-data/local-catalogs
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
@@ -573,6 +577,11 @@ COPY --from=tini /usr/bin/tini /usr/bin/
 COPY --from=agent-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
+
+# We still create the catalogs dir
+RUN mkdir -p /var/lib/rancher-data/local-catalogs
+
+VOLUME /var/lib/rancher-data/local-catalogs
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
     "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
