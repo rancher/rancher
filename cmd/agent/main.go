@@ -20,10 +20,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
+	"github.com/moby/moby/client"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -153,10 +151,9 @@ func cleanup(ctx context.Context) error {
 	}
 	defer c.Close()
 
-	args := filters.NewArgs()
-	args.Add("label", "io.cattle.agent=true")
+	args := client.Filters{}.Add("label", "io.cattle.agent=true")
 
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+	containers, err := c.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: args,
 	})
@@ -164,7 +161,7 @@ func cleanup(ctx context.Context) error {
 		return err
 	}
 
-	for _, container := range containers {
+	for _, container := range containers.Items {
 		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
 			continue
 		}
@@ -177,7 +174,7 @@ func cleanup(ctx context.Context) error {
 		go func() {
 			time.Sleep(15 * time.Second)
 			logrus.Infof("Removing unmanaged agent %s(%s)", container.Names[0], container.ID)
-			c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
+			c.ContainerRemove(ctx, container.ID, client.ContainerRemoveOptions{
 				Force: true,
 			})
 		}()
@@ -437,9 +434,8 @@ func exitCertWriter(ctx context.Context) {
 		os.Exit(0)
 	}
 
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=share-mnt")
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+	args := client.Filters{}.Add("label", "io.rancher.rke.container.name=share-mnt")
+	containers, err := c.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: args,
 	})
@@ -448,9 +444,9 @@ func exitCertWriter(ctx context.Context) {
 		os.Exit(0)
 	}
 
-	for _, container := range containers {
+	for _, container := range containers.Items {
 		if len(container.Names) > 0 && strings.Contains(container.Names[0], "share-mnt") {
-			err := c.ContainerKill(ctx, container.ID, "SIGTERM")
+			_, err := c.ContainerKill(ctx, container.ID, client.ContainerKillOptions{Signal: "SIGTERM"})
 			if err != nil {
 				logrus.Error(err)
 				os.Exit(0) // only need to write certs so exit cleanly
@@ -498,10 +494,9 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 	}
 	defer c.Close()
 
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=kubelet")
+	args := client.Filters{}.Add("label", "io.rancher.rke.container.name=kubelet")
 
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+	containers, err := c.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: args,
 	})
@@ -509,11 +504,11 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	for _, container := range containers {
+	for _, container := range containers.Items {
 		if len(container.Names) > 0 && strings.Contains(container.Names[0], "kubelet") {
 			nodeName := os.Getenv("CATTLE_NODE_NAME")
 			logrus.Infof("node %v is not registered, restarting kubelet now", nodeName)
-			if err := c.ContainerRestart(ctx, container.ID, nil); err != nil {
+			if _, err := c.ContainerRestart(ctx, container.ID, client.ContainerRestartOptions{}); err != nil {
 				return false, err
 			}
 			break
