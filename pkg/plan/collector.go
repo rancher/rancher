@@ -280,6 +280,10 @@ func (c CollectorError) Error() string {
 	return c.Err.Error()
 }
 
+func (c CollectorError) Unwrap() error {
+	return c.Err
+}
+
 // IsTransient returns true if the CollectorError is transient (e.g. cache failure).
 // By default, all non-CollectorError errors are transient.
 // A `nil` error is considered not transient.

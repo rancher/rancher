@@ -13,30 +13,34 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// fakeCache is an in-memory SecretClient for tests. It records every List call so we can assert
+// fakeClient is an in-memory SecretClient for tests. It records every List call so we can assert
 // the exact selectors a Collector evaluates against the cache.
-type fakeCache struct {
+type fakeClient struct {
 	secrets []*corev1.Secret
 	calls   []string
 	err     error
 }
 
-func (f *fakeCache) List(namespace string, selector labels.Selector) ([]*corev1.Secret, error) {
-	f.calls = append(f.calls, fmt.Sprintf("%s|%s", namespace, selector.String()))
+func (f *fakeClient) List(namespace string, opts metav1.ListOptions) (*corev1.SecretList, error) {
+	f.calls = append(f.calls, fmt.Sprintf("%s|%s", namespace, opts.LabelSelector))
 	if f.err != nil {
 		return nil, f.err
 	}
-	var out []*corev1.Secret
+	sel, err := labels.Parse(opts.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	var out corev1.SecretList
 	for _, s := range f.secrets {
 		if s.Namespace != namespace {
 			continue
 		}
-		if !selector.Matches(labels.Set(s.Labels)) {
+		if !sel.Matches(labels.Set(s.Labels)) {
 			continue
 		}
-		out = append(out, s)
+		out.Items = append(out.Items, *s)
 	}
-	return out, nil
+	return &out, nil
 }
 
 // fakeCluster is a minimal ClusterRef used in tests.
@@ -53,6 +57,7 @@ func newSecret(name string, lbls map[string]string) *corev1.Secret {
 			Labels:    lbls,
 			UID:       types.UID(name),
 		},
+		Type: SecretTypeMachinePlan,
 	}
 }
 
@@ -68,7 +73,7 @@ func secretNames(s []*corev1.Secret) []string {
 func TestNewCollectorAutoAppliesClusterNameFilter(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("ours-a", map[string]string{labelClusterName: "mine"}),
 			newSecret("ours-b", map[string]string{labelClusterName: "mine"}),
@@ -94,7 +99,7 @@ func TestNewCollectorNilClusterMatchesEverything(t *testing.T) {
 
 	// Documented escape hatch: passing nil disables the auto cluster-name filter and returns
 	// every secret in the namespace.
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("a", map[string]string{labelClusterName: "mine"}),
 			newSecret("b", map[string]string{labelClusterName: "other"}),
@@ -124,7 +129,7 @@ func TestNewCollectorReturnsErrorWithoutCache(t *testing.T) {
 func TestWithLabelsComposesWithClusterFilter(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("etcd-1", map[string]string{labelClusterName: "mine", labelEtcd: "true"}),
 			newSecret("etcd-2", map[string]string{labelClusterName: "mine", labelEtcd: "true"}),
@@ -151,7 +156,7 @@ func TestWithLabelsComposesWithClusterFilter(t *testing.T) {
 func TestWithLabelsMultipleCallsAndCompose(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("etcd-init", map[string]string{labelClusterName: "mine", labelEtcd: "true", labelInitNode: "true"}),
 			newSecret("etcd-only", map[string]string{labelClusterName: "mine", labelEtcd: "true"}),
@@ -174,7 +179,7 @@ func TestWithLabelsMultipleCallsAndCompose(t *testing.T) {
 func TestWithFilterRunsAfterFetch(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("linux-etcd", map[string]string{labelClusterName: "mine", labelEtcd: "true"}),
 			newSecret("windows-etcd", map[string]string{labelClusterName: "mine", labelEtcd: "true", labelOS: osWindows}),
@@ -196,7 +201,7 @@ func TestWithFilterRunsAfterFetch(t *testing.T) {
 func TestWithFilterMultipleAndCompose(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("a", map[string]string{labelClusterName: "mine"}),
 			newSecret("ab", map[string]string{labelClusterName: "mine"}),
@@ -220,7 +225,7 @@ func TestWithFilterMultipleAndCompose(t *testing.T) {
 func TestWithFilterNilIsNoOp(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{newSecret("a", map[string]string{labelClusterName: "mine"})},
 	}
 	_, err := NewCollector(cache, fakeCluster{name: "mine"}, "fleet-default").
@@ -234,7 +239,7 @@ func TestWithFilterNilIsNoOp(t *testing.T) {
 func TestWithSorterApplied(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("c", map[string]string{labelClusterName: "mine"}),
 			newSecret("a", map[string]string{labelClusterName: "mine"}),
@@ -260,7 +265,7 @@ func TestWithSorterApplied(t *testing.T) {
 func TestWithSorterChainOrder(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("a", map[string]string{labelClusterName: "mine"}),
 			newSecret("b", map[string]string{labelClusterName: "mine"}),
@@ -291,7 +296,7 @@ func TestWithSorterChainOrder(t *testing.T) {
 func TestCacheErrorBubbles(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{err: errors.New("cache exploded")}
+	cache := &fakeClient{err: errors.New("cache exploded")}
 	_, err := NewCollector(cache, fakeCluster{name: "mine"}, "fleet-default").Collect()
 	if err == nil || !strings.Contains(err.Error(), "cache exploded") {
 		t.Errorf("expected cache error to bubble, got: %v", err)
@@ -303,7 +308,7 @@ func TestOrSelectorDeduplicatedByUID(t *testing.T) {
 
 	// Both the etcd and controlplane branches match `init` — it must appear in the result
 	// exactly once.
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("init", map[string]string{labelClusterName: "mine", labelEtcd: "true", labelControl: "true"}),
 			newSecret("etcd-only", map[string]string{labelClusterName: "mine", labelEtcd: "true"}),
@@ -328,7 +333,7 @@ func TestOrSelectorDeduplicatedByUID(t *testing.T) {
 func TestValidatorRunsAfterFilteringAndSorting(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{
 			newSecret("etcd-1", map[string]string{labelClusterName: "mine", labelEtcd: "true"}),
 			newSecret("etcd-2", map[string]string{labelClusterName: "mine", labelEtcd: "true"}),
@@ -355,7 +360,7 @@ func TestValidatorRunsAfterFilteringAndSorting(t *testing.T) {
 func TestValidatorErrorAbortsCollect(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{newSecret("a", map[string]string{labelClusterName: "mine"})},
 	}
 	sentinel := errors.New("nope")
@@ -370,7 +375,7 @@ func TestValidatorErrorAbortsCollect(t *testing.T) {
 func TestValidatorFirstFailureWins(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{newSecret("a", map[string]string{labelClusterName: "mine"})},
 	}
 	first := errors.New("first")
@@ -390,7 +395,7 @@ func TestValidatorFirstFailureWins(t *testing.T) {
 func TestWithValidatorNilIgnored(t *testing.T) {
 	t.Parallel()
 
-	cache := &fakeCache{
+	cache := &fakeClient{
 		secrets: []*corev1.Secret{newSecret("a", map[string]string{labelClusterName: "mine"})},
 	}
 	_, err := NewCollector(cache, fakeCluster{name: "mine"}, "fleet-default").
