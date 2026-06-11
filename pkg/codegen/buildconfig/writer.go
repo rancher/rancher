@@ -12,23 +12,18 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"gopkg.in/yaml.v3"
 )
 
 type GoConstantsWriter struct {
-	Input  io.Reader
+	Config map[string]string
 	Output io.Writer
 	Tmpl   *template.Template
 	buf    []byte
-	cfg    map[string]string
 }
 
-// Run loads YAML data from the pre-configured Input source, processes it, and outputs a template with formatted
-// Go constants in the pre-configured Output source. This method can only be run once, since the Input source gets fully read.
+// Run processes the pre-configured Config and outputs a template with formatted
+// Go constants to the pre-configured Output.
 func (f *GoConstantsWriter) Run() error {
-	if err := f.load(); err != nil {
-		return err
-	}
 	if err := f.process(); err != nil {
 		return err
 	}
@@ -38,30 +33,16 @@ func (f *GoConstantsWriter) Run() error {
 	return nil
 }
 
-func (f *GoConstantsWriter) load() error {
-	if f.Input == nil {
-		return errors.New("nil input")
-	}
-	b, err := io.ReadAll(f.Input)
-	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
-	}
-	if len(b) == 0 {
-		return errors.New("nothing was read")
-	}
-	if err := yaml.Unmarshal(b, &f.cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal raw YAML from input: %w", err)
-	}
-	return nil
-}
-
 func (f *GoConstantsWriter) process() error {
 	if f.Tmpl == nil {
 		return errors.New("nil template")
 	}
+	if f.Config == nil {
+		return errors.New("nil config")
+	}
 	// This sorts the keys alphabetically to process the map in a fixed order.
-	keys := make([]string, 0, len(f.cfg))
-	for k := range f.cfg {
+	keys := make([]string, 0, len(f.Config))
+	for k := range f.Config {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -69,7 +50,7 @@ func (f *GoConstantsWriter) process() error {
 	capitalize := cases.Title(language.English, cases.NoLower)
 	var builder strings.Builder
 	for _, k := range keys {
-		v := f.cfg[k]
+		v := f.Config[k]
 		// Capitalize the key to make the constant exported in the generated Go file.
 		k = capitalize.String(k)
 		s := fmt.Sprintf("\t%s = %q\n", k, v)

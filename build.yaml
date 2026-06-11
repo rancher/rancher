@@ -1,8 +1,13 @@
 webhookVersion: 110.0.0+up0.11.0-rc.13
-remoteDialerProxyVersion: 110.0.0+up0.8.0-rc.9
+remoteDialerProxyVersion: 110.0.0+up0.8.0-rc.8
 # NOTE: CAPI controller version has to be updated in scripts/package-env
 turtlesVersion: 110.0.0+up0.27.0-rc.3
 cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
 defaultShellVersion: rancher/shell:v0.8.0-rc.2
 fleetVersion: 110.0.0+up0.16.0-alpha.9
 defaultSccOperatorImage: rancher/scc-operator:v0.4.1
+chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
+chartDefaultBranch: dev-v2.15
+partnerChartDefaultBranch: main
+rke2ChartDefaultBranch: main
+defaultChartsImage: rancher/rancher-assets:v0.1.0-rc.1
