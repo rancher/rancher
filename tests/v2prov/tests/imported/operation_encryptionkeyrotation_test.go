@@ -110,7 +110,7 @@ func Test_Operation_SetD_ImportedEncryptionKeyRotation(t *testing.T) {
 // This test exercises imported-cluster EKR restart ordering on a mixed RKE2 server topology.
 // The topology includes init+etcd, etcd-only, and additional control-plane nodes so restart
 // sequencing and final hash convergence are validated through the full imported workflow.
-func Test_Operation_Imported_EncryptionKeyRotation_MultiNodeMixedRoles(t *testing.T) {
+func Test_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRoles(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) != "rke2" {
 		t.Skip("encryption key rotation")
 	}

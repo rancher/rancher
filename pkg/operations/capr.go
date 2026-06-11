@@ -9,7 +9,7 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
@@ -123,11 +123,11 @@ func (a *CAPRAdapter) ServerUnit() string {
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // If the cluster is using a custom data directory or secure probes, this information is extracted from the cluster object and rendered in.
-func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]planapi.Probe, error) {
+func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
 		probeNames []string
-		probes     = map[string]planapi.Probe{}
+		probes     = map[string]plan.Probe{}
 	)
 
 	if runtime != capr.RuntimeK3S && IsEtcd(secret) {
@@ -214,9 +214,9 @@ func (a *CAPRAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 // Returns nil, nil when no suitable candidate exists yet.
 func (a *CAPRAdapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
 	secrets := a.clients.Core.Secret()
-	candidates, err := planapi.NewCollector(secrets, a.controlPlane, a.controlPlane.Namespace).
-		WithFilter(planapi.FilterFunc(filter)).
-		WithSorter(planapi.DefaultSorter()).
+	candidates, err := plan.NewCollector(secrets, a.controlPlane, a.controlPlane.Namespace).
+		WithFilter(plan.FilterFunc(filter)).
+		WithSorter(plan.DefaultSorter()).
 		Collect()
 	if err != nil {
 		return nil, err
@@ -332,7 +332,7 @@ func (a *CAPRAdapter) PauseClusterActivity(paused bool) error {
 }
 
 // Note: most of this functionally has been copied from the planner 1:1.
-// The intention is to split 100% of the planner code to both the planapi package and the operations package.
+// The intention is to split 100% of the planner code to both the plan package and the operations package.
 // This will ideally be performed before 2.15 is released; however, migrating piecemeal provides us with the flexibility
 // to make changes as desired without putting the existing codebase at risk.
 

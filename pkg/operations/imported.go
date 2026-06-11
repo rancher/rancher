@@ -5,7 +5,7 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -108,11 +108,11 @@ func (a *ImportedAdapter) ServerUnit() string {
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // Currently custom data directories, probes, and using ipv4 as the primary ip family are not supported.
-func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]planapi.Probe, error) {
+func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
 		probeNames []string
-		probes     = map[string]planapi.Probe{}
+		probes     = map[string]plan.Probe{}
 	)
 
 	if runtime != capr.RuntimeK3S && IsEtcd(secret) {
@@ -197,9 +197,9 @@ func (a *ImportedAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 // Returns nil, nil when no suitable candidate exists yet.
 func (a *ImportedAdapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
 	secrets := a.clients.Core.Secret()
-	candidates, err := planapi.NewCollector(secrets, a.cluster, a.cluster.Name).
-		WithFilter(planapi.FilterFunc(filter)).
-		WithSorter(planapi.DefaultSorter()).
+	candidates, err := plan.NewCollector(secrets, a.cluster, a.cluster.Name).
+		WithFilter(plan.FilterFunc(filter)).
+		WithSorter(plan.DefaultSorter()).
 		Collect()
 	if err != nil {
 		return nil, err
