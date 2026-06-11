@@ -9,6 +9,7 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
@@ -45,6 +46,10 @@ func (a *stubAdapter) ServerUnit() string     { return a.serverUnit }
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return a.probes, a.probesErr
 }
+func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
+	return nil, nil
+}
+func (a *stubAdapter) PauseClusterActivity(_ bool) error { return nil }
 
 // fakeDynamic satisfies the controller's dynamicResolver interface for the success-path tests.
 // Enqueue records the (gvk, namespace, name) tuple so tests can assert handleSucceeded nudged
