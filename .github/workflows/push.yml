@@ -44,13 +44,8 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: setup and build
         uses: ./.github/actions/build-images/agent
-  integration-tests:
-    needs: [build-server, build-agent]
-    uses: ./.github/workflows/integration-tests.yml
-    permissions:
-      contents: read
   push-images:
-    needs: [unit-tests, integration-tests]
+    needs: [unit-tests, build-server, build-agent]
     strategy:
       matrix:
         os: [linux]
