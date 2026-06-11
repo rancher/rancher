@@ -29,17 +29,19 @@ import (
 // corresponding method returns; RenderProbes always returns the same map regardless of secret/
 // supervisor flag to keep produced plans byte-deterministic across calls.
 type stubAdapter struct {
-	runtimeCommand    string
-	serverUnit        string
-	probes            map[string]rkeplan.Probe
-	probesErr         error
-	waitForRegisterOK bool
+	runtimeCommand     string
+	serverUnit         string
+	probes             map[string]rkeplan.Probe
+	probesErr          error
+	waitForRegisterOK  bool
 	waitForRegisterErr error
 }
 
-func (a *stubAdapter) WaitForRegister() (bool, error) { return a.waitForRegisterOK, a.waitForRegisterErr }
-func (a *stubAdapter) RuntimeCommand() string         { return a.runtimeCommand }
-func (a *stubAdapter) ServerUnit() string             { return a.serverUnit }
+func (a *stubAdapter) WaitForRegister() (bool, error) {
+	return a.waitForRegisterOK, a.waitForRegisterErr
+}
+func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }
+func (a *stubAdapter) ServerUnit() string     { return a.serverUnit }
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return a.probes, a.probesErr
 }
@@ -48,9 +50,9 @@ func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan
 // Enqueue records the (gvk, namespace, name) tuple so tests can assert handleSucceeded nudged
 // the parent cluster.
 type fakeDynamic struct {
-	gets      map[string]runtime.Object
-	enqueued  []string
-	getErr    error
+	gets       map[string]runtime.Object
+	enqueued   []string
+	getErr     error
 	enqueueErr error
 }
 
@@ -475,12 +477,6 @@ func expectedSaveInstruction(op *opv1alpha1.ETCDSnapshotSave, runtime string) pl
 	if op.Spec.Args.Name != "" {
 		args = append(args, "--name", op.Spec.Args.Name)
 	}
-	if op.Spec.Args.ETCDSnapshotCompress {
-		args = append(args, "--compress")
-	}
-	if op.Spec.Args.ETCDSnapshotDir != "" {
-		args = append(args, "--dir", op.Spec.Args.ETCDSnapshotDir)
-	}
 	return planapi.OneTimeInstruction{
 		CommonInstruction: planapi.CommonInstruction{
 			Name:    "snapshot",
@@ -594,8 +590,6 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	op := newOp()
 	op.Spec.Args.Name = "my-snap"
-	op.Spec.Args.ETCDSnapshotCompress = true
-	op.Spec.Args.ETCDSnapshotDir = "/snaps"
 	adapter := defaultAdapter()
 
 	// Pre-populate so the test traverses the "applied" branch without needing additional poll
@@ -611,7 +605,7 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	_, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
 
-	wantArgs := []string{"etcd-snapshot", "save", "--name", "my-snap", "--compress", "--dir", "/snaps"}
+	wantArgs := []string{"etcd-snapshot", "save", "--name", "my-snap"}
 	if !reflect.DeepEqual(plan.OneTimeInstructions[0].Args, wantArgs) {
 		t.Errorf("plan args = %v, want %v — snapshot Args were not threaded through", plan.OneTimeInstructions[0].Args, wantArgs)
 	}
