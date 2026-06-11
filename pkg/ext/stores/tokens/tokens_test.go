@@ -266,9 +266,73 @@ func TestStoreGroupVersionKind(t *testing.T) {
 func TestStoreDeleteCollection(t *testing.T) {
 	t.Parallel()
 
-	ctrl := gomock.NewController(t)
+	t.Run("ignore not found errors due to concurrent other delete", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		var deleteValidationCalledTimes int
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			deleteValidationCalledTimes++
+			return nil
+		}
+		deleteOptions := &metav1.DeleteOptions{
+			GracePeriodSeconds: ptr.To(int64(60)),
+		}
+		listOptions := &metainternalversion.ListOptions{
+			LabelSelector: labels.Set{
+				UserIDLabel: properUser,
+				"custom":    "label",
+			}.AsSelector(),
+		}
+
+		secretClient := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		secretClient.EXPECT().List(TokenNamespace, gomock.Any()).
+			DoAndReturn(func(namespace string, options metav1.ListOptions) (*corev1.SecretList, error) {
+				labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
+				require.NoError(t, err)
+				assert.Equal(t, properUser, labelSet[UserIDLabel])
+				assert.Equal(t, "label", labelSet["custom"])
+
+				return &corev1.SecretList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "1",
+					},
+					Items: []corev1.Secret{*properSecret.DeepCopy()},
+				}, nil
+			}).Times(1)
+		secretClient.EXPECT().Delete(TokenNamespace, "bogus", gomock.Any()).
+			DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+				assert.Equal(t, deleteOptions, options)
+				// report concurrent deletion of listed resource
+				return apierrors.NewNotFound(GVR.GroupResource(), name)
+			}).Times(1)
+		secretClient.EXPECT().Cache().Return(nil)
+		userClient := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Cache().Return(nil)
+		auth := NewMockauthHandler(ctrl)
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, false, true, nil)
+
+		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
+
+		obj, err := store.DeleteCollection(t.Context(), deleteValidation,
+			deleteOptions, listOptions)
+
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.TokenList{}, obj)
+
+		list := obj.(*ext.TokenList)
+		// len == 0, not listing the concurrently deleted object
+		require.Len(t, list.Items, 0)
+		assert.Equal(t, "1", list.ResourceVersion)
+
+		assert.Equal(t, deleteValidationCalledTimes, 1)
+
+	})
 
 	t.Run("admin deletes a user's tokens with a label", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
 		var deleteValidationCalledTimes int
 		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
 			deleteValidationCalledTimes++
@@ -313,7 +377,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 
 		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
 
-		obj, err := store.DeleteCollection(context.Background(), deleteValidation,
+		obj, err := store.DeleteCollection(t.Context(), deleteValidation,
 			deleteOptions, listOptions)
 
 		require.NoError(t, err)
@@ -1509,7 +1573,7 @@ func TestSystemStoreCreateClusterScoped(t *testing.T) {
 			}
 
 			userInfo := &mockUser{name: "world"}
-			_, err := store.Create(context.Background(), GVR.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
+			_, err := store.Create(t.Context(), GVR.GroupResource(), token, &metav1.CreateOptions{}, userInfo)
 
 			if test.err != "" {
 				require.Error(t, err)
@@ -1694,7 +1758,7 @@ func TestSystemStoreDelete(t *testing.T) {
 			name:  "secret not found is ok",
 			token: "bogus",
 			opts:  &metav1.DeleteOptions{},
-			err:   nil,
+			err:   apierrors.NewNotFound(GVR.GroupResource(), "bogus"),
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					Delete("cattle-tokens", "bogus", gomock.Any()).

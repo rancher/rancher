@@ -339,6 +339,9 @@ func (t *Store) DeleteCollection(
 	for _, secret := range secrets.Items {
 		token, _, err := t.deleteCore(ctx, &secret, deleteValidation, options)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
 				secret.Name, err))
 		}
@@ -788,7 +791,9 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 		return nil
 	}
 	if apierrors.IsNotFound(err) {
-		return nil
+		// Convert not found for secret to not found for token
+		// Returned to match k8s behaviour for resource deletion
+		return apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
