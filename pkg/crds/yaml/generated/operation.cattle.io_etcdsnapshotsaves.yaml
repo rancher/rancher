@@ -62,20 +62,8 @@ spec:
             description: Spec defines the desired state of the ETCDSnapshotSave.
             properties:
               args:
-                description: |-
-                  ETCDSnapshotSaveArgs contains parameters for saving an ETCD snapshot.
-                  Name specifies the name of the snapshot file.
-                  ETCDSnapshotCompress determines if the snapshot will be compressed.
-                  ETCDSnapshotDir specifies the directory where the snapshot will be saved.
+                description: Args contains parameters for saving an ETCD snapshot.
                 properties:
-                  etcd_snapshot_compress:
-                    description: ETCDSnapshotCompress determines if the snapshot will
-                      be compressed.
-                    type: boolean
-                  etcd_snapshot_dir:
-                    description: ETCDSnapshotDir specifies the directory where the
-                      snapshot will be saved.
-                    type: string
                   name:
                     description: Name specifies the name of the ETCD snapshot file.
                     type: string
