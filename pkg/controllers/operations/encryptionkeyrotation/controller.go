@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
-	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -51,7 +51,7 @@ type handler struct {
 
 	secrets corecontrollers.SecretClient
 
-	store *planapi.Store
+	store *plan.Store
 
 	dynamic dynamicResolver
 
@@ -65,7 +65,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		beaconCache:            clients.Plan.Beacon().Cache(),
 		secrets:                clients.Core.Secret(),
 		dynamic:                clients.Dynamic,
-		store:                  planapi.NewStore(clients.Core.Secret()),
+		store:                  plan.NewStore(clients.Core.Secret()),
 		clients:                clients,
 	}
 
@@ -229,7 +229,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		return status, err
 	}
 
-	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ownerKey)
+	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, ownerKey)
 	if err != nil {
 		return status, err
 	}
@@ -278,7 +278,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	if !planapi.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
+	if !plan.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
 		status.Phase = opv1alpha1.OperationPhaseFailed
 		status.LastUpdated = metav1.Now()
 
@@ -290,7 +290,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	}
 
 	var err error
-	s.beacon, err = planapi.ToggleBeacon(s.beacon, true, h.beacons)
+	s.beacon, err = plan.ToggleBeacon(s.beacon, true, h.beacons)
 	if err != nil {
 		return status, err
 	}
@@ -345,11 +345,11 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	env := operationEnv(s.op, status.Step)
 	runtime := s.adapter.RuntimeCommand()
 
-	nodePlan := &planapi.Plan{
-		OneTimeInstructions: []planapi.OneTimeInstruction{
+	nodePlan := &plan.Plan{
+		OneTimeInstructions: []plan.OneTimeInstruction{
 			// 1. Run rotate-keys via wrapper that always exits 0; captures real exit code in output.
 			{
-				CommonInstruction: planapi.CommonInstruction{
+				CommonInstruction: plan.CommonInstruction{
 					Name:    rotateKeysInstructionName,
 					Command: "/bin/sh",
 					Args:    []string{"-c", rotateKeysScript(runtime)},
@@ -360,7 +360,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 			// 2. Poll until secrets-encrypt status responds; gates planStatus.Applied until
 			// the encryption server is reachable after key reload.
 			{
-				CommonInstruction: planapi.CommonInstruction{
+				CommonInstruction: plan.CommonInstruction{
 					Name:    "wait-for-secrets-encrypt-status",
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
@@ -370,7 +370,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 			// 3. One-time status snapshot captured when the plan is applied; provides an
 			// observability anchor and confirms the endpoint is stable.
 			{
-				CommonInstruction: planapi.CommonInstruction{
+				CommonInstruction: plan.CommonInstruction{
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
@@ -379,10 +379,10 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 				SaveOutput: true,
 			},
 		},
-		PeriodicInstructions: []planapi.PeriodicInstruction{
+		PeriodicInstructions: []plan.PeriodicInstruction{
 			// Runs every 5s independently; used for stage/hash convergence checking.
 			{
-				CommonInstruction: planapi.CommonInstruction{
+				CommonInstruction: plan.CommonInstruction{
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
@@ -419,7 +419,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	}
 
 	// Plan applied and probes passed. Read the one-time output to check the rotate-keys exit code.
-	appliedOutput, err := planapi.ReadAppliedOutput(leader)
+	appliedOutput, err := plan.ReadAppliedOutput(leader)
 	if err != nil {
 		return status, err
 	}
@@ -483,21 +483,21 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
 
-	// Restart order comes from planapi.DefaultSorter(): init+etcd first, then
+	// Restart order comes from plan.DefaultSorter(): init+etcd first, then
 	// etcd-only, then mixed etcd/control-plane, then control-plane-only. That
 	// keeps etcd nodes ahead of pure control-plane nodes.
-	pool, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
+	pool, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithLabels(
-			planapi.Label(capr.ClusterNameLabel, s.clusterObj.GetName()),
-			planapi.Or(
-				planapi.Label(capr.EtcdRoleLabel, "true"),
-				planapi.Label(capr.ControlPlaneRoleLabel, "true"),
+			plan.Label(capr.ClusterNameLabel, s.clusterObj.GetName()),
+			plan.Or(
+				plan.Label(capr.EtcdRoleLabel, "true"),
+				plan.Label(capr.ControlPlaneRoleLabel, "true"),
 			)).
-		WithSorter(planapi.DefaultSorter()).
-		WithValidator(planapi.AtLeast(1, "")).
+		WithSorter(plan.DefaultSorter()).
+		WithValidator(plan.AtLeast(1, "")).
 		Collect()
 
-	if planapi.IsTransient(err) {
+	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: no control-plane nodes found at restart step", s.op.Namespace, s.op.Name)
@@ -514,7 +514,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 	serverUnit := s.adapter.ServerUnit()
 	runtime := s.adapter.RuntimeCommand()
 
-	// pool is ordered with planapi.DefaultSorter(), so the final element is the
+	// pool is ordered with plan.DefaultSorter(), so the final element is the
 	// last control-plane node. For the new k3s rotate-keys flow, strict "All
 	// hashes match" validation only makes sense after every control-plane node
 	// has restarted; before that, k3s may legitimately report
@@ -560,9 +560,9 @@ func (h *handler) reconcileRestartNode(
 		return status, false, err
 	}
 
-	oneTimeInstructions := []planapi.OneTimeInstruction{
+	oneTimeInstructions := []plan.OneTimeInstruction{
 		{
-			CommonInstruction: planapi.CommonInstruction{
+			CommonInstruction: plan.CommonInstruction{
 				Name:    "restart",
 				Command: "systemctl",
 				Args:    []string{"restart", serverUnit},
@@ -570,7 +570,7 @@ func (h *handler) reconcileRestartNode(
 			},
 		},
 		{
-			CommonInstruction: planapi.CommonInstruction{
+			CommonInstruction: plan.CommonInstruction{
 				Name:    "wait-for-systemctl-status",
 				Command: "/bin/sh",
 				Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
@@ -579,22 +579,22 @@ func (h *handler) reconcileRestartNode(
 		},
 	}
 
-	nodePlan := &planapi.Plan{
+	nodePlan := &plan.Plan{
 		OneTimeInstructions: oneTimeInstructions,
 		Probes:              probes,
 	}
 	if ops.IsControlPlane(secret) {
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions,
-			planapi.OneTimeInstruction{
-				CommonInstruction: planapi.CommonInstruction{
+			plan.OneTimeInstruction{
+				CommonInstruction: plan.CommonInstruction{
 					Name:    "wait-for-secrets-encrypt-status",
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
 					Env:     env,
 				},
 			},
-			planapi.OneTimeInstruction{
-				CommonInstruction: planapi.CommonInstruction{
+			plan.OneTimeInstruction{
+				CommonInstruction: plan.CommonInstruction{
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
@@ -603,9 +603,9 @@ func (h *handler) reconcileRestartNode(
 				SaveOutput: true,
 			},
 		)
-		nodePlan.PeriodicInstructions = []planapi.PeriodicInstruction{
+		nodePlan.PeriodicInstructions = []plan.PeriodicInstruction{
 			{
-				CommonInstruction: planapi.CommonInstruction{
+				CommonInstruction: plan.CommonInstruction{
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
@@ -662,7 +662,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotation
 		return status, err
 	}
 
-	err := planapi.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op))
+	err := plan.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op))
 	if err != nil {
 		return status, err
 	}
@@ -679,14 +679,14 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotat
 		return status, err
 	}
 
-	if planapi.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
+	if plan.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
 		var err error
-		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
+		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {
 			return status, err
 		}
 
-		err = planapi.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op))
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op))
 		if err != nil {
 			return status, err
 		}
@@ -960,13 +960,13 @@ func commandTimedOut(output, endpoint string) bool {
 //   - ("", err)    — hard error: corrupt payload, plan instruction missing, parse failure,
 //     or hash field absent when requireHashMatch is true at reencrypt_finished
 func convergenceWaitMessage(secret *corev1.Secret, requireHashMatch bool) (string, error) {
-	periodicOutput, err := planapi.ReadAppliedPeriodicOutput(secret)
+	periodicOutput, err := plan.ReadAppliedPeriodicOutput(secret)
 	if err != nil {
 		// gzip decode or JSON unmarshal failure — corrupt payload, not a normal wait.
 		return "", fmt.Errorf("corrupt applied-periodic-output on %s: %w", secret.Name, err)
 	}
 
-	var entry planapi.PeriodicInstructionOutput
+	var entry plan.PeriodicInstructionOutput
 	var entryOK bool
 	if periodicOutput != nil {
 		entry, entryOK = periodicOutput[statusPeriodicName]
@@ -1021,7 +1021,7 @@ func validatePlanHasPeriodicStatus(secret *corev1.Secret) error {
 	if len(raw) == 0 {
 		return fmt.Errorf("plan data absent from %s", secret.Name)
 	}
-	var p planapi.Plan
+	var p plan.Plan
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return fmt.Errorf("decoding plan from %s: %w", secret.Name, err)
 	}

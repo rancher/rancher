@@ -11,7 +11,7 @@ import (
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
-	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -156,7 +156,7 @@ func (f *fakeBeaconClient) UpdateStatus(beacon *planv1alpha1.Beacon) (*planv1alp
 }
 
 func newPeriodicStatusSecret(secretName, stdout string) *corev1.Secret {
-	periodicOutput := map[string]planapi.PeriodicInstructionOutput{
+	periodicOutput := map[string]plan.PeriodicInstructionOutput{
 		statusPeriodicName: {
 			Name:   statusPeriodicName,
 			Stdout: []byte(stdout),
