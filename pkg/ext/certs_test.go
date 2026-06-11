@@ -192,7 +192,7 @@ func setup(t *testing.T) (*rotatingSNIProvider, *fake.MockControllerInterface[*c
 	provider, err := NewSNIProviderForCname(
 		"test-provider",
 		[]string{
-			fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace),
+			fmt.Sprintf("%s.%s.svc", TargetServiceName, GetNamespace()),
 		},
 		secretMock)
 	assert.NoError(t, err)
@@ -215,7 +215,7 @@ func TestRotatingSNIProviderNoExistingSecret(t *testing.T) {
 	}()
 
 	wait.Until(func() {
-		_, err := secretMock.Get(Namespace, provider.secretName, metav1.GetOptions{})
+		_, err := secretMock.Get(GetNamespace(), provider.secretName, metav1.GetOptions{})
 
 		if err == nil {
 			close(stopChan)
@@ -226,7 +226,7 @@ func TestRotatingSNIProviderNoExistingSecret(t *testing.T) {
 
 	wg.Wait()
 
-	secret, err := store.Get(fmt.Sprintf("%s/%s", Namespace, provider.secretName))
+	secret, err := store.Get(fmt.Sprintf("%s/%s", GetNamespace(), provider.secretName))
 	assert.Error(t, err)
 	assert.Nil(t, secret)
 }
@@ -235,13 +235,13 @@ func TestRotatingSNIProviderWithExistingExpiringSecret(t *testing.T) {
 	provider, secretMock, store := setup(t)
 	stopChan := make(chan struct{})
 
-	initialCert, initialCa, err := GenerateSelfSignedCertKeyWithOpts(fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace), time.Second*5)
+	initialCert, initialCa, err := GenerateSelfSignedCertKeyWithOpts(fmt.Sprintf("%s.%s.svc", TargetServiceName, GetNamespace()), time.Second*5)
 	assert.NoError(t, err)
 
-	err = store.Create(fmt.Sprintf("%s/%s", Namespace, provider.secretName), &corev1.Secret{
+	err = store.Create(fmt.Sprintf("%s/%s", GetNamespace(), provider.secretName), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      provider.secretName,
-			Namespace: Namespace,
+			Namespace: GetNamespace(),
 		},
 		Data: map[string][]byte{
 			corev1.TLSCertKey:       initialCert,
@@ -262,7 +262,7 @@ func TestRotatingSNIProviderWithExistingExpiringSecret(t *testing.T) {
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*10))
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
-		secret, err := secretMock.Get(Namespace, provider.secretName, metav1.GetOptions{})
+		secret, err := secretMock.Get(GetNamespace(), provider.secretName, metav1.GetOptions{})
 		assert.NoError(t, err)
 
 		cert := secret.Data[corev1.TLSCertKey]
@@ -272,7 +272,7 @@ func TestRotatingSNIProviderWithExistingExpiringSecret(t *testing.T) {
 		}
 	}, time.Second)
 
-	secret, err := secretMock.Get(Namespace, provider.secretName, metav1.GetOptions{})
+	secret, err := secretMock.Get(GetNamespace(), provider.secretName, metav1.GetOptions{})
 	assert.NoError(t, err)
 
 	cert := secret.Data[corev1.TLSCertKey]
@@ -285,7 +285,7 @@ func TestRotatingSNIProviderWithExistingExpiringSecret(t *testing.T) {
 
 	wg.Wait()
 
-	secret, err = store.Get(fmt.Sprintf("%s/%s", Namespace, provider.secretName))
+	secret, err = store.Get(fmt.Sprintf("%s/%s", GetNamespace(), provider.secretName))
 	assert.Error(t, err)
 	assert.Nil(t, secret)
 }
