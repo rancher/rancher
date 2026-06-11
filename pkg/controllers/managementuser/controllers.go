@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -53,7 +54,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	}
 
 	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
-		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		err := cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			// For non-local clusters, register nodesyncer with CAPI context
 			if cluster.ClusterName != "local" {
 				nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
@@ -61,6 +62,9 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 			registerProvV2(ctx, cluster, capi, clusterRec)
 			return nil
 		})()
+		if err != nil {
+			logrus.Errorf("failed to start cluster manager: %v", err)
+		}
 	})
 
 	registerCaches(cluster)
@@ -97,13 +101,18 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 			cluster.K3s = k3s.New(cluster.ControllerFactory)
-			snapshotbackpopulate.Register(ctx, cluster, capi)
+			snapshotbackpopulate.Register(ctx, cluster, clusterRec)
 		}
 		cluster.Plan = upgrade.New(cluster.ControllerFactory)
 		rkecontrolplanecondition.Register(ctx,
 			cluster.ClusterName,
 			cluster.Catalog.V1().App(),
 			cluster.Management.Wrangler.RKE.RKEControlPlane())
+	} else {
+		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+			cluster.K3s = k3s.New(cluster.ControllerFactory)
+			snapshotbackpopulate.Register(ctx, cluster, clusterRec)
+		}
 	}
 	machinerole.Register(ctx, cluster)
 }

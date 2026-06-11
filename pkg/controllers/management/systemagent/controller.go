@@ -11,14 +11,14 @@ import (
 	"time"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	planv1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	plancontrollers "github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/image"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
@@ -93,6 +93,7 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 				cluster.Annotations = map[string]string{}
 			}
 			cluster.Annotations[Day2OpsEnabledAnnotation] = "true"
+			logrus.Infof("[importedsystemagent] cluster %s: setting %s to true", cluster.Name, Day2OpsEnabledAnnotation)
 			return h.clusters.Update(cluster)
 		}
 		return cluster, nil

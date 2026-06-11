@@ -10,6 +10,7 @@ func RequiredCRDs() []string {
 	if features.ProvisioningV2.Enabled() {
 		requiredCRDS = append(requiredCRDS, ProvisioningV2CRDs()...)
 		requiredCRDS = append(requiredCRDS, PlanCRDs()...)
+		requiredCRDS = append(requiredCRDS, OperationCRDs()...)
 		if features.RKE2.Enabled() {
 			requiredCRDS = append(requiredCRDS, RKE2CRDs()...)
 		}
@@ -34,6 +35,7 @@ func RequiredCRDs() []string {
 	}
 	if features.ImportedDay2Ops.Enabled() {
 		requiredCRDS = append(requiredCRDS, PlanCRDs()...)
+		requiredCRDS = append(requiredCRDS, OperationCRDs()...)
 	}
 
 	requiredCRDS = append(requiredCRDS, TelemetryCRDs()...)
@@ -206,6 +208,13 @@ func PlanCRDs() []string {
 	}
 }
 
+func OperationCRDs() []string {
+	return []string{
+		"etcdsnapshotsaves.operation.cattle.io",
+		"etcdsnapshotrestores.operation.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
@@ -236,6 +245,8 @@ var MigratedResources = map[string]bool{
 	"dockercredentials.project.cattle.io":                             false,
 	"dynamicschemas.management.cattle.io":                             true,
 	"etcdsnapshots.rke.cattle.io":                                     true,
+	"etcdsnapshotsaves.operation.cattle.io":                           true,
+	"etcdsnapshotrestores.operation.cattle.io":                        true,
 	"extensionconfigs.runtime.cluster.x-k8s.io":                       false,
 	"features.management.cattle.io":                                   false,
 	"fleetworkspaces.management.cattle.io":                            false,

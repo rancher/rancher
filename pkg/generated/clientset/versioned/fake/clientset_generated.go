@@ -22,8 +22,8 @@ import (
 	clientset "github.com/rancher/rancher/pkg/generated/clientset/versioned"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	fakecatalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1/fake"
-	planv1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1"
-	fakeplanv1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/plan.cattle.io/v1alpha1/fake"
+	operationv1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/operation.cattle.io/v1alpha1"
+	fakeoperationv1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/operation.cattle.io/v1alpha1/fake"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	fakeprovisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1/fake"
 	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
@@ -110,9 +110,9 @@ func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
 	return &fakecatalogv1.FakeCatalogV1{Fake: &c.Fake}
 }
 
-// PlanV1alpha1 retrieves the PlanV1alpha1Client
-func (c *Clientset) PlanV1alpha1() planv1alpha1.PlanV1alpha1Interface {
-	return &fakeplanv1alpha1.FakePlanV1alpha1{Fake: &c.Fake}
+// OperationV1alpha1 retrieves the OperationV1alpha1Client
+func (c *Clientset) OperationV1alpha1() operationv1alpha1.OperationV1alpha1Interface {
+	return &fakeoperationv1alpha1.FakeOperationV1alpha1{Fake: &c.Fake}
 }
 
 // ProvisioningV1 retrieves the ProvisioningV1Client

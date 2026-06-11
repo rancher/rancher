@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 
 	"github.com/rancher/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -664,6 +665,24 @@ func addLabels(config map[string]interface{}, entry *planEntry) error {
 	}
 
 	labels = append(labels, capr.MachineUIDLabel+"="+string(entry.Machine.UID))
+
+	// todo: add cluster lifecycle labels
+	//lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(nil)
+	//if err != nil {
+	//	return err
+	//}
+	//for k, v := range lifecycleLabels {
+	//	labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+	//}
+
+	lifecycleLabels, err := planv1alpha1.ObjToMachineLifecycleLabels(entry.Machine)
+	if err != nil {
+		return err
+	}
+	for k, v := range lifecycleLabels {
+		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+	}
+
 	sort.Strings(labels)
 	if len(labels) > 0 {
 		config["node-label"] = labels
