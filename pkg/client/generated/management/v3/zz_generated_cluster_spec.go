@@ -8,6 +8,7 @@ const (
 	ClusterSpecFieldAliConfig                                            = "aliConfig"
 	ClusterSpecFieldAmazonElasticContainerServiceConfig                  = "amazonElasticContainerServiceConfig"
 	ClusterSpecFieldAzureKubernetesServiceConfig                         = "azureKubernetesServiceConfig"
+	ClusterSpecFieldChartsImageOverride                                  = "chartsImageOverride"
 	ClusterSpecFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterSpecFieldClusterSecrets                                       = "clusterSecrets"
 	ClusterSpecFieldDefaultClusterRoleForProjectMembers                  = "defaultClusterRoleForProjectMembers"
@@ -15,6 +16,7 @@ const (
 	ClusterSpecFieldDescription                                          = "description"
 	ClusterSpecFieldDesiredAgentImage                                    = "desiredAgentImage"
 	ClusterSpecFieldDesiredAuthImage                                     = "desiredAuthImage"
+	ClusterSpecFieldDesiredChartsImage                                   = "desiredChartsImage"
 	ClusterSpecFieldDisplayName                                          = "displayName"
 	ClusterSpecFieldDockerRootDir                                        = "dockerRootDir"
 	ClusterSpecFieldEKSConfig                                            = "eksConfig"
@@ -40,6 +42,7 @@ type ClusterSpec struct {
 	AliConfig                                            *AliClusterConfigSpec           `json:"aliConfig,omitempty" yaml:"aliConfig,omitempty"`
 	AmazonElasticContainerServiceConfig                  map[string]interface{}          `json:"amazonElasticContainerServiceConfig,omitempty" yaml:"amazonElasticContainerServiceConfig,omitempty"`
 	AzureKubernetesServiceConfig                         map[string]interface{}          `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
+	ChartsImageOverride                                  string                          `json:"chartsImageOverride,omitempty" yaml:"chartsImageOverride,omitempty"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization   `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets                 `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                          `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
@@ -47,6 +50,7 @@ type ClusterSpec struct {
 	Description                                          string                          `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                                    string                          `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	DesiredAuthImage                                     string                          `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
+	DesiredChartsImage                                   string                          `json:"desiredChartsImage,omitempty" yaml:"desiredChartsImage,omitempty"`
 	DisplayName                                          string                          `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	EKSConfig                                            *EKSClusterConfigSpec           `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`

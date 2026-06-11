@@ -30,6 +30,7 @@ const (
 	ClusterFieldCapabilities                                         = "capabilities"
 	ClusterFieldCapacity                                             = "capacity"
 	ClusterFieldCertificatesExpiration                               = "certificatesExpiration"
+	ClusterFieldChartsImageOverride                                  = "chartsImageOverride"
 	ClusterFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterFieldClusterSecrets                                       = "clusterSecrets"
 	ClusterFieldComponentStatuses                                    = "componentStatuses"
@@ -42,6 +43,7 @@ const (
 	ClusterFieldDescription                                          = "description"
 	ClusterFieldDesiredAgentImage                                    = "desiredAgentImage"
 	ClusterFieldDesiredAuthImage                                     = "desiredAuthImage"
+	ClusterFieldDesiredChartsImage                                   = "desiredChartsImage"
 	ClusterFieldDockerRootDir                                        = "dockerRootDir"
 	ClusterFieldDriver                                               = "driver"
 	ClusterFieldEKSConfig                                            = "eksConfig"
@@ -113,6 +115,7 @@ type Cluster struct {
 	Capabilities                                         *Capabilities                   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                                             map[string]string               `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration                               map[string]CertExpiration       `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ChartsImageOverride                                  string                          `json:"chartsImageOverride,omitempty" yaml:"chartsImageOverride,omitempty"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization   `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets                 `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	ComponentStatuses                                    []ClusterComponentStatus        `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
@@ -125,6 +128,7 @@ type Cluster struct {
 	Description                                          string                          `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                                    string                          `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
 	DesiredAuthImage                                     string                          `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
+	DesiredChartsImage                                   string                          `json:"desiredChartsImage,omitempty" yaml:"desiredChartsImage,omitempty"`
 	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	Driver                                               string                          `json:"driver,omitempty" yaml:"driver,omitempty"`
 	EKSConfig                                            *EKSClusterConfigSpec           `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`
