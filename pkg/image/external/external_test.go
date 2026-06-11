@@ -297,6 +297,26 @@ func Test_filterLatestPatchReleases(t *testing.T) {
 			input: []string{"not-a-version", "v1.28.3+k3s1"},
 			want:  []string{"v1.28.3+k3s1"},
 		},
+		{
+			name:  "release beats RC with same patch and build number",
+			input: []string{"v1.33.3-rc.1+rke2r1", "v1.33.3+rke2r1"},
+			want:  []string{"v1.33.3+rke2r1"},
+		},
+		{
+			name:  "higher RC number wins over lower RC",
+			input: []string{"v1.33.3-rc.1+rke2r2", "v1.33.3-rc.2+rke2r2"},
+			want:  []string{"v1.33.3-rc.2+rke2r2"},
+		},
+		{
+			name:  "release beats RC regardless of build number",
+			input: []string{"v1.33.3-rc.1+rke2r2", "v1.33.3+rke2r1"},
+			want:  []string{"v1.33.3+rke2r1"},
+		},
+		{
+			name:  "RC patch beats lower non-RC patch",
+			input: []string{"v1.33.3+rke2r1", "v1.33.4-rc.1+rke2r1"},
+			want:  []string{"v1.33.4-rc.1+rke2r1"},
+		},
 	}
 
 	for _, tt := range tests {
