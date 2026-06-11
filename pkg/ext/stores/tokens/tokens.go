@@ -182,7 +182,12 @@ func New(
 
 // NewSystemFromWrangler is a convenience function for creating a system token
 // store. It initializes the returned store from the provided wrangler context.
-func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
+// An optional authorizer can be provided for cluster-scoped token authorization.
+func NewSystemFromWrangler(wranglerContext *wrangler.Context, authz ...authorizer.Authorizer) *SystemStore {
+	var authorizer authorizer.Authorizer
+	if len(authz) > 0 {
+		authorizer = authz[0]
+	}
 	return NewSystem(
 		wranglerContext.Core.Namespace(),
 		wranglerContext.Core.Namespace().Cache(),
@@ -193,6 +198,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 		NewTimeHandler(),
 		NewHashHandler(),
 		NewAuthHandler(),
+		authorizer,
 	)
 }
 
@@ -200,6 +206,7 @@ func NewSystemFromWrangler(wranglerContext *wrangler.Context) *SystemStore {
 // accessors to all the other controllers the store requires for proper
 // function. Note that it is recommended to use the NewSystemFromWrangler
 // convenience function instead.
+// An optional authorizer can be provided as the last argument for cluster-scoped token authorization.
 func NewSystem(
 	namespaceClient v1.NamespaceClient,
 	namespaceCache v1.NamespaceCache,
@@ -210,8 +217,14 @@ func NewSystem(
 	timer timeHandler,
 	hasher hashHandler,
 	auth authHandler,
+	authz ...authorizer.Authorizer,
 ) *SystemStore {
+	var authorizer authorizer.Authorizer
+	if len(authz) > 0 {
+		authorizer = authz[0]
+	}
 	tokenStore := SystemStore{
+		authorizer:      authorizer,
 		namespaceClient: namespaceClient,
 		namespaceCache:  namespaceCache,
 		secretClient:    secretClient,
@@ -326,6 +339,9 @@ func (t *Store) DeleteCollection(
 	for _, secret := range secrets.Items {
 		token, _, err := t.deleteCore(ctx, &secret, deleteValidation, options)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
 				secret.Name, err))
 		}
@@ -673,7 +689,10 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 				token.Spec.ClusterName, err))
 		}
 
-		// Verify that user is authorized to access cluster
+		if t.authorizer == nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("authorizer is required for cluster-scoped tokens"))
+		}
+
 		decision, _, err := t.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 			User:            userInfo,
 			Verb:            "get",
@@ -772,7 +791,9 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 		return nil
 	}
 	if apierrors.IsNotFound(err) {
-		return nil
+		// Convert not found for secret to not found for token
+		// Returned to match k8s behaviour for resource deletion
+		return apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
@@ -867,6 +888,30 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	return &ext.TokenList{
 		Items: tokens,
 	}, nil
+}
+
+// ListForProvider returns all ext tokens associated with the named auth
+// provider. It is an internal call invoked by other parts of Rancher.
+func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
+	secrets, err := t.secretCache.List(TokenNamespace, labels.Set(map[string]string{
+		SecretKindLabel: SecretKindLabelValue,
+	}).AsSelector())
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens for provider %s: %w", provider, err))
+	}
+
+	var tokens []ext.Token
+	for _, secret := range secrets {
+		token, err := fromSecret(secret)
+		if err != nil {
+			continue
+		}
+		if token.Spec.UserPrincipal.Provider == provider {
+			tokens = append(tokens, *token)
+		}
+	}
+
+	return &ext.TokenList{Items: tokens}, nil
 }
 
 func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, options *metav1.ListOptions) (*ext.TokenList, error) {

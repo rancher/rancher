@@ -61,9 +61,24 @@ var (
 		"cattle-tokens",
 		"cattle-oidc-codes",
 		"cattle-oidc-client-secrets",
+		"cattle-turtles-system",
+		"cattle-capi-system",
 	}
 
-	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
+	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:head")
+	SystemNamespacesIgnoringPullSecrets = []string{
+		"cattle-system",
+		"cattle-global-data",
+		"cattle-local-user-passwords",
+		"cattle-tokens",
+		"cattle-oidc-codes",
+		"cattle-oidc-client-secrets",
+		"cattle-impersonation-system",
+		"cluster-fleet-.*",
+		"cattle-fleet-local-system",
+		"cattle-fleet-clusters-system",
+	}
+
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
 	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
 	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeStrict).WithDefaultOnUpgrade(AgentTLSModeSystemStore)
@@ -110,8 +125,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.16/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.5/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.15.0-rc.3/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.15.0-rc.2/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -127,6 +142,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
+	// ATTENTION: This file and the following line are used in the rancher/webhook CI to extract the default branch they need
 	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.15")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
@@ -139,7 +155,7 @@ var (
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	AlibabaUpstreamRefresh              = NewSetting("alibaba-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher142")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher143")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -152,6 +168,13 @@ var (
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
+
+	// Rke2ProvisioningPrimeDefault controls whether newly provisioned RKE2 clusters automatically get
+	// the --prime server argument. When "true", all new RKE2 clusters will have prime=true added to
+	// server args (unless overridden by the per-cluster provisioning.cattle.io/rke2-prime-enabled annotation).
+	// Defaults to empty (treated as "false") in standard builds; Prime builds set
+	// CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=true to override.
+	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", os.Getenv("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT"))
 
 	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
@@ -276,6 +299,10 @@ var (
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
 	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
 
+	// SystemDefaultRegistryPullSecrets are the default pull secrets used for authenticating to the system default container registry.
+	// The environmental variable "CATTLE_BASE_REGISTRY_PULL_SECRETS" controls the default value of this setting.
+	SystemDefaultRegistryPullSecrets = NewSetting("system-default-registry-pull-secrets", os.Getenv("CATTLE_BASE_REGISTRY_PULL_SECRETS"))
+
 	// K3sBasedUpgraderUninstallConcurrency defines the maximum number of clusters
 	// for which Rancher can simultaneously uninstall the legacy K3s-based upgrade app.
 	K3sBasedUpgraderUninstallConcurrency = NewSetting("k3s-based-upgrader-uninstall-concurrency", "5")
@@ -316,9 +343,6 @@ var (
 	// UIFeedBackForm Ember UI specific.
 	UIFeedBackForm = NewSetting("ui-feedback-form", "")
 
-	// UIIndex depends on ui-offline-preferred, use this version of the old ember UI instead of the one contained in Rancher Manager.
-	UIIndex = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
-
 	// UIIssues use a url address to send new 'File an Issue' reports instead of sending users to the Github issues page.
 	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", {}).
 	UIIssues = NewSetting("ui-issues", "")
@@ -329,12 +353,9 @@ var (
 	// UIKubernetesSupportedVersions Ember UI specific.
 	UIKubernetesSupportedVersions = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
 
-	// UIOfflinePreferred controls whether UI assets are served locally by the server container ('true') or from the remote URL defined in the ui-index and ui-dashboard-index settings ('false).
+	// UIOfflinePreferred controls whether UI assets are served locally by the server container ('true') or from the remote URL defined in the ui-dashboard-index setting ('false).
 	// The `dynamic` option will use remote assets for `-head` builds, otherwise the local assets for production builds.
 	UIOfflinePreferred = NewSetting("ui-offline-preferred", "dynamic")
-
-	// UIPath path within Rancher Manager where the old ember UI files are found.
-	UIPath = NewSetting("ui-path", "/usr/share/rancher/ui")
 
 	// UIPerformance experimental settings for UI functionality to improve the UX with large numbers of resources.
 	UIPerformance = NewSetting("ui-performance", "")

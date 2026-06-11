@@ -25,6 +25,7 @@ import (
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
+	"github.com/rancher/rancher/pkg/cluster"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -64,6 +65,17 @@ var (
 		"chart.yml":  true,
 		"Chart.yml":  true,
 	}
+	valuesYAML = map[string]bool{
+		"values.yaml": true,
+		"values.yml":  true,
+		"Values.yaml": true,
+		"Values.yml":  true,
+	}
+	imagePullSecretPaths = [][]string{
+		{"global", "cattle", "imagePullSecrets"},
+		{"global", "imagePullSecrets"},
+		{"imagePullSecrets"},
+	}
 )
 
 var (
@@ -77,17 +89,20 @@ func init() {
 
 // Operations describes a helm operation, containing its namespace, roles and such
 type Operations struct {
-	namespace      string                               // namespace the operation is going to be in
-	contentManager *content.Manager                     // manager struct to retrieve information about helm repos and its charts
-	Impersonator   *podimpersonation.PodImpersonation   // the impersonator used to manage pods created using the service account of the logged in user
-	clusterRepos   catalogcontrollers.ClusterRepoClient // client for cluster repo custom resource
-	ops            catalogcontrollers.OperationClient   // client for operation custom resource
-	pods           corev1controllers.PodClient          // client for pod kubernetes resource
-	nodes          corev1controllers.NodeClient
-	apps           catalogcontrollers.AppClient        // client for apps custom resource
-	roles          rbacv1controllers.RoleClient        // client for role kubernetes resource
-	roleBindings   rbacv1controllers.RoleBindingClient // client for rolebinding kubernetes resource
-	cg             proxy.ClientGetter                  // dynamic kubernetes client factory
+	namespace         string                               // namespace the operation is going to be in
+	contentManager    *content.Manager                     // manager struct to retrieve information about helm repos and its charts
+	Impersonator      *podimpersonation.PodImpersonation   // the impersonator used to manage pods created using the service account of the logged in user
+	clusterRepos      catalogcontrollers.ClusterRepoClient // client for cluster repo custom resource
+	clusterReposCache catalogcontrollers.ClusterRepoCache
+	ops               catalogcontrollers.OperationClient // client for operation custom resource
+	pods              corev1controllers.PodClient        // client for pod kubernetes resource
+	nodes             corev1controllers.NodeClient
+	apps              catalogcontrollers.AppClient // client for apps custom resource
+	roles             rbacv1controllers.RoleClient // client for role kubernetes resource
+	secretCache       corev1controllers.SecretCache
+	secrets           corev1controllers.SecretClient
+	roleBindings      rbacv1controllers.RoleBindingClient // client for rolebinding kubernetes resource
+	cg                proxy.ClientGetter                  // dynamic kubernetes client factory
 }
 
 // NewOperations creates a new Operations struct with all fields initialized
@@ -97,19 +112,23 @@ func NewOperations(
 	rbac rbacv1controllers.Interface,
 	contentManager *content.Manager,
 	pods corev1controllers.PodClient,
-	nodes corev1controllers.NodeClient) *Operations {
+	nodes corev1controllers.NodeClient,
+	secrets corev1controllers.SecretController) *Operations {
 	return &Operations{
-		cg:             cg,
-		contentManager: contentManager,
-		namespace:      namespaces.System,
-		Impersonator:   podimpersonation.New("helm-op", cg, time.Hour, settings.FullShellImage),
-		pods:           pods,
-		clusterRepos:   catalog.ClusterRepo(),
-		ops:            catalog.Operation(),
-		apps:           catalog.App(),
-		roleBindings:   rbac.RoleBinding(),
-		roles:          rbac.Role(),
-		nodes:          nodes,
+		cg:                cg,
+		contentManager:    contentManager,
+		namespace:         namespaces.System,
+		Impersonator:      podimpersonation.New("helm-op", cg, time.Hour, settings.FullShellImage),
+		pods:              pods,
+		clusterRepos:      catalog.ClusterRepo(),
+		clusterReposCache: catalog.ClusterRepo().Cache(),
+		ops:               catalog.Operation(),
+		apps:              catalog.App(),
+		roleBindings:      rbac.RoleBinding(),
+		roles:             rbac.Role(),
+		nodes:             nodes,
+		secretCache:       secrets.Cache(),
+		secrets:           secrets,
 	}
 }
 
@@ -133,7 +152,7 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name)
 }
 
 // Upgrade gets the upgrade commands using the given namespace, name and options and gets the user using the isApp flag as false.
@@ -156,7 +175,7 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name)
 }
 
 // Install gets the install commands using the given namespace, name and options and gets the user using the isApp flag as false.
@@ -179,7 +198,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds, imageOverride)
+	return s.createOperation(ctx, user, status, cmds, imageOverride, name)
 }
 
 // decodeParams decodes the request using its url and v1 group version into the target object
@@ -414,6 +433,7 @@ type Command struct {
 	ArgObjects       []interface{} // the arguments that will be used in the command
 	ValuesFile       string        // name of the values.yaml file
 	Values           []byte        // content of the values.yaml file
+	ChartBaseValues  []byte        // the full values.yaml file of the incoming chart
 	ChartFile        string        // name of the chart tar file
 	Chart            []byte        // content of the chart file
 	ReleaseName      string        // name of the release
@@ -551,23 +571,20 @@ func sanitizeVersion(chartVersion string) string {
 	return badChars.ReplaceAllString(chartVersion, "-")
 }
 
-// injectAnnotation receives the chart data from a tar file and injects the given annotations.
-// Returns the modified chart data
-func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error) {
-	if len(annotations) == 0 {
-		return data, nil
-	}
-
+// injectAnnotationAndRetrieveValues receives the chart data from a tar file and injects the given annotations.
+// Returns the modified chart data and values.yaml of the chart.
+func injectAnnotationAndRetrieveValues(data []byte, annotations map[string]string) ([]byte, []byte, error) {
 	tgz, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var (
-		dest    = &bytes.Buffer{}
-		destGz  = gzip.NewWriter(dest)
-		destTar = tar.NewWriter(destGz)
-		tar     = tar.NewReader(tgz)
+		dest            = &bytes.Buffer{}
+		destGz          = gzip.NewWriter(dest)
+		destTar         = tar.NewWriter(destGz)
+		tar             = tar.NewReader(tgz)
+		chartValuesYaml []byte
 	)
 
 	for {
@@ -578,38 +595,43 @@ func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error
 
 		data, err := io.ReadAll(tar)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// checks if its chart.yaml
 		parts := strings.Split(header.Name, "/")
-		if len(parts) == 2 && chartYAML[parts[1]] {
+		if len(parts) == 2 && chartYAML[parts[1]] && len(annotations) != 0 {
 			data, err = addAnnotations(data, annotations)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			header.Size = int64(len(data))
 		}
 
+		// checks if its values.yaml
+		if len(parts) == 2 && valuesYAML[parts[1]] {
+			chartValuesYaml = data
+		}
+
 		if err := destTar.WriteHeader(header); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		_, err = destTar.Write(data)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	if err = destTar.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err = destGz.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return dest.Bytes(), nil
+	return dest.Bytes(), chartValuesYaml, nil
 }
 
 // addAnnotations receives that chart.yaml data and injects the given annotations in it
@@ -644,8 +666,8 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	if err != nil {
 		return Command{}, err
 	}
-
-	chartData, err = injectAnnotation(chartData, annotations)
+	var baseChartValues []byte
+	chartData, baseChartValues, err = injectAnnotationAndRetrieveValues(chartData, annotations)
 	if err != nil {
 		return Command{}, err
 	}
@@ -654,9 +676,10 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	chartFileName := sanitizeCommandKeyNames(fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)))
 
 	c := Command{
-		ValuesFile: valuesFileName,
-		ChartFile:  chartFileName,
-		Chart:      chartData,
+		ValuesFile:      valuesFileName,
+		ChartBaseValues: baseChartValues,
+		ChartFile:       chartFileName,
+		Chart:           chartData,
 	}
 
 	if len(values) > 0 {
@@ -741,9 +764,13 @@ func namespace(ns string) string {
 // createOperation creates an operation and its pod, along with its roles and roleBinding.
 // Uses the Operations.Impersonator and Operations.ops to do it.
 // Returns the created catalog.Operation struct
-func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string) (*catalog.Operation, error) {
-	if status.Action != "uninstall" {
-		_, err := s.createNamespace(ctx, status.Namespace, status.ProjectID)
+func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string, clusterRepoName string) (*catalog.Operation, error) {
+	if status.Action == "uninstall" {
+		if err := s.deleteReleasePullSecrets(status.Namespace, status.Release); err != nil {
+			return nil, err
+		}
+	} else {
+		err := s.createNamespaceAndPullSecrets(ctx, status, cmds, clusterRepoName)
 		if err != nil {
 			return nil, err
 		}
@@ -1041,6 +1068,11 @@ func (s *Operations) createPod(secretData map[string][]byte, imageOverride strin
 				},
 			},
 		},
+	}
+
+	registry, _ := cluster.GetPrivateRegistry(nil)
+	if registry != nil && len(registry.PullSecrets) > 0 {
+		pod.Spec.ImagePullSecrets = registry.PullSecretsAsObjectReferences()
 	}
 
 	return pod, &podimpersonation.PodOptions{

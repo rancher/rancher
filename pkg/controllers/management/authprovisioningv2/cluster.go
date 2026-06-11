@@ -3,8 +3,10 @@ package authprovisioningv2
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
 	"k8s.io/apimachinery/pkg/labels"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -14,15 +16,49 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const capiResourcesCleanupFinalizer = "auth.cattle.io/capi-resources-cleanup"
+
 // OnCluster creates the roles required for users to be able to see/manage the
-// provisioning cluster resource
+// provisioning cluster resource. It also manages a finalizer to ensure that
+// cluster-indexed resources (e.g. AWSMachineTemplate) can be cleaned up by users
+// before the scoped RBAC roles are garbage-collected along with the cluster.
 func (h *handler) OnCluster(key string, cluster *v1.Cluster) (*v1.Cluster, error) {
 	if cluster == nil {
 		return cluster, nil
 	}
 
+	// Ensure the finalizer is present on all provisioning clusters
+	if !slices.Contains(cluster.Finalizers, capiResourcesCleanupFinalizer) {
+		clusterCopy := cluster.DeepCopy()
+		clusterCopy.Finalizers = append(clusterCopy.Finalizers, capiResourcesCleanupFinalizer)
+		return h.clusterController.Update(clusterCopy)
+	}
+
 	if cluster.DeletionTimestamp != nil {
-		return cluster, h.cleanClusterAdminRoleBindings(cluster)
+		// Cluster is being deleted — check if any cluster-indexed resources still exist
+		hasResources, err := h.clusterIndexedResourcesExist(cluster)
+		if err != nil {
+			return cluster, err
+		}
+		if hasResources {
+			// Re-enqueue to keep checking; this keeps the crt-* Role alive
+			// via the finalizer blocking GC on the cluster object
+			h.clusterController.EnqueueAfter(cluster.Namespace, cluster.Name, reenqueueTime)
+			return cluster, nil
+		}
+
+		// No cluster-indexed resources remain — safe to proceed with deletion
+		if err := h.cleanClusterAdminRoleBindings(cluster); err != nil {
+			return cluster, err
+		}
+
+		// Remove the finalizer to unblock GC
+		if slices.Contains(cluster.Finalizers, capiResourcesCleanupFinalizer) {
+			clusterCopy := cluster.DeepCopy()
+			clusterCopy.Finalizers = slices.DeleteFunc(clusterCopy.Finalizers,
+				func(f string) bool { return f == capiResourcesCleanupFinalizer })
+			return h.clusterController.Update(clusterCopy)
+		}
 	}
 
 	return cluster, h.createClusterViewRole(cluster)
@@ -131,4 +167,29 @@ func (h *handler) enqueueRoleTemplateBindings(cluster *v1.Cluster) error {
 	}
 
 	return nil
+}
+
+// clusterIndexedResourcesExist returns true if any cluster-indexed resources
+// (across all registered GVKs) still exist for the given cluster.
+func (h *handler) clusterIndexedResourcesExist(cluster *v1.Cluster) (bool, error) {
+	for _, candidate := range h.candidateTypes() {
+		// Skip the provisioning cluster GVK itself — the cluster being deleted
+		// is still in the index (blocked by our finalizer), which would cause
+		// a self-referential deadlock preventing the finalizer from ever being removed.
+		if candidate.GVK == h.provisioningClusterGVK {
+			continue
+		}
+		// Skip the rke machine config whose owner is the provisioning cluster
+		if candidate.GVK.Group == dynamicschema.MachineConfigAPIGroup {
+			continue
+		}
+		names, err := getResourceNames(h.dynamic, candidate, cluster)
+		if err != nil {
+			return false, err
+		}
+		if len(names) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }

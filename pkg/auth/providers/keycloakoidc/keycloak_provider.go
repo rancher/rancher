@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
@@ -113,6 +114,18 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 		principals = append(principals, p)
 	}
 	return principals, nil
+}
+
+// TransformToAuthProvider yields information used, typically by the UI, to be able to form URLs used to perform login.
+func (k *keyCloakOIDCProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
+	p, err := k.OpenIDCProvider.TransformToAuthProvider(authConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	p[publicclient.KeyCloakOIDCProviderFieldScopes] = authConfig["scope"]
+
+	return p, nil
 }
 
 func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, token accessor.TokenAccessor) apiv3.Principal {

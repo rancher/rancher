@@ -1,5 +1,7 @@
 name: '{{ .k8s.manifest }}'
 pipelineid: '{{ .k8s.pipelineid }}'
+dependson:
+  - 'go-generate'
 
 sources:
   rancher-go-mod-k8s:

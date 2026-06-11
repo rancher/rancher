@@ -70,7 +70,7 @@ func TestCreateProjectMembershipRoles(t *testing.T) {
 				APIGroups:     []string{"management.cattle.io"},
 				Resources:     []string{"projects"},
 				ResourceNames: []string{"test-project"},
-				Verbs:         []string{"*"},
+				Verbs:         []string{"get", "update", "delete", "patch", "create", "list", "watch", "deletecollection"},
 			},
 		},
 	}
@@ -133,7 +133,7 @@ func TestCreateClusterMembershipRoles(t *testing.T) {
 				APIGroups:     []string{"management.cattle.io"},
 				Resources:     []string{"clusters"},
 				ResourceNames: []string{"test-cluster"},
-				Verbs:         []string{"*"},
+				Verbs:         []string{"get", "update", "delete", "patch", "create", "list", "watch", "deletecollection"},
 			},
 		},
 	}

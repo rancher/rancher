@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
@@ -26,6 +27,33 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+type fakeExtTokenStore struct {
+	tokens    map[string]*ext.Token
+	listErr   error
+	deleteErr error
+}
+
+func (f *fakeExtTokenStore) ListForProvider(provider string) (*ext.TokenList, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var items []ext.Token
+	for _, t := range f.tokens {
+		if t.Spec.UserPrincipal.Provider == provider {
+			items = append(items, *t)
+		}
+	}
+	return &ext.TokenList{Items: items}, nil
+}
+
+func (f *fakeExtTokenStore) Delete(name string, _ *metav1.DeleteOptions) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	delete(f.tokens, name)
+	return nil
+}
 
 func TestRunCleanup(t *testing.T) {
 	var globalRoleBindingStore = map[string]*v3.GlobalRoleBinding{
@@ -99,6 +127,27 @@ func TestRunCleanup(t *testing.T) {
 		},
 	}
 
+	var extTokens = map[string]*ext.Token{
+		"ext-azure-1": {
+			ObjectMeta: metav1.ObjectMeta{Name: "ext-azure-1"},
+			Spec: ext.TokenSpec{
+				UserPrincipal: ext.TokenPrincipal{Provider: "azuread"},
+			},
+		},
+		"ext-azure-2": {
+			ObjectMeta: metav1.ObjectMeta{Name: "ext-azure-2"},
+			Spec: ext.TokenSpec{
+				UserPrincipal: ext.TokenPrincipal{Provider: "azuread"},
+			},
+		},
+		"ext-local-1": {
+			ObjectMeta: metav1.ObjectMeta{Name: "ext-local-1"},
+			Spec: ext.TokenSpec{
+				UserPrincipal: ext.TokenPrincipal{Provider: "local"},
+			},
+		},
+	}
+
 	var secretStore = map[string]*v1.Secret{
 		"cattle-system:oauthSecretName": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -130,6 +179,7 @@ func TestRunCleanup(t *testing.T) {
 		},
 	}
 
+	extStore := &fakeExtTokenStore{tokens: extTokens}
 	svc := newMockCleanupService(t,
 		globalRoleBindingStore,
 		projectRoleTemplateBindingStore,
@@ -137,6 +187,7 @@ func TestRunCleanup(t *testing.T) {
 		tokenStore,
 		userStore,
 		secretStore,
+		extStore,
 	)
 	cfg := v3.AuthConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -156,6 +207,8 @@ func TestRunCleanup(t *testing.T) {
 	assert.Len(t, secretStore, 1)
 	assert.Len(t, tokenStore, 2)
 	assert.Empty(t, tokenStore["azure-123"])
+	assert.Len(t, extTokens, 1)
+	assert.NotNil(t, extTokens["ext-local-1"])
 
 	for _, user := range userStore {
 		require.Lenf(t, user.PrincipalIDs, 1, "every user after cleanup must have only one principal ID, got %d", len(user.PrincipalIDs))
@@ -170,7 +223,8 @@ func newMockCleanupService(t *testing.T,
 	crtbStore map[string]*v3.ClusterRoleTemplateBinding,
 	tokenStore map[string]*v3.Token,
 	userStore map[string]*v3.User,
-	secretStore map[string]*v1.Secret) Service {
+	secretStore map[string]*v1.Secret,
+	extStore extTokenStore) Service {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 
@@ -304,6 +358,7 @@ func newMockCleanupService(t *testing.T,
 		tokensCache:                       tokenCache,
 		tokensClient:                      tokenClient,
 		userClient:                        userClient,
+		extTokenStore:                     extStore,
 	}
 }
 
@@ -344,4 +399,93 @@ func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.S
 	}).AnyTimes()
 
 	return secretController
+}
+
+func TestDeleteExtTokens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		provider  string
+		tokens    map[string]*ext.Token
+		listErr   error
+		deleteErr error
+		wantErr   bool
+		wantLeft  []string
+	}{
+		{
+			name:     "no matching tokens",
+			provider: "azuread",
+			tokens: map[string]*ext.Token{
+				"ext-local": {
+					ObjectMeta: metav1.ObjectMeta{Name: "ext-local"},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "local"}},
+				},
+			},
+			wantLeft: []string{"ext-local"},
+		},
+		{
+			name:     "deletes only matching provider tokens",
+			provider: "azuread",
+			tokens: map[string]*ext.Token{
+				"ext-azure": {
+					ObjectMeta: metav1.ObjectMeta{Name: "ext-azure"},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "azuread"}},
+				},
+				"ext-local": {
+					ObjectMeta: metav1.ObjectMeta{Name: "ext-local"},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "local"}},
+				},
+				"ext-ping": {
+					ObjectMeta: metav1.ObjectMeta{Name: "ext-ping"},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "ping"}},
+				},
+			},
+			wantLeft: []string{"ext-local", "ext-ping"},
+		},
+		{
+			name:     "list error propagates",
+			provider: "azuread",
+			tokens:   map[string]*ext.Token{},
+			listErr:  errors.New("list failed"),
+			wantErr:  true,
+		},
+		{
+			name:     "delete error propagates",
+			provider: "azuread",
+			tokens: map[string]*ext.Token{
+				"ext-azure": {
+					ObjectMeta: metav1.ObjectMeta{Name: "ext-azure"},
+					Spec:       ext.TokenSpec{UserPrincipal: ext.TokenPrincipal{Provider: "azuread"}},
+				},
+			},
+			deleteErr: errors.New("delete failed"),
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &fakeExtTokenStore{
+				tokens:    tt.tokens,
+				listErr:   tt.listErr,
+				deleteErr: tt.deleteErr,
+			}
+			svc := &Service{extTokenStore: store}
+			err := svc.deleteExtTokens(tt.provider)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, store.tokens, len(tt.wantLeft))
+			for _, name := range tt.wantLeft {
+				assert.Contains(t, store.tokens, name)
+			}
+		})
+	}
 }

@@ -356,11 +356,12 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, s
 		return nil, "", err
 	}
 	defer resp.Body.Close()
-	// Check the status code
+	// Check the status code. 401 means the user's token was revoked at GitHub
+	// (account deleted, OAuth app uninstalled, PAT revoked); 404 means the
+	// resource (e.g. the user) is gone. Neither resolves on retry.
 	switch resp.StatusCode {
-	case 200:
-	case 201:
-	case 404:
+	case 200, 201:
+	case 401, 404:
 		return nil, "", &common.NonTransientError{Err: fmt.Errorf("request failed, got status code: %d", resp.StatusCode)}
 	default:
 		return nil, "", fmt.Errorf("request failed, got status code: %d", resp.StatusCode)

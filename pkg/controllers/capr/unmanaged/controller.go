@@ -12,7 +12,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -466,7 +466,7 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 		return nil, err
 	}
 
-	rClusters, err := h.clusterCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, cluster.Name)
+	rClusters, err := h.clusterCache.GetByIndex(provcluster.ByCluster, cluster.Name)
 	if err != nil || len(rClusters) == 0 {
 		return nil, err
 	}

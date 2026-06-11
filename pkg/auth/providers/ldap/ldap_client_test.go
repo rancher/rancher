@@ -569,3 +569,65 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		require.Equal(t, validation.Unauthorized, herr.Code)
 	})
 }
+
+func TestSearchLdapNoSuchObjectErrorIsIgnored(t *testing.T) {
+	t.Parallel()
+
+	provider := &ldapProvider{
+		providerName: "openldap",
+		userScope:    "openldap_user",
+		groupScope:   "openldap_group",
+	}
+
+	config := &v3.LdapConfig{
+		LdapFields: v3.LdapFields{
+			ServiceAccountDistinguishedName: saDN,
+			ServiceAccountPassword:          saPassword,
+			UserObjectClass:                 userObjectClassName,
+			UserSearchBase:                  "ou=users,dc=foo,dc=bar",
+		},
+	}
+
+	ldapConn := &ldapFakes.FakeLdapConn{
+		SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+			// Return an empty result alongside the error so that the code can
+			// safely iterate over result.Entries after skipping the error.
+			return &ldapv3.SearchResult{}, ldapv3.NewError(ldapv3.LDAPResultNoSuchObject, fmt.Errorf("no such object"))
+		},
+	}
+
+	principals, err := provider.searchLdap("(objectClass=inetOrgPerson)", provider.userScope, config, ldapConn)
+
+	require.NoError(t, err, "LDAPResultNoSuchObject should be treated as empty results, not an error")
+	require.Empty(t, principals)
+}
+
+func TestSearchLdapOtherLDAPErrorIsPropagated(t *testing.T) {
+	t.Parallel()
+
+	provider := &ldapProvider{
+		providerName: "openldap",
+		userScope:    "openldap_user",
+		groupScope:   "openldap_group",
+	}
+
+	config := &v3.LdapConfig{
+		LdapFields: v3.LdapFields{
+			ServiceAccountDistinguishedName: saDN,
+			ServiceAccountPassword:          saPassword,
+			UserObjectClass:                 userObjectClassName,
+			UserSearchBase:                  "ou=users,dc=foo,dc=bar",
+		},
+	}
+
+	ldapConn := &ldapFakes.FakeLdapConn{
+		SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+			return nil, ldapv3.NewError(ldapv3.LDAPResultUnavailable, fmt.Errorf("service unavailable"))
+		},
+	}
+
+	principals, err := provider.searchLdap("(objectClass=inetOrgPerson)", provider.userScope, config, ldapConn)
+
+	require.Error(t, err, "non-NoSuchObject LDAP errors should be propagated to the caller")
+	require.Empty(t, principals)
+}

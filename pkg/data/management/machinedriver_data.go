@@ -166,10 +166,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(Azuredriver, "local://", "", "", nil, true, true, true, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip", "https://objects-east.cloud.ca/v1/5ef827605f884961b94881e928e7a250/ui-driver-cloudca/v2.1.2/component.js", "1757e2b807b0fea4a38eade4e961bcc609853986a44a99a4e86a37ccea1f7679", []string{"objects-east.cloud.ca"}, false, false, false, nil, management); err != nil {
+	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip", "", "1757e2b807b0fea4a38eade4e961bcc609853986a44a99a4e86a37ccea1f7679", []string{"objects-east.cloud.ca"}, false, false, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("cloudscale", "https://github.com/cloudscale-ch/docker-machine-driver-cloudscale/releases/download/v1.2.0/docker-machine-driver-cloudscale_v1.2.0_linux_amd64.tar.gz", "https://objects.rma.cloudscale.ch/cloudscale-rancher-v2-ui-driver/component.js", "e33fbd6c2f87b1c470bcb653cc8aa50baf914a9d641a2f18f86a07c398cfb544", []string{"objects.rma.cloudscale.ch"}, false, false, false, nil, management); err != nil {
+	if err := addMachineDriver("cloudscale", "https://github.com/cloudscale-ch/docker-machine-driver-cloudscale/releases/download/v1.2.0/docker-machine-driver-cloudscale_v1.2.0_linux_amd64.tar.gz", "", "e33fbd6c2f87b1c470bcb653cc8aa50baf914a9d641a2f18f86a07c398cfb544", []string{"objects.rma.cloudscale.ch"}, false, false, false, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(DigitalOceandriver, "local://", "", "", []string{"api.digitalocean.com"}, true, true, false, nil, management); err != nil {
@@ -194,7 +194,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		// overwrite arm driver version here
 		linodeDriverChecksum = "1a8336f66bffc2186f5fb77642f509b9370f177397ee71f1a8cb522e5979dbec"
 	}
-	if err := addMachineDriver(Linodedriver, linodeDriverURL, "/assets/rancher-ui-driver-linode/component.js", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, nil, management); err != nil {
+	if err := addMachineDriver(Linodedriver, linodeDriverURL, "", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OCIDriver, "https://github.com/rancher-plugins/rancher-machine-driver-oci/releases/download/v1.3.0/docker-machine-driver-oci-linux", "", "0a1afa6a0af85ecf3d77cc554960e36e1be5fd12b22b0155717b9289669e4021", []string{"*.oraclecloud.com"}, false, false, false, nil, management); err != nil {
@@ -203,10 +203,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(OpenstackDriver, "local://", "", "", nil, false, true, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(OTCDriver, "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/driver/0.3.3/docker-machine-driver-otc_0.3.3_linux_amd64.tar.gz", "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/ui/1.0.2/component.js", "2151670a96e3ee71aedcfb5a1b73804a4772c3f9ca7f714f2a572d3868a648d1", []string{"*.otc.t-systems.com"}, false, false, false, nil, management); err != nil {
+	if err := addMachineDriver(OTCDriver, "https://otc-rancher.obs.eu-de.otc.t-systems.com/node/driver/0.3.3/docker-machine-driver-otc_0.3.3_linux_amd64.tar.gz", "", "2151670a96e3ee71aedcfb5a1b73804a4772c3f9ca7f714f2a572d3868a648d1", []string{"*.otc.t-systems.com"}, false, false, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(PacketDriver, "https://github.com/equinix/docker-machine-driver-metal/releases/download/v0.6.0/docker-machine-driver-metal_linux-amd64.zip", "https://rancher-drivers.equinixmetal.net/1.0.2/component.js", "fad5e551a35d2ef2db742b07ca6d61bb9c9b574d322d3000f0c557d5fb90a734", []string{"api.packet.net", "api.equinix.com", "rancher-drivers.equinixmetal.net"}, false, false, false, nil, management); err != nil {
+	if err := addMachineDriver(PacketDriver, "https://github.com/equinix/docker-machine-driver-metal/releases/download/v0.6.0/docker-machine-driver-metal_linux-amd64.zip", "", "fad5e551a35d2ef2db742b07ca6d61bb9c9b574d322d3000f0c557d5fb90a734", []string{"api.packet.net", "api.equinix.com", "rancher-drivers.equinixmetal.net"}, false, false, false, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(PhoenixNAPDriver, "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.5.1/docker-machine-driver-pnap_0.5.1_linux_amd64.zip", "", "5847599c24c137975fd190747a15ad4db9529ae35059b60e5f8bc9a470d55229", []string{"api.securedservers.com", "api.phoenixnap.com", "auth.phoenixnap.com"}, false, false, false, nil, management); err != nil {
@@ -218,10 +218,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.8.0/docker-machine-driver-nutanix", "https://nutanix.github.io/rancher-ui-driver/v3.8.0/component.js", "ad18a0150f37e6cf0aef99a529f9541be72daa9e6dc3dad835d095d44e600f6a", []string{"nutanix.github.io"}, false, false, false, nil, management); err != nil {
+	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.8.0/docker-machine-driver-nutanix", "", "ad18a0150f37e6cf0aef99a529f9541be72daa9e6dc3dad835d095d44e600f6a", []string{"nutanix.github.io"}, false, false, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale/docker-machine-driver-outscale/releases/download/v0.2.0/docker-machine-driver-outscale_0.2.0_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.2.0/component.js", "bb539ed4e2b0f1a1083b29cbdbab59bde3efed0a3145fefc0b2f47026c48bfe0", []string{"oos.eu-west-2.outscale.com"}, false, false, false, nil, management); err != nil {
+	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale/docker-machine-driver-outscale/releases/download/v0.2.0/docker-machine-driver-outscale_0.2.0_linux_amd64.zip", "", "bb539ed4e2b0f1a1083b29cbdbab59bde3efed0a3145fefc0b2f47026c48bfe0", []string{"oos.eu-west-2.outscale.com"}, false, false, false, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, nil, management); err != nil {

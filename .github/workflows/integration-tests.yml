@@ -6,8 +6,7 @@ env:
   GIT_TAG: v2.14-${{ github.sha }}-head
   HOST_ARCH: amd64
   ARCH: amd64
-  PYTHON_VERSION: '3.11'
-  GOLANG_VERSION: '1.25'
+  GOLANG_VERSION: '1.26'
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}
@@ -78,18 +77,6 @@ jobs:
           echo "${K3D_BIN_HASH_AMD64}  k3d" | shasum -a 256 --check
           sudo mv k3d /usr/local/bin
           sudo chmod +x /usr/local/bin/k3d
-      - name: Check Python version
-        run: |
-          python -V
-          python3 -V
-      - name: Update dependencies
-        run: sudo apt-get update
-      - name: Install python and dependencies
-        run: sudo apt-get install -y "python${PYTHON_VERSION}" python3-pip python3-dev libffi-dev libssl-dev
-      - name: Install tox and flake8
-        run: |
-          sudo pip3 install --upgrade pip
-          sudo pip3 install tox flake8
       - name: KDM data
         env:
           CATTLE_KDM_BRANCH: ${{ steps.env.outputs.CATTLE_KDM_BRANCH }}

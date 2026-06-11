@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -113,9 +114,11 @@ func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlP
 	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
 	createPlan.Instructions = append(createPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, entry),
 		plan.OneTimeInstruction{
-			Name:    "create",
-			Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-			Args:    args,
+			CommonInstruction: planapi.CommonInstruction{
+				Name:    "create",
+				Command: capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+				Args:    args,
+			},
 		})
 	return createPlan, joinedServer, err
 }

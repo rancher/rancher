@@ -35,6 +35,7 @@ const (
 	PodSpecFieldSELinuxChangePolicy           = "seLinuxChangePolicy"
 	PodSpecFieldScheduling                    = "scheduling"
 	PodSpecFieldSchedulingGates               = "schedulingGates"
+	PodSpecFieldSchedulingGroup               = "schedulingGroup"
 	PodSpecFieldSeccompProfile                = "seccompProfile"
 	PodSpecFieldServiceAccountName            = "serviceAccountName"
 	PodSpecFieldSetHostnameAsFQDN             = "setHostnameAsFQDN"
@@ -47,7 +48,6 @@ const (
 	PodSpecFieldUid                           = "uid"
 	PodSpecFieldVolumes                       = "volumes"
 	PodSpecFieldWindowsOptions                = "windowsOptions"
-	PodSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type PodSpec struct {
@@ -84,6 +84,7 @@ type PodSpec struct {
 	SELinuxChangePolicy           string                         `json:"seLinuxChangePolicy,omitempty" yaml:"seLinuxChangePolicy,omitempty"`
 	Scheduling                    *Scheduling                    `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	SchedulingGates               []PodSchedulingGate            `json:"schedulingGates,omitempty" yaml:"schedulingGates,omitempty"`
+	SchedulingGroup               *PodSchedulingGroup            `json:"schedulingGroup,omitempty" yaml:"schedulingGroup,omitempty"`
 	SeccompProfile                *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`
 	ServiceAccountName            string                         `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
 	SetHostnameAsFQDN             *bool                          `json:"setHostnameAsFQDN,omitempty" yaml:"setHostnameAsFQDN,omitempty"`
@@ -96,5 +97,4 @@ type PodSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
-	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }

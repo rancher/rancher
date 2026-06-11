@@ -187,11 +187,12 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 	principals, err = p.searchPrincipals(searchKey, principalType, config, lConn)
 	if err == nil {
 		for _, principal := range principals {
-			if principal.PrincipalType == "user" {
+			switch principal.PrincipalType {
+			case "user":
 				if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
 					principal.Me = true
 				}
-			} else if principal.PrincipalType == "group" {
+			case "group":
 				if p.isMemberOf(myToken.GetGroupPrincipals(), principal) {
 					principal.MemberOf = true
 				}

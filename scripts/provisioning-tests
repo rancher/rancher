@@ -127,11 +127,6 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
   echo "Resolved ${DIST} to latest version ${SOME_K8S_VERSION}"
 fi
 
-if [ $SOME_K8S_VERSION = "v1.35.0+k3s3" ]; then
-  echo "WARNING: Downgrading k3s version v1.35.0+k3s3 to v1.35.0+k3s1 to skip temporary test problem"
-  export SOME_K8S_VERSION="v1.35.0+k3s1"
-fi
-
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
 # If `CATTLE_CHART_DEFAULT_URL` is not set, use the `https://github.com/rancher/charts` so GitHub is used instead of
 # the default `https://git.rancher.io/charts` to reduce the reliance and load on our Git mirror
@@ -144,10 +139,10 @@ touch /tmp/rancher.log
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
-mkdir -p /usr/share/rancher/ui/assets
-curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
-curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui/assets/rancher-system-agent-arm64
-curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
+mkdir -p /usr/share/rancher/ui-dashboard/assets
+curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-amd64
+curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-arm64
+curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui-dashboard/assets/system-agent-uninstall.sh
 
 build_and_run_rancher()
 {

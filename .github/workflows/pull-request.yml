@@ -6,7 +6,10 @@ on:
       - "tests/v2/codecoverage/**"
       - "tests/validation/**"
 
-permissions: {}
+permissions:
+  contents: read
+  id-token: none
+
 env:
   ARCH: amd64
   TAG: v2.14-${{ github.sha }}-head

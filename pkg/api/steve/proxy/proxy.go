@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	httprequest "github.com/rancher/rancher/internal/http/request"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -76,6 +78,13 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 		apiHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			if proxyHandler.matchManagementCRDs(req) {
 				proxyHandler.authLocalCluster(next, rw, req)
+				return
+			}
+			// Block pod exec requests when the pod-shell feature is disabled.
+			if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
+				rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				rw.WriteHeader(http.StatusForbidden)
+				rw.Write([]byte("pod-shell feature is disabled"))
 				return
 			}
 			next.ServeHTTP(rw, req)
@@ -170,6 +179,15 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+
+	// Block pod exec requests when the pod-shell feature is disabled.
+	if httprequest.IsPodExecRequest(req) && !features.PodShell.Enabled() {
+		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		rw.WriteHeader(http.StatusForbidden)
+		rw.Write([]byte("pod-shell feature is disabled"))
+		return
+	}
+
 	prefix := "/k8s/clusters/" + clusterID
 	handler, err := h.next(clusterID, prefix)
 	if err != nil {

@@ -12,10 +12,12 @@ import (
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
 	"github.com/rancher/rancher/pkg/oidc/randomstring"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -62,18 +64,11 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 	}
 
 	// create necessary namespaces
-	if _, err := namespaceClient.Create(&v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: secretsNamespace,
-		},
-	}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureNamespaceWithRetry(ctx, namespaceClient, secretsNamespace); err != nil {
 		return Provider{}, err
 	}
-	if _, err := namespaceClient.Create(&v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: codesNamespace,
-		},
-	}); err != nil && !apierrors.IsAlreadyExists(err) {
+
+	if err := ensureNamespaceWithRetry(ctx, namespaceClient, codesNamespace); err != nil {
 		return Provider{}, err
 	}
 
@@ -83,6 +78,20 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 		tokenHandler:    newTokenHandler(tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
 		userInfoHandler: newUserInfoHandler(userLister, userAttributeLister, jwks),
 	}, nil
+}
+
+func ensureNamespaceWithRetry(ctx context.Context, namespaceClient corecontrollers.NamespaceClient, name string) error {
+	return wait.PollUntilContextTimeout(ctx, 10*time.Second, 3*time.Minute, true, func(context.Context) (bool, error) {
+		_, err := namespaceClient.Create(&v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+		})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			logrus.WithError(err).Warnf("creating namespace %s failed; retrying", name)
+			return false, nil
+		}
+
+		return true, nil
+	})
 }
 
 // middleware adds security headers, and returns not found if there aren't any OIDCClients

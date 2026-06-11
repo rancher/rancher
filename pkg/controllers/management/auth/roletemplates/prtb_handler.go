@@ -310,6 +310,8 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		return nil, fmt.Errorf("binding %v has no subject", binding.Name)
 	}
 
+	needsUpdate := false
+
 	if binding.UserName == "" {
 		displayName := binding.Annotations["auth.cattle.io/principal-display-name"]
 		user, err := p.userMGR.EnsureUser(binding.UserPrincipalName, displayName)
@@ -318,6 +320,7 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		}
 
 		binding.UserName = user.Name
+		needsUpdate = true
 	}
 
 	if binding.UserPrincipalName == "" {
@@ -328,9 +331,18 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 		for _, p := range u.PrincipalIDs {
 			if strings.HasSuffix(p, binding.UserName) {
 				binding.UserPrincipalName = p
+				needsUpdate = true
 				break
 			}
 		}
+	}
+
+	if needsUpdate {
+		updated, err := p.prtbClient.Update(binding)
+		if err != nil {
+			return binding, err
+		}
+		binding = updated
 	}
 
 	return binding, nil

@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/scc/deployer/params"
@@ -24,6 +25,12 @@ type deployersHandler struct {
 	log         log.StructuredLogger
 	sccDeployer *deployer.SCCDeployer
 	deployments deploymentControllers.DeploymentController
+}
+
+var relatedSettings = []string{
+	settings.SCCOperatorImage.Name,
+	settings.SystemDefaultRegistry.Name,
+	settings.SystemDefaultRegistryPullSecrets.Name,
 }
 
 func RegisterDeployer(
@@ -67,7 +74,7 @@ func RegisterDeployer(
 // OnRelatedSettings triggers changes to deployment if related settings change
 func (h *deployersHandler) OnRelatedSettings(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 	if _, ok := obj.(*v3.Setting); ok {
-		if name == settings.SCCOperatorImage.Name {
+		if slices.Contains(relatedSettings, name) {
 			return []relatedresource.Key{{
 				Namespace: consts.DefaultSCCNamespace,
 				Name:      consts.DeploymentName,

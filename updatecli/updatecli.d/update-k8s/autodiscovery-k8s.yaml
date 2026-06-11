@@ -1,5 +1,6 @@
 name: '{{ .k8s.manifest }}'
 pipelineid: '{{ .k8s.pipelineid }}'
+id: 'bump-k8s-version'
 
 autodiscovery:
   scmid: 'default'
