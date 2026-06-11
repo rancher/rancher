@@ -187,6 +187,20 @@ spec:
       {{- if .EnablePriorityClass }}
       priorityClassName: cattle-cluster-agent-priority-class
       {{- end }}
+      initContainers:
+      - name: rancher-charts-copy
+        image: {{.ChartsImage}}
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          echo "Copying charts to shared volume..."
+          cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
+          echo "Charts copied successfully"
+        volumeMounts:
+        - name: rancher-charts
+          mountPath: /charts
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
@@ -228,11 +242,15 @@ spec:
           - name: CATTLE_AGENT_PULL_SECRETS
             value: "{{range $i, $s := .AgentDeploymentPullSecrets}}{{if $i}},{{end}}{{$s.Name}}{{end}}"
           {{- end }}
+          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+            value: {{.ChartsImage}}
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}
           image: "{{.AgentImage}}"
           volumeMounts:
+          - name: rancher-charts
+            mountPath: /var/lib/rancher-data/local-catalogs/v2
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
@@ -247,6 +265,8 @@ spec:
       hostNetwork: true
       {{- end }}
       volumes:
+      - name: rancher-charts
+        emptyDir: {}
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-{{.TokenKey}}
