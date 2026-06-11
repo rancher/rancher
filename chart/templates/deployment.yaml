@@ -74,6 +74,13 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
 {{- end }}
+      initContainers:
+        - name: rancher-charts-copy
+          image: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
+          imagePullPolicy: {{ include "rancherCharts.imagePullPolicy" . }}
+          volumeMounts:
+            - name: rancher-charts
+              mountPath: /charts
       containers:
       - image: "{{ template "rancher.image" . }}:{{ template "rancher.imageTag" . }}"
         imagePullPolicy: {{ include "rancher.imagePullPolicy" . }}
@@ -177,6 +184,8 @@ spec:
         - name: CATTLE_BASE_REGISTRY_PULL_SECRETS
           value: "{{ range $i, $v := .Values.imagePullSecrets }}{{- if $i }},{{ end }}{{ $v.name }}{{ end }}"
 {{- end }}
+        - name: CATTLE_CHARTS_IMAGE_DEFAULT
+          value: "{{ template "rancherCharts.image" . }}:{{ default .Chart.appVersion .Values.chartsImage.tag }}"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
@@ -211,6 +220,8 @@ spec:
         resources: {{- toYaml .Values.resources | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - mountPath: /var/lib/rancher-data/local-catalogs/v2
+          name: rancher-charts
 {{- if .Values.additionalTrustedCAs }}
         - mountPath: /etc/pki/trust/anchors/ca-additional.pem
           name: tls-ca-additional-volume
@@ -258,6 +269,8 @@ spec:
   {{- end }}
 {{- end }}
       volumes:
+      - name: rancher-charts
+        emptyDir: {}
 {{- if .Values.additionalTrustedCAs }}
       - name: tls-ca-additional-volume
         secret:

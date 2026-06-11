@@ -110,6 +110,8 @@ type ClusterSpecBase struct {
 	DesiredAuthImage                                     string                          `json:"desiredAuthImage"`
 	AgentImageOverride                                   string                          `json:"agentImageOverride"`
 	AgentEnvVars                                         []v1.EnvVar                     `json:"agentEnvVars,omitempty"`
+	DesiredChartsImage                                   string                          `json:"desiredChartsImage"`
+	ChartsImageOverride                                  string                          `json:"chartsImageOverride"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                          `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
