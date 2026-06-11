@@ -124,13 +124,15 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	// only support ipv4, need to implement per-node extraction mechanism
 	loopbackAddress := "127.0.0.1"
 
+	// render this probe separately because it has a specific format
 	if supervisor && (IsEtcd(secret) || IsControlPlane(secret)) {
-		supervisorProbe := probes[SupervisorProbeName]
+		supervisorProbe := AllProbes[SupervisorProbeName]
 		port := 9345
 		if runtime == capr.RuntimeK3S {
 			port = 6443
 		}
 		supervisorProbe.HTTPGetAction.URL = fmt.Sprintf(supervisorProbe.HTTPGetAction.URL, loopbackAddress, port, runtime)
+		probes[SupervisorProbeName] = supervisorProbe
 	}
 
 	if IsControlPlane(secret) {
