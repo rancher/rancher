@@ -15,7 +15,6 @@ func TestChartValuesWriterRun(t *testing.T) {
 
 	cfg := map[string]string{
 		"chartAuditLogImage":  "rancher/mirrored-bci-micro:16.0-15.11",
-		"defaultChartsImage":  "rancher/rancher-charts:v0.1.0-rc.1",
 		"defaultShellVersion": "rancher/shell:v0.8.0-rc.2",
 	}
 
@@ -24,10 +23,6 @@ func TestChartValuesWriterRun(t *testing.T) {
   image:
     repository: "rancher/old-audit"
     tag: old-tag
-
-chartsImage:
-  repository: rancher/old-charts
-  tag: v0.0.1
 
 postDelete:
   enabled: true
@@ -46,10 +41,6 @@ preUpgrade:
   image:
     repository: "rancher/mirrored-bci-micro"
     tag: 16.0-15.11
-
-chartsImage:
-  repository: rancher/rancher-charts
-  tag: v0.1.0-rc.1
 
 postDelete:
   enabled: true
@@ -208,7 +199,7 @@ func TestChartValuesWriterPartialConfig(t *testing.T) {
 
 	// Only update some values, not all
 	cfg := map[string]string{
-		"defaultChartsImage": "rancher/charts:v1.0.0",
+		"defaultShellVersion": "rancher/shell:v1.1.0",
 	}
 
 	chartInput := `auditLog:
@@ -216,14 +207,15 @@ func TestChartValuesWriterPartialConfig(t *testing.T) {
     repository: rancher/audit
     tag: old
 
-chartsImage:
-  repository: rancher/old-charts
-  tag: v0.0.1
-
 postDelete:
   image:
     repository: rancher/shell
-    tag: v0.1.0
+    tag: v0.0.1
+
+preUpgrade:
+  image:
+    repository: rancher/shell
+    tag: v0.0.1
 `
 
 	expected := `auditLog:
@@ -231,14 +223,15 @@ postDelete:
     repository: rancher/audit
     tag: old
 
-chartsImage:
-  repository: rancher/charts
-  tag: v1.0.0
-
 postDelete:
   image:
     repository: rancher/shell
-    tag: v0.1.0
+    tag: v1.1.0
+
+preUpgrade:
+  image:
+    repository: rancher/shell
+    tag: v1.1.0
 `
 
 	chart := bytes.NewBufferString(chartInput)
@@ -312,10 +305,10 @@ func TestChartValuesWriterFailsWithMissingPath(t *testing.T) {
 	t.Parallel()
 
 	cfg := map[string]string{
-		"defaultChartsImage": "rancher/charts:v1.0.0",
+		"defaultShellVersion": "rancher/shell:v1.0.0",
 	}
 
-	// Chart missing the chartsImage section entirely
+	// Chart missing the postDelete section entirely
 	chartInput := `auditLog:
   image:
     repository: rancher/audit
@@ -333,7 +326,7 @@ func TestChartValuesWriterFailsWithMissingPath(t *testing.T) {
 
 	err := w.Run()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "chartsImage")
+	require.Contains(t, err.Error(), "postDelete")
 	require.Contains(t, err.Error(), "not found")
 }
 
