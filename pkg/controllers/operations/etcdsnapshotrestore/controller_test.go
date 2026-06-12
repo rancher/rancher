@@ -30,13 +30,13 @@ type stubAdapter struct {
 	waitForRegisterOK bool
 }
 
-func (a *stubAdapter) WaitForRegister() (bool, error)               { return a.waitForRegisterOK, nil }
-func (a *stubAdapter) PauseCluster(_ bool) error                    { return nil }
-func (a *stubAdapter) RuntimeCommand() string                       { return a.runtimeCommand }
-func (a *stubAdapter) DataDirectory(_ *corev1.Secret) string        { return a.dataDir }
-func (a *stubAdapter) ProvisioningDataDirectory() string            { return a.provisioningDir }
-func (a *stubAdapter) ServerUnit() string                           { return a.serverUnit }
-func (a *stubAdapter) RenderProbes(_ *corev1.Secret) (map[string]rkeplan.Probe, error) {
+func (a *stubAdapter) WaitForRegister() (bool, error)                    { return a.waitForRegisterOK, nil }
+func (a *stubAdapter) PauseCluster(_ bool) error                         { return nil }
+func (a *stubAdapter) RuntimeCommand() string                            { return a.runtimeCommand }
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string       { return a.dataDir }
+func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
+func (a *stubAdapter) ServerUnit() string                                { return a.serverUnit }
+func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return map[string]rkeplan.Probe{}, nil
 }
 func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectlPath }
@@ -121,9 +121,9 @@ func TestBuildPostRestoreNodeCleanupPlan(t *testing.T) {
 		t.Fatalf("expected 3 files, got %d", len(plan.Files))
 	}
 
-	wantIdempotentPath := ops.IdempotentActionScriptPath(s.adapter.ProvisioningDataDirectory())
-	wantCleanupPath := path.Join(s.adapter.DataDirectory(initSecret), etcdRestoreBinSubdir, nodeCleanupScriptName)
-	wantNodeNamesPath := path.Join(s.adapter.DataDirectory(initSecret), etcdRestoreBinSubdir, fmt.Sprintf("node-names-%s", string(s.op.UID)))
+	wantIdempotentPath := ops.IdempotentActionScriptPath(s.adapter.ProvisioningDataDirectory(initSecret))
+	wantCleanupPath := path.Join(s.adapter.DistroDataDirectory(initSecret), etcdRestoreBinSubdir, nodeCleanupScriptName)
+	wantNodeNamesPath := path.Join(s.adapter.DistroDataDirectory(initSecret), etcdRestoreBinSubdir, fmt.Sprintf("node-names-%s", string(s.op.UID)))
 
 	pathsByPath := map[string]planapi.File{}
 	for _, f := range plan.Files {
