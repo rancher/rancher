@@ -13,8 +13,8 @@
   "ignoreDeps": [
     "go.qase.io/client"
   ],
-  "prHourlyLimit": 2,
-  "prConcurrentLimit": 4,
+  "prHourlyLimit": 6,
+  "prConcurrentLimit": 10,
   "prCreation": "status-success",
   "packageRules": [
     {
