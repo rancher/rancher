@@ -20,7 +20,7 @@ func newUserAttributeRefresher(mgmt *config.ManagementContext) UserAttributeRefr
 	}
 }
 
-// onChange is called periodically and on real updates
+// CheckAndRefresh is invoked periodically and on real updates, by ext token controllers
 func (t *UserAttributeRefresher) CheckAndRefresh(userID string) error {
 
 	refreshUserAttributes, err := t.needsRefresh(userID)

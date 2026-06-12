@@ -68,7 +68,8 @@ func TestExtOnChange(t *testing.T) {
 	testCases := populateExtTestCases(tokens, userAttributes)
 	for _, testcase := range testCases {
 		testErr := fmt.Sprintf("test case failed: %s", testcase.description)
-		testTokenController.onChange(testcase.inputToken.Name, testcase.inputToken)
+		_, err := testTokenController.onChange(testcase.inputToken.Name, testcase.inputToken)
+		assert.NoErrorf(t, err, "%s: unexpected onChange error", testErr)
 
 		returnUserAttribute, _ := testTokenController.userAttrRefresher.userAttributesLister.Get(testcase.inputUserAttribute.Name)
 		assert.Equalf(t, testcase.expectedOutputUserAttribute, returnUserAttribute, "%s: %s", testErr, testcase.inputUserAttribute.Name)
@@ -116,13 +117,13 @@ func TestExtOnChange(t *testing.T) {
 			Name: "testtoken",
 		},
 		// UserID not being "" should trigger userattribute refresh check
-		Spec: ext.TokenSpec {UserID: "abcd"},
+		Spec: ext.TokenSpec{UserID: "abcd"},
 	}
 	userAttributes = map[string]*v3.UserAttribute{
 		// ExtraByProvider being nil should trigger a userattribute update
 		"abcd": {
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "testuser",
+				Name: "abcd",
 			},
 		},
 	}
@@ -159,7 +160,7 @@ func TestExtOnChange(t *testing.T) {
 			Name: "testtoken",
 		},
 		// UserID not being "" should trigger userattribute refresh check
-		Spec: ext.TokenSpec {UserID: "abcd"},
+		Spec: ext.TokenSpec{UserID: "abcd"},
 	}
 	_, err = testUserAttributeErrorGetController.onChange(genericTestToken.Name, genericTestToken)
 	assert.NotNilf(t, err, "handler should return err when userattribute lister's get function returns non-notfound error")
@@ -194,7 +195,7 @@ func TestExtOnChange(t *testing.T) {
 			Name: "testtoken",
 		},
 		// UserID not being "" should trigger userattribute refresh check
-		Spec: ext.TokenSpec {UserID: "abcd"},
+		Spec: ext.TokenSpec{UserID: "abcd"},
 	}
 	_, err = testUserAttributeErrorGetController.onChange(genericTestToken.Name, genericTestToken)
 	assert.Nil(t, err, "handler should not return err when userattribute lister's get function returns notfound error")
@@ -203,8 +204,8 @@ func TestExtOnChange(t *testing.T) {
 func populateExtTestCases(tokens map[string]*ext.Token, userAttributes map[string]*v3.UserAttribute) []extTokenTestCase {
 	testCases := []extTokenTestCase{
 		{
-			inputToken:          &ext.Token{Spec: ext.TokenSpec {UserID: "testuser"}},
-			expectedOutputToken: &ext.Token{Spec: ext.TokenSpec {UserID: "testuser"}},
+			inputToken:          &ext.Token{Spec: ext.TokenSpec{UserID: "testuser"}},
+			expectedOutputToken: &ext.Token{Spec: ext.TokenSpec{UserID: "testuser"}},
 			inputUserAttribute: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "testuser",
@@ -220,8 +221,8 @@ func populateExtTestCases(tokens map[string]*ext.Token, userAttributes map[strin
 				" potentially be provided by the token.",
 		},
 		{
-			inputToken:          &ext.Token{Spec: ext.TokenSpec {UserID: "testuser2"}},
-			expectedOutputToken: &ext.Token{Spec: ext.TokenSpec {UserID: "testuser2"}},
+			inputToken:          &ext.Token{Spec: ext.TokenSpec{UserID: "testuser2"}},
+			expectedOutputToken: &ext.Token{Spec: ext.TokenSpec{UserID: "testuser2"}},
 			inputUserAttribute: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "testuser2",
@@ -235,7 +236,7 @@ func populateExtTestCases(tokens map[string]*ext.Token, userAttributes map[strin
 				ExtraByProvider: map[string]map[string][]string{"something": {"something": []string{"something"}}},
 			},
 			description: "Verify that UserAttribute is not triggered for a refresh if it is not missing info" +
-				" than can potentially be provided by the token.",
+				" that can potentially be provided by the token.",
 		},
 	}
 	for index, testCase := range testCases {
