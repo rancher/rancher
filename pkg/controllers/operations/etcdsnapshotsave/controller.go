@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
-	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -47,7 +47,7 @@ type handler struct {
 
 	secrets corecontrollers.SecretClient
 
-	store *planapi.Store
+	store *plan.Store
 
 	dynamic dynamicResolver
 
@@ -63,7 +63,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		beaconCache:       clients.Plan.Beacon().Cache(),
 		secrets:           clients.Core.Secret(),
 		dynamic:           clients.Dynamic,
-		store:             planapi.NewStore(clients.Core.Secret()),
+		store:             plan.NewStore(clients.Core.Secret()),
 		clients:           clients,
 	}
 
@@ -248,7 +248,7 @@ type scope struct {
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling pending", s.op.Namespace, s.op.Name)
 
-	beacon, err := planapi.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 	if err != nil {
 		return status, err
 	}
@@ -288,7 +288,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling in-progress", s.op.Namespace, s.op.Name)
 
-	if !planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if !plan.HoldingBeacon(s.beacon, ControllerOwnerKey) {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
@@ -300,7 +300,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	}
 
 	var err error
-	s.beacon, err = planapi.ToggleBeacon(s.beacon, true, h.beacons)
+	s.beacon, err = plan.ToggleBeacon(s.beacon, true, h.beacons)
 	if err != nil {
 		return status, err
 	}
@@ -342,12 +342,12 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling snapshot save", s.op.Namespace, s.op.Name)
 
 	// collect etcd nodes belonging to cluster
-	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
-		WithSorter(planapi.DefaultSorter()).
-		WithValidator(planapi.AtLeast(1, "")).
+	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithLabels(plan.Label(capr.EtcdRoleLabel, "true")).
+		WithSorter(plan.DefaultSorter()).
+		WithValidator(plan.AtLeast(1, "")).
 		Collect()
-	if planapi.IsTransient(err) {
+	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
@@ -366,8 +366,8 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			return status, err
 		}
 
-		saveInstruction := planapi.OneTimeInstruction{
-			CommonInstruction: planapi.CommonInstruction{
+		saveInstruction := plan.OneTimeInstruction{
+			CommonInstruction: plan.CommonInstruction{
 				Name:    "snapshot",
 				Command: s.adapter.RuntimeCommand(),
 				Args: []string{
@@ -381,8 +381,8 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			saveInstruction.CommonInstruction.Args = append(saveInstruction.CommonInstruction.Args, "--name", s.op.Spec.Args.Name)
 		}
 
-		nodePlan := &planapi.Plan{
-			OneTimeInstructions: []planapi.OneTimeInstruction{
+		nodePlan := &plan.Plan{
+			OneTimeInstructions: []plan.OneTimeInstruction{
 				saveInstruction,
 			},
 			Probes: probes,
@@ -432,12 +432,12 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
 
 	// collect etcd nodes belonging to cluster
-	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
-		WithSorter(planapi.DefaultSorter()).
-		WithValidator(planapi.AtLeast(1, "")).
+	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithLabels(plan.Label(capr.EtcdRoleLabel, "true")).
+		WithSorter(plan.DefaultSorter()).
+		WithValidator(plan.AtLeast(1, "")).
 		Collect()
-	if planapi.IsTransient(err) {
+	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
@@ -456,10 +456,10 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			return status, err
 		}
 
-		nodePlan := &planapi.Plan{
-			OneTimeInstructions: []planapi.OneTimeInstruction{
+		nodePlan := &plan.Plan{
+			OneTimeInstructions: []plan.OneTimeInstruction{
 				{
-					CommonInstruction: planapi.CommonInstruction{
+					CommonInstruction: plan.CommonInstruction{
 						Name:    "restart",
 						Command: "systemctl",
 						Args: []string{
@@ -518,14 +518,14 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
-	if planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if plan.HoldingBeacon(s.beacon, ControllerOwnerKey) {
 		var err error
-		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
+		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {
 			return status, err
 		}
 
-		err = planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 		if err != nil {
 			return status, err
 		}
@@ -541,14 +541,14 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
-	if planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if plan.HoldingBeacon(s.beacon, ControllerOwnerKey) {
 		var err error
-		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
+		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {
 			return status, err
 		}
 
-		err = planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
 		if err != nil {
 			return status, err
 		}

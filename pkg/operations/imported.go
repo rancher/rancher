@@ -7,11 +7,14 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 func init() {
@@ -167,4 +170,130 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	probes = ReplaceURLForProbes(probes, loopbackAddress)
 
 	return probes, nil
+}
+
+// isSuitableLeader returns true when the mgmtv3.Node backing the plan secret exists,
+// is not deleting, and is Ready. Imported clusters have no CAPI Machine, readiness is
+// verified via mgmtv3.Node.
+func (a *ImportedAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
+	machineName := MachineName(s)
+	node, err := a.clients.Mgmt.Node().Cache().Get(a.cluster.Name, machineName)
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if node.DeletionTimestamp != nil {
+		return false, nil
+	}
+	return mgmtv3.NodeConditionReady.IsTrue(node), nil
+}
+
+// FindOrElectLeader finds or elects a machine-plan secret to lead the given operation.
+// Candidates are collected from the cluster namespace, filtered by filter, and sorted
+// deterministically. An existing leader annotation is reused if the leader is still suitable;
+// otherwise a new leader is elected and the annotation written with retry-on-conflict.
+// Returns nil, nil when no suitable candidate exists yet.
+func (a *ImportedAdapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
+	secrets := a.clients.Core.Secret()
+	candidates, err := plan.NewCollector(secrets, a.cluster, a.cluster.Name).
+		WithFilter(plan.FilterFunc(filter)).
+		WithSorter(plan.DefaultSorter()).
+		Collect()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		marked        *corev1.Secret
+		markedCount   int
+		markedReady   bool
+		initCandidate *corev1.Secret
+		fallback      *corev1.Secret
+	)
+	for _, secret := range candidates {
+		if secret.Annotations[OperationLeaderAnnotation] == operation {
+			marked = secret
+			markedCount++
+			if markedCount > 1 {
+				return nil, fmt.Errorf("multiple machine-plan secrets marked as operation leader for %s", operation)
+			}
+		}
+
+		ok, err := a.isSuitableLeader(secret)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		if marked != nil && secret.Namespace == marked.Namespace && secret.Name == marked.Name {
+			markedReady = true
+		}
+		if initCandidate == nil && IsInitNode(secret) {
+			initCandidate = secret
+		}
+		if fallback == nil {
+			fallback = secret
+		}
+	}
+
+	if marked != nil {
+		if markedReady {
+			return marked, nil
+		}
+		logrus.Warnf("[operations] %s: elected leader %s is no longer suitable, re-electing", a.cluster.Name, marked.Name)
+		if err := a.clearLeaderAnnotation(marked, operation); err != nil {
+			return nil, err
+		}
+	}
+	if initCandidate != nil {
+		return a.markLeader(initCandidate, operation)
+	}
+	if fallback != nil {
+		return a.markLeader(fallback, operation)
+	}
+	return nil, nil
+}
+
+func (a *ImportedAdapter) markLeader(secret *corev1.Secret, operation string) (*corev1.Secret, error) {
+	var updated *corev1.Secret
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		s, err := a.clients.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if s.Annotations[OperationLeaderAnnotation] == operation {
+			updated = s
+			return nil
+		}
+		if s.Annotations == nil {
+			s.Annotations = make(map[string]string)
+		}
+		s.Annotations[OperationLeaderAnnotation] = operation
+		updated, err = a.clients.Core.Secret().Update(s)
+		return err
+	})
+	return updated, err
+}
+
+func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		s, err := a.clients.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if s.Annotations == nil || s.Annotations[OperationLeaderAnnotation] != operation {
+			return nil
+		}
+		delete(s.Annotations, OperationLeaderAnnotation)
+		_, err = a.clients.Core.Secret().Update(s)
+		return err
+	})
+}
+
+// PauseClusterActivity is a no-op for imported clusters since they have no CAPI cluster.
+func (a *ImportedAdapter) PauseClusterActivity(_ bool) error {
+	return nil
 }
