@@ -10,3 +10,4 @@ defaultSccOperatorImage: rancher/scc-operator:v0.4.3
 # k8s minor <-> image tag mapping in pkg/controllers/capr/autoscaler/fleet.go (imageTagVersions variable).
 # if adding support for a new k8s minor release (e.g. new rancher release)
 clusterAutoscalerChartVersion: 9.50.1
+chartAuditLogImage: rancher/mirrored-bci-micro:15.6.24.2
