@@ -195,7 +195,9 @@ func (h *handler) updateAppliedWebhookCustomization() error {
 		}
 		cluster := cached.DeepCopy()
 		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
-		_, err = h.clusters.UpdateStatus(cluster)
+		// Use Update (not UpdateStatus) because the clusters.management.cattle.io
+		// CRD does not define a status subresource.
+		_, err = h.clusters.Update(cluster)
 		return err
 	})
 }
