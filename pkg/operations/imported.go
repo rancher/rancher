@@ -14,6 +14,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+func init() {
+	RegisterAdapter(mgmtv3.SchemeGroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
+		var cluster *mgmtv3.Cluster
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, &cluster)
+		if err != nil {
+			return nil, err
+		}
+
+		return &ImportedAdapter{
+			cluster: cluster,
+			clients: clients,
+		}, nil
+	})
+}
+
 type ImportedAdapter struct {
 	cluster *mgmtv3.Cluster
 	clients *wrangler.CAPIContext
@@ -152,19 +167,4 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	probes = ReplaceURLForProbes(probes, loopbackAddress)
 
 	return probes, nil
-}
-
-func init() {
-	RegisterAdapter(mgmtv3.SchemeGroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
-		var cluster *mgmtv3.Cluster
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, &cluster)
-		if err != nil {
-			return nil, err
-		}
-
-		return &ImportedAdapter{
-			cluster: cluster,
-			clients: clients,
-		}, nil
-	})
 }

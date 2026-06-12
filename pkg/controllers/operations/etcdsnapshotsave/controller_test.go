@@ -514,10 +514,11 @@ func TestReconcileSave_NoSecrets(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	_, err := h.reconcileSave(newScope(newOp(), nil, defaultAdapter()), opv1alpha1.ETCDSnapshotSaveStatus{})
+	status, err := h.reconcileSave(newScope(newOp(), nil, defaultAdapter()), opv1alpha1.ETCDSnapshotSaveStatus{})
 	// The Collector validator surfaces the empty-set condition as an error; the outer status
 	// handler will requeue (and the op stays in its current phase until the situation resolves).
-	assert.Error(t, err, "validator must reject an empty etcd set")
+	assert.NoError(t, err, "terminal errors should not trigger reenqueue")
+	assert.Equal(t, opv1alpha1.OperationPhaseFailed, status.Phase, "terminal errors should cause operation to fail")
 }
 
 func TestReconcileSave_WaitsForPlanApply(t *testing.T) {
