@@ -20,7 +20,8 @@ func newUserAttributeRefresher(mgmt *config.ManagementContext) UserAttributeRefr
 	}
 }
 
-// CheckAndRefresh is invoked periodically and on real updates, by ext token controllers
+// CheckAndRefresh is invoked periodically and on real updates, by the token
+// controllers, legacy and ext
 func (t *UserAttributeRefresher) CheckAndRefresh(userID string) error {
 
 	refreshUserAttributes, err := t.needsRefresh(userID)
