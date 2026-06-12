@@ -21,11 +21,7 @@ func newExtTokenController(mgmt *config.ManagementContext) *ExtTokenController {
 
 // onChange is called periodically and on real updates
 func (t *ExtTokenController) onChange(key string, obj *ext.Token) (*ext.Token, error) {
-	if obj == nil {
-		return nil, nil
-	}
-	// remove legacy finalizers
-	if obj.DeletionTimestamp != nil {
+	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
