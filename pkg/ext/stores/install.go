@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/ext/stores/cloudcredential"
 	"github.com/rancher/rancher/pkg/ext/stores/groupmembershiprefreshrequest"
 	"github.com/rancher/rancher/pkg/ext/stores/kubeconfig"
 	"github.com/rancher/rancher/pkg/ext/stores/passwordchangerequest"
@@ -84,6 +85,15 @@ func InstallStores(
 		return fmt.Errorf("unable to install %s store: %w", selfuser.SingularName, err)
 	}
 	logrus.Infof("Successfully installed %s store", selfuser.SingularName)
+
+	if err = server.Install(
+		cloudcredential.PluralName,
+		cloudcredential.GVK,
+		cloudcredential.NewFromWrangler(wranglerContext, server.GetAuthorizer()),
+	); err != nil {
+		return fmt.Errorf("unable to install %s store: %w", cloudcredential.SingularName, err)
+	}
+	logrus.Infof("Successfully installed %s store", cloudcredential.SingularName)
 
 	return nil
 }
