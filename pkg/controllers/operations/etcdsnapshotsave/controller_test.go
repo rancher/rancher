@@ -595,8 +595,8 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 
 	// Pre-populate so the test traverses the "applied" branch without needing additional poll
 	// cycles — we're asserting on the *plan content* not the wait behaviour here.
-	plan := expectedSavePlan(op, adapter)
-	secret := withAppliedPlan(newPlanSecret("etcd-1"), plan)
+	expectedPlan := expectedSavePlan(op, adapter)
+	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedPlan)
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
@@ -606,8 +606,8 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	assert.NoError(t, err)
 
 	wantArgs := []string{"etcd-snapshot", "save", "--name", "my-snap"}
-	if !reflect.DeepEqual(plan.OneTimeInstructions[0].Args, wantArgs) {
-		t.Errorf("plan args = %v, want %v — snapshot Args were not threaded through", plan.OneTimeInstructions[0].Args, wantArgs)
+	if !reflect.DeepEqual(expectedPlan.OneTimeInstructions[0].Args, wantArgs) {
+		t.Errorf("plan args = %v, want %v — snapshot Args were not threaded through", expectedPlan.OneTimeInstructions[0].Args, wantArgs)
 	}
 }
 
