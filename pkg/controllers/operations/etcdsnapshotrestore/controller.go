@@ -602,7 +602,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to post-restore pod cleanup", s.op.Namespace, s.op.Name)
 
-	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup)
+	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup)
 	return status, nil
 }
 
