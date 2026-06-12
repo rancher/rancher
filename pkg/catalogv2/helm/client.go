@@ -1,9 +1,8 @@
 package helm
 
 import (
-	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	release "helm.sh/helm/v4/pkg/release/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -19,7 +18,7 @@ func NewClient(restClientGetter genericclioptions.RESTClientGetter) *Client {
 
 func (c *Client) ListReleases(namespace, name string, stateMask action.ListStates) ([]*release.Release, error) {
 	helmCfg := &action.Configuration{}
-	if err := helmCfg.Init(c.restClientGetter, namespace, "", logrus.Infof); err != nil {
+	if err := helmCfg.Init(c.restClientGetter, namespace, ""); err != nil {
 		return nil, err
 	}
 	l := c.newList(helmCfg)
@@ -29,5 +28,16 @@ func (c *Client) ListReleases(namespace, name string, stateMask action.ListState
 }
 
 func runAction(l *action.List) ([]*release.Release, error) {
-	return l.Run()
+	results, err := l.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	var rels []*release.Release
+	for _, r := range results {
+		if rel, ok := r.(*release.Release); ok {
+			rels = append(rels, rel)
+		}
+	}
+	return rels, nil
 }

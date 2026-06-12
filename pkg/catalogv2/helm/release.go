@@ -74,8 +74,8 @@ func ToRelease(obj runtime.Object, isNamespaced IsNamespaced) (*v1.ReleaseSpec, 
 	}
 
 	switch {
-	case isHelm3(meta.GetLabels()):
-		return fromHelm3Data(releaseData, isNamespaced)
+	case isHelm4(meta.GetLabels()):
+		return fromHelm4Data(releaseData, isNamespaced)
 	case isHelm2(meta.GetLabels()):
 		return fromHelm2Data(releaseData, isNamespaced)
 	}
