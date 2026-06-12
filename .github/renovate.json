@@ -15,7 +15,6 @@
   ],
   "prHourlyLimit": 6,
   "prConcurrentLimit": 10,
-  "prCreation": "status-success",
   "packageRules": [
     {
       "matchBaseBranches": [
