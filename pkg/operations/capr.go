@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
@@ -14,9 +15,11 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -338,4 +341,75 @@ func convertInterfaceSliceToStringSlice(input []any) []string {
 		stringArr = append(stringArr, fmt.Sprintf("%v", v))
 	}
 	return stringArr
+}
+
+func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {
+	return capr.GetDistroDataDir(a.controlPlane)
+}
+
+func (a *CAPRAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
+	return capr.GetProvisioningDataDir(&a.controlPlane.Spec.ClusterConfiguration)
+}
+
+func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/usr/local/bin/kubectl"
+	}
+	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+}
+
+func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/etc/rancher/k3s/k3s.yaml"
+	}
+	return "/etc/rancher/rke2/rke2.yaml"
+}
+
+// ElectLeader picks a leader from the CAPR cluster's machine-plan secrets. Eligibility excludes
+// secrets whose CAPI machine has a non-nil DeletionTimestamp (or whose machine is gone). Init
+// detection uses capr.InitNodeLabel, which the planner sets during init-node election.
+func (a *CAPRAdapter) ElectLeader(role LeaderRole, namespace string) (*corev1.Secret, error) {
+	secrets, err := a.clients.Core.Secret().Cache().List(namespace, labels.SelectorFromSet(labels.Set{
+		capr.ClusterNameLabel: a.controlPlane.Name,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	candidates := make([]LeaderCandidate, 0, len(secrets))
+	for _, secret := range secrets {
+		c := LeaderCandidate{Secret: secret, Eligible: true}
+		c.Init = secret.Labels[capr.InitNodeLabel] == "true"
+
+		machineName := secret.Labels[capr.MachineNameLabel]
+		machineNamespace := secret.Labels[capr.MachineNamespaceLabel]
+		if machineName != "" && machineNamespace != "" {
+			machine, err := a.clients.CAPI.Machine().Cache().Get(machineNamespace, machineName)
+			switch {
+			case apierrors.IsNotFound(err):
+				// The plan secret outlives its machine briefly during deletion; treat as ineligible.
+				c.Eligible = false
+			case err != nil:
+				return nil, err
+			case machine.DeletionTimestamp != nil:
+				c.Eligible = false
+			}
+		}
+		candidates = append(candidates, c)
+	}
+	return electLeader(role, candidates), nil
+}
+
+func (a *CAPRAdapter) PauseCluster(pause bool) error {
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return err
+	}
+	if ptr.Equal(cluster.Spec.Paused, &pause) {
+		return nil
+	}
+	cluster = cluster.DeepCopy()
+	cluster.Spec.Paused = &pause
+	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
 }

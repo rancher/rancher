@@ -629,11 +629,20 @@ func (p *Planner) runEtcdRestoreInitNodeElection(controlPlane *rkev1.RKEControlP
 	if snapshot != nil { // If the snapshot CR is not nil, then find an init node.
 		if snapshot.SnapshotFile.S3 == nil {
 			// If the snapshot is not an S3 snapshot, then designate the init node by machine ID defined.
-			if id, ok := snapshot.Labels[capr.MachineIDLabel]; ok {
-				logrus.Infof("[planner] rkecluster %s/%s: designating init node with machine ID: %s for local snapshot %s/%s restoration", controlPlane.Namespace, controlPlane.Name, id, snapshot.Namespace, snapshot.Name)
-				return p.designateInitNodeByMachineID(controlPlane, clusterPlan, id)
+			for _, owner := range snapshot.GetOwnerReferences() {
+				if owner.APIVersion != "cluster.x-k8s.io/v1beta2" || owner.Kind != "Machine" {
+					continue
+				}
+				machine, err := p.machinesCache.Get(controlPlane.Namespace, owner.Name)
+				if err != nil {
+					return "", err
+				}
+				if id, ok := machine.Labels[capr.MachineIDLabel]; ok {
+					logrus.Infof("[planner] rkecluster %s/%s: designating init node with machine ID: %s for local snapshot %s/%s restoration", controlPlane.Namespace, controlPlane.Name, id, snapshot.Namespace, snapshot.Name)
+					return p.designateInitNodeByMachineID(controlPlane, clusterPlan, id)
+				}
 			}
-			return "", fmt.Errorf("unable to designate machine as label %s on snapshot %s/%s did not exist", capr.MachineIDLabel, snapshot.Namespace, snapshot.Name)
+			return "", fmt.Errorf("unable to designate machine as owner reference %s on snapshot %s/%s did not exist", capr.MachineIDLabel, snapshot.Namespace, snapshot.Name)
 		}
 		logrus.Infof("[planner] rkecluster %s/%s: electing init node for S3 snapshot %s/%s restoration", controlPlane.Namespace, controlPlane.Name, snapshot.Namespace, snapshot.Name)
 		return p.electInitNode(controlPlane, clusterPlan, true)
