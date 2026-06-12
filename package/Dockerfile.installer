@@ -25,9 +25,8 @@ RUN if [ "${BUILDARCH}" = "amd64" ]; then \
     wget "https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz" -O /tmp/helm.tar.gz && \
     echo "${HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
     tar -xzf /tmp/helm.tar.gz --strip-components=1 -C /usr/bin && \
-    mv /usr/bin/helm /usr/bin/helm_v3 && \
-    chown root:root /usr/bin/helm_v3 && \
-    chmod +x /usr/bin/helm_v3 && \
+    chown root:root /usr/bin/helm && \
+    chmod +x /usr/bin/helm && \
     rm -f /tmp/helm.tar.gz
 
 # renovate: datasource=github-release-attachments depName=mikefarah/yq
@@ -57,6 +56,6 @@ RUN /src/scripts/export-config
 RUN /src/scripts/chart/ci
 
 FROM scratch
-COPY --from=build /usr/bin/helm_v3 /helm
+COPY --from=build /usr/bin/helm /helm
 COPY --from=build /src/bin/chart/*/*.tgz /
 COPY package/installer-run.sh /run.sh
