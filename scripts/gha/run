@@ -23,7 +23,11 @@ export KUBECONFIG=
 export CATTLE_DEV_MODE=yes
 export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}')"
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
-export CATTLE_FEATURES="harvester=false"
+if [ -n "$CATTLE_FEATURES" ]; then
+  export CATTLE_FEATURES="$CATTLE_FEATURES,harvester=false"
+else
+  export CATTLE_FEATURES="harvester=false"
+fi
 
 mkdir -p /etc/rancher/k3s/
 docker run -d --name rancher-server -v /etc/rancher/k3s:/etc/rancher/k3s --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD=$CATTLE_BOOTSTRAP_PASSWORD -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE

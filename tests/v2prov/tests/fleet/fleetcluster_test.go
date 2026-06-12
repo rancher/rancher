@@ -8,6 +8,7 @@ import (
 	fleetv1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/v2prov/clients"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/stretchr/testify/require"
 
@@ -106,16 +107,22 @@ func Test_Fleet_Cluster(t *testing.T) {
 	require.NotEmpty(agent.Spec.Template.Spec.Tolerations) // Fleet has built-in tolerations
 
 	// change settings on management cluster, results should show up in fleet-agent deployment
-	mc, err := clients.Mgmt.Cluster().Get("local", metav1.GetOptions{})
-	require.NoError(err)
+	var mc *mgmt.Cluster
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		mc, err = clients.Mgmt.Cluster().Get("local", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	mc.Spec.FleetAgentDeploymentCustomization = &mgmt.AgentDeploymentCustomization{
-		OverrideAffinity:             &linuxAffinity,
-		OverrideResourceRequirements: resourceReq,
-		AppendTolerations:            tolerations,
-	}
+		mc.Spec.FleetAgentDeploymentCustomization = &mgmt.AgentDeploymentCustomization{
+			OverrideAffinity:             &linuxAffinity,
+			OverrideResourceRequirements: resourceReq,
+			AppendTolerations:            tolerations,
+		}
 
-	_, err = clients.Mgmt.Cluster().Update(mc)
+		mc, err = clients.Mgmt.Cluster().Update(mc)
+		return err
+	})
 	require.NoError(err)
 
 	// changes propagate to fleet cluster

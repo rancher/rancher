@@ -3,6 +3,7 @@ package cluster
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/namespace"
 	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
 	"github.com/rancher/rancher/tests/v2prov/registry"
+	"github.com/rancher/rancher/tests/v2prov/systemdnode"
 	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -34,12 +36,111 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to update the secret: Operation cannot be fulfilled on secrets.*: the object has been modified; please apply your changes to the latest version and try again`
 const SaneConflictMessageThreshold = 10
+
+type ImportedNodePool struct {
+	ControlPlane bool
+	ETCD         bool
+	Worker       bool
+	Quantity     int
+}
+
+// NewImported creates a management cluster object for an imported cluster.
+// This function is expected to be called in conjunction with NewImportedClusterPods.
+func NewImported(clients *clients.Clients, c *v3.Cluster) (*v3.Cluster, error) {
+	c = c.DeepCopy()
+	if c.Name == "" && c.GenerateName == "" {
+		c.GenerateName = "test-imported-"
+	}
+
+	created, err := clients.Mgmt.Cluster().Create(c)
+	if err != nil {
+		return nil, err
+	}
+
+	clients.OnClose(func() {
+		clients.Mgmt.Cluster().Delete(created.Name, &metav1.DeleteOptions{})
+	})
+
+	return created, nil
+}
+
+// NewImportedClusterPods creates systemd-node pods that independently bootstrap an RKE2/K3s cluster.
+// The first ETCD node is brought up as the init node, and subsequent nodes join via the
+// init node's IP at the supervisor port (9345 for RKE2, 6443 for K3s).
+func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion string, pools []ImportedNodePool, labels map[string]string, registryCACert []byte) ([]*corev1.Pod, error) {
+	distro := capr.GetRuntime(k8sVersion)
+	supervisorPort := capr.GetRuntimeSupervisorPort(k8sVersion)
+
+	token, err := generateImportedToken()
+	if err != nil {
+		return nil, err
+	}
+
+	type nodeSpec struct {
+		cp, etcd, worker bool
+	}
+
+	var initSpec *nodeSpec
+	var joinSpecs []nodeSpec
+
+	for _, pool := range pools {
+		for i := 0; i < pool.Quantity; i++ {
+			spec := nodeSpec{
+				cp:     pool.ControlPlane,
+				etcd:   pool.ETCD,
+				worker: pool.Worker,
+			}
+			if initSpec == nil && pool.ETCD {
+				initSpec = &spec
+			} else {
+				joinSpecs = append(joinSpecs, spec)
+			}
+		}
+	}
+
+	if initSpec == nil {
+		return nil, fmt.Errorf("at least one pool must have ETCD: true for the init node")
+	}
+
+	var pods []*corev1.Pod
+
+	initScript := importedNodeUserData(distro, k8sVersion, token, "imported-init-0", "", true, initSpec.cp, initSpec.etcd, initSpec.worker, registryCACert)
+	initPod, err := systemdnode.New(clients, namespace, initScript, labels, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create init node: %w", err)
+	}
+	pods = append(pods, initPod)
+
+	err = wait.Object(clients.Ctx, clients.Core.Pod().Watch, initPod, func(obj runtime.Object) (bool, error) {
+		initPod = obj.(*corev1.Pod)
+		return initPod.Status.PodIP != "" && initPod.Status.Phase == corev1.PodRunning, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("init node pod did not become ready: %w", err)
+	}
+
+	serverURL := fmt.Sprintf("https://%s:%d", initPod.Status.PodIP, supervisorPort)
+
+	for i, spec := range joinSpecs {
+		nodeName := fmt.Sprintf("imported-node-%d", i+1)
+		script := importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL, false, spec.cp, spec.etcd, spec.worker, registryCACert)
+		pod, err := systemdnode.New(clients, namespace, script, labels, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create node %s: %w", nodeName, err)
+		}
+		pods = append(pods, pod)
+	}
+
+	return pods, nil
+}
 
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
 	cluster = cluster.DeepCopy()
@@ -355,6 +456,47 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 	return "", fmt.Errorf("timeout getting custom command")
 }
 
+func ImportCommand(clients *clients.Clients, mgmtCluster *v3.Cluster) (string, error) {
+	for i := 0; i < 15; i++ {
+		tokens, err := clients.Mgmt.ClusterRegistrationToken().List(mgmtCluster.Name, metav1.ListOptions{})
+		if err != nil || len(tokens.Items) == 0 || tokens.Items[0].Status.InsecureCommand == "" {
+			time.Sleep(time.Second)
+			continue
+		}
+		return strings.Replace(tokens.Items[0].Status.InsecureCommand, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
+	}
+
+	return "", fmt.Errorf("timeout getting import command")
+}
+
+func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
+	req := clients.K8s.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Namespace(namespace).
+		Name(podName).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Command: cmd,
+			Stdout:  true,
+			Stderr:  true,
+		}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(clients.RESTConfig, "POST", req.URL())
+	if err != nil {
+		return "", fmt.Errorf("failed to create executor: %w", err)
+	}
+
+	var stdout, stderr strings.Builder
+	err = executor.StreamWithContext(clients.Ctx, remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		return stdout.String(), fmt.Errorf("exec failed: %w: %s", err, stderr.String())
+	}
+	return stdout.String(), nil
+}
+
 // getPodLogs gathers the logs from the specified pod in a manner similar to `kubectl logs`
 func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string, error) {
 	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
@@ -613,6 +755,78 @@ func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioni
 		}
 	}
 	return nil
+}
+
+func generateImportedToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate cluster token: %w", err)
+	}
+	return fmt.Sprintf("%x", b), nil
+}
+
+func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, registryCACert []byte) string {
+	isServer := etcd || cp
+	rancherDir := fmt.Sprintf("/etc/rancher/%s", distro)
+	configDir := rancherDir + "/config.yaml.d"
+
+	var configLines []string
+	configLines = append(configLines, "token: "+token)
+	configLines = append(configLines, "node-name: "+nodeName)
+	configLines = append(configLines, "service-cidr: 10.45.0.0/16")
+	configLines = append(configLines, "cluster-cidr: 10.44.0.0/16")
+
+	if isInit && distro == capr.RuntimeK3S {
+		configLines = append(configLines, "cluster-init: true")
+	}
+
+	if !isInit && serverURL != "" {
+		configLines = append(configLines, "server: "+serverURL)
+	}
+
+	if isServer {
+		if !etcd {
+			configLines = append(configLines, "disable-etcd: true")
+		}
+		if !cp {
+			configLines = append(configLines, "disable-apiserver: true")
+			configLines = append(configLines, "disable-controller-manager: true")
+			configLines = append(configLines, "disable-scheduler: true")
+		}
+	}
+
+	configContent := strings.Join(configLines, "\n")
+
+	var installCmd, serviceName string
+	if isServer {
+		if distro == capr.RuntimeRKE2 {
+			installCmd = fmt.Sprintf("curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=%s sh -", k8sVersion)
+			serviceName = "rke2-server"
+		} else {
+			installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=%s INSTALL_K3S_SKIP_START=true sh -", k8sVersion)
+			serviceName = "k3s"
+		}
+	} else {
+		if distro == capr.RuntimeRKE2 {
+			installCmd = fmt.Sprintf("curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=agent INSTALL_RKE2_VERSION=%s sh -", k8sVersion)
+			serviceName = "rke2-agent"
+		} else {
+			installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=%s INSTALL_K3S_EXEC=agent INSTALL_K3S_SKIP_START=true sh -", k8sVersion)
+			serviceName = "k3s-agent"
+		}
+	}
+
+	var registryBlock string
+	if len(registryCACert) > 0 {
+		registryHost := "registry-cache.default.svc.cluster.local:5000"
+		caPath := rancherDir + "/registry-ca.crt"
+		registryBlock = fmt.Sprintf(
+			"cat > %s/registries.yaml <<'REGISTRIES'\nmirrors:\n  docker.io:\n    endpoint:\n      - \"https://%s\"\n      - \"https://registry-1.docker.io\"\nconfigs:\n  \"%s\":\n    auth:\n      username: admin\n      password: admin\n    tls:\n      ca_file: %s\nREGISTRIES\ncat > %s <<'CACERT'\n%s\nCACERT\n",
+			rancherDir, registryHost, registryHost, caPath, caPath, string(registryCACert))
+	}
+
+	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s\nsystemctl enable %s\nsystemctl start %s\n",
+		configDir, configDir, configContent, registryBlock, installCmd, serviceName, serviceName)
 }
 
 func appendGlobalRegistrySelector(c *provisioningv1api.Cluster, host string) {

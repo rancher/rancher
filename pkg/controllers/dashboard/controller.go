@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/proxysettings"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
+	"github.com/rancher/rancher/pkg/controllers/operations"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
@@ -86,6 +87,7 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 					return fmt.Errorf("failed to register deferred capr controllers: %w", err)
 				}
 			}
+			operations.Register(ctx, clients)
 			return nil
 		})
 	}
