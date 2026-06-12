@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -874,4 +875,37 @@ func Test_gatherRoleTemplates(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fakeObjectCreator is a minimal objectCreator whose Create always returns the
+// configured error, simulating a specific API-server response.
+type fakeObjectCreator struct{ err error }
+
+func (f *fakeObjectCreator) Create(_ runtime.Object) (runtime.Object, error) {
+	return nil, f.err
+}
+
+func TestCreateMembershipRole_AlreadyExists(t *testing.T) {
+	t.Parallel()
+
+	cluster := &v3.Cluster{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "Cluster",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test-cluster",
+			UID:  "1234-abcd",
+		},
+	}
+
+	alreadyExistsErr := errors.NewAlreadyExists(
+		schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"},
+		"test-role",
+	)
+
+	m := &manager{}
+
+	err := m.createMembershipRole(clusterResource, "test-role", false, cluster, &fakeObjectCreator{err: alreadyExistsErr}, true)
+	require.NoError(t, err)
 }

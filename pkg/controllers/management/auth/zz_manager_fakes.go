@@ -168,3 +168,42 @@ func (mr *MockmanagerInterfaceMockRecorder) removeAuthV2Permissions(arg0, arg1 a
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "removeAuthV2Permissions", reflect.TypeOf((*MockmanagerInterface)(nil).removeAuthV2Permissions), arg0, arg1)
 }
+
+// MockobjectCreator is a mock of objectCreator interface.
+type MockobjectCreator struct {
+	ctrl     *gomock.Controller
+	recorder *MockobjectCreatorMockRecorder
+	isgomock struct{}
+}
+
+// MockobjectCreatorMockRecorder is the mock recorder for MockobjectCreator.
+type MockobjectCreatorMockRecorder struct {
+	mock *MockobjectCreator
+}
+
+// NewMockobjectCreator creates a new mock instance.
+func NewMockobjectCreator(ctrl *gomock.Controller) *MockobjectCreator {
+	mock := &MockobjectCreator{ctrl: ctrl}
+	mock.recorder = &MockobjectCreatorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockobjectCreator) EXPECT() *MockobjectCreatorMockRecorder {
+	return m.recorder
+}
+
+// Create mocks base method.
+func (m *MockobjectCreator) Create(o runtime.Object) (runtime.Object, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", o)
+	ret0, _ := ret[0].(runtime.Object)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockobjectCreatorMockRecorder) Create(o any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockobjectCreator)(nil).Create), o)
+}
