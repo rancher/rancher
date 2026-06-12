@@ -17,7 +17,6 @@ import (
 type extTokenTestCase struct {
 	description                 string
 	inputToken                  *ext.Token
-	expectedOutputToken         *ext.Token
 	inputUserAttribute          *v3.UserAttribute
 	expectedOutputUserAttribute *v3.UserAttribute
 }
@@ -68,8 +67,9 @@ func TestExtOnChange(t *testing.T) {
 	testCases := populateExtTestCases(tokens, userAttributes)
 	for _, testcase := range testCases {
 		testErr := fmt.Sprintf("test case failed: %s", testcase.description)
-		_, err := testTokenController.onChange(testcase.inputToken.Name, testcase.inputToken)
+		returnToken, err := testTokenController.onChange(testcase.inputToken.Name, testcase.inputToken)
 		assert.NoErrorf(t, err, "%s: unexpected onChange error", testErr)
+		assert.Equalf(t, testcase.inputToken, returnToken, "%s: token", testErr)
 
 		returnUserAttribute, _ := testTokenController.userAttrRefresher.userAttributesLister.Get(testcase.inputUserAttribute.Name)
 		assert.Equalf(t, testcase.expectedOutputUserAttribute, returnUserAttribute, "%s: %s", testErr, testcase.inputUserAttribute.Name)
@@ -204,8 +204,7 @@ func TestExtOnChange(t *testing.T) {
 func populateExtTestCases(tokens map[string]*ext.Token, userAttributes map[string]*v3.UserAttribute) []extTokenTestCase {
 	testCases := []extTokenTestCase{
 		{
-			inputToken:          &ext.Token{Spec: ext.TokenSpec{UserID: "testuser"}},
-			expectedOutputToken: &ext.Token{Spec: ext.TokenSpec{UserID: "testuser"}},
+			inputToken: &ext.Token{Spec: ext.TokenSpec{UserID: "testuser"}},
 			inputUserAttribute: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "testuser",
@@ -221,8 +220,7 @@ func populateExtTestCases(tokens map[string]*ext.Token, userAttributes map[strin
 				" potentially be provided by the token.",
 		},
 		{
-			inputToken:          &ext.Token{Spec: ext.TokenSpec{UserID: "testuser2"}},
-			expectedOutputToken: &ext.Token{Spec: ext.TokenSpec{UserID: "testuser2"}},
+			inputToken: &ext.Token{Spec: ext.TokenSpec{UserID: "testuser2"}},
 			inputUserAttribute: &v3.UserAttribute{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "testuser2",
@@ -242,7 +240,6 @@ func populateExtTestCases(tokens map[string]*ext.Token, userAttributes map[strin
 	for index, testCase := range testCases {
 		id := fmt.Sprintf("test%d", index)
 		testCase.inputToken.Name = id
-		testCase.expectedOutputToken.Name = id
 		tokens[id] = testCase.inputToken.DeepCopy()
 		if testCase.inputUserAttribute == nil {
 			continue
