@@ -398,8 +398,8 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling shutdown", s.op.Namespace, s.op.Name)
 
 	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(planapi.Label(capr.CattleOSLabel, capr.DefaultMachineOS)).
 		WithSorter(planapi.DefaultSorter()).
+		WithFilter(nonWindowsSecret).
 		WithValidator(planapi.AtLeast(1, "")).
 		Collect()
 	if planapi.IsTransient(err) {
@@ -771,7 +771,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling cluster restart", s.op.Namespace, s.op.Name)
 
 	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(planapi.Label(capr.CattleOSLabel, capr.DefaultMachineOS)).
+		WithFilter(nonWindowsSecret).
 		WithSorter(planapi.DefaultSorter()).
 		Collect()
 	if planapi.IsTransient(err) {
