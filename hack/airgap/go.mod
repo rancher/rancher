@@ -9,7 +9,7 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.2.8 // CVE-2024-45310
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.15 // CVE-2025-58058
 	golang.org/x/crypto => golang.org/x/crypto v0.47.0 // CVE-2025-47914, CVE-2025-58181
-	golang.org/x/net => golang.org/x/net v0.48.0
+	golang.org/x/net => golang.org/x/net v0.55.0
 )
 
 require (
@@ -100,12 +100,12 @@ require (
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/grpc v1.79.3 // indirect
