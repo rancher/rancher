@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/rancher/norman v0.9.7
-	k8s.io/apimachinery v0.36.1
+	k8s.io/apimachinery v0.36.2
 )
 
 require (
