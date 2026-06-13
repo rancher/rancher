@@ -89,6 +89,12 @@ type ClusterSpec struct {
 	// +optional
 	FleetAgentDeploymentCustomization *AgentDeploymentCustomization `json:"fleetAgentDeploymentCustomization,omitempty"`
 
+	// WebhookDeploymentCustomization is the customization configuration
+	// to apply to the rancher-webhook deployment on this cluster.
+	// +nullable
+	// +optional
+	WebhookDeploymentCustomization *WebhookDeploymentCustomization `json:"webhookDeploymentCustomization,omitempty"`
+
 	// RedeploySystemAgentGeneration is used to force the redeployment of the
 	// system agent via the system-upgrade controller's system-agent-upgrader
 	// plan.
@@ -478,6 +484,37 @@ type PodDisruptionBudgetSpec struct {
 	// +nullable
 	// +optional
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
+}
+
+// WebhookDeploymentCustomization holds HA and resource configuration for the rancher-webhook deployment.
+type WebhookDeploymentCustomization struct {
+	// ReplicaCount sets the number of webhook pod replicas. The webhook natively supports
+	// multi-replica operation via leader election and shared TLS certificates, so increasing
+	// this value improves availability without additional configuration.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	ReplicaCount *int32 `json:"replicaCount,omitempty"`
+
+	// AppendTolerations is a list of tolerations appended to the webhook deployment.
+	// +nullable
+	// +optional
+	AppendTolerations []corev1.Toleration `json:"appendTolerations,omitempty"`
+
+	// OverrideAffinity overrides the default affinity for the webhook deployment.
+	// +nullable
+	// +optional
+	OverrideAffinity *corev1.Affinity `json:"overrideAffinity,omitempty"`
+
+	// OverrideResourceRequirements sets CPU/memory requests and limits for the webhook container.
+	// +nullable
+	// +optional
+	OverrideResourceRequirements *corev1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+
+	// PodDisruptionBudget specifies the desired pod disruption budget for the webhook deployment.
+	// Recommended when ReplicaCount > 1 to prevent all replicas from being disrupted simultaneously.
+	// +nullable
+	// +optional
+	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
 
 type ClusterStatus struct {

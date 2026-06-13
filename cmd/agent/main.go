@@ -19,10 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
+	"github.com/moby/moby/client"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -56,12 +54,7 @@ func main() {
 
 	initFeatures()
 
-	// The cleanup is only performed by the cattle-cluster-agent,
-	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
-	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
-		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
-		go clean.UnusedCattleCredentials()
-	}
+	runCleanup(ctx)
 
 	if os.Getenv("CLUSTER_CLEANUP") == "true" {
 		err = clean.Cluster()
@@ -93,6 +86,17 @@ func getParams() (map[string]interface{}, error) {
 
 func getTokenAndURL() (string, string, error) {
 	return cluster.TokenAndURL()
+}
+
+func runCleanup(ctx context.Context) {
+	// The cleanup is only performed by the cattle-cluster-agent,
+	// in whose template the CATTLE_CREDENTIAL_NAME environment variable is set
+	if os.Getenv("CATTLE_CREDENTIAL_NAME") != "" {
+		logrus.Infof("starting cattle-credential-cleanup goroutine in the background")
+		go clean.UnusedCattleCredentials()
+		// Run once on startup to make sure that there are no lingering pull secrets in the cattle-system namespace
+		go clean.UnusedPullSecrets(ctx)
+	}
 }
 
 func isConnect() bool {
@@ -320,10 +324,8 @@ func exitCertWriter(ctx context.Context) {
 		logrus.Error(err)
 		os.Exit(0)
 	}
-
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=share-mnt")
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+	args := client.Filters{}.Add("label", "io.rancher.rke.container.name=share-mnt")
+	containers, err := c.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: args,
 	})
@@ -332,9 +334,9 @@ func exitCertWriter(ctx context.Context) {
 		os.Exit(0)
 	}
 
-	for _, container := range containers {
+	for _, container := range containers.Items {
 		if len(container.Names) > 0 && strings.Contains(container.Names[0], "share-mnt") {
-			err := c.ContainerKill(ctx, container.ID, "SIGTERM")
+			_, err := c.ContainerKill(ctx, container.ID, client.ContainerKillOptions{Signal: "SIGTERM"})
 			if err != nil {
 				logrus.Error(err)
 				os.Exit(0) // only need to write certs so exit cleanly

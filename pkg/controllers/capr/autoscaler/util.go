@@ -17,6 +17,22 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
+const (
+	autoscalerHelmSecretResourceName   = "autoscaler-helm-secret"
+	autoscalerChartImagePullSecretName = "autoscaler-chart-image-pull-secret"
+)
+
+func helmOpSecretName(clusterName, clusterNamespace string) string {
+	if clusterNamespace == "fleet-default" {
+		return autoscalerHelmSecretResourceName
+	}
+	return name.SafeConcatName(autoscalerHelmSecretResourceName, clusterName)
+}
+
+func autoscalerClusterScopedImagePullSecretName(clusterName string) string {
+	return name.SafeConcatName(autoscalerChartImagePullSecretName, clusterName)
+}
+
 // autoscalerUserName generates the autoscaler-specific name for a cluster
 func autoscalerUserName(cluster *capi.Cluster) string {
 	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler")
@@ -39,6 +55,20 @@ func kubeconfigSecretName(cluster *capi.Cluster) string {
 
 func helmOpName(cluster *capi.Cluster) string {
 	return name.SafeConcatName("autoscaler", cluster.Namespace, cluster.Name)
+}
+
+// autoScalerChartRepositoryHost trims away the protocol and chart path
+// from the configured settings.ClusterAutoscalerChartRepository to return just the host.
+// This is then used to identify the correct dockerconfigjson auth entry defined within the
+// first configured pull secret in the settings.SystemDefaultRegistryPullSecrets list.
+func autoScalerChartRepositoryHost() string {
+	host := settings.ClusterAutoscalerChartRepository.Get()
+	_, hostWithoutProto, found := strings.Cut(host, "://")
+	if !found {
+		hostWithoutProto = host
+	}
+	hostWithoutPath, _, _ := strings.Cut(hostWithoutProto, "/")
+	return hostWithoutPath
 }
 
 // ownerReference creates an owner reference from a cluster

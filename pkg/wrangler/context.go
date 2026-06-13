@@ -36,8 +36,8 @@ import (
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io"
-	planv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io"
+	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io"
 	projectv3 "github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io"
@@ -50,6 +50,8 @@ import (
 	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/remotedialer"
@@ -159,6 +161,7 @@ type Context struct {
 	Upgrade             upgradev1.Interface
 	Telemetry           telemetryv1.Interface
 	Plan                planv1alpha1.Interface
+	Operation           operationcontrollers.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -189,6 +192,7 @@ type Context struct {
 	upgrade      *upgrade.Factory
 	telemetry    *telemetry.Factory
 	plan         *plan.Factory
+	operation    *operation.Factory
 
 	started bool
 }
@@ -477,6 +481,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
+	operation, err := operation.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	k8s, err := namespace.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
@@ -500,7 +509,8 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac.Rbac().V1(),
 		content,
 		core.Core().V1().Pod(),
-		core.Core().V1().Node())
+		core.Core().V1().Node(),
+		core.Core().V1().Secret())
 
 	cache := memory.NewMemCacheClient(k8s.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
@@ -569,6 +579,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Upgrade:                 upgrade.Upgrade().V1(),
 		Telemetry:               telemetry.Telemetry().V1(),
 		Plan:                    plan.Plan().V1alpha1(),
+		Operation:               operation.Operation().V1alpha1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -586,6 +597,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		upgrade:      upgrade,
 		telemetry:    telemetry,
 		plan:         plan,
+		operation:    operation,
 	}
 
 	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer(wContext), "deferred-capi")

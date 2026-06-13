@@ -10,6 +10,7 @@ import (
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	clusterutil "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
@@ -54,6 +55,14 @@ var (
 		chart.RemoteDialerProxyChartName: "rancher/remotedialer-proxy",
 		chart.TurtlesChartName:           "rancher/turtles",
 	}
+	// topLevelImagePullSecrets tracks the system charts that do not
+	// use the standard 'global.cattle.imagePullSecrets' field to accept pull
+	// secret references. Any chart listed in this map will have to subsequently
+	// set up the image pull secrets in the chart specific Values function.
+	topLevelImagePullSecrets = map[string]struct{}{
+		chart.RemoteDialerProxyChartName: {},
+		chart.TurtlesChartName:           {},
+	}
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookVersion.Name:               {},
 		settings.RancherTurtlesVersion.Name:               {},
@@ -61,6 +70,7 @@ var (
 		settings.ShellImage.Name:                          {},
 		settings.SystemUpgradeControllerChartVersion.Name: {},
 		settings.ImportedClusterVersionManagement.Name:    {},
+		settings.SystemDefaultRegistryPullSecrets.Name:    {},
 	}
 	managedPlanSelector = labels.Set(map[string]string{k3sbasedupgrade.RancherManagedPlan: "true"}).AsSelector()
 )
@@ -75,6 +85,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		deploymentCache:                wContext.Apps.Deployment().Cache(),
 		clusterRepo:                    wContext.Catalog.ClusterRepo(),
 		clusterCache:                   wContext.Mgmt.Cluster().Cache(),
+		clusters:                       wContext.Mgmt.Cluster(),
 		plan:                           wContext.Upgrade.Plan(),
 		planCache:                      wContext.Upgrade.Plan().Cache(),
 		secrets:                        wContext.Core.Secret(),
@@ -85,6 +96,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 	}
 
 	wContext.Catalog.ClusterRepo().OnChange(ctx, "bootstrap-charts", h.onRepo)
+
 	relatedresource.WatchClusterScoped(ctx, "bootstrap-charts", relatedFeatures, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Feature())
 
 	relatedresource.WatchClusterScoped(ctx, "bootstrap-settings-charts", relatedSettings, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Setting())
@@ -116,76 +128,114 @@ type handler struct {
 	validatingWebhookConfiguration admissionregcontrollers.ValidatingWebhookConfigurationController
 	chartsConfig                   chart.RancherConfigGetter
 	clusterCache                   mgmtcontrollers.ClusterCache
+	clusters                       mgmtcontrollers.ClusterController
 	plan                           plancontrolers.PlanController
 	planCache                      plancontrolers.PlanCache
 	registryOverride               string
 }
 
-func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
+func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
 	if repo == nil || repo.Name != repoName {
 		return repo, nil
 	}
 
-	systemGlobalRegistry := map[string]interface{}{
-		"cattle": map[string]interface{}{
-			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-		},
-	}
+	systemDefaultRegistry := settings.SystemDefaultRegistry.Get()
+	var helmOpInstallImageOverride string
 	if h.registryOverride != "" {
-		// if we have a specific image override, don't set the system default registry
-		// don't need to check for type assert since we just created this above
-		registryMap := systemGlobalRegistry["cattle"].(map[string]interface{})
-		registryMap["systemDefaultRegistry"] = ""
-		systemGlobalRegistry["cattle"] = registryMap
+		// if we have a specific image override, don't set the system default registry. This will be the case when
+		// these controllers are running in the downstream cattle-cluster-agent.
+		systemDefaultRegistry = ""
+		logrus.Tracef("[system-charts] registryOverride=%q set; systemDefaultRegistry cleared for per-chart image override", h.registryOverride)
+		helmOpInstallImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
+		logrus.Tracef("[system-charts] helmOpInstallImageOverride=%q", helmOpInstallImageOverride)
 	}
-	for _, chartDef := range h.getChartsToInstall() {
+
+	chartsToInstall := h.getChartsToInstall()
+	logrus.Tracef("[system-charts] evaluating %d chart definition(s)", len(chartsToInstall))
+
+	for _, chartDef := range chartsToInstall {
+		logrus.Tracef("[system-charts] processing chart %q (namespace=%q, release=%q, uninstall=%v)", chartDef.ChartName, chartDef.ReleaseNamespace, chartDef.ReleaseName, chartDef.Uninstall)
+
 		if chartDef.Uninstall {
+			logrus.Tracef("[system-charts] uninstalling chart %q (removeNamespace=%v)", chartDef.ChartName, chartDef.RemoveNamespace)
 			// it is important to remove the chart from the desired chart list
 			h.manager.Remove(chartDef.ReleaseNamespace, chartDef.ChartName)
 			if err := h.manager.Uninstall(chartDef.ReleaseNamespace, chartDef.ChartName); err != nil {
+				logrus.Errorf("[system-charts] failed to uninstall chart %q: %v", chartDef.ChartName, err)
 				return repo, err
 			}
 			if chartDef.RemoveNamespace {
+				logrus.Tracef("[system-charts] deleting namespace %q for chart %q", chartDef.ReleaseNamespace, chartDef.ChartName)
 				if err := h.namespaces.Delete(chartDef.ReleaseNamespace, nil); err != nil && !errors.IsNotFound(err) {
+					logrus.Errorf("[system-charts] failed to delete namespace %q: %v", chartDef.ReleaseNamespace, err)
 					return repo, err
 				}
 			}
 			continue
 		}
+
 		if chartDef.Enabled != nil && !chartDef.Enabled() {
+			logrus.Tracef("[system-charts] chart %q is disabled, skipping", chartDef.ChartName)
 			continue
 		}
 
 		values := map[string]interface{}{
-			"global": systemGlobalRegistry,
+			"global": map[string]interface{}{
+				"cattle": map[string]interface{}{
+					"systemDefaultRegistry": systemDefaultRegistry,
+				},
+			},
 		}
-		var installImageOverride string
-		if h.registryOverride != "" {
-			imageSettings, ok := values["image"].(map[string]interface{})
-			if !ok {
-				imageSettings = map[string]interface{}{}
-			}
-			if image, ok := primaryImages[chartDef.ChartName]; ok {
+
+		if _, ok := topLevelImagePullSecrets[chartDef.ChartName]; !ok {
+			global := values["global"].(map[string]interface{})
+			cattle := global["cattle"].(map[string]interface{})
+			h.setImagePullSecrets(cattle, false)
+		}
+
+		if image, ok := primaryImages[chartDef.ChartName]; ok {
+			imageSettings := map[string]interface{}{}
+			if h.registryOverride != "" {
 				imageSettings["repository"] = h.registryOverride + "/" + image
-				values["image"] = imageSettings
+			} else {
+				// If we do not have a registry override, ensure we are passing the plain repository and image name.
+				// Due to how the chart patching logic works, this is required to properly handle the case where a
+				// private registry is no longer configured at the cluster or global level. If we do not explicitly
+				// define this field, the old value (which points to the previously defined private registry) will always
+				// be used.
+				imageSettings["repository"] = image
 			}
-			installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
+			logrus.Debugf("[system-charts] overriding image repository for chart %q to %q", chartDef.ChartName, imageSettings["repository"])
+			values["image"] = imageSettings
 		}
+
 		if chartDef.Values != nil {
-			for k, v := range chartDef.Values() {
+			chartSpecificValues := chartDef.Values()
+			logrus.Tracef("[system-charts] merging %d chart-specific value(s) for chart %q", len(chartSpecificValues), chartDef.ChartName)
+			for k, v := range chartSpecificValues {
 				values[k] = v
 			}
 		}
+
 		// webhook needs to be able to adopt the MutatingWebhookConfiguration which originally wasn't a part of the
 		// chart definition, but is now part of the chart definition
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
 		takeOwnership := chartDef.ChartName == chart.WebhookChartName
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, takeOwnership, helmOpInstallImageOverride); err != nil {
+			logrus.Errorf("[system-charts] failed to ensure chart %q: %v", chartDef.ChartName, err)
 			return repo, err
+		}
+
+		logrus.Tracef("[system-charts] ensured chart %q in namespace %q", chartDef.ChartName, chartDef.ReleaseNamespace)
+		if chartDef.ChartName == chart.WebhookChartName {
+			if err := h.updateAppliedWebhookCustomization(); err != nil {
+				logrus.Warnf("[systemcharts] failed to update applied webhook customization status: %v", err)
+			}
 		}
 	}
 
+	logrus.Tracef("[system-charts] reconciliation complete for repo %q", repoName)
 	return repo, nil
 }
 
@@ -200,6 +250,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				values := map[string]interface{}{}
 				// add priority class value
 				h.setPriorityClass(values, chart.RemoteDialerProxyChartName)
+				// add image pull secrets, RDP uses local object references at
+				// the top level.
+				h.setImagePullSecrets(values, true)
 				return values
 			},
 			Enabled: func() bool {
@@ -229,7 +282,22 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				}
 				// add priority class value
 				h.setPriorityClass(values, chart.WebhookChartName)
-				// get custom values for the rancher-webhook
+				// merge per-cluster webhook customization from the local cluster spec;
+				// this is overridden by any values set in the rancher-config ConfigMap below.
+				wdc, err := h.getLocalWebhookCustomization()
+				if err != nil && !errors.IsNotFound(err) {
+					logrus.Warnf("[systemcharts] failed to get local cluster for webhook values: %v", err)
+				} else {
+					// wdc is nil when the local cluster is not found; WebhookHelmValues
+					// handles nil by returning defaults that reset every customizable field.
+					helmValues, err := chart.WebhookHelmValues(wdc)
+					if err != nil {
+						logrus.Warnf("[systemcharts] failed to build webhook helm values: %v", err)
+					} else {
+						values = data.MergeMaps(values, helmValues)
+					}
+				}
+				// get custom values for the rancher-webhook; ConfigMap values take highest precedence
 				configMapValues := h.getChartValues(chart.WebhookChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
@@ -263,6 +331,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						},
 					},
 				}
+				// add image pull secrets, turtles uses string references at
+				// the top level.
+				h.setImagePullSecrets(values, false)
 				// add priority class value
 				h.setPriorityClass(values, chart.TurtlesChartName)
 				// get custom values for rancher-turtles
@@ -292,19 +363,28 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				values := map[string]interface{}{}
 				// add priority class value
 				h.setPriorityClass(values, chart.SystemUpgradeControllerChartName)
-				// override the image registries because the structure of the values in this chart differs from the expected structure
+
+				// override the image registries because the structure of the values
+				// in this chart differs from the expected structure. Ensure that
+				// we always set the image repository so that the current private
+				// registry configuration is always respected.
+				sucRepository := "rancher/system-upgrade-controller"
+				kubectlRepository := "rancher/kuberlr-kubectl"
 				if h.registryOverride != "" {
-					values["systemUpgradeController"] = map[string]interface{}{
-						"image": map[string]interface{}{
-							"repository": fmt.Sprintf("%s/%s", h.registryOverride, "rancher/system-upgrade-controller"),
-						},
-					}
-					values["kubectl"] = map[string]interface{}{
-						"image": map[string]interface{}{
-							"repository": fmt.Sprintf("%s/%s", h.registryOverride, "rancher/kuberlr-kubectl"),
-						},
-					}
+					sucRepository = fmt.Sprintf("%s/%s", h.registryOverride, "rancher/system-upgrade-controller")
+					kubectlRepository = fmt.Sprintf("%s/%s", h.registryOverride, "rancher/kuberlr-kubectl")
 				}
+				values["systemUpgradeController"] = map[string]interface{}{
+					"image": map[string]interface{}{
+						"repository": sucRepository,
+					},
+				}
+				values["kubectl"] = map[string]interface{}{
+					"image": map[string]interface{}{
+						"repository": kubectlRepository,
+					},
+				}
+
 				// get custom values for system-upgrade-controller
 				configMapValues := h.getChartValues(chart.SystemUpgradeControllerChartName)
 				return data.MergeMaps(values, configMapValues)
@@ -314,7 +394,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				suc, err := h.deploymentCache.Get(namespace.System, sucDeploymentName)
 				if err != nil && !errors.IsNotFound(err) {
 					toEnable = false
-					logrus.Warnf("[systemcharts] failed to get the deployment %s/%s: %s", namespace.System, sucDeploymentName, err.Error())
+					logrus.Warnf("[system-charts] failed to get deployment %q/%q: %v", namespace.System, sucDeploymentName, err)
 				}
 				if suc != nil {
 					// The missing annotation suggests that either the legacy Fleet bundle in the node-driver RKE2/K3s cluster,
@@ -335,7 +415,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					// Rancher has direct access to the mgmt v3 cluster and the ImportedClusterVersionManagement setting
 					cluster, err := h.clusterCache.Get("local")
 					if err != nil {
-						logrus.Warnf("[systemcharts] failed to get the local cluster: %v", err)
+						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
 						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
@@ -344,14 +424,14 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				if isInHarvesterLocal() {
 					cluster, err := h.clusterCache.Get("local")
 					if err != nil {
-						logrus.Warnf("[systemcharts] failed to get the local cluster: %v", err)
+						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
 						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
 					}
 				}
 				toInstall := versionManagementEnabled && toEnable
-				logrus.Debugf("[systemcharts] install system-upgrade-controller: %t (versionManagementEnabled: %t && toEnable: %t)",
+				logrus.Debugf("[system-charts] install system-upgrade-controller: %v (versionManagementEnabled=%v, toEnable=%v)",
 					toInstall, versionManagementEnabled, toEnable)
 				return toInstall
 			},
@@ -361,7 +441,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				// The removal of the plans is handled in the k3sbasedupgrade package.
 				plans, err := h.planCache.List(namespace.System, managedPlanSelector)
 				if err != nil {
-					logrus.Warnf("[systemcharts] failed to list plans: %v", err)
+					logrus.Warnf("[system-charts] failed to list plans: %v", err)
 				}
 				if len(plans) == 0 {
 					noManagedPlan = true
@@ -378,7 +458,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					// Rancher has direct access to the mgmt v3 cluster and the ImportedClusterVersionManagement setting
 					cluster, err := h.clusterCache.Get("local")
 					if err != nil {
-						logrus.Warnf("[systemcharts] failed to get the local cluster: %v", err)
+						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
 						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
@@ -387,15 +467,15 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				if isInHarvesterLocal() {
 					cluster, err := h.clusterCache.Get("local")
 					if err != nil {
-						logrus.Warnf("[systemcharts] failed to get the local cluster: %v", err)
+						logrus.Warnf("[system-charts] failed to get local cluster: %v", err)
 					}
 					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
 						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
 					}
 				}
 				toUninstall := !versionManagementEnabled && noManagedPlan
-				logrus.Debugf("[systemcharts] uninstall system-upgrade-controller: %t (!versionManagementEnabled: %t && noManagedPlan: %t)",
-					toUninstall, !versionManagementEnabled, noManagedPlan)
+				logrus.Debugf("[system-charts] uninstall system-upgrade-controller: %v (versionManagementEnabled=%v, noManagedPlan=%v)",
+					toUninstall, versionManagementEnabled, noManagedPlan)
 				return toUninstall
 			}(),
 		},
@@ -415,7 +495,7 @@ func (h *handler) onDeployment(_ string, d *k8sappsv1.Deployment) (*k8sappsv1.De
 	}
 
 	index := slices.Index(d.Finalizers, legacyAppFinalizer)
-	logrus.Infof("[systemcharts] found deployment %s/%s with index of target finalzier = %d", d.Namespace, d.Name, index)
+	logrus.Tracef("[system-charts] deployment %q/%q: legacy finalizer index=%d", d.Namespace, d.Name, index)
 	if (d.DeletionTimestamp != nil && index == -1) || (d.DeletionTimestamp == nil && index >= 0) {
 		return d, nil
 	}
@@ -442,7 +522,7 @@ func (h *handler) onDeployment(_ string, d *k8sappsv1.Deployment) (*k8sappsv1.De
 		}); err != nil {
 			return nil, fmt.Errorf("failed to update deployment %s/%s: %w", d.Namespace, d.Name, err)
 		}
-		logrus.Infof("[systemcharts] enqueue %s", repoName)
+		logrus.Debugf("[system-charts] enqueuing %q to reconcile after legacy SUC deployment cleanup", repoName)
 		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
 
 	case d.DeletionTimestamp == nil && index == -1:
@@ -479,7 +559,7 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 		return plan, nil
 	}
 	index := slices.Index(plan.Finalizers, managedPlanFinalizer)
-	logrus.Debugf("[systemcharts] found plan %s/%s with index of target finalzier = %d", plan.Namespace, plan.Name, index)
+	logrus.Tracef("[system-charts] plan %q/%q: managed-plan finalizer index=%d", plan.Namespace, plan.Name, index)
 	if (plan.DeletionTimestamp != nil && index == -1) || (plan.DeletionTimestamp == nil && index >= 0) {
 		return plan, nil
 	}
@@ -502,7 +582,7 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 		if err != nil {
 			return nil, err
 		}
-		logrus.Infof("[systemcharts] enqueue %s", repoName)
+		logrus.Infof("[system-charts] enqueuing %q to reconcile after managed plan deletion", repoName)
 		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
 	}
 	if plan.DeletionTimestamp == nil && index == -1 {
@@ -527,14 +607,19 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 	return plan, nil
 }
 
-// OnCluster enqueues the rancher-charts ClusterRepo to the controller's processing queue when the local cluster is updated.
+// onCluster enqueues the rancher-charts ClusterRepo to the controller's processing queue when the local cluster is updated.
 // It ensures the timely installation or uninstallation of the system-upgrade-controller app in the local cluster
 // when the "rancher.io/imported-cluster-version-management" annotation is changed.
 func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
-	if !features.MCM.Enabled() {
+	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
 		return obj, nil
 	}
-	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
+	// Always re-sync when webhook deployment customization has drifted from applied state.
+	if clusterutil.WebhookDeploymentCustomizationChanged(obj) {
+		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
+		return obj, nil
+	}
+	if !features.MCM.Enabled() {
 		return obj, nil
 	}
 	h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
@@ -547,7 +632,24 @@ func (h *handler) setPriorityClass(values map[string]interface{}, chartName stri
 	if err == nil {
 		values[chart.PriorityClassKey] = priorityClassName
 	} else if !chart.IsNotFoundError(err) {
-		logrus.Warnf("[systemcharts] Failed to get rancher %s for %s: %s", chart.PriorityClassKey, chartName, err.Error())
+		logrus.Warnf("[system-charts] failed to get %s for chart %q: %v", chart.PriorityClassKey, chartName, err)
+	}
+}
+
+func (h *handler) setImagePullSecrets(values map[string]interface{}, useObjectReferences bool) {
+	var pullSecretsAsStrings []string
+	var pullSecretsAsObjectReferences []kcorev1.LocalObjectReference
+
+	registry, _ := clusterutil.GetPrivateRegistry(nil)
+	if registry != nil {
+		pullSecretsAsObjectReferences = registry.PullSecretsAsObjectReferences()
+		pullSecretsAsStrings = registry.PullSecretNamesAsSlice()
+	}
+
+	if useObjectReferences {
+		values["imagePullSecrets"] = pullSecretsAsObjectReferences
+	} else {
+		values["imagePullSecrets"] = pullSecretsAsStrings
 	}
 }
 
@@ -555,9 +657,54 @@ func (h *handler) setPriorityClass(values map[string]interface{}, chartName stri
 func (h *handler) getChartValues(chartName string) map[string]interface{} {
 	configMapValues, err := h.chartsConfig.GetChartValues(chartName)
 	if err != nil && !chart.IsNotFoundError(err) {
-		logrus.Warnf("[systemcharts] Failed to get chart values for %s: %s", chartName, err.Error())
+		logrus.Warnf("[system-charts] failed to get chart values for chart %q: %v", chartName, err)
 	}
 	return configMapValues
+}
+
+// getLocalWebhookCustomization returns the WebhookDeploymentCustomization from the local
+// management cluster, or nil if the cluster has no customization set.
+// On downstream clusters (MCMAgent enabled), webhook customization is delivered via a
+// rancher-config ConfigMap pushed by the management server's clusterdeploy controller.
+// The systemcharts controller reads those values through the existing getChartValues()
+// path, so this function returns nil in that context.
+func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomization, error) {
+	if features.MCMAgent.Enabled() {
+		// Downstream: values come from rancher-config ConfigMap, not from
+		// the cluster spec. Return nil so they are merged in getChartValues().
+		return nil, nil
+	}
+	cluster, err := h.clusterCache.Get("local")
+	if err != nil {
+		return nil, err
+	}
+	return cluster.Spec.WebhookDeploymentCustomization, nil
+}
+
+// updateAppliedWebhookCustomization reads the local cluster from cache, copies the webhook
+// customization from Spec to Status, and persists the status via UpdateStatus.
+// On downstream clusters (MCMAgent enabled), this is a no-op because the management server
+// tracks applied state via the clusterdeploy controller's manageWebhookConfig().
+func (h *handler) updateAppliedWebhookCustomization() error {
+	if features.MCMAgent.Enabled() {
+		return nil
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Read from the informer cache which is available immediately at startup,
+		// rather than h.clusters.Get() which can return "not found" for several
+		// minutes while the wrangler controller client initializes.
+		cached, err := h.clusterCache.Get("local")
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		cluster := cached.DeepCopy()
+		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
+		_, err = h.clusters.UpdateStatus(cluster)
+		return err
+	})
 }
 
 func relatedFeatures(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
@@ -594,7 +741,7 @@ func isInHarvesterLocal() bool {
 	// the multi-cluster-management and multi-cluster-management-agent features are disabled,
 	// and the Harvester feature is enabled.
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
-		logrus.Debugf("Rancher is embedded and running in the Harvester local cluster.")
+		logrus.Debugf("[system-charts] Rancher is embedded in the Harvester local cluster")
 		return true
 	}
 	return false

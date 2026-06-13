@@ -604,14 +604,16 @@ func TestUpdateStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		localConditions []metav1.Condition
-		grFromCluster   *v3.GlobalRole
-		grCacheErr      error
-		updateErr       error
-		wantError       bool
-		wantSummary     string
-		wantSkipUpdate  bool
+		name                   string
+		localConditions        []metav1.Condition
+		grFromCluster          *v3.GlobalRole
+		grCacheErr             error
+		updateErr              error
+		wantError              bool
+		wantSummary            string
+		wantSkipUpdate         bool
+		inputGlobalRole        *v3.GlobalRole
+		wantObservedGeneration int64
 	}{
 		{
 			name: "conditions unchanged - no update",
@@ -626,6 +628,23 @@ func TestUpdateStatus(t *testing.T) {
 				},
 			},
 			wantSkipUpdate: true,
+		},
+		{
+			name: "conditions unchanged but generation mismatch - triggers update",
+			localConditions: []metav1.Condition{
+				{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
+			},
+			grFromCluster: &v3.GlobalRole{
+				Status: v3.GlobalRoleStatus{
+					ObservedGeneration: 2,
+					Conditions: []metav1.Condition{
+						{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
+					},
+				},
+			},
+			inputGlobalRole:        &v3.GlobalRole{ObjectMeta: metav1.ObjectMeta{Generation: 3}},
+			wantSummary:            status.SummaryCompleted,
+			wantObservedGeneration: 3,
 		},
 		{
 			name: "all conditions true - completed summary",
@@ -658,11 +677,9 @@ func TestUpdateStatus(t *testing.T) {
 			wantError:     true,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			ctrl := gomock.NewController(t)
 			grCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
 			grCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(test.grFromCluster, test.grCacheErr)
 
@@ -682,7 +699,11 @@ func TestUpdateStatus(t *testing.T) {
 				grCache:  grCacheMock,
 				status:   status.NewStatus(),
 			}
-			err := grLifecycle.updateStatus(&v3.GlobalRole{}, test.localConditions)
+			inputGR := test.inputGlobalRole
+			if inputGR == nil {
+				inputGR = &v3.GlobalRole{}
+			}
+			err := grLifecycle.updateStatus(inputGR, test.localConditions)
 			if test.wantError {
 				require.Error(t, err)
 			} else {
@@ -691,6 +712,7 @@ func TestUpdateStatus(t *testing.T) {
 			if test.wantSummary != "" {
 				require.NotNil(t, updatedGR)
 				require.Equal(t, test.wantSummary, updatedGR.Status.Summary)
+				require.Equal(t, test.wantObservedGeneration, updatedGR.Status.ObservedGeneration)
 			}
 		})
 	}

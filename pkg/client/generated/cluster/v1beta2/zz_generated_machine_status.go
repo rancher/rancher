@@ -7,6 +7,7 @@ const (
 	MachineStatusFieldConditions             = "conditions"
 	MachineStatusFieldDeletion               = "deletion"
 	MachineStatusFieldDeprecated             = "deprecated"
+	MachineStatusFieldFailureDomain          = "failureDomain"
 	MachineStatusFieldInitialization         = "initialization"
 	MachineStatusFieldLastUpdated            = "lastUpdated"
 	MachineStatusFieldNodeInfo               = "nodeInfo"
@@ -21,6 +22,7 @@ type MachineStatus struct {
 	Conditions             []Condition                  `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Deletion               *MachineDeletionStatus       `json:"deletion,omitempty" yaml:"deletion,omitempty"`
 	Deprecated             *MachineDeprecatedStatus     `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	FailureDomain          string                       `json:"failureDomain,omitempty" yaml:"failureDomain,omitempty"`
 	Initialization         *MachineInitializationStatus `json:"initialization,omitempty" yaml:"initialization,omitempty"`
 	LastUpdated            string                       `json:"lastUpdated,omitempty" yaml:"lastUpdated,omitempty"`
 	NodeInfo               *NodeSystemInfo              `json:"nodeInfo,omitempty" yaml:"nodeInfo,omitempty"`

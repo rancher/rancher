@@ -44,7 +44,7 @@ var (
 )
 
 type clusterLifecycle struct {
-	clusterClient      v3.ClusterController
+	clusterClient      v3.ClusterClient
 	crtbLister         v3.ClusterRoleTemplateBindingCache
 	crtbClient         v3.ClusterRoleTemplateBindingController
 	nsLister           corev1.NamespaceCache

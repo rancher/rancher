@@ -5,14 +5,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"maps"
+	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/version"
+	"github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type SCCOperatorParams struct {
@@ -22,7 +25,8 @@ type SCCOperatorParams struct {
 
 	RefreshHash string
 
-	SCCOperatorImage string
+	SCCOperatorImage       string
+	SCCOperatorPullSecrets []corev1.LocalObjectReference
 }
 
 func ExtractSccOperatorParams() (*SCCOperatorParams, error) {
@@ -39,6 +43,11 @@ func ExtractSccOperatorParams() (*SCCOperatorParams, error) {
 		rancherGitCommit:    version.GitCommit,
 		SCCOperatorImage:    settings.FullSCCOperatorImage(),
 	}
+
+	if globalRegistry, _ := cluster.GetPrivateRegistry(nil); globalRegistry != nil {
+		params.SCCOperatorPullSecrets = globalRegistry.PullSecretsAsObjectReferences()
+	}
+
 	if err := params.setConfigHash(); err != nil {
 		return nil, err
 	}
@@ -61,6 +70,10 @@ func (p *SCCOperatorParams) setConfigHash() error {
 		hashInputData = append(hashInputData, []byte(p.SCCOperatorImage)...)
 	} else {
 		hashInputData = append(hashInputData, podSpecBytes...)
+	}
+
+	for _, pullSecret := range p.SCCOperatorPullSecrets {
+		hashInputData = append(hashInputData, []byte(pullSecret.Name+",")...)
 	}
 
 	// Generate the hash...
@@ -131,7 +144,7 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 
 	// TODO: We should support the "extra tolerations" feature users are asking for
 	// ref: https://github.com/rancher/rancher/issues/48541
-	return &appsv1.Deployment{
+	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: consts.DefaultSCCNamespace,
 			Name:      consts.DeploymentName,
@@ -150,12 +163,31 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 			},
 		},
 	}
+
+	if len(p.SCCOperatorPullSecrets) > 0 {
+		dep.Spec.Template.Spec.ImagePullSecrets = p.SCCOperatorPullSecrets
+	}
+
+	return dep
 }
 
 func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
-	// TODO: should pass in some relevant ENVs to the container
 	t := true
 	u1000 := int64(1000)
+
+	// Collect whitelisted environment variables from the whitelist-envvars setting.
+	// By default, this includes HTTP_PROXY, HTTPS_PROXY, and NO_PROXY.
+	// Note: Invalid Kubernetes env var names are skipped to prevent deployment rejection.
+	var envVars []corev1.EnvVar
+	settings.IterateWhitelistedEnvVars(func(name, value string) {
+		if isValidEnvVarName(name) {
+			envVars = append(envVars, corev1.EnvVar{
+				Name:  name,
+				Value: value,
+			})
+		}
+	})
+
 	return corev1.PodSpec{
 		ServiceAccountName: consts.ServiceAccountName,
 		Containers: []corev1.Container{
@@ -163,6 +195,7 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 				Name:            "scc-operator",
 				Image:           p.SCCOperatorImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env:             envVars,
 				SecurityContext: &corev1.SecurityContext{
 					RunAsNonRoot:   &t,
 					RunAsGroup:     &u1000,
@@ -172,4 +205,14 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 			},
 		},
 	}
+}
+
+// isValidEnvVarName checks if a name is a valid Kubernetes environment variable name.
+func isValidEnvVarName(name string) bool {
+	if errs := validation.IsEnvVarName(name); len(errs) > 0 {
+		logrus.Warnf("Skipping invalid environment variable name '%s' in whitelist-envvars setting: %s",
+			name, strings.Join(errs, "; "))
+		return false
+	}
+	return true
 }

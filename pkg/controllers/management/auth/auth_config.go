@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -48,10 +49,11 @@ type authConfigController struct {
 }
 
 func newAuthConfigController(mgmt *config.ManagementContext, scaledContext *config.ScaledContext) *authConfigController {
+	extTokenStore := exttokenstore.NewSystemFromWrangler(mgmt.Wrangler)
 	controller := &authConfigController{
 		users:                   mgmt.Management.Users("").Controller().Lister(),
 		authRefresher:           providerrefresh.NewUserAuthRefresher(scaledContext),
-		cleanup:                 cleanup.NewCleanupService(mgmt.Wrangler.Core.Secret(), mgmt.Wrangler.Mgmt),
+		cleanup:                 cleanup.NewCleanupService(mgmt.Wrangler.Core.Secret(), mgmt.Wrangler.Mgmt, extTokenStore),
 		authConfigsUnstructured: scaledContext.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 	}
 	return controller

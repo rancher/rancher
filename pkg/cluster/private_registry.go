@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	kcorev1 "k8s.io/api/core/v1"
 )
 
@@ -21,6 +23,9 @@ const (
 	// CopiedPullSecretLabel is used to track copies of the source pull secrets,
 	// so that their life cycle can be managed by other controllers (e.g. imported cluster cleanup).
 	CopiedPullSecretLabel = "management.cattle.io/rancher-managed-pull-secret"
+	// AgentPullSecretLabel is used to track pull secrets that are copied to the cattle-system namespace for use by the cattle-cluster-agent.
+	// This includes both global system default registry pull secrets and cluster level registry pull secrets for imported or hosted clusters.
+	AgentPullSecretLabel = "management.cattle.io/cattle-cluster-agent-pull-secret"
 )
 
 var MgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
@@ -186,6 +191,13 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 	return "", nil, nil
 }
 
+// GeneratePullSecretName accepts an image pull secret name and returns a new name that
+// is generated and managed by Rancher. This is done to help avoid trampling user defined
+// secrets in downstream environments.
+func GeneratePullSecretName(secretName string) string {
+	return name.SafeConcatName(secretName, "rancher-managed-pull-secret")
+}
+
 func generateProvisionedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, []AgentPullSecret, error) {
 	v2ProvRegistryURL := cluster.GetSecret(v3.ClusterPrivateRegistryURL)
 
@@ -200,9 +212,13 @@ func generateProvisionedClusterDockerConfig(cluster *v3.Cluster, secretLister v1
 		return v2ProvRegistryURL, nil, err
 	}
 
-	configJson, err := ConvertToDockerConfigJson(v2ProvRegistryURL, registrySecret)
+	configJson, err := generateConfigJson(v2ProvRegistryURL, registrySecret)
 	if err != nil {
-		return "", nil, fmt.Errorf("clusterDeploy: failed to convert pull secret to json for cluster %s: %w", cluster.Name, err)
+		return v2ProvRegistryURL, nil, err
+	}
+
+	if configJson == nil {
+		return v2ProvRegistryURL, nil, nil
 	}
 
 	// note:
@@ -218,7 +234,7 @@ func generateProvisionedClusterDockerConfig(cluster *v3.Cluster, secretLister v1
 func generateImportedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister, registry *PrivateRegistry) (string, []AgentPullSecret, error) {
 	clusterSystemDefaultURL := registry.URL
 	// Only generate credentials for imported or hosted clusters.
-	if !MgmtNameRegexp.MatchString(cluster.Name) {
+	if cluster == nil || !MgmtNameRegexp.MatchString(cluster.Name) {
 		return clusterSystemDefaultURL, nil, nil
 	}
 
@@ -229,21 +245,50 @@ func generateImportedClusterDockerConfig(cluster *v3.Cluster, secretLister v1.Se
 
 	// build out all the cluster level pull secrets
 	for _, pullSecret := range registry.PullSecrets {
-		sec, err := secretLister.Get(pullSecret.Namespace, pullSecret.Name)
+		registrySecret, err := secretLister.Get(pullSecret.Namespace, pullSecret.Name)
 		if err != nil {
 			return "", nil, fmt.Errorf("failed to get pull secret %s in namespace %s for cluster %s: %w", pullSecret.Name, pullSecret.Namespace, cluster.Name, err)
 		}
 
-		configJson, err := ConvertToDockerConfigJson(clusterSystemDefaultURL, sec)
+		configJson, err := generateConfigJson(clusterSystemDefaultURL, registrySecret)
 		if err != nil {
 			return "", nil, fmt.Errorf("clusterDeploy: failed to convert pull secret to json: %w", err)
 		}
 
+		if configJson == nil {
+			continue
+		}
+
 		pullSecrets = append(pullSecrets, AgentPullSecret{
-			Name:             sec.Name,
+			Name:             GeneratePullSecretName(registrySecret.Name),
 			DockerConfigJSON: base64.StdEncoding.EncodeToString(configJson),
 		})
 	}
 
 	return clusterSystemDefaultURL, pullSecrets, nil
+}
+
+func generateConfigJson(clusterSystemDefaultURL string, secret *kcorev1.Secret) ([]byte, error) {
+	var configJson []byte
+	var err error
+	if secret.Type == kcorev1.SecretTypeDockerConfigJson {
+		if secret.Data == nil {
+			return nil, nil
+		}
+		// A .dockerconfigjson may contain credentials for a number of registry hostnames,
+		// we need to ensure that we are only delivering credentials for the configured hostname.
+		configJson, err = FilterDockerConfigJson(clusterSystemDefaultURL, secret.Data)
+		if err != nil {
+			if errors.Is(err, ErrRegistryHostnameNotFound) {
+				return nil, nil
+			}
+			return nil, err
+		}
+	} else {
+		configJson, err = ConvertToDockerConfigJson(clusterSystemDefaultURL, secret)
+		if err != nil {
+			return nil, fmt.Errorf("clusterDeploy: failed to convert pull secret to json for cluster: %w", err)
+		}
+	}
+	return configJson, nil
 }

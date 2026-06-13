@@ -60,6 +60,7 @@ var (
 )
 
 type handler struct {
+	mgmtClusterCache          v3.ClusterCache
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
 	bundles                   fleetcontrollers.BundleController
 	cluster                   provisioningcontrollers.ClusterController
@@ -70,6 +71,7 @@ type handler struct {
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
+		mgmtClusterCache:          clients.Mgmt.Cluster().Cache(),
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),
 		cluster:                   clients.Provisioning.Cluster(),
@@ -80,7 +82,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.Provisioning.Cluster().OnChange(ctx, "uninstall-fleet-managed-suc-and-system-agent", h.UninstallFleetBasedApps)
 	clients.Provisioning.Cluster().OnChange(ctx, "install-system-agent-upgrader", h.InstallSystemAgentUpgrader)
-
 }
 
 // InstallSystemAgentUpgrader ensures that the resources required to upgrade the system-agent in the target cluster
@@ -96,16 +97,29 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	}
 	if settings.SystemAgentUpgradeImage.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set, skip installing system-agent-upgrader", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set", cluster.Namespace, cluster.Name)
+		return cluster, nil
 	}
 	if settings.SystemUpgradeControllerChartVersion.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set, skip installing system-agent-upgrader", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
-	}
-	// Skip if Rancher does not have a connection to the cluster
-	if !clusterconnected.Connected.IsTrue(cluster) {
 		return cluster, nil
 	}
+
+	// Skip if Rancher does not have a connection to the cluster.
+	// The Connected condition lives on the management cluster object, not the provisioning cluster.
+	if cluster.Status.ClusterName == "" {
+		return cluster, nil
+	}
+	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return cluster, nil
+		}
+		return cluster, err
+	}
+	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
+		return cluster, nil
+	}
+
 	// Skip if the cluster's kubeconfig is not populated
 	if cluster.Status.ClientSecretName == "" {
 		return cluster, nil
@@ -482,8 +496,19 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		return cluster, nil
 	}
 
-	// Skip if Rancher does not have a connection to the cluster
-	if !clusterconnected.Connected.IsTrue(cluster) {
+	// Skip if Rancher does not have a connection to the cluster.
+	// The Connected condition lives on the management cluster object, not the provisioning cluster.
+	if cluster.Status.ClusterName == "" {
+		return cluster, nil
+	}
+	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return cluster, nil
+		}
+		return cluster, err
+	}
+	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
 		return cluster, nil
 	}
 
@@ -494,11 +519,11 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 
 	if settings.SystemAgentUpgradeImage.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set, skip uninstalling Fleet-based apps", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemAgentUpgradeImage setting is not set", cluster.Namespace, cluster.Name)
+		return cluster, nil
 	}
 	if settings.SystemUpgradeControllerChartVersion.Get() == "" {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set, skip uninstalling Fleet-based apps", cluster.Namespace, cluster.Name)
-		return cluster, fmt.Errorf("[managesystemagent] cluster %s/%s: the SystemUpgradeControllerChartVersion setting is not set", cluster.Namespace, cluster.Name)
+		return cluster, nil
 	}
 
 	dropAnnotation := false

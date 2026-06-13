@@ -40,6 +40,7 @@ type ChartInstallAction struct {
 	Wait                     bool                `json:"wait,omitempty"`
 	DisableHooks             bool                `json:"noHooks,omitempty"`
 	DisableOpenAPIValidation bool                `json:"disableOpenAPIValidation,omitempty"`
+	SkipSchemaValidation     bool                `json:"skipSchemaValidation,omitempty"`
 	Namespace                string              `json:"namespace,omitempty"`
 	ProjectID                string              `json:"projectId,omitempty"`
 	OperationTolerations     []corev1.Toleration `json:"operationTolerations,omitempty"`
@@ -72,6 +73,7 @@ type ChartUpgradeAction struct {
 	Wait                     bool                `json:"wait,omitempty"`
 	DisableHooks             bool                `json:"noHooks,omitempty"`
 	DisableOpenAPIValidation bool                `json:"disableOpenAPIValidation,omitempty"`
+	SkipSchemaValidation     bool                `json:"skipSchemaValidation,omitempty"`
 	Force                    bool                `json:"force,omitempty"`
 	TakeOwnership            bool                `json:"takeOwnership,omitempty"`
 	MaxHistory               int                 `json:"historyMax,omitempty"`

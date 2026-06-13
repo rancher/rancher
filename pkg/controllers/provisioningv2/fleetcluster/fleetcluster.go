@@ -19,13 +19,12 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/sirupsen/logrus"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	"github.com/rancher/wrangler/v3/pkg/apply"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +56,6 @@ type handler struct {
 	secretsController corecontrollers.SecretController
 	nodesController   corecontrollers.NodeController
 	fleetClusters     fleetcontrollers.ClusterController
-	apply             apply.Apply
 	getPrivateRepoURL func(*provv1.Cluster, *apimgmtv3.Cluster) string
 }
 
@@ -75,7 +73,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secretsController: clients.Core.Secret(),
 		nodesController:   clients.Core.Node(),
 		fleetClusters:     clients.Fleet.Cluster(),
-		apply:             clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 	}
 
 	h.getPrivateRepoURL = func(cluster *provv1.Cluster, mgmtCluster *apimgmtv3.Cluster) string {
@@ -85,15 +82,15 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			// cluster for the cluster level registry.
 			return mgmtcluster.GetPrivateRegistryURL(mgmtCluster)
 		}
-		return image.GetPrivateRepoURLFromCluster(cluster)
+		url, _ := image.GetPrivateRepoURLFromCluster(cluster)
+		return url
 	}
 
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithCacheTypes(clients.Fleet.Cluster(),
-				clients.Fleet.ClusterGroup(),
-				clients.Provisioning.Cluster()),
+				clients.Fleet.ClusterGroup()),
 		"",
 		"fleet-cluster",
 		h.createCluster,

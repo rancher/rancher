@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -27,6 +28,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -157,7 +159,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-etcd"] = true
 	}
 
-	if pr := image.GetPrivateRepoURLFromControlPlane(controlPlane); pr != "" && !isOnlyWorker(entry) {
+	if pr, _ := image.GetPrivateRepoURLFromControlPlane(controlPlane); pr != "" && !isOnlyWorker(entry) {
 		config["system-default-registry"] = pr
 	}
 
@@ -183,6 +185,50 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["node-name"] = nodeName
 	}
 	return joinServer
+}
+
+// addRKE2Prime adds the "prime" server argument to the config map if the following conditions are met:
+// 1. The cluster is RKE2 (not K3S)
+// 2. The node is a server node (not worker-only)
+// 3. The user has not already explicitly set "prime" in config
+// 4. The KDM release data includes "prime" as a valid server arg for this version
+// 5. The per-cluster annotation or global setting enables prime
+func addRKE2Prime(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
+	// Only applies to RKE2 server nodes
+	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
+	if runtime != capr.RuntimeRKE2 || isOnlyWorker(entry) {
+		return
+	}
+
+	// If user has already explicitly set "prime", respect their choice
+	if _, exists := config["prime"]; exists {
+		return
+	}
+
+	// Determine if prime should be enabled: annotation takes precedence over global setting.
+	// An empty annotation value is treated the same as absent (fall through to global setting).
+	primeEnabled := false
+	if ann, ok := controlPlane.Annotations[capr.RKE2PrimeEnabledAnnotation]; ok && ann != "" {
+		primeEnabled = strings.EqualFold(ann, "true")
+	} else {
+		primeEnabled = strings.EqualFold(settings.Rke2ProvisioningPrimeDefault.Get(), "true")
+	}
+
+	if !primeEnabled {
+		return
+	}
+
+	// Verify this RKE2 version supports the prime arg via KDM release data
+	release := capr.GetKDMReleaseData(context.TODO(), controlPlane)
+	if release == nil {
+		return
+	}
+	if _, supported := release.ServerArgs["prime"]; !supported {
+		logrus.Debugf("RKE2 version %s does not support the prime server arg, skipping", controlPlane.Spec.KubernetesVersion)
+		return
+	}
+
+	config["prime"] = true
 }
 
 func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
@@ -814,6 +860,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		return nodePlan, config, "", fmt.Errorf("implausible joined server for entry")
 	}
 
+	addRKE2Prime(config, controlPlane, entry)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
 

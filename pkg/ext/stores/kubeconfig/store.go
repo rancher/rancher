@@ -66,13 +66,14 @@ const (
 
 // List of fields that hold Kubeconfig data.
 const (
-	ClustersField         = "clusters"
-	CurrentContextField   = "current-context"
-	DescriptionField      = "description"
-	TTLField              = "ttl"
-	StatusConditionsField = "status-conditions"
-	StatusSummaryField    = "status-summary"
-	StatusTokensField     = "status-tokens"
+	ClustersField            = "clusters"
+	CurrentContextField      = "current-context"
+	DescriptionField         = "description"
+	TTLField                 = "ttl"
+	IncludeDefaultEntryField = "include-default-entry"
+	StatusConditionsField    = "status-conditions"
+	StatusSummaryField       = "status-summary"
+	StatusTokensField        = "status-tokens"
 )
 
 // List of statuses.
@@ -136,7 +137,7 @@ type Store struct {
 
 // New creates a new instance of [Store].
 func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
-	extTokenStore := exttokens.NewSystemFromWrangler(wranglerContext)
+	extTokenStore := exttokens.NewSystemFromWrangler(wranglerContext, authorizer)
 	store := &Store{
 		mcmEnabled:      mcmEnabled,
 		configMapCache:  wranglerContext.Core.ConfigMap().Cache(),
@@ -271,6 +272,10 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest("spec.clusters must be unique")
 	}
 
+	if !includeDefaultEntry(&kubeconfig.Spec) && len(kubeconfig.Spec.Clusters) == 0 {
+		return nil, apierrors.NewBadRequest("at least one cluster is required when includeDefaultEntry is false")
+	}
+
 	defaultTTL, err := s.getDefaultTTL()
 	if err != nil {
 		return nil, fmt.Errorf("error getting default token TTL: %w", err)
@@ -385,6 +390,18 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid currentContext %s", kubeconfig.Spec.CurrentContext))
 	}
 
+	includeDefault := includeDefaultEntry(&kubeconfig.Spec)
+
+	needsSharedToken := includeDefault
+	if !needsSharedToken {
+		for _, c := range clusters {
+			if !c.Spec.LocalClusterAuthEndpoint.Enabled {
+				needsSharedToken = true
+				break
+			}
+		}
+	}
+
 	dryRun := options != nil && len(options.DryRun) > 0
 	generateToken := s.shouldGenerateToken()
 
@@ -438,13 +455,18 @@ func (s *Store) Create(
 			CreationTimestamp: configMap.CreationTimestamp.Format(time.RFC3339),
 			TTL:               strconv.FormatInt(kubeconfig.Spec.TTL, 10),
 		},
-		CurrentContext: defaultClusterName,
+		CurrentContext: func() string {
+			if includeDefault {
+				return defaultClusterName
+			}
+			return ""
+		}(),
 	}
 
 	err = func() error { // Deliberately use an anonymous function to capture the status and error conditions.
 		// Generate a shared token for the default and non-ACE clusters.
-		if !dryRun && generateToken {
-			extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, "")
+		if !dryRun && generateToken && needsSharedToken {
+			extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, "", kubeConfigID)
 			sharedToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 			if err != nil {
 				conditions = append(conditions, metav1.Condition{
@@ -475,23 +497,29 @@ func (s *Store) Create(
 			})
 		}
 
-		// The default entry that points to the Rancher URL.
-		// Even a base user without access to any cluster should be able to use a kubeconfig
-		// to interact with Rancher via Public API.
-		data.Clusters = append(data.Clusters, kconfig.Cluster{
-			Name:   defaultClusterName,
-			Server: "https://" + host,
-			Cert:   caCert,
-		})
-		data.Users = append(data.Users, kconfig.User{
-			Name:  defaultClusterName,
-			Token: sharedTokenKey,
-		})
-		data.Contexts = append(data.Contexts, kconfig.Context{
-			Name:    defaultClusterName,
-			Cluster: defaultClusterName,
-			User:    defaultClusterName,
-		})
+		if includeDefault {
+			data.Clusters = append(data.Clusters, kconfig.Cluster{
+				Name:   defaultClusterName,
+				Server: "https://" + host,
+				Cert:   caCert,
+			})
+			data.Users = append(data.Users, kconfig.User{
+				Name:  defaultClusterName,
+				Token: sharedTokenKey,
+				Host:  host,
+			})
+			data.Contexts = append(data.Contexts, kconfig.Context{
+				Name:    defaultClusterName,
+				Cluster: defaultClusterName,
+				User:    defaultClusterName,
+			})
+		} else if needsSharedToken {
+			data.Users = append(data.Users, kconfig.User{
+				Name:  defaultClusterName,
+				Token: sharedTokenKey,
+				Host:  host,
+			})
+		}
 
 		for _, cluster := range clusters {
 			var tokenKey string
@@ -529,7 +557,7 @@ func (s *Store) Create(
 
 			// Generate a cluster-scoped token for the ACE cluster.
 			if !dryRun && generateToken {
-				extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, cluster.Name)
+				extToken := s.buildExtToken(userInfo.GetName(), authToken, ttlMilliseconds, cluster.Name, kubeConfigID)
 				clusterToken, err := s.tokenMgr.CreateToken(ctx, extToken, userInfo)
 				if err != nil {
 					conditions = append(conditions, metav1.Condition{
@@ -566,8 +594,10 @@ func (s *Store) Create(
 				User:    clusterName,
 			})
 			data.Users = append(data.Users, kconfig.User{
-				Name:  clusterName,
-				Token: tokenKey,
+				Name:      clusterName,
+				Token:     tokenKey,
+				Host:      host,
+				ClusterID: cluster.Name,
 			})
 
 			if s.mcmEnabled { // Nodes are only available if MCM is enabled.
@@ -723,6 +753,10 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 	configMap.Data[DescriptionField] = kubeconfig.Spec.Description
 	configMap.Data[TTLField] = strconv.FormatInt(kubeconfig.Spec.TTL, 10)
 
+	if kubeconfig.Spec.IncludeDefaultEntry != nil {
+		configMap.Data[IncludeDefaultEntryField] = strconv.FormatBool(*kubeconfig.Spec.IncludeDefaultEntry)
+	}
+
 	// Note: Value should never be persisted!
 	configMap.Data[StatusSummaryField] = kubeconfig.Status.Summary
 	if len(kubeconfig.Status.Conditions) > 0 {
@@ -784,6 +818,14 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 		}
 	}
 
+	if v, ok := configMap.Data[IncludeDefaultEntryField]; ok {
+		boolVal, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing includeDefaultEntry for %s: %w", configMap.Name, err)
+		}
+		kubeconfig.Spec.IncludeDefaultEntry = &boolVal
+	}
+
 	kubeconfig.Status.Summary = configMap.Data[StatusSummaryField]
 
 	if serialized := configMap.Data[StatusConditionsField]; serialized != "" {
@@ -809,6 +851,10 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 	return kubeconfig, nil
 }
 
+func includeDefaultEntry(spec *ext.KubeconfigSpec) bool {
+	return spec.IncludeDefaultEntry == nil || *spec.IncludeDefaultEntry
+}
+
 // first returns the first element of a slice of strings, or an empty string if the slice is empty.
 func first(values []string) string {
 	if len(values) > 0 {
@@ -818,8 +864,13 @@ func first(values []string) string {
 }
 
 // buildExtToken builds an [ext.Token] for a kubeconfig token.
-func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor, ttl int64, clusterID string) *ext.Token {
+func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor, ttl int64, clusterID, kubeConfigID string) *ext.Token {
 	return &ext.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				tokens.TokenKubeconfigIDLabel: kubeConfigID,
+			},
+		},
 		Spec: ext.TokenSpec{
 			UserID:        userName,
 			UserPrincipal: toExtTokenPrincipal(authToken.GetUserPrincipal()),
@@ -1410,6 +1461,9 @@ func (s *Store) Update(
 	if oldKubeconfig.Spec.TTL != newKubeconfig.Spec.TTL {
 		return nil, false, apierrors.NewBadRequest("spec.ttl is immutable")
 	}
+	if !reflect.DeepEqual(oldKubeconfig.Spec.IncludeDefaultEntry, newKubeconfig.Spec.IncludeDefaultEntry) {
+		return nil, false, apierrors.NewBadRequest("spec.includeDefaultEntry is immutable")
+	}
 
 	newKubeconfig.UID = oldKubeconfig.UID // Make sure UID is preserved.
 
@@ -1494,27 +1548,32 @@ var (
 
 	pathCMLabelKind = fieldpath.MakePathOrDie("metadata", "labels", KindLabel)
 
-	pathKConfigClustersField       = fieldpath.MakePathOrDie("spec", "clusters")
-	pathKConfigCurrentContextField = fieldpath.MakePathOrDie("spec", "currentContext")
-	pathKConfigDescriptionField    = fieldpath.MakePathOrDie("spec", "description")
-	pathKConfigTTLField            = fieldpath.MakePathOrDie("spec", "ttl")
+	pathKConfigClustersField            = fieldpath.MakePathOrDie("spec", "clusters")
+	pathKConfigCurrentContextField      = fieldpath.MakePathOrDie("spec", "currentContext")
+	pathKConfigDescriptionField         = fieldpath.MakePathOrDie("spec", "description")
+	pathKConfigTTLField                 = fieldpath.MakePathOrDie("spec", "ttl")
+	pathKConfigIncludeDefaultEntryField = fieldpath.MakePathOrDie("spec", "includeDefaultEntry")
+
+	pathCMIncludeDefaultEntryField = fieldpath.MakePathOrDie("data", "include-default-entry")
 
 	mapFromConfigMap = extcommon.MapSpec{
-		pathCMData.String():                  nil,
-		pathCMClustersField.String():         pathKConfigClustersField,
-		pathCMCurrentContextField.String():   pathKConfigCurrentContextField,
-		pathCMDescriptionField.String():      pathKConfigDescriptionField,
-		pathCMTTLField.String():              pathKConfigTTLField,
-		pathCMStatusConditionsField.String(): nil,
-		pathCMStatusSummaryField.String():    nil,
-		pathCMStatusTokensField.String():     nil,
-		pathCMLabelKind.String():             nil,
+		pathCMData.String():                     nil,
+		pathCMClustersField.String():            pathKConfigClustersField,
+		pathCMCurrentContextField.String():      pathKConfigCurrentContextField,
+		pathCMDescriptionField.String():         pathKConfigDescriptionField,
+		pathCMTTLField.String():                 pathKConfigTTLField,
+		pathCMIncludeDefaultEntryField.String(): pathKConfigIncludeDefaultEntryField,
+		pathCMStatusConditionsField.String():    nil,
+		pathCMStatusSummaryField.String():       nil,
+		pathCMStatusTokensField.String():        nil,
+		pathCMLabelKind.String():                nil,
 	}
 
 	mapFromKubeconfig = extcommon.MapSpec{
-		pathKConfigClustersField.String():       pathCMClustersField,
-		pathKConfigCurrentContextField.String(): pathCMCurrentContextField,
-		pathKConfigDescriptionField.String():    pathCMDescriptionField,
-		pathKConfigTTLField.String():            pathCMTTLField,
+		pathKConfigClustersField.String():            pathCMClustersField,
+		pathKConfigCurrentContextField.String():      pathCMCurrentContextField,
+		pathKConfigDescriptionField.String():         pathCMDescriptionField,
+		pathKConfigTTLField.String():                 pathCMTTLField,
+		pathKConfigIncludeDefaultEntryField.String(): pathCMIncludeDefaultEntryField,
 	}
 )

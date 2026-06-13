@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/lasso/pkg/dynamic"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	planv1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -20,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr/planner"
 	"github.com/rancher/rancher/pkg/controllers/capr/machineprovision"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
@@ -644,7 +644,8 @@ func rkeControlPlane(cluster *provv1.Cluster) (*rkev1.RKEControlPlane, error) {
 				capr.InitNodeMachineIDLabel: cluster.Labels[capr.InitNodeMachineIDLabel],
 			},
 			Annotations: map[string]string{
-				capr.ClusterSpecAnnotation: b64GZCluster,
+				capr.ClusterSpecAnnotation:      b64GZCluster,
+				capr.RKE2PrimeEnabledAnnotation: cluster.Annotations[capr.RKE2PrimeEnabledAnnotation],
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{

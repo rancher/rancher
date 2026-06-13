@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"k8s.io/apimachinery/pkg/api/equality"
 
@@ -25,8 +26,8 @@ import (
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	name2 "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +52,7 @@ type repoHandler struct {
 	clusterRepos   catalogcontrollers.ClusterRepoController
 	configMaps     corev1controllers.ConfigMapClient
 	configMapCache corev1controllers.ConfigMapCache
+	settings       mgmtcontrollers.SettingController
 	apply          apply.Apply
 }
 
@@ -442,6 +444,11 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		newStatus.NumberOfRetries = 0
 		newStatus.NextRetryAt = metav1.Time{}
 		return false
+	}
+
+	// negative refresh interval disables periodic updates
+	if clusterRepo.Spec.RefreshInterval < 0 {
+		return true
 	}
 
 	// The handler is triggered immediately after any changes, including when updating the number of retries done.

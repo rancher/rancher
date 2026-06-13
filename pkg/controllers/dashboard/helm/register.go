@@ -13,6 +13,8 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 		wrangler.Catalog.ClusterRepo(),
 		wrangler.Core.ConfigMap(),
 		wrangler.Core.ConfigMap().Cache())
+	RegisterRepoSettings(ctx, wrangler.Mgmt.Setting(),
+		wrangler.Catalog.ClusterRepo())
 	RegisterOCIRepo(ctx,
 		wrangler.Apply,
 		wrangler.Catalog.ClusterRepo(),

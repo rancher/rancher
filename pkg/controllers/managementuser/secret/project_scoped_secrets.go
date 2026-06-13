@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/cluster"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -37,12 +39,13 @@ const (
 	settingEnqueuerName    = "project-scoped-secret-setting-enqueuer"
 	projectsEnqueuerName   = "project-scoped-secret-project-enqueuer"
 
-	projectIDLabel                = "field.cattle.io/projectId"
-	ProjectScopedSecretLabel      = "management.cattle.io/project-scoped-secret"
-	pssCopyAnnotation             = "management.cattle.io/project-scoped-secret-copy"
-	pssIgnoreNamespacesAnnotation = "management.cattle.io/project-scoped-secret-ignore-namespaces"
+	projectIDLabel                  = "field.cattle.io/projectId"
+	ProjectScopedSecretLabel        = "management.cattle.io/project-scoped-secret"
+	ProjectScopedSecretClusterLabel = "management.cattle.io/project-scoped-secret-cluster"
+	pssCopyAnnotation               = "management.cattle.io/project-scoped-secret-copy"
+	PSSIgnoreNamespacesAnnotation   = "management.cattle.io/project-scoped-secret-ignore-namespaces"
 
-	needsGlobalPrivateRegistryPullSecret = "management.cattle.io/use-global-private-registry-pull-secret"
+	NeedsGlobalPrivateRegistryPullSecret = "management.cattle.io/use-global-private-registry-pull-secret"
 )
 
 // previous controller label, annotations and finalizer
@@ -94,7 +97,11 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 	}
 
 	// migrate existing project scoped secrets
-	if err := n.migrateExistingProjectScopedSecrets(project); err != nil {
+	if err := n.migrateExistingNormanProjectScopedSecrets(project); err != nil {
+		return nil, err
+	}
+
+	if err := n.ensureProjectScopeSecretClusterLabel(project); err != nil {
 		return nil, err
 	}
 
@@ -136,7 +143,7 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 	return namespace, n.removeUndesiredProjectScopedSecrets(namespace, desiredSecrets)
 }
 
-// migrateExistingProjectScopedSecrets migrates existing project scoped secrets.
+// migrateExistingNormanProjectScopedSecrets migrates existing project scoped secrets.
 // It removes the following:
 //   - Finalizer "clusterscoped.controller.cattle.io/secretsController_<clusterID>"
 //   - Annotation "lifecycle.cattle.io/create.secretsController_<clusterID>"
@@ -144,7 +151,8 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 //
 // And adds:
 //   - Label "management.cattle.io/project-scoped-secret"
-func (n *namespaceHandler) migrateExistingProjectScopedSecrets(project *v3.Project) error {
+//   - Label "management.cattle.io/project-scoped-secret-cluster"
+func (n *namespaceHandler) migrateExistingNormanProjectScopedSecrets(project *v3.Project) error {
 	backingNamespace := project.GetProjectBackingNamespace()
 	clusterName := project.Spec.ClusterName
 
@@ -168,8 +176,38 @@ func (n *namespaceHandler) migrateExistingProjectScopedSecrets(project *v3.Proje
 			secretCopy.Finalizers = slices.Delete(secretCopy.Finalizers, i, i+1)
 		}
 		secretCopy.Labels[ProjectScopedSecretLabel] = project.Name
+		secretCopy.Labels[ProjectScopedSecretClusterLabel] = clusterName
 		_, err := n.managementSecretClient.Update(secretCopy)
 		errs = errors.Join(errs, err)
+	}
+
+	return errs
+}
+
+// ensureProjectScopeSecretClusterLabel ensures that any pre-existing Project-Scoped_Secrets will have the "management.cattle.io/project-scoped-secret-cluster" label.
+func (n *namespaceHandler) ensureProjectScopeSecretClusterLabel(project *v3.Project) error {
+	backingNamespace := project.GetProjectBackingNamespace()
+
+	r, err := labels.NewRequirement(ProjectScopedSecretLabel, selection.Exists, nil)
+	if err != nil {
+		return err
+	}
+
+	secrets, err := n.managementSecretCache.List(backingNamespace, labels.NewSelector().Add(*r))
+	if err != nil {
+		return err
+	}
+
+	var errs error
+	for _, s := range secrets {
+		secretCopy := s.DeepCopy()
+
+		if _, ok := secretCopy.Labels[ProjectScopedSecretClusterLabel]; !ok {
+			secretCopy.Labels[ProjectScopedSecretClusterLabel] = project.Spec.ClusterName
+
+			_, err := n.managementSecretClient.Update(secretCopy)
+			errs = errors.Join(errs, err)
+		}
 	}
 
 	return errs
@@ -358,7 +396,7 @@ func (n *namespaceHandler) getNamespacesFromGlobalPullSecret(secret *corev1.Secr
 // that have opted in to the global private registry pull secret.
 func (n *namespaceHandler) getNamespacesForGlobalPullSecretProjects() ([]*corev1.Namespace, error) {
 	projects, err := n.projectCache.List(n.clusterName, labels.SelectorFromSet(map[string]string{
-		needsGlobalPrivateRegistryPullSecret: "true",
+		NeedsGlobalPrivateRegistryPullSecret: "true",
 	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list projects which need global private registry pull secret: %w", err)
@@ -417,7 +455,7 @@ func (n *namespaceHandler) getNamespacesFromSecret(secret *corev1.Secret) ([]*co
 }
 
 // getGlobalPullSecrets retrieves the pull secrets specified in the SystemDefaultRegistryPullSecrets setting
-// and returns copies of those secrets which have been relabeled to indicate that they are not source secrets.
+// and returns copies of those secrets which have been relabeled and renamed to indicate that they are not source secrets.
 // The returned secrets can be safely synchronized into project namespaces without impacting future list operations for
 // source secrets. Secrets that are not of type kubernetes.io/dockerconfigjson are silently skipped
 // rather than causing an error, as we don't want a single misconfigured secret to block reconciliation of
@@ -449,6 +487,9 @@ func (n *namespaceHandler) getGlobalPullSecrets() ([]*corev1.Secret, error) {
 		}
 		delete(secretCopy.Labels, cluster.SourcePullSecretLabel)
 		secretCopy.Labels[cluster.CopiedPullSecretLabel] = "true"
+
+		// rename the downstream secret to help avoid trampling user defined secrets.
+		secretCopy.Name = cluster.GeneratePullSecretName(secretCopy.Name)
 		pullSecrets = append(pullSecrets, secretCopy)
 	}
 	return pullSecrets, nil
@@ -478,27 +519,36 @@ func areSecretsSame(s1, s2 *corev1.Secret) bool {
 		reflect.DeepEqual(s1.Labels, s2.Labels)
 }
 
-func isSystemProject(project *v3.Project) bool {
-	if project.Labels == nil {
+func isSystemProject(proj *v3.Project) bool {
+	if proj.Labels == nil {
 		return false
 	}
-	return project.Labels["authz.management.cattle.io/system-project"] == "true"
+	return proj.Labels[project.SystemProjectLabelKey] == "true"
 }
 
 func usesGlobalSecrets(project *v3.Project) bool {
 	if project.Labels == nil {
 		return false
 	}
-	return project.Labels[needsGlobalPrivateRegistryPullSecret] == "true"
+	return project.Labels[NeedsGlobalPrivateRegistryPullSecret] == "true"
 }
 
 func secretIgnoresNamespace(annos map[string]string, namespace string) bool {
-	v, ok := annos[pssIgnoreNamespacesAnnotation]
+	v, ok := annos[PSSIgnoreNamespacesAnnotation]
 	if !ok {
 		return false
 	}
 	for _, ignoredNs := range strings.Split(v, ",") {
+		// If an asterisk ("*") is present, treat the value as a regexp
 		ignoredNs = strings.TrimSpace(ignoredNs)
+		if strings.Contains(ignoredNs, "*") {
+			exp, err := regexp.Compile(ignoredNs)
+			if err != nil {
+				logrus.Warnf("Invalid regular expression '%s' in annotation %s: %v. Skipping regex evaluation and treating as literal string.", ignoredNs, PSSIgnoreNamespacesAnnotation, err)
+			} else if exp.MatchString(namespace) {
+				return true
+			}
+		}
 		if ignoredNs == namespace {
 			return true
 		}

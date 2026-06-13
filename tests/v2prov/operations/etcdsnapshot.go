@@ -49,6 +49,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	if configMap.Namespace != "" {
 		ns = configMap.Namespace
 	}
+
 	_, err = clientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), &configMap, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -105,31 +106,13 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		t.Fatal(err)
 	}
 
-	// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
-	if err := retry.OnError(wait.Backoff{
-		Steps:    10,
-		Duration: 30 * time.Second,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func(err error) bool {
-		return !apierrors.IsForbidden(err)
-	},
-		func() error {
-			clientset, err = GetAndVerifyDownstreamClientset(clients, c)
-			if err != nil {
-				return err
-			}
-			etcdSnapshotsConfigMap, err := clientset.CoreV1().ConfigMaps("kube-system").Get(clients.Ctx, fmt.Sprintf("%s-etcd-snapshots", capr.GetRuntime(c.Spec.KubernetesVersion)), metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if etcdSnapshotsConfigMap != nil && len(etcdSnapshotsConfigMap.Data) > 0 {
-				return nil
-			}
-			return fmt.Errorf("etcd snapshots config map was not usable")
-		}); err != nil {
-		t.Fatal(err)
-	}
+	// Generally speaking, this is bad for a test; however, there is a bug within RKE2/K3s where post-restart of an etcd
+	// node, the controlplane nodes will fail until the apiserver can reconnect to the etcd plane.
+	// This is not very disruptive for provisioned clusters, as controlplane nodes are typically reconciled immediately
+	// after operation processing, however, imported clusters are not "reconciled" outside the operation context,
+	// leading to scenarios where a node may depend on other nodes being available.
+
+	time.Sleep(30 * time.Second)
 
 	snapshotsValidTime := time.Now()
 

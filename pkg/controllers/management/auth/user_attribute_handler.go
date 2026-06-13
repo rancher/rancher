@@ -17,6 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -137,20 +138,33 @@ func (c *UserAttributeController) sync(key string, attribs *v3.UserAttribute) (r
 func (c *UserAttributeController) skipRefresh(name string, reason error) (runtime.Object, error) {
 	logrus.Warnf("Skipping provider refresh for %s due to non-transient error: %v", name, reason)
 
-	// Re-fetch to get a clean version (important for the 413 case where the
-	// in-memory attribs may contain bloated GroupPrincipals).
-	attribs, err := c.userAttributes.Get(name, metav1.GetOptions{})
+	// Re-fetch from the API server inside the retry: gets a clean version
+	// (important for the 413 case where the in-memory attribs may contain
+	// bloated GroupPrincipals) and keeps the ResourceVersion fresh so the
+	// annotation write doesn't lose to a concurrent trigger or consumer
+	// writeback under contention.
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		attribs, err := c.userAttributes.Get(name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			// The user attribute was deleted under us.
+			// The annotation would have no reader. No point in requeuing.
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if attribs.Annotations == nil {
+			attribs.Annotations = make(map[string]string)
+		}
+		attribs.Annotations[common.ProviderRefreshErrorAnnotation] = reason.Error()
+		attribs.NeedsRefresh = false
+		_, err = c.userAttributes.Update(attribs)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	})
 	if err != nil {
-		return nil, fmt.Errorf("error getting user attribute %s to skip refresh: %w", name, err)
-	}
-
-	if attribs.Annotations == nil {
-		attribs.Annotations = make(map[string]string)
-	}
-	attribs.Annotations[common.ProviderRefreshErrorAnnotation] = reason.Error()
-	attribs.NeedsRefresh = false
-
-	if _, err := c.userAttributes.Update(attribs); err != nil {
 		return nil, fmt.Errorf("error annotating user attribute %s to skip refresh: %w", name, err)
 	}
 

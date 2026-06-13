@@ -69,7 +69,7 @@ RUN zypper refresh && \
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.25 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
@@ -169,27 +169,26 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher142
-ENV CATTLE_MACHINE_CHECKSUM_amd64=9ae8f09bde3d036ab71659bcdbd7f03e2566371b985eb44e67cacfa6481306e5
-ENV CATTLE_MACHINE_CHECKSUM_arm64=0d2afec21404af012ba49afd60c1d7bba962fab6685d794a46f2202b72908580
-ENV CATTLE_K3S_VERSION=v1.35.4+k3s1
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher143
+ENV CATTLE_MACHINE_CHECKSUM_amd64=9e434a25b3547b3cf55b6d73d61c7086190c5d89b207cc3313cbf9b1da70e842
+ENV CATTLE_MACHINE_CHECKSUM_arm64=a2fbe569456ecfe2da40fae3261b7e3da3026b67d10d3e08bd9870b5d344b546
+ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION=v3.6.7
-ENV CATTLE_ETCD_CHECKSUM_amd64=cf8af880c5a01ee5363cefa14a3e0cb7e5308dcf4ed17a6973099c9a7aee5a9a
-ENV CATTLE_ETCD_CHECKSUM_arm64=ef5fc443cf7cc5b82738f3c28363704896551900af90a6d622cae740b5644270
+ENV CATTLE_ETCD_VERSION=v3.6.12
+ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
+ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
 ENV DOCKER_MACHINE_LINODE_VERSION=v0.1.16
 ENV DOCKER_MACHINE_LINODE_CHECKSUM_amd64=d9c3b8c389a022b0e5c5e8912496c18a673fa74bb52ec6ab51c0a93e0f4de06d
 ENV DOCKER_MACHINE_LINODE_CHECKSUM_arm64=1a8336f66bffc2186f5fb77642f509b9370f177397ee71f1a8cb522e5979dbec
-ENV LINODE_UI_DRIVER_VERSION=v0.7.0
 # For displaying Helm version in the UI only.
-ENV CATTLE_HELM_VERSION=v3.20.0-rancher1
+ENV CATTLE_HELM_VERSION=v4.2.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.6
 ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=7db00430a1c047e6627681446a99219815156e971043ba7a22a083d69fafe44a
 ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=e536ded30af40bdfa53a1010e39dfe2f72f5add499b564b9516c1385ee3a98c5
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.5.5
-ENV CATTLE_WINS_AGENT_CHECKSUM=cb42373cad3260d3b628de3d18cad13c0825577337499e4b9a05dc8926300512
+ENV CATTLE_WINS_AGENT_VERSION=v0.15.0-rc.2
+ENV CATTLE_WINS_AGENT_CHECKSUM=b2f88e836c66ce4153eae0c8c4b50c999ddfdbfcd9b699819738b6a043f1493c
 ENV CATTLE_WINS_AGENT_CHECKSUM_install=86725633b000e46dbbee43228c96d5ab7aa26e7cfcba9561d82ccdd6c96f5d61
 ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=bcc0f990176079f7dc69e668907230ac785d4676e037eef5b70cf3316e614adc
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -198,10 +197,10 @@ ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.3.16
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=686dd937ce907185b642b12f34b0f94a9781b73f7d0d13e4204867d2f753249a
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=7ca4eaf7f639995f7fe97e90b3c690caf8e15c1f1df8363ebbb53e4b13e10adb
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=bd08a39dfbe7f7042f27e8a4eb13e000c27d9123f04561285deaba8bb4b14450
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.15.0-rc.3
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=bffe785762c751bf1022db191a133e0a7b3213a0981988bb54cfd33344e0b08c
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=6f0014cf2945bc5abb98f773fe601d5f164333a226fdc818ba1c7026796f4442
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=2deaab5392ca8b24e52438be75fc1414db0bbb674c6e623e6d1fd86f227afc2a
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -209,7 +208,7 @@ ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE=rancher/system-agent-installer-
 # make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
-ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION=110.0.0
+ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION=110.0.1
 
 # AKS,EKS,GKE Operator charts versions
 ARG CATTLE_AKS_OPERATOR_VERSION
@@ -261,8 +260,8 @@ RUN case "${ARCH}" in \
     sha256sum -c driver-linode.sha256 && \
     rm driver-linode.sha256 && \
     unzip /tmp/docker-machine-driver-linode.zip -d /opt/drivers/management-state/bin && \
-    mkdir -p /usr/share/rancher/ui/assets/ && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui/assets/ && \
+    mkdir -p /usr/share/rancher/ui-dashboard/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-linode.zip
 
 RUN case "${ARCH}" in \
@@ -275,12 +274,12 @@ RUN case "${ARCH}" in \
     sha256sum -c machine-harvester.sha256 && \
     rm machine-harvester.sha256 && \
     tar xvzf /tmp/docker-machine-driver-harvester.tar.gz -C /opt/drivers/management-state/bin && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.35.4-k3s1 \
+COPY --from=rancher/k3s:v1.36.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -357,13 +356,15 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     mkdir -p /var/lib/rancher-data/driver-metadata && \
     rm /tmp/etcd.tar.gz
 
-ENV CATTLE_UI_VERSION=2.14.0-alpha7
-ENV CATTLE_DASHBOARD_UI_VERSION=v2.14.0-alpha7
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.15.0-alpha3
 
 ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
+
+# RKE2 Prime provisioning default, only set in prime installs
+ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=
 
 # Cluster Autoscaler related settings, only set in prime installs
 ENV CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
@@ -379,22 +380,17 @@ ENV AUDIT_LOG_MAXBACKUP=10
 ENV AUDIT_LOG_MAXSIZE=100
 ENV AUDIT_LEVEL=0
 
-RUN mkdir -p /usr/share/rancher/ui && \
-    cd /usr/share/rancher/ui && \
-    curl -sL "https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=1 && \
-    mkdir -p assets/rancher-ui-driver-linode && \
-    cd assets/rancher-ui-driver-linode && \
-    curl -O "https://linode.github.io/rancher-ui-driver-linode/releases/${LINODE_UI_DRIVER_VERSION}/component.js" && \
-    curl -O "https://linode.github.io/rancher-ui-driver-linode/releases/${LINODE_UI_DRIVER_VERSION}/component.css" && \
-    curl -O "https://linode.github.io/rancher-ui-driver-linode/releases/${LINODE_UI_DRIVER_VERSION}/linode.svg" && \
-    mkdir -p /usr/share/rancher/ui/api-ui && \
-    cd /usr/share/rancher/ui/api-ui && \
+RUN mkdir -p /usr/share/rancher/ui-dashboard/api-ui && \
+    cd /usr/share/rancher/ui-dashboard/api-ui && \
     curl -sL "https://releases.rancher.com/api-ui/${CATTLE_API_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=1 && \
     mkdir -p /usr/share/rancher/ui-dashboard/dashboard && \
     cd /usr/share/rancher/ui-dashboard/dashboard && \
     curl -sL "https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=2 && \
     ln -s dashboard/index.html ../index.html && \
-    cd ../../ui/assets && \
+    ln -s dashboard/robots.txt ../robots.txt && \
+    ln -s dashboard/humans.txt ../humans.txt && \
+    ln -s dashboard/VERSION.txt ../VERSION.txt && \
+    cd ../assets && \
     curl -sfL "${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64" -O && \
     printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_arm64}" "rancher-system-agent-arm64" > rancher-system-agent-arm64.sha256 && \
     sha256sum -c rancher-system-agent-arm64.sha256 && \
@@ -444,7 +440,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.35.4+k3s1
+ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -495,6 +491,7 @@ ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X git
 ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
+COPY internal/ internal/
 COPY pkg/ pkg/
 COPY main.go ./
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
@@ -513,6 +510,7 @@ ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
 COPY cmd/ cmd/
+COPY internal/ internal/
 COPY pkg/ pkg/
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
@@ -524,6 +522,7 @@ ARG BASE_UI_BRAND
 ARG RANCHER_VERSION_TYPE
 ARG CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
 ARG CATTLE_CLUSTER_AUTOSCALER_IMAGE
+ARG CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT
 
 ENV CATTLE_BASE_REGISTRY=$BASE_REGISTRY
 ENV CATTLE_BASE_UI_BRAND=$BASE_UI_BRAND
@@ -533,6 +532,7 @@ ENV CATTLE_AGENT_IMAGE=${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE=${IMAGE_REPO}/${IMAGE_NAME}
 ENV CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=$CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
 ENV CATTLE_CLUSTER_AUTOSCALER_IMAGE=$CATTLE_CLUSTER_AUTOSCALER_IMAGE
+ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=$CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT
 
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
@@ -548,7 +548,7 @@ VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
 VOLUME /var/log
 
-LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
     "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
     "org.opencontainers.image.description"="Rancher Manager: complete container management platform." \
     "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
@@ -572,9 +572,9 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/nsenter --version
 
 ARG ARCH
-ENV KUBECTL_VERSION=v1.35.4
-ENV KUBECTL_CHECKSUM_amd64=b529430df69a688fd61b64ad2299edb5fd71cb58be2a4779dba624c7d3510efd
-ENV KUBECTL_CHECKSUM_arm64=6a5a4cc4e396d7626a7a693a3044b51c75520f81db30fe6816c2554e53be336f
+ENV KUBECTL_VERSION=v1.36.0
+ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
+ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
 
 RUN case "${ARCH}" in \
         amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
@@ -607,7 +607,7 @@ COPY --from=agent-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
-LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
+LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
     "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
     "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
     "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \

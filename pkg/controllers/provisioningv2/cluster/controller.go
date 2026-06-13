@@ -23,8 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-
-	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -77,7 +75,6 @@ type handler struct {
 	rkeControlPlanesCache rkecontrollers.RKEControlPlaneCache
 	secretCache           corecontrollers.SecretCache
 	kubeconfigManager     *kubeconfig.Manager
-	apply                 apply.Apply
 
 	capiClustersCache capicontrollers.ClusterCache
 	capiClusters      capicontrollers.ClusterClient
@@ -99,9 +96,6 @@ func handlerWithoutCAPI(clients *wrangler.Context, kubeconfigManager *kubeconfig
 		rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache(),
 		secretCache:           clients.Core.Secret().Cache(),
 		kubeconfigManager:     kubeconfigManager,
-		apply: clients.Apply.WithCacheTypes(
-			clients.Provisioning.Cluster(),
-			clients.Mgmt.Cluster()),
 	}
 }
 
@@ -153,6 +147,7 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 		h.capiMachinesCache = capiClients.CAPI.Machine().Cache()
 	})
 
+	// For every mgmt.Cluster reconciliation, trigger the corresponding prov.Cluster
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 }
@@ -178,9 +173,6 @@ func Register(
 		capiMachinesCache: clients.CAPI.Machine().Cache(),
 
 		kubeconfigManager: kubeconfigManager,
-		apply: clients.Apply.WithCacheTypes(
-			clients.Provisioning.Cluster(),
-			clients.Mgmt.Cluster()),
 	}
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
@@ -363,6 +355,22 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 		}
 	}
 
+	if cluster.Spec.WebhookDeploymentCustomization != nil {
+		wdc := cluster.Spec.WebhookDeploymentCustomization.DeepCopy()
+		provCluster.Spec.WebhookDeploymentCustomization = &v1.WebhookDeploymentCustomization{
+			ReplicaCount:                 wdc.ReplicaCount,
+			AppendTolerations:            wdc.AppendTolerations,
+			OverrideAffinity:             wdc.OverrideAffinity,
+			OverrideResourceRequirements: wdc.OverrideResourceRequirements,
+		}
+		if wdc.PodDisruptionBudget != nil {
+			provCluster.Spec.WebhookDeploymentCustomization.PodDisruptionBudget = &v1.PodDisruptionBudgetSpec{
+				MinAvailable:   wdc.PodDisruptionBudget.MinAvailable,
+				MaxUnavailable: wdc.PodDisruptionBudget.MaxUnavailable,
+			}
+		}
+	}
+
 	return []runtime.Object{
 		provCluster,
 	}, status, nil
@@ -513,8 +521,8 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	spec.DesiredAuthImage = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
 
-	spec.ClusterSecrets.PrivateRegistrySecret = image.GetPrivateRepoSecretFromCluster(cluster)
-	spec.ClusterSecrets.PrivateRegistryURL = image.GetPrivateRepoURLFromCluster(cluster)
+	spec.ClusterSecrets.PrivateRegistrySecret, _ = image.GetPrivateRepoSecretFromCluster(cluster)
+	spec.ClusterSecrets.PrivateRegistryURL, _ = image.GetPrivateRepoURLFromCluster(cluster)
 
 	spec.AgentEnvVars = nil
 	for _, env := range cluster.Spec.AgentEnvVars {
@@ -538,6 +546,22 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
 			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
 			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+
+	if cluster.Spec.WebhookDeploymentCustomization != nil {
+		wdc := cluster.Spec.WebhookDeploymentCustomization.DeepCopy()
+		spec.WebhookDeploymentCustomization = &v3.WebhookDeploymentCustomization{
+			ReplicaCount:                 wdc.ReplicaCount,
+			AppendTolerations:            wdc.AppendTolerations,
+			OverrideAffinity:             wdc.OverrideAffinity,
+			OverrideResourceRequirements: wdc.OverrideResourceRequirements,
+		}
+		if wdc.PodDisruptionBudget != nil {
+			spec.WebhookDeploymentCustomization.PodDisruptionBudget = &v3.PodDisruptionBudgetSpec{
+				MinAvailable:   wdc.PodDisruptionBudget.MinAvailable,
+				MaxUnavailable: wdc.PodDisruptionBudget.MaxUnavailable,
+			}
 		}
 	}
 

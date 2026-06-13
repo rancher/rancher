@@ -13,10 +13,28 @@ runs:
       uses: ./.github/actions/setup-build-env
     - name: Install Helm dependencies
       env:
-        HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
+         HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
+         HELM_VERSION: ${{ steps.env.outputs.HELM_VERSION }}
+         HELM_HASH_amd64: ${{ steps.env.outputs.HELM_HASH_amd64 }}
+         HELM_HASH_arm64: ${{ steps.env.outputs.HELM_HASH_arm64 }}
       shell: bash
       run: |
-        helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
+        set -ex
+        OS_ARCH=$(uname -m)
+        if [ "$OS_ARCH" = "x86_64" ]; then
+          ARCH="amd64"
+          HELM_HASH="${HELM_HASH_amd64}"
+        elif [ "$OS_ARCH" = "aarch64" ]; then
+          ARCH="arm64"
+          HELM_HASH="${HELM_HASH_arm64}"
+        fi
+        HELM_URL="https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz"
+        curl "${HELM_URL}" -o /tmp/helm.tar.gz && \
+        echo "${HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
+        tar xvzf /tmp/helm.tar.gz --strip-components=1 -C /tmp/ && \
+        mv /tmp/helm /usr/bin/helm && \
+        chmod +x /usr/bin/helm
+        helm plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION} --verify=false;
     - name: Build
       shell: bash
       run: ./scripts/chart/build chart

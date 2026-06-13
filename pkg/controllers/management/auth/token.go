@@ -7,7 +7,9 @@ import (
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -115,12 +117,27 @@ func (t *TokenController) userAttributesNeedsRefresh(user string) (bool, error) 
 }
 
 func (t *TokenController) triggerUserAttributesRefresh(user string) error {
-	userAttribute, err := t.userAttributesLister.Get(user)
-	if err != nil {
+	// Re-fetch from the API server inside the retry; the lister cache used
+	// for the gating check can be stale and lead to 409 conflicts when other
+	// writers (e.g. the refresh consumer) touch the object concurrently.
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		userAttribute, err := t.userAttributes.Get(user, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			// The user attribute was deleted under us.
+			// Nothing to refresh, no point in requeuing.
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if userAttribute.NeedsRefresh {
+			return nil
+		}
+		userAttribute.NeedsRefresh = true
+		_, err = t.userAttributes.Update(userAttribute)
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return err
-	}
-
-	userAttribute.NeedsRefresh = true
-	_, err = t.userAttributes.Update(userAttribute)
-	return err
+	})
 }

@@ -6,12 +6,13 @@ import (
 	"strings"
 	"time"
 
-	planv1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	caprplanner "github.com/rancher/rancher/pkg/capr/planner"
-	plancontrollers "github.com/rancher/rancher/pkg/generated/controllers/plan.cattle.io/v1alpha1"
+	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -37,13 +38,16 @@ type handler struct {
 	planner       *caprplanner.Planner
 	controlPlanes rkecontrollers.RKEControlPlaneController
 	beacons       plancontrollers.BeaconClient
+
+	etcdsnapshotsaves operationcontrollers.ETCDSnapshotSaveClient
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprplanner.Planner) {
 	h := handler{
-		planner:       planner,
-		controlPlanes: clients.RKE.RKEControlPlane(),
-		beacons:       clients.Plan.Beacon(),
+		planner:           planner,
+		controlPlanes:     clients.RKE.RKEControlPlane(),
+		beacons:           clients.Plan.Beacon(),
+		etcdsnapshotsaves: clients.Operation.ETCDSnapshotSave(),
 	}
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)
 	relatedresource.Watch(ctx, "planner", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
@@ -118,7 +122,7 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 		if err != nil {
 			return status, err
 		}
-	} else if owner, ok := beacon.Labels[planv1alpha1.OwnerLabel]; !ok {
+	} else if owner, ok := beacon.Labels[planv1alpha1.OwnerLabel]; !ok || owner == "" {
 		beacon = beacon.DeepCopy()
 		beacon.Labels[planv1alpha1.OwnerLabel] = PlannerOwnerKey
 		beacon, err = h.beacons.Update(beacon)

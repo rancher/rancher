@@ -77,8 +77,6 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
-	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
-	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
 
 	SnapshotNameAnnotation = "etcdsnapshot.rke.io/snapshot-name"
@@ -183,6 +181,13 @@ const (
 	// ClusterAutoscalerPausedAnnotation is an annotation used to pause cluster autoscaling for a cluster
 	// it triggers a scale-down of the cluster-autoscaler chart in the downstream cluster
 	ClusterAutoscalerPausedAnnotation = "provisioning.cattle.io/cluster-autoscaler-paused"
+
+	// RKE2PrimeEnabledAnnotation is a per-cluster annotation that overrides the global
+	// rke2-provisioning-prime-default setting. When explicitly set to "true" or "false", it takes
+	// precedence over the global setting. If absent, the global setting applies.
+	// On upgrade, existing RKE2 clusters receive this annotation set to "false" so their behavior
+	// is unchanged.
+	RKE2PrimeEnabledAnnotation = "provisioning.cattle.io/rke2-prime-enabled"
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
@@ -584,6 +589,8 @@ func GetOwnerCAPIMachineSet(obj runtime.Object, cache capicontrollers.MachineSet
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
 // or the object could not be found, it returns an ErrNoMatchingControllerOwnerRef error.
 // If the owner reference exists and is valid, it will return the owner reference and the namespace it belongs to.
+// This function is resilient to CAPI v1.13.1+ changes where the controller flag may not be set on owner references.
+// It will first try to find a controller-flagged owner reference, and if that fails, fall back to matching by kind and apiVersion.
 func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.OwnerReference, string, error) {
 	if obj == nil {
 		return nil, "", errNilObject
@@ -592,11 +599,23 @@ func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.Own
 	if err != nil {
 		return nil, "", err
 	}
+
+	// find the controller-flagged owner reference
 	ref := metav1.GetControllerOf(objMeta)
-	if ref == nil || ref.Kind != kind || ref.APIVersion != groupVersion {
-		return nil, "", ErrNoMatchingControllerOwnerRef
+	if ref != nil && ref.Kind == kind && ref.APIVersion == groupVersion {
+		return ref, objMeta.GetNamespace(), nil
 	}
-	return ref, objMeta.GetNamespace(), nil
+
+	// Fallback: search for an owner reference that matches by kind and apiVersion
+	for _, owner := range objMeta.GetOwnerReferences() {
+		if owner.Kind == kind &&
+			owner.APIVersion == groupVersion {
+			ownerCopy := owner
+			return &ownerCopy, objMeta.GetNamespace(), nil
+		}
+	}
+
+	return nil, "", ErrNoMatchingControllerOwnerRef
 }
 
 // SafeConcatName takes a maximum length and set of strings, it returns a string

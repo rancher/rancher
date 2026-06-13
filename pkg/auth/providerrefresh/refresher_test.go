@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -21,8 +22,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ktypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -68,7 +71,7 @@ func TestRefreshAttributes(t *testing.T) {
 			"shibboleth": {},
 		},
 		ExtraByProvider: map[string]map[string][]string{
-			providers.LocalProvider: {
+			local.Name: {
 				common.UserAttributePrincipalID: {"local://user-abcde"},
 				common.UserAttributeUserName:    {"admin"},
 			},
@@ -92,13 +95,13 @@ func TestRefreshAttributes(t *testing.T) {
 	loginTokenLocal := apiv3.Token{
 		UserID:       "user-abcde",
 		IsDerived:    false,
-		AuthProvider: providers.LocalProvider,
+		AuthProvider: local.Name,
 		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "local://user-abcde",
 			},
 			LoginName: "admin",
-			Provider:  providers.LocalProvider,
+			Provider:  local.Name,
 			ExtraInfo: map[string]string{
 				common.UserAttributePrincipalID: "local://user-abcde",
 				common.UserAttributeUserName:    "admin",
@@ -138,7 +141,7 @@ func TestRefreshAttributes(t *testing.T) {
 			Kind:   exttokens.IsLogin,
 			UserPrincipal: ext.TokenPrincipal{
 				Name:      "local://user-abcde",
-				Provider:  providers.LocalProvider,
+				Provider:  local.Name,
 				LoginName: "admin",
 				ExtraInfo: map[string]string{
 					common.UserAttributePrincipalID: "local://user-abcde",
@@ -490,23 +493,18 @@ func TestRefreshAttributes(t *testing.T) {
 		},
 	}
 
-	providers.ProviderNames = map[string]bool{
-		providers.LocalProvider: true,
-		saml.ShibbolethName:     true,
-	}
-
 	for _, tt := range tests {
 		tokenUpdateCalled = false
 		tokenDeleteCalled = false
 		t.Run(tt.name, func(t *testing.T) {
-			providers.Providers = map[string]common.AuthProvider{
-				providers.LocalProvider: &mockLocalProvider{
+			providers.SetProviders(map[string]common.AuthProvider{
+				local.Name: &mockLocalProvider{
 					canAccess:   tt.enabled,
 					disabled:    tt.providerDisabled,
 					disabledErr: tt.providerDisabledError,
 				},
 				saml.ShibbolethName: &mockShibbolethProvider{},
-			}
+			})
 
 			ctrl := gomock.NewController(t)
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
@@ -560,7 +558,7 @@ func TestRefreshAttributes(t *testing.T) {
 						return nil
 					},
 				},
-				tokenMGR: tokens.NewMockedManager(tokenClient),
+				tokenMGR: tokens.NewMockedManager(tokenClient, nil),
 				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
 					exttokens.NewTimeHandler(),
 					exttokens.NewHashHandler(),
@@ -686,6 +684,126 @@ func TestTriggerUserRefreshSkipsAnnotatedUser(t *testing.T) {
 		"Update should not be called for annotated user attribute")
 }
 
+func TestTriggerUserRefreshNoopsWhenAlreadyPending(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	cachedAttribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: userID},
+	}
+	// Stale lister copy: NeedsRefresh=false. Fresh API copy: already true
+	// (a concurrent trigger won the race). triggerUserRefresh should re-read
+	// from the API, see NeedsRefresh already set, and skip Update.
+	freshAttribs := &apiv3.UserAttribute{
+		ObjectMeta:   metav1.ObjectMeta{Name: userID},
+		NeedsRefresh: true,
+	}
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return cachedAttribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+				return freshAttribs.DeepCopy(), nil
+			},
+		},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	mock := r.userAttributes.(*fakes.UserAttributeInterfaceMock)
+	assert.Len(t, mock.GetCalls(), 1, "Get should be called to re-read from the API server")
+	assert.Empty(t, mock.UpdateCalls(),
+		"Update should be skipped when the fresh copy already has NeedsRefresh=true")
+}
+
+func TestTriggerUserRefreshIgnoresUserAttributeNotFound(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	cachedAttribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: userID},
+	}
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return cachedAttribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+				return nil, apierrors.NewNotFound(
+					schema.GroupResource{Group: "management.cattle.io", Resource: "userattributes"},
+					name)
+			},
+		},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	mock := r.userAttributes.(*fakes.UserAttributeInterfaceMock)
+	assert.Empty(t, mock.UpdateCalls(),
+		"Update must not be called when the user attribute is gone")
+}
+
+func TestTriggerUserRefreshRetriesOnConflict(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	cachedAttribs := &apiv3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: userID},
+	}
+	var updateAttempts int
+
+	r := &refresher{
+		ensureAndGetUserAttribute: func(userName string) (*apiv3.UserAttribute, bool, error) {
+			return cachedAttribs.DeepCopy(), false, nil
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*apiv3.User, error) {
+				return &apiv3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"azuread_user://some-guid"},
+				}, nil
+			},
+		},
+		userAttributes: &fakes.UserAttributeInterfaceMock{
+			GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.UserAttribute, error) {
+				return cachedAttribs.DeepCopy(), nil
+			},
+			UpdateFunc: func(ua *apiv3.UserAttribute) (*apiv3.UserAttribute, error) {
+				updateAttempts++
+				if updateAttempts == 1 {
+					return nil, apierrors.NewConflict(
+						schema.GroupResource{Group: "management.cattle.io", Resource: "userattributes"},
+						userID, errors.New("the object has been modified"))
+				}
+				return ua, nil
+			},
+		},
+	}
+
+	r.triggerUserRefresh(userID, true)
+
+	assert.Equal(t, 2, updateAttempts, "Update should retry after a 409 conflict and then succeed")
+}
+
 func TestRefreshAttributesNonTransientError(t *testing.T) {
 	t.Parallel()
 
@@ -712,12 +830,9 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 		},
 	}
 
-	providers.ProviderNames = map[string]bool{
-		providerName: true,
-	}
-	providers.Providers = map[string]common.AuthProvider{
+	providers.SetProviders(map[string]common.AuthProvider{
 		providerName: &mockNonTransientProvider{},
-	}
+	})
 
 	ctrl := gomock.NewController(t)
 	secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
@@ -748,7 +863,7 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 				return nil
 			},
 		},
-		tokenMGR: tokens.NewMockedManager(tokenClient),
+		tokenMGR: tokens.NewMockedManager(tokenClient, nil),
 		extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
 			exttokens.NewTimeHandler(),
 			exttokens.NewHashHandler(),
@@ -778,9 +893,11 @@ func (p *mockNonTransientProvider) IsDisabledProvider() (bool, error) {
 }
 
 type mockLocalProvider struct {
-	canAccess   bool
-	disabled    bool
-	disabledErr error
+	canAccess      bool
+	canAccessErr   error
+	getPrincipalFn func(string, accessor.TokenAccessor) (apiv3.Principal, error)
+	disabled       bool
+	disabledErr    error
 }
 
 func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
@@ -808,6 +925,9 @@ func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken
 }
 
 func (p *mockLocalProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	if p.getPrincipalFn != nil {
+		return p.getPrincipalFn(principalID, token)
+	}
 	return token.GetUserPrincipal(), nil
 }
 
@@ -824,7 +944,7 @@ func (p *mockLocalProvider) RefetchGroupPrincipals(principalID string, secret st
 }
 
 func (p *mockLocalProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []apiv3.Principal) (bool, error) {
-	return p.canAccess, nil
+	return p.canAccess, p.canAccessErr
 }
 
 func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
@@ -833,6 +953,9 @@ func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal
 		common.UserAttributeUserName:    {userPrincipal.ExtraInfo[common.UserAttributeUserName]},
 	}
 }
+
+func (p *mockLocalProvider) UsesUserSecrets() bool      { return false }
+func (p *mockLocalProvider) CanRefreshPrincipals() bool { return true }
 
 func (p *mockLocalProvider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
@@ -894,6 +1017,936 @@ func (p *mockShibbolethProvider) GetUserExtraAttributes(userPrincipal apiv3.Prin
 	}
 }
 
+func (p *mockShibbolethProvider) UsesUserSecrets() bool      { return false }
+func (p *mockShibbolethProvider) CanRefreshPrincipals() bool { return false }
+
 func (p *mockShibbolethProvider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
+}
+
+type mockGitHubAppProvider struct {
+	mockLocalProvider
+	refetchCalled   bool
+	refetchSecret   string
+	groupPrincipals []apiv3.Principal
+}
+
+func (p *mockGitHubAppProvider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
+	p.refetchCalled = true
+	p.refetchSecret = secret
+	return p.groupPrincipals, nil
+}
+
+func (p *mockGitHubAppProvider) IsDisabledProvider() (bool, error) {
+	return false, nil
+}
+
+func TestRefreshAttributesNoPerUserSecrets(t *testing.T) {
+	const providerName = "githubapp"
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "user-ghapp"},
+		PrincipalIDs: []string{providerName + "_user://12345"},
+	}
+
+	attribs := &apiv3.UserAttribute{
+		ObjectMeta:      metav1.ObjectMeta{Name: "user-ghapp"},
+		GroupPrincipals: map[string]apiv3.Principals{},
+		ExtraByProvider: map[string]map[string][]string{},
+	}
+
+	loginToken := &apiv3.Token{
+		UserID:       "user-ghapp",
+		IsDerived:    false,
+		AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
+			Provider:   providerName,
+			LoginName:  "testuser",
+			ExtraInfo: map[string]string{
+				common.UserAttributePrincipalID: providerName + "_user://12345",
+				common.UserAttributeUserName:    "testuser",
+			},
+		},
+	}
+
+	wantGroupPrincipals := []apiv3.Principal{
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: providerName + "_team://org:team1"},
+			PrincipalType: "group",
+			Provider:      providerName,
+		},
+	}
+
+	mockProvider := &mockGitHubAppProvider{
+		mockLocalProvider: mockLocalProvider{canAccess: true},
+		groupPrincipals:   wantGroupPrincipals,
+	}
+
+	providers.SetProviders(map[string]common.AuthProvider{
+		providerName: mockProvider,
+	})
+
+	ctrl := gomock.NewController(t)
+	secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+
+	users.EXPECT().Cache().Return(nil)
+	secrets.EXPECT().Cache().Return(scache)
+	scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+	tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+	r := &refresher{
+		tokenLister: &fakes.TokenListerMock{
+			ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+				return []*apiv3.Token{loginToken}, nil
+			},
+		},
+		userLister: &fakes.UserListerMock{
+			GetFunc: func(_, _ string) (*apiv3.User, error) {
+				return user, nil
+			},
+		},
+		tokens:   &fakes.TokenInterfaceMock{},
+		tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+		extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+			exttokens.NewTimeHandler(),
+			exttokens.NewHashHandler(),
+			exttokens.NewAuthHandler()),
+	}
+
+	got, err := r.refreshAttributes(attribs)
+	assert.NoError(t, err)
+	assert.True(t, mockProvider.refetchCalled, "RefetchGroupPrincipals should be called for providers without per-user secrets")
+	assert.Empty(t, mockProvider.refetchSecret, "secret should be empty for providers without per-user secrets")
+	assert.Equal(t, wantGroupPrincipals, got.GroupPrincipals[providerName].Items)
+}
+
+type mockSecretProvider struct {
+	mockLocalProvider
+	refetchErr    error
+	refetchGroups []apiv3.Principal
+	refetchCalled bool
+}
+
+func (p *mockSecretProvider) UsesUserSecrets() bool      { return true }
+func (p *mockSecretProvider) CanRefreshPrincipals() bool { return true }
+
+func (p *mockSecretProvider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
+	p.refetchCalled = true
+	return p.refetchGroups, p.refetchErr
+}
+
+func (p *mockSecretProvider) IsDisabledProvider() (bool, error) {
+	return p.disabled, p.disabledErr
+}
+
+type mockRefetchErrorProvider struct {
+	mockLocalProvider
+	refetchErr error
+}
+
+func (p *mockRefetchErrorProvider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
+	return nil, p.refetchErr
+}
+
+func (p *mockRefetchErrorProvider) IsDisabledProvider() (bool, error) {
+	return false, nil
+}
+
+func TestRefreshAttributesEarlyErrors(t *testing.T) {
+	t.Run("user lister error", func(t *testing.T) {
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) {
+					return nil, fmt.Errorf("user lookup failed")
+				},
+			},
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "error getting user")
+	})
+
+	t.Run("token lister error", func(t *testing.T) {
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) {
+					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
+				},
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return nil, fmt.Errorf("token list failed")
+				},
+			},
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "error listing tokens")
+	})
+
+	t.Run("ext token list error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return(nil, fmt.Errorf("cache error")).AnyTimes()
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) {
+					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
+				},
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{}, nil
+				},
+			},
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "error listing ext tokens")
+	})
+}
+
+func TestRefreshAttributesPerUserSecrets(t *testing.T) {
+	const providerName = "github"
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "user-secret"},
+		PrincipalIDs: []string{providerName + "_user://12345"},
+	}
+
+	existingGroups := []apiv3.Principal{
+		{ObjectMeta: metav1.ObjectMeta{Name: providerName + "_team://org:existing"}},
+	}
+
+	t.Run("secret not found preserves state", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		mgrSecretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		mgrSecretCache.EXPECT().
+			Get("cattle-system", "user-secret-secret").
+			Return(nil, apierrors.NewNotFound(corev1.Resource("secrets"), "user-secret-secret")).
+			AnyTimes()
+
+		mockProvider := &mockSecretProvider{
+			mockLocalProvider: mockLocalProvider{canAccess: true},
+		}
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: mockProvider,
+		})
+
+		derivedToken := &apiv3.Token{
+			UserID:       "user-secret",
+			IsDerived:    true,
+			AuthProvider: providerName,
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
+				Provider:   providerName,
+			},
+		}
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{derivedToken}, nil
+				},
+			},
+			tokens:   &fakes.TokenInterfaceMock{},
+			tokenMGR: tokens.NewMockedManager(tokenClient, mgrSecretCache),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-secret"},
+			GroupPrincipals: map[string]apiv3.Principals{
+				providerName: {Items: existingGroups},
+			},
+			ExtraByProvider: map[string]map[string][]string{
+				providerName: {"key": {"existing-value"}},
+			},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.NoError(t, err)
+		assert.False(t, mockProvider.refetchCalled, "RefetchGroupPrincipals should not be called when secret is missing")
+		assert.Equal(t, existingGroups, got.GroupPrincipals[providerName].Items, "existing group principals should be preserved")
+		assert.Equal(t, map[string][]string{"key": {"existing-value"}}, got.ExtraByProvider[providerName], "existing extra attributes should be preserved")
+	})
+
+	t.Run("secret hard error returns error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		mgrSecretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		mgrSecretCache.EXPECT().
+			Get("cattle-system", "user-secret-secret").
+			Return(nil, fmt.Errorf("connection refused")).
+			AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockSecretProvider{
+				mockLocalProvider: mockLocalProvider{canAccess: true},
+			},
+		})
+
+		loginToken := &apiv3.Token{
+			UserID:       "user-secret",
+			IsDerived:    false,
+			AuthProvider: providerName,
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://12345"},
+				Provider:   providerName,
+			},
+		}
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken}, nil
+				},
+			},
+			tokens:   &fakes.TokenInterfaceMock{},
+			tokenMGR: tokens.NewMockedManager(tokenClient, mgrSecretCache),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-secret"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.Error(t, err)
+	})
+}
+
+func TestRefreshAttributesRefetchErrors(t *testing.T) {
+	const providerName = "testprovider"
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "user-refetch"},
+		PrincipalIDs: []string{providerName + "_user://abc"},
+	}
+
+	existingGroups := []apiv3.Principal{
+		{ObjectMeta: metav1.ObjectMeta{Name: providerName + "_team://existing-group"}},
+	}
+
+	loginToken := &apiv3.Token{
+		UserID:       "user-refetch",
+		IsDerived:    false,
+		AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
+			Provider:   providerName,
+			LoginName:  "testuser",
+			ExtraInfo: map[string]string{
+				common.UserAttributePrincipalID: providerName + "_user://abc",
+				common.UserAttributeUserName:    "testuser",
+			},
+		},
+	}
+
+	t.Run("transient error preserves groups", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockRefetchErrorProvider{
+				mockLocalProvider: mockLocalProvider{canAccess: true},
+				refetchErr:        fmt.Errorf("connection timeout"),
+			},
+		})
+
+		var tokenDeleteCalled bool
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken}, nil
+				},
+			},
+			tokens: &fakes.TokenInterfaceMock{
+				DeleteFunc: func(_ string, _ *metav1.DeleteOptions) error {
+					tokenDeleteCalled = true
+					return nil
+				},
+			},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-refetch"},
+			GroupPrincipals: map[string]apiv3.Principals{
+				providerName: {Items: existingGroups},
+			},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.NoError(t, err)
+		assert.Equal(t, existingGroups, got.GroupPrincipals[providerName].Items, "existing groups should be preserved on transient error")
+		assert.False(t, tokenDeleteCalled, "login tokens should not be deleted when errorConfirmingLogins is set")
+	})
+
+	t.Run("no access blanks principal and deletes tokens", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockRefetchErrorProvider{
+				mockLocalProvider: mockLocalProvider{canAccess: false},
+				refetchErr:        errors.New("no access"),
+			},
+		})
+
+		derivedToken := &apiv3.Token{
+			UserID:       "user-refetch",
+			IsDerived:    true,
+			AuthProvider: providerName,
+			UserPrincipal: apiv3.Principal{
+				ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
+				Provider:   providerName,
+			},
+		}
+
+		var tokenDeleteCalled, tokenUpdateCalled bool
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken, derivedToken}, nil
+				},
+			},
+			tokens: &fakes.TokenInterfaceMock{
+				DeleteFunc: func(_ string, _ *metav1.DeleteOptions) error {
+					tokenDeleteCalled = true
+					return nil
+				},
+			},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		tokenClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(token *apiv3.Token) (*apiv3.Token, error) {
+			tokenUpdateCalled = true
+			return token.DeepCopy(), nil
+		}).AnyTimes()
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-refetch"},
+			GroupPrincipals: map[string]apiv3.Principals{
+				providerName: {Items: existingGroups},
+			},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.NoError(t, err)
+		assert.Nil(t, got.GroupPrincipals[providerName].Items, "group principals should be cleared on no access")
+		assert.True(t, tokenDeleteCalled, "login tokens should be deleted when user has no access")
+		assert.True(t, tokenUpdateCalled, "derived tokens should be disabled when user has no access")
+	})
+}
+
+func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
+	const providerName = "testprovider"
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "user-err"},
+		PrincipalIDs: []string{providerName + "_user://abc"},
+	}
+
+	loginToken := &apiv3.Token{
+		UserID:       "user-err",
+		IsDerived:    false,
+		AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://abc"},
+			Provider:   providerName,
+			LoginName:  "testuser",
+			ExtraInfo: map[string]string{
+				common.UserAttributePrincipalID: providerName + "_user://abc",
+				common.UserAttributeUserName:    "testuser",
+			},
+		},
+	}
+
+	t.Run("can access error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockRefetchErrorProvider{
+				mockLocalProvider: mockLocalProvider{
+					canAccess:    false,
+					canAccessErr: fmt.Errorf("ldap connection failed"),
+				},
+				refetchErr: nil,
+			},
+		})
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken}, nil
+				},
+			},
+			tokens:   &fakes.TokenInterfaceMock{},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-err"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.Error(t, err)
+	})
+
+	t.Run("get principal error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockRefetchErrorProvider{
+				mockLocalProvider: mockLocalProvider{
+					canAccess: true,
+					getPrincipalFn: func(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+						return apiv3.Principal{}, fmt.Errorf("principal fetch failed")
+					},
+				},
+			},
+			local.Name: &mockLocalProvider{
+				canAccess: true,
+				getPrincipalFn: func(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+					return apiv3.Principal{}, fmt.Errorf("local fallback also failed")
+				},
+			},
+		})
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken}, nil
+				},
+			},
+			tokens:   &fakes.TokenInterfaceMock{},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-err"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "principal fetch failed")
+	})
+
+	t.Run("extra attributes with nil ExtraByProvider", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockRefetchErrorProvider{
+				mockLocalProvider: mockLocalProvider{canAccess: true},
+			},
+		})
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken}, nil
+				},
+			},
+			tokens:   &fakes.TokenInterfaceMock{},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-err"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.NoError(t, err)
+		assert.NotNil(t, got.ExtraByProvider, "ExtraByProvider should be initialized when nil")
+		assert.Contains(t, got.ExtraByProvider, providerName)
+	})
+
+	t.Run("login token delete not found is ignored", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockRefetchErrorProvider{
+				mockLocalProvider: mockLocalProvider{canAccess: false},
+			},
+		})
+
+		tokenClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(token *apiv3.Token) (*apiv3.Token, error) {
+			return token.DeepCopy(), nil
+		}).AnyTimes()
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken}, nil
+				},
+			},
+			tokens: &fakes.TokenInterfaceMock{
+				DeleteFunc: func(_ string, _ *metav1.DeleteOptions) error {
+					return apierrors.NewNotFound(corev1.Resource("tokens"), "token")
+				},
+			},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-err"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.NoError(t, err, "not-found errors during login token deletion should be ignored")
+		assert.NotNil(t, got)
+	})
+
+	t.Run("login token delete error propagates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockRefetchErrorProvider{
+				mockLocalProvider: mockLocalProvider{canAccess: false},
+			},
+		})
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{loginToken}, nil
+				},
+			},
+			tokens: &fakes.TokenInterfaceMock{
+				DeleteFunc: func(_ string, _ *metav1.DeleteOptions) error {
+					return fmt.Errorf("delete failed")
+				},
+			},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-err"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.Error(t, err)
+	})
+}
+
+func TestRefreshAttributesExtTokenDisable(t *testing.T) {
+	const providerName = local.Name
+
+	user := &apiv3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: "user-ext"},
+		PrincipalIDs: []string{"local://user-ext"},
+	}
+
+	eDerivedToken := ext.Token{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-ext-derived"},
+		Spec: ext.TokenSpec{
+			UserID: "user-ext",
+			Kind:   "",
+			UserPrincipal: ext.TokenPrincipal{
+				Name:     "local://user-ext",
+				Provider: providerName,
+			},
+		},
+	}
+
+	principalBytes, _ := json.Marshal(eDerivedToken.Spec.UserPrincipal)
+	eDerivedSecret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "user-ext-derived",
+			Labels: map[string]string{tokens.UserIDLabel: "user-ext"},
+		},
+		Data: map[string][]byte{
+			exttokens.FieldEnabled:        []byte("true"),
+			exttokens.FieldHash:           []byte("somehash"),
+			exttokens.FieldKind:           []byte(""),
+			exttokens.FieldLastUpdateTime: []byte("13:00:05"),
+			exttokens.FieldPrincipal:      principalBytes,
+			exttokens.FieldTTL:            []byte("4000"),
+			exttokens.FieldUID:            []byte("uid-123"),
+			exttokens.FieldUserID:         []byte("user-ext"),
+		},
+	}
+
+	t.Run("ext derived tokens disabled on lost access", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{&eDerivedSecret}, nil).AnyTimes()
+		scache.EXPECT().Get("cattle-tokens", gomock.Any()).Return(&eDerivedSecret, nil).AnyTimes()
+
+		var patchCalled bool
+		secrets.EXPECT().
+			Patch("cattle-tokens", "user-ext-derived", ktypes.JSONPatchType, gomock.Any()).
+			DoAndReturn(func(ns, name string, pt ktypes.PatchType, patch []byte, subresources ...string) (*corev1.Secret, error) {
+				patchCalled = true
+				return nil, nil
+			}).
+			AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockLocalProvider{canAccess: false},
+		})
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{}, nil
+				},
+			},
+			tokens:   &fakes.TokenInterfaceMock{},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-ext"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		_, err := r.refreshAttributes(attribs)
+		assert.NoError(t, err)
+		assert.True(t, patchCalled, "ext derived token should be disabled via secret patch")
+	})
+
+	t.Run("disable token error propagates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{&eDerivedSecret}, nil).AnyTimes()
+		scache.EXPECT().Get("cattle-tokens", gomock.Any()).Return(&eDerivedSecret, nil).AnyTimes()
+
+		secrets.EXPECT().
+			Patch("cattle-tokens", gomock.Any(), ktypes.JSONPatchType, gomock.Any()).
+			Return(nil, fmt.Errorf("patch failed")).
+			AnyTimes()
+
+		providers.SetProviders(map[string]common.AuthProvider{
+			providerName: &mockLocalProvider{canAccess: false},
+		})
+
+		r := &refresher{
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
+			},
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return []*apiv3.Token{}, nil
+				},
+			},
+			tokens:   &fakes.TokenInterfaceMock{},
+			tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+		}
+
+		attribs := &apiv3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "user-ext"},
+			GroupPrincipals: map[string]apiv3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}
+
+		got, err := r.refreshAttributes(attribs)
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "error disabling token")
+	})
 }

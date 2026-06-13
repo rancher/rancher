@@ -8,14 +8,13 @@
     "release/v2.13",
     "release/v2.12",
     "release/v2.11",
-    "release/v2.10"
+    "release/v2.14"
   ],
   "ignoreDeps": [
     "go.qase.io/client"
   ],
-  "prHourlyLimit": 2,
-  "prConcurrentLimit": 4,
-  "prCreation": "status-success",
+  "prHourlyLimit": 6,
+  "prConcurrentLimit": 10,
   "packageRules": [
     {
       "matchBaseBranches": [
@@ -43,10 +42,10 @@
     },
     {
       "matchBaseBranches": [
-        "release/v2.10"
+        "release/v2.14"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.10#release"
+        "github>rancher/renovate-config//rancher-2.14#release"
       ]
     }
   ]

@@ -18,13 +18,17 @@ import (
 
 func TestPRTBHandlerReconcileSubject(t *testing.T) {
 	t.Parallel()
+	type controllers struct {
+		userMGR        *userMocks.MockManager
+		userController *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]
+		prtbController *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
+	}
 	tests := []struct {
-		name                string
-		setupUserManager    func(*userMocks.MockManager)
-		setupUserController func(*fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList])
-		binding             *v3.ProjectRoleTemplateBinding
-		want                *v3.ProjectRoleTemplateBinding
-		wantErr             bool
+		name             string
+		setupControllers func(controllers)
+		binding          *v3.ProjectRoleTemplateBinding
+		want             *v3.ProjectRoleTemplateBinding
+		wantErr          bool
 	}{
 		{
 			name: "prtb with a UserPrincipalName and Username is no-op",
@@ -74,10 +78,13 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "",
 				UserPrincipalName: "test-principal",
 			},
-			setupUserManager: func(m *userMocks.MockManager) {
-				m.EXPECT().EnsureUser("test-principal", "display-name").Return(&v3.User{
+			setupControllers: func(c controllers) {
+				c.userMGR.EXPECT().EnsureUser("test-principal", "display-name").Return(&v3.User{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-user"},
 				}, nil)
+				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+					return prtb, nil
+				})
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -100,8 +107,8 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "",
 				UserPrincipalName: "test-principal",
 			},
-			setupUserManager: func(m *userMocks.MockManager) {
-				m.EXPECT().EnsureUser("test-principal", "display-name").Return(nil, errDefault)
+			setupControllers: func(c controllers) {
+				c.userMGR.EXPECT().EnsureUser("test-principal", "display-name").Return(nil, errDefault)
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -120,10 +127,13 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "test-user",
 				UserPrincipalName: "",
 			},
-			setupUserController: func(m *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
-				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(&v3.User{
+			setupControllers: func(c controllers) {
+				c.userController.EXPECT().Get("test-user", metav1.GetOptions{}).Return(&v3.User{
 					PrincipalIDs: []string{"principal-test-user"},
 				}, nil)
+				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+					return prtb, nil
+				})
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				UserName:          "test-user",
@@ -136,8 +146,8 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 				UserName:          "test-user",
 				UserPrincipalName: "",
 			},
-			setupUserController: func(m *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
-				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(nil, errDefault)
+			setupControllers: func(c controllers) {
+				c.userController.EXPECT().Get("test-user", metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				UserName:          "test-user",
@@ -150,17 +160,18 @@ func TestPRTBHandlerReconcileSubject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			mockUserManager := userMocks.NewMockManager(ctrl)
-			mockUserController := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
-			if tt.setupUserManager != nil {
-				tt.setupUserManager(mockUserManager)
+			controllers := controllers{
+				userMGR:        userMocks.NewMockManager(ctrl),
+				userController: fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl),
+				prtbController: fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl),
 			}
-			if tt.setupUserController != nil {
-				tt.setupUserController(mockUserController)
+			if tt.setupControllers != nil {
+				tt.setupControllers(controllers)
 			}
 			p := &prtbHandler{
-				userMGR:        mockUserManager,
-				userController: mockUserController,
+				userMGR:        controllers.userMGR,
+				userController: controllers.userController,
+				prtbClient:     controllers.prtbController,
 			}
 
 			got, err := p.reconcileSubject(tt.binding)
@@ -976,7 +987,6 @@ func TestPRTBHandlerHandleMigration(t *testing.T) {
 	}
 }
 
-
 func TestDeleteDuplicatePRTBs(t *testing.T) {
 	t.Parallel()
 
@@ -1176,7 +1186,7 @@ func TestDeleteDuplicatePRTBs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "prtb-2",
 						Namespace:         "ns",
-						CreationTimestamp:  now,
+						CreationTimestamp: now,
 						DeletionTimestamp: &now,
 					},
 					UserName:         "user1",
@@ -1263,4 +1273,3 @@ func TestDeleteDuplicatePRTBs(t *testing.T) {
 		})
 	}
 }
-

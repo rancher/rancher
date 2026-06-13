@@ -233,7 +233,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			expectedURL: registryURL,
 			expectedPullSecrets: func(t *testing.T) []AgentPullSecret {
 				return []AgentPullSecret{{
-					Name:             "imported-secret",
+					Name:             "imported-secret-rancher-managed-pull-secret",
 					DockerConfigJSON: dockerConfigForCreds(t, "importuser", "importpass"),
 				}}
 			},
@@ -425,11 +425,11 @@ func TestGetPrivateRegistry(t *testing.T) {
 				URL: "cluster.registry.example.com",
 				PullSecrets: []corev1.SecretReference{
 					{
-						Namespace: "fleet-default",
+						Namespace: fleet.ClustersDefaultNamespace,
 						Name:      "imported-secret",
 					},
 					{
-						Namespace: "fleet-default",
+						Namespace: fleet.ClustersDefaultNamespace,
 						Name:      "imported-secret2",
 					},
 				},
@@ -632,62 +632,6 @@ func TestPrivateRegistryPullSecretsAsObjectReferences(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.expected, tt.registry.PullSecretsAsObjectReferences())
-		})
-	}
-}
-
-func TestGetPrivateRegistry(t *testing.T) {
-	clusterRegistry := &PrivateRegistry{URL: "registry.example.com"}
-
-	tests := []struct {
-		name                  string
-		cluster               *v3.Cluster
-		systemDefaultRegistry string
-		expected              *PrivateRegistry
-	}{
-		{
-			name: "cluster-level private registry is returned when present",
-			cluster: &v3.Cluster{
-				Spec: v3.ClusterSpec{
-					FleetWorkspaceName: "fleet-default",
-					ImportedConfig: &v3.ImportedConfig{
-						PrivateRegistryURL: "registry.example.com",
-					}}},
-			expected: clusterRegistry,
-		},
-		{
-			name:                  "system default registry is returned when no cluster-level registry",
-			cluster:               &v3.Cluster{},
-			systemDefaultRegistry: "system-default.example.com",
-			expected:              &PrivateRegistry{URL: "system-default.example.com"},
-		},
-		{
-			name:                  "nil returned when neither cluster nor system default registry exists",
-			cluster:               &v3.Cluster{},
-			systemDefaultRegistry: "",
-			expected:              nil,
-		},
-		{
-			name: "cluster-level private registry is returned when both private registry and system default registry exists",
-			cluster: &v3.Cluster{
-				Spec: v3.ClusterSpec{
-					FleetWorkspaceName: "fleet-default",
-					ImportedConfig: &v3.ImportedConfig{
-						PrivateRegistryURL: "registry.example.com",
-					}}},
-			systemDefaultRegistry: "system-default.example.com",
-			expected:              &PrivateRegistry{URL: "registry.example.com"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Patch the system default registry setting for the duration of the test
-			settings.SystemDefaultRegistry.Set(tt.systemDefaultRegistry)
-			defer settings.SystemDefaultRegistry.Set("")
-
-			result := GetPrivateRegistry(tt.cluster)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

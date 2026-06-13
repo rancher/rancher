@@ -3,6 +3,8 @@ package clusterdeploy
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -130,6 +132,10 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 		toUpdate.Status.AuthImage = modified.Status.AuthImage
 		toUpdate.Status.AppliedAgentEnvVars = modified.Status.AppliedAgentEnvVars
 		toUpdate.Status.AppliedClusterAgentDeploymentCustomization = modified.Status.AppliedClusterAgentDeploymentCustomization
+		toUpdate.Status.AppliedClusterAgentImagePullSecretsHash = modified.Status.AppliedClusterAgentImagePullSecretsHash
+		if !modified.Spec.Internal {
+			toUpdate.Status.AppliedWebhookDeploymentCustomization = modified.Status.AppliedWebhookDeploymentCustomization
+		}
 		// Copy conditions this controller owns
 		util.CopyCondition(apimgmtv3.ClusterConditionAgentDeployed, modified, toUpdate)
 		util.CopyCondition(apimgmtv3.ClusterConditionSystemAccountCreated, modified, toUpdate)
@@ -196,6 +202,10 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 
 	err = cd.managePodDisruptionBudget(cluster)
 	if err != nil {
+		return err
+	}
+
+	if err = cd.manageWebhookConfig(cluster); err != nil {
 		return err
 	}
 
@@ -329,6 +339,48 @@ func (cd *clusterDeploy) managePodDisruptionBudget(cluster *apimgmtv3.Cluster) e
 	return nil
 }
 
+// manageWebhookConfig pushes webhook deployment customization to a downstream cluster's
+// rancher-config ConfigMap so the embedded systemcharts controller can configure the
+// rancher-webhook chart without bouncing the cluster-agent. When the customization is
+// cleared, a ConfigMap with an empty value is applied so the chart reverts to defaults.
+// This follows the same pattern as managePriorityClass: detect change → get kubeconfig →
+// kubectl.Apply() the resource directly.
+func (cd *clusterDeploy) manageWebhookConfig(cluster *apimgmtv3.Cluster) error {
+	if cluster.Spec.Internal {
+		return nil
+	}
+
+	if !util.WebhookDeploymentCustomizationChanged(cluster) {
+		return nil
+	}
+
+	logrus.Infof("clusterDeploy: manageWebhookConfig: webhook deployment customization changed for cluster [%s], pushing ConfigMap", cluster.Name)
+
+	cmYAML, err := systemtemplate.WebhookConfigMapTemplate(cluster)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to generate webhook ConfigMap for cluster [%s]: %w", cluster.Name, err)
+	}
+
+	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to get kubeconfig for cluster [%s]: %w", cluster.Name, err)
+	}
+	defer func() {
+		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
+			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
+		}
+	}()
+
+	output, err := kubectl.Apply(cmYAML, kubeConfig)
+	if err != nil {
+		return fmt.Errorf("clusterDeploy: manageWebhookConfig: failed to apply webhook ConfigMap to cluster [%s]: %s: %w", cluster.Name, string(output), err)
+	}
+
+	logrus.Infof("clusterDeploy: manageWebhookConfig: successfully applied webhook ConfigMap to cluster [%s]", cluster.Name)
+	util.UpdateAppliedWebhookDeploymentCustomization(cluster)
+	return nil
+}
+
 // managePriorityClass compares the apimgmtv3.Cluster status and spec to determine if the priority class configuration has changed.
 // If the priority class configuration has not been updated, the function will exit early and return false booleans and a nil error. If a change is detected,
 // a kubeConfig will be generated, the downstream priority class will be deleted and recreated, and a boolean indicating the type of update will be returned.
@@ -418,6 +470,43 @@ func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeCon
 	return false, fmt.Errorf("clusterDeploy: error encountered querying downstream priority class: %w", err)
 }
 
+// manageImagePullSecretHash generates a hash of the image pull secrets configured
+// on the cluster and compares it to the hash stored in the cluster status. A change
+// in the hash indicates when one or more secrets used by the cluster need to be copied
+// downstream to stay up to date with the version in the local cluster.
+// The value is generated using the secrets name, namespace, and the observed resource version.
+func (cd *clusterDeploy) manageImagePullSecretHash(cluster *apimgmtv3.Cluster) (string, bool, error) {
+	if !util.MgmtNameRegexp.MatchString(cluster.Name) {
+		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
+	}
+
+	registry, _ := util.GetPrivateRegistry(cluster)
+	// since provisioned clusters don't use pull secrets we don't need to track the hash. This also helps
+	// reduce unneeded agent redeployments.
+	if registry == nil || len(registry.PullSecrets) == 0 {
+		return "", cluster.Status.AppliedClusterAgentImagePullSecretsHash != "", nil
+	}
+
+	var secretReferences []string
+	for _, pullSecret := range registry.PullSecrets {
+		s, err := cd.secretLister.Get(pullSecret.Namespace, pullSecret.Name)
+		if err != nil {
+			logrus.Errorf("clusterDeploy: manageImagePullSecretHash: failed to retrieve secret [%s]: %v", pullSecret.Name, err)
+			return "", false, err
+		}
+		secretReferences = append(secretReferences, fmt.Sprintf("%s:%s=%s", s.Namespace, s.Name, s.ResourceVersion))
+	}
+
+	hashBytes := sha256.Sum256([]byte(strings.Join(secretReferences, ",")))
+	hash := hex.EncodeToString(hashBytes[:])
+	if hash != cluster.Status.AppliedClusterAgentImagePullSecretsHash {
+		logrus.Debugf("clusterDeploy: manageImagePullSecretHash: returning true due to secret resource version hash change")
+		return hash, true, nil
+	}
+
+	return hash, false, nil
+}
+
 func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
@@ -440,8 +529,13 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
+	pullSecretHash, hashChanged, err := cd.manageImagePullSecretHash(cluster)
+	if err != nil {
+		return err
+	}
+
 	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
-	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated
+	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated || hashChanged
 	if !agentManifestChanged && !pcChanged {
 		return nil
 	}
@@ -544,6 +638,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
+	cluster.Status.AppliedClusterAgentImagePullSecretsHash = pullSecretHash
 
 	util.UpdateAppliedAgentDeploymentCustomization(cluster)
 
@@ -584,11 +679,23 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 		return nil, fmt.Errorf("waiting for server-url setting to be set")
 	}
 
-	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name,
-		token, url, capr.PreBootstrap(cluster), cluster, features,
-		taints, cd.secretLister, priorityClassExists, namespace.GetMutator())
+	ops := &systemtemplate.TemplateOps{
+		AgentImage:     agentImage,
+		AuthImage:      authImage,
+		Namespace:      cluster.Name,
+		Token:          token,
+		URL:            url,
+		IsPreBootstrap: capr.PreBootstrap(cluster),
+		Cluster:        cluster,
+		AgentFeatures:  features,
+		Taints:         taints,
+		SecretLister:   cd.secretLister,
+		PcExists:       priorityClassExists,
+		Mutator:        namespace.GetMutator(),
+	}
 
+	buf := &bytes.Buffer{}
+	err = systemtemplate.SystemTemplate(buf, ops)
 	return buf.Bytes(), err
 }
 

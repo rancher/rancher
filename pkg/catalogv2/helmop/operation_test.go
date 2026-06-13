@@ -1,9 +1,11 @@
 package helmop
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"strings"
 	"testing"
+
+	"github.com/rancher/rancher/pkg/settings"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -97,6 +99,26 @@ func Test_Render(t *testing.T) {
 				"test-chart-v1.1.0.tgz": []byte("test-chart"),
 			},
 			failMsg: "uninstall test case failed",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test6",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"skipSchemaValidation": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--skip-schema-validation=true", "test6", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "skip schema validation test case failed",
 		},
 	}
 
@@ -209,6 +231,38 @@ func Test_CreatePod(t *testing.T) {
 	}
 }
 
+func Test_CreatePod_ImagePullSecrets(t *testing.T) {
+	asserts := assert.New(t)
+
+	// Set up global registry with pull secrets
+	withSettings(t, "registry.example.com", "pull-secret-a,pull-secret-b")
+
+	operation := Operations{
+		namespace: "test-ns",
+	}
+
+	actual, _ := operation.createPod(nil, "", nil)
+	expectedPullSecrets := []corev1.LocalObjectReference{
+		{Name: "pull-secret-a"},
+		{Name: "pull-secret-b"},
+	}
+	asserts.Equal(expectedPullSecrets, actual.Spec.ImagePullSecrets, "Pod should have imagePullSecrets when global registry pull secrets are configured")
+}
+
+func Test_CreatePod_NoImagePullSecrets(t *testing.T) {
+	asserts := assert.New(t)
+
+	// Ensure no registry is configured
+	withSettings(t, "", "")
+
+	operation := Operations{
+		namespace: "test-ns",
+	}
+
+	actual, _ := operation.createPod(nil, "", nil)
+	asserts.Nil(actual.Spec.ImagePullSecrets, "Pod should not have imagePullSecrets when no global registry is configured")
+}
+
 func Test_mergeTolerations(t *testing.T) {
 	asserts := assert.New(t)
 	testCases := []mergeTolerationsTestCase{
@@ -268,4 +322,15 @@ func Test_mergeTolerations(t *testing.T) {
 		resp := mergeTolerations(t.tolerations, t.newTolerations)
 		asserts.ElementsMatch(resp, t.expected, t.name)
 	}
+}
+
+func withSettings(t *testing.T, sdr, pullSecrets string) {
+	curSdr := settings.SystemDefaultRegistry.Get()
+	curSdrPull := settings.SystemDefaultRegistryPullSecrets.Get()
+	settings.SystemDefaultRegistry.Set(sdr)
+	settings.SystemDefaultRegistryPullSecrets.Set(pullSecrets)
+	t.Cleanup(func() {
+		settings.SystemDefaultRegistry.Set(curSdr)
+		settings.SystemDefaultRegistryPullSecrets.Set(curSdrPull)
+	})
 }
