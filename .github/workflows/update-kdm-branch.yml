@@ -72,7 +72,7 @@ jobs:
 
       - name: Create App Token
         if: ${{ steps.changes.outputs.changes_exist == 'true' }}
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}

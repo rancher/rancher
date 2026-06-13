@@ -107,7 +107,7 @@ jobs:
           path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*"
       - name: Upload logdump artifact if we had some tests failures
         if: failure()
-        uses: rancherlabs/cowboy@be178bda40ee2199a674861d8ba1a399b28d5451
+        uses: rancherlabs/cowboy@61de86d99456805424f9af0dadfcf362413cd745
         with:
           log-file-path: provtest_output.txt
           artifact-retention-days: 7
