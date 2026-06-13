@@ -98,7 +98,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
       - name: Create App Token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.10.1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
