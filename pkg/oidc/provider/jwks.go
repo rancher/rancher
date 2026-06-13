@@ -113,7 +113,7 @@ func newJWKSHandler(secretCache corecontrollers.SecretCache, secretClient coreco
 		}
 
 		_, err = secretClient.Create(secret)
-		if err != nil {
+		if err != nil && !errors.IsAlreadyExists(err) {
 			return nil, err
 		}
 	}
