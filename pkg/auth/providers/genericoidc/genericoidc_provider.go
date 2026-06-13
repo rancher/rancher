@@ -122,7 +122,11 @@ func (g *GenOIDCProvider) TransformToAuthProvider(authConfig map[string]any) (ma
 
 	if authConfig["acrValue"] != nil {
 		redirectURL := p[publicclient.GenericOIDCProviderFieldRedirectURL].(string)
-		p[publicclient.GenericOIDCProviderFieldRedirectURL] = redirectURL + fmt.Sprintf("&acr_values=%s", authConfig["acrValue"])
+		separator := "&"
+		if !strings.Contains(redirectURL, "?") {
+			separator = "?"
+		}
+		p[publicclient.GenericOIDCProviderFieldRedirectURL] = redirectURL + fmt.Sprintf("%sacr_values=%s", separator, authConfig["acrValue"])
 	}
 
 	p[publicclient.GenericOIDCProviderFieldScopes] = authConfig["scope"]
