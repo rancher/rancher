@@ -28,7 +28,8 @@ import (
 )
 
 var (
-	ETCDSnapshotSaveResourceName = "etcdsnapshotsaves"
+	ETCDSnapshotSaveResourceName      = "etcdsnapshotsaves"
+	EncryptionKeyRotationResourceName = "encryptionkeyrotations"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -54,6 +55,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ETCDSnapshotSave{},
 		&ETCDSnapshotSaveList{},
+		&EncryptionKeyRotation{},
+		&EncryptionKeyRotationList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

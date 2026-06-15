@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,6 +38,8 @@ const (
 	DefaultKubeSchedulerCertDir = "server/tls/kube-scheduler"
 	DefaultKubeSchedulerCert    = "kube-scheduler.crt"
 	DefaultKubeSchedulerPort    = "10259"
+
+	OperationLeaderAnnotation = "rke.cattle.io/operation-leader"
 )
 
 var (
@@ -135,6 +138,16 @@ type Adapter interface {
 	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
 	// supervisor probe to fail.
 	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
+
+	// FindOrElectLeader finds an existing elected leader for the given operation or elects one
+	// from candidates passing filter. The elected leader is marked with an annotation on the
+	// machine-plan secret so the same node is reused across reconciles. Returns nil, nil when
+	// no suitable candidate exists yet.
+	FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error)
+
+	// PauseClusterActivity pauses or unpauses the owning cluster's control-plane activity.
+	// ImportedAdapter implements this as a no-op since imported clusters have no CAPI cluster.
+	PauseClusterActivity(paused bool) error
 }
 
 // NewAdapter returns an Adapter for the given cluster object.
@@ -230,4 +243,11 @@ func renderSecureProbe(arg any, probe plan.Probe, dataDir string, loopbackAddres
 		TLSCert = certDir + "/" + defaultCert
 	}
 	return ReplaceCACertAndPortForProbes(probe, TLSCert, loopbackAddress, securePort)
+}
+
+func MachineName(secret *corev1.Secret) string {
+	if secret == nil || secret.Labels == nil {
+		return ""
+	}
+	return secret.Labels[capr.MachineNameLabel]
 }

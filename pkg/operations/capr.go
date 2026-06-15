@@ -14,9 +14,11 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 )
 
 func init() {
@@ -189,8 +191,148 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 	return probes, nil
 }
 
+// isSuitableLeader returns true when the CAPI Machine backing the plan secret exists,
+// is not deleting, has a NodeRef, and is Ready.
+func (a *CAPRAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
+	machineName := MachineName(s)
+	machine, err := a.clients.CAPI.Machine().Cache().Get(a.controlPlane.Namespace, machineName)
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return machine.DeletionTimestamp == nil &&
+		machine.Status.NodeRef.IsDefined() &&
+		capr.Ready.IsTrue(machine), nil
+}
+
+// FindOrElectLeader finds or elects a machine-plan secret to lead the given operation.
+// Candidates are collected from the control-plane namespace, filtered by filter, and sorted
+// deterministically. An existing leader annotation is reused if the leader is still suitable;
+// otherwise a new leader is elected and the annotation written with retry-on-conflict.
+// Returns nil, nil when no suitable candidate exists yet.
+func (a *CAPRAdapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
+	secrets := a.clients.Core.Secret()
+	candidates, err := plan.NewCollector(secrets, a.controlPlane, a.controlPlane.Namespace).
+		WithFilter(plan.FilterFunc(filter)).
+		WithSorter(plan.DefaultSorter()).
+		Collect()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		marked        *corev1.Secret
+		markedCount   int
+		markedReady   bool
+		initCandidate *corev1.Secret
+		fallback      *corev1.Secret
+	)
+	for _, secret := range candidates {
+		if secret.Annotations[OperationLeaderAnnotation] == operation {
+			marked = secret
+			markedCount++
+			if markedCount > 1 {
+				return nil, fmt.Errorf("multiple machine-plan secrets marked as operation leader for %s", operation)
+			}
+		}
+
+		ok, err := a.isSuitableLeader(secret)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+
+		if marked != nil && secret.Namespace == marked.Namespace && secret.Name == marked.Name {
+			markedReady = true
+		}
+		if initCandidate == nil && IsInitNode(secret) {
+			initCandidate = secret
+		}
+		if fallback == nil {
+			fallback = secret
+		}
+	}
+
+	if marked != nil {
+		if markedReady {
+			return marked, nil
+		}
+		logrus.Warnf("[operations] %s/%s: elected leader %s is no longer suitable, re-electing", a.controlPlane.Namespace, a.controlPlane.Name, marked.Name)
+		if err := a.clearLeaderAnnotation(marked, operation); err != nil {
+			return nil, err
+		}
+	}
+	if initCandidate != nil {
+		return a.markLeader(initCandidate, operation)
+	}
+	if fallback != nil {
+		return a.markLeader(fallback, operation)
+	}
+	return nil, nil
+}
+
+func (a *CAPRAdapter) markLeader(secret *corev1.Secret, operation string) (*corev1.Secret, error) {
+	var updated *corev1.Secret
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		s, err := a.clients.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if s.Annotations[OperationLeaderAnnotation] == operation {
+			updated = s
+			return nil
+		}
+		if s.Annotations == nil {
+			s.Annotations = make(map[string]string)
+		}
+		s.Annotations[OperationLeaderAnnotation] = operation
+		updated, err = a.clients.Core.Secret().Update(s)
+		return err
+	})
+	return updated, err
+}
+
+func (a *CAPRAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		s, err := a.clients.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if s.Annotations == nil || s.Annotations[OperationLeaderAnnotation] != operation {
+			return nil
+		}
+		delete(s.Annotations, OperationLeaderAnnotation)
+		_, err = a.clients.Core.Secret().Update(s)
+		return err
+	})
+}
+
+// PauseClusterActivity sets spec.paused on the owning CAPI cluster.
+func (a *CAPRAdapter) PauseClusterActivity(paused bool) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cluster, err := capr.GetOwnerCAPICluster(a.controlPlane, a.clients.CAPI.Cluster().Cache())
+		if err != nil {
+			return err
+		}
+		if cluster == nil {
+			return fmt.Errorf("CAPI cluster does not exist for %s/%s", a.controlPlane.Namespace, a.controlPlane.Name)
+		}
+		cluster = cluster.DeepCopy()
+		if cluster.Spec.Paused != nil && *cluster.Spec.Paused == paused {
+			return nil
+		}
+		cluster.Spec.Paused = &paused
+		_, err = a.clients.CAPI.Cluster().Update(cluster)
+		return err
+	})
+}
+
 // Note: most of this functionally has been copied from the planner 1:1.
-// The intention is to split 100% of the planner code to both the planapi package and the operations package.
+// The intention is to split 100% of the planner code to both the plan package and the operations package.
 // This will ideally be performed before 2.15 is released; however, migrating piecemeal provides us with the flexibility
 // to make changes as desired without putting the existing codebase at risk.
 
