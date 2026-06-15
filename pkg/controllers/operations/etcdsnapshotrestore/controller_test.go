@@ -122,8 +122,8 @@ func TestBuildPostRestoreNodeCleanupPlan(t *testing.T) {
 	}
 
 	wantIdempotentPath := ops.IdempotentActionScriptPath(s.adapter.ProvisioningDataDirectory(initSecret))
-	wantCleanupPath := path.Join(s.adapter.DistroDataDirectory(initSecret), etcdRestoreBinSubdir, nodeCleanupScriptName)
-	wantNodeNamesPath := path.Join(s.adapter.DistroDataDirectory(initSecret), etcdRestoreBinSubdir, fmt.Sprintf("node-names-%s", string(s.op.UID)))
+	wantCleanupPath := path.Join(s.adapter.ProvisioningDataDirectory(initSecret), etcdRestoreBinSubdir, nodeCleanupScriptName)
+	wantNodeNamesPath := path.Join(s.adapter.ProvisioningDataDirectory(initSecret), etcdRestoreBinSubdir, fmt.Sprintf("node-names-%s", string(s.op.UID)))
 
 	pathsByPath := map[string]planapi.File{}
 	for _, f := range plan.Files {
