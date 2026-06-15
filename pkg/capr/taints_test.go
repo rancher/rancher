@@ -92,6 +92,32 @@ func TestGetExpectedDefaultTaints(t *testing.T) {
 			},
 		},
 		{
+			name: "etcd only (K3s split roles) - etcd taint",
+			machineLabels: map[string]string{
+				EtcdRoleLabel: "true",
+			},
+			runtime: RuntimeK3S,
+			expectedTaints: []corev1.Taint{
+				{
+					Key:    "node-role.kubernetes.io/etcd",
+					Effect: corev1.TaintEffectNoExecute,
+				},
+			},
+		},
+		{
+			name: "control plane only (K3s split roles) - control-plane taint",
+			machineLabels: map[string]string{
+				ControlPlaneRoleLabel: "true",
+			},
+			runtime: RuntimeK3S,
+			expectedTaints: []corev1.Taint{
+				{
+					Key:    "node-role.kubernetes.io/control-plane",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		{
 			name: "all roles - no taints (worker role present)",
 			machineLabels: map[string]string{
 				ControlPlaneRoleLabel: "true",
