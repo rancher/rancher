@@ -361,7 +361,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 			// the encryption server is reachable after key reload.
 			{
 				CommonInstruction: plan.CommonInstruction{
-					Name:    "wait-for-secrets-encrypt-status",
+					Name:    waitForStatusInstructionName,
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
 					Env:     env,
@@ -587,7 +587,7 @@ func (h *handler) reconcileRestartNode(
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions,
 			plan.OneTimeInstruction{
 				CommonInstruction: plan.CommonInstruction{
-					Name:    "wait-for-secrets-encrypt-status",
+					Name:    waitForStatusInstructionName,
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
 					Env:     env,
@@ -840,11 +840,12 @@ var errRotateKeysOutputNotYet = errors.New("rotate-keys output not yet available
 var errStatusTimeout = errors.New("secrets-encrypt status timed out")
 
 const (
-	rotateKeysInstructionName = "rotate-keys"
-	statusPeriodicName        = "secrets-encrypt-status"
-	stageReencryptFinished    = "reencrypt_finished"
-	hashesMatchMessage        = "All hashes match"
-	exitCodePrefix            = "rancher-rotate-keys-exit-code="
+	rotateKeysInstructionName    = "rotate-keys"
+	statusPeriodicName           = "secrets-encrypt-status"
+	waitForStatusInstructionName = "wait-for-secrets-encrypt-status"
+	stageReencryptFinished       = "reencrypt_finished"
+	hashesMatchMessage           = "All hashes match"
+	exitCodePrefix               = "rancher-rotate-keys-exit-code="
 
 	// rotateKeysTimeoutMessage and rotateKeysTimeoutEndpoint are combined with
 	// timeoutMarkers to identify CLI timeouts from the rotate-keys wrapper output.
