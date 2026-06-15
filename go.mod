@@ -95,7 +95,7 @@ require (
 	github.com/google/go-github/v73 v73.0.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/hashicorp/golang-lru v1.0.2
-	github.com/k3s-io/api v0.1.0
+	github.com/k3s-io/api v0.1.4
 	github.com/mattn/go-colorable v0.1.14
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/microsoft/kiota-abstractions-go v1.9.2
