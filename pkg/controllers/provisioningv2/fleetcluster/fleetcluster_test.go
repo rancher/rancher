@@ -2,6 +2,7 @@ package fleetcluster
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -79,7 +80,8 @@ func TestClusterCustomization(t *testing.T) {
 	require := require.New(t)
 
 	h := &handler{
-		getPrivateRepoURL: func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
+		getPrivateRepoURL:         func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
+		getPrivateRepoPullSecrets: getPrivateRepoSecrets,
 	}
 
 	cluster := &provv1.Cluster{
@@ -457,9 +459,250 @@ func TestAssignWorkspace(t *testing.T) {
 	}
 }
 
+func TestCreateCluster_WithPullSecrets(t *testing.T) {
+	tests := []struct {
+		name                       string
+		cluster                    *provv1.Cluster
+		status                     provv1.ClusterStatus
+		cachedClusters             map[string]*apimgmtv3.Cluster
+		expectedPullSecrets        []corev1.LocalObjectReference
+		privateRegistryURL         string
+		privateRegistryPullSecrets []string
+	}{
+		{
+			name: "no pull secrets",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "test-cluster",
+				ClientSecretName: "client-secret-name",
+			},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"test-cluster": newMgmtCluster(
+					"c-abc12",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						Internal:           false,
+					},
+				),
+			},
+		},
+		{
+			name: "one pull secret",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "test-cluster",
+				ClientSecretName: "client-secret-name",
+			},
+			expectedPullSecrets: []corev1.LocalObjectReference{{
+				Name: "ps1-rancher-managed-pull-secret",
+			}},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"test-cluster": newMgmtCluster(
+					"c-abc12",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ImportedConfig: &apimgmtv3.ImportedConfig{
+							PrivateRegistryURL: "test.com",
+							PrivateRegistryPullSecrets: []string{
+								"ps1",
+							},
+						},
+					},
+				),
+			},
+		},
+		{
+			name: "one pull secret, local cluster",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "local",
+					Namespace: "fleet-default",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "local",
+				ClientSecretName: "client-secret-name",
+			},
+			expectedPullSecrets: []corev1.LocalObjectReference{{
+				Name: "ps1",
+			}},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"local": newMgmtCluster(
+					"local",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ImportedConfig: &apimgmtv3.ImportedConfig{
+							PrivateRegistryURL: "test.com",
+							PrivateRegistryPullSecrets: []string{
+								"ps1",
+							},
+						},
+					},
+				),
+			},
+		},
+		{
+			name: "multiple pull secrets",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "test-cluster",
+				ClientSecretName: "client-secret-name",
+			},
+			expectedPullSecrets: []corev1.LocalObjectReference{
+				{Name: "ps1-rancher-managed-pull-secret"},
+				{Name: "ps2-rancher-managed-pull-secret"},
+			},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"test-cluster": newMgmtCluster(
+					"c-abc12",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ImportedConfig: &apimgmtv3.ImportedConfig{
+							PrivateRegistryURL: "test.com",
+							PrivateRegistryPullSecrets: []string{
+								"ps1",
+								"ps2",
+							},
+						},
+					},
+				),
+			},
+		},
+		{
+			name: "provisioned cluster does not deliver misconfigured pull secrets",
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "fleet-default",
+				},
+				Spec: provv1.ClusterSpec{},
+			},
+			status: provv1.ClusterStatus{
+				ClusterName:      "c-m-abc12",
+				ClientSecretName: "client-secret-name",
+			},
+			expectedPullSecrets: []corev1.LocalObjectReference{},
+			cachedClusters: map[string]*apimgmtv3.Cluster{
+				"c-m-abc12": newMgmtCluster(
+					"c-m-abc12",
+					map[string]string{
+						"cluster-group": "cluster-group-name",
+					},
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ImportedConfig: &apimgmtv3.ImportedConfig{
+							PrivateRegistryURL: "test.com",
+							PrivateRegistryPullSecrets: []string{
+								"ps1",
+								"ps2",
+							},
+						},
+					},
+				),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			h := &handler{
+				getPrivateRepoURL:         func(*provv1.Cluster, *apimgmtv3.Cluster) string { return tt.privateRegistryURL },
+				getPrivateRepoPullSecrets: getPrivateRepoSecrets,
+			}
+
+			h.clustersCache = newClusterCache(t, ctrl, tt.cachedClusters)
+			objs, _, err := h.createCluster(tt.cluster, tt.status)
+			if objs == nil {
+				t.Errorf("Expected non-nil objs: %v", err)
+			}
+
+			if err != nil {
+				t.Errorf("Expected nil err")
+			}
+
+			foundCluster := false
+			for _, obj := range objs {
+				cluster, ok := obj.(*fleet.Cluster)
+
+				if !ok {
+					continue
+				}
+
+				if cluster.Name != tt.cluster.Name || cluster.Namespace != tt.cluster.Namespace {
+					continue
+				}
+
+				foundCluster = true
+
+				// ensure pull secrets are equal
+				if len(tt.expectedPullSecrets) != 0 && cluster.Spec.AgentPullSecrets == nil {
+					t.Errorf("expected pull secrets %v, got nil AgentPullSecrets", tt.expectedPullSecrets)
+					t.FailNow()
+				}
+
+				if len(tt.expectedPullSecrets) == 0 && cluster.Spec.AgentPullSecrets == nil {
+					continue
+				}
+
+				if len(tt.expectedPullSecrets) != len(*cluster.Spec.AgentPullSecrets) {
+					t.Errorf("expected %d pull secrets, got %d", len(tt.expectedPullSecrets), len(*cluster.Spec.AgentPullSecrets))
+				}
+
+				for _, lor := range *cluster.Spec.AgentPullSecrets {
+					if !slices.Contains(tt.expectedPullSecrets, lor) {
+						t.Errorf("pull secret %s was not expected", lor)
+					}
+				}
+			}
+
+			if !foundCluster {
+				t.Errorf("Did not find expected cluster %v among created objects %v", tt.cluster, objs)
+			}
+		})
+	}
+}
+
 func TestCreateCluster(t *testing.T) {
 	h := &handler{
-		getPrivateRepoURL: func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
+		getPrivateRepoURL:         func(*provv1.Cluster, *apimgmtv3.Cluster) string { return "" },
+		getPrivateRepoPullSecrets: getPrivateRepoSecrets,
 	}
 
 	tests := []struct {
