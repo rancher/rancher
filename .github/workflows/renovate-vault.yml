@@ -51,7 +51,7 @@ permissions:
 
 jobs:
   call-workflow:
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@e87b4124e0f0d9091c31a265df7807ad2958ea0a # release
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@f6f6a076c8a7393c460e9c180e5d81586e9cd6cc # release
     with:
       configMigration: ${{ inputs.configMigration || 'true' }}
       logLevel: ${{ inputs.logLevel || 'info' }}
