@@ -149,7 +149,12 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				FullGroupPath: []string{"/admingroup"},
 				Roles:         []string{"adminrole"},
 			},
-			expectedClaimInfo: &ClaimInfo{},
+			expectedClaimInfo: &ClaimInfo{
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
+			},
 		},
 		"get groups with GroupsClaims": {
 			config: func(port string) *apiv3.OIDCConfig {
@@ -195,7 +200,58 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Groups: []string{"group1", "group2"},
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"group1", "group2"},
+			},
+		},
+		"get groups with GroupsClaim present only in UserInfo": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "custom:groups"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				// ID token intentionally omits "custom:groups".
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud": "test",
+					"exp": time.Now().Add(5 * time.Minute).Unix(),
+					"iss": "http://localhost:" + port,
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				// UserInfo carries the groups claim.
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"custom:groups": ["group1", "group2"]
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"group1", "group2"},
 			},
 		},
 		"error - invalid certificate": {
@@ -295,7 +351,62 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Name:  "Test User",
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Name:    "Test User",
+				Email:   "test@example.com",
+			},
+		},
+		"nameClaim configured but claim absent preserves standard name": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.NameClaim = "display_name"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"name":  "Standard Name",
+					"aud":   "test",
+					"exp":   time.Now().Add(5 * time.Minute).Unix(),
+					"email": "test@example.com",
+					"iss":   "http://localhost:" + port,
+					// no "display_name" claim
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+                }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				// Name must be preserved from the standard "name" claim in the
+				// ID token; it must NOT be wiped to "" just because the
+				// configured NameClaim ("display_name") is absent.
+				Name:  "Standard Name",
 				Email: "test@example.com",
 			},
 		},
@@ -344,7 +455,117 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Email: "test.dev@example.com",
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Email:   "test.dev@example.com",
+			},
+		},
+		"emailClaim configured but claim absent preserves standard email": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.EmailClaim = "work_email"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":   "test",
+					"exp":   time.Now().Add(5 * time.Minute).Unix(),
+					"email": "standard@example.com",
+					"iss":   "http://localhost:" + port,
+					// no "work_email" claim
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+                }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				// Email must be preserved from the standard "email" claim in the
+				// ID token; it must NOT be wiped to "" just because the
+				// configured EmailClaim ("work_email") is absent.
+				Email: "standard@example.com",
+			},
+		},
+		"groupsClaim configured but claim absent preserves standard groups": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "custom_groups"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud": "test",
+					"exp": time.Now().Add(5 * time.Minute).Unix(),
+					"iss": "http://localhost:" + port,
+					// no "custom_groups" claim
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				// UserInfo has standard "groups" and "full_group_path" but no "custom_groups".
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"groups": ["standardgroup"],
+				"full_group_path": ["/standardgroup"]
+                }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"standardgroup"},
+				FullGroupPath: []string{"/standardgroup"},
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				// Groups and FullGroupPath must be preserved from the standard
+				// UserInfo claims; they must NOT be wiped just because the
+				// configured GroupsClaim ("custom_groups") is absent.
+				Groups:        []string{"standardgroup"},
+				FullGroupPath: []string{"/standardgroup"},
 			},
 		},
 	}
