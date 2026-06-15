@@ -74,6 +74,8 @@ jobs:
         with:
           app-id: ${{ env.APP_ID }}
           private-key: ${{ env.PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Apply updatecli
         env:
