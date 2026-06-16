@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -394,6 +395,24 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		s.clientState.DeleteState(w, r, relayState)
 	}
 
+	// Validate the assertion's time conditions.
+	now := time.Now()
+	if err := checkAssertionTimeConditions(now, assertion.Conditions); err != nil {
+		log.Errorf("SAML: Rejected assertion ID %q: %v", assertion.ID, err)
+		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
+		return
+	}
+
+	assertionExpiry := now.Add(time.Hour)
+	if assertion.Conditions != nil && !assertion.Conditions.NotOnOrAfter.IsZero() {
+		assertionExpiry = assertion.Conditions.NotOnOrAfter
+	}
+	if s.assertionCache.seen(assertion.ID, assertionExpiry) {
+		log.Errorf("SAML: Rejected previous assertion ID %q", assertion.ID)
+		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
+		return
+	}
+
 	samlData := make(map[string][]string)
 
 	for _, attributeStatement := range assertion.AttributeStatements {
@@ -629,4 +648,79 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 
 func newJWTParser() *jwt.Parser {
 	return jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+}
+
+func validateFinalRedirectURL(redirectURL string, rancherServerURL string) (string, error) {
+	if redirectURL == "" {
+		return "", errors.New("redirect URL was not provided")
+	}
+	parsed, err := url.Parse(redirectURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid redirect URL: %w", err)
+	}
+	rancherParsed, err := url.Parse(rancherServerURL)
+	if err != nil {
+		return "", fmt.Errorf("could not parse Rancher server URL: %w", err)
+	}
+	if parsed.Host != rancherParsed.Host {
+		return "", fmt.Errorf("redirect URL host %q does not match Rancher host %q", parsed.Host, rancherParsed.Host)
+	}
+
+	return redirectURL, nil
+}
+
+// checkAssertionTimeConditions returns an error if now falls outside the
+// assertion's [NotBefore, NotOnOrAfter) validity window. A nil or zero-valued
+// bound is treated as unbounded on that side.
+func checkAssertionTimeConditions(now time.Time, conditions *saml.Conditions) error {
+	if conditions == nil {
+		return nil
+	}
+	if !conditions.NotBefore.IsZero() && now.Before(conditions.NotBefore) {
+		return fmt.Errorf("current time %s is before NotBefore %s", now, conditions.NotBefore)
+	}
+	if !conditions.NotOnOrAfter.IsZero() && !now.Before(conditions.NotOnOrAfter) {
+		return fmt.Errorf("current time %s is on or after NotOnOrAfter %s", now, conditions.NotOnOrAfter)
+	}
+
+	return nil
+}
+
+// assertionCache tracks recently seen SAML assertion IDs to prevent replay attacks.
+type assertionCache struct {
+	mu      sync.Mutex
+	entries map[string]time.Time // assertion ID -> expiry time
+}
+
+func newAssertionCache() *assertionCache {
+	return &assertionCache{
+		entries: make(map[string]time.Time),
+	}
+}
+
+// seen returns true if the assertion ID was seen before.
+//
+// If not seen, it records the ID with its expiry time and returns false.
+// Expired entries are evicted lazily on each call.
+func (c *assertionCache) seen(id string, expiry time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.evict()
+	if _, ok := c.entries[id]; ok {
+		return true
+	}
+	c.entries[id] = expiry
+	return false
+}
+
+// evict removes expired entries.
+//
+// Must be called with c.mu held.
+func (c *assertionCache) evict() {
+	now := time.Now()
+	for id, exp := range c.entries {
+		if now.After(exp) {
+			delete(c.entries, id)
+		}
+	}
 }
