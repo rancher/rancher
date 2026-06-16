@@ -153,7 +153,7 @@ func Register(ctx context.Context, cluster *config.UserContext, secretsCache cor
 
 	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
 		extToken := w.Client.Token()
-		handler.extTokenIndexer = extToken.Informer().GetIndexer()
+		handler.extTokenIndexer.Store(extToken.Informer().GetIndexer())
 		extTokenLifecycle(ctx, extToken, extTokenController, clusterName, handler)
 
 		catHandler := &clusterAuthTokenHandler{
