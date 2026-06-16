@@ -19,15 +19,15 @@ import (
 // factories in doStart().
 func TestRegisterFactoryDuplicate(t *testing.T) {
 	t.Parallel()
-	cluster := buildMinimalUserContext(t)
 
+	cluster := buildMinimalUserContext(t)
 	cache, err := RegisterFactory(cluster)
 	require.NoError(t, err)
 	assert.NotNil(t, cache)
 
 	_, err = RegisterFactory(cluster)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate")
+	assert.ErrorContains(t, err, "duplicate")
 }
 
 // buildMinimalUserContext constructs the minimum UserContext needed to test
@@ -36,11 +36,13 @@ func TestRegisterFactoryDuplicate(t *testing.T) {
 // RegisterExtraControllerFactory does not call factory.Start()).
 func buildMinimalUserContext(t *testing.T) *config.UserContext {
 	t.Helper()
+
 	cfg := &rest.Config{Host: "http://127.0.0.1:0"}
 	clientFactory, err := client.NewSharedClientFactory(cfg, nil)
 	require.NoError(t, err)
 	cacheFactory := lassocache.NewSharedCachedFactory(clientFactory, nil)
 	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, nil)
+
 	return &config.UserContext{
 		ClusterName:       "test-cluster",
 		ControllerFactory: controllerFactory,
