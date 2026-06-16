@@ -21,7 +21,9 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/types/config"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -62,6 +64,7 @@ type handler struct {
 	dynamic                dynamicClient
 	etcdSnapshotCache      rkev1controllers.ETCDSnapshotCache
 	etcdSnapshotController rkev1controllers.ETCDSnapshotController
+	beaconCache            plancontrollers.BeaconCache
 
 	nodeCache                  corecontrollers.NodeCache
 	etcdSnapshotFileController k3scontrollers.ETCDSnapshotFileController
@@ -76,6 +79,7 @@ func Register(ctx context.Context, userContext *config.UserContext, cluster *api
 		dynamic:                    userContext.Management.Wrangler.Dynamic,
 		etcdSnapshotCache:          userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
 		etcdSnapshotController:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
+		beaconCache:                userContext.Management.Wrangler.Plan.Beacon().Cache(),
 		nodeCache:                  userContext.Corew.Node().Cache(),
 		etcdSnapshotFileController: userContext.K3s.V1().ETCDSnapshotFile(),
 		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
@@ -129,24 +133,22 @@ func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rke
 		namespace = cluster.GetName()
 	}
 
+	beacon, err := h.beaconCache.Get(namespace, cluster.GetName())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return snapshot, err
+	}
+
+	// Abort if anything is holding the beacon
+	if !planapi.HoldingBeacon(beacon, "") {
+		h.etcdSnapshotController.EnqueueAfter(snapshot.Namespace, snapshot.Name, 1*time.Minute)
+		return snapshot, nil
+	}
+
 	if snapshot.Namespace != namespace || snapshot.Labels == nil || snapshot.Labels[capr.ClusterNameLabel] != cluster.GetName() {
 		return snapshot, nil
 	}
 
 	logPrefix := getLogPrefix(cluster)
-
-	// todo: check if object is busy/restoring
-	//controlPlane, err := h.controlPlaneCache.Get(cluster.Namespace, cluster.Name)
-	//if err != nil {
-	//	return snapshot, err
-	//}
-
-	//// if controlplane is currently performing a restore, reconciling snapshots will be postponed until post restore
-	//if controlPlane.Spec.ETCDSnapshotRestore != nil && controlPlane.Status.ETCDSnapshotRestore != nil &&
-	//	controlPlane.Spec.ETCDSnapshotRestore.Generation != controlPlane.Status.ETCDSnapshotRestore.Generation {
-	//	h.etcdSnapshotController.EnqueueAfter(snapshot.Namespace, snapshot.Name, 1*time.Minute)
-	//	return snapshot, nil
-	//}
 
 	// Only delete snapshots if the annotation is present: this will allow users to manually create snapshot objects during a DR scenario
 	if snapshot.Annotations == nil || snapshot.Annotations[capr.SnapshotNameAnnotation] == "" {
@@ -201,19 +203,22 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 		return downstream, errors.Join(errs...)
 	}
 
-	//controlPlane, err := h.controlPlaneCache.Get(cluster.Namespace, cluster.Name)
-	//if err != nil {
-	//	return downstream, err
-	//}
-	//
-	//// if controlplane is currently performing a restore, reconciling snapshots will be postponed until post restore
-	//if controlPlane.Spec.ETCDSnapshotRestore != nil && controlPlane.Status.ETCDSnapshotRestore != nil &&
-	//	controlPlane.Spec.ETCDSnapshotRestore.Generation != controlPlane.Status.ETCDSnapshotRestore.Generation {
-	//	logrus.Debugf("%s skipping snapshot reconcile as cluster is being restored", logPrefix)
-	//
-	//	h.etcdSnapshotFileController.EnqueueAfter(downstream.Name, 1*time.Minute)
-	//	return downstream, nil
-	//}
+	namespace := cluster.GetNamespace()
+	if namespace == "" {
+		// Assume cluster-scoped resources (e.g. mgmt cluster) use namespace mapping to name of the resource
+		namespace = cluster.GetName()
+	}
+
+	beacon, err := h.beaconCache.Get(namespace, cluster.GetName())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return downstream, err
+	}
+
+	// Abort if anything is holding the beacon
+	if !planapi.HoldingBeacon(beacon, "") {
+		h.etcdSnapshotFileController.EnqueueAfter(downstream.Name, 1*time.Minute)
+		return downstream, nil
+	}
 
 	logrus.Infof("%s processing snapshot %s", logPrefix, downstream.Name)
 

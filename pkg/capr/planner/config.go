@@ -652,7 +652,7 @@ func updateConfigWithAdvertiseAddresses(config map[string]interface{}, info *mac
 	}
 }
 
-func addLabels(config map[string]interface{}, entry *planEntry) error {
+func addLabels(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) error {
 	var labels []string
 	if data := entry.Metadata.Annotations[capr.LabelsAnnotation]; data != "" {
 		labelMap := map[string]string{}
@@ -666,16 +666,15 @@ func addLabels(config map[string]interface{}, entry *planEntry) error {
 
 	labels = append(labels, capr.MachineUIDLabel+"="+string(entry.Machine.UID))
 
-	// todo: add cluster lifecycle labels
-	//lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(nil)
-	//if err != nil {
-	//	return err
-	//}
-	//for k, v := range lifecycleLabels {
-	//	labels = append(labels, fmt.Sprintf("%s=%s", k, v))
-	//}
+	lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(controlPlane)
+	if err != nil {
+		return err
+	}
+	for k, v := range lifecycleLabels {
+		labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+	}
 
-	lifecycleLabels, err := planv1alpha1.ObjToMachineLifecycleLabels(entry.Machine)
+	lifecycleLabels, err = planv1alpha1.ObjToMachineLifecycleLabels(entry.Machine)
 	if err != nil {
 		return err
 	}
@@ -886,7 +885,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
-	if err := addLabels(config, entry); err != nil {
+	if err := addLabels(config, controlPlane, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
 	if err := addTaints(config, entry, controlPlane); err != nil {

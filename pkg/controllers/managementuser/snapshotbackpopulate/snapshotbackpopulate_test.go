@@ -88,10 +88,19 @@ func TestOnUpstreamChange(t *testing.T) {
 		{
 			name:     "snapshot from different namespace",
 			snapshot: rkev1.NewETCDSnapshot("other-namespace", "test-snapshot", rkev1.ETCDSnapshot{}),
-			handlerFunc: func(_ *gomock.Controller) handler {
+			handlerFunc: func(ctrl *gomock.Controller) handler {
 				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-cluster",
+					},
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				return handler{
-					dynamic: &dynamicClientFake{obj: cluster},
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
 					clusterRef: corev1.ObjectReference{
 						APIVersion: "provisioning.cattle.io/v1",
 						Kind:       "Cluster",
@@ -105,10 +114,19 @@ func TestOnUpstreamChange(t *testing.T) {
 		{
 			name:     "snapshot has no labels",
 			snapshot: rkev1.NewETCDSnapshot("test-namespace", "test-snapshot", rkev1.ETCDSnapshot{}),
-			handlerFunc: func(_ *gomock.Controller) handler {
+			handlerFunc: func(ctrl *gomock.Controller) handler {
 				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-cluster",
+					},
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				return handler{
-					dynamic: &dynamicClientFake{obj: cluster},
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
 					clusterRef: corev1.ObjectReference{
 						APIVersion: "provisioning.cattle.io/v1",
 						Kind:       "Cluster",
@@ -128,10 +146,19 @@ func TestOnUpstreamChange(t *testing.T) {
 					},
 				},
 			}),
-			handlerFunc: func(_ *gomock.Controller) handler {
+			handlerFunc: func(ctrl *gomock.Controller) handler {
 				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-cluster",
+					},
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				return handler{
-					dynamic: &dynamicClientFake{obj: cluster},
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
 					clusterRef: corev1.ObjectReference{
 						APIVersion: "provisioning.cattle.io/v1",
 						Kind:       "Cluster",
@@ -151,10 +178,19 @@ func TestOnUpstreamChange(t *testing.T) {
 					},
 				},
 			}),
-			handlerFunc: func(_ *gomock.Controller) handler {
+			handlerFunc: func(ctrl *gomock.Controller) handler {
 				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-cluster",
+					},
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				return handler{
-					dynamic: &dynamicClientFake{obj: cluster},
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
 					clusterRef: corev1.ObjectReference{
 						APIVersion: "provisioning.cattle.io/v1",
 						Kind:       "Cluster",
@@ -179,10 +215,19 @@ func TestOnUpstreamChange(t *testing.T) {
 			}),
 			handlerFunc: func(ctrl *gomock.Controller) handler {
 				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-cluster",
+					},
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
 				etcdSnapshotFileController.EXPECT().Get("test-snapshot-downstream", gomock.Any()).Return(&k3s.ETCDSnapshotFile{}, nil)
 				return handler{
-					dynamic: &dynamicClientFake{obj: cluster},
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
 					clusterRef: corev1.ObjectReference{
 						APIVersion: "provisioning.cattle.io/v1",
 						Kind:       "Cluster",
@@ -210,10 +255,19 @@ func TestOnUpstreamChange(t *testing.T) {
 				cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
 				etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
 				etcdSnapshotFileController.EXPECT().Get("test-snapshot-downstream", gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "test-snapshot-downstream"))
+				beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+				beacon := &planv1alpha1.Beacon{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-cluster",
+					},
+				}
+				beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 				etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
 				etcdSnapshotController.EXPECT().Delete("test-namespace", "test-snapshot", gomock.Any()).Return(nil)
 				return handler{
-					dynamic: &dynamicClientFake{obj: cluster},
+					beaconCache: beaconCache,
+					dynamic:     &dynamicClientFake{obj: cluster},
 					clusterRef: corev1.ObjectReference{
 						APIVersion: "provisioning.cattle.io/v1",
 						Kind:       "Cluster",
@@ -252,6 +306,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
 	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
+	beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
 	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
 	nodeCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Node](ctrl)
 
@@ -273,6 +328,7 @@ func TestOnDownstreamChange(t *testing.T) {
 		dynamic:                    dynamicSuccess,
 		etcdSnapshotCache:          etcdSnapshotCache,
 		etcdSnapshotController:     etcdSnapshotController,
+		beaconCache:                beaconCache,
 		nodeCache:                  nodeCache,
 		etcdSnapshotFileController: etcdSnapshotFileController,
 	}
@@ -302,6 +358,13 @@ func TestOnDownstreamChange(t *testing.T) {
 		Status: k3s.ETCDSnapshotStatus{
 			CreationTime: &metav1.Time{Time: time.Now()},
 			ReadyToUse:   ptr.To(true),
+		},
+	}
+
+	beacon := &planv1alpha1.Beacon{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
 		},
 	}
 
@@ -367,6 +430,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	snapshot.DeletionTimestamp = nil
 
 	etcdSnapshotCache.EXPECT().GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/test-snapshot-downstream").Return(nil, errors.New("error")).Times(1)
+	beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.Error(t, err, "It should return an error if getting snapshots from the index fails")
@@ -380,8 +444,8 @@ func TestOnDownstreamChange(t *testing.T) {
 				planv1alpha1.MachineLifecycleGroup:     "cluster.x-k8s.io",
 				planv1alpha1.MachineLifecycleVersion:   "v1beta2",
 				planv1alpha1.MachineLifecycleKind:      "Machine",
-				planv1alpha1.MachineLifecycleNamespace:  "test-namespace",
-				planv1alpha1.MachineLifecycleName:       "test-machine",
+				planv1alpha1.MachineLifecycleNamespace: "test-namespace",
+				planv1alpha1.MachineLifecycleName:      "test-machine",
 			},
 		},
 	}
@@ -529,12 +593,13 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 		},
 	}
 
-	mockController := gomock.NewController(t)
+	ctrl := gomock.NewController(t)
 
-	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](mockController)
-	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](mockController)
-	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](mockController)
-	nodeCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Node](mockController)
+	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
+	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
+	beaconCache := fake.NewMockCacheInterface[*planv1alpha1.Beacon](ctrl)
+	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
+	nodeCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Node](ctrl)
 
 	cluster := newProvisioningClusterUnstructured("fleet-default", "example")
 
@@ -545,8 +610,8 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 				planv1alpha1.MachineLifecycleGroup:     "cluster.x-k8s.io",
 				planv1alpha1.MachineLifecycleVersion:   "v1beta2",
 				planv1alpha1.MachineLifecycleKind:      "Machine",
-				planv1alpha1.MachineLifecycleNamespace:  "fleet-default",
-				planv1alpha1.MachineLifecycleName:       "machine-0",
+				planv1alpha1.MachineLifecycleNamespace: "fleet-default",
+				planv1alpha1.MachineLifecycleName:      "machine-0",
 			},
 		},
 	}
@@ -561,9 +626,19 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 		dynamic:                    &dynamicClientFake{obj: cluster},
 		etcdSnapshotCache:          etcdSnapshotCache,
 		etcdSnapshotController:     etcdSnapshotController,
+		beaconCache:                beaconCache,
 		nodeCache:                  nodeCache,
 		etcdSnapshotFileController: etcdSnapshotFileController,
 	}
+
+	beacon := &planv1alpha1.Beacon{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fleet-default",
+			Name:      "example",
+		},
+	}
+
+	beaconCache.EXPECT().Get(cluster.GetNamespace(), cluster.GetName()).Return(beacon, nil).AnyTimes()
 
 	makeDownstream := func(isS3Storage bool, metadata map[string]string, name string) *k3s.ETCDSnapshotFile {
 		ds := &k3s.ETCDSnapshotFile{
@@ -809,8 +884,8 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 		planv1alpha1.MachineLifecycleGroup:     "cluster.x-k8s.io",
 		planv1alpha1.MachineLifecycleVersion:   "v1beta2",
 		planv1alpha1.MachineLifecycleKind:      "Machine",
-		planv1alpha1.MachineLifecycleNamespace:  "fleet-default",
-		planv1alpha1.MachineLifecycleName:       "test-machine",
+		planv1alpha1.MachineLifecycleNamespace: "fleet-default",
+		planv1alpha1.MachineLifecycleName:      "test-machine",
 	}
 
 	tests := []struct {

@@ -58,9 +58,10 @@ func ToggleBeacon(beacon *planv1alpha1.Beacon, active bool, beacons plancontroll
 }
 
 // HoldingBeacon returns true if the beacon is owned by the desired owner.
+// If desiredOwner is empty string, validates nothing is holding beacon.
 func HoldingBeacon(beacon *planv1alpha1.Beacon, desiredOwner string) bool {
 	if beacon == nil || beacon.Labels == nil {
-		return false
+		return desiredOwner == ""
 	}
 	return beacon.Labels[planv1alpha1.BeaconOwnerLabel] == desiredOwner
 }
