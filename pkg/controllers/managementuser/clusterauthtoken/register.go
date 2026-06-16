@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
@@ -19,7 +18,6 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,7 +25,6 @@ import (
 const (
 	tokenByUserAndClusterIndex = "auth.management.cattle.io/token-by-user-and-cluster"
 
-	clusterController              = "cat-cluster-controller-deferred"
 	tokenController                = "cat-token-controller"
 	extTokenController             = "cat-ext-token-controller"
 	settingController              = "cat-setting-controller"
@@ -57,32 +54,43 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 		})
 }
 
-// Register sets up cluster initializations to run when the cluster has started.
-func Register(ctx context.Context, cluster *config.UserContext) {
-	// Defer until the EXT API is ready
-	clusters := cluster.Management.Management.Clusters("")
+// RegisterFactory creates the dedicated namespace-scoped secrets cache for
+// clusterauthtoken handlers and registers it with the UserContext so it is
+// started by UserContext.Start() as part of doStart()'s normal factory-start
+// sequence.
+//
+// Must be called before UserContext.Start() — i.e. during managementuser.Register,
+// while the transaction is open and startContext is still nil. When Start() is
+// later called, the factory starts alongside ControllerFactory and all others;
+// if it fails, the error surfaces through doStart() to the cluster manager,
+// which logs the failure, marks the cluster unavailable, and retries.
+//
+// Returns the SecretCache to pass to Register() for handler wiring.
+func RegisterFactory(cluster *config.UserContext) (corecontrollers.SecretCache, error) {
+	clientFactory := cluster.ControllerFactory.SharedCacheFactory().SharedClientFactory()
+	secretsCache, controllerFactory := newDedicatedSecretsCache(clientFactory, common.DefaultNamespace)
+	// startContext is nil here: factory is added to extraControllerFactories
+	// without being started. UserContext.Start() starts it in its factory loop.
+	if err := cluster.RegisterExtraControllerFactory("clusterauthtoken", controllerFactory); err != nil {
+		return nil, err
+	}
+	return secretsCache, nil
+}
+
+// Register wires up clusterauthtoken event handlers once the EXT API is ready.
+// secretsCache must be the value returned by RegisterFactory on the same
+// UserContext. Handler wiring is pure in-process Go with no network calls, so
+// no retry machinery is needed.
+func Register(ctx context.Context, cluster *config.UserContext, secretsCache corecontrollers.SecretCache) {
 	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
-		starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
-			if err := registerDeferred(ctx, cluster, w); err != nil {
-				logrus.Errorf("[%s] Failed to register controller: %v", clusterAuthTokenController, err)
-				return err
-			}
-			return nil
-		})
-		clusters.AddHandler(ctx, clusterController, func(key string, obj *v3.Cluster) (runtime.Object, error) {
-			if obj != nil &&
-				obj.Name == cluster.ClusterName &&
-				obj.Spec.LocalClusterAuthEndpoint.Enabled {
-				return obj, starter()
-			}
-			return obj, nil
-		})
+		registerHandlers(ctx, cluster, secretsCache, w)
 	})
 }
 
-// registerDeferred sets up the handlers for the new remote cluster which sync
-// tokens (v3 and ext) to the cluster auth tokens in that remote.
-func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPIContext *wrangler.EXTAPIContext) error {
+// registerHandlers wires all event handlers. It has no factory lifecycle
+// operations and makes no network calls, so it is called synchronously from
+// the DeferFunc goroutine without additional wrapping or a retry gate.
+func registerHandlers(ctx context.Context, cluster *config.UserContext, secretsCache corecontrollers.SecretCache, extAPIContext *wrangler.EXTAPIContext) {
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 	tokenCache := cluster.Management.Wrangler.Mgmt.Token().Cache()
 	tokenClient := cluster.Management.Wrangler.Mgmt.Token()
@@ -102,14 +110,6 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPICo
 	userAttributeLister := cluster.Management.Management.UserAttributes("").Controller().Lister()
 	settingInterface := cluster.Management.Management.Settings("")
 
-	// We use a separate controller factory that only watches a single namespace. This ensures that the cache does not contain all the secrets, just those of that namespace.
-	// The default controller factory does not allow caching secrets for all namespaces, see https://github.com/rancher/rancher/issues/46827
-	clientFactory := cluster.ControllerFactory.SharedCacheFactory().SharedClientFactory()
-	clusterSecretLister, controllerFactory := newDedicatedSecretsCache(clientFactory, namespace)
-	if err := cluster.RegisterExtraControllerFactory("clusterauthtoken", controllerFactory); err != nil {
-		return err
-	}
-
 	cluster.Management.Management.Settings("").AddHandler(ctx, settingController, (&settingHandler{
 		namespace,
 		clusterConfigMap,
@@ -127,7 +127,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPICo
 		userLister:                 userLister,
 		userAttributeLister:        userAttributeLister,
 		clusterSecret:              clusterSecret,
-		clusterSecretLister:        clusterSecretLister,
+		clusterSecretLister:        secretsCache,
 	}
 
 	cluster.Management.Management.Tokens("").AddClusterScopedLifecycle(ctx,
@@ -161,13 +161,10 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPICo
 		tokenCache:  tokenCache,
 		tokenClient: tokenClient,
 	}
-
 	catHandler.extTokenCache = extAPIContext.Client.Token().Cache()
 	catHandler.extTokenStore = extstore.NewSystemFromWrangler(cluster.Management.Wrangler)
 
 	cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, catHandler.sync)
-
-	return nil
 }
 
 func newDedicatedSecretsCache(clientFactory client.SharedClientFactory, namespace string) (corecontrollers.SecretCache, controller.SharedControllerFactory) {
@@ -176,18 +173,14 @@ func newDedicatedSecretsCache(clientFactory client.SharedClientFactory, namespac
 			corev1.SchemeGroupVersion.WithKind("Secret"): namespace,
 		},
 	})
-
 	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, controllers.GetOptsFromEnv(controllers.User))
 	return corecontrollers.New(controllerFactory).Secret().Cache(), controllerFactory
 }
 
-// tokenUserClusterKey computes the v3 token's key for indexing by user and
-// cluster
 func tokenUserClusterKey(token *managementv3.Token) string {
 	return fmt.Sprintf("%s/%s", token.UserID, token.ClusterName)
 }
 
-// tokenByUserAndCluster indexes v3 tokens by the user and cluster they belong to
 func tokenByUserAndCluster(obj any) ([]string, error) {
 	t, ok := obj.(*managementv3.Token)
 	if !ok {
@@ -196,7 +189,6 @@ func tokenByUserAndCluster(obj any) ([]string, error) {
 	return []string{tokenUserClusterKey(t)}, nil
 }
 
-// extTokenByUserAndCluster indexes ext tokens by the user and cluster they belong to
 func extTokenByUserAndCluster(obj any) ([]string, error) {
 	t, ok := obj.(*extv1.Token)
 	if !ok {
@@ -205,26 +197,19 @@ func extTokenByUserAndCluster(obj any) ([]string, error) {
 	return []string{extTokenUserClusterKey(t)}, nil
 }
 
-// extTokenUserClusterKey computes the ext token's key for indexing by user and
-// cluster
 func extTokenUserClusterKey(token *extv1.Token) string {
 	return fmt.Sprintf("%s/%s", token.Spec.UserID, token.Spec.ClusterName)
 }
 
-// extTokenLifecycle registers handlers watching for tokens scoped to the given
-// cluster. The handlers sync changes in these tokens to the remote cluster, as
-// cluster auth tokens.
 func extTokenLifecycle(ctx context.Context, tok ext.TokenController, controller, clusterName string, h *tokenHandler) {
 	logrus.Debugf("[%s] WATCH CLUSTER %q", clusterAuthTokenController, clusterName)
 
 	tok.OnChange(ctx,
 		controller+"-change-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
-			// ignore removals
 			if obj == nil {
 				return obj, nil
 			}
-			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
 			}
@@ -235,7 +220,6 @@ func extTokenLifecycle(ctx context.Context, tok ext.TokenController, controller,
 	tok.OnRemove(ctx,
 		controller+"-remove-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
-			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
 			}
