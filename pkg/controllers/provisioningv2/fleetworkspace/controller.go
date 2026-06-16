@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,12 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	mgmtcontrollers.RegisterFleetWorkspaceGeneratingHandler(ctx,
 		clients.Mgmt.FleetWorkspace(),
 		clients.Apply.
-			WithCacheTypes(clients.Core.Namespace()),
+			WithCacheTypes(
+				clients.Core.Namespace(),
+				clients.RBAC.RoleBinding(),
+				clients.RBAC.ClusterRole(),
+				clients.RBAC.ClusterRoleBinding(),
+			),
 		"",
 		"workspace",
 		h.OnChange,
@@ -96,14 +102,70 @@ func (h *handle) OnChange(workspace *mgmt.FleetWorkspace, status mgmt.FleetWorks
 		return nil, status, nil
 	}
 
-	return []runtime.Object{
+	objs := []runtime.Object{
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   workspace.Name,
 				Labels: yaml.CleanAnnotationsForExport(workspace.Labels),
 			},
 		},
-	}, status, nil
+	}
+
+	creator := workspace.Annotations["field.cattle.io/creatorId"]
+	if creator != "" {
+		objs = append(objs,
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fleetworkspace-admin-binding-" + workspace.Name,
+					Namespace: workspace.Name,
+				},
+				Subjects: []rbacv1.Subject{
+					{
+						Kind:     "User",
+						APIGroup: "rbac.authorization.k8s.io",
+						Name:     creator,
+					},
+				},
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: "rbac.authorization.k8s.io",
+					Kind:     "ClusterRole",
+					Name:     "fleetworkspace-admin",
+				},
+			},
+			&rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fleetworkspace-own-" + workspace.Name,
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{"management.cattle.io"},
+						Resources:     []string{"fleetworkspaces"},
+						ResourceNames: []string{workspace.Name},
+						Verbs:         []string{"*"},
+					},
+				},
+			},
+			&rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fleetworkspace-own-binding-" + workspace.Name,
+				},
+				Subjects: []rbacv1.Subject{
+					{
+						Kind:     "User",
+						APIGroup: "rbac.authorization.k8s.io",
+						Name:     creator,
+					},
+				},
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: "rbac.authorization.k8s.io",
+					Kind:     "ClusterRole",
+					Name:     "fleetworkspace-own-" + workspace.Name,
+				},
+			},
+		)
+	}
+
+	return objs, status, nil
 }
 
 func (h *handle) onFleetObject(obj runtime.Object) error {
