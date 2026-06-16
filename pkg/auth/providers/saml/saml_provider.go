@@ -51,20 +51,23 @@ type Provider struct {
 	ldapProvider    common.AuthProvider
 	sloEnabled      bool
 	sloForced       bool
+
+	assertionCache *assertionCache
 }
 
 var SamlProviders = make(map[string]*Provider)
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	provider := &Provider{
-		authConfigs: mgmtCtx.Management.AuthConfigs(""),
-		secrets:     mgmtCtx.Wrangler.Core.Secret(),
-		samlTokens:  mgmtCtx.Management.SamlTokens(""),
-		userMGR:     userMGR,
-		tokenMGR:    tokenMGR,
-		name:        name,
-		userType:    name + "_user",
-		groupType:   name + "_group",
+		authConfigs:    mgmtCtx.Management.AuthConfigs(""),
+		secrets:        mgmtCtx.Wrangler.Core.Secret(),
+		samlTokens:     mgmtCtx.Management.SamlTokens(""),
+		userMGR:        userMGR,
+		tokenMGR:       tokenMGR,
+		name:           name,
+		userType:       name + "_user",
+		groupType:      name + "_group",
+		assertionCache: newAssertionCache(),
 	}
 
 	if provider.hasLdapGroupSearch() {
