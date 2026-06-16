@@ -1054,6 +1054,14 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	return newToken, nil
 }
 
+// Patch applies the given JSONPatchType to the named token. It operates
+// directly on the internal secret. Use this only for operations on labels
+// and/or annotations.
+func (t *SystemStore) Patch(name string, patch []byte) error {
+	_, err := t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
+}
+
 // UpdateLastUsedAt patches the last-used-at information of the token.
 // Called during authentication.
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
