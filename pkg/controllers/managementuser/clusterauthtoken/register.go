@@ -77,26 +77,23 @@ func RegisterFactory(cluster *config.UserContext) (corecontrollers.SecretCache, 
 	return secretsCache, nil
 }
 
-// Register wires up clusterauthtoken event handlers once the EXT API is ready.
-// secretsCache must be the value returned by RegisterFactory on the same
-// UserContext. Handler wiring is pure in-process Go with no network calls, so
-// no retry machinery is needed.
+// Register wires up clusterauthtoken event handlers. secretsCache must be the
+// value returned by RegisterFactory on the same UserContext.
+//
+// v3 Token handlers are registered immediately — they have no EXT API
+// dependency and are active as soon as the management informers deliver events,
+// eliminating the EXT API readiness window for v3 Token → ClusterAuthToken sync.
+//
+// ext Token handlers are registered once the EXT API is ready, since they
+// require the EXT API client context.
 func Register(ctx context.Context, cluster *config.UserContext, secretsCache corecontrollers.SecretCache) {
-	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
-		registerHandlers(ctx, cluster, secretsCache, w)
-	})
-}
+	namespace := common.DefaultNamespace
+	clusterName := cluster.ClusterName
 
-// registerHandlers wires all event handlers. It has no factory lifecycle
-// operations and makes no network calls, so it is called synchronously from
-// the DeferFunc goroutine without additional wrapping or a retry gate.
-func registerHandlers(ctx context.Context, cluster *config.UserContext, secretsCache corecontrollers.SecretCache, extAPIContext *wrangler.EXTAPIContext) {
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 	tokenCache := cluster.Management.Wrangler.Mgmt.Token().Cache()
 	tokenClient := cluster.Management.Wrangler.Mgmt.Token()
 
-	namespace := common.DefaultNamespace
-	clusterName := cluster.ClusterName
 	clusterAuthToken := cluster.Cluster.ClusterAuthTokens(namespace)
 	clusterAuthTokenLister := cluster.Cluster.ClusterAuthTokens(namespace).Controller().Lister()
 	clusterUserAttribute := cluster.Cluster.ClusterUserAttributes(namespace)
@@ -104,11 +101,25 @@ func registerHandlers(ctx context.Context, cluster *config.UserContext, secretsC
 	clusterConfigMap := cluster.Corew.ConfigMap()
 	clusterConfigMapLister := cluster.Corew.ConfigMap().Cache()
 	clusterSecret := cluster.Corew.Secret()
-	tokenIndexer := tokenInformer.GetIndexer()
 	userLister := cluster.Management.Management.Users("").Controller().Lister()
 	userAttribute := cluster.Management.Management.UserAttributes("")
 	userAttributeLister := cluster.Management.Management.UserAttributes("").Controller().Lister()
 	settingInterface := cluster.Management.Management.Settings("")
+
+	// extTokenIndexer starts nil and is set when the EXT API becomes ready.
+	// The v3 Remove path already guards against a nil extTokenIndexer.
+	handler := &tokenHandler{
+		namespace:                  namespace,
+		clusterAuthToken:           clusterAuthToken,
+		clusterAuthTokenLister:     clusterAuthTokenLister,
+		clusterUserAttribute:       clusterUserAttribute,
+		clusterUserAttributeLister: clusterUserAttributeLister,
+		tokenIndexer:               tokenInformer.GetIndexer(),
+		userLister:                 userLister,
+		userAttributeLister:        userAttributeLister,
+		clusterSecret:              clusterSecret,
+		clusterSecretLister:        secretsCache,
+	}
 
 	cluster.Management.Management.Settings("").AddHandler(ctx, settingController, (&settingHandler{
 		namespace,
@@ -117,27 +128,10 @@ func registerHandlers(ctx context.Context, cluster *config.UserContext, secretsC
 		settingInterface,
 	}).Sync)
 
-	handler := &tokenHandler{
-		namespace:                  namespace,
-		clusterAuthToken:           clusterAuthToken,
-		clusterAuthTokenLister:     clusterAuthTokenLister,
-		clusterUserAttribute:       clusterUserAttribute,
-		clusterUserAttributeLister: clusterUserAttributeLister,
-		tokenIndexer:               tokenIndexer,
-		userLister:                 userLister,
-		userAttributeLister:        userAttributeLister,
-		clusterSecret:              clusterSecret,
-		clusterSecretLister:        secretsCache,
-	}
-
 	cluster.Management.Management.Tokens("").AddClusterScopedLifecycle(ctx,
 		tokenController,
 		clusterName,
 		handler)
-
-	extToken := extAPIContext.Client.Token()
-	handler.extTokenIndexer = extToken.Informer().GetIndexer()
-	extTokenLifecycle(ctx, extToken, extTokenController, clusterName, handler)
 
 	cluster.Management.Management.Users("").AddHandler(ctx, userController, (&userHandler{
 		namespace,
@@ -157,14 +151,19 @@ func registerHandlers(ctx context.Context, cluster *config.UserContext, secretsC
 		clusterUserAttribute,
 	}).Sync)
 
-	catHandler := &clusterAuthTokenHandler{
-		tokenCache:  tokenCache,
-		tokenClient: tokenClient,
-	}
-	catHandler.extTokenCache = extAPIContext.Client.Token().Cache()
-	catHandler.extTokenStore = extstore.NewSystemFromWrangler(cluster.Management.Wrangler)
+	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
+		extToken := w.Client.Token()
+		handler.extTokenIndexer = extToken.Informer().GetIndexer()
+		extTokenLifecycle(ctx, extToken, extTokenController, clusterName, handler)
 
-	cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, catHandler.sync)
+		catHandler := &clusterAuthTokenHandler{
+			tokenCache:    tokenCache,
+			tokenClient:   tokenClient,
+			extTokenCache: extToken.Cache(),
+			extTokenStore: extstore.NewSystemFromWrangler(cluster.Management.Wrangler),
+		}
+		cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, catHandler.sync)
+	})
 }
 
 func newDedicatedSecretsCache(clientFactory client.SharedClientFactory, namespace string) (corecontrollers.SecretCache, controller.SharedControllerFactory) {
