@@ -16,7 +16,7 @@ import (
 // the same UserContext returns a duplicate-factory error on the second call.
 // This confirms the factory is registered in UserContext.extraControllerFactories
 // on the first call, enabling UserContext.Start() to start it alongside other
-// factories in doStart().
+// factories.
 func TestRegisterFactoryDuplicate(t *testing.T) {
 	t.Parallel()
 

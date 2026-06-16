@@ -56,14 +56,14 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 
 // RegisterFactory creates the dedicated namespace-scoped secrets cache for
 // clusterauthtoken handlers and registers it with the UserContext so it is
-// started by UserContext.Start() as part of doStart()'s normal factory-start
-// sequence.
+// started by UserContext.Start() as part of the cluster controller's normal
+// factory-start sequence.
 //
 // Must be called before UserContext.Start() — i.e. during managementuser.Register,
 // while the transaction is open and startContext is still nil. When Start() is
 // later called, the factory starts alongside ControllerFactory and all others;
-// if it fails, the error surfaces through doStart() to the cluster manager,
-// which logs the failure, marks the cluster unavailable, and retries.
+// if it fails, the error surfaces to the cluster manager, which logs the
+// failure, marks the cluster unavailable, and retries.
 //
 // Returns the SecretCache to pass to Register() for handler wiring.
 func RegisterFactory(cluster *config.UserContext) (corecontrollers.SecretCache, error) {
