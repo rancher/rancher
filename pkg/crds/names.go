@@ -203,7 +203,6 @@ var MigratedResources = map[string]bool{
 	"etcdsnapshots.rke.cattle.io":                                     false,
 	"extensionconfigs.runtime.cluster.x-k8s.io":                       false,
 	"features.management.cattle.io":                                   false,
-	"fleetworkspaces.management.cattle.io":                            false,
 	"freeipaproviders.management.cattle.io":                           false,
 	"githubproviders.management.cattle.io":                            false,
 	"globalrolebindings.management.cattle.io":                         true,
