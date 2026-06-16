@@ -2,6 +2,7 @@ package operations
 
 import (
 	"fmt"
+	"path"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
@@ -106,6 +107,18 @@ func (a *ImportedAdapter) ServerUnit() string {
 	return "k3s"
 }
 
+func (a *ImportedAdapter) DistroDataDirectory(_ *corev1.Secret) string {
+	if a.cluster.Status.Provider == "rke2" {
+		return "/var/lib/rancher/rke2"
+	}
+	return "/var/lib/rancher/k3s"
+}
+
+func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
+	// Imported clusters do not expose the provisioning data directory; fall back to the default.
+	return "/var/lib/rancher/capr"
+}
+
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // Currently custom data directories, probes, and using ipv4 as the primary ip family are not supported.
 func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
@@ -196,8 +209,7 @@ func (a *ImportedAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 // otherwise a new leader is elected and the annotation written with retry-on-conflict.
 // Returns nil, nil when no suitable candidate exists yet.
 func (a *ImportedAdapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
-	secrets := a.clients.Core.Secret()
-	candidates, err := plan.NewCollector(secrets, a.cluster, a.cluster.Name).
+	candidates, err := plan.NewCollector(a.clients.Core.Secret(), a.cluster, a.cluster.Name).
 		WithFilter(plan.FilterFunc(filter)).
 		WithSorter(plan.DefaultSorter()).
 		Collect()
@@ -257,6 +269,20 @@ func (a *ImportedAdapter) FindOrElectLeader(operation string, filter Filter) (*c
 	return nil, nil
 }
 
+func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) string {
+	if a.cluster.Status.Provider == "k3s" {
+		return "/usr/local/bin/kubectl"
+	}
+	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+}
+
+func (a *ImportedAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	if a.cluster.Status.Provider == "k3s" {
+		return "/etc/rancher/k3s/k3s.yaml"
+	}
+	return "/etc/rancher/rke2/rke2.yaml"
+}
+
 func (a *ImportedAdapter) markLeader(secret *corev1.Secret, operation string) (*corev1.Secret, error) {
 	var updated *corev1.Secret
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -293,7 +319,7 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 	})
 }
 
-// PauseClusterActivity is a no-op for imported clusters since they have no CAPI cluster.
-func (a *ImportedAdapter) PauseClusterActivity(_ bool) error {
+// PauseCluster is a no-op for imported clusters since they have no CAPI cluster.
+func (a *ImportedAdapter) PauseCluster(_ bool) error {
 	return nil
 }

@@ -212,6 +212,7 @@ func OperationCRDs() []string {
 	return []string{
 		"encryptionkeyrotations.operation.cattle.io",
 		"etcdsnapshotsaves.operation.cattle.io",
+		"etcdsnapshotrestores.operation.cattle.io",
 	}
 }
 
@@ -247,6 +248,7 @@ var MigratedResources = map[string]bool{
 	"encryptionkeyrotations.operation.cattle.io":                      true,
 	"etcdsnapshots.rke.cattle.io":                                     true,
 	"etcdsnapshotsaves.operation.cattle.io":                           true,
+	"etcdsnapshotrestores.operation.cattle.io":                        true,
 	"extensionconfigs.runtime.cluster.x-k8s.io":                       false,
 	"features.management.cattle.io":                                   false,
 	"freeipaproviders.management.cattle.io":                           false,

@@ -28,6 +28,7 @@ import (
 )
 
 var (
+	ETCDSnapshotRestoreResourceName   = "etcdsnapshotrestores"
 	ETCDSnapshotSaveResourceName      = "etcdsnapshotsaves"
 	EncryptionKeyRotationResourceName = "encryptionkeyrotations"
 )
@@ -53,6 +54,8 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&ETCDSnapshotRestore{},
+		&ETCDSnapshotRestoreList{},
 		&ETCDSnapshotSave{},
 		&ETCDSnapshotSaveList{},
 		&EncryptionKeyRotation{},

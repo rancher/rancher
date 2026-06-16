@@ -10,7 +10,7 @@ import (
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	ops "github.com/rancher/rancher/pkg/operations"
-	"github.com/rancher/rancher/pkg/plan"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -31,25 +31,32 @@ import (
 // supervisor flag to keep produced plans byte-deterministic across calls.
 type stubAdapter struct {
 	runtimeCommand     string
+	dataDir            string
+	provisioningDir    string
+	kubectlPath        string
+	kubeconfigPath     string
 	serverUnit         string
-	probes             map[string]rkeplan.Probe
-	probesErr          error
 	waitForRegisterOK  bool
 	waitForRegisterErr error
+	probes             map[string]planapi.Probe
 }
 
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }
-func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }
-func (a *stubAdapter) ServerUnit() string     { return a.serverUnit }
+func (a *stubAdapter) PauseCluster(_ bool) error                         { return nil }
+func (a *stubAdapter) RuntimeCommand() string                            { return a.runtimeCommand }
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string       { return a.dataDir }
+func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
+func (a *stubAdapter) ServerUnit() string                                { return a.serverUnit }
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
-	return a.probes, a.probesErr
+	return map[string]rkeplan.Probe{}, nil
 }
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectlPath }
+func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
 }
-func (a *stubAdapter) PauseClusterActivity(_ bool) error { return nil }
 
 // fakeDynamic satisfies the controller's dynamicResolver interface for the success-path tests.
 // Enqueue records the (gvk, namespace, name) tuple so tests can assert handleSucceeded nudged
@@ -81,10 +88,12 @@ func (f *fakeDynamic) Enqueue(gvk schema.GroupVersionKind, ns, name string) erro
 // strings matter.
 func defaultAdapter() *stubAdapter {
 	return &stubAdapter{
-		runtimeCommand:    "k3s",
-		serverUnit:        "k3s",
-		probes:            map[string]rkeplan.Probe{},
-		waitForRegisterOK: true,
+		runtimeCommand:  "rke2",
+		dataDir:         "/var/lib/rancher/rke2",
+		provisioningDir: "/var/lib/rancher/capr",
+		kubectlPath:     "/var/lib/rancher/rke2/bin/kubectl",
+		kubeconfigPath:  "/etc/rancher/rke2/rke2.yaml",
+		serverUnit:      "rke2-server",
 	}
 }
 
@@ -120,7 +129,7 @@ func newOp() *opv1alpha1.ETCDSnapshotSave {
 func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 	lbls := map[string]string{}
 	if owner != "" {
-		lbls[planv1alpha1.OwnerLabel] = owner
+		lbls[planv1alpha1.BeaconOwnerLabel] = owner
 	}
 	return &planv1alpha1.Beacon{
 		ObjectMeta: metav1.ObjectMeta{
@@ -146,14 +155,14 @@ func newPlanSecret(name string) *corev1.Secret {
 				capr.EtcdRoleLabel:    "true",
 			},
 		},
-		Type: plan.SecretTypeMachinePlan,
+		Type: planapi.SecretTypeMachinePlan,
 	}
 }
 
 // withAppliedPlan returns a copy of the secret pre-populated to look like the system-agent has
 // already applied the given plan with healthy probes — used to fast-forward reconcile tests
 // through the "wait for plan" branch.
-func withAppliedPlan(secret *corev1.Secret, expectedPlan *plan.Plan) *corev1.Secret {
+func withAppliedPlan(secret *corev1.Secret, expectedPlan *planapi.Plan) *corev1.Secret {
 	out := secret.DeepCopy()
 	data, _ := json.Marshal(expectedPlan)
 	if out.Data == nil {
@@ -165,27 +174,27 @@ func withAppliedPlan(secret *corev1.Secret, expectedPlan *plan.Plan) *corev1.Sec
 	if out.Annotations == nil {
 		out.Annotations = map[string]string{}
 	}
-	out.Annotations[plan.PlanProbesPassedAnnotation] = "applied"
+	out.Annotations[planapi.PlanProbesPassedAnnotation] = "applied"
 	return out
 }
 
 // withFailedPlan marks the secret as having failed its plan past the failure threshold so the
 // store reports Failure() == true.
-func withFailedPlan(secret *corev1.Secret, expectedPlan *plan.Plan) *corev1.Secret {
+func withFailedPlan(secret *corev1.Secret, expectedPlan *planapi.Plan) *corev1.Secret {
 	out := secret.DeepCopy()
 	data, _ := json.Marshal(expectedPlan)
 	if out.Data == nil {
 		out.Data = map[string][]byte{}
 	}
 	out.Data["plan"] = data
-	out.Data["failed-checksum"] = []byte(plan.PlanHash(data))
+	out.Data["failed-checksum"] = []byte(planapi.PlanHash(data))
 	out.Data["failure-count"] = []byte("5")
 	out.Data["max-failures"] = []byte("1")
 	out.Data["failure-threshold"] = []byte("1")
 	return out
 }
 
-// newSecretClient mocks the SecretClient used by plan.Store.AssignPlan. Update echoes the
+// newSecretClient mocks the SecretClient used by planapi.Store.AssignPlan. Update echoes the
 // passed-in secret back to the caller so the store treats it as the "post-update" state.
 func newSecretClient(t *testing.T, ctrl *gomock.Controller, items ...*corev1.Secret) *ctrlfake.MockClientInterface[*corev1.Secret, *corev1.SecretList] {
 	t.Helper()
@@ -247,7 +256,7 @@ func TestUpdateStatusPaused(t *testing.T) {
 	status := updateStatus(op, opv1alpha1.ETCDSnapshotSaveStatus{})
 
 	assert.Equal(t, int64(7), status.ObservedGeneration, "ObservedGeneration must be copied from the op")
-	assert.Equal(t, "True", string(opv1alpha1.PausedCondition.GetStatus(&status)))
+	assert.Equal(t, "True", opv1alpha1.PausedCondition.GetStatus(&status))
 	assert.Equal(t, opv1alpha1.PausedReason, opv1alpha1.PausedCondition.GetReason(&status))
 }
 
@@ -263,7 +272,7 @@ func TestUpdateStatusByPhase(t *testing.T) {
 			name:  "pending sets Pending=True",
 			phase: opv1alpha1.OperationPhasePending,
 			check: func(t *testing.T, s opv1alpha1.ETCDSnapshotSaveStatus) {
-				assert.Equal(t, "True", string(opv1alpha1.PendingCondition.GetStatus(&s)))
+				assert.Equal(t, "True", opv1alpha1.PendingCondition.GetStatus(&s))
 			},
 		},
 		{
@@ -356,7 +365,9 @@ func TestHandlePending_TransitionsToInProgress(t *testing.T) {
 
 	beacons := &fakeBeaconClient{}
 	h := &handler{beacons: beacons}
-	s := newScope(newOp(), newBeacon(ControllerOwnerKey, false), defaultAdapter())
+	a := defaultAdapter()
+	a.waitForRegisterOK = true
+	s := newScope(newOp(), newBeacon(ControllerOwnerKey, false), a)
 
 	got, err := h.handlePending(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -422,7 +433,7 @@ func TestHandleFailed_HoldingBeaconReleases(t *testing.T) {
 		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive")
 	}
 	if assert.Len(t, beacons.updates, 1, "ReleaseBeacon should update the beacon labels") {
-		_, hasOwner := beacons.updates[0].Labels[planv1alpha1.OwnerLabel]
+		_, hasOwner := beacons.updates[0].Labels[planv1alpha1.BeaconOwnerLabel]
 		assert.False(t, hasOwner, "owner label must be cleared")
 	}
 }
@@ -476,13 +487,13 @@ func TestHandleSucceeded_HoldingBeaconEnqueuesCluster(t *testing.T) {
 
 // expectedSaveInstruction builds the snapshot save instruction the controller will dispatch given
 // an op spec and stubAdapter, so tests can predict the exact plan bytes the agent will see.
-func expectedSaveInstruction(op *opv1alpha1.ETCDSnapshotSave, runtime string) plan.OneTimeInstruction {
+func expectedSaveInstruction(op *opv1alpha1.ETCDSnapshotSave, runtime string) planapi.OneTimeInstruction {
 	args := []string{"etcd-snapshot", "save"}
 	if op.Spec.Args.Name != "" {
 		args = append(args, "--name", op.Spec.Args.Name)
 	}
-	return plan.OneTimeInstruction{
-		CommonInstruction: plan.CommonInstruction{
+	return planapi.OneTimeInstruction{
+		CommonInstruction: planapi.CommonInstruction{
 			Name:    "snapshot",
 			Command: runtime,
 			Args:    args,
@@ -490,17 +501,17 @@ func expectedSaveInstruction(op *opv1alpha1.ETCDSnapshotSave, runtime string) pl
 	}
 }
 
-func expectedSavePlan(op *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) *plan.Plan {
-	return &plan.Plan{
-		OneTimeInstructions: []plan.OneTimeInstruction{expectedSaveInstruction(op, adapter.runtimeCommand)},
+func expectedSavePlan(op *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) *planapi.Plan {
+	return &planapi.Plan{
+		OneTimeInstructions: []planapi.OneTimeInstruction{expectedSaveInstruction(op, adapter.runtimeCommand)},
 		Probes:              adapter.probes,
 	}
 }
 
-func expectedRestartPlan(adapter *stubAdapter) *plan.Plan {
-	return &plan.Plan{
-		OneTimeInstructions: []plan.OneTimeInstruction{
-			{CommonInstruction: plan.CommonInstruction{
+func expectedRestartPlan(adapter *stubAdapter) *planapi.Plan {
+	return &planapi.Plan{
+		OneTimeInstructions: []planapi.OneTimeInstruction{
+			{CommonInstruction: planapi.CommonInstruction{
 				Name:    "restart",
 				Command: "systemctl",
 				Args:    []string{"restart", adapter.serverUnit},
@@ -517,7 +528,7 @@ func TestReconcileSave_NoSecrets(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	status, err := h.reconcileSave(newScope(newOp(), nil, defaultAdapter()), opv1alpha1.ETCDSnapshotSaveStatus{})
 	// The Collector validator surfaces the empty-set condition as an error; the outer status
@@ -537,7 +548,7 @@ func TestReconcileSave_WaitsForPlanApply(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -558,7 +569,7 @@ func TestReconcileSave_TransitionsToRestartWhenApplied(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -577,7 +588,7 @@ func TestReconcileSave_PlanFailureMarksFailed(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -600,7 +611,7 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	_, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -624,7 +635,7 @@ func TestReconcileRestart_MarksSucceededWhenApplied(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -643,7 +654,7 @@ func TestReconcileRestart_WaitsForPlanApply(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -662,7 +673,7 @@ func TestReconcileRestart_PlanFailureMarksFailed(t *testing.T) {
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -689,12 +700,12 @@ func TestReconcileRestart_FiltersToEtcdSecrets(t *testing.T) {
 				capr.WorkerRoleLabel:  "true",
 			},
 		},
-		Type: plan.SecretTypeMachinePlan,
+		Type: planapi.SecretTypeMachinePlan,
 	}
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, etcd, worker),
 	}
-	h.store = plan.NewStore(h.secrets)
+	h.store = planapi.NewStore(h.secrets)
 
 	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)

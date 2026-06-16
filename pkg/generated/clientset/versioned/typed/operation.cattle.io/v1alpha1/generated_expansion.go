@@ -18,6 +18,8 @@ limitations under the License.
 
 package v1alpha1
 
+type ETCDSnapshotRestoreExpansion interface{}
+
 type ETCDSnapshotSaveExpansion interface{}
 
 type EncryptionKeyRotationExpansion interface{}

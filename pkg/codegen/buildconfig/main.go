@@ -3,9 +3,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"text/template"
 
 	"gopkg.in/yaml.v3"
@@ -107,10 +109,60 @@ func updateChartValues(cfg map[string]string) error {
 		return err
 	}
 
-	// Replace original with updated version
-	if err := os.Rename(tempPath, "chart/values.yaml"); err != nil {
+	// Replace original using the safe cross-device rename helper
+	if err := safeRename(tempPath, "chart/values.yaml"); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// safeRename attempts a fast OS rename. If it detects a cross-device
+// link error (EXDEV), it falls back to a copy-and-delete strategy.
+func safeRename(src, dst string) error {
+	// Only works on the same partition
+	err := os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+
+	// Check if the error is specifically an "invalid cross-device link"
+	if linkErr, ok := errors.AsType[*os.LinkError](err); ok && errors.Is(linkErr.Err, syscall.EXDEV) {
+		// Different partitions detected, execute copy-and-delete fallback
+		return copyAndDelete(src, dst)
+	}
+
+	// Return any other legitimate error (e.g., Permission Denied)
+	return err
+}
+
+func copyAndDelete(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	// Stream the data from /tmp to the destination
+	if _, err = io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+
+	// Safely flush memory to disk before deleting the source
+	if err = dstFile.Sync(); err != nil {
+		return err
+	}
+
+	// Close files explicitly before removing the source
+	srcFile.Close()
+	dstFile.Close()
+
+	// Remove the temporary file from /tmp
+	return os.Remove(src)
 }
