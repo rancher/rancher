@@ -75,7 +75,7 @@ func NewProvider(ctx context.Context, extTokenStore *exttokenstore.SystemStore, 
 
 	return Provider{
 		jwksHandler:     jwks,
-		authHandler:     newAuthorizeHandler(extTokenStore, tokenCache, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
+		authHandler:     newAuthorizeHandler(extTokenStore, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
 		tokenHandler:    newTokenHandler(extTokenStore, tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
 		userInfoHandler: newUserInfoHandler(userLister, userAttributeLister, jwks),
 	}, nil
