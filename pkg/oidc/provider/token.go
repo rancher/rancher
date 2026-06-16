@@ -16,6 +16,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
@@ -46,6 +47,7 @@ type jsonPatch struct {
 }
 
 type tokenHandler struct {
+	extTokenStore       *exttokenstore.SystemStore
 	tokenCache          wrangmgmtv3.TokenCache
 	tokenClient         wrangmgmtv3.TokenClient
 	userLister          wrangmgmtv3.UserCache
@@ -81,7 +83,8 @@ type RefreshTokenClaims struct {
 	Scope []string `json:"scope"`
 }
 
-func newTokenHandler(tokenCache wrangmgmtv3.TokenCache,
+func newTokenHandler(extTokenStore *exttokenstore.SystemStore,
+	tokenCache wrangmgmtv3.TokenCache,
 	userLister wrangmgmtv3.UserCache,
 	userAttributeLister wrangmgmtv3.UserAttributeCache,
 	sessionClient sessionGetterRemover,
@@ -92,6 +95,7 @@ func newTokenHandler(tokenCache wrangmgmtv3.TokenCache,
 	tokenClient wrangmgmtv3.TokenClient) *tokenHandler {
 
 	return &tokenHandler{
+		extTokenStore:       extTokenStore,
 		tokenCache:          tokenCache,
 		tokenClient:         tokenClient,
 		userLister:          userLister,
