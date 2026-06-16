@@ -109,7 +109,7 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
 
 FROM builder AS tini
 ARG ARCH
-ENV TINI_VERSION=v0.18.0
+ENV TINI_VERSION=v0.19.0
 ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
     TINI_CHECKSUM_amd64=12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855 \
     TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
