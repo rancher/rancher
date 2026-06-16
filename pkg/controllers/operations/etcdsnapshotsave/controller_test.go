@@ -57,7 +57,6 @@ func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubecon
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
 }
-func (a *stubAdapter) PauseClusterActivity(_ bool) error { return nil }
 
 // fakeDynamic satisfies the controller's dynamicResolver interface for the success-path tests.
 // Enqueue records the (gvk, namespace, name) tuple so tests can assert handleSucceeded nudged

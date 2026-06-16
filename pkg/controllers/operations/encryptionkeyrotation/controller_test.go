@@ -37,6 +37,13 @@ func (a *stubAdapter) RuntimeCommand() string {
 	return "rke2"
 }
 
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string {
+	return "/var/lib/rancher/rke2"
+}
+
+func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
+	return "/var/lib/rancher/capr"
+}
 func (a *stubAdapter) ServerUnit() string {
 	return "rke2-server"
 }
@@ -45,11 +52,19 @@ func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan
 	return map[string]rkeplan.Probe{}, nil
 }
 
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string {
+	return "/var/lib/rancher/rke2/bin/kubectl"
+}
+
+func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	return "/etc/rancher/rke2/rke2.yaml"
+}
+
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
 }
 
-func (a *stubAdapter) PauseClusterActivity(paused bool) error {
+func (a *stubAdapter) PauseCluster(paused bool) error {
 	a.pauseCalls = append(a.pauseCalls, paused)
 	return nil
 }
@@ -96,7 +111,7 @@ func newOp() *opv1alpha1.EncryptionKeyRotation {
 func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 	labels := map[string]string{}
 	if owner != "" {
-		labels[planv1alpha1.OwnerLabel] = owner
+		labels[planv1alpha1.BeaconOwnerLabel] = owner
 	}
 	return &planv1alpha1.Beacon{
 		ObjectMeta: metav1.ObjectMeta{
@@ -492,12 +507,12 @@ func TestHandleFailed_HoldingBeaconReleasesAndUnpauses(t *testing.T) {
 	}
 
 	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-		t.Fatalf("expected PauseClusterActivity(false), got %+v", adapter.pauseCalls)
+		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
 	}
 	if len(beacons.updates) != 1 {
 		t.Fatalf("expected one beacon release update, got %d", len(beacons.updates))
 	}
-	if _, ok := beacons.updates[0].Labels[planv1alpha1.OwnerLabel]; ok {
+	if _, ok := beacons.updates[0].Labels[planv1alpha1.BeaconOwnerLabel]; ok {
 		t.Fatalf("expected owner label to be cleared on release")
 	}
 }
@@ -520,7 +535,7 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 	}
 
 	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-		t.Fatalf("expected PauseClusterActivity(false), got %+v", adapter.pauseCalls)
+		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
 	}
 	if len(beacons.statusUpdates) != 1 {
 		t.Fatalf("expected one beacon status update, got %d", len(beacons.statusUpdates))
@@ -531,7 +546,7 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 	if len(beacons.updates) != 1 {
 		t.Fatalf("expected one beacon release update, got %d", len(beacons.updates))
 	}
-	if _, ok := beacons.updates[0].Labels[planv1alpha1.OwnerLabel]; ok {
+	if _, ok := beacons.updates[0].Labels[planv1alpha1.BeaconOwnerLabel]; ok {
 		t.Fatalf("expected owner label to be cleared on release")
 	}
 
@@ -562,7 +577,7 @@ func TestHandleSucceeded_NotHoldingOnlyUnpauses(t *testing.T) {
 	}
 
 	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-		t.Fatalf("expected PauseClusterActivity(false), got %+v", adapter.pauseCalls)
+		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
 	}
 	if len(beacons.statusUpdates) != 0 {
 		t.Fatalf("expected no beacon status updates, got %d", len(beacons.statusUpdates))
@@ -654,7 +669,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					Name:      "fleet-default",
 					Namespace: "fleet-default",
 					Labels: map[string]string{
-						planv1alpha1.OwnerLabel: beaconOwnerKey(currentOp),
+						planv1alpha1.BeaconOwnerLabel: beaconOwnerKey(currentOp),
 					},
 				},
 			},
@@ -666,7 +681,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					Name:      "fleet-default",
 					Namespace: "fleet-default",
 					Labels: map[string]string{
-						planv1alpha1.OwnerLabel: "etcd-snapshot-save",
+						planv1alpha1.BeaconOwnerLabel: "etcd-snapshot-save",
 					},
 				},
 			},
@@ -678,7 +693,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					Name:      "fleet-default",
 					Namespace: "fleet-default",
 					Labels: map[string]string{
-						planv1alpha1.OwnerLabel: "encryption-key-rotation-old-owner",
+						planv1alpha1.BeaconOwnerLabel: "encryption-key-rotation-old-owner",
 					},
 					Annotations: map[string]string{
 						beaconOwnerRefAnnotation: "bad-owner-ref",
@@ -696,7 +711,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					Name:      "fleet-default",
 					Namespace: "fleet-default",
 					Labels: map[string]string{
-						planv1alpha1.OwnerLabel: "encryption-key-rotation-old-owner",
+						planv1alpha1.BeaconOwnerLabel: "encryption-key-rotation-old-owner",
 					},
 					Annotations: map[string]string{
 						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
@@ -717,7 +732,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					Name:      "fleet-default",
 					Namespace: "fleet-default",
 					Labels: map[string]string{
-						planv1alpha1.OwnerLabel: "encryption-key-rotation-old-owner",
+						planv1alpha1.BeaconOwnerLabel: "encryption-key-rotation-old-owner",
 					},
 					Annotations: map[string]string{
 						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
@@ -747,7 +762,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					Name:      "fleet-default",
 					Namespace: "fleet-default",
 					Labels: map[string]string{
-						planv1alpha1.OwnerLabel: "encryption-key-rotation-old-owner",
+						planv1alpha1.BeaconOwnerLabel: "encryption-key-rotation-old-owner",
 					},
 					Annotations: map[string]string{
 						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
@@ -777,7 +792,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					Name:      "fleet-default",
 					Namespace: "fleet-default",
 					Labels: map[string]string{
-						planv1alpha1.OwnerLabel: "encryption-key-rotation-old-owner",
+						planv1alpha1.BeaconOwnerLabel: "encryption-key-rotation-old-owner",
 					},
 					Annotations: map[string]string{
 						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
@@ -834,7 +849,7 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 				return
 			}
 
-			owner := s.beacon.Labels[planv1alpha1.OwnerLabel]
+			owner := s.beacon.Labels[planv1alpha1.BeaconOwnerLabel]
 			if tt.wantOwnerCleared && owner != "" {
 				t.Fatalf("expected owner label cleared, got %q", owner)
 			}

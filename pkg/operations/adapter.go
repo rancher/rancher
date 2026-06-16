@@ -127,7 +127,8 @@ type Adapter interface {
 	// all expected nodes.
 	WaitForRegister() (bool, error)
 
-	// Pause edits the related cluster object to indicate it should not be reconciled (if supported, mostly relevant for CAPI).
+	// PauseCluster edits the related cluster object to indicate it should not be reconciled.
+	// This is intended to prevent other controllers from manipulating the cluster during sensitive operations.
 	PauseCluster(pause bool) error
 
 	// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
@@ -148,10 +149,6 @@ type Adapter interface {
 	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
 	// supervisor probe to fail.
 	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
-
-	// PauseCluster pauses or unpauses the owning cluster's control-plane activity.
-	// ImportedAdapter implements this as a no-op since imported clusters have no CAPI cluster.
-	PauseCluster(paused bool) error
 
 	// KubectlPath returns the path to the kubectl binary on the host relative to the machine-plan secret.
 	KubectlPath(secret *corev1.Secret) string

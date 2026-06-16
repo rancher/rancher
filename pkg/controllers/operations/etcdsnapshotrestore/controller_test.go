@@ -41,7 +41,7 @@ func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan
 }
 func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectlPath }
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
-func (a *stubAdapter) ElectLeader(_ ops.LeaderRole, _ string) (*corev1.Secret, error) {
+func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
 }
 

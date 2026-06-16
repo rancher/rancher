@@ -523,7 +523,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	secret, err := s.adapter.ElectLeader(ops.LeaderRoleEtcd, s.namespace)
+	secret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -928,7 +928,7 @@ func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSec
 func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling post-restore node cleanup", s.op.Namespace, s.op.Name)
 
-	initSecret, err := s.adapter.ElectLeader(ops.LeaderRoleEtcd, s.namespace)
+	initSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 

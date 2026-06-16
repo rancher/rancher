@@ -323,7 +323,3 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 func (a *ImportedAdapter) PauseCluster(_ bool) error {
 	return nil
 }
-
-func (a *ImportedAdapter) PauseCluster(_ bool) error {
-	return nil
-}

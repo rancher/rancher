@@ -769,7 +769,7 @@ func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 		return nil
 	}
 
-	currentOwnerKey := s.beacon.Labels[planv1alpha1.OwnerLabel]
+	currentOwnerKey := s.beacon.Labels[planv1alpha1.BeaconOwnerLabel]
 	newOwnerKey := beaconOwnerKey(s.op)
 	// No owner, or we already own it
 	if currentOwnerKey == "" || currentOwnerKey == newOwnerKey {
@@ -807,7 +807,7 @@ func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 	}
 
 	beacon := s.beacon.DeepCopy()
-	delete(beacon.Labels, planv1alpha1.OwnerLabel)
+	delete(beacon.Labels, planv1alpha1.BeaconOwnerLabel)
 	if beacon.Annotations != nil {
 		delete(beacon.Annotations, beaconOwnerRefAnnotation)
 	}
