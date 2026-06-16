@@ -159,7 +159,8 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 
 	// only create RBAC resources if user has updatepsa permission
 	if !hasUpdatePSAPermission {
-		return nil
+		// if the user doesn't have updatepsa permissions, ensure any existing ClusterRole and ClusterRoleBinding are deleted
+		return p.ensurePSAPermissionsDelete(binding)
 	}
 
 	// ensure ClusterRole exists with correct updatepsa rules
@@ -256,53 +257,39 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 }
 
 // ensurePSAPermissionsDelete removes the ClusterRole and ClusterRoleBinding
-// that were created to grant 'updatepsa' permissions when a ProjectRoleTemplateBinding
-// is deleted. This function only performs cleanup if the binding's RoleTemplate
-// actually granted updatepsa permissions, ensuring proper cleanup of PSA-related
-// RBAC resources without affecting unrelated bindings.
+// that were created to grant 'updatepsa' permissions when a ProjectRoleTemplateBinding is deleted.
+// This function always checks for the PSA permissions in case they were removed and the CR/CRB still exist.
+// Ignore NotFound errors since we check even if the permissions don't exist, and we want to ensure the resources are deleted if they are there.
 func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTemplateBinding) error {
-	psaRec := authorizer.AttributesRecord{
-		Verb:            "updatepsa",
-		APIGroup:        management.GroupName,
-		Resource:        v32.ProjectResourceName,
-		Name:            binding.ProjectName,
-		ResourceRequest: true,
-	}
 	_, projectName, found := strings.Cut(binding.ProjectName, ":")
 	if !found {
 		return fmt.Errorf("invalid project name format")
 	}
-	prtbRoleTemplate, err := p.rtLister.Get("", binding.RoleTemplateName)
+
+	// delete the ClusterRoleBinding first
+	psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
+	ref := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
+		Kind:     "ClusterRole",
+		Name:     psaCRName,
+	}
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}
+	psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
+	err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
+	}
 
-	if rbac.RulesAllow(psaRec, prtbRoleTemplate.Rules...) {
-		// delete the ClusterRoleBinding first
-		// if ClusterRole is not used by other ClusterRoleBindings:
-		// then delete the ClusterRole
-		// skip the deletion otherwhise
-		psaCRName := fmt.Sprintf("%s-namespaces-psa", projectName)
-		ref := rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     psaCRName,
-		}
-		subject, err := pkgrbac.BuildSubjectFromRTB(binding)
-		if err != nil {
-			return err
-		}
-		psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
-		err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
+	// if ClusterRole is not used by other ClusterRoleBindings:
+	// then delete the ClusterRole
+	// skip the deletion otherwhise
+	if !p.isClusterRoleUsed(psaCRName) {
+		err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
-		}
-		isUsed := p.isClusterRoleUsed(psaCRName)
-		if !isUsed {
-			err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				return fmt.Errorf("error deleting clusterrole %v: %w", psaCRName, err)
-			}
+			return fmt.Errorf("error deleting clusterrole %v: %w", psaCRName, err)
 		}
 	}
 

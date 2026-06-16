@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	rancherv3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -445,10 +444,38 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 	}
 }
 
+const (
+	psaClusterRoleName = "p-example-namespaces-psa"
+)
+
+var (
+	examplePRTB = apisV3.ProjectRoleTemplateBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "prtb-example",
+		},
+		UserName:    "u-test1",
+		ProjectName: "c-abc:p-example",
+	}
+	updatePSARule = rbacv1.PolicyRule{
+		APIGroups: []string{management.GroupName},
+		Verbs:     []string{"updatepsa"},
+		Resources: []string{apisV3.ProjectResourceName},
+	}
+)
+
 func Test_ensurePSAPermissions(t *testing.T) {
 	type args struct {
 		binding *v3.ProjectRoleTemplateBinding
-		roles   map[string]*v3.RoleTemplate
+		rule    rbacv1.PolicyRule
+	}
+
+	psaRules := []rbacv1.PolicyRule{
+		{
+			APIGroups:     []string{management.GroupName},
+			Verbs:         []string{"updatepsa"},
+			Resources:     []string{apisV3.ProjectResourceName},
+			ResourceNames: []string{"p-example"},
+		},
 	}
 
 	tests := []struct {
@@ -461,20 +488,15 @@ func Test_ensurePSAPermissions(t *testing.T) {
 			name: "create psa rbac resources without errors",
 			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
 				p := &prtbLifecycle{}
-				crListerMock := fake.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
-				crListerMock.EXPECT().Get(gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
+
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
 				p.crLister = crListerMock
 
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-				crClientMock.EXPECT().Create(gomock.Any()).Return(&v1.ClusterRole{
-					Rules: []rbacv1.PolicyRule{
-						{
-							APIGroups:     []string{management.GroupName},
-							Verbs:         []string{"updatepsa"},
-							Resources:     []string{apisV3.ProjectResourceName},
-							ResourceNames: []string{"p-example"},
-						},
-					},
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+				crClientMock.EXPECT().Create(gomock.Any()).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: psaClusterRoleName},
+					Rules:      psaRules,
 				}, nil)
 				p.crClient = crClientMock
 
@@ -484,24 +506,101 @@ func Test_ensurePSAPermissions(t *testing.T) {
 				return p
 			},
 			args: args{
+				binding: examplePRTB.DeepCopy(),
+				rule:    updatePSARule,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid project name format",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				return &prtbLifecycle{}
+			},
+			args: args{
 				binding: &apisV3.ProjectRoleTemplateBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "prtb-example",
 					},
 					UserName:    "u-test1",
-					ProjectName: "c-abc:p-example",
+					ProjectName: "invalid-no-colon",
 				},
-				roles: map[string]*v3.RoleTemplate{
-					"role_template_0": &apisV3.RoleTemplate{
-						Rules: []v1.PolicyRule{
-							{
-								APIGroups: []string{management.GroupName},
-								Verbs:     []string{"updatepsa"},
-								Resources: []string{apisV3.ProjectResourceName},
-							},
-						},
-					},
+
+				rule: updatePSARule,
+			},
+			wantErr: true,
+		},
+		{
+			name: "no updatepsa permission calls delete",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(apierrors.NewNotFound(schema.GroupResource{}, ""))
+				crbClientMock.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				p.crbClient = crbClientMock
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+				crClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(apierrors.NewNotFound(schema.GroupResource{}, ""))
+				p.crClient = crClientMock
+				return p
+			},
+			args: args{
+				binding: examplePRTB.DeepCopy(),
+				rule: rbacv1.PolicyRule{
+					APIGroups: []string{management.GroupName},
+					Verbs:     []string{"get"},
+					Resources: []string{apisV3.ProjectResourceName},
 				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "existing CR with correct rules does not update",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: psaClusterRoleName},
+					Rules:      psaRules,
+				}, nil)
+				p.crLister = crListerMock
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+				// No Update expected since rules match
+				p.crClient = crClientMock
+
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Create(gomock.Any()).Return(&rbacv1.ClusterRoleBinding{}, nil)
+				p.crbClient = crbClientMock
+				return p
+			},
+			args: args{
+				binding: examplePRTB.DeepCopy(),
+				rule:    updatePSARule,
+			},
+			wantErr: false,
+		},
+		{
+			name: "CRB already exists is not an error",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: psaClusterRoleName},
+					Rules:      psaRules,
+				}, nil)
+				p.crLister = crListerMock
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+				p.crClient = crClientMock
+
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Create(gomock.Any()).Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, ""))
+				p.crbClient = crbClientMock
+				return p
+			},
+			args: args{
+				binding: examplePRTB.DeepCopy(),
+				rule:    updatePSARule,
 			},
 			wantErr: false,
 		},
@@ -509,20 +608,15 @@ func Test_ensurePSAPermissions(t *testing.T) {
 			name: "unable to create CRB",
 			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
 				p := &prtbLifecycle{}
-				crListerMock := fake.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
-				crListerMock.EXPECT().Get(gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
+
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
 				p.crLister = crListerMock
 
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-				crClientMock.EXPECT().Create(gomock.Any()).Return(&v1.ClusterRole{
-					Rules: []rbacv1.PolicyRule{
-						{
-							APIGroups:     []string{management.GroupName},
-							Verbs:         []string{"updatepsa"},
-							Resources:     []string{apisV3.ProjectResourceName},
-							ResourceNames: []string{"p-example"},
-						},
-					},
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+				crClientMock.EXPECT().Create(gomock.Any()).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: psaClusterRoleName},
+					Rules:      psaRules,
 				}, nil)
 				p.crClient = crClientMock
 
@@ -532,24 +626,9 @@ func Test_ensurePSAPermissions(t *testing.T) {
 				return p
 			},
 			args: args{
-				binding: &apisV3.ProjectRoleTemplateBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "prtb-example",
-					},
-					UserName:    "u-test1",
-					ProjectName: "c-abc:p-example",
-				},
-				roles: map[string]*v3.RoleTemplate{
-					"role_template_0": &apisV3.RoleTemplate{
-						Rules: []v1.PolicyRule{
-							{
-								APIGroups: []string{management.GroupName},
-								Verbs:     []string{"updatepsa"},
-								Resources: []string{apisV3.ProjectResourceName},
-							},
-						},
-					},
-				},
+
+				binding: examplePRTB.DeepCopy(),
+				rule:    updatePSARule,
 			},
 			wantErr: true,
 		},
@@ -557,33 +636,20 @@ func Test_ensurePSAPermissions(t *testing.T) {
 			name: "unable to create CR",
 			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
 				p := &prtbLifecycle{}
-				crListerMock := fake.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
-				crListerMock.EXPECT().Get(gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
+
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
 				p.crLister = crListerMock
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 				crClientMock.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("error"))
 				p.crClient = crClientMock
 				return p
 			},
 			args: args{
-				binding: &apisV3.ProjectRoleTemplateBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "prtb-example",
-					},
-					UserName:    "u-test1",
-					ProjectName: "c-abc:p-example",
-				},
-				roles: map[string]*v3.RoleTemplate{
-					"role_template_0": &apisV3.RoleTemplate{
-						Rules: []v1.PolicyRule{
-							{
-								APIGroups: []string{management.GroupName},
-								Verbs:     []string{"updatepsa"},
-								Resources: []string{apisV3.ProjectResourceName},
-							},
-						},
-					},
-				},
+
+				binding: examplePRTB.DeepCopy(),
+				rule:    updatePSARule,
 			},
 			wantErr: true,
 		},
@@ -591,8 +657,10 @@ func Test_ensurePSAPermissions(t *testing.T) {
 			name: "unable to update CR",
 			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
 				p := &prtbLifecycle{}
-				crListerMock := fake.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
-				crListerMock.EXPECT().Get(gomock.Any()).Return(&v1.ClusterRole{
+
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: psaClusterRoleName},
 					Rules: []rbacv1.PolicyRule{
 						{
 							APIGroups:     []string{management.GroupName},
@@ -609,9 +677,43 @@ func Test_ensurePSAPermissions(t *testing.T) {
 					},
 				}, nil)
 				p.crLister = crListerMock
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 				crClientMock.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("error"))
 				p.crClient = crClientMock
+				return p
+			},
+			args: args{
+				binding: examplePRTB.DeepCopy(),
+				rule:    updatePSARule,
+			},
+			wantErr: true,
+		},
+		{
+			name: "get CR fails with non-NotFound error",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(nil, fmt.Errorf("internal error"))
+				p.crLister = crListerMock
+				return p
+			},
+			args: args{
+				binding: examplePRTB.DeepCopy(),
+				rule:    updatePSARule,
+			},
+			wantErr: true,
+		},
+		{
+			name: "no subject on binding fails",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+				crListerMock.EXPECT().Get(psaClusterRoleName).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: psaClusterRoleName},
+					Rules:      psaRules,
+				}, nil)
+				p.crLister = crListerMock
 				return p
 			},
 			args: args{
@@ -619,20 +721,10 @@ func Test_ensurePSAPermissions(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "prtb-example",
 					},
-					UserName:    "u-test1",
 					ProjectName: "c-abc:p-example",
 				},
-				roles: map[string]*v3.RoleTemplate{
-					"role_template_0": &apisV3.RoleTemplate{
-						Rules: []v1.PolicyRule{
-							{
-								APIGroups: []string{management.GroupName},
-								Verbs:     []string{"updatepsa"},
-								Resources: []string{apisV3.ProjectResourceName},
-							},
-						},
-					},
-				},
+
+				rule: updatePSARule,
 			},
 			wantErr: true,
 		},
@@ -641,186 +733,150 @@ func Test_ensurePSAPermissions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			p := tt.setup(ctrl)
-			if err := p.ensurePSAPermissions(tt.args.binding, tt.args.roles); (err != nil) != tt.wantErr {
+
+			roles := map[string]*v3.RoleTemplate{
+				"role_template_0": {Rules: []rbacv1.PolicyRule{tt.args.rule}},
+			}
+
+			if err := p.ensurePSAPermissions(tt.args.binding, roles); (err != nil) != tt.wantErr {
 				t.Errorf("prtbLifecycle.ensurePSAPermissions() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_ensurePSAPermissionsDelete(t *testing.T) {
-	type args struct {
-		binding *v3.ProjectRoleTemplateBinding
+var (
+	testBinding = apisV3.ProjectRoleTemplateBinding{
+		ProjectName: "c-abc:p-example",
+		UserName:    "u-zxv",
 	}
+)
 
-	p := &prtbLifecycle{}
-
+func Test_ensurePSAPermissionsDelete(t *testing.T) {
 	tests := []struct {
-		name      string
-		mockSetup func(*gomock.Controller)
-		args      args
-		wantErr   bool
+		name    string
+		setup   func(*gomock.Controller) *prtbLifecycle
+		binding *v3.ProjectRoleTemplateBinding
+		wantErr bool
 	}{
 		{
 			name: "clean up psa rbac resources",
-			mockSetup: func(ctrl *gomock.Controller) {
-				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
-						return &apisV3.RoleTemplate{
-							Rules: []v1.PolicyRule{
-								{
-									APIGroups: []string{management.GroupName},
-									Verbs:     []string{"updatepsa"},
-									Resources: []string{apisV3.ProjectResourceName},
-								},
-							},
-						}, nil
-					},
-				}
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
+				crbClientMock.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				p.crbClient = crbClientMock
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 				crClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
 				p.crClient = crClientMock
-
-				crbClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList](ctrl)
-				crbClientMock.EXPECT().List(gomock.Any()).Return(&v1.ClusterRoleBindingList{}, nil)
-				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
-				p.crbClient = crbClientMock
+				return p
 			},
-			args: args{
-				binding: &apisV3.ProjectRoleTemplateBinding{
-					ProjectName:      "c-abc:p-example",
-					RoleTemplateName: "role_template_0",
-					UserName:         "u-zxv",
-				},
-			},
+			binding: testBinding.DeepCopy(),
 			wantErr: false,
 		},
 		{
+			name: "invalid project name format",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				return &prtbLifecycle{}
+			},
+			binding: &apisV3.ProjectRoleTemplateBinding{
+				ProjectName: "invalid-no-colon",
+				UserName:    "u-zxv",
+			},
+			wantErr: true,
+		},
+		{
+			name: "no subject on binding fails",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				return &prtbLifecycle{}
+			},
+			binding: &apisV3.ProjectRoleTemplateBinding{
+				ProjectName: "c-abc:p-example",
+			},
+			wantErr: true,
+		},
+		{
 			name: "unable to delete CRB",
-			mockSetup: func(ctrl *gomock.Controller) {
-				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
-						return &apisV3.RoleTemplate{
-							Rules: []v1.PolicyRule{
-								{
-									APIGroups: []string{management.GroupName},
-									Verbs:     []string{"updatepsa"},
-									Resources: []string{apisV3.ProjectResourceName},
-								},
-							},
-						}, nil
-					},
-				}
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-				// no calls expected
-				p.crClient = crClientMock
 
-				crbClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList](ctrl)
-				// no calls expected
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
 				p.crbClient = crbClientMock
+				return p
 			},
-			args: args{
-				binding: &apisV3.ProjectRoleTemplateBinding{
-					ProjectName:      "c-abc:p-example",
-					RoleTemplateName: "role_template_0",
-				},
-			},
+			binding: testBinding.DeepCopy(),
 			wantErr: true,
 		},
 		{
 			name: "unable to delete CR",
-			mockSetup: func(ctrl *gomock.Controller) {
-				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
-						return &apisV3.RoleTemplate{
-							Rules: []v1.PolicyRule{
-								{
-									APIGroups: []string{management.GroupName},
-									Verbs:     []string{"updatepsa"},
-									Resources: []string{apisV3.ProjectResourceName},
-								},
-							},
-						}, nil
-					},
-				}
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-				// no calls expected
+
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
+				crbClientMock.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				p.crbClient = crbClientMock
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+				crClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(fmt.Errorf("error"))
 				p.crClient = crClientMock
+				return p
 			},
-			args: args{
-				binding: &apisV3.ProjectRoleTemplateBinding{
-					ProjectName:      "c-abc:p-example",
-					RoleTemplateName: "role_template_0",
-				},
-			},
+			binding: testBinding.DeepCopy(),
 			wantErr: true,
 		},
 		{
 			name: "delete only CRB (CR locked by other CRBs)",
-			mockSetup: func(ctrl *gomock.Controller) {
-				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
-						return &apisV3.RoleTemplate{
-							Rules: []v1.PolicyRule{
-								{
-									APIGroups: []string{management.GroupName},
-									Verbs:     []string{"updatepsa"},
-									Resources: []string{apisV3.ProjectResourceName},
-								},
-							},
-						}, nil
-					},
-				}
-				crbClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList](ctrl)
-				crbClientMock.EXPECT().List(gomock.Any()).Return(&v1.ClusterRoleBindingList{
-					Items: []v1.ClusterRoleBinding{
+
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
+				crbClientMock.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{
 						{
 							RoleRef: v1.RoleRef{
 								Kind: "ClusterRole",
-								Name: "p-example-namespaces-psa",
+								Name: psaClusterRoleName,
 							},
 						},
 					},
 				}, nil)
-				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
 				p.crbClient = crbClientMock
+				return p
 			},
-			args: args{
-				binding: &apisV3.ProjectRoleTemplateBinding{
-					ProjectName:      "c-abc:p-example",
-					RoleTemplateName: "role_template_0",
-					UserName:         "u-zxv",
-				},
-			},
+			binding: testBinding.DeepCopy(),
 			wantErr: false,
 		},
 		{
-			name: "unable to get RT",
-			mockSetup: func(ctrl *gomock.Controller) {
-				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
-					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
-						return nil, fmt.Errorf("error")
-					},
-				}
-				crClientMock := fake.NewMockNonNamespacedClientInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-				// no calls expected
+
+			name: "CRB not found is not an error",
+			setup: func(ctrl *gomock.Controller) *prtbLifecycle {
+				p := &prtbLifecycle{}
+				crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+				crbClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(apierrors.NewNotFound(schema.GroupResource{}, ""))
+				crbClientMock.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				p.crbClient = crbClientMock
+
+				crClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+				crClientMock.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(apierrors.NewNotFound(schema.GroupResource{}, ""))
 				p.crClient = crClientMock
+				return p
 			},
-			args: args{
-				binding: &apisV3.ProjectRoleTemplateBinding{
-					ProjectName:      "c-abc:p-example",
-					RoleTemplateName: "role_template_0",
-				},
-			},
-			wantErr: true,
+			binding: testBinding.DeepCopy(),
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			tt.mockSetup(ctrl)
-			if err := p.ensurePSAPermissionsDelete(tt.args.binding); (err != nil) != tt.wantErr {
-				t.Errorf("prtbLifecycle.ensurePRTBDelete() error = %v, wantErr %v", err, tt.wantErr)
+			p := tt.setup(ctrl)
+			if err := p.ensurePSAPermissionsDelete(tt.binding); (err != nil) != tt.wantErr {
+				t.Errorf("prtbLifecycle.ensurePSAPermissionsDelete() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
