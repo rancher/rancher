@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
@@ -47,6 +48,7 @@ type sessionAdder interface {
 }
 
 type authorizeHandler struct {
+	extTokenStore   *exttokenstore.SystemStore
 	tokenCache      wrangmgmtv3.TokenCache
 	userLister      wrangmgmtv3.UserCache
 	oidcClientCache wrangmgmtv3.OIDCClientCache
@@ -55,8 +57,9 @@ type authorizeHandler struct {
 	now             func() time.Time
 }
 
-func newAuthorizeHandler(tokenCache wrangmgmtv3.TokenCache, userLister wrangmgmtv3.UserCache, sessionAdder sessionAdder, codeCreator codeCreator, oidcClientCache wrangmgmtv3.OIDCClientCache) *authorizeHandler {
+func newAuthorizeHandler(extTokenStore *exttokenstore.SystemStore, tokenCache wrangmgmtv3.TokenCache, userLister wrangmgmtv3.UserCache, sessionAdder sessionAdder, codeCreator codeCreator, oidcClientCache wrangmgmtv3.OIDCClientCache) *authorizeHandler {
 	return &authorizeHandler{
+		extTokenStore:   extTokenStore,
 		tokenCache:      tokenCache,
 		userLister:      userLister,
 		sessionAdder:    sessionAdder,

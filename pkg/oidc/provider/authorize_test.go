@@ -627,7 +627,7 @@ func TestAuthEndpoint(t *testing.T) {
 			if test.mockSetup != nil {
 				test.mockSetup(m)
 			}
-			h := newAuthorizeHandler(m.tokenCache, m.userLister, m.sessionAdder, m.codeCreator, m.oidcClientCache)
+			h := newAuthorizeHandler(nil, m.tokenCache, m.userLister, m.sessionAdder, m.codeCreator, m.oidcClientCache)
 			h.now = func() time.Time {
 				return fakeTime
 			}
