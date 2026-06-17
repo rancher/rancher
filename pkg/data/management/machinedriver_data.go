@@ -168,7 +168,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
 		linodeBuiltin = isCommandAvailable("docker-machine-driver-linode")
 	}
-	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.16/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
+	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.15/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
 	linodeDriverChecksum := "26a71dbbc2f5249a66716cad586c3b4048d3cd9e67c0527442c374dd5dcf1c41"
 	if runtime.GOARCH == "arm64" {
 		//overwrite arm driver version here
