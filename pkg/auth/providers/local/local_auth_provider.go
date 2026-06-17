@@ -15,6 +15,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/features"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -46,13 +48,14 @@ type PasswordVerifier interface {
 }
 
 type Provider struct {
-	userLister   v3.UserLister
-	groupLister  v3.GroupLister
-	userIndexer  cache.Indexer
-	gmIndexer    cache.Indexer
-	groupIndexer cache.Indexer
-	userMgr      user.Manager
-	pwdVerifier  PasswordVerifier
+	userLister      v3.UserLister
+	groupLister     v3.GroupLister
+	userIndexer     cache.Indexer
+	gmIndexer       cache.Indexer
+	groupIndexer    cache.Indexer
+	userMgr         user.Manager
+	pwdVerifier     PasswordVerifier
+	authConfigCache mgmtv3.AuthConfigCache
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMgr user.Manager) common.AuthProvider {
@@ -69,13 +72,14 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMgr user.
 	_ = gInformer.AddIndexers(gIndexers)
 
 	l := &Provider{
-		userIndexer:  informer.GetIndexer(),
-		gmIndexer:    gmInformer.GetIndexer(),
-		groupLister:  mgmtCtx.Management.Groups("").Controller().Lister(),
-		groupIndexer: gInformer.GetIndexer(),
-		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
-		userMgr:      userMgr,
-		pwdVerifier:  pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
+		userIndexer:     informer.GetIndexer(),
+		gmIndexer:       gmInformer.GetIndexer(),
+		groupLister:     mgmtCtx.Management.Groups("").Controller().Lister(),
+		groupIndexer:    gInformer.GetIndexer(),
+		userLister:      mgmtCtx.Management.Users("").Controller().Lister(),
+		authConfigCache: mgmtCtx.Wrangler.Mgmt.AuthConfig().Cache(),
+		userMgr:         userMgr,
+		pwdVerifier:     pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
 	}
 	return l
 }
@@ -204,6 +208,28 @@ func (l *Provider) getGroupPrincipals(user *apiv3.User) ([]apiv3.Principal, erro
 
 func (l *Provider) UsesUserSecrets() bool      { return false }
 func (l *Provider) CanRefreshPrincipals() bool { return true }
+
+func (l *Provider) IsHidden() bool {
+	// Check policy first, fast
+	hide := features.HideLocalAuthProvider.Enabled()
+	if !hide {
+		return false
+	}
+
+	// Check for active external auth provider, query etcd
+	acList, err := l.authConfigCache.List(labels.Everything())
+	if err != nil {
+		logrus.Errorf("unable to properly determine if local is hidden, keeping visible: %v", err)
+		return false
+	}
+	for _, ac := range acList {
+		if ac.Enabled && ac.Name != "local" {
+			return true
+		}
+	}
+
+	return false
+}
 
 func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
 	userID := strings.SplitN(principalID, "://", 2)[1]
