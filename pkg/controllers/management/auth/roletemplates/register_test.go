@@ -401,7 +401,7 @@ func TestClusterRoleEnqueuePRTBs(t *testing.T) {
 			obj:  aggregationClusterRole,
 			prtbCache: func(ctrl *gomock.Controller) mgmtv3.ProjectRoleTemplateBindingCache {
 				m := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
-				m.EXPECT().GetByIndex(prtbByRoleTemplateNameIndex, "rt-1").Return([]*v3.ProjectRoleTemplateBinding{projectRoleTemplateBinding}, nil)
+				m.EXPECT().GetByIndex(rbac.PRTBByRoleTemplateNameIndex, "rt-1").Return([]*v3.ProjectRoleTemplateBinding{projectRoleTemplateBinding}, nil)
 				return m
 			},
 			want: []relatedresource.Key{
@@ -413,7 +413,7 @@ func TestClusterRoleEnqueuePRTBs(t *testing.T) {
 			obj:  aggregationClusterRole,
 			prtbCache: func(ctrl *gomock.Controller) mgmtv3.ProjectRoleTemplateBindingCache {
 				m := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
-				m.EXPECT().GetByIndex(prtbByRoleTemplateNameIndex, "rt-1").Return(nil, errors.New("prtb cache error"))
+				m.EXPECT().GetByIndex(rbac.PRTBByRoleTemplateNameIndex, "rt-1").Return(nil, errors.New("prtb cache error"))
 				return m
 			},
 			wantErr: true,
@@ -468,7 +468,7 @@ func TestClusterRoleEnqueueCRTBs(t *testing.T) {
 			obj:  aggregationClusterRole,
 			crtbCache: func(ctrl *gomock.Controller) mgmtv3.ClusterRoleTemplateBindingCache {
 				m := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				m.EXPECT().GetByIndex(crtbByRoleTemplateNameIndex, "rt-1").Return([]*v3.ClusterRoleTemplateBinding{clusterRoleTemplateBinding}, nil)
+				m.EXPECT().GetByIndex(rbac.CRTBByRoleTemplateNameIndex, "rt-1").Return([]*v3.ClusterRoleTemplateBinding{clusterRoleTemplateBinding}, nil)
 				return m
 			},
 			want: []relatedresource.Key{
@@ -480,7 +480,7 @@ func TestClusterRoleEnqueueCRTBs(t *testing.T) {
 			obj:  aggregationClusterRole,
 			crtbCache: func(ctrl *gomock.Controller) mgmtv3.ClusterRoleTemplateBindingCache {
 				m := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				m.EXPECT().GetByIndex(crtbByRoleTemplateNameIndex, "rt-1").Return(nil, errors.New("crtb cache error"))
+				m.EXPECT().GetByIndex(rbac.CRTBByRoleTemplateNameIndex, "rt-1").Return(nil, errors.New("crtb cache error"))
 				return m
 			},
 			wantErr: true,

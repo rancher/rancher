@@ -11,8 +11,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -75,15 +73,12 @@ func (e *roleTemplateEnqueuer) enqueuePRTBs(_, name string, obj runtime.Object) 
 	if obj == nil {
 		return nil, nil
 	}
-	prtbs, err := e.prtbCache.List(metav1.NamespaceAll, labels.Everything())
+	prtbs, err := e.prtbCache.GetByIndex(rbac.PRTBByRoleTemplateNameIndex, name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list ProjectRoleTemplateBindings: %w", err)
+		return nil, fmt.Errorf("failed to list ProjectRoleTemplateBindings for roletemplate %s: %w", name, err)
 	}
 	var keys []relatedresource.Key
 	for _, prtb := range prtbs {
-		if prtb.RoleTemplateName != name {
-			continue
-		}
 		clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 		if clusterName != e.clusterName {
 			continue
@@ -98,13 +93,13 @@ func (e *roleTemplateEnqueuer) enqueueCRTBs(_, name string, obj runtime.Object) 
 	if obj == nil {
 		return nil, nil
 	}
-	crtbs, err := e.crtbCache.List(e.clusterName, labels.Everything())
+	crtbs, err := e.crtbCache.GetByIndex(rbac.CRTBByRoleTemplateNameIndex, name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list ClusterRoleTemplateBindings for cluster %s: %w", e.clusterName, err)
+		return nil, fmt.Errorf("failed to list ClusterRoleTemplateBindings for roletemplate %s: %w", name, err)
 	}
 	var keys []relatedresource.Key
 	for _, crtb := range crtbs {
-		if crtb.RoleTemplateName == name {
+		if crtb.ClusterName == e.clusterName {
 			keys = append(keys, relatedresource.Key{Namespace: crtb.Namespace, Name: crtb.Name})
 		}
 	}
