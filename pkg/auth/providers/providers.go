@@ -25,7 +25,9 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -256,6 +258,45 @@ func SetProviders(m map[string]common.AuthProvider) {
 	}
 
 	providers = m
+}
+
+// IsExternalProviderEnabled reports whether at least one non-local auth provider is currently enabled.
+// It consults each registered provider's IsDisabledProvider rather than querying auth config resources.
+func IsExternalProviderEnabled() bool {
+	// Snapshot the non-local provider list while holding the lock, then release
+	// before calling IsDisabledProvider — those implementations make live
+	// Kubernetes API calls that must not block the lock.
+	mu.RLock()
+	type entry struct {
+		name     string
+		provider common.AuthProvider
+	}
+	snapshot := make([]entry, 0, len(providers))
+	for name, p := range providers {
+		if name != local.Name {
+			snapshot = append(snapshot, entry{name, p})
+		}
+	}
+	mu.RUnlock()
+
+	for _, e := range snapshot {
+		disabled, err := e.provider.IsDisabledProvider()
+		if err != nil {
+			logrus.Warnf("checking if provider %s is disabled: %v", e.name, err)
+			continue
+		}
+		if !disabled {
+			return true
+		}
+	}
+	return false
+}
+
+// IsLocalHidden reports whether the local auth provider should be hidden from public-facing endpoints.
+// It returns true when the HideLocalAuthProvider feature flag is enabled and at least one external
+// auth provider is currently active.
+func IsLocalHidden() bool {
+	return features.HideLocalAuthProvider.Enabled() && IsExternalProviderEnabled()
 }
 
 // ProviderUsesUserSecrets reports whether the named provider stores per-user secrets for token refresh.
