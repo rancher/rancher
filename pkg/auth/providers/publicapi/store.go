@@ -12,6 +12,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/util"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -39,6 +40,14 @@ type authProvidersStore struct {
 }
 
 func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]any, error) {
+	provider := providers.GetProviderByType(id)
+	if provider == nil {
+		return nil, httperror.NewAPIError(httperror.NotFound, "")
+	}
+	if lp, ok := provider.(*local.Provider); ok && lp.IsHidden() {
+		return nil, httperror.NewAPIError(httperror.NotFound, "")
+	}
+
 	o, err := s.authConfigsRaw.Get(id, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -64,12 +73,20 @@ func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Sc
 	for _, i := range list.Items {
 		if t, ok := i.Object["type"].(string); ok && t != "" {
 			if enabled, ok := i.Object["enabled"].(bool); ok && enabled {
+				provider := providers.GetProviderByType(t)
+				if provider == nil {
+					logrus.Errorf("Internal error, no provider for type %q", t)
+					continue
+				}
+				if lp, ok := provider.(*local.Provider); ok && lp.IsHidden() {
+					continue
+				}
 				i.Object[".host"] = util.GetHost(apiContext.Request)
-				provider, err := providers.GetProviderByType(t).TransformToAuthProvider(i.Object)
+				providerObj, err := provider.TransformToAuthProvider(i.Object)
 				if err != nil {
 					return result, err
 				}
-				result = append(result, provider)
+				result = append(result, providerObj)
 			}
 		}
 	}
@@ -88,6 +105,14 @@ type v3AuthTokensStore struct {
 }
 
 func (t *v3AuthTokensStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]any, error) {
+	provider := providers.GetProviderByType(id)
+	if provider == nil {
+		return nil, httperror.NewAPIError(httperror.NotFound, "")
+	}
+	if lp, ok := provider.(*local.Provider); ok && lp.IsHidden() {
+		return nil, httperror.NewAPIError(httperror.NotFound, "")
+	}
+
 	token, err := t.tokens.Get(namespace.GlobalNamespace, id, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -158,6 +183,14 @@ func (s *v1AuthProviderStore) List(w http.ResponseWriter, r *http.Request) {
 		if !authConfig.Enabled {
 			continue
 		}
+		authProvider := s.getProviderByType(authConfig.Type)
+		if authProvider == nil {
+			logrus.Errorf("Internal error, no provider for type %q", authConfig.Type)
+			continue
+		}
+		if lp, ok := authProvider.(*local.Provider); ok && lp.IsHidden() {
+			continue
+		}
 
 		raw, err := s.authConfigsUnstructured.Get(r.Context(), authConfig.Name, metav1.GetOptions{})
 		if err != nil {
@@ -168,14 +201,14 @@ func (s *v1AuthProviderStore) List(w http.ResponseWriter, r *http.Request) {
 
 		raw.Object[".host"] = util.GetHost(r)
 
-		authProvider, err := s.getProviderByType(authConfig.Type).TransformToAuthProvider(raw.Object)
+		authProviderObj, err := authProvider.TransformToAuthProvider(raw.Object)
 		if err != nil {
 			logrus.Errorf("v1AuthProviderStore: Getting authprovider %s: %s", authConfig.Type, err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
-		response.Data = append(response.Data, authProvider)
+		response.Data = append(response.Data, authProviderObj)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

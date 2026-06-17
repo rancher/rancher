@@ -256,6 +256,16 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 		return
 	}
 
+	provider := providers.GetProviderByType(input.GetName())
+	if provider == nil {
+		util.ReturnAPIError(w, httperror.NewAPIError(httperror.NotFound, ""))
+		return
+	}
+	if lp, ok := provider.(*local.Provider); ok && lp.IsHidden() {
+		util.ReturnAPIError(w, httperror.NewAPIError(httperror.NotFound, ""))
+		return
+	}
+
 	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(w, r, input, input.GetName())
 	if err != nil {
 		if !util.IsAPIError(err) {

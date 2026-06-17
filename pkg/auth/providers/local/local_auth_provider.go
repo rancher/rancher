@@ -217,13 +217,18 @@ func (l *Provider) IsHidden() bool {
 	}
 
 	// Check for active external auth provider, query etcd
+	// Check for active external auth provider, query cache. keep visible without cache
+	if l.authConfigCache == nil {
+		logrus.Warnf("unable to properly determine if local is hidden, keeping visible: no auth config cache")
+		return false
+	}
 	acList, err := l.authConfigCache.List(labels.Everything())
 	if err != nil {
-		logrus.Errorf("unable to properly determine if local is hidden, keeping visible: %v", err)
+		logrus.Warnf("unable to properly determine if local is hidden, keeping visible: %v", err)
 		return false
 	}
 	for _, ac := range acList {
-		if ac.Enabled && ac.Name != "local" {
+		if ac.Enabled && ac.Name != Name {
 			return true
 		}
 	}
