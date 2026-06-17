@@ -199,7 +199,7 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 		return err
 	}
 
-	psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
+	psaCRBName := pkgrbac.NameForClusterRoleBindingWithOwner(ref, subject, binding.Name)
 
 	// create ClusterRoleBinding to bind the ClusterRole to the user/group
 	psaCRB := &rbacv1.ClusterRoleBinding{
@@ -277,7 +277,15 @@ func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTempla
 	if err != nil {
 		return err
 	}
-	psaCRBName := pkgrbac.NameForClusterRoleBinding(ref, subject)
+	psaCRBName := pkgrbac.NameForClusterRoleBindingWithOwner(ref, subject, binding.Name)
+	err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
+	}
+
+	// In previous versions, the ClusterRoleBinding name didn't include the binding name as an owner label.
+	// We need to check and delete the legacy ClusterRoleBinding if it exists to ensure proper cleanup.
+	psaCRBName = pkgrbac.NameForClusterRoleBinding(ref, subject)
 	err = p.crbClient.Delete(psaCRBName, &metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("error deleting clusterrolebinding %v: %w", psaCRBName, err)
