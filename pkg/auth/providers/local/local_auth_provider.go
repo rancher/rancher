@@ -84,6 +84,10 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMgr user.
 	return l
 }
 
+func (l *Provider) MockAuthConfigCache(authConfigCache mgmtv3.AuthConfigCache) {
+	l.authConfigCache = authConfigCache
+}
+
 func (l *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }

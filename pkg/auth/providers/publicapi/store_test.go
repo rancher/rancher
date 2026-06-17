@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -118,6 +119,114 @@ func TestV1AuthProviderStoreList(t *testing.T) {
 				"logoutAllForced":    false,
 				"logoutAllSupported": false,
 			},
+			map[string]any{
+				"id":                 "okta",
+				"type":               "oktaProvider",
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+				"logoutAllSupported": false,
+			},
+		},
+	}
+	require.Equal(t, wantPayload, gotPayload)
+}
+
+func TestV1AuthProviderStoreListHideLocal(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	previousHide := features.HideLocalAuthProvider.Enabled()
+	features.HideLocalAuthProvider.Set(true)
+	t.Cleanup(func () {
+		features.HideLocalAuthProvider.Set(previousHide)
+	})
+
+	authConfigCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.AuthConfig](ctrl)
+	authConfigCache.EXPECT().List(labels.Everything()).Return([]*apiv3.AuthConfig{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "local"},
+			Type:       "localConfig",
+			Enabled:    true,
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "okta"},
+			Type:       "oktaConfig",
+			Enabled:    true,
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "github"},
+			Type:       "githubConfig",
+		},
+	}, nil).Times(2)
+
+	localConfig := &unstructured.Unstructured{}
+	localConfig.SetUnstructuredContent(map[string]any{
+		"apiVersion": "management.cattle.io/v3",
+		"kind":       "AuthConfig",
+		"metadata": map[string]any{
+			"name": "local",
+		},
+		"type":    "localConfig",
+		"enabled": true,
+	})
+	oktaConfig := &unstructured.Unstructured{}
+	oktaConfig.SetUnstructuredContent(map[string]any{
+		"apiVersion": "management.cattle.io/v3",
+		"kind":       "AuthConfig",
+		"metadata": map[string]any{
+			"name": "okta",
+		},
+		"type":    "oktaConfig",
+		"enabled": true,
+	})
+	githubConfig := &unstructured.Unstructured{}
+	githubConfig.SetUnstructuredContent(map[string]any{
+		"apiVersion": "management.cattle.io/v3",
+		"kind":       "AuthConfig",
+		"metadata": map[string]any{
+			"name": "github",
+		},
+		"type": "githubConfig",
+	})
+
+	fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), localConfig, oktaConfig, githubConfig)
+	authConfigUnstructured := fakeDynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "authconfigs",
+	})
+
+	getProviderByType := func(providerType string) common.AuthProvider {
+		switch providerType {
+		case "localConfig":
+			p := &local.Provider{}
+			p.MockAuthConfigCache(authConfigCache)
+			return p
+		case "oktaConfig":
+			return &saml.Provider{}
+		case "githubConfig":
+			return &github.Provider{}
+		default:
+			require.FailNow(t, "unexpected provider type "+providerType)
+			return nil
+		}
+	}
+
+	store := v1AuthProviderStore{
+		authConfigCache:         authConfigCache,
+		authConfigsUnstructured: authConfigUnstructured,
+		getProviderByType:       getProviderByType,
+	}
+
+	r := httptest.NewRequest("GET", "/v1-public/authproviders", nil)
+	w := httptest.NewRecorder()
+
+	store.List(w, r)
+	require.Equal(t, 200, w.Result().StatusCode)
+	require.Equal(t, "application/json", w.Result().Header.Get("Content-Type"))
+	gotPayload := map[string]any{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &gotPayload))
+	wantPayload := map[string]any{
+		"data": []any{
 			map[string]any{
 				"id":                 "okta",
 				"type":               "oktaProvider",
