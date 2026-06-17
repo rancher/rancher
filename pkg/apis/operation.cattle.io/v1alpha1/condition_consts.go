@@ -53,7 +53,7 @@ const (
 	NotFailedReason = "NotFailed"
 
 	// NotSuccessfulReason surfaces when an operation has not completed successfully.
-	NotSuccessfulReason = "notSuccessful"
+	NotSuccessfulReason = "NotSuccessful"
 
 	// InProgressReason surfaces when an operation is currently in progress.
 	InProgressReason = "InProgress"
@@ -63,4 +63,12 @@ const (
 
 	// NotPausedReason surfaces when an operation is not paused.
 	NotPausedReason = "NotPaused"
+
+	// WaitingForSuitableLeaderReason surfaces when no suitable control-plane leader can be
+	// elected for encryption key rotation yet. The operation will retry automatically.
+	WaitingForSuitableLeaderReason = "WaitingForSuitableLeader"
+
+	// WaitingForEncryptionKeyRotationReason surfaces when the rotate-keys plan has been applied
+	// but the runtime secrets-encrypt status has not yet confirmed reencrypt_finished.
+	WaitingForEncryptionKeyRotationReason = "WaitingForEncryptionKeyRotation"
 )

@@ -50,6 +50,13 @@ func handleError(t *testing.T, clients *clients.Clients, name string, err error)
 			} else {
 				objs["ETCDSnapshotSave"] = creates
 			}
+
+			restores, newErr := clients.Operation.ETCDSnapshotRestore().List(c.Name, metav1.ListOptions{})
+			if newErr != nil {
+				logrus.Error(newErr)
+			} else {
+				objs["ETCDSnapshotRestore"] = restores
+			}
 		}
 
 		features, newErr := clients.Mgmt.Feature().List(metav1.ListOptions{})

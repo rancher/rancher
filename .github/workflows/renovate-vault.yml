@@ -36,11 +36,6 @@ on:
         required: false
         default: "null"
         type: string
-      extendsPreset:
-        description: "Override renovate extends preset (default: 'github>rancher/renovate-config#release')."
-        required: false
-        default: "github>rancher/renovate-config#release"
-        type: string
 
   schedule:
     - cron: '30 4,6 * * 1-5'
@@ -51,13 +46,12 @@ permissions:
 
 jobs:
   call-workflow:
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@c88cbe41a49d02648b9bf83aa5a64902151323fa # release
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@a9fa41f899dfd0b3f211f7a897ec19ec7c4462c4 # v1.0.3
     with:
       configMigration: ${{ inputs.configMigration || 'true' }}
       logLevel: ${{ inputs.logLevel || 'info' }}
       overrideSchedule: ${{ github.event.inputs.overrideSchedule == 'true' && '{''schedule'':null}' || '' }}
       renovateConfig: ${{ inputs.renovateConfig || '.github/renovate.json' }}
       minimumReleaseAge: ${{ inputs.minimumReleaseAge || 'null' }}
-      extendsPreset: ${{ inputs.extendsPreset || 'github>rancher/renovate-config#release' }}
     secrets:
       override-token: "${{ secrets.RENOVATE_FORK_GH_TOKEN || '' }}"

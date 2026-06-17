@@ -500,45 +500,6 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *h
 		return userInfo, oauth2Token, "", fmt.Errorf("failed to parse claims: %w", err)
 	}
 
-	// read groups from GroupsClaim if provided
-	if config.GroupsClaim != "" {
-		groupsClaim, err := getValueFromClaims[[]any](idToken, config.GroupsClaim)
-		if err != nil {
-			return userInfo, oauth2Token, "", fmt.Errorf("failed to parse groups claims: %w", err)
-		}
-
-		if len(groupsClaim) > 0 {
-			logrus.Debugf("OpenIDCProvider: using custom groups claim")
-			var groups []string
-			for _, g := range groupsClaim {
-				group, ok := g.(string)
-				if !ok {
-					logrus.Warn("OpenIDCProvider: failed to convert group to string")
-				}
-				groups = append(groups, group)
-			}
-			claimInfo.Groups = groups
-		}
-	}
-
-	// read name from nameClaim if provided
-	if config.NameClaim != "" {
-		nameClaim, err := getValueFromClaims[string](idToken, config.NameClaim)
-		if err != nil {
-			return userInfo, oauth2Token, "", fmt.Errorf("failed to parse claims: %w", err)
-		}
-		claimInfo.Name = nameClaim
-	}
-
-	// read email from emailClaim if provided
-	if config.EmailClaim != "" {
-		emailClaim, err := getValueFromClaims[string](idToken, config.EmailClaim)
-		if err != nil {
-			return userInfo, oauth2Token, "", fmt.Errorf("failed to parse claims: %w", err)
-		}
-		claimInfo.Email = emailClaim
-	}
-
 	// Valid will return false if access token is expired
 	if !oauth2Token.Valid() {
 		return userInfo, oauth2Token, "", fmt.Errorf("not valid token: %w", err)
@@ -561,6 +522,14 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *h
 	logrus.Debugf("OpenIDCProvider: getUserInfo: getting user info for user %s", userName)
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
 	if err != nil {
+		return userInfo, oauth2Token, "", err
+	}
+
+	// UserInfo overrides the ID token for standard fields.
+	if err := userInfo.Claims(&claimInfo); err != nil {
+		return userInfo, oauth2Token, "", fmt.Errorf("failed to get user info claims: %w", err)
+	}
+	if err := applyCustomClaims(idToken, userInfo, config, claimInfo); err != nil {
 		return userInfo, oauth2Token, "", err
 	}
 
@@ -625,7 +594,11 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *api
 	if err != nil {
 		return nil, err
 	}
+	// UserInfo overrides the ID token for standard fields.
 	if err := userInfo.Claims(&claimInfo); err != nil {
+		return nil, err
+	}
+	if err := applyCustomClaims(idToken, userInfo, config, claimInfo); err != nil {
 		return nil, err
 	}
 
@@ -652,6 +625,83 @@ func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *apiv3.OIDCConfig) oau
 		RedirectURL:  config.RancherURL,
 		Scopes:       finalScopes,
 	}
+}
+
+// applyCustomClaims resolves custom claim fields (GroupsClaim, NameClaim, EmailClaim)
+// from the config. For each configured claim the ID token supplies the initial value
+// and the UserInfo endpoint overrides it, so UserInfo takes precedence.
+func applyCustomClaims(idToken *oidc.IDToken, userInfo *oidc.UserInfo, config *apiv3.OIDCConfig, claimInfo *ClaimInfo) error {
+	if config.GroupsClaim == "" && config.NameClaim == "" && config.EmailClaim == "" {
+		return nil
+	}
+
+	var userInfoRawClaims map[string]any
+	if err := userInfo.Claims(&userInfoRawClaims); err != nil {
+		return fmt.Errorf("failed to parse user info claims: %w", err)
+	}
+
+	if config.GroupsClaim != "" {
+		groupsClaim, err := getValueFromClaims[[]any](idToken, config.GroupsClaim)
+		if err != nil {
+			return fmt.Errorf("failed to parse groups claims: %w", err)
+		}
+		// UserInfo overrides ID token.
+		if raw, ok := userInfoRawClaims[config.GroupsClaim]; ok {
+			if rawSlice, ok := raw.([]any); ok {
+				groupsClaim = rawSlice
+			}
+		}
+
+		if len(groupsClaim) > 0 {
+			logrus.Debugf("OpenIDCProvider: using custom groups claim")
+			groups := make([]string, 0, len(groupsClaim))
+			for _, g := range groupsClaim {
+				group, ok := g.(string)
+				if !ok || group == "" {
+					logrus.Warn("OpenIDCProvider: failed to convert group to string")
+					continue
+				}
+				groups = append(groups, group)
+			}
+			if len(groups) > 0 {
+				claimInfo.Groups = groups
+			}
+		}
+	}
+
+	if config.NameClaim != "" {
+		nameClaim, err := getValueFromClaims[string](idToken, config.NameClaim)
+		if err != nil {
+			return fmt.Errorf("failed to parse name claim: %w", err)
+		}
+		// UserInfo overrides ID token.
+		if userInfoName, ok := userInfoRawClaims[config.NameClaim].(string); ok && userInfoName != "" {
+			nameClaim = userInfoName
+		}
+		// Only override if a non-empty value was resolved; otherwise preserve any
+		// name already populated from the standard "name" claim.
+		if nameClaim != "" {
+			claimInfo.Name = nameClaim
+		}
+	}
+
+	if config.EmailClaim != "" {
+		emailClaim, err := getValueFromClaims[string](idToken, config.EmailClaim)
+		if err != nil {
+			return fmt.Errorf("failed to parse email claim: %w", err)
+		}
+		// UserInfo overrides ID token.
+		if userInfoEmail, ok := userInfoRawClaims[config.EmailClaim].(string); ok && userInfoEmail != "" {
+			emailClaim = userInfoEmail
+		}
+		// Only override if a non-empty value was resolved; otherwise preserve any
+		// email already populated from the standard "email" claim.
+		if emailClaim != "" {
+			claimInfo.Email = emailClaim
+		}
+	}
+
+	return nil
 }
 
 func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []apiv3.Principal {

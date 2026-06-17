@@ -9,6 +9,7 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
@@ -30,20 +31,31 @@ import (
 // supervisor flag to keep produced plans byte-deterministic across calls.
 type stubAdapter struct {
 	runtimeCommand     string
+	dataDir            string
+	provisioningDir    string
+	kubectlPath        string
+	kubeconfigPath     string
 	serverUnit         string
-	probes             map[string]rkeplan.Probe
-	probesErr          error
 	waitForRegisterOK  bool
 	waitForRegisterErr error
+	probes             map[string]planapi.Probe
 }
 
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }
-func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }
-func (a *stubAdapter) ServerUnit() string     { return a.serverUnit }
+func (a *stubAdapter) PauseCluster(_ bool) error                         { return nil }
+func (a *stubAdapter) RuntimeCommand() string                            { return a.runtimeCommand }
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string       { return a.dataDir }
+func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
+func (a *stubAdapter) ServerUnit() string                                { return a.serverUnit }
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
-	return a.probes, a.probesErr
+	return map[string]rkeplan.Probe{}, nil
+}
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectlPath }
+func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
+func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
+	return nil, nil
 }
 
 // fakeDynamic satisfies the controller's dynamicResolver interface for the success-path tests.
@@ -76,10 +88,12 @@ func (f *fakeDynamic) Enqueue(gvk schema.GroupVersionKind, ns, name string) erro
 // strings matter.
 func defaultAdapter() *stubAdapter {
 	return &stubAdapter{
-		runtimeCommand:    "k3s",
-		serverUnit:        "k3s",
-		probes:            map[string]rkeplan.Probe{},
-		waitForRegisterOK: true,
+		runtimeCommand:  "rke2",
+		dataDir:         "/var/lib/rancher/rke2",
+		provisioningDir: "/var/lib/rancher/capr",
+		kubectlPath:     "/var/lib/rancher/rke2/bin/kubectl",
+		kubeconfigPath:  "/etc/rancher/rke2/rke2.yaml",
+		serverUnit:      "rke2-server",
 	}
 }
 
@@ -115,7 +129,7 @@ func newOp() *opv1alpha1.ETCDSnapshotSave {
 func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 	lbls := map[string]string{}
 	if owner != "" {
-		lbls[planv1alpha1.OwnerLabel] = owner
+		lbls[planv1alpha1.BeaconOwnerLabel] = owner
 	}
 	return &planv1alpha1.Beacon{
 		ObjectMeta: metav1.ObjectMeta{
@@ -128,7 +142,7 @@ func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 }
 
 // newPlanSecret builds a machine-plan secret carrying the cluster-name + etcd-role labels and
-// non-nil Annotations (the planapi.Store assumes Annotations is non-nil).
+// non-nil Annotations (the plan.Store assumes Annotations is non-nil).
 func newPlanSecret(name string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -148,9 +162,9 @@ func newPlanSecret(name string) *corev1.Secret {
 // withAppliedPlan returns a copy of the secret pre-populated to look like the system-agent has
 // already applied the given plan with healthy probes — used to fast-forward reconcile tests
 // through the "wait for plan" branch.
-func withAppliedPlan(secret *corev1.Secret, plan *planapi.Plan) *corev1.Secret {
+func withAppliedPlan(secret *corev1.Secret, expectedPlan *planapi.Plan) *corev1.Secret {
 	out := secret.DeepCopy()
-	data, _ := json.Marshal(plan)
+	data, _ := json.Marshal(expectedPlan)
 	if out.Data == nil {
 		out.Data = map[string][]byte{}
 	}
@@ -166,9 +180,9 @@ func withAppliedPlan(secret *corev1.Secret, plan *planapi.Plan) *corev1.Secret {
 
 // withFailedPlan marks the secret as having failed its plan past the failure threshold so the
 // store reports Failure() == true.
-func withFailedPlan(secret *corev1.Secret, plan *planapi.Plan) *corev1.Secret {
+func withFailedPlan(secret *corev1.Secret, expectedPlan *planapi.Plan) *corev1.Secret {
 	out := secret.DeepCopy()
-	data, _ := json.Marshal(plan)
+	data, _ := json.Marshal(expectedPlan)
 	if out.Data == nil {
 		out.Data = map[string][]byte{}
 	}
@@ -242,7 +256,7 @@ func TestUpdateStatusPaused(t *testing.T) {
 	status := updateStatus(op, opv1alpha1.ETCDSnapshotSaveStatus{})
 
 	assert.Equal(t, int64(7), status.ObservedGeneration, "ObservedGeneration must be copied from the op")
-	assert.Equal(t, "True", string(opv1alpha1.PausedCondition.GetStatus(&status)))
+	assert.Equal(t, "True", opv1alpha1.PausedCondition.GetStatus(&status))
 	assert.Equal(t, opv1alpha1.PausedReason, opv1alpha1.PausedCondition.GetReason(&status))
 }
 
@@ -258,7 +272,7 @@ func TestUpdateStatusByPhase(t *testing.T) {
 			name:  "pending sets Pending=True",
 			phase: opv1alpha1.OperationPhasePending,
 			check: func(t *testing.T, s opv1alpha1.ETCDSnapshotSaveStatus) {
-				assert.Equal(t, "True", string(opv1alpha1.PendingCondition.GetStatus(&s)))
+				assert.Equal(t, "True", opv1alpha1.PendingCondition.GetStatus(&s))
 			},
 		},
 		{
@@ -351,7 +365,9 @@ func TestHandlePending_TransitionsToInProgress(t *testing.T) {
 
 	beacons := &fakeBeaconClient{}
 	h := &handler{beacons: beacons}
-	s := newScope(newOp(), newBeacon(ControllerOwnerKey, false), defaultAdapter())
+	a := defaultAdapter()
+	a.waitForRegisterOK = true
+	s := newScope(newOp(), newBeacon(ControllerOwnerKey, false), a)
 
 	got, err := h.handlePending(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -417,7 +433,7 @@ func TestHandleFailed_HoldingBeaconReleases(t *testing.T) {
 		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive")
 	}
 	if assert.Len(t, beacons.updates, 1, "ReleaseBeacon should update the beacon labels") {
-		_, hasOwner := beacons.updates[0].Labels[planv1alpha1.OwnerLabel]
+		_, hasOwner := beacons.updates[0].Labels[planv1alpha1.BeaconOwnerLabel]
 		assert.False(t, hasOwner, "owner label must be cleared")
 	}
 }
@@ -590,8 +606,8 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 
 	// Pre-populate so the test traverses the "applied" branch without needing additional poll
 	// cycles — we're asserting on the *plan content* not the wait behaviour here.
-	plan := expectedSavePlan(op, adapter)
-	secret := withAppliedPlan(newPlanSecret("etcd-1"), plan)
+	expectedPlan := expectedSavePlan(op, adapter)
+	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedPlan)
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
@@ -601,8 +617,8 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	assert.NoError(t, err)
 
 	wantArgs := []string{"etcd-snapshot", "save", "--name", "my-snap"}
-	if !reflect.DeepEqual(plan.OneTimeInstructions[0].Args, wantArgs) {
-		t.Errorf("plan args = %v, want %v — snapshot Args were not threaded through", plan.OneTimeInstructions[0].Args, wantArgs)
+	if !reflect.DeepEqual(expectedPlan.OneTimeInstructions[0].Args, wantArgs) {
+		t.Errorf("plan args = %v, want %v — snapshot Args were not threaded through", expectedPlan.OneTimeInstructions[0].Args, wantArgs)
 	}
 }
 

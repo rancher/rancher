@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
@@ -14,9 +15,12 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -189,8 +193,128 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 	return probes, nil
 }
 
+// isSuitableLeader returns true when the CAPI Machine backing the plan secret exists,
+// is not deleting, has a NodeRef, and is Ready.
+func (a *CAPRAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
+	machineName := MachineName(s)
+	machine, err := a.clients.CAPI.Machine().Cache().Get(a.controlPlane.Namespace, machineName)
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return machine.DeletionTimestamp == nil &&
+		machine.Status.NodeRef.IsDefined() &&
+		capr.Ready.IsTrue(machine), nil
+}
+
+// FindOrElectLeader finds or elects a machine-plan secret to lead the given operation.
+// Candidates are collected from the control-plane namespace, filtered by filter, and sorted
+// deterministically. An existing leader annotation is reused if the leader is still suitable;
+// otherwise a new leader is elected and the annotation written with retry-on-conflict.
+// Returns nil, nil when no suitable candidate exists yet.
+func (a *CAPRAdapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
+	secrets := a.clients.Core.Secret()
+	candidates, err := plan.NewCollector(secrets, a.controlPlane, a.controlPlane.Namespace).
+		WithFilter(plan.FilterFunc(filter)).
+		WithSorter(plan.DefaultSorter()).
+		Collect()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		marked        *corev1.Secret
+		markedCount   int
+		markedReady   bool
+		initCandidate *corev1.Secret
+		fallback      *corev1.Secret
+	)
+	for _, secret := range candidates {
+		if secret.Annotations[OperationLeaderAnnotation] == operation {
+			marked = secret
+			markedCount++
+			if markedCount > 1 {
+				return nil, fmt.Errorf("multiple machine-plan secrets marked as operation leader for %s", operation)
+			}
+		}
+
+		ok, err := a.isSuitableLeader(secret)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+
+		if marked != nil && secret.Namespace == marked.Namespace && secret.Name == marked.Name {
+			markedReady = true
+		}
+		if initCandidate == nil && IsInitNode(secret) {
+			initCandidate = secret
+		}
+		if fallback == nil {
+			fallback = secret
+		}
+	}
+
+	if marked != nil {
+		if markedReady {
+			return marked, nil
+		}
+		logrus.Warnf("[operations] %s/%s: elected leader %s is no longer suitable, re-electing", a.controlPlane.Namespace, a.controlPlane.Name, marked.Name)
+		if err := a.clearLeaderAnnotation(marked, operation); err != nil {
+			return nil, err
+		}
+	}
+	if initCandidate != nil {
+		return a.markLeader(initCandidate, operation)
+	}
+	if fallback != nil {
+		return a.markLeader(fallback, operation)
+	}
+	return nil, nil
+}
+
+func (a *CAPRAdapter) markLeader(secret *corev1.Secret, operation string) (*corev1.Secret, error) {
+	var updated *corev1.Secret
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		s, err := a.clients.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if s.Annotations[OperationLeaderAnnotation] == operation {
+			updated = s
+			return nil
+		}
+		if s.Annotations == nil {
+			s.Annotations = make(map[string]string)
+		}
+		s.Annotations[OperationLeaderAnnotation] = operation
+		updated, err = a.clients.Core.Secret().Update(s)
+		return err
+	})
+	return updated, err
+}
+
+func (a *CAPRAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		s, err := a.clients.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if s.Annotations == nil || s.Annotations[OperationLeaderAnnotation] != operation {
+			return nil
+		}
+		delete(s.Annotations, OperationLeaderAnnotation)
+		_, err = a.clients.Core.Secret().Update(s)
+		return err
+	})
+}
+
 // Note: most of this functionally has been copied from the planner 1:1.
-// The intention is to split 100% of the planner code to both the planapi package and the operations package.
+// The intention is to split 100% of the planner code to both the plan package and the operations package.
 // This will ideally be performed before 2.15 is released; however, migrating piecemeal provides us with the flexibility
 // to make changes as desired without putting the existing codebase at risk.
 
@@ -338,4 +462,40 @@ func convertInterfaceSliceToStringSlice(input []any) []string {
 		stringArr = append(stringArr, fmt.Sprintf("%v", v))
 	}
 	return stringArr
+}
+
+func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {
+	return capr.GetDistroDataDir(a.controlPlane)
+}
+
+func (a *CAPRAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
+	return capr.GetProvisioningDataDir(&a.controlPlane.Spec.ClusterConfiguration)
+}
+
+func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/usr/local/bin/kubectl"
+	}
+	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+}
+
+func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
+	if a.RuntimeCommand() == "k3s" {
+		return "/etc/rancher/k3s/k3s.yaml"
+	}
+	return "/etc/rancher/rke2/rke2.yaml"
+}
+
+func (a *CAPRAdapter) PauseCluster(pause bool) error {
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return err
+	}
+	if ptr.Equal(cluster.Spec.Paused, &pause) {
+		return nil
+	}
+	cluster = cluster.DeepCopy()
+	cluster.Spec.Paused = &pause
+	_, err = a.clients.CAPI.Cluster().Update(cluster)
+	return err
 }

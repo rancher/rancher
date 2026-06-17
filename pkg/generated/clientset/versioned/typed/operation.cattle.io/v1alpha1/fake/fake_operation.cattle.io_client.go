@@ -28,8 +28,16 @@ type FakeOperationV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeOperationV1alpha1) ETCDSnapshotRestores(namespace string) v1alpha1.ETCDSnapshotRestoreInterface {
+	return newFakeETCDSnapshotRestores(c, namespace)
+}
+
 func (c *FakeOperationV1alpha1) ETCDSnapshotSaves(namespace string) v1alpha1.ETCDSnapshotSaveInterface {
 	return newFakeETCDSnapshotSaves(c, namespace)
+}
+
+func (c *FakeOperationV1alpha1) EncryptionKeyRotations(namespace string) v1alpha1.EncryptionKeyRotationInterface {
+	return newFakeEncryptionKeyRotations(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

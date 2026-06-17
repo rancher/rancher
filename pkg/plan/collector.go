@@ -207,9 +207,9 @@ type Collector struct {
 // Passing a nil cluster returns a Collector that matches every secret in the namespace (no
 // auto-filter), which is occasionally useful for cluster-list operations but is rarely what you
 // want — prefer passing the cluster object explicitly.
-func NewCollector(cache SecretClient, cluster ClusterRef, namespace string) *Collector {
+func NewCollector(client SecretClient, cluster ClusterRef, namespace string) *Collector {
 	c := &Collector{
-		client:    cache,
+		client:    client,
 		namespace: namespace,
 	}
 	if cluster != nil {

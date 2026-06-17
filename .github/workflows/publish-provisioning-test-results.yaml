@@ -54,7 +54,7 @@ jobs:
 
       - name: Publish Test Results
         if: steps.xml_reports.outcome == 'success' && steps.event_file.outcome == 'success'
-        uses: rancher/publish-unit-test-result-action/linux@29a85161a9d18bf8cbf186abc523927ce71221b0
+        uses: rancher/publish-unit-test-result-action/linux@2c5c7685c1698e015459f9a9bfa49f0888800df5
         with:
           check_name: Provisioning Tests Results
           commit: ${{ github.event.workflow_run.head_sha }}
