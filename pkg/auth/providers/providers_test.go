@@ -179,3 +179,24 @@ func TestIsLocalHidden(t *testing.T) {
 		})
 	}
 }
+
+func TestIsLocalHiddenReflectsProviderStateChange(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	provider := mocks.NewMockAuthProvider(ctrl)
+	gomock.InOrder(
+		provider.EXPECT().IsDisabledProvider().Return(false, nil), // external enabled
+		provider.EXPECT().IsDisabledProvider().Return(true, nil),  // external disabled
+	)
+
+	features.HideLocalAuthProvider.Set(true)
+	defer features.HideLocalAuthProvider.Set(false)
+	SetProviders(map[string]common.AuthProvider{
+		local.Name: &local.Provider{},
+		"github":   provider,
+	})
+	defer SetProviders(nil)
+
+	assert.True(t, IsLocalHidden(), "local should be hidden while external provider is active")
+	assert.False(t, IsLocalHidden(), "local should reappear after external provider is disabled")
+}
