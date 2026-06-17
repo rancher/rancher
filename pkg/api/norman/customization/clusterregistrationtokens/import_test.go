@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -44,10 +43,7 @@ func TestClusterImportHandler_ValidateAuthImage(t *testing.T) {
 				url += "?authImage=" + tt.authImage
 			}
 			req := httptest.NewRequest(http.MethodGet, url, nil)
-			req = mux.SetURLVars(req, map[string]string{
-				"token":     "token",
-				"clusterId": "cluster",
-			})
+			req.SetPathValue("filename", "token_cluster.yaml")
 			resp := httptest.NewRecorder()
 
 			ch.ClusterImportHandler(resp, req)
