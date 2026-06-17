@@ -329,6 +329,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 				}
 				// add image pull secrets, turtles uses string references at
