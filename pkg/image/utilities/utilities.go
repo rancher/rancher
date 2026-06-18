@@ -650,9 +650,9 @@ while IFS= read -r i; do
         echo "Pulling chart: ${i}..."
         helm_error=$(helm pull "oci://${i%:*}" --version "${chart_version//_/+}" -d ./rancher-oci-charts 2>&1)
         if [ $? -eq 0 ]; then
-            echo "✓ Chart pull success: ${i}"
+            echo "Chart pull success: ${i}"
         else
-            echo "✗ Chart pull FAILED: ${i}"
+            echo "Chart pull FAILED: ${i}"
             echo "Error output:"
             echo "${helm_error}"
             echo ""
@@ -674,8 +674,12 @@ while IFS= read -r i; do
     fi
 done < "${list}"
 
-echo "Creating ${images} with $(echo ${pulled} | wc -w | tr -d '[:space:]') images"
-docker save $(echo ${pulled}) | gzip --stdout > ${images}
+if [ -n "${pulled}" ]; then
+    echo "Creating ${images} with $(echo ${pulled} | wc -w | tr -d '[:space:]') images"
+    docker save $(echo ${pulled}) | gzip --stdout > ${images}
+else
+    echo "No docker images pulled; skipping ${images}."
+fi
 
 if $use_helm_for_charts; then
     chart_count=$(ls ./rancher-oci-charts/*.tgz 2>/dev/null | wc -l)
