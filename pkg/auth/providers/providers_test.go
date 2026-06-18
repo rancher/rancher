@@ -180,6 +180,26 @@ func TestIsLocalHidden(t *testing.T) {
 	}
 }
 
+func TestIsExternalProviderEnabledFastPathErrorRetriedInFullScan(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	provider := mocks.NewMockAuthProvider(ctrl)
+	gomock.InOrder(
+		provider.EXPECT().IsDisabledProvider().Return(false, nil),                           // full scan warms the hint
+		provider.EXPECT().IsDisabledProvider().Return(false, fmt.Errorf("transient error")), // fast path errors: alreadyChecked must stay ""
+		provider.EXPECT().IsDisabledProvider().Return(false, nil),                           // full scan retries and confirms enabled
+	)
+
+	SetProviders(map[string]common.AuthProvider{
+		local.Name: &local.Provider{},
+		"github":   provider,
+	})
+	defer SetProviders(nil)
+
+	assert.True(t, IsExternalProviderEnabled(), "first call: full scan finds provider enabled and warms hint")
+	assert.True(t, IsExternalProviderEnabled(), "second call: fast-path error must not prevent full scan from retrying the provider")
+}
+
 func TestIsLocalHiddenReflectsProviderStateChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 

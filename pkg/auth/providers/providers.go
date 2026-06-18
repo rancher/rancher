@@ -283,12 +283,17 @@ func IsExternalProviderEnabled() bool {
 		p := providers[hint]
 		mu.RUnlock()
 		if p != nil {
-			alreadyChecked = hint
-			if disabled, err := p.IsDisabledProvider(); err == nil && !disabled {
-				return true
+			disabled, err := p.IsDisabledProvider()
+			if err == nil {
+				if !disabled {
+					return true // Hint still valid.
+				}
+				// Got a clean "disabled" answer — safe to skip in the full scan.
+				alreadyChecked = hint
 			}
+			// On error: alreadyChecked stays "" so the full scan retries this provider.
 		}
-		lastKnownEnabled.Store("") // Stale; clear before full scan.
+		// Don't clear the hint here; the full scan overwrites it authoritatively.
 	}
 
 	// Full scan: snapshot the non-local provider list while holding the lock,
@@ -318,6 +323,7 @@ func IsExternalProviderEnabled() bool {
 			return true
 		}
 	}
+	lastKnownEnabled.Store("")
 	return false
 }
 
