@@ -67,9 +67,17 @@ func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Sc
 }
 
 func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]any, error) {
-	rrr, _ := s.authConfigsRaw.List(metav1.ListOptions{})
+	rrr, err := s.authConfigsRaw.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	var result []map[string]any
 	list, _ := rrr.(*unstructured.UnstructuredList)
+	if list == nil {
+		return nil, nil
+	}
+
 	for _, i := range list.Items {
 		if t, ok := i.Object["type"].(string); ok && t != "" {
 			if enabled, ok := i.Object["enabled"].(bool); ok && enabled {

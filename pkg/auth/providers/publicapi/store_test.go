@@ -556,6 +556,22 @@ func TestAuthProvidersStoreList(t *testing.T) {
 		},
 	}
 
+	// Kubernetes API error must be returned, not silently discarded.
+	t.Run("Kubernetes List error propagates", func(t *testing.T) {
+		store := &authProvidersStore{
+			authConfigsRaw: &fakeAuthConfigsRaw{
+				list: func(_ metav1.ListOptions) (runtime.Object, error) {
+					return nil, fmt.Errorf("api server unavailable")
+				},
+			},
+		}
+		ctx := &normantypes.APIContext{
+			Request: httptest.NewRequest(http.MethodGet, "/v3-public/authproviders", nil),
+		}
+		_, err := store.List(ctx, nil, nil)
+		require.Error(t, err)
+	})
+
 	apiCtx := &normantypes.APIContext{
 		Request: httptest.NewRequest(http.MethodGet, "/v3-public/authproviders", nil),
 	}
