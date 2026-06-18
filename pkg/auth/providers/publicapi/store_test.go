@@ -359,7 +359,7 @@ func TestAuthProvidersStoreByID(t *testing.T) {
 				local.Name: localMock,
 			},
 			getFunc: func(_ string, _ metav1.GetOptions) (runtime.Object, error) {
-				return makeUnstructured(map[string]any{"type": "localConfig"}), nil
+				return makeUnstructured(map[string]any{"type": "localConfig", "enabled": true}), nil
 			},
 			wantData: map[string]any{"id": "local", "type": "localProvider"},
 		},
@@ -379,7 +379,7 @@ func TestAuthProvidersStoreByID(t *testing.T) {
 			flag:     false,
 			registry: map[string]common.AuthProvider{},
 			getFunc: func(_ string, _ metav1.GetOptions) (runtime.Object, error) {
-				return makeUnstructured(map[string]any{"type": "unknownConfig"}), nil
+				return makeUnstructured(map[string]any{"type": "unknownConfig", "enabled": true}), nil
 			},
 			wantErr: true,
 			want404: true,
@@ -392,9 +392,20 @@ func TestAuthProvidersStoreByID(t *testing.T) {
 				"github": externalMock,
 			},
 			getFunc: func(_ string, _ metav1.GetOptions) (runtime.Object, error) {
-				return makeUnstructured(map[string]any{"type": "githubConfig"}), nil
+				return makeUnstructured(map[string]any{"type": "githubConfig", "enabled": true}), nil
 			},
 			wantData: map[string]any{"id": "github", "type": "githubProvider"},
+		},
+		{
+			name:     "disabled provider returns 404",
+			id:       "github",
+			flag:     false,
+			registry: map[string]common.AuthProvider{"github": externalMock},
+			getFunc: func(_ string, _ metav1.GetOptions) (runtime.Object, error) {
+				return makeUnstructured(map[string]any{"type": "githubConfig", "enabled": false}), nil
+			},
+			wantErr: true,
+			want404: true,
 		},
 		{
 			name:     "config missing type field returns 404",

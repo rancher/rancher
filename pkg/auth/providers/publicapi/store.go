@@ -50,6 +50,9 @@ func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Sc
 	}
 	u, _ := o.(runtime.Unstructured)
 	config := u.UnstructuredContent()
+	if enabled, ok := config["enabled"].(bool); !ok || !enabled {
+		return nil, httperror.NewAPIError(httperror.NotFound, "")
+	}
 	if t, ok := config["type"].(string); ok && t != "" {
 		p := providers.GetProviderByType(t)
 		if p == nil {
