@@ -76,12 +76,14 @@ Wait a few minutes for Rancher to start up. You can check the logs with `docker 
 
 ### 3. Build the Setup Binary
 
-Navigate to this directory and build the program.
+Use the provided build script from the repo root. The script sets the required build tags (the bare `go build` command
+will fail without them due to C library dependencies in `github.com/containers/image`).
 
 ```bash
 # From the root of the rancher/rancher repository
-cd tests/v2/integration/setup
-go build -o setup .
+cd tests/v2/integration
+./scripts/build-integration-setup
+# Produces: tests/v2/integration/bin/integrationsetup
 ```
 
 ### 4. Run the Setup Program
@@ -89,11 +91,17 @@ go build -o setup .
 With the Rancher server running, execute the setup binary. Make sure to set the required environment variables.
 
 ```bash
-# From the tests/v2/integration/setup directory
+# From the root of the rancher/rancher repository
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_AGENT_IMAGE="rancher/rancher-agent:stable" # or your custom tag
+export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml
 
-./setup
+./tests/v2/integration/bin/integrationsetup
 ```
 
-The program will output the progress of creating and importing the k3d cluster, and finally list the deployments found in the new cluster.
+The program will output the progress of creating and importing the k3d cluster. When complete, `config.yaml` will be
+written to the path specified by `CATTLE_TEST_CONFIG`. You can then run the integration tests with:
+
+```bash
+go test -v -timeout 30m -failfast -p 1 ./tests/v2/integration/...
+```

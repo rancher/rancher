@@ -2,6 +2,8 @@
 
 ## Running Tests
 
+### Method 1: Full CI Run (Recommended for Validation)
+
 To run the integration tests in `tests/v2/integration`, use
 
 ```shell
@@ -16,7 +18,145 @@ This _should_ work on Mac and Linux systems out of the box, at least in theory. 
 consume a fair bit of CPU and memory. If you experience unexpected timeouts, you may not have enough compute power. If
 you encounter OOM issues that affect scheduling of containers, you may not have enough memory.
 
-## Test Setup
+### Method 2: Running Locally Against an External Rancher
+
+This method is useful for iterative development — you point the tests at an already-running Rancher instance instead of
+spinning up a new one inside a container.
+
+#### Step 1: Start a Rancher Server
+
+```bash
+export RANCHER_IP=$(ifconfig | grep 'inet ' | grep -v 127.0.0.1 | head -1 | awk '{print $2}')
+
+docker run -d --name rancher-server --restart=unless-stopped \
+  -p 80:80 -p 443:443 \
+  --privileged \
+  -e CATTLE_SERVER_URL="https://${RANCHER_IP}" \
+  -e CATTLE_BOOTSTRAP_PASSWORD="admin" \
+  -e CATTLE_DEV_MODE="yes" \
+  -e CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.11-head" \
+  rancher/rancher:v2.11-head
+```
+
+Wait for Rancher to be healthy:
+
+```bash
+until curl -sk "https://${RANCHER_IP}/ping" | grep -q pong; do echo "waiting for Rancher..."; sleep 5; done
+```
+
+#### Step 2: Build and Run the Integration Setup
+
+The setup program connects to Rancher, creates a k3d downstream cluster, imports it, and writes the test config file.
+
+```bash
+# Build the setup binary (from repo root)
+cd tests/v2/integration
+./scripts/build-integration-setup
+# Produces: tests/v2/integration/bin/integrationsetup
+
+# Run the setup (from repo root)
+cd ../../..
+export CATTLE_BOOTSTRAP_PASSWORD="admin"
+export CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.11-head"
+export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml
+
+./tests/v2/integration/bin/integrationsetup
+```
+
+The setup program auto-detects the Rancher host IP, generates an admin token, creates a k3d cluster, imports it into
+Rancher, and writes connection details to the path specified by `CATTLE_TEST_CONFIG`.
+
+#### Step 3: (Optional) Create `config.yaml` Manually
+
+If you already have a Rancher instance with an imported cluster, you can skip the setup binary and create the config
+file directly. See [Configuration Reference](#configuration-reference) below for all fields.
+
+#### Step 4: Run the Tests
+
+```bash
+export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml
+
+# Run all integration tests
+go test -v -timeout 30m -failfast -p 1 ./tests/v2/integration/...
+
+# Run a specific test suite
+go test -v -count=1 -run TestChartsTestSuite ./tests/v2/integration/catalogv2/
+
+# Run a specific test within a suite
+go test -v -count=1 -run TestRTBTestSuite/TestUserVsUserBaseGlobalRoleVisibility ./tests/v2/integration/rbac/
+
+# Run Steve API tests (local cluster only — no downstream cluster needed)
+go test -v -count=1 -run TestSteveLocal ./tests/v2/integration/steveapi/
+```
+
+> **Tip:** The default Go test timeout is 10 minutes, which can be too short for catalog tests that pull external
+> repositories. Use `-timeout 30m` or higher for full suite runs.
+
+---
+
+## Configuration Reference
+
+### `config.yaml`
+
+The test config file is read from the path in `CATTLE_TEST_CONFIG`. A minimal example:
+
+```yaml
+rancher:
+  adminToken: "token-xxxxx:yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+  host: "192.168.1.100"        # Rancher host (no https://, no trailing slash)
+  clusterName: "my-k3d-cluster" # name of the imported downstream cluster in Rancher
+  insecure: true
+  cleanup: true
+```
+
+All supported fields:
+
+| Field | Type | Description | Required |
+|---|---|---|---|
+| `rancher.adminToken` | string | Bearer token for admin API access. Obtain from Rancher UI: User Icon → Account & API Keys → Create API Key (No Scope). | Yes |
+| `rancher.host` | string | Rancher server hostname or IP (no scheme, no trailing slash). | Yes |
+| `rancher.clusterName` | string | Name of the downstream cluster in Rancher. Required for downstream tests; use `local` to target the local cluster only. | Yes |
+| `rancher.insecure` | bool | Skip TLS verification. Useful for self-signed certs. Default: `false`. | No |
+| `rancher.cleanup` | bool | Whether tests should delete the resources they create. Default: `true`. | No |
+| `rancher.adminPassword` | string | Admin password (alternative to `adminToken`). | No |
+| `rancher.caFile` | string | Path to a CA certificate file for TLS verification. | No |
+| `rancher.caCerts` | string | Inline PEM-encoded CA certificate(s). | No |
+
+### Environment Variables
+
+| Variable | Used By | Description |
+|---|---|---|
+| `CATTLE_TEST_CONFIG` | Tests + setup | **Required.** Absolute path to `config.yaml`. Must be exported before running tests or the setup binary. |
+| `CATTLE_BOOTSTRAP_PASSWORD` | Setup only | Bootstrap password for Rancher first-login. Default: `admin`. |
+| `CATTLE_AGENT_IMAGE` | Setup only | Full image reference for the Rancher agent (e.g. `rancher/rancher-agent:v2.11-head`). Used when importing the k3d cluster. |
+
+---
+
+## Test Suites
+
+Tests that only use the `local` cluster do **not** require a downstream cluster and can be run with just a basic
+`config.yaml`. Tests marked "downstream required" need an imported cluster referenced by `rancher.clusterName`.
+
+| Directory | Test Function | What It Tests | Downstream Required? |
+|---|---|---|---|
+| `catalogv2/` | `TestChartsTestSuite` | Chart installation, tolerations, pull-through | Yes |
+| `catalogv2/` | `TestClusterRepoTestSuite` | ClusterRepo CRUD, OCI repos | No |
+| `catalogv2/` | `TestSystemChartsVersionSuite` | System chart version constraints | No |
+| `catalogv2/` | `TestUIPluginSuite` | UI plugin extensions | No |
+| `catalogv2/` | `TestRancherManagedChartsSuite` | Rancher-managed Helm charts | No |
+| `clusters/` | `TestK8sProxy` | K8s API proxy through Rancher | Yes |
+| `projects/` | `TestResourceQuotaTestSuite` | Namespace resource quotas | No |
+| `projects/` | `TestProjectUserTestSuite` | Project-level user access | No |
+| `rbac/` | `TestRTBTestSuite` | Role/ClusterRole template bindings, features, impersonation, projects | No (uses `local`) |
+| `steveapi/` | `TestSteveLocal` | Steve resource listing API (local cluster) | No |
+| `steveapi/` | `TestSteveDownstream` | Steve API on downstream cluster | Yes (currently skipped) |
+| `users/` | `TestUserTestSuite` | User CRUD operations | No |
+| `authconfigs/` | `TestAuthConfig` | Auth configuration management | No |
+| `serviceaccount/` | `TestSATestSuite` | Service account token handling | No |
+
+---
+
+## Test Setup Details
 
 Setup for the integration tests can be found in `scripts/test` and `tests/v2/integration/setup/main.go`. The latter is
 responsible primarily for
