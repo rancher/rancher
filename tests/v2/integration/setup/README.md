@@ -96,11 +96,19 @@ export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_AGENT_IMAGE="rancher/rancher-agent:stable" # or your custom tag
 export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml
 
+# Optional: override the auto-detected host (useful when Rancher is not on the local machine,
+# or when the outbound IP detection returns the wrong interface)
+# export CATTLE_RANCHER_HOST="192.168.1.100:443"
+
 ./tests/v2/integration/bin/integrationsetup
 ```
 
-The program will output the progress of creating and importing the k3d cluster. When complete, `config.yaml` will be
-written to the path specified by `CATTLE_TEST_CONFIG`. You can then run the integration tests with:
+By default the binary auto-detects the host by opening a UDP socket to 8.8.8.8 and reading the local address. Set
+`CATTLE_RANCHER_HOST` to override this (e.g. `localhost:8443` or a remote IP). The value is written directly into
+`config.yaml`, so it is the address the tests will use to reach Rancher.
+
+The generated `config.yaml` is gitignored and written to `tests/v2/integration/config.yaml`. You can then run the
+integration tests with:
 
 ```bash
 go test -v -timeout 30m -failfast -p 1 ./tests/v2/integration/...

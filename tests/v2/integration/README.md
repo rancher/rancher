@@ -129,6 +129,7 @@ All supported fields:
 | `CATTLE_TEST_CONFIG` | Tests + setup | **Required.** Absolute path to `config.yaml`. Must be exported before running tests or the setup binary. |
 | `CATTLE_BOOTSTRAP_PASSWORD` | Setup only | Bootstrap password for Rancher first-login. Default: `admin`. |
 | `CATTLE_AGENT_IMAGE` | Setup only | Full image reference for the Rancher agent (e.g. `rancher/rancher-agent:v2.11-head`). Used when importing the k3d cluster. |
+| `CATTLE_RANCHER_HOST` | Setup only | Override the auto-detected Rancher host (e.g. `192.168.1.100:443` or `localhost:8443`). If unset, the setup binary detects the host by inspecting the machine's outbound IP. |
 
 ---
 
