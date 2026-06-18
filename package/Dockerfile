@@ -77,6 +77,13 @@ ENV GOCACHE=/root/.cache/go/cache
 
 FROM builder AS rancher-charts
 ARG CHART_DEFAULT_BRANCH
+# Declaring these causes cache invalidation when any of these versions change,
+# ensuring the cloned charts are always in sync with build.yaml.
+ARG CATTLE_FLEET_VERSION
+ARG CATTLE_RANCHER_WEBHOOK_VERSION
+ARG CATTLE_REMOTEDIALER_PROXY_VERSION
+ARG CATTLE_RANCHER_TURTLES_VERSION
+ARG CATTLE_CSP_ADAPTER_MIN_VERSION
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
     # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
     git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
