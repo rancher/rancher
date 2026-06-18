@@ -23,6 +23,35 @@ you encounter OOM issues that affect scheduling of containers, you may not have 
 This method is useful for iterative development — you point the tests at an already-running Rancher instance instead of
 spinning up a new one inside a container.
 
+#### Quick Start (copy-paste)
+
+If you already have a Rancher server running and just want to get tests going:
+
+```bash
+# 1. Start Rancher (if not already running)
+export RANCHER_IP=$(ifconfig | grep 'inet ' | grep -v 127.0.0.1 | head -1 | awk '{print $2}')
+docker run -d --name rancher-server --restart=unless-stopped \
+  -p 80:80 -p 443:443 --privileged \
+  -e CATTLE_SERVER_URL="https://${RANCHER_IP}" \
+  -e CATTLE_BOOTSTRAP_PASSWORD="admin" \
+  -e CATTLE_DEV_MODE="yes" \
+  -e CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.14-head" \
+  rancher/rancher:v2.14-head
+
+# 2. Create a k3d downstream cluster and generate config.yaml
+export CATTLE_BOOTSTRAP_PASSWORD="admin"
+export CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.14-head"
+make integration-setup
+
+# 3. Run the tests
+make integration-test-local
+```
+
+`make integration-setup` builds the setup binary, connects to Rancher, creates a k3d downstream cluster, and writes
+`tests/v2/integration/config.yaml`. `make integration-test-local` reads that file and runs the full test suite.
+
+If you already have `config.yaml` from a previous setup run, you can skip straight to step 3.
+
 #### Step 1: Start a Rancher Server
 
 ```bash
@@ -34,8 +63,8 @@ docker run -d --name rancher-server --restart=unless-stopped \
   -e CATTLE_SERVER_URL="https://${RANCHER_IP}" \
   -e CATTLE_BOOTSTRAP_PASSWORD="admin" \
   -e CATTLE_DEV_MODE="yes" \
-  -e CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.11-head" \
-  rancher/rancher:v2.11-head
+  -e CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.14-head" \
+  rancher/rancher:v2.14-head
 ```
 
 Wait for Rancher to be healthy:
@@ -57,7 +86,7 @@ cd tests/v2/integration
 # Run the setup (from repo root)
 cd ../../..
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
-export CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.11-head"
+export CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.14-head"
 export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml
 
 ./tests/v2/integration/bin/integrationsetup
@@ -136,7 +165,7 @@ All supported fields:
 |---|---|---|
 | `CATTLE_TEST_CONFIG` | Tests + setup | **Required.** Absolute path to `config.yaml`. Must be exported before running tests or the setup binary. |
 | `CATTLE_BOOTSTRAP_PASSWORD` | Setup only | Bootstrap password for Rancher first-login. Default: `admin`. |
-| `CATTLE_AGENT_IMAGE` | Setup only | Full image reference for the Rancher agent (e.g. `rancher/rancher-agent:v2.11-head`). Used when importing the k3d cluster. |
+| `CATTLE_AGENT_IMAGE` | Setup only | Full image reference for the Rancher agent (e.g. `rancher/rancher-agent:v2.14-head`). Used when importing the k3d cluster. |
 | `CATTLE_RANCHER_HOST` | Setup only | Override the auto-detected Rancher host (e.g. `192.168.1.100:443` or `localhost:8443`). If unset, the setup binary detects the host by inspecting the machine's outbound IP. |
 
 ---
