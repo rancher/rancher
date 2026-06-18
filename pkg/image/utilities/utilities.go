@@ -400,8 +400,17 @@ helm_available () {
     command -v helm >/dev/null 2>&1
 }
 
+helm_oci_ga () {
+    local v major minor
+    v=$(helm version --short 2>/dev/null | sed -n 's/^v\([0-9.]*\).*/\1/p')
+    [ -z "$v" ] && return 1
+    major=${v%%.*}
+    minor=${v#*.}; minor=${minor%%.*}
+    [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -ge 8 ]; }
+}
+
 is_oci_helm_chart () {
-    [[ "$1" == *"/rancher/charts/"* || "$1" == "rancher/charts/"* ]]
+    [[ "$1" == *"rancher/charts/"* ]]
 }
 
 # Preflight: rancher-images.txt now ships OCI Helm chart entries that
@@ -421,6 +430,20 @@ use_helm_for_charts=false
 if $has_oci_charts; then
     if ! docker_uses_containerd_snapshotter; then
         if helm_available; then
+            if ! helm_oci_ga; then
+                echo "====================================================================="
+                echo "ERROR: helm CLI is older than v3.8.0; OCI chart support requires helm 3.8.0+ (GA)."
+                echo ""
+                echo "Please upgrade helm to v3.8.0 or later:"
+                echo "    https://helm.sh/docs/intro/install/"
+                echo ""
+                echo "For reference, older versions need HELM_EXPERIMENTAL_OCI=1 and are not supported here:"
+                echo "    v3.7.2 - last pre-GA (OCI works only with HELM_EXPERIMENTAL_OCI=1)"
+                echo "    v3.6.3 - older experimental-OCI"
+                echo "    v3.4.2 - OCI very limited"
+                echo "====================================================================="
+                exit 1
+            fi
             echo "WARNING: Docker is not using the containerd snapshotter; falling back to helm CLI for OCI Helm charts."
             use_helm_for_charts=true
         else
@@ -597,8 +620,17 @@ helm_available () {
     command -v helm >/dev/null 2>&1
 }
 
+helm_oci_ga () {
+    local v major minor
+    v=$(helm version --short 2>/dev/null | sed -n 's/^v\([0-9.]*\).*/\1/p')
+    [ -z "$v" ] && return 1
+    major=${v%%.*}
+    minor=${v#*.}; minor=${minor%%.*}
+    [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -ge 8 ]; }
+}
+
 is_oci_helm_chart () {
-    [[ "$1" == *"/rancher/charts/"* || "$1" == "rancher/charts/"* ]]
+    [[ "$1" == *"rancher/charts/"* ]]
 }
 
 # Preflight: rancher-images.txt now ships OCI Helm chart entries that
@@ -618,6 +650,20 @@ use_helm_for_charts=false
 if $has_oci_charts; then
     if ! docker_uses_containerd_snapshotter; then
         if helm_available; then
+            if ! helm_oci_ga; then
+                echo "====================================================================="
+                echo "ERROR: helm CLI is older than v3.8.0; OCI chart support requires helm 3.8.0+ (GA)."
+                echo ""
+                echo "Please upgrade helm to v3.8.0 or later:"
+                echo "    https://helm.sh/docs/intro/install/"
+                echo ""
+                echo "For reference, older versions need HELM_EXPERIMENTAL_OCI=1 and are not supported here:"
+                echo "    v3.7.2 - last pre-GA (OCI works only with HELM_EXPERIMENTAL_OCI=1)"
+                echo "    v3.6.3 - older experimental-OCI"
+                echo "    v3.4.2 - OCI very limited"
+                echo "====================================================================="
+                exit 1
+            fi
             echo "WARNING: Docker is not using the containerd snapshotter; falling back to helm CLI for OCI Helm charts."
             use_helm_for_charts=true
         else
