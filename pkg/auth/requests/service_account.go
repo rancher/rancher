@@ -132,6 +132,11 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 		return info, false, nil
 	}
 
+	if tokenReview.Status.Error != "" {
+		logrus.Debugf("saauth: tokenReview returned an error: %s", tokenReview.Status.Error)
+		return info, false, nil
+	}
+
 	// Let others know that this request is authenticated using a service account.
 	*req = *req.WithContext(authcontext.SetSAAuthenticated(req.Context()))
 
