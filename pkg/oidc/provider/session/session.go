@@ -96,26 +96,35 @@ func (m *SecretSessionStore) Add(code string, session Session) error {
 	return nil
 }
 
-// GetAndRemove retrieves the session associated with the given code.
-func (m *SecretSessionStore) Get(code string) (*Session, error) {
+// GetAndRemove atomically retrieves and deletes the session associated with the
+// given code.
+//
+// This holds the mutex for the duration of the operation.
+func (m *SecretSessionStore) GetAndRemove(code string) (*Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var secret *corev1.Secret
+	var lastErr error
 	// Retry if the secret is not available yet. In most cases (if not all), the secret will be available, even if it was created on a different node.
 	err := wait.ExponentialBackoff(retry.DefaultBackoff, func() (bool, error) {
 		var err error
 		secret, err = m.secretClient.Get(namespace, code, metav1.GetOptions{})
 		if err != nil {
+			lastErr = err
 			if errors.IsNotFound(err) {
 				return false, nil
 			}
 			return false, err
 		}
+		lastErr = nil
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invalid code: %v", err)
+		if errors.IsNotFound(lastErr) {
+			return nil, fmt.Errorf("invalid code: %w", lastErr)
+		}
+		return nil, fmt.Errorf("invalid code: %w", err)
 	}
 
 	var session Session
@@ -128,15 +137,14 @@ func (m *SecretSessionStore) Get(code string) (*Session, error) {
 		return nil, fmt.Errorf("the code has expired")
 	}
 
+	if err := m.secretClient.Delete(namespace, code, &metav1.DeleteOptions{}); err != nil {
+		if errors.IsNotFound(err) {
+			return nil, fmt.Errorf("invalid code: already used")
+		}
+		return nil, fmt.Errorf("error consuming code: %w", err)
+	}
+
 	return &session, nil
-}
-
-// Remove removes the session associated with the given code.
-func (m *SecretSessionStore) Remove(code string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	return m.secretClient.Delete(namespace, code, &metav1.DeleteOptions{})
 }
 
 func (m *SecretSessionStore) cleanUpExpiredSessions(ctx context.Context, c <-chan time.Time) {
@@ -149,7 +157,8 @@ func (m *SecretSessionStore) cleanUpExpiredSessions(ctx context.Context, c <-cha
 			secrets, err := m.secretCache.List(namespace, labels.Set{secretLabel: "true"}.AsSelector())
 			if err != nil {
 				logrus.Errorf("[OIDC provider] error listing secrets: %v", err)
-				return
+				m.mu.Unlock()
+				continue
 			}
 			for _, secret := range secrets {
 				var session Session

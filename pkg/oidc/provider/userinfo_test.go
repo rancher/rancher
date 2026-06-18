@@ -92,6 +92,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 		mockSetup    func(mockParams)
 		wantResponse *UserInfoResponse
 		wantError    string
+		wantHeaders  map[string]string
 	}{
 		"success response": {
 			req: func() *http.Request {
@@ -183,6 +184,23 @@ func TestUserInfoEndpoint(t *testing.T) {
 			},
 			wantError: `{"error":"invalid_request","error_description":"failed to get token from header: authorization header is missing"}`,
 		},
+		"userinfo endpoint sets cache-control headers": {
+			req: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", fakeAccessTokenString))
+				return req
+			},
+			mockSetup: func(mockParams mockParams) {
+				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
+				mockParams.userCache.EXPECT().Get(fakeUserID).Return(&fakeUser, nil)
+				mockParams.useAttributeLister.EXPECT().Get(fakeUserID).Return(&fakeUserAttributes, nil)
+			},
+			wantHeaders: map[string]string{
+				"Cache-Control": "no-store",
+				"Pragma":        "no-cache",
+			},
+			wantResponse: &UserInfoResponse{},
+		},
 	}
 
 	for name, test := range tests {
@@ -204,6 +222,9 @@ func TestUserInfoEndpoint(t *testing.T) {
 
 			h.userInfoEndpoint(rec, test.req())
 
+			for k, v := range test.wantHeaders {
+				assert.Equal(t, v, rec.Header().Get(k), "response header %s", k)
+			}
 			if test.wantError != "" {
 				assert.JSONEq(t, test.wantError, strings.TrimSpace(rec.Body.String()))
 			} else {
