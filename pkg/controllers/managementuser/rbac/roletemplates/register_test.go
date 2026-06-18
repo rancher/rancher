@@ -119,9 +119,9 @@ func TestEnqueuePRTBs(t *testing.T) {
 		ObjectMeta:  metav1.ObjectMeta{Name: "prtb-1", Namespace: "p-abc123"},
 		ProjectName: "c-abc123:p-abc123",
 	}
-	prtbOtherCluster := &v3.ProjectRoleTemplateBinding{
-		ObjectMeta:  metav1.ObjectMeta{Name: "prtb-2", Namespace: "p-other"},
-		ProjectName: "c-other:p-other",
+	prtbInCluster2 := &v3.ProjectRoleTemplateBinding{
+		ObjectMeta:  metav1.ObjectMeta{Name: "prtb-2", Namespace: "p-abc123"},
+		ProjectName: "c-abc123:p-abc123",
 	}
 
 	tests := []struct {
@@ -148,15 +148,15 @@ func TestEnqueuePRTBs(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name:        "PRTB in different cluster is not enqueued",
+			name:        "no PRTBs in the cluster returns nil",
 			clusterName: "c-abc123",
 			rtName:      "test-rt",
 			obj:         nonNilObj,
-			prtbs:       []*v3.ProjectRoleTemplateBinding{prtbOtherCluster},
+			prtbs:       nil,
 			wantKeys:    nil,
 		},
 		{
-			name:        "PRTB in same cluster is enqueued",
+			name:        "PRTB from the cluster-scoped index is enqueued",
 			clusterName: "c-abc123",
 			rtName:      "test-rt",
 			obj:         nonNilObj,
@@ -164,12 +164,12 @@ func TestEnqueuePRTBs(t *testing.T) {
 			wantKeys:    []relatedresource.Key{{Namespace: "p-abc123", Name: "prtb-1"}},
 		},
 		{
-			name:        "only PRTBs in same cluster are enqueued",
+			name:        "all PRTBs from the cluster-scoped index are enqueued",
 			clusterName: "c-abc123",
 			rtName:      "test-rt",
 			obj:         nonNilObj,
-			prtbs:       []*v3.ProjectRoleTemplateBinding{prtbInCluster, prtbOtherCluster},
-			wantKeys:    []relatedresource.Key{{Namespace: "p-abc123", Name: "prtb-1"}},
+			prtbs:       []*v3.ProjectRoleTemplateBinding{prtbInCluster, prtbInCluster2},
+			wantKeys:    []relatedresource.Key{{Namespace: "p-abc123", Name: "prtb-1"}, {Namespace: "p-abc123", Name: "prtb-2"}},
 		},
 	}
 
@@ -180,7 +180,7 @@ func TestEnqueuePRTBs(t *testing.T) {
 
 			prtbCache := fake.NewMockCacheInterface[*v3.ProjectRoleTemplateBinding](ctrl)
 			if tt.obj != nil {
-				prtbCache.EXPECT().GetByIndex(rbac.PRTBByRoleTemplateNameIndex, tt.rtName).Return(tt.prtbs, tt.indexErr)
+				prtbCache.EXPECT().GetByIndex(rbac.PRTBByClusterAndRoleTemplateNameIndex, rbac.RoleTemplateClusterIndexKey(tt.clusterName, tt.rtName)).Return(tt.prtbs, tt.indexErr)
 			}
 
 			enqueuer := &roleTemplateEnqueuer{
@@ -208,9 +208,9 @@ func TestEnqueueCRTBs(t *testing.T) {
 		ObjectMeta:  metav1.ObjectMeta{Name: "crtb-1", Namespace: "c-abc123"},
 		ClusterName: "c-abc123",
 	}
-	crtbOtherCluster := &v3.ClusterRoleTemplateBinding{
-		ObjectMeta:  metav1.ObjectMeta{Name: "crtb-2", Namespace: "c-other"},
-		ClusterName: "c-other",
+	crtbInCluster2 := &v3.ClusterRoleTemplateBinding{
+		ObjectMeta:  metav1.ObjectMeta{Name: "crtb-2", Namespace: "c-abc123"},
+		ClusterName: "c-abc123",
 	}
 
 	tests := []struct {
@@ -237,15 +237,15 @@ func TestEnqueueCRTBs(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name:        "CRTB in different cluster is not enqueued",
+			name:        "no CRTBs in the cluster returns nil",
 			clusterName: "c-abc123",
 			rtName:      "test-rt",
 			obj:         nonNilObj,
-			crtbs:       []*v3.ClusterRoleTemplateBinding{crtbOtherCluster},
+			crtbs:       nil,
 			wantKeys:    nil,
 		},
 		{
-			name:        "CRTB in same cluster is enqueued",
+			name:        "CRTB from the cluster-scoped index is enqueued",
 			clusterName: "c-abc123",
 			rtName:      "test-rt",
 			obj:         nonNilObj,
@@ -253,12 +253,12 @@ func TestEnqueueCRTBs(t *testing.T) {
 			wantKeys:    []relatedresource.Key{{Namespace: "c-abc123", Name: "crtb-1"}},
 		},
 		{
-			name:        "only CRTBs in same cluster are enqueued",
+			name:        "all CRTBs from the cluster-scoped index are enqueued",
 			clusterName: "c-abc123",
 			rtName:      "test-rt",
 			obj:         nonNilObj,
-			crtbs:       []*v3.ClusterRoleTemplateBinding{crtbInCluster, crtbOtherCluster},
-			wantKeys:    []relatedresource.Key{{Namespace: "c-abc123", Name: "crtb-1"}},
+			crtbs:       []*v3.ClusterRoleTemplateBinding{crtbInCluster, crtbInCluster2},
+			wantKeys:    []relatedresource.Key{{Namespace: "c-abc123", Name: "crtb-1"}, {Namespace: "c-abc123", Name: "crtb-2"}},
 		},
 	}
 
@@ -269,7 +269,7 @@ func TestEnqueueCRTBs(t *testing.T) {
 
 			crtbCache := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
 			if tt.obj != nil {
-				crtbCache.EXPECT().GetByIndex(rbac.CRTBByRoleTemplateNameIndex, tt.rtName).Return(tt.crtbs, tt.indexErr)
+				crtbCache.EXPECT().GetByIndex(rbac.CRTBByClusterAndRoleTemplateNameIndex, rbac.RoleTemplateClusterIndexKey(tt.clusterName, tt.rtName)).Return(tt.crtbs, tt.indexErr)
 			}
 
 			enqueuer := &roleTemplateEnqueuer{

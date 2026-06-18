@@ -73,16 +73,14 @@ func (e *roleTemplateEnqueuer) enqueuePRTBs(_, name string, obj runtime.Object) 
 	if obj == nil {
 		return nil, nil
 	}
-	prtbs, err := e.prtbCache.GetByIndex(rbac.PRTBByRoleTemplateNameIndex, name)
+	// Use the cluster-scoped index so we only fetch the PRTBs belonging to this cluster, instead of
+	// every PRTB referencing the RoleTemplate across all clusters and then filtering by clusterName.
+	prtbs, err := e.prtbCache.GetByIndex(rbac.PRTBByClusterAndRoleTemplateNameIndex, rbac.RoleTemplateClusterIndexKey(e.clusterName, name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ProjectRoleTemplateBindings for roletemplate %s: %w", name, err)
 	}
 	var keys []relatedresource.Key
 	for _, prtb := range prtbs {
-		clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
-		if clusterName != e.clusterName {
-			continue
-		}
 		keys = append(keys, relatedresource.Key{Namespace: prtb.Namespace, Name: prtb.Name})
 	}
 	return keys, nil
@@ -93,15 +91,15 @@ func (e *roleTemplateEnqueuer) enqueueCRTBs(_, name string, obj runtime.Object) 
 	if obj == nil {
 		return nil, nil
 	}
-	crtbs, err := e.crtbCache.GetByIndex(rbac.CRTBByRoleTemplateNameIndex, name)
+	// Use the cluster-scoped index so we only fetch the CRTBs belonging to this cluster, instead of
+	// every CRTB referencing the RoleTemplate across all clusters and then filtering by clusterName.
+	crtbs, err := e.crtbCache.GetByIndex(rbac.CRTBByClusterAndRoleTemplateNameIndex, rbac.RoleTemplateClusterIndexKey(e.clusterName, name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ClusterRoleTemplateBindings for roletemplate %s: %w", name, err)
 	}
 	var keys []relatedresource.Key
 	for _, crtb := range crtbs {
-		if crtb.ClusterName == e.clusterName {
-			keys = append(keys, relatedresource.Key{Namespace: crtb.Namespace, Name: crtb.Name})
-		}
+		keys = append(keys, relatedresource.Key{Namespace: crtb.Namespace, Name: crtb.Name})
 	}
 	return keys, nil
 }

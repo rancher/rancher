@@ -50,13 +50,19 @@ const (
 	HelmProvisioningReaderRole        = "cattle-helm-provisioning-reader"
 
 	// Index names for PRTB/CRTB caches, registered by pkg/controllers/management/auth/roletemplates.
-	PRTBByRoleTemplateNameIndex         = "auth.management.cattle.io/prtb-by-roletemplate-name"
-	CRTBByRoleTemplateNameIndex         = "auth.management.cattle.io/crtb-by-roletemplate-name"
-	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
-	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
-	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
-	AggregationManagementFeatureLabel   = "management.cattle.io/roletemplate-aggregation-mgmt"
-	AggregationFeatureLabel             = "management.cattle.io/roletemplate-aggregation"
+	PRTBByRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-roletemplate-name"
+	CRTBByRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-roletemplate-name"
+	// Cluster-scoped variants of the indexes above, keyed by <cluster-name>/<roletemplate-name> (see
+	// RoleTemplateClusterIndexKey). Used by the per-cluster owner-plane enqueuers so that a RoleTemplate
+	// change only fetches the bindings belonging to that cluster, instead of every binding referencing
+	// the RoleTemplate across all clusters.
+	PRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-cluster-and-roletemplate-name"
+	CRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-cluster-and-roletemplate-name"
+	CrbGlobalRoleAnnotation               = "authz.cluster.cattle.io/globalrole"
+	CrbGlobalRoleBindingAnnotation        = "authz.cluster.cattle.io/globalrolebinding"
+	CrbAdminGlobalRoleCheckedAnnotation   = "authz.cluster.cattle.io/admin-globalrole-checked"
+	AggregationManagementFeatureLabel     = "management.cattle.io/roletemplate-aggregation-mgmt"
+	AggregationFeatureLabel               = "management.cattle.io/roletemplate-aggregation"
 	// GRDownstreamNSIndex is the cache index name for looking up GlobalRoles by the namespaces in InheritedNamespacedRules.
 	GRDownstreamNSIndex = "mgmt-auth-gr-downstream-ns-index"
 )
@@ -702,4 +708,11 @@ func GetClusterRoleOwnerLabel(s string) string {
 func GetClusterAndProjectNameFromPRTB(prtb *v3.ProjectRoleTemplateBinding) (string, string) {
 	cluster, project, _ := strings.Cut(prtb.ProjectName, ":")
 	return cluster, project
+}
+
+// RoleTemplateClusterIndexKey builds the cache index key used by the cluster-scoped
+// PRTBByClusterAndRoleTemplateNameIndex / CRTBByClusterAndRoleTemplateNameIndex indexes. Producers
+// (indexer funcs) and consumers (per-cluster enqueuers) must use this helper so their keys match.
+func RoleTemplateClusterIndexKey(clusterName, roleTemplateName string) string {
+	return clusterName + "/" + roleTemplateName
 }
