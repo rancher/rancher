@@ -141,7 +141,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
-	github.com/urfave/cli v1.22.16
+	github.com/urfave/cli v1.22.17
 	github.com/vmware/govmomi v0.42.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.53.0
