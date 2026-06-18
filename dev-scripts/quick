@@ -12,6 +12,7 @@ OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
 REPO="${REPO:-rancher}"
 BINARY_DEBUG=${BINARY_DEBUG:-false}
+REFRESH_DATA=${REFRESH_DATA:-false}
 CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
 CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
@@ -108,6 +109,13 @@ add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
 
 if [ "$needs_workdir" = "true" ]; then
   BUILD_ARGS+=("--build-arg=BUILD_WORKDIR=$PWD")
+fi
+
+if [ "$REFRESH_DATA" = "true" ]; then
+  BUILD_ARGS+=("--no-cache-filter=rancher-charts")
+  BUILD_ARGS+=("--no-cache-filter=partner-charts")
+  BUILD_ARGS+=("--no-cache-filter=rke2-charts")
+  BUILD_ARGS+=("--no-cache-filter=kdm")
 fi
 
 if [ "$TARGET" = "k3s-images" ]; then
