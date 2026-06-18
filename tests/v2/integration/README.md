@@ -80,7 +80,7 @@ export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml
 go test -v -timeout 30m -failfast -p 1 ./tests/v2/integration/...
 
 # Run a specific test suite
-go test -v -count=1 -run TestChartsTestSuite ./tests/v2/integration/catalogv2/
+go test -v -count=1 -timeout 30m -run TestChartsTestSuite ./tests/v2/integration/catalogv2/
 
 # Run a specific test within a suite
 go test -v -count=1 -run TestRTBTestSuite/TestUserVsUserBaseGlobalRoleVisibility ./tests/v2/integration/rbac/
@@ -89,8 +89,16 @@ go test -v -count=1 -run TestRTBTestSuite/TestUserVsUserBaseGlobalRoleVisibility
 go test -v -count=1 -run TestSteveLocal ./tests/v2/integration/steveapi/
 ```
 
-> **Tip:** The default Go test timeout is 10 minutes, which can be too short for catalog tests that pull external
-> repositories. Use `-timeout 30m` or higher for full suite runs.
+### Common `go test` Flags
+
+| Flag | Example | Description |
+|---|---|---|
+| `-timeout` | `-timeout 30m` | Hard deadline for the entire test binary. The default is **10 minutes**, which is too short for catalog tests that pull external repositories. Use `30m` for full suite runs. |
+| `-run` | `-run TestChartsTestSuite` | Run only tests/suites matching the regex. Supports `/` to select a sub-test: `-run Suite/TestName`. |
+| `-count` | `-count=1` | Disable test result caching. Always use `-count=1` when running integration tests to ensure a fresh run. |
+| `-v` | `-v` | Verbose output — prints each test name and PASS/FAIL as it runs. Useful for spotting which test hangs. |
+| `-failfast` | `-failfast` | Stop the run after the first test failure. Used in CI to avoid wasting time once something breaks. |
+| `-p` | `-p 1` | Number of test packages to build and run in parallel. Must be `1` for integration tests to avoid resource conflicts. |
 
 ---
 

@@ -184,7 +184,7 @@ export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by inte
 }
 
 echo Running go integration tests
-CGO_ENABLED=0 go test -v -failfast -p 1 ./tests/v2/integration/... || {
+CGO_ENABLED=0 go test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
   dump_rancher_logs
   exit 1
 }
