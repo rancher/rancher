@@ -408,12 +408,23 @@ func TestAuthProvidersStoreByID(t *testing.T) {
 			want404: true,
 		},
 		{
+			name:     "config missing enabled field returns 404",
+			id:       "github",
+			flag:     false,
+			registry: map[string]common.AuthProvider{},
+			getFunc: func(_ string, _ metav1.GetOptions) (runtime.Object, error) {
+				return makeUnstructured(map[string]any{"type": "githubConfig"}), nil
+			},
+			wantErr: true,
+			want404: true,
+		},
+		{
 			name:     "config missing type field returns 404",
 			id:       "github",
 			flag:     false,
 			registry: map[string]common.AuthProvider{},
 			getFunc: func(_ string, _ metav1.GetOptions) (runtime.Object, error) {
-				return makeUnstructured(map[string]any{"name": "github"}), nil
+				return makeUnstructured(map[string]any{"name": "github", "enabled": true}), nil
 			},
 			wantErr: true,
 			want404: true,
