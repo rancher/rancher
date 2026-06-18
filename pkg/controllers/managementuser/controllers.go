@@ -82,7 +82,11 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		if err != nil {
 			return err
 		}
-		clusterauthtoken.Register(ctx, cluster)
+		secretsCache, err := clusterauthtoken.RegisterFactory(cluster)
+		if err != nil {
+			return fmt.Errorf("registering clusterauthtoken factory: %w", err)
+		}
+		clusterauthtoken.Register(ctx, cluster, secretsCache)
 	}
 
 	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
