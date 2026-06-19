@@ -543,6 +543,7 @@ func (c Command) renderArgs() ([]string, error) {
 
 	if v, ok := dataMap["takeOwnership"]; ok && convert.ToString(v) == "true" {
 		dataMap["force-conflicts"] = "true"
+		dataMap["server-side"] = "true"
 	}
 
 	for k, v := range dataMap {
