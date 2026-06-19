@@ -728,7 +728,7 @@ fi
 if $use_helm_for_charts; then
     chart_count=$(ls ./rancher-oci-charts/*.tgz 2>/dev/null | wc -l)
     echo ""
-    echo "OCI Helm charts saved in ./rancher-oci-charts/ (${chart_count} files). Reused on next runs and by rancher-load-images.sh. Remove with: rm -rf ./rancher-oci-charts"
+    echo "OCI Helm charts saved in ./rancher-oci-charts/ (${chart_count} files). Used by rancher-load-images.sh. Remove with: rm -rf ./rancher-oci-charts"
 fi
 `
 	linuxMirrorScript = "#!/bin/sh\nset -e -x\n\n"
