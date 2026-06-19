@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -110,8 +111,27 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 			cluster.Management.Wrangler.RKE.RKEControlPlane())
 	} else {
 		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
-			cluster.K3s = k3s.New(cluster.ControllerFactory)
-			snapshotbackpopulate.Register(ctx, cluster, clusterRec)
+			resources, err := cluster.K8sClient.Discovery().ServerResourcesForGroupVersion("k3s.cattle.io/v1")
+			if apierrors.IsNotFound(err) {
+				logrus.Tracef("refusing to start snapshotbackpopulate controller for non RKE2/K3s cluster")
+			} else if err != nil {
+				logrus.Errorf("failed to find k3s server resources: %v", err)
+			} else if resources == nil || len(resources.APIResources) == 0 {
+				logrus.Tracef("skipping snapshotbackpopulate controller because k3s.cattle.io/v1 returned no resources")
+			} else {
+				found := false
+				for _, resource := range resources.APIResources {
+					if resource.Kind == "ETCDSnapshotFile" {
+						cluster.K3s = k3s.New(cluster.ControllerFactory)
+						snapshotbackpopulate.Register(ctx, cluster, clusterRec)
+						found = true
+						break
+					}
+				}
+				if !found {
+					logrus.Tracef("skipping snapshotbackpopulate controller because ETCDSnapshotFile is not served downstream")
+				}
+			}
 		}
 	}
 	machinerole.Register(ctx, cluster)
