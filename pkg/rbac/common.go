@@ -217,6 +217,17 @@ func NameForClusterRoleBinding(role rbacv1.RoleRef, subject rbacv1.Subject) stri
 	return nm
 }
 
+// NameForClusterRoleBindingWithOwner returns a deterministic name for a ClusterRoleBinding with the provided roleName, subject, and owner.
+// The owner name is included in the hash so that different owners can have distinct ClusterRoleBindings for the same role and subject.
+func NameForClusterRoleBindingWithOwner(role rbacv1.RoleRef, subject rbacv1.Subject, owner string) string {
+	var name strings.Builder
+	name.WriteString("crb-")
+	name.WriteString(getBindingHash(owner, role, subject))
+	nm := name.String()
+	logrus.Debugf("ClusterRoleBinding with role.kind=%s role.name=%s subject.kind=%s subject.name=%s owner=%s has name: %s", role.Kind, role.Name, subject.Kind, subject.Name, owner, nm)
+	return nm
+}
+
 // getBindingHash returns a hash created from the passed in arguments
 // uses base32 encoding for hash, since all characters in encoding scheme are valid in k8s resource names
 // probability of collision is: 1/32^10 == 1/(2^5)^10 == 1/2^50 (sufficiently low)
