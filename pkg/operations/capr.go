@@ -11,6 +11,8 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
@@ -21,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func init() {
@@ -50,6 +53,70 @@ func init() {
 type CAPRAdapter struct {
 	controlPlane *rkev1.RKEControlPlane
 	clients      *wrangler.CAPIContext
+}
+
+func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(secret *corev1.Secret) ([]string, []string, []plan.File) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *CAPRAdapter) LoopbackAddress(_ *corev1.Secret) string {
+	loopbackAddress := capr.GetLoopbackAddress(a.controlPlane)
+
+	if utils.IsPlainIPV6(loopbackAddress) {
+		loopbackAddress = fmt.Sprintf("[%s]", loopbackAddress)
+	}
+
+	return loopbackAddress
+}
+
+func (a *CAPRAdapter) ConfigDirectory(_ *corev1.Secret) string {
+	return fmt.Sprintf("/etc/rancher/%s/config.yaml.d", a.RuntimeCommand())
+}
+
+func (a *CAPRAdapter) GetServerURL(secret *corev1.Secret) string {
+	if secret == nil {
+		return ""
+	}
+
+	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
+		return ""
+	}
+
+	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret)
+	if err != nil {
+		logrus.Errorf("error getting reference for machine lifecycle labels: %v", err)
+		return ""
+	}
+
+	machine, err := a.clients.CAPI.Machine().Cache().Get(ref.Namespace, ref.Name)
+	if err != nil {
+		logrus.Errorf("error getting machine %s for machine lifecycle: %v", ref.Name, err)
+		return ""
+	}
+
+	if len(machine.Status.Addresses) == 0 {
+		return ""
+	}
+
+	var address string
+
+	for _, addr := range machine.Status.Addresses {
+		if addr.Type == capi.MachineExternalIP && address == "" {
+			address = addr.Address
+		} else if addr.Type == capi.MachineInternalIP {
+			address = addr.Address
+		}
+	}
+
+	return address
+}
+
+func (a *CAPRAdapter) GetSupervisorPort(_ *corev1.Secret) string {
+	if a.RuntimeCommand() == "rke2" {
+		return "9345"
+	}
+	return "6443"
 }
 
 // WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for

@@ -278,7 +278,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	if !plan.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
+	if !plan.AuthorizedForBeacon(s.beacon, beaconOwnerKey(s.op)) {
 		status.Phase = opv1alpha1.OperationPhaseFailed
 		status.LastUpdated = metav1.Now()
 
@@ -679,7 +679,7 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotat
 		return status, err
 	}
 
-	if plan.HoldingBeacon(s.beacon, beaconOwnerKey(s.op)) {
+	if plan.AuthorizedForBeacon(s.beacon, beaconOwnerKey(s.op)) {
 		var err error
 		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {

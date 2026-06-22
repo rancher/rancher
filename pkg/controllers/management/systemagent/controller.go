@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -67,12 +66,11 @@ func Register(ctx context.Context, w *wrangler.Context, manager *clustermanager.
 		beacons:     w.Plan.Beacon(),
 		beaconCache: w.Plan.Beacon().Cache(),
 	}
-	if features.ImportedDay2Ops.Enabled() {
-		w.Mgmt.Cluster().OnChange(ctx, "imported-system-agent-setup", h.onChange)
-	}
+
+	w.Mgmt.Cluster().OnChange(ctx, "imported-system-agent-setup", h.OnChange)
 }
 
-func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+func (h *handler) OnChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
@@ -86,21 +84,98 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 		return cluster, nil
 	}
 
-	if cluster.Annotations[Day2OpsEnabledAnnotation] == "" {
-		if settings.ImportedClusterDay2OpsEnabledDefault.Get() == "true" {
-			cluster := cluster.DeepCopy()
-			if cluster.Annotations == nil {
-				cluster.Annotations = map[string]string{}
+	if features.ImportedDay2Ops.Enabled() {
+		if cluster.Annotations == nil || cluster.Annotations[Day2OpsEnabledAnnotation] == "" {
+			// if default is enable, set annotation
+			if settings.ImportedClusterDay2OpsEnabledDefault.Get() == "true" {
+				cluster := cluster.DeepCopy()
+				if cluster.Annotations == nil {
+					cluster.Annotations = map[string]string{}
+				}
+				cluster.Annotations[Day2OpsEnabledAnnotation] = "true"
+				logrus.Infof("[importedsystemagent] cluster %s: setting %s to true", cluster.Name, Day2OpsEnabledAnnotation)
+				return h.clusters.Update(cluster)
 			}
-			cluster.Annotations[Day2OpsEnabledAnnotation] = "true"
-			logrus.Infof("[importedsystemagent] cluster %s: setting %s to true", cluster.Name, Day2OpsEnabledAnnotation)
-			return h.clusters.Update(cluster)
+		} else if cluster.Annotations[Day2OpsEnabledAnnotation] != "true" {
+			// otherwise if annotation set to false, uninstall
+			return h.UninstallSystemAgent(cluster)
+
 		}
-		return cluster, nil
-	} else if cluster.Annotations[Day2OpsEnabledAnnotation] != "true" {
+		// otherwise if annotation set to true, install
+		return h.InstallSystemAgent(cluster)
+	}
+
+	cluster, err := h.UninstallSystemAgent(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	cluster = cluster.DeepCopy()
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	delete(cluster.Annotations, Day2OpsEnabledAnnotation)
+
+	return h.clusters.Update(cluster)
+}
+
+// todo: add system-agent uninstall plan
+func (h *handler) UninstallSystemAgent(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	beacon, err := h.beaconCache.Get(cluster.Name, cluster.Name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return cluster, err
+	} else if err == nil {
+		err = h.beacons.Delete(beacon.Namespace, beacon.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			return cluster, err
+		}
+	}
+
+	clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)
+	if err != nil {
+		return cluster, err
+	}
+
+	if err := healthsyncer.IsAPIUp(h.ctx, clusterCtx.K8sClient.CoreV1().Namespaces()); err != nil {
+		// skip further work if the cluster's API is not reachable,
+		// this usually happen during cattle-cluster-agent being redeployed
+		logrus.Debugf("[importedsystemagent] [%s] cluster API is not reachable, will try again", cluster.Name)
+		h.clusters.EnqueueAfter(cluster.Name, 5*time.Second)
 		return cluster, nil
 	}
 
+	// Limit the number of cluster to be processed simultaneously
+	if installCounter.Load() >= int32(settings.SystemAgentUpgraderInstallConcurrency.GetInt()) {
+		h.clusters.EnqueueAfter(cluster.Name, 5*time.Second)
+		return cluster, nil
+	}
+	installCounter.Add(1)
+	defer installCounter.Add(-1)
+
+	apply, err := apply.NewForConfig(&clusterCtx.RESTConfig)
+	if err != nil {
+		return cluster, err
+	}
+	err = apply.
+		WithSetID("managed-system-agent").
+		WithDynamicLookup().
+		WithDefaultNamespace(namespaces.System).
+		ApplyObjects()
+	if err != nil {
+		return cluster, err
+	}
+
+	// Update the annotation with the latest hash value
+	cluster = cluster.DeepCopy()
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	delete(cluster.Annotations, AppliedSystemAgentUpgraderHashAnnotation)
+
+	return h.clusters.Update(cluster)
+}
+
+func (h *handler) InstallSystemAgent(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	_, err := h.beaconCache.Get(cluster.Name, cluster.Name)
 	if apierrors.IsNotFound(err) {
 		_, err = h.beacons.Create(&planv1alpha1.Beacon{
@@ -187,11 +262,8 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 		cluster.Annotations = map[string]string{}
 	}
 	cluster.Annotations[AppliedSystemAgentUpgraderHashAnnotation] = hash
-	if _, err := h.clusters.Update(cluster); err != nil {
-		return cluster, fmt.Errorf("failed to update annotation: %w", err)
-	}
 
-	return cluster, nil
+	return h.clusters.Update(cluster)
 }
 
 // SystemAgentUpgraderVersion returns the version of the system-agent-upgrader,
@@ -237,6 +309,11 @@ func installer(cluster *apimgmtv3.Cluster, secretName string) []runtime.Object {
 			})
 		}
 	}
+
+	env = append(env, corev1.EnvVar{
+		Name:  "CATTLE_ROLE_NONE",
+		Value: "true",
+	})
 
 	// todo: data directory detection
 	var plans []runtime.Object

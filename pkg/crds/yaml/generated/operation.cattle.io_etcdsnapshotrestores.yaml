@@ -66,8 +66,8 @@ spec:
             properties:
               args:
                 description: |-
-                  ETCDSnapshotRestoreArgs contains parameters for restoring an ETCD snapshot.
-                  Name specifies the name of the snapshot file.
+                  Args contains parameters for restoring an ETCD snapshot.
+                  Mutually exclusive with SnapshotRef.
                 properties:
                   name:
                     description: Name specifies the name of the ETCD snapshot file.

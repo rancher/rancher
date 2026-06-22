@@ -239,6 +239,23 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 		}
 		machine.Labels[capr.MachineIDLabel] = data.String("id")
 
+		if machine.Spec.Etcd {
+			labels[capr.EtcdRoleLabel] = "true"
+		}
+
+		if machine.Spec.ControlPlane {
+			labels[capr.ControlPlaneRoleLabel] = "true"
+		}
+
+		if machine.Spec.Worker {
+			labels[capr.WorkerRoleLabel] = "true"
+		}
+
+		// if no labels set, assume worker
+		if labels[capr.EtcdRoleLabel] != "true" && labels[capr.ControlPlaneRoleLabel] != "true" {
+			labels[capr.WorkerRoleLabel] = "true"
+		}
+
 		machine, err = h.mgmtNodeClient.Update(machine)
 		if err != nil {
 			return nil, err

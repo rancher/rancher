@@ -85,7 +85,6 @@ func Register(ctx context.Context, userContext *config.UserContext, cluster *api
 		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
 	}
 
-	// todo: find a better way to do this
 	if cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
 		provCluster, err := userContext.Management.Wrangler.Provisioning.Cluster().Cache().GetByIndex(provcluster.ByCluster, cluster.Name)
 		if err != nil {
@@ -139,7 +138,7 @@ func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rke
 	}
 
 	// Abort if anything is holding the beacon
-	if !planapi.HoldingBeacon(beacon, "") {
+	if !planapi.AuthorizedForBeacon(beacon, "") {
 		h.etcdSnapshotController.EnqueueAfter(snapshot.Namespace, snapshot.Name, 1*time.Minute)
 		return snapshot, nil
 	}
@@ -215,7 +214,7 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 	}
 
 	// Abort if anything is holding the beacon
-	if !planapi.HoldingBeacon(beacon, "") {
+	if !planapi.AuthorizedForBeacon(beacon, "") {
 		h.etcdSnapshotFileController.EnqueueAfter(downstream.Name, 1*time.Minute)
 		return downstream, nil
 	}
@@ -466,7 +465,7 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 				return nil, err
 			}
 
-			ref, err := MachineLifecycleLabelsToObjectReference(node)
+			ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(node)
 			if err != nil {
 				logrus.Errorf("error getting node reference for snapshot %s/%s: %v", namespace, snapshotName, err)
 				return nil, err
@@ -556,74 +555,4 @@ func getLogPrefix(cluster *unstructured.Unstructured) string {
 	}
 	suffix = schema.FromAPIVersionAndKind(cluster.GetAPIVersion(), cluster.GetKind()).String() + "/" + suffix
 	return fmt.Sprintf("[snapshotbackpopulate] %s:", suffix)
-}
-
-func (h *handler) hasMachineLifecycleLabels(upstream *rkev1.ETCDSnapshot) bool {
-	if upstream.Labels == nil {
-		return false
-	}
-	group := upstream.Labels[planv1alpha1.MachineLifecycleGroup]
-	if group == "" {
-		return false
-	}
-	version := upstream.Labels[planv1alpha1.MachineLifecycleVersion]
-	if version == "" {
-		return false
-	}
-	kind := upstream.Labels[planv1alpha1.MachineLifecycleKind]
-	if kind == "" {
-		return false
-	}
-	// theoretically could be a non-namespaced resource, but in practice this doesn't exist
-	namespace := upstream.Labels[planv1alpha1.MachineLifecycleNamespace]
-	if namespace == "" {
-		return false
-	}
-	name := upstream.Labels[planv1alpha1.MachineLifecycleName]
-	return name != ""
-}
-
-func MachineLifecycleLabelsToObjectReference(obj metav1.Object) (*corev1.ObjectReference, error) {
-	prefix := fmt.Sprintf("object %s", obj.GetName())
-	if obj.GetNamespace() != "" {
-		prefix = fmt.Sprintf("object %s/%s", obj.GetNamespace(), obj.GetName())
-	}
-
-	labels := obj.GetLabels()
-	if labels == nil {
-		return nil, fmt.Errorf("%s has no labels", prefix)
-	}
-
-	group := labels[planv1alpha1.MachineLifecycleGroup]
-	if group == "" {
-		return nil, fmt.Errorf("%s has no group label", prefix)
-	}
-
-	version := labels[planv1alpha1.MachineLifecycleVersion]
-	if version == "" {
-		return nil, fmt.Errorf("%s has no version label", prefix)
-	}
-
-	kind := labels[planv1alpha1.MachineLifecycleKind]
-	if kind == "" {
-		return nil, fmt.Errorf("%s has no kind label", prefix)
-	}
-
-	namespace := labels[planv1alpha1.MachineLifecycleNamespace]
-	if namespace == "" {
-		return nil, fmt.Errorf("%s has no namespace label", prefix)
-	}
-
-	name := labels[planv1alpha1.MachineLifecycleName]
-	if name == "" {
-		return nil, fmt.Errorf("%s has no name label", prefix)
-	}
-
-	gvr := schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
-	return &corev1.ObjectReference{
-		APIVersion: gvr.GroupVersion().String(),
-		Kind:       gvr.Kind,
-		Name:       name,
-		Namespace:  namespace,
-	}, nil
 }

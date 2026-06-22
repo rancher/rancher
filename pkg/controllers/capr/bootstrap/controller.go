@@ -267,9 +267,9 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	}, nil
 }
 
-func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) ([]runtime.Object, error) {
+func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap, cluster *capi.Cluster) ([]runtime.Object, error) {
 	planSecretName := capr.PlanSecretFromBootstrapName(bootstrap.Name)
-	labels, annotations, err := getLabelsAndAnnotationsForPlanSecret(bootstrap, machine)
+	labels, annotations, err := getLabelsAndAnnotationsForPlanSecret(bootstrap, machine, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -372,6 +372,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 	if !capiCluster.Spec.ControlPlaneRef.IsDefined() || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
 		return nil, nil, nil
 	}
+
 	controlPlane, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		return nil, nil, err
@@ -463,7 +464,7 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 	}
 
 	// The plan secret is used by the planner to deliver plans to the system-agent (and receive feedback)
-	objs, err := h.assignPlanSecret(machine, bootstrap)
+	objs, err := h.assignPlanSecret(machine, bootstrap, capiCluster)
 	if err != nil {
 		return nil, status, err
 	}
@@ -510,7 +511,7 @@ func (h *handler) rancherDeploymentHasHostPort() (bool, error) {
 	return false, nil
 }
 
-func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (map[string]string, map[string]string, error) {
+func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine, cluster *capi.Cluster) (map[string]string, map[string]string, error) {
 	labels := make(map[string]string, len(bootstrap.Labels)+3)
 	labels[capr.MachineNameLabel] = machine.Name
 	labels[capr.ClusterNameLabel] = bootstrap.Spec.ClusterName
@@ -523,6 +524,11 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 
 	for k, v := range lifecycleLabels {
 		labels[k] = v
+	}
+
+	lifecycleLabels, err = planv1alpha1.ObjToClusterLifecycleLabels(cluster)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	for k, v := range bootstrap.Labels {

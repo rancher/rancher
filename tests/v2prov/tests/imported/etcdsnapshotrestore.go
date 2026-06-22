@@ -18,17 +18,47 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
+func waitForSnapshots(t *testing.T, clients *clients.Clients, clusterName string, createdAfter time.Time, desired int) {
+	t.Helper()
+
+	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, 5*time.Minute, true, func(_ context.Context) (bool, error) {
+		list, err := clients.RKE.ETCDSnapshot().List(clusterName, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, clusterName),
+		})
+		if err != nil {
+			return false, err
+		}
+		// Prefer the newest snapshot that landed after we started saving; this avoids picking up a
+		// stale snapshot from a prior test run that somehow shares this cluster's namespace.
+		var count int
+		for i := range list.Items {
+			s := &list.Items[i]
+			if s.SnapshotFile.CreatedAt == nil || !s.SnapshotFile.CreatedAt.Time.After(createdAfter) {
+				continue
+			}
+			if s.SnapshotFile.Name == "" {
+				continue
+			}
+			count++
+		}
+		return desired == count, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for back-populated ETCDSnapshot CR: %v", err)
+	}
+}
+
 // waitForBackpopulatedSnapshot polls until at least one ETCDSnapshot CR has been back-populated for
 // the imported cluster, then returns the most recently created one. The snapshotbackpopulate
 // controller writes these CRs into the namespace whose name matches the cluster (cluster-scoped
 // mgmt clusters use namespace == name).
-func waitForBackpopulatedSnapshot(t *testing.T, clients *clients.Clients, clusterName string, createdAfter time.Time) *rkev1.ETCDSnapshot {
+func waitForBackpopulatedSnapshot(t *testing.T, clients *clients.Clients, clusterName, nodeName string, createdAfter time.Time) *rkev1.ETCDSnapshot {
 	t.Helper()
 
 	var picked *rkev1.ETCDSnapshot
 	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, 5*time.Minute, true, func(_ context.Context) (bool, error) {
 		list, err := clients.RKE.ETCDSnapshot().List(clusterName, metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, clusterName),
+			LabelSelector: fmt.Sprintf("%s=%s,%s=%s", capr.ClusterNameLabel, clusterName, capr.NodeNameLabel, nodeName),
 		})
 		if err != nil {
 			return false, err

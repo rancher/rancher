@@ -13,6 +13,7 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -113,6 +114,8 @@ rm "$NODENAMESFILE"
 type handler struct {
 	etcdsnapshotrestores operationcontrollers.ETCDSnapshotRestoreController
 
+	etcdsnapshots rkecontrollers.ETCDSnapshotController
+
 	beacons     plancontrollers.BeaconClient
 	beaconCache plancontrollers.BeaconCache
 
@@ -129,6 +132,7 @@ type handler struct {
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		etcdsnapshotrestores: clients.Operation.ETCDSnapshotRestore(),
+		etcdsnapshots:        clients.RKE.ETCDSnapshot(),
 		beacons:              clients.Plan.Beacon(),
 		beaconCache:          clients.Plan.Beacon().Cache(),
 		secrets:              clients.Core.Secret(),
@@ -269,15 +273,6 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		return h.handleSucceeded(s, status)
 	}
 
-	// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
-	if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
-		err = h.etcdsnapshotrestores.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			return status, err
-		}
-		return status, generic.ErrSkip
-	}
-
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
 	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
@@ -347,7 +342,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-	if !planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if !planapi.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
@@ -523,7 +518,34 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	secret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
+	filter := ops.IsEtcd
+	snapshot, err := h.etcdsnapshots.Get(s.namespace, snapshotName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: could not find associated etcdsnapshot.rke.cattle.io %s, assuming snapshot file", s.op.Namespace, s.op.Name, snapshotName)
+	} else if err != nil {
+		return status, err
+	} else if snapshot != nil && snapshot.SnapshotFile.S3 == nil {
+		if len(snapshot.OwnerReferences) == 0 {
+			// todo(jhyde): failure
+		}
+
+		ref := snapshot.OwnerReferences[0]
+
+		filter = func(secret *corev1.Secret) bool {
+			if secret == nil || secret.Labels == nil {
+				return false
+			}
+
+			if secret.Labels[planv1alpha1.MachineLifecycleName] == ref.Name {
+				return true
+			}
+
+			return false
+		}
+	}
+
+	// todo: elect leader based on snapshot
+	secret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, filter)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -533,9 +555,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
-	}
-
-	if secret == nil {
+	} else if secret == nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -550,8 +570,37 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	value := s.idempotencyValue()
 
+	args := []string{
+		"server",
+		"--cluster-reset",
+		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
+		"--etcd-disable-snapshots=false",
+	}
+
+	var env []string
+
+	files := []planapi.File{
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
+			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+		},
+		ops.IdempotentScriptFile(provisioningDir),
+	}
+
+	if snapshot == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
+	} else if snapshot.SnapshotFile.S3 == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
+	} else {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
+		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
+		args = append(args, s3Args...)
+		env = append(env, s3Env...)
+		files = append(files, s3Files...)
+	}
+
 	nodePlan := &planapi.Plan{
-		Files: []planapi.File{ops.IdempotentScriptFile(provisioningDir)},
+		Files: files,
 		OneTimeInstructions: []planapi.OneTimeInstruction{
 			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, planapi.OneTimeInstruction{
 				CommonInstruction: planapi.CommonInstruction{
@@ -560,15 +609,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
 				},
 			}),
-			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(),
-				[]string{
-					"server",
-					"--cluster-reset",
-					"--etcd-arg=advertise-client-urls=https://127.0.0.1:2379",
-					"--etcd-disable-snapshots=false",
-					fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName),
-					"--etcd-s3=false",
-				}, nil),
+			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
 		},
 	}
 
@@ -609,13 +650,8 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling post-restore pod cleanup", s.op.Namespace, s.op.Name)
 
-	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(planapi.Label(capr.ControlPlaneRoleLabel, "true")).
-		WithSorter(planapi.DefaultSorter()).
-		Collect()
-	if planapi.IsTransient(err) {
-		return status, err
-	} else if err != nil {
+	etcdSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, nil)
+	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -624,13 +660,26 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
+	} else if etcdSecret == nil {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for restore")
+
+		return status, nil
 	}
 
-	if len(secrets) == 0 {
-		secrets, err = planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-			WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
+	var controlPlaneSecret *corev1.Secret
+
+	if ops.IsControlPlane(etcdSecret) {
+		controlPlaneSecret = etcdSecret
+	} else {
+		secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
+			WithLabels(planapi.Label(capr.ControlPlaneRoleLabel, "true")).
 			WithSorter(planapi.DefaultSorter()).
-			WithValidator(planapi.AtLeast(1, "")).
 			Collect()
 		if planapi.IsTransient(err) {
 			return status, err
@@ -643,19 +692,21 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 			return status, nil
+		} else if len(secrets) == 0 {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		}
+
+		controlPlaneSecret = secrets[0]
 	}
 
-	if len(secrets) == 0 {
-		logrus.Warnf("[etcdsnapshotrestore] %s/%s: no suitable nodes found for pod cleanup, skipping", s.op.Namespace, s.op.Name)
-		status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster)
-		return status, nil
-	}
-
-	secret := secrets[0]
-
-	kubectl := s.adapter.KubectlPath(secret)
-	kubeconfig := s.adapter.KubeconfigPath(secret)
+	kubectl := s.adapter.KubectlPath(etcdSecret)
+	kubeconfig := s.adapter.KubeconfigPath(etcdSecret)
 
 	podSelectors := []string{
 		"kube-system:k8s-app=kube-dns",
@@ -676,22 +727,23 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		)
 	}
 
-	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	provisioningDir := s.adapter.ProvisioningDataDirectory(etcdSecret)
 	value := s.idempotencyValue()
-	waitScriptPath := etcdRestoreScriptPath(s, secret, waitForPodListScriptName)
-
-	// After `--cluster-reset` the distro process exits — it's a one-shot mode — so we need to
-	// bring the service back up before waiting for the apiserver. systemctl start is a no-op when
-	// the service is already running, so this is safe on retries.
-	unit := s.adapter.ServerUnit()
-	if secret.Labels[capr.EtcdRoleLabel] != "true" && secret.Labels[capr.ControlPlaneRoleLabel] != "true" {
-		unit = s.adapter.RuntimeCommand() + "-agent"
-	}
+	waitScriptPath := etcdRestoreScriptPath(s, etcdSecret, waitForPodListScriptName)
 
 	instructions := []planapi.OneTimeInstruction{
-		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/post-restore-start-service", value, "systemctl",
-			[]string{"start", unit}, nil),
-		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/wait-for-api-server", value, "/bin/sh",
+		ops.IdempotentInstruction(
+			provisioningDir,
+			idempotencyKey+"/post-restore-start-service",
+			value,
+			"systemctl",
+			[]string{"start", s.adapter.ServerUnit()},
+			nil),
+		ops.IdempotentInstruction(
+			provisioningDir,
+			idempotencyKey+"/wait-for-api-server",
+			value,
+			"/bin/sh",
 			[]string{
 				"-x",
 				waitScriptPath,
@@ -733,20 +785,67 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		OneTimeInstructions: instructions,
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+	if etcdSecret.Name != controlPlaneSecret.Name {
+		etcdNodePlan := &planapi.Plan{
+			OneTimeInstructions: []planapi.OneTimeInstruction{
+				ops.IdempotentInstruction(
+					provisioningDir,
+					idempotencyKey+"/post-restore-start-service",
+					value,
+					"systemctl",
+					[]string{"start", s.adapter.ServerUnit()},
+					nil),
+			},
+		}
+
+		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, 1, -1)
+		if err != nil {
+			return status, err
+		}
+
+		if planStatus.Failure() {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
+				s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
+
+			return status, nil
+		}
+
+		if wait, msg := planStatus.Wait(); wait {
+			logrus.Infof("[etcdsnapshotrestore] %s/%s: waiting for pod cleanup: %s", s.op.Namespace, s.op.Name, msg)
+
+			opv1alpha1.InProgressCondition.True(&status)
+			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
+			opv1alpha1.InProgressCondition.Message(&status, msg)
+
+			return status, nil
+		}
+
+		nodePlan.Files = append(nodePlan.Files, planapi.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", s.adapter.GetServerURL(etcdSecret), s.adapter.GetSupervisorPort(etcdSecret)))),
+			Path:    path.Join(s.adapter.ConfigDirectory(controlPlaneSecret), "zz_etcd-snapshot-restore.yaml"),
+		})
+	}
+
+	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, 1, -1)
 	if err != nil {
 		return status, err
 	}
 
 	if planStatus.Failure() {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
-			s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+			s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", secret.Namespace, secret.Name))
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
 
 		return status, nil
 	}
@@ -796,6 +895,20 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		value = value + "/final"
 	}
 
+	initSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
+	if err != nil {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		return status, nil
+	}
+
+	serverURL := s.adapter.GetServerURL(initSecret)
+
 	for _, secret := range secrets {
 		provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 
@@ -816,6 +929,37 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 					[]string{"restart", unit}, nil),
 			},
 			Probes: probes,
+		}
+
+		if secret.UID != initSecret.UID {
+			if nextStep != "" {
+				nodePlan.Files = append(nodePlan.Files, planapi.File{
+					Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret)))),
+					Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+				})
+			} else {
+				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, planapi.OneTimeInstruction{
+					CommonInstruction: planapi.CommonInstruction{
+						Name:    "remove-server-arg",
+						Command: "rm",
+						Args: []string{
+							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+						},
+					},
+				})
+			}
+		} else {
+			if nextStep == "" {
+				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, planapi.OneTimeInstruction{
+					CommonInstruction: planapi.CommonInstruction{
+						Name:    "remove-server-arg",
+						Command: "rm",
+						Args: []string{
+							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+						},
+					},
+				})
+			}
 		}
 
 		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
@@ -1016,7 +1160,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
-	if planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if planapi.AuthorizedForBeacon(s.beacon, ControllerOwnerKey) {
 		var err error
 		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {
