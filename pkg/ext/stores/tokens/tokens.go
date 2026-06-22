@@ -660,7 +660,8 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		// already some kind of api error
+		return nil, err
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
@@ -1340,6 +1341,7 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		if err == nil {
 			return ext, nil
 		}
+		// %w wraps the error, still testable for various API errors
 		return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
 	}
 
@@ -1352,11 +1354,12 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	}
 
 	// not a v3 Token, now check for ext token
-	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+	ext, err := t.Get(tokenID, "", &metav1.GetOptions{})
+	if err == nil {
 		return ext, nil
 	}
-
-	return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	// %w wraps the error, still testable for various API errors
+	return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from

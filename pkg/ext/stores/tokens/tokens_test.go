@@ -1150,7 +1150,45 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token \"session-token\"")),
+			err:  fmt.Errorf("unable to fetch token session-token: %w",
+				apierrors.NewInternalError(
+					fmt.Errorf("failed to retrieve token session-token: %w", errSomeError))),
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// fail fetch of session token, v3 and ext, internal error
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").
+					Return(nil, errSomeError)
+				scache.EXPECT().Get("cattle-tokens", "session-token").
+					Return(nil, errSomeError)
+
+				users.EXPECT().Get("world").
+					Return(enabledUser, nil)
+			},
+		},
+		{
+			name: "provider/principal retrieval error, not found",
+			err:  fmt.Errorf("unable to fetch token session-token: %w",
+				apierrors.NewNotFound(GVR.GroupResource(), "session-token")),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1175,9 +1213,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").
-					Return(nil, errSomeError)
+					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "session-token"))
 				scache.EXPECT().Get("cattle-tokens", "session-token").
-					Return(nil, errSomeError)
+					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "session-token"))
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
