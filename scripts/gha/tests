@@ -135,7 +135,7 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
     && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
 
 echo Running integrationsetup
-export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
+export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
 ./tests/v2/integration/bin/integrationsetup || {
   dump_rancher_logs
   exit 1
