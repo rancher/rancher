@@ -120,6 +120,46 @@ func Test_Render(t *testing.T) {
 			},
 			failMsg: "skip schema validation test case failed",
 		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test7",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--force-conflicts=true", "--server-side=true", "--take-ownership=true", "test7", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "take ownership test case failed",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test8",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--take-ownership=false", "test8", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "take ownership false should not add force-conflicts or server-side",
+		},
 	}
 
 	for _, testCase := range testCases {
