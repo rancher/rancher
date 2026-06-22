@@ -1225,7 +1225,7 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.SystemDefaultRegistryPullSecrets.Set("pull-secret-a,pull-secret-b")
 
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
@@ -1236,39 +1236,6 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				pullSecrets := []string{"pull-secret-a", "pull-secret-b"}
-
-				// rancher-webhook: global.cattle.imagePullSecrets set; no top-level imagePullSecrets
-				expectedWebhookValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": "registry.example.com",
-							"imagePullSecrets":      pullSecrets,
-						},
-					},
-					"image": map[string]interface{}{
-						"repository": "rancher/rancher-webhook",
-					},
-					"replicaCount":        1,
-					"tolerations":         []interface{}{},
-					"affinity":            nil,
-					"resources":           map[string]interface{}{},
-					"podDisruptionBudget": map[string]interface{}{"enabled": false},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.WebhookChartName,
-					chart.WebhookChartName,
-					"",
-					"2.0.0",
-					expectedWebhookValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
 
 				// rancher-turtles: global.cattle.imagePullSecrets set; top-level imagePullSecrets as []string
 				expectedTurtlesValues := map[string]interface{}{
