@@ -1,0 +1,31 @@
+name: Retry failed jobs once
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] -- guarded by head_repository.full_name == github.repository
+    workflows:
+      - "Build Pull Request"
+      - "Push to release branches"
+    types: [completed]
+
+permissions:
+  actions: write
+
+jobs:
+  retry:
+    # Only retry once, only on failure, and only for PR/release push runs.
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.run_attempt == 1 &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'pull_request' ||
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rerun failed jobs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${{ github.repository }}/actions/runs/$RUN_ID/rerun-failed-jobs"
