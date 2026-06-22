@@ -15,6 +15,7 @@ func TestChartValuesWriterRun(t *testing.T) {
 
 	cfg := map[string]string{
 		"chartAuditLogImage":  "rancher/mirrored-bci-micro:16.0-15.11",
+		"defaultChartsImage":  "rancher/rancher-charts:v0.1.0-rc.1",
 		"defaultShellVersion": "rancher/shell:v0.8.0-rc.2",
 	}
 
@@ -23,6 +24,10 @@ func TestChartValuesWriterRun(t *testing.T) {
   image:
     repository: "rancher/old-audit"
     tag: old-tag
+
+chartsImage:
+  repository: rancher/old-charts
+  tag: v0.0.1
 
 postDelete:
   enabled: true
@@ -41,6 +46,10 @@ preUpgrade:
   image:
     repository: "rancher/mirrored-bci-micro"
     tag: 16.0-15.11
+
+chartsImage:
+  repository: rancher/rancher-charts
+  tag: v0.1.0-rc.1
 
 postDelete:
   enabled: true
