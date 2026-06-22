@@ -162,7 +162,7 @@ func TestAuthEndpoint(t *testing.T) {
 				}, nil)
 				m.sessionAdder.EXPECT().Add(fakeCode, session.Session{
 					ClientID:      fakeClientID,
-					TokenName:     "ext/"+fakeTokenName,
+					TokenName:     "ext/" + fakeTokenName,
 					Scope:         []string{"openid"},
 					CodeChallenge: "code-challenge",
 					CreatedAt:     fakeTime,
@@ -785,10 +785,11 @@ func TestAuthEndpoint(t *testing.T) {
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
 	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
 	providers.SetProviders(map[string]common.AuthProvider{"local": mockProvider})
+	t.Cleanup(func() { providers.SetProviders(nil) })
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+			// no t.Parallel() because of shared controller, provider map
 			tc := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 			sc := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			scc := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
