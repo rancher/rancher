@@ -1150,7 +1150,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token \"session-token\"")),
+			err:  apierrors.NewInternalError(fmt.Errorf("failed to retrieve token session-token: %w", errSomeError)),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
