@@ -43,8 +43,10 @@ import (
 )
 
 const (
-	AddressAnnotation = "rke.cattle.io/address"
-	ClusterNameLabel  = "rke.cattle.io/cluster-name"
+	AddressAnnotation                      = "rke.cattle.io/address"
+	BootstrapTokenLastAccessTimeAnnotation = "rke.cattle.io/last-access-timestamp"
+	BootstrapTokenAnnotation               = "rke.cattle.io/bootstrap-token"
+	ClusterNameLabel                       = "rke.cattle.io/cluster-name"
 	// ClusterSpecAnnotation is used to define the cluster spec used to generate the rkecontrolplane object as an annotation on the object
 	ClusterSpecAnnotation                      = "rke.cattle.io/cluster-spec"
 	ControlPlaneRoleLabel                      = "rke.cattle.io/control-plane-role"
@@ -57,6 +59,7 @@ const (
 	InitNodeLabel                              = "rke.cattle.io/init-node"
 	InitNodeMachineIDLabel                     = "rke.cattle.io/init-node-machine-id"
 	InternalAddressAnnotation                  = "rke.cattle.io/internal-address"
+	InvalidatedBootstrapTokenAnnotation        = "rke.cattle.io/bootstrap-token-invalidated"
 	JoinURLAutosetDisabled                     = "rke.cattle.io/join-url-autoset-disabled"
 	JoinURLAnnotation                          = "rke.cattle.io/join-url"
 	JoinedToAnnotation                         = "rke.cattle.io/joined-to"

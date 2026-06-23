@@ -130,6 +130,22 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	if err != nil {
 		return nil, err
 	}
+
+	if secret.Annotations[capr.BootstrapTokenAnnotation] != "true" {
+		secret = secret.DeepCopy()
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+
+		secret.Annotations[capr.BootstrapTokenAnnotation] = "true"
+
+		secret, err = h.secretClient.Update(secret)
+		if err != nil {
+			return nil, fmt.Errorf("could not set bootstrap annotation on sa secret %s/%s: %w",
+				secret.Namespace, secret.Name, err)
+		}
+	}
+
 	hash := sha256.Sum256(secret.Data["token"])
 
 	hasHostPort, err := h.rancherDeploymentHasHostPort()
