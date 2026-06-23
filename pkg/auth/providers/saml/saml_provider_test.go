@@ -383,6 +383,8 @@ type fakeToken struct {
 	authProvider string
 }
 
+func (m *fakeToken) GetLabels() map[string]string { return nil }
+
 func (m *fakeToken) GetName() string { return "" }
 
 func (m *fakeToken) GetIsEnabled() bool { return true }
