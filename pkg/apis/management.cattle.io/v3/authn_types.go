@@ -58,6 +58,10 @@ func (t *Token) GetName() string {
 	return t.ObjectMeta.Name
 }
 
+func (t *Token) GetFullName() string {
+	return t.ObjectMeta.Name
+}
+
 func (t *Token) GetIsEnabled() bool {
 	return t.Enabled == nil || *t.Enabled
 }
