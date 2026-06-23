@@ -164,10 +164,13 @@ jobs:
           if [[ "$INCOMPLETE_WORKFLOWS" -eq 0 ]]; then
             echo "All workflows have reached their attempt limits. Closing PR..."
 
-            if FAILURE_REPORT=$(python3 .github/scripts/list-ci-failures-for-pr.py "$PR_NUMBER" 2>&1); then
-              gh pr close "$PR_NUMBER" --comment "$FAILURE_REPORT" --delete-branch
+            REPORT_FILE=$(mktemp)
+            if python3 .github/scripts/list-ci-failures-for-pr.py "$PR_NUMBER" > "$REPORT_FILE" 2>&1; then
+              gh pr comment "$PR_NUMBER" --body-file "$REPORT_FILE"
             else
               echo "❌ Failure report could not be generated."
-              gh pr close "$PR_NUMBER" --comment "Closing PR after completing all CI test runs ($MAX_ATTEMPTS per workflow)" --delete-branch
+              gh pr comment "$PR_NUMBER" --body "Closing PR after completing all CI test runs ($MAX_ATTEMPTS per workflow)"
             fi
+            rm -f "$REPORT_FILE"
+            gh pr close "$PR_NUMBER" --delete-branch
           fi
