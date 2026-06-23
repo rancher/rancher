@@ -122,7 +122,7 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	if apierrors.IsNotFound(err) {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
-	} else if errors.Is(err, retrievalInvalidatedError) {
+	} else if errors.Is(err, errRetrievalInvalidated) {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	} else if err != nil {

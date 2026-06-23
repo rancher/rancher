@@ -11,7 +11,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-var retrievalInvalidatedError = errors.New("secret retrieval invalidated")
+var errRetrievalInvalidated = errors.New("secret retrieval invalidated")
 
 func (r *RKE2ConfigServer) findMachineByProvisioningSA(req *http.Request) (*corev1.ObjectReference, error) {
 	token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
@@ -34,7 +34,7 @@ func (r *RKE2ConfigServer) findMachineByProvisioningSA(req *http.Request) (*core
 	}
 
 	if secrets[0].Annotations[capr.InvalidatedBootstrapTokenAnnotation] == "true" {
-		return nil, retrievalInvalidatedError
+		return nil, errRetrievalInvalidated
 	}
 
 	secret := secrets[0].DeepCopy()
