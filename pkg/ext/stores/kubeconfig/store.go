@@ -1378,11 +1378,8 @@ func (s *Store) delete(
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", configMap.Name, err))
 	}
 
-	// Token IDs are tracked in status.tokens. Probe the ext store first to
-	// decide whether the token lives there or in the v3 token client. The
-	// v3 fallback is needed for pre-migration kubeconfigs that reference v3
-	// tokens. SystemStore.Delete swallows NotFound, so it can't be used to
-	// distinguish the two stores on its own.
+	// Token IDs are tracked in status.tokens. Delete each token, falling back
+	// to the v3 token client for pre-migration kubeconfigs that reference v3 tokens.
 	for _, tokenName := range kubeconfig.Status.Tokens {
 		delOptions := &metav1.DeleteOptions{
 			GracePeriodSeconds: options.GracePeriodSeconds,
@@ -1390,18 +1387,13 @@ func (s *Store) delete(
 			DryRun:             options.DryRun, // Pass through the dry run flag instead of handling it explicitly.
 		}
 
-		_, getErr := s.tokenStore.GetSecret(tokenName, &metav1.GetOptions{}, false)
-		switch {
-		case getErr == nil:
-			if err := s.tokenStore.Delete(tokenName, delOptions); err != nil {
-				return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting ext token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
-			}
-		case apierrors.IsNotFound(getErr):
-			if err := s.v3Tokens.Delete(tokenName, delOptions); err != nil && !apierrors.IsNotFound(err) {
-				return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting v3 token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
-			}
-		default:
-			return nil, false, apierrors.NewInternalError(fmt.Errorf("error probing ext token %s for kubeconfig %s: %w", tokenName, configMap.Name, getErr))
+		err := s.tokenStore.Delete(tokenName, delOptions)
+		if apierrors.IsNotFound(err) {
+			// Not an ext token — try v3 token for backward compatibility.
+			err = s.v3Tokens.Delete(tokenName, delOptions)
+		}
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
 		}
 	}
 

@@ -95,9 +95,8 @@ func (f *fakeTokenManager) generate(token *ext.Token) (*ext.Token, error) {
 }
 
 type fakeTokenStore struct {
-	fetchFunc     func(tokenID string) (accessor.TokenAccessor, error)
-	getSecretFunc func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error)
-	deleteFunc    func(name string, options *metav1.DeleteOptions) error
+	fetchFunc  func(tokenID string) (accessor.TokenAccessor, error)
+	deleteFunc func(name string, options *metav1.DeleteOptions) error
 }
 
 func (f *fakeTokenStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
@@ -108,9 +107,6 @@ func (f *fakeTokenStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 }
 
 func (f *fakeTokenStore) GetSecret(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
-	if f.getSecretFunc != nil {
-		return f.getSecretFunc(name, options, useCache)
-	}
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -2769,15 +2765,9 @@ func TestStoreDelete(t *testing.T) {
 		}).Times(1)
 		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
 
-		var probed []string
 		extTokenStore := &fakeTokenStore{
-			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
-				probed = append(probed, name)
-				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-			},
 			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
-				require.Fail(t, "ext token store delete should not be called for v3 tokens")
-				return nil
+				return apierrors.NewNotFound(gvr.GroupResource(), name)
 			},
 		}
 
@@ -2808,7 +2798,6 @@ func TestStoreDelete(t *testing.T) {
 		obj, _, err := store.Delete(ctx, kubeconfigID, nil, deleteOptions)
 		require.NoError(t, err)
 		require.NotNil(t, obj)
-		assert.ElementsMatch(t, []string{v3TokenID1, v3TokenID2}, probed)
 		assert.ElementsMatch(t, []string{v3TokenID1, v3TokenID2}, deletedV3)
 	})
 	t.Run("admin deletes a kubeconfig with mixed ext and v3 tokens", func(t *testing.T) {
@@ -2824,19 +2813,14 @@ func TestStoreDelete(t *testing.T) {
 		}).Times(1)
 		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
 
-		var probed []string
 		var deletedExt []string
 		extTokenStore := &fakeTokenStore{
-			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
-				probed = append(probed, name)
-				if name == extTokenID {
-					return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
-				}
-				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-			},
 			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
-				deletedExt = append(deletedExt, name)
-				return nil
+				if name == extTokenID {
+					deletedExt = append(deletedExt, name)
+					return nil
+				}
+				return apierrors.NewNotFound(gvr.GroupResource(), name)
 			},
 		}
 
@@ -2862,12 +2846,11 @@ func TestStoreDelete(t *testing.T) {
 
 		_, _, err := store.Delete(ctx, kubeconfigID, nil, &metav1.DeleteOptions{})
 		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{extTokenID, v3TokenID}, probed)
 		assert.Equal(t, []string{extTokenID}, deletedExt)
 		assert.Equal(t, []string{v3TokenID}, deletedV3)
 	})
-	t.Run("error probing the ext token store fails the delete", func(t *testing.T) {
-		tokenID := "token-probefail"
+	t.Run("error deleting ext token fails the delete", func(t *testing.T) {
+		tokenID := "token-delfail"
 
 		cm := configMap.DeepCopy()
 		cm.Data[StatusTokensField] = `["` + tokenID + `"]`
@@ -2879,12 +2862,8 @@ func TestStoreDelete(t *testing.T) {
 		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
 
 		extTokenStore := &fakeTokenStore{
-			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
-				return nil, apierrors.NewInternalError(fmt.Errorf("boom"))
-			},
 			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
-				require.Fail(t, "ext token store delete should not be called when probe fails")
-				return nil
+				return apierrors.NewInternalError(fmt.Errorf("boom"))
 			},
 		}
 
@@ -3087,12 +3066,8 @@ func TestStoreDeleteCollection(t *testing.T) {
 		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(nil).Times(1)
 
 		extTokenStore := &fakeTokenStore{
-			getSecretFunc: func(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
-				return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-			},
 			deleteFunc: func(name string, options *metav1.DeleteOptions) error {
-				require.Fail(t, "ext token store delete should not be called for v3 tokens")
-				return nil
+				return apierrors.NewNotFound(gvr.GroupResource(), name)
 			},
 		}
 
