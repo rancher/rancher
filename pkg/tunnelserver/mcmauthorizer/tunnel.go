@@ -19,6 +19,7 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -30,7 +31,8 @@ import (
 )
 
 const (
-	crtKeyIndex  = "crtKeyIndex"
+	CRTKeyIndex  = "crtKeyIndex"
+	crtKeyIndex  = CRTKeyIndex
 	nodeKeyIndex = "nodeKeyIndex"
 
 	Token  = "X-API-Tunnel-Token"
@@ -403,10 +405,19 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 
 func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
 	crt := obj.(*v3.ClusterRegistrationToken)
-	if crt.Status.Token == "" {
+	current, previous, err := clusterregistrationtoken.GetTokensFromSecret(t.SecretLister, crt)
+	if err != nil {
+		logrus.Warnf("failed to resolve CRT token for %s/%s: %v", crt.Namespace, crt.Name, err)
 		return nil, nil
 	}
-	return []string{crt.Status.Token}, nil
+	if current == "" {
+		return nil, nil
+	}
+	tokens := []string{current}
+	if previous != "" {
+		tokens = append(tokens, previous)
+	}
+	return tokens, nil
 }
 
 func (t *Authorizer) nodeIndex(obj interface{}) ([]string, error) {

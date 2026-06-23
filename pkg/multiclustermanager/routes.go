@@ -45,7 +45,10 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
-		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
+		clusterImport        = clusterregistrationtokens.ClusterImport{
+			Clusters:   scaledContext.Management.Clusters(""),
+			CRTIndexer: scaledContext.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+		}
 	)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)

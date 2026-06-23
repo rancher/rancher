@@ -13,7 +13,10 @@ import (
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8scache "k8s.io/client-go/tools/cache"
 )
 
 func validateAuthImage(authImage string) error {
@@ -25,13 +28,27 @@ func validateAuthImage(authImage string) error {
 }
 
 type ClusterImport struct {
-	Clusters v3.ClusterInterface
+	Clusters     v3.ClusterInterface
+	CRTIndexer   k8scache.Indexer
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "text/plain")
 	token := mux.Vars(req)["token"]
 	clusterID := mux.Vars(req)["clusterId"]
+
+	cluster, err := ch.Clusters.Get(clusterID, metav1.GetOptions{})
+	if err != nil || cluster == nil {
+		resp.WriteHeader(http.StatusBadRequest)
+		resp.Write([]byte("cluster not found or invalid token"))
+		return
+	}
+
+	if !ch.isValidToken(clusterID, token) {
+		resp.WriteHeader(http.StatusBadRequest)
+		resp.Write([]byte("cluster not found or invalid token"))
+		return
+	}
 
 	urlBuilder, err := urlbuilder.New(req, schema.Version, types.NewSchemas())
 	if err != nil {
@@ -56,15 +73,25 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		return
 	}
 
-	var cluster *apimgmtv3.Cluster
-	if clusterID != "" {
-		cluster, _ = ch.Clusters.Get(clusterID, metav1.GetOptions{})
-	}
-
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	if err = systemtemplate.SystemTemplate(resp, agentImage, authImage, "", token, url,
 		false, false, cluster, nil, nil, nil, false); err != nil {
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}
+}
+
+func (ch *ClusterImport) isValidToken(clusterID, token string) bool {
+	objs, err := ch.CRTIndexer.ByIndex(mcmauthorizer.CRTKeyIndex, token)
+	if err != nil {
+		logrus.Errorf("[cluster-registration-tokens] CRT index lookup failed: %v", err)
+		return false
+	}
+	for _, obj := range objs {
+		crt, ok := obj.(*apimgmtv3.ClusterRegistrationToken)
+		if ok && crt.Namespace == clusterID {
+			return true
+		}
+	}
+	return false
 }
