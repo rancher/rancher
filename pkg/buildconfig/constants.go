@@ -5,11 +5,11 @@ package buildconfig
 const (
 	ClusterAutoscalerChartVersion = "9.50.1"
 	CspAdapterMinVersion          = "108.0.0+up8.0.0"
-	DefaultSccOperatorImage       = "rancher/scc-operator:v0.4.2-rc.1"
-	DefaultShellVersion           = "rancher/shell:v0.6.4-rc.1"
+	DefaultSccOperatorImage       = "rancher/scc-operator:v0.4.2"
+	DefaultShellVersion           = "rancher/shell:v0.6.4"
 	FleetVersion                  = "108.0.7+up0.14.7"
 	ProvisioningCAPIVersion       = "108.0.0+up0.9.0"
 	RemoteDialerProxyVersion      = "108.0.2+up0.6.2-rc.3"
 	TurtlesVersion                = "108.0.5+up0.25.5"
-	WebhookVersion                = "108.0.6+up0.9.6-rc.6"
+	WebhookVersion                = "108.0.6+up0.9.6-rc.7"
 )
