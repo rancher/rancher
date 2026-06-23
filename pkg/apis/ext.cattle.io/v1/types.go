@@ -157,6 +157,10 @@ func (t *Token) GetName() string {
 	return t.Name
 }
 
+func (t *Token) GetFullName() string {
+	return "ext/" + t.Name
+}
+
 func (t *Token) GetIsEnabled() bool {
 	return t.Spec.Enabled == nil || *t.Spec.Enabled
 }

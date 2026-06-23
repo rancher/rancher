@@ -15,6 +15,8 @@ type TokenAccessor interface {
 	GetLabels() map[string]string
 	// GetName returns the resource name of the token.
 	GetName() string
+	// GetFullName returns the extended resource name of the token, i.e. any applicable prefixes
+	GetFullName() string
 	// GetIsEnabled returns a boolean flag indicating if the token is
 	// enabled or not.
 	GetIsEnabled() bool

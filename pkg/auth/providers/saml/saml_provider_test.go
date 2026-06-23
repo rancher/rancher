@@ -385,6 +385,8 @@ type fakeToken struct {
 
 func (m *fakeToken) GetLabels() map[string]string { return nil }
 
+func (m *fakeToken) GetFullName() string { return "" }
+
 func (m *fakeToken) GetName() string { return "" }
 
 func (m *fakeToken) GetIsEnabled() bool { return true }
