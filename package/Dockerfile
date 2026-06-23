@@ -32,8 +32,7 @@ FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
 
-FROM registry.suse.com/bci/bci-micro:15.7 AS final
-RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
+FROM registry.suse.com/bci/bci-nano:15.7 AS final
 
 # Temporary build stage image
 FROM registry.suse.com/bci/bci-base:15.7 AS chroot-builder
@@ -42,7 +41,7 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-      curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
+      curl util-linux ca-certificates-mozilla-prebuilt xz gzip tar gawk vim-small openssh-clients
 
 
 FROM chroot-builder AS chroot-builder-server
@@ -123,7 +122,7 @@ RUN case "${ARCH}" in \
     chmod +x /usr/bin/tini
 
 
-# Main stage using bci-micro as the base image
+# Main stage using bci-nano as the base image
 FROM final AS base
 # Copy binaries and configuration files from builder to micro
 COPY --from=chroot-builder-server /chroot/ /
@@ -551,7 +550,7 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
 ENTRYPOINT ["entrypoint.sh"]
 
 
-# Main stage using bci-micro as the base image.
+# Main stage using bci-nano as the base image.
 FROM final AS agent
 
 # Copy binaries and configuration files from zypper to micro.
