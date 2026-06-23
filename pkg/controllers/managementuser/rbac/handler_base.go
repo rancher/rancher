@@ -183,6 +183,14 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r, management, nsInformer))
 	management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r, management))
 	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
+
+	// Register owner-side enqueuers so that editing a RoleTemplate re-triggers the non-aggregated
+	// cluster-prtb-sync / cluster-crtb-sync handlers above. The equivalent enqueuers in
+	// pkg/controllers/management/auth run on the leader plane and only reach the leader-side
+	// management-plane handlers; in HA the owner is a different replica, so these owner-side
+	// enqueuers guarantee the downstream binding reconcile is enqueued on every RoleTemplate change.
+	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-prtb-roletemplate-enqueuer", newPRTBRoleTemplateEnqueuer(r, management.Management.ProjectRoleTemplateBindings("")))
+	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-crtb-roletemplate-enqueuer", newCRTBRoleTemplateEnqueuer(r, management.Management.ClusterRoleTemplateBindings("")))
 	return nil
 }
 

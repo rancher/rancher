@@ -40,7 +40,7 @@ type rtEnqueue struct {
 	rtIndexer cache.Indexer
 }
 
-func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
+func (c *rtSync) sync(key string, obj *wranglerv3.RoleTemplate) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
@@ -68,10 +68,69 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 	return obj, err
 }
 
+// newPRTBRoleTemplateEnqueuer returns a RoleTemplate handler that enqueues every PRTB in this cluster
+// referencing the changed RoleTemplate, so the owner-side cluster-prtb-sync handler re-runs.
+// The equivalent enqueuer in pkg/controllers/management/auth/role_template_lifecycle.go runs on the
+// leader plane and only reaches the leader-side management-plane handler; in HA the owner is a
+// different replica, so this enqueuer is required for the downstream binding reconcile to trigger.
+func newPRTBRoleTemplateEnqueuer(m *manager, prtbClient v3.ProjectRoleTemplateBindingInterface) v3.RoleTemplateHandlerFunc {
+	e := &prtbRoleTemplateEnqueuer{m: m, prtbClient: prtbClient}
+	return e.sync
+}
+
+type prtbRoleTemplateEnqueuer struct {
+	m          *manager
+	prtbClient v3.ProjectRoleTemplateBindingInterface
+}
+
+func (e *prtbRoleTemplateEnqueuer) sync(key string, obj *wranglerv3.RoleTemplate) (runtime.Object, error) {
+	if obj == nil || obj.DeletionTimestamp != nil || features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
+	prtbs, err := e.m.prtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, e.m.workload.ClusterName+"-"+obj.Name)
+	if err != nil {
+		return obj, err
+	}
+	for _, x := range prtbs {
+		if prtb, ok := x.(*wranglerv3.ProjectRoleTemplateBinding); ok {
+			e.prtbClient.Controller().Enqueue(prtb.Namespace, prtb.Name)
+		}
+	}
+	return obj, nil
+}
+
+// newCRTBRoleTemplateEnqueuer returns a RoleTemplate handler that enqueues every CRTB in this cluster
+// referencing the changed RoleTemplate, so the owner-side cluster-crtb-sync handler re-runs.
+func newCRTBRoleTemplateEnqueuer(m *manager, crtbClient v3.ClusterRoleTemplateBindingInterface) v3.RoleTemplateHandlerFunc {
+	e := &crtbRoleTemplateEnqueuer{m: m, crtbClient: crtbClient}
+	return e.sync
+}
+
+type crtbRoleTemplateEnqueuer struct {
+	m          *manager
+	crtbClient v3.ClusterRoleTemplateBindingInterface
+}
+
+func (e *crtbRoleTemplateEnqueuer) sync(key string, obj *wranglerv3.RoleTemplate) (runtime.Object, error) {
+	if obj == nil || obj.DeletionTimestamp != nil || features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
+	crtbs, err := e.m.crtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, e.m.workload.ClusterName+"-"+obj.Name)
+	if err != nil {
+		return obj, err
+	}
+	for _, x := range crtbs {
+		if crtb, ok := x.(*wranglerv3.ClusterRoleTemplateBinding); ok {
+			e.crtbClient.Controller().Enqueue(crtb.Namespace, crtb.Name)
+		}
+	}
+	return obj, nil
+}
+
 // syncRT ensures that all the Roles and RoleBindings needed for PRTBs and CRTBs to give RoleTemplate access exist.
 // For PRTBs there is special handling to provide access to global resources, which are referred to as Promoted Rules.
-func (c *rtSync) syncRT(template *v3.RoleTemplate, prtbs []any, crtbs []any) error {
-	roleTemplates := map[string]*v3.RoleTemplate{}
+func (c *rtSync) syncRT(template *wranglerv3.RoleTemplate, prtbs []any, crtbs []any) error {
+	roleTemplates := map[string]*wranglerv3.RoleTemplate{}
 	if err := c.m.gatherRoles(template, roleTemplates, 0); err != nil {
 		return err
 	}
@@ -81,7 +140,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, prtbs []any, crtbs []any) err
 	}
 
 	for _, obj := range prtbs {
-		prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+		prtb, ok := obj.(*wranglerv3.ProjectRoleTemplateBinding)
 		if !ok {
 			continue
 		}
@@ -126,7 +185,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, prtbs []any, crtbs []any) err
 	}
 
 	for _, obj := range crtbs {
-		crtb, ok := obj.(*v3.ClusterRoleTemplateBinding)
+		crtb, ok := obj.(*wranglerv3.ClusterRoleTemplateBinding)
 		if !ok {
 			continue
 		}
