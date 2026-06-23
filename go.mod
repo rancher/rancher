@@ -163,7 +163,6 @@ require (
 	k8s.io/apiserver v0.36.2
 	k8s.io/cli-runtime v0.36.2
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/helm v2.17.0+incompatible
 	k8s.io/kube-aggregator v0.36.2
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a
 	k8s.io/kubectl v0.36.2
@@ -188,7 +187,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.24 // indirect
-	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
@@ -416,7 +414,7 @@ require (
 	golang.org/x/time v0.15.0
 	golang.org/x/tools v0.45.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
-	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/cluster-bootstrap v0.36.1 // indirect
 	k8s.io/code-generator v0.36.2 // indirect
