@@ -294,7 +294,7 @@ func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTempla
 	// skip the deletion otherwise
 	clusterRoleInUse, err := p.isClusterRoleUsed(psaCRName)
 	if err != nil {
-		return fmt.Errorf("error checking if clusterrole %v is used: %w", psaCRName, err)
+		logrus.Errorf("Error checking if clusterrole %v is used, continuing with deletion: %v", psaCRName, err)
 	}
 	if !clusterRoleInUse {
 		if err = p.crClient.Delete(psaCRName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -306,13 +306,14 @@ func (p *prtbLifecycle) ensurePSAPermissionsDelete(binding *v3.ProjectRoleTempla
 }
 
 // isClusterRoleUsed checks if a ClusterRole is referenced by any ClusterRoleBinding.
+// If there is an error while listing the ClusterRoleBindings, it returns false.
 func (p *prtbLifecycle) isClusterRoleUsed(clusterRoleName string) (bool, error) {
-	bindings, err := p.crbClient.List(metav1.ListOptions{})
+	bindings, err := p.crbLister.List(labels.Everything())
 	if err != nil {
 		return false, err
 	}
 
-	for _, binding := range bindings.Items {
+	for _, binding := range bindings {
 		if binding.RoleRef.Kind == "ClusterRole" && binding.RoleRef.Name == clusterRoleName {
 			return true, nil
 		}
