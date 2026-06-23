@@ -13,6 +13,8 @@ import (
 	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 )
 
+const errorUserName string = "system:cattle:error"
+
 type TokenReviewAuth struct {
 	AuthClient authv1.AuthenticationV1Interface
 }
@@ -28,7 +30,7 @@ func NewTokenReviewAuth(authClient authv1.AuthenticationV1Interface) auth.Authen
 // review to authenticate token and extract user info.
 func (t *TokenReviewAuth) Authenticate(req *http.Request) (user.Info, bool, error) {
 	info, hasAuth := request.UserFrom(req.Context())
-	if info.GetName() != "system:cattle:error" {
+	if info.GetName() != errorUserName {
 		// auth has succeeded
 		return info, hasAuth, nil
 	}
@@ -46,6 +48,11 @@ func (t *TokenReviewAuth) Authenticate(req *http.Request) (user.Info, bool, erro
 	tokenReview, err := t.AuthClient.TokenReviews().Create(req.Context(), tokenReview, metav1.CreateOptions{})
 	if err != nil {
 		logrus.Debugf("tokenReview failed: %v", err)
+		return info, false, nil
+	}
+
+	if tokenReview.Status.Error != "" {
+		logrus.Debugf("tokenReview returned an error: %s", tokenReview.Status.Error)
 		return info, false, nil
 	}
 
