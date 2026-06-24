@@ -86,5 +86,5 @@ func (r *Retriever) preBootstrapCluster(cp *rkev1.RKEControlPlane) (bool, error)
 		return false, fmt.Errorf("failed to get mgmt Cluster %v: %w", cp.Spec.ManagementClusterName, err)
 	}
 
-	return capr.ShouldPreBootstrap(r.secretCache, mgmtCluster)
+	return capr.ShouldPreBootstrap(mgmtCluster), nil
 }

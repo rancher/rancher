@@ -12,7 +12,6 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -768,55 +767,31 @@ func TestShouldPreBootstrap(t *testing.T) {
 	tests := []struct {
 		name    string
 		cluster *apimgmtv3.Cluster
-		secrets []*corev1.Secret
 		want    bool
 	}{
 		{
-			name: "authorized sync-bootstrap secret exists",
+			name: "cluster with fleet workspace should pre-bootstrap",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
 				Spec: apimgmtv3.ClusterSpec{
 					DisplayName:        "c-test",
 					FleetWorkspaceName: "fleet-default",
-				},
-			},
-			secrets: []*corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bootstrap-secret",
-						Annotations: map[string]string{
-							SyncPreBootstrapAnnotation: "true",
-							AuthorizedObjectAnnotation: "c-test",
-						},
-					},
 				},
 			},
 			want: true,
 		},
 		{
-			name: "sync-bootstrap secret not authorized for cluster",
+			name: "cluster without fleet workspace should not pre-bootstrap",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
 				Spec: apimgmtv3.ClusterSpec{
-					DisplayName:        "c-test",
-					FleetWorkspaceName: "fleet-default",
-				},
-			},
-			secrets: []*corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bootstrap-secret",
-						Annotations: map[string]string{
-							SyncPreBootstrapAnnotation: "true",
-							AuthorizedObjectAnnotation: "c-other",
-						},
-					},
+					DisplayName: "c-test",
 				},
 			},
 			want: false,
 		},
 		{
-			name: "no sync-bootstrap secret",
+			name: "cluster already pre-bootstrapped should not pre-bootstrap",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
 				Spec: apimgmtv3.ClusterSpec{
@@ -824,28 +799,14 @@ func TestShouldPreBootstrap(t *testing.T) {
 					FleetWorkspaceName: "fleet-default",
 				},
 			},
-			secrets: []*corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "non-bootstrap-secret",
-						Annotations: map[string]string{
-							AuthorizedObjectAnnotation: "c-test",
-						},
-					},
-				},
-			},
 			want: false,
 		},
 	}
+	apimgmtv3.ClusterConditionPreBootstrapped.True(tests[2].cluster)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-			secretCache.EXPECT().List("fleet-default", labels.Everything()).Return(tt.secrets, nil)
-
-			got, err := ShouldPreBootstrap(secretCache, tt.cluster)
-			assert.NoError(t, err)
+			got := ShouldPreBootstrap(tt.cluster)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -861,30 +822,7 @@ func TestShouldPreBootstrapWhenClusterAlreadyPreBootstrapped(t *testing.T) {
 	}
 	apimgmtv3.ClusterConditionPreBootstrapped.True(cluster)
 
-	ctrl := gomock.NewController(t)
-	secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-	// No EXPECT — cache should not be called for already pre-bootstrapped clusters
-
-	got, err := ShouldPreBootstrap(secretCache, cluster)
-	assert.NoError(t, err)
-	assert.False(t, got)
-}
-
-func TestShouldPreBootstrapWhenSecretListFails(t *testing.T) {
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
-		Spec: apimgmtv3.ClusterSpec{
-			DisplayName:        "c-test",
-			FleetWorkspaceName: "fleet-default",
-		},
-	}
-
-	ctrl := gomock.NewController(t)
-	secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-	secretCache.EXPECT().List("fleet-default", labels.Everything()).Return(nil, errors.New("list failed"))
-
-	got, err := ShouldPreBootstrap(secretCache, cluster)
-	assert.Error(t, err)
+	got := ShouldPreBootstrap(cluster)
 	assert.False(t, got)
 }
 
