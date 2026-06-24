@@ -64,7 +64,7 @@ sources:
     dependson:
       - 'system-agent-release'
     spec:
-      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-amd64$" | awk ''{print $1}'''
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-amd64$" | cut -d " " -f1'
 
   system-agent-checksum-arm64:
     name: 'Get sha256 for rancher-system-agent-arm64 from {{ source "system-agent-release" }}'
@@ -72,7 +72,7 @@ sources:
     dependson:
       - 'system-agent-release'
     spec:
-      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-arm64$" | awk ''{print $1}'''
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-arm64$" | cut -d " " -f1'
 
   system-agent-checksum-install:
     name: 'Get sha256 for install.sh from {{ source "system-agent-release" }}'
@@ -80,7 +80,7 @@ sources:
     dependson:
       - 'system-agent-release'
     spec:
-      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " install.sh$" | awk ''{print $1}'''
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " install.sh$" | cut -d " " -f1'
 
   system-agent-checksum-uninstall:
     name: 'Get sha256 for system-agent-uninstall.sh from {{ source "system-agent-release" }}'
@@ -88,7 +88,7 @@ sources:
     dependson:
       - 'system-agent-release'
     spec:
-      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " system-agent-uninstall.sh$" | awk ''{print $1}'''
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " system-agent-uninstall.sh$" | cut -d " " -f1'
 
 conditions:
   check-dockerfile-wins-version:
