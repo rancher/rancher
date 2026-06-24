@@ -449,6 +449,9 @@ var (
 	ExpireSCIMTokensAfter = NewSetting("expire-scim-tokens-after", "720h") // 30 days
 
 	ImportedClusterDay2OpsEnabledDefault = NewSetting("imported-cluster-day2-ops-enabled", "true")
+
+	// ChartsImage is the image used for Rancher's `ClusterRepo` assets on downstream clusters.
+	ChartsImage = NewSetting("charts-image", buildconfig.DefaultChartsImage)
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
