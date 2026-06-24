@@ -20,7 +20,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/features"
 	kubenamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
@@ -68,7 +67,6 @@ var (
 	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
 	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	revisionReg                = regexp.MustCompile(`(revision=)[\d]+`)
-	testLabelReg               = regexp.MustCompile(`(labelSelector=test.cattle.io%2Fsteveapi%3D)[\w]+`)
 	projectTag                 = regexp.MustCompile(`(test-prj-[1-9])`)
 	namespaceTag               = regexp.MustCompile(`(test-ns-[1-9])`)
 	namespaceSecretManagerRole = rbacv1.Role{
@@ -741,401 +739,10 @@ type listTestType struct {
 	expectSummary  []clientv1.SteveAPISummaryItem
 }
 
-// TEST LIST
-var SQLOnlyListTests = []listTestType{
-	// user-a
-	{
-		description: "user:user-a,namespace:none,query:summary=metadata.namespace,metadata.name",
-		user:        "user-a",
-		namespace:   "",
-		query:       "summary=metadata.namespace,metadata.name",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-2"},
-			{"name": "test2", "namespace": "test-ns-2"},
-			{"name": "test3", "namespace": "test-ns-2"},
-			{"name": "test4", "namespace": "test-ns-2"},
-			{"name": "test5", "namespace": "test-ns-2"},
-			{"name": "test1", "namespace": "test-ns-3"},
-			{"name": "test2", "namespace": "test-ns-3"},
-			{"name": "test3", "namespace": "test-ns-3"},
-			{"name": "test4", "namespace": "test-ns-3"},
-			{"name": "test5", "namespace": "test-ns-3"},
-			{"name": "test1", "namespace": "test-ns-4"},
-			{"name": "test2", "namespace": "test-ns-4"},
-			{"name": "test3", "namespace": "test-ns-4"},
-			{"name": "test4", "namespace": "test-ns-4"},
-			{"name": "test5", "namespace": "test-ns-4"},
-			{"name": "test1", "namespace": "test-ns-5"},
-			{"name": "test2", "namespace": "test-ns-5"},
-			{"name": "test3", "namespace": "test-ns-5"},
-			{"name": "test4", "namespace": "test-ns-5"},
-			{"name": "test5", "namespace": "test-ns-5"},
-		},
-		expectSummary: []clientv1.SteveAPISummaryItem{
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.name",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"test1": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test2": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test3": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test4": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
-				},
-			},
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.namespace",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test-ns-3": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test-ns-4": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test-ns-5": clientv1.SteveSummaryWithBreakdown{Total: 5},
-				},
-			},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name",
-		user:        "user-a",
-		namespace:   "",
-		query:       "pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-2"},
-			{"name": "test2", "namespace": "test-ns-2"},
-			{"name": "test3", "namespace": "test-ns-2"},
-		},
-		expectSummary: []clientv1.SteveAPISummaryItem{
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.name",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"test1": clientv1.SteveSummaryWithBreakdown{Total: 2},
-					"test2": clientv1.SteveSummaryWithBreakdown{Total: 2},
-					"test3": clientv1.SteveSummaryWithBreakdown{Total: 2},
-					"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
-					"test5": clientv1.SteveSummaryWithBreakdown{Total: 1},
-				},
-			},
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.namespace",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
-					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 3},
-				},
-			},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name",
-		user:        "user-a",
-		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name",
-		expect: []map[string]string{
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test4"},
-		},
-		expectSummary: []clientv1.SteveAPISummaryItem{
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.name",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
-					"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
-				},
-			},
-		},
-	},
-	{
-		description: "user:user-a,namespace:test-ns-2,query:filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name",
-		user:        "user-a",
-		namespace:   "test-ns-2",
-		query:       "filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name",
-		expect: []map[string]string{
-			{"name": "test2", "namespace": "test-ns-2"},
-		},
-		expectSummary: []clientv1.SteveAPISummaryItem{
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.name",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"test2": clientv1.SteveSummaryWithBreakdown{Total: 1},
-				},
-			},
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.namespace",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 1},
-				},
-			},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:summary=metadata.state.name",
-		user:        "user-a",
-		namespace:   "none",
-		query:       "summary=metadata.state.name",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-2"},
-			{"name": "test2", "namespace": "test-ns-2"},
-			{"name": "test3", "namespace": "test-ns-2"},
-			{"name": "test4", "namespace": "test-ns-2"},
-			{"name": "test5", "namespace": "test-ns-2"},
-			{"name": "test1", "namespace": "test-ns-3"},
-			{"name": "test2", "namespace": "test-ns-3"},
-			{"name": "test3", "namespace": "test-ns-3"},
-			{"name": "test4", "namespace": "test-ns-3"},
-			{"name": "test5", "namespace": "test-ns-3"},
-			{"name": "test1", "namespace": "test-ns-4"},
-			{"name": "test2", "namespace": "test-ns-4"},
-			{"name": "test3", "namespace": "test-ns-4"},
-			{"name": "test4", "namespace": "test-ns-4"},
-			{"name": "test5", "namespace": "test-ns-4"},
-			{"name": "test1", "namespace": "test-ns-5"},
-			{"name": "test2", "namespace": "test-ns-5"},
-			{"name": "test3", "namespace": "test-ns-5"},
-			{"name": "test4", "namespace": "test-ns-5"},
-			{"name": "test5", "namespace": "test-ns-5"},
-		},
-		expectSummary: []clientv1.SteveAPISummaryItem{
-			clientv1.SteveAPISummaryItem{
-				Property: "metadata.state.name",
-				Counts: map[string]clientv1.SteveSummaryWithBreakdown{
-					"active": clientv1.SteveSummaryWithBreakdown{Total: 25},
-				},
-			},
-		},
-	},
-	{
-		// non-sql can't handle annotations and label fields that contain "."s because it splits on them
-		description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
-		user:        "user-a",
-		namespace:   "test-ns-2",
-		query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-2"},
-		},
-	},
-	{
-		// non-sql doesn't handle the '>' greater-than operator
-		description: "user:user-a,namespace:test-ns-1,query:filter=metadata.fields[2]>0&sort=metadata.fields[2]",
-		user:        "user-a",
-		namespace:   "test-ns-1",
-		query:       "filter=metadata.fields[2]>0&sort=metadata.fields[2]",
-		expect: []map[string]string{
-			{"name": "test3", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-		},
-	},
-}
-
-// TEST LIST
-var nonSQLListTests = []listTestType{
-	// user-a
-	{
-		description: "user:user-a,namespace:none,query:limit=8",
-		user:        "user-a",
-		namespace:   "",
-		query:       "limit=8",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-2"},
-			{"name": "test2", "namespace": "test-ns-2"},
-			{"name": "test3", "namespace": "test-ns-2"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:limit=8&continue=" + continueToken,
-		user:        "user-a",
-		namespace:   "",
-		query:       "limit=8&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-2"},
-			{"name": "test5", "namespace": "test-ns-2"},
-			{"name": "test1", "namespace": "test-ns-3"},
-			{"name": "test2", "namespace": "test-ns-3"},
-			{"name": "test3", "namespace": "test-ns-3"},
-			{"name": "test4", "namespace": "test-ns-3"},
-			{"name": "test5", "namespace": "test-ns-3"},
-			{"name": "test1", "namespace": "test-ns-4"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:test-ns-1,query:limit=3",
-		user:        "user-a",
-		namespace:   "test-ns-1",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
-		user:        "user-a",
-		namespace:   "test-ns-1",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20",
-		user:        "user-a",
-		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20",
-		// limit is applied BEFORE filter and pagesize, which is why not all test5 secrets appear in the result
-		expect: []map[string]string{
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test5"},
-			{"name": "test4"},
-			{"name": "test4"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
-		user:        "user-a",
-		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=2&revision=" + revisionNum + "&limit=20",
-		expect: []map[string]string{
-			{"name": "test4"},
-			{"name": "test4"},
-			{"name": "test3"},
-			{"name": "test3"},
-			{"name": "test3"},
-			{"name": "test3"},
-		},
-	},
-	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
-		user:        "user-a",
-		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&page=1&limit=20&continue=" + continueToken,
-		// the remaining chunk is all from test-ns-5
-		expect: []map[string]string{
-			{"name": "test5", "namespace": "test-ns-5"},
-			{"name": "test4", "namespace": "test-ns-5"},
-			{"name": "test3", "namespace": "test-ns-5"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:none,query:limit=3",
-		user:        "user-b",
-		namespace:   "",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:none,query:limit=3&continue=" + continueToken,
-		user:        "user-b",
-		namespace:   "",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:test-ns-1,query:limit=3",
-		user:        "user-b",
-		namespace:   "test-ns-1",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test3", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:test-ns-1,query:limit=3&continue=" + continueToken,
-		user:        "user-b",
-		namespace:   "test-ns-1",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test4", "namespace": "test-ns-1"},
-			{"name": "test5", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-b,namespace:test-ns-5,query:limit=3",
-		user:        "user-b",
-		namespace:   "test-ns-5",
-		query:       "limit=3",
-		expect:      []map[string]string{},
-	},
-	{
-		description: "user:user-c,namespace:none,query:limit=3",
-		user:        "user-c",
-		namespace:   "",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-			{"name": "test1", "namespace": "test-ns-2"},
-		},
-	},
-	{
-		description: "user:user-c,namespace:none,query:limit=3&continue=" + continueToken,
-		user:        "user-c",
-		namespace:   "",
-		query:       "limit=3&continue=" + continueToken,
-		expect: []map[string]string{
-			{"name": "test2", "namespace": "test-ns-2"},
-			{"name": "test1", "namespace": "test-ns-3"},
-			{"name": "test2", "namespace": "test-ns-3"},
-		},
-	},
-	{
-		description: "user:user-c,namespace:test-ns-1,query:limit=3",
-		user:        "user-c",
-		namespace:   "test-ns-1",
-		query:       "limit=3",
-		expect: []map[string]string{
-			{"name": "test1", "namespace": "test-ns-1"},
-			{"name": "test2", "namespace": "test-ns-1"},
-		},
-	},
-	{
-		description: "user:user-c,namespace:test-ns-5,query:limit=3",
-		user:        "user-c",
-		namespace:   "test-ns-5",
-		query:       "limit=3",
-		expect:      []map[string]string{},
-	},
-}
-
 func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
-	usingSQLCache := features.UISQLCache.Enabled()
+	usingSQLCache := true
 	relativeDateRx := regexp.MustCompile(`^(\d+[smhd])+$`)
 	containsNamespaceTag := regexp.MustCompile(`(%2Fsteveapi%5D~)[a-z]+`)
 	containsSortNamespace := regexp.MustCompile(`sort=.*metadata.namespace\b`)
@@ -1180,10 +787,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:labelSelector=test-label=2",
+			description: "user:user-a,namespace:none,query:filter=metadata.labels[test-label]=2",
 			user:        "user-a",
 			namespace:   "",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-2"},
@@ -1193,10 +800,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:test-ns-2,query:labelSelector=test-label=2",
+			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.labels[test-label]=2",
 			user:        "user-a",
 			namespace:   "test-ns-2",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-2"},
 			},
@@ -1228,10 +835,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-a,namespace:none,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1241,10 +848,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:fieldSelector=metadata.name=test1",
+			description: "user:user-a,namespace:none,query:filter=metadata.name=test1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test1", "namespace": "test-ns-2"},
@@ -1254,10 +861,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-a,namespace:test-ns-1,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-a",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1267,17 +874,17 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:test-ns-2,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-a",
 			namespace:   "test-ns-2",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-a,namespace:test-ns-1,query:fieldSelector=metadata.name=test1",
+			description: "user:user-a,namespace:test-ns-1,query:filter=metadata.name=test1",
 			user:        "user-a",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
@@ -1312,10 +919,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.name=test1,metadata.namespace=test-ns-1",
+			description: "user:user-a,namespace:none,query:filter=metadata.name=test1,metadata.namespace~test-ns-1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.name=test1,metadata.namespace=test-ns-1",
+			query:       "filter=metadata.name=test1,metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1329,10 +936,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1",
 			user:        "user-a",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1622,35 +1229,35 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:labelSelector=test-label=2",
+			description: "user:user-b,namespace:none,query:filter=metadata.labels[test-label]=2",
 			user:        "user-b",
 			namespace:   "",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-1,query:labelSelector=test-label=2",
+			description: "user:user-b,namespace:test-ns-1,query:filter=metadata.labels[test-label]=2",
 			user:        "user-b",
 			namespace:   "test-ns-1",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-2,query:labelSelector=test-label=2",
+			description: "user:user-b,namespace:test-ns-2,query:filter=metadata.labels[test-label]=2",
 			user:        "user-b",
 			namespace:   "test-ns-2",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-b,namespace:none,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1660,26 +1267,26 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:fieldSelector=metadata.namespace=test-ns-2",
+			description: "user:user-b,namespace:none,query:filter=metadata.namespace~test-ns-2",
 			user:        "user-b",
 			namespace:   "",
-			query:       "fieldSelector=metadata.namespace=test-ns-2",
+			query:       "filter=metadata.namespace~test-ns-2",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:fieldSelector=metadata.name=test1",
+			description: "user:user-b,namespace:none,query:filter=metadata.name=test1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-b,namespace:test-ns-1,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-b",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1689,33 +1296,33 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-2,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-b,namespace:test-ns-2,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-b",
 			namespace:   "test-ns-2",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-2",
+			description: "user:user-b,namespace:test-ns-1,query:filter=metadata.namespace~test-ns-2",
 			user:        "user-b",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.namespace=test-ns-2",
+			query:       "filter=metadata.namespace~test-ns-2",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-1,query:fieldSelector=metadata.name=test1",
+			description: "user:user-b,namespace:test-ns-1,query:filter=metadata.name=test1",
 			user:        "user-b",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-b,namespace:test-ns-2,query:fieldSelector=metadata.name=test1",
+			description: "user:user-b,namespace:test-ns-2,query:filter=metadata.name=test1",
 			user:        "user-b",
 			namespace:   "test-ns-2",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect:      []map[string]string{},
 		},
 		{
@@ -1744,10 +1351,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.name=test1,metadata.namespace=test-ns-1",
+			description: "user:user-b,namespace:none,query:filter=metadata.name=test1,metadata.namespace~test-ns-1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.name=test1,metadata.namespace=test-ns-1",
+			query:       "filter=metadata.name=test1,metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -1757,10 +1364,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
+			description: "user:user-b,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1",
 			user:        "user-b",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test3", "namespace": "test-ns-1"},
@@ -1967,10 +1574,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:labelSelector=test-label=2",
+			description: "user:user-c,namespace:none,query:filter=metadata.labels[test-label]=2",
 			user:        "user-c",
 			namespace:   "",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-2"},
@@ -1978,53 +1585,53 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-1,query:labelSelector=test-label=2",
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.labels[test-label]=2",
 			user:        "user-c",
 			namespace:   "test-ns-1",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-5,query:labelSelector=test-label=2",
+			description: "user:user-c,namespace:test-ns-5,query:filter=metadata.labels[test-label]=2",
 			user:        "user-c",
 			namespace:   "test-ns-5",
-			query:       "labelSelector=test-label=2",
+			query:       "filter=metadata.labels[test-label]=2",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:fieldSelector=metadata.namespace=test-ns-2",
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace~test-ns-2",
 			user:        "user-c",
 			namespace:   "",
-			query:       "fieldSelector=metadata.namespace=test-ns-2",
+			query:       "filter=metadata.namespace~test-ns-2",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-2"},
 				{"name": "test2", "namespace": "test-ns-2"},
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:fieldSelector=metadata.namespace=test-ns-5",
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace~test-ns-5",
 			user:        "user-c",
 			namespace:   "",
-			query:       "fieldSelector=metadata.namespace=test-ns-5",
+			query:       "filter=metadata.namespace~test-ns-5",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:fieldSelector=metadata.name=test1",
+			description: "user:user-c,namespace:none,query:filter=metadata.name=test1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test1", "namespace": "test-ns-2"},
@@ -2032,57 +1639,57 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:fieldSelector=metadata.name=test5",
+			description: "user:user-c,namespace:none,query:filter=metadata.name=test5",
 			user:        "user-c",
 			namespace:   "",
-			query:       "fieldSelector=metadata.name=test5",
+			query:       "filter=metadata.name=test5",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-c",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-2,query:fieldSelector=metadata.namespace=test-ns-1",
+			description: "user:user-c,namespace:test-ns-2,query:filter=metadata.namespace~test-ns-1",
 			user:        "user-c",
 			namespace:   "test-ns-2",
-			query:       "fieldSelector=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.namespace~test-ns-1",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-1,query:fieldSelector=metadata.namespace=test-ns-2",
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.namespace~test-ns-2",
 			user:        "user-c",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.namespace=test-ns-2",
+			query:       "filter=metadata.namespace~test-ns-2",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-1,query:fieldSelector=metadata.name=test1",
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.name=test1",
 			user:        "user-c",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 			},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-5,query:fieldSelector=metadata.name=test1",
+			description: "user:user-c,namespace:test-ns-5,query:filter=metadata.name=test1",
 			user:        "user-c",
 			namespace:   "test-ns-5",
-			query:       "fieldSelector=metadata.name=test1",
+			query:       "filter=metadata.name=test1",
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:test-ns-1,query:fieldSelector=metadata.name=test5",
+			description: "user:user-c,namespace:test-ns-1,query:filter=metadata.name=test5",
 			user:        "user-c",
 			namespace:   "test-ns-1",
-			query:       "fieldSelector=metadata.name=test5",
+			query:       "filter=metadata.name=test5",
 			expect:      []map[string]string{},
 		},
 		{
@@ -2113,10 +1720,10 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.name=test1,metadata.namespace=test-ns-1",
+			description: "user:user-c,namespace:none,query:filter=metadata.name=test1,metadata.namespace~test-ns-1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.name=test1,metadata.namespace=test-ns-1",
+			query:       "filter=metadata.name=test1,metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-1"},
 				{"name": "test2", "namespace": "test-ns-1"},
@@ -2136,10 +1743,10 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
+			description: "user:user-c,namespace:none,query:filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace=test-ns-1",
+			query:       "filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-1"},
 			},
@@ -2287,19 +1894,19 @@ func (s *steveAPITestSuite) TestList() {
 			expect:      []map[string]string{},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.namespace=test-ns-3&sort=-metadata.name&pagesize=1",
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace~test-ns-3&sort=-metadata.name&pagesize=1",
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.namespace=test-ns-3&sort=-metadata.name&pagesize=1",
+			query:       "filter=metadata.namespace~test-ns-3&sort=-metadata.name&pagesize=1",
 			expect: []map[string]string{
 				{"name": "test2", "namespace": "test-ns-3"},
 			},
 		},
 		{
-			description: "user:user-c,namespace:none,query:filter=metadata.namespace=test-ns-3&sort=-metadata.name&pagesize=1&page=2&revision=" + revisionNum,
+			description: "user:user-c,namespace:none,query:filter=metadata.namespace~test-ns-3&sort=-metadata.name&pagesize=1&page=2&revision=" + revisionNum,
 			user:        "user-c",
 			namespace:   "",
-			query:       "filter=metadata.namespace=test-ns-3&sort=-metadata.name&pagesize=1&page=2&revision=" + revisionNum,
+			query:       "filter=metadata.namespace~test-ns-3&sort=-metadata.name&pagesize=1&page=2&revision=" + revisionNum,
 			expect: []map[string]string{
 				{"name": "test1", "namespace": "test-ns-3"},
 			},
@@ -2864,45 +2471,207 @@ func (s *steveAPITestSuite) TestList() {
 			query:       "projectsornamespaces!=test-prj-1,test-ns-2,test-ns-8",
 			expect:      []map[string]string{},
 		},
-	}
-	if !usingSQLCache {
-		tests = append(tests, nonSQLListTests...)
-	} else {
-		tests = append(tests, SQLOnlyListTests...)
-		// map labelSelector and fieldSelector params to the VAI equivalents
-		// ensure metadata.namespace tests are doing partial matching because
-		// the actual namespaces are given an `auto` prefix and a random suffix
-		for i, test := range tests {
-			query := test.query
-			parts := strings.Split(query, "&")
-			changed := false
-			for j, part := range parts {
-				subparts := strings.Split(part, "=")
-				if subparts[0] == "labelSelector" {
-					parts[j] = fmt.Sprintf("filter=metadata.labels[%s]=%s", subparts[1], subparts[2])
-					changed = true
-				} else if subparts[0] == "fieldSelector" {
-					op := "="
-					if subparts[1] == "metadata.namespace" {
-						// Use the partial-match operator because actual namespaces have a random prefix and suffix
-						op = "~"
-					}
-					parts[j] = fmt.Sprintf("filter=%s%s%s", subparts[1], op, subparts[2])
-					changed = true
-				} else if subparts[0] == "filter" {
-					if strings.Contains(part, "metadata.namespace=") {
-						// No need to break the filter down into sub-filters because in the test suite we don't
-						// have any VALUES that match 'metadata.namespace='
-						changed = true
-						parts[j] = strings.ReplaceAll(part, "metadata.namespace=", "metadata.namespace~")
-					}
-				}
-			}
-			if changed {
-				query = strings.Join(parts, "&")
-				tests[i].query = query
-			}
-		}
+		// These were the SQLOnlyListTests when VAI was optional
+		// user-a
+		{
+			description: "user:user-a,namespace:none,query:summary=metadata.namespace,metadata.name",
+			user:        "user-a",
+			namespace:   "",
+			query:       "summary=metadata.namespace,metadata.name",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+			},
+			expectSummary: []clientv1.SteveAPISummaryItem{
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.name",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"test1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test2": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test3": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test4": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					},
+				},
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.namespace",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test-ns-3": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test-ns-4": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test-ns-5": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					},
+				},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name",
+			user:        "user-a",
+			namespace:   "",
+			query:       "pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+			},
+			expectSummary: []clientv1.SteveAPISummaryItem{
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.name",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"test1": clientv1.SteveSummaryWithBreakdown{Total: 2},
+						"test2": clientv1.SteveSummaryWithBreakdown{Total: 2},
+						"test3": clientv1.SteveSummaryWithBreakdown{Total: 2},
+						"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
+						"test5": clientv1.SteveSummaryWithBreakdown{Total: 1},
+					},
+				},
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.namespace",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"test-ns-1": clientv1.SteveSummaryWithBreakdown{Total: 5},
+						"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 3},
+					},
+				},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name",
+			user:        "user-a",
+			namespace:   "",
+			query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name",
+			expect: []map[string]string{
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test5"},
+				{"name": "test4"},
+			},
+			expectSummary: []clientv1.SteveAPISummaryItem{
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.name",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"test4": clientv1.SteveSummaryWithBreakdown{Total: 1},
+						"test5": clientv1.SteveSummaryWithBreakdown{Total: 5},
+					},
+				},
+			},
+		},
+		{
+			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name",
+			user:        "user-a",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name",
+			expect: []map[string]string{
+				{"name": "test2", "namespace": "test-ns-2"},
+			},
+			expectSummary: []clientv1.SteveAPISummaryItem{
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.name",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"test2": clientv1.SteveSummaryWithBreakdown{Total: 1},
+					},
+				},
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.namespace",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"test-ns-2": clientv1.SteveSummaryWithBreakdown{Total: 1},
+					},
+				},
+			},
+		},
+		{
+			description: "user:user-a,namespace:none,query:summary=metadata.state.name",
+			user:        "user-a",
+			namespace:   "none",
+			query:       "summary=metadata.state.name",
+			expect: []map[string]string{
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test4", "namespace": "test-ns-1"},
+				{"name": "test5", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-2"},
+				{"name": "test2", "namespace": "test-ns-2"},
+				{"name": "test3", "namespace": "test-ns-2"},
+				{"name": "test4", "namespace": "test-ns-2"},
+				{"name": "test5", "namespace": "test-ns-2"},
+				{"name": "test1", "namespace": "test-ns-3"},
+				{"name": "test2", "namespace": "test-ns-3"},
+				{"name": "test3", "namespace": "test-ns-3"},
+				{"name": "test4", "namespace": "test-ns-3"},
+				{"name": "test5", "namespace": "test-ns-3"},
+				{"name": "test1", "namespace": "test-ns-4"},
+				{"name": "test2", "namespace": "test-ns-4"},
+				{"name": "test3", "namespace": "test-ns-4"},
+				{"name": "test4", "namespace": "test-ns-4"},
+				{"name": "test5", "namespace": "test-ns-4"},
+				{"name": "test1", "namespace": "test-ns-5"},
+				{"name": "test2", "namespace": "test-ns-5"},
+				{"name": "test3", "namespace": "test-ns-5"},
+				{"name": "test4", "namespace": "test-ns-5"},
+				{"name": "test5", "namespace": "test-ns-5"},
+			},
+			expectSummary: []clientv1.SteveAPISummaryItem{
+				clientv1.SteveAPISummaryItem{
+					Property: "metadata.state.name",
+					Counts: map[string]clientv1.SteveSummaryWithBreakdown{
+						"active": clientv1.SteveSummaryWithBreakdown{Total: 25},
+					},
+				},
+			},
+		},
+		{
+			// non-sql can't handle annotations and label fields that contain "."s because it splits on them
+			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+			user:        "user-a",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+			expect: []map[string]string{
+				{"name": "test4", "namespace": "test-ns-2"},
+			},
+		},
+		{
+			// non-sql doesn't handle the '>' greater-than operator
+			description: "user:user-a,namespace:test-ns-1,query:filter=metadata.fields[2]>0&sort=metadata.fields[2]",
+			user:        "user-a",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.fields[2]>0&sort=metadata.fields[2]",
+			expect: []map[string]string{
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
+			},
+		},
 	}
 
 	var csvWriter *csv.Writer
@@ -2940,13 +2709,6 @@ func (s *steveAPITestSuite) TestList() {
 			if _, ok := query["continue"]; ok {
 				query["continue"] = []string{s.lastContinueToken}
 			}
-			if fs, ok := query["fieldSelector"]; ok {
-				if strings.Contains(fs[0], "metadata.namespace") {
-					fieldParts := strings.Split(fs[0], "=")
-					ns := namespaceMap[fieldParts[1]]
-					query["fieldSelector"] = []string{"metadata.namespace=" + ns}
-				}
-			}
 			key := "projectsornamespaces"
 			projectsOrNamespaces, ok := query[key]
 			if !ok {
@@ -2973,8 +2735,6 @@ func (s *steveAPITestSuite) TestList() {
 			}
 			if usingSQLCache {
 				query["filter"] = append(query["filter"], fmt.Sprintf("metadata.labels[%s]~%s", steveAPITestLabel, testID))
-			} else {
-				query["labelSelector"] = append(query["labelSelector"], steveAPITestLabel+"="+testID)
 			}
 			secretList, err := secretClient.List(query)
 			require.NoError(s.T(), err)
@@ -3101,7 +2861,6 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 		if next, ok := pagination["next"].(string); ok {
 			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
 			next = revisionReg.ReplaceAllString(next, "${1}"+revisionNum)
-			next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
 			pagination["next"] = next
 			mapResp["pagination"] = pagination
 		}
