@@ -660,7 +660,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		// already some kind of api error
+		// wrapped api error
 		return nil, err
 	}
 
