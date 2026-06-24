@@ -853,13 +853,16 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 
 		var shouldUpdateAttr, shouldUpdateUser bool
 		for name, value := range fields {
+			if name == "" {
+				return false, false, NewError(http.StatusBadRequest, "empty attribute name in bulk operation")
+			}
 			updateAttr, updateUser, err := applyPatchUser(provider, attr, user, patchOp{
 				Op:    "replace",
 				Path:  name,
 				Value: value,
 			}, cfg)
 			if err != nil {
-				return false, false, fmt.Errorf("failed to apply replace operation: %v", err)
+				return false, false, fmt.Errorf("failed to apply %s operation: %w", op.Op, err)
 			}
 			if updateAttr {
 				shouldUpdateAttr = true

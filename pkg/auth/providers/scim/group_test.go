@@ -705,6 +705,44 @@ func TestApplyPatchGroup(t *testing.T) {
 		require.Error(t, err)
 		assert.False(t, updated)
 	})
+
+	t.Run("rejects empty attribute name in bulk", func(t *testing.T) {
+		group := &v3.Group{}
+		op := patchOp{
+			Op:   "add",
+			Path: "",
+			Value: map[string]any{
+				"": "value",
+			},
+		}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		var scimErr *Error
+		require.ErrorAs(t, err, &scimErr)
+		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
+	})
+
+	t.Run("bulk wraps inner SCIM error so callers can extract scimType", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Old Name"}
+		op := patchOp{
+			Op:   "add",
+			Path: "",
+			Value: map[string]any{
+				"displayName": "New Name",
+			},
+		}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		var scimErr *Error
+		require.ErrorAs(t, err, &scimErr)
+		assert.Equal(t, "mutability", scimErr.ScimType)
+	})
 }
 
 func TestExtractMemberValueFromPath(t *testing.T) {
@@ -2186,17 +2224,10 @@ func TestCreateGroup(t *testing.T) {
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		groupsCache.EXPECT().Get("grp-existing").Return(existingGroup, nil)
 
-		// When ID is provided and exists, ensureRancherGroup updates externalId if it
-		// differs, then returns created=false, which triggers a 409 Conflict.
-		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
-		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
-			assert.Equal(t, "new-ext-id", g.ExternalID)
-			return g, nil
-		})
-
+		// When ID is provided and the group exists, CreateGroup returns 409 Conflict
+		// without persisting any change. The mutability-gated update belongs to UpdateGroup.
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			groups:      groupClient,
 			getConfig:   testDefaultGetConfig,
 		}
 
@@ -2232,17 +2263,10 @@ func TestCreateGroup(t *testing.T) {
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{existingGroup}, nil)
 
-		// When found by displayName with different externalId, the group is updated
-		// but created=false is returned, which triggers a 409 Conflict.
-		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
-		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
-			assert.Equal(t, "new-ext-id", g.ExternalID)
-			return g, nil
-		})
-
+		// When a group with the same displayName already exists, CreateGroup returns
+		// 409 Conflict without mutating the existing group's externalId.
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			groups:      groupClient,
 			getConfig:   testDefaultGetConfig,
 		}
 

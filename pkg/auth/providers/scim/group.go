@@ -195,12 +195,8 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	group, created, err := s.ensureRancherGroup(provider, payload, cfg)
+	group, created, err := s.ensureRancherGroup(provider, payload)
 	if err != nil {
-		if scimErr, ok := err.(*Error); ok {
-			writeError(w, scimErr)
-			return
-		}
 		logrus.Errorf("scim::CreateGroup: failed to ensure rancher group: %s", err)
 		writeError(w, NewInternalError())
 		return
@@ -348,25 +344,29 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 
 	cfg := s.getConfig(provider)
 
-	group, _, err := s.ensureRancherGroup(provider, payload, cfg)
+	group, err := s.groupsCache.Get(id)
 	if err != nil {
-		if scimErr, ok := err.(*Error); ok {
-			writeError(w, scimErr)
+		if apierrors.IsNotFound(err) {
+			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
 			return
 		}
-
-		logrus.Errorf("scim::UpdateGroup: failed to ensure rancher group %s: %s", id, err)
+		logrus.Errorf("scim::UpdateGroup: failed to get group %s: %s", id, err)
 		writeError(w, NewInternalError())
 		return
 	}
 
-	// Update DisplayName if it changed (only when externalId is the group ID).
-	if group.DisplayName != payload.DisplayName {
-		if cfg.GroupIDAttribute != GroupIDExternalID {
-			writeError(w, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier"))
-			return
-		}
+	if group.ExternalID != payload.ExternalID && cfg.GroupIDAttribute == GroupIDExternalID {
+		writeError(w, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the group principal identifier", "mutability"))
+		return
+	}
+	if group.DisplayName != payload.DisplayName && cfg.GroupIDAttribute != GroupIDExternalID {
+		writeError(w, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier", "mutability"))
+		return
+	}
+
+	if group.ExternalID != payload.ExternalID || group.DisplayName != payload.DisplayName {
 		group = group.DeepCopy()
+		group.ExternalID = payload.ExternalID
 		group.DisplayName = payload.DisplayName
 		group, err = s.groups.Update(group)
 		if err != nil {
@@ -937,7 +937,7 @@ func (s *SCIMServer) removeAllGroupMembers(provider, principalName string) error
 
 // ensureRancherGroup ensures that a Rancher group exists for the given SCIM group.
 // Returns the group, a boolean indicating if a new group was created, and any error.
-func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup, cfg providerConfig) (*v3.Group, bool, error) {
+func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Group, bool, error) {
 	var (
 		group *v3.Group
 		err   error
@@ -964,25 +964,9 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup, cfg prov
 	}
 
 	if group != nil {
-		// Found existing group - update if needed and return created=false.
-		var shouldUpdate bool
-		group = group.DeepCopy()
-
-		if group.ExternalID != grp.ExternalID {
-			if cfg.GroupIDAttribute == GroupIDExternalID {
-				return nil, false, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the group principal identifier", "mutability")
-			}
-			group.ExternalID = grp.ExternalID
-			shouldUpdate = true
-		}
-
-		if shouldUpdate {
-			group, err = s.groups.Update(group)
-			if err != nil {
-				return nil, false, fmt.Errorf("failed to update group %s: %w", group.Name, err)
-			}
-		}
-
+		// Found existing group - return as-is and let the caller decide what to do.
+		// CreateGroup treats created=false as a conflict; UpdateGroup applies its own
+		// mutability-gated updates inline rather than calling this helper.
 		return group, false, nil
 	}
 
@@ -1015,13 +999,16 @@ func applyPatchGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, err
 
 		var updated bool
 		for name, value := range fields {
+			if name == "" {
+				return false, NewError(http.StatusBadRequest, "empty attribute name in bulk operation")
+			}
 			wasUpdated, err := applyPatchGroup(group, patchOp{
 				Op:    op.Op,
 				Path:  name,
 				Value: value,
 			}, cfg)
 			if err != nil {
-				return false, fmt.Errorf("failed to apply %s operation: %v", op.Op, err)
+				return false, fmt.Errorf("failed to apply %s operation: %w", op.Op, err)
 			}
 			if wasUpdated {
 				updated = true
