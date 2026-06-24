@@ -1589,6 +1589,59 @@ func TestUpdateUser(t *testing.T) {
 		assert.Equal(t, "mutability", resp.ScimType)
 	})
 
+	t.Run("rejects externalId change with externalId config", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"old-ext-id"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"externalId": "new-ext-id",
+			"active": true
+		}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Detail, "cannot be changed")
+		assert.Equal(t, "mutability", resp.ScimType)
+	})
+
 	t.Run("deactivates user", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
@@ -2859,6 +2912,149 @@ func TestPatchUser(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, "mutability", resp.ScimType)
+	})
+
+	t.Run("allows userName no-op in default mode", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"john.doe"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "userName", "value": "john.doe"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("rejects externalId change in externalId mode", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"old-ext-id"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "Add", "path": "externalId", "value": "new-ext-id"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Detail, "cannot be changed")
+		assert.Equal(t, "mutability", resp.ScimType)
+	})
+
+	t.Run("allows externalId no-op in externalId mode", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"same-ext-id"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "Add", "path": "externalId", "value": "same-ext-id"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "same-ext-id", resp["externalId"])
 	})
 
 	t.Run("no update when value unchanged", func(t *testing.T) {
