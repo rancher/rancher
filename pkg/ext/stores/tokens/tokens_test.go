@@ -166,6 +166,7 @@ var (
 	errInvalidContext      = fmt.Errorf("context has no user info")
 
 	bogusNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
+	sessionNotFoundError    = apierrors.NewNotFound(GVR.GroupResource(), "session-token")
 	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
 	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
@@ -1150,9 +1151,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  fmt.Errorf("unable to fetch token session-token: %w",
-				apierrors.NewInternalError(
-					fmt.Errorf("failed to retrieve token session-token: %w", errSomeError))),
+			err:  fmt.Errorf("unable to fetch token session-token: %w", sessionNotFoundError),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1173,13 +1172,13 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(&mockUser{name: "world"}, false, true, nil)
 
-				// fail fetch of session token, v3 and ext, internal error
+				// fail fetch of session token, v3 and ext, neither is found
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").
-					Return(nil, errSomeError)
+					Return(nil, sessionNotFoundError)
 				scache.EXPECT().Get("cattle-tokens", "session-token").
-					Return(nil, errSomeError)
+					Return(nil, sessionNotFoundError)
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
@@ -1187,7 +1186,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error, not found",
-			err:  fmt.Errorf("unable to fetch token session-token: %w",
+			err: fmt.Errorf("unable to fetch token session-token: %w",
 				apierrors.NewNotFound(GVR.GroupResource(), "session-token")),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{

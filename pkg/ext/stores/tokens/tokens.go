@@ -1349,17 +1349,23 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
 	// cache.
-	if v3token, err := t.v3TokenClient.Get(tokenID); err == nil {
+	v3token, errV3 := t.v3TokenClient.Get(tokenID)
+	if errV3 == nil {
 		return v3token, nil
+	}
+	if !apierrors.IsNotFound(errV3) {
+		// report transient/internal v3 errors
+		// as we cannot be sure about resource state
+		return nil, errV3
 	}
 
 	// not a v3 Token, now check for ext token
-	ext, err := t.Get(tokenID, "", &metav1.GetOptions{})
-	if err == nil {
+	ext, errExt := t.Get(tokenID, "", &metav1.GetOptions{})
+	if errExt == nil {
 		return ext, nil
 	}
 	// %w wraps the error, still testable for various API errors
-	return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
+	return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, errExt)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from
