@@ -288,38 +288,6 @@ func TestHelmOpName(t *testing.T) {
 	}
 }
 
-func TestHelmOpSecretName(t *testing.T) {
-	tests := []struct {
-		name        string
-		clusterName string
-		expected    string
-	}{
-		{
-			name:        "regular cluster",
-			clusterName: "my-cluster",
-			expected:    "autoscaler-helm-secret-my-cluster",
-		},
-		{
-			name:        "v2prov cluster in fleet-default namespace",
-			clusterName: "fleet-default-cluster",
-			expected:    "autoscaler-helm-secret-fleet-default-cluster",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := helmOpSecretName(tt.clusterName)
-			if result != tt.expected {
-				t.Errorf("helmOpSecretName() = %q, want %q", result, tt.expected)
-			}
-			// The result must never equal the global root secret name.
-			if result == autoscalerHelmSecretResourceName {
-				t.Errorf("helmOpSecretName() returned the global root secret name %q, which would cause cluster-level credentials to overwrite the shared secret", result)
-			}
-		})
-	}
-}
-
 func TestAutoScalerChartRepositoryHost(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -10,6 +10,7 @@ import (
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -599,6 +600,61 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyNamespace() 
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has empty namespace")
+}
+
+func (s *autoscalerSuite) TestManageHelmOpSecrets_GSDREqualsChartHost_ClusterHasOwnSDR() {
+	const (
+		chartHost      = "charts.example.com"
+		chartRepo      = "https://charts.example.com/helm/charts"
+		pullSecretName = "autoscaler-pull-secret"
+		clusterName    = "test-cluster"
+		clusterNS      = "fleet-default"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepo,
+		settings.SystemDefaultRegistry:            chartHost,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNS},
+	}
+	capiCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNS},
+	}
+	s.clusterCache.EXPECT().Get(clusterNS, clusterName).Return(provCluster, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+
+	s.secretClient.EXPECT().Delete(clusterNS, helmOpSecretName(clusterName), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(clusterNS, autoscalerClusterScopedImagePullSecretName(clusterName), gomock.Any()).Return(notFound)
+
+	pullSecretData, err := dockerConfigSecretData(chartHost, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(sec *corev1.Secret) (*corev1.Secret, error) {
+		return sec, nil
+	})
+
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(sec *corev1.Secret) (*corev1.Secret, error) {
+		return sec, nil
+	})
+
+	helmOpSec, imagePullSec, err := s.h.manageHelmOpSecrets(capiCluster)
+	s.NoError(err)
+	s.Equal(autoscalerHelmSecretResourceName, helmOpSec)
+	s.Equal(autoscalerChartImagePullSecretName, imagePullSec,
+		"root image pull secret must be propagated even when GSDR equals the autoscaler chart host, "+
+			"because clusters with their own SDR do not get GSDR credentials in their containerd config")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters() {
