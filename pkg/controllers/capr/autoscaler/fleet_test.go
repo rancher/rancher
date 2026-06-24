@@ -176,7 +176,7 @@ func (s *autoscalerSuite) expectManageHelmOpSecrets(clusterName, clusterNamespac
 
 	notFound := errors.NewNotFound(schema.GroupResource{}, "")
 	// cleanupClusterScopedSecrets
-	s.secretClient.EXPECT().Delete(clusterNamespace, helmOpSecretName(clusterName, clusterNamespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(clusterNamespace, helmOpSecretName(clusterName), gomock.Any()).Return(notFound)
 	s.secretClient.EXPECT().Delete(clusterNamespace, autoscalerClusterScopedImagePullSecretName(clusterName), gomock.Any()).Return(notFound)
 	// ensureRootHelmOpSecrets — no global registry → attempt to delete both root secrets
 	s.secretClient.EXPECT().Delete("fleet-default", autoscalerHelmSecretResourceName, gomock.Any()).Return(notFound)
@@ -472,7 +472,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_CleansClusterScopedSecrets(
 	// HelmOp does not exist, so only cluster-scoped secret cleanup should run.
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
 	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
-	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(notFound)
 	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(notFound)
 
 	err := s.h.cleanupFleet(cluster)
@@ -544,7 +544,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCleanupClusterScopedSec
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
 	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
-	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(cleanupError)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(cleanupError)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err, "Expected error when cluster-scoped secret cleanup fails")
@@ -568,7 +568,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteClusterScopedImag
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
 	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
-	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(notFound)
 	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(cleanupError)
 
 	err := s.h.cleanupFleet(cluster)

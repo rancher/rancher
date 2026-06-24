@@ -908,7 +908,7 @@ func (s *autoscalerSuite) TestCheckAndRenewTokens_MultipleTokensOnlyOneNotExpiri
 		&provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster-1", Namespace: "default"}}, nil,
 	).Times(2)
 	notFound := errors.NewNotFound(schema.GroupResource{}, "")
-	s.secretClient.EXPECT().Delete("default", helmOpSecretName("cluster-1", "default"), gomock.Any()).Return(notFound).Times(2)
+	s.secretClient.EXPECT().Delete("default", helmOpSecretName("cluster-1"), gomock.Any()).Return(notFound).Times(2)
 	s.secretClient.EXPECT().Delete("default", autoscalerClusterScopedImagePullSecretName("cluster-1"), gomock.Any()).Return(notFound).Times(2)
 	s.secretClient.EXPECT().Delete("fleet-default", autoscalerHelmSecretResourceName, gomock.Any()).Return(notFound).Times(2)
 	s.secretClient.EXPECT().Delete("fleet-default", autoscalerChartImagePullSecretName, gomock.Any()).Return(notFound).Times(2)
