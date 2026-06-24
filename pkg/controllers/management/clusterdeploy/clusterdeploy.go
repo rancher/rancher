@@ -43,8 +43,18 @@ import (
 )
 
 const (
-	AgentForceDeployAnn = "io.cattle.agent.force.deploy"
-	clusterImage        = "clusterImage"
+	AgentForceDeployAnn                  = "io.cattle.agent.force.deploy"
+	clusterImage                         = "clusterImage"
+	clusterAgentNamespace                = "cattle-system"
+	clusterAgentDeploymentName           = "cattle-cluster-agent"
+	bootstrapClusterAgentDeploymentName  = "cattle-cluster-agent-bootstrap"
+	preBootstrapEnvVarName               = "CATTLE_PREBOOTSTRAP"
+	bootstrapAgentDeploymentManifestYAML = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cattle-cluster-agent-bootstrap
+  namespace: cattle-system
+`
 )
 
 var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
@@ -236,7 +246,25 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	return false
 }
 
-func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
+func desiredAppliedAgentEnvVars(cluster *apimgmtv3.Cluster, prebootstrap bool) []corev1.EnvVar {
+	envVars := append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
+	if prebootstrap {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  preBootstrapEnvVarName,
+			Value: "true",
+		})
+	}
+	return envVars
+}
+
+func clusterAgentDeployment(prebootstrap bool) string {
+	if prebootstrap {
+		return bootstrapClusterAgentDeploymentName
+	}
+	return clusterAgentDeploymentName
+}
+
+func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint, prebootstrap bool) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
 	if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
@@ -278,8 +306,9 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
-	if !reflect.DeepEqual(append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...), cluster.Status.AppliedAgentEnvVars) {
-		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedAgentEnvVars, cluster.Spec.AgentEnvVars)
+	desiredEnvVars := desiredAppliedAgentEnvVars(cluster, prebootstrap)
+	if !reflect.DeepEqual(desiredEnvVars, cluster.Status.AppliedAgentEnvVars) {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedAgentEnvVars, desiredEnvVars)
 		return true
 	}
 
@@ -534,7 +563,12 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
-	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
+	prebootstrap, err := capr.ShouldPreBootstrap(cd.secretLister, cluster)
+	if err != nil {
+		return err
+	}
+
+	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, prebootstrap)
 	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated || hashChanged
 	if !agentManifestChanged && !pcChanged {
 		return nil
@@ -556,10 +590,11 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	// In this case we need to manually roll out the deployment. The only exception to this is if the PC is
 	// being created for the first time or removed, at which point the reference needs to be updated.
 	if !agentManifestChanged {
-		logrus.Debugf("clusterDeploy: deployAgent: restarting rollout of cattle-cluster-agent deployment to apply updated priority class value")
-		output, err := kubectl.RestartRolloutWithNamespace("cattle-system", "deployment/cattle-cluster-agent", kubeConfig)
+		deploymentName := clusterAgentDeployment(prebootstrap)
+		logrus.Debugf("clusterDeploy: deployAgent: restarting rollout of %s deployment to apply updated priority class value", deploymentName)
+		output, err := kubectl.RestartRolloutWithNamespace(clusterAgentNamespace, fmt.Sprintf("deployment/%s", deploymentName), kubeConfig)
 		if err != nil {
-			logrus.Errorf("clusterDeploy: failed to rollout cattle-cluster-agent deployment: %s: %v", output, err)
+			logrus.Errorf("clusterDeploy: failed to rollout %s deployment: %s: %v", deploymentName, output, err)
 			return err
 		}
 		util.UpdateAppliedAgentDeploymentCustomization(cluster)
@@ -580,7 +615,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	}
 
 	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, pcExists)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, pcExists, prebootstrap)
 		if err != nil {
 			return cluster, err
 		}
@@ -614,6 +649,18 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
+
+		if !prebootstrap {
+			output, err = kubectl.Delete([]byte(bootstrapAgentDeploymentManifestYAML), kubeConfig)
+			if err != nil {
+				logrus.Tracef("Output from kubectl delete %s deployment, output: %s, err: %v", bootstrapClusterAgentDeploymentName, string(output), err)
+				bootstrapDeploymentNotFoundError := fmt.Sprintf("\"%s\" not found", bootstrapClusterAgentDeploymentName)
+				if !strings.Contains(string(output), bootstrapDeploymentNotFoundError) {
+					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
+				}
+				logrus.Debugf("Ignored '%s' error during delete %s deployment", bootstrapDeploymentNotFoundError, bootstrapClusterAgentDeploymentName)
+			}
+		}
 		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
@@ -637,7 +684,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		cluster.Annotations[AgentForceDeployAnn] = "false"
 	}
 
-	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
+	cluster.Status.AppliedAgentEnvVars = desiredAppliedAgentEnvVars(cluster, prebootstrap)
 	cluster.Status.AppliedClusterAgentImagePullSecretsHash = pullSecretHash
 
 	util.UpdateAppliedAgentDeploymentCustomization(cluster)
@@ -662,7 +709,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *apimgmtv3.Cluster) (*clientcmdap
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, priorityClassExists bool) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, priorityClassExists bool, prebootstrap bool) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
@@ -677,11 +724,6 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 	if url == "" {
 		cd.clusters.Controller().EnqueueAfter("", cluster.Name, time.Second)
 		return nil, fmt.Errorf("waiting for server-url setting to be set")
-	}
-
-	prebootstrap, err := capr.ShouldPreBootstrap(cd.secretLister, cluster)
-	if err != nil {
-		return nil, err
 	}
 
 	ops := &systemtemplate.TemplateOps{

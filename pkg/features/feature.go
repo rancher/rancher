@@ -138,7 +138,7 @@ var (
 		"provisioningprebootstrap",
 		"Support running pre-bootstrap workloads on downstream clusters",
 		true,
-		false,
+		true,
 		true)
 	CleanStaleSecrets = newFeature(
 		"clean-stale-secrets",
