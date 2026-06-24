@@ -374,17 +374,32 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, ErrMustAuthenticate
 		}
 
-		obj, exists, err := a.tokenIndexer.GetByKey(claims.Token)
-		if err != nil || !exists {
-			logrus.Errorf("Unknown token in OAuth Token: %s", claims.Token)
-			return nil, ErrMustAuthenticate
+		if extTokenName, found := strings.CutPrefix(claims.Token, "ext/"); found {
+			// Detected ext token in OIDC session. Perform the same
+			// process as for legacy tokens, using a different store.
+			token, err := a.extTokenStore.Get(extTokenName, "", &metav1.GetOptions{})
+			if err != nil {
+				logrus.Errorf("Unknown ext token in OAuth Token: %s", claims.Token)
+				return nil, ErrMustAuthenticate
+			}
+
+			tokenName, tokenKey = token.GetFullName(), token.Status.Hash
+			logrus.Debug("Parsed (ext) tokenName and TokenKey from JWT")
+		} else {
+			// Falling back to legacy token
+			obj, exists, err := a.tokenIndexer.GetByKey(claims.Token)
+			if err != nil || !exists {
+				logrus.Errorf("Unknown token in OAuth Token: %s", claims.Token)
+				return nil, ErrMustAuthenticate
+			}
+
+			token := obj.(*apiv3.Token)
+
+			tokenName, tokenKey = token.Name, token.Token
+			logrus.Debug("Parsed tokenName and TokenKey from JWT")
 		}
 
-		token := obj.(*apiv3.Token)
-
 		tokenClaims = claims
-		tokenName, tokenKey = token.Name, token.Token
-		logrus.Debug("Parsed tokenName and TokenKey from JWT")
 	}
 
 	logrus.Debugf("TokenFromRequest: Using tokenName %q", tokenName)
