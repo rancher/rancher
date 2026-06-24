@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -205,9 +204,9 @@ func TestStoreUpdate(t *testing.T) {
 
 				gomock.InOrder(
 					userCache.EXPECT().Get(user.Name).Return(user, nil),
-					tokenCache.EXPECT().Get(tokenID).Return(nil, fmt.Errorf("some error")),
+					tokenCache.EXPECT().Get(tokenID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenID)),
 					secretCache.EXPECT().Get(exttokens.TokenNamespace, tokenID).Return(&secret, nil),
-					tokenCache.EXPECT().Get(tokenID).Return(nil, fmt.Errorf("some error")),
+					tokenCache.EXPECT().Get(tokenID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenID)),
 					secretCache.EXPECT().Get(exttokens.TokenNamespace, tokenID).Return(&secret, nil),
 					secrets.EXPECT().Patch(exttokens.TokenNamespace, tokenID, types.JSONPatchType, gomock.Any()).Return(patchedSecret, nil),
 				)
@@ -613,7 +612,8 @@ func TestStoreGet(t *testing.T) {
 					},
 				}
 
-				tokenCache.EXPECT().Get(gomock.Any()).Return(nil, fmt.Errorf("some error")).AnyTimes()
+				tokenCache.EXPECT().Get(gomock.Any()).
+					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenID)).AnyTimes()
 				secretCache.EXPECT().Get(exttokens.TokenNamespace, gomock.Any()).Return(&secret, nil).AnyTimes()
 			},
 			want:    wantUserActivity,
