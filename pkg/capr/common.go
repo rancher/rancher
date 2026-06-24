@@ -29,11 +29,9 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/summary"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -80,8 +78,6 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
-	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
-	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
 
 	SnapshotNameAnnotation = "etcdsnapshot.rke.io/snapshot-name"
@@ -676,50 +672,19 @@ func SafeConcatName(maxLength int, name ...string) string {
 	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
 }
 
-// SecretLister is a minimal interface for listing secrets in order to be compatible with core controllers, norman, etc
-type SecretLister interface {
-	List(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
-}
-
 // ShouldPreBootstrap determines whether the given cluster should enter the pre-bootstrap flow.
-// It checks whether the cluster has already been pre-bootstrapped, and whether there are any authorized
-// sync-bootstrap secrets for this cluster.
-func ShouldPreBootstrap(secretLister SecretLister, cluster *v3.Cluster) (bool, error) {
+// Until the cluster is marked pre-bootstrapped, always run the flow so every pre-bootstrap controller
+// gets a chance to do its work.
+func ShouldPreBootstrap(cluster *v3.Cluster) bool {
 	if v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
-		return false, nil
+		return false
 	}
 
 	if cluster.Spec.FleetWorkspaceName == "" {
-		return false, nil
+		return false
 	}
 
-	// The bootstrap gate is annotation-based (`provisioning.cattle.io/sync-bootstrap=true`), so we must list
-	// and inspect secrets in-memory because annotation selectors are not supported by the Kubernetes API.
-	secrets, err := secretLister.List(cluster.Spec.FleetWorkspaceName, labels.Everything())
-	if err != nil {
-		return false, fmt.Errorf("failed to list secrets in namespace %s for cluster %s: %w", cluster.Spec.FleetWorkspaceName, cluster.Name, err)
-	}
-
-	for _, secret := range secrets {
-		if secret.Annotations == nil {
-			continue
-		}
-
-		if secret.Annotations[SyncPreBootstrapAnnotation] != "true" {
-			continue
-		}
-
-		// Keep this aligned with managementuser/secret bootstrap sync authorization, which authorizes by
-		// management cluster display name.
-		if !ClusterAuthorizedForSecret(secret.Annotations[AuthorizedObjectAnnotation], cluster.Spec.DisplayName) {
-			continue
-		}
-
-		return true, nil
-	}
-
-	logrus.Debugf("[pre-bootstrap] no authorized sync-bootstrap secrets found for cluster %s, skipping pre-bootstrap flow", cluster.Name)
-	return false, nil
+	return true
 }
 
 // AuthorizedClusterNames returns the authorized cluster names from a comma-separated annotation value.

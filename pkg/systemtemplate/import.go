@@ -333,19 +333,15 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
 	status := util.GetAgentSchedulingCustomizationStatus(cluster)
 	pcExists := status != nil && status.PriorityClass != nil
-	prebootstrapping, err := capr.ShouldPreBootstrap(secretLister, cluster)
-	if err != nil {
-		return nil, fmt.Errorf("error checking for pre-bootstrap secrets: %w", err)
-	}
 
 	buf := &bytes.Buffer{}
-	err = SystemTemplate(buf, &TemplateOps{
+	err := SystemTemplate(buf, &TemplateOps{
 		AgentImage:     GetDesiredAgentImage(cluster),
 		AuthImage:      GetDesiredAuthImage(cluster),
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            settings.ServerURL.Get(),
-		IsPreBootstrap: prebootstrapping,
+		IsPreBootstrap: capr.ShouldPreBootstrap(cluster),
 		Cluster:        cluster,
 		AgentFeatures:  GetDesiredFeatures(cluster),
 		Taints:         taints,

@@ -652,7 +652,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			url:            "https://rancher.example.com",
 			isPreBootstrap: true,
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent-bootstrap": "7050b599b7fce1af3ce6a5165118ba749d3415b2e623d40477f46f8999c3d5a6",
+				"cattle-cluster-agent-bootstrap": "ca84e7f8afa1b9f1acf945b95cf215ce31b43625bb961f763178a56f37680c7d",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
