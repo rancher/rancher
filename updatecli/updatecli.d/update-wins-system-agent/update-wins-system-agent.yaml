@@ -58,6 +58,38 @@ sources:
       username: '{{ .scm.username }}'
       token: '{{ requiredEnv .scm.token }}'
 
+  system-agent-checksum-amd64:
+    name: 'Get sha256 for rancher-system-agent-amd64 from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-amd64$" | awk ''{print $1}'''
+
+  system-agent-checksum-arm64:
+    name: 'Get sha256 for rancher-system-agent-arm64 from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " rancher-system-agent-arm64$" | awk ''{print $1}'''
+
+  system-agent-checksum-install:
+    name: 'Get sha256 for install.sh from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " install.sh$" | awk ''{print $1}'''
+
+  system-agent-checksum-uninstall:
+    name: 'Get sha256 for system-agent-uninstall.sh from {{ source "system-agent-release" }}'
+    kind: shell
+    dependson:
+      - 'system-agent-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.system_agent.owner }}/{{ .repos.system_agent.repo }}/releases/download/{{ source "system-agent-release" }}/sha256sum.txt | grep " system-agent-uninstall.sh$" | awk ''{print $1}'''
+
 conditions:
   check-dockerfile-wins-version:
     name: 'Check if ENV CATTLE_WINS_AGENT_VERSION is set in Dockerfile'
@@ -99,6 +131,46 @@ targets:
       file: 'package/Dockerfile'
       matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
       replacepattern: '$1 CATTLE_SYSTEM_AGENT_VERSION={{ source "system-agent-release" }}'
+
+  update-dockerfile-system-agent-checksum-amd64:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64 in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-amd64'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_amd64[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_amd64={{ source "system-agent-checksum-amd64" }}'
+
+  update-dockerfile-system-agent-checksum-arm64:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64 in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-arm64'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_arm64[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_arm64={{ source "system-agent-checksum-arm64" }}'
+
+  update-dockerfile-system-agent-checksum-install:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-install'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_install[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_install={{ source "system-agent-checksum-install" }}'
+
+  update-dockerfile-system-agent-checksum-uninstall:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-checksum-uninstall'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall={{ source "system-agent-checksum-uninstall" }}'
 
   update-pkg-settings-wins-release:
     name: 'Update Wins to {{ source "wins-release" }} in pkg/settings/setting.go'
