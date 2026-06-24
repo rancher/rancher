@@ -264,7 +264,7 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 	}))
 	if err != nil {
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError,
-			fmt.Sprintf("[OIDC provider] failed to retrieve legacy tokens for user %q : %v", claims.Subject, err))
+			fmt.Sprintf("[OIDC provider] failed to retrieve legacy tokens for user %q: %v", claims.Subject, err))
 	}
 	var rancherToken accessor.TokenAccessor
 	for _, token := range tokenList {
@@ -280,7 +280,7 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 		tokenList, err := h.extTokenStore.ListForUser(claims.Subject)
 		if err != nil {
 			return TokenResponse{}, oidcerror.New(oidcerror.ServerError,
-				fmt.Sprintf("[OIDC provider] failed to retrieve ext tokens for user %q : %v", claims.Subject, err))
+				fmt.Sprintf("[OIDC provider] failed to retrieve ext tokens for user %q: %v", claims.Subject, err))
 		}
 		for _, token := range tokenList.Items {
 			hash := sha256.Sum256([]byte(token.Name))
