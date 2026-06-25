@@ -594,6 +594,10 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		shouldUpdateAttr = true
 	}
 	if externalID := first(attr.ExtraByProvider[provider]["externalid"]); externalID != payload.ExternalID {
+		if cfg.UserIDAttribute == UserIDExternalID {
+			writeError(w, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the principal identifier", "mutability"))
+			return
+		}
 		changedExternalID = payload.ExternalID
 		attr.ExtraByProvider[provider]["externalid"] = []string{payload.ExternalID}
 		shouldUpdateAttr = true
@@ -849,13 +853,16 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 
 		var shouldUpdateAttr, shouldUpdateUser bool
 		for name, value := range fields {
+			if name == "" {
+				return false, false, NewError(http.StatusBadRequest, "empty attribute name in bulk operation")
+			}
 			updateAttr, updateUser, err := applyPatchUser(provider, attr, user, patchOp{
 				Op:    "replace",
 				Path:  name,
 				Value: value,
 			}, cfg)
 			if err != nil {
-				return false, false, fmt.Errorf("failed to apply replace operation: %v", err)
+				return false, false, fmt.Errorf("failed to apply %s operation: %w", op.Op, err)
 			}
 			if updateAttr {
 				shouldUpdateAttr = true
@@ -899,16 +906,15 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 			updateUser = true
 		}
 	case "username":
-		if cfg.UserIDAttribute != UserIDExternalID {
-			return false, false, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier", "mutability")
-		}
-
 		username, ok := op.Value.(string)
 		if !ok {
 			return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for userName: %v", op.Value))
 		}
 
 		if first(attr.ExtraByProvider[provider]["username"]) != username {
+			if cfg.UserIDAttribute != UserIDExternalID {
+				return false, false, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier", "mutability")
+			}
 			attr.ExtraByProvider[provider]["username"] = []string{username}
 			updateAttr = true
 		}
@@ -919,6 +925,9 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 		}
 
 		if first(attr.ExtraByProvider[provider]["externalid"]) != externalID {
+			if cfg.UserIDAttribute == UserIDExternalID {
+				return false, false, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the principal identifier", "mutability")
+			}
 			attr.ExtraByProvider[provider]["externalid"] = []string{externalID}
 			updateAttr = true
 		}

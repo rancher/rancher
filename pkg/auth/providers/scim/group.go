@@ -2,6 +2,7 @@ package scim
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -343,25 +344,29 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 
 	cfg := s.getConfig(provider)
 
-	group, _, err := s.ensureRancherGroup(provider, payload)
+	group, err := s.groupsCache.Get(id)
 	if err != nil {
-		if scimErr, ok := err.(*Error); ok {
-			writeError(w, scimErr)
+		if apierrors.IsNotFound(err) {
+			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
 			return
 		}
-
-		logrus.Errorf("scim::UpdateGroup: failed to ensure rancher group %s: %s", id, err)
+		logrus.Errorf("scim::UpdateGroup: failed to get group %s: %s", id, err)
 		writeError(w, NewInternalError())
 		return
 	}
 
-	// Update DisplayName if it changed (only when externalId is the group ID).
-	if group.DisplayName != payload.DisplayName {
-		if cfg.GroupIDAttribute != GroupIDExternalID {
-			writeError(w, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier"))
-			return
-		}
+	if group.ExternalID != payload.ExternalID && cfg.GroupIDAttribute == GroupIDExternalID {
+		writeError(w, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the group principal identifier", "mutability"))
+		return
+	}
+	if group.DisplayName != payload.DisplayName && cfg.GroupIDAttribute != GroupIDExternalID {
+		writeError(w, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier", "mutability"))
+		return
+	}
+
+	if group.ExternalID != payload.ExternalID || group.DisplayName != payload.DisplayName {
 		group = group.DeepCopy()
+		group.ExternalID = payload.ExternalID
 		group.DisplayName = payload.DisplayName
 		group, err = s.groups.Update(group)
 		if err != nil {
@@ -455,59 +460,66 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 
 	for _, op := range payload.Operations {
 		switch strings.ToLower(op.Op) {
-		case "replace":
-			updated, err := applyReplaceGroup(group, op, cfg)
+		case "replace", "add":
+			// Multi-valued add on members is handled differently from single-valued
+			// add/replace. Single-valued add and replace share semantics per RFC 7644 §3.5.2.
+			if strings.EqualFold(op.Op, "add") && op.Path != "" {
+				addPath, _, err := stripSchemaURN(op.Path, groupResource)
+				if err != nil {
+					writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid path %q: %s", op.Path, err)))
+					return
+				}
+				if strings.EqualFold(addPath, "members") {
+					members, ok := op.Value.([]any)
+					if !ok {
+						writeError(w, NewError(http.StatusBadRequest, "Invalid members value for add operation"))
+						return
+					}
+					for _, m := range members {
+						memberMap, ok := m.(map[string]any)
+						if !ok {
+							continue
+						}
+
+						value, _ := memberMap["value"].(string)
+						display, _ := memberMap["display"].(string)
+
+						memberType, _ := memberMap["type"].(string)
+						switch strings.ToLower(memberType) { // The default caseExact value for the type attribute is false.
+						case "", "user": // The type attribute is optional. We'll default to "User" if it's not provided.
+						case "group":
+							writeError(w, NewError(http.StatusBadRequest, "Nested groups are not supported"))
+							return
+						default:
+							writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported member type: %s", memberType)))
+							return
+						}
+
+						if value != "" {
+							membersToAdd = append(membersToAdd, scimMember{
+								Value:   value,
+								Display: display,
+							})
+						}
+					}
+					continue
+				}
+			}
+
+			updated, err := applyPatchGroup(group, op, cfg)
 			if err != nil {
-				logrus.Errorf("scim::PatchGroup: failed to apply replace operation: %s", err)
-				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Failed to apply replace operation: %s", err)))
+				logrus.Errorf("scim::PatchGroup: failed to apply %s operation: %s", op.Op, err)
+				var scimErr *Error
+				if errors.As(err, &scimErr) {
+					writeError(w, scimErr)
+				} else {
+					writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Failed to apply %s operation: %s", op.Op, err)))
+				}
 				return
 			}
 
 			if updated {
 				shouldUpdateGroup = true
-			}
-		case "add":
-			addPath, _, err := stripSchemaURN(op.Path, groupResource)
-			if err != nil {
-				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid path %q: %s", op.Path, err)))
-				return
-			}
-			if strings.ToLower(addPath) != "members" {
-				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported add path: %s", op.Path)))
-				return
-			}
-
-			members, ok := op.Value.([]any)
-			if !ok {
-				writeError(w, NewError(http.StatusBadRequest, "Invalid members value for add operation"))
-				return
-			}
-			for _, m := range members {
-				memberMap, ok := m.(map[string]any)
-				if !ok {
-					continue
-				}
-
-				value, _ := memberMap["value"].(string)
-				display, _ := memberMap["display"].(string)
-
-				memberType, _ := memberMap["type"].(string)
-				switch strings.ToLower(memberType) { // The default caseExact value for the type attribute is false.
-				case "", "user": // The type attribute is optional. We'll default to "User" if it's not provided.
-				case "group":
-					writeError(w, NewError(http.StatusBadRequest, "Nested groups are not supported"))
-					return
-				default:
-					writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported member type: %s", memberType)))
-					return
-				}
-
-				if value != "" {
-					membersToAdd = append(membersToAdd, scimMember{
-						Value:   value,
-						Display: display,
-					})
-				}
 			}
 		case "remove":
 			removePath, _, err := stripSchemaURN(op.Path, groupResource)
@@ -952,22 +964,9 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Gro
 	}
 
 	if group != nil {
-		// Found existing group - update if needed and return created=false.
-		var shouldUpdate bool
-		group = group.DeepCopy()
-
-		if group.ExternalID != grp.ExternalID {
-			group.ExternalID = grp.ExternalID
-			shouldUpdate = true
-		}
-
-		if shouldUpdate {
-			group, err = s.groups.Update(group)
-			if err != nil {
-				return nil, false, fmt.Errorf("failed to update group %s: %w", group.Name, err)
-			}
-		}
-
+		// Found existing group - return as-is and let the caller decide what to do.
+		// CreateGroup treats created=false as a conflict; UpdateGroup applies its own
+		// mutability-gated updates inline rather than calling this helper.
 		return group, false, nil
 	}
 
@@ -988,24 +987,28 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Gro
 	return created, true, err
 }
 
-// applyReplaceGroup applies a replace operation to a group.
-func applyReplaceGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, error) {
+// applyPatchGroup applies a SCIM PATCH add/replace operation to a group.
+// For single-valued attributes, add and replace have identical semantics (RFC 7644 §3.5.2).
+func applyPatchGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, error) {
 	if op.Path == "" {
-		// Bulk replace - replace multiple attributes at once
+		// Bulk update - apply multiple attributes at once.
 		fields, ok := op.Value.(map[string]any)
 		if !ok {
-			return false, fmt.Errorf("invalid value type for replace operation: %T", op.Value)
+			return false, fmt.Errorf("invalid value type for %s operation: %T", op.Op, op.Value)
 		}
 
 		var updated bool
 		for name, value := range fields {
-			wasUpdated, err := applyReplaceGroup(group, patchOp{
-				Op:    "replace",
+			if name == "" {
+				return false, NewError(http.StatusBadRequest, "empty attribute name in bulk operation")
+			}
+			wasUpdated, err := applyPatchGroup(group, patchOp{
+				Op:    op.Op,
 				Path:  name,
 				Value: value,
 			}, cfg)
 			if err != nil {
-				return false, fmt.Errorf("failed to apply replace operation: %v", err)
+				return false, fmt.Errorf("failed to apply %s operation: %w", op.Op, err)
 			}
 			if wasUpdated {
 				updated = true
@@ -1022,15 +1025,14 @@ func applyReplaceGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, e
 	var updated bool
 	switch strings.ToLower(path) {
 	case "displayname":
-		if cfg.GroupIDAttribute != GroupIDExternalID {
-			return false, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier")
-		}
-
 		displayName, ok := op.Value.(string)
 		if !ok {
 			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for displayName: %v", op.Value))
 		}
 		if group.DisplayName != displayName {
+			if cfg.GroupIDAttribute != GroupIDExternalID {
+				return false, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier", "mutability")
+			}
 			group.DisplayName = displayName
 			updated = true
 		}
@@ -1040,6 +1042,9 @@ func applyReplaceGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, e
 			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for externalId: %v", op.Value))
 		}
 		if group.ExternalID != externalID {
+			if cfg.GroupIDAttribute == GroupIDExternalID {
+				return false, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the group principal identifier", "mutability")
+			}
 			group.ExternalID = externalID
 			updated = true
 		}

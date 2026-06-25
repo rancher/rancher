@@ -488,7 +488,7 @@ func TestSyncGroupMembersUpdatesStaleDisplayName(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestApplyReplaceGroup(t *testing.T) {
+func TestApplyPatchGroup(t *testing.T) {
 	cfg := defaultProviderConfig()
 	externalIDCfg := providerConfig{GroupIDAttribute: GroupIDExternalID}
 
@@ -496,7 +496,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{ExternalID: "old-id"}
 		op := patchOp{Op: "replace", Path: "externalId", Value: "new-id"}
 
-		updated, err := applyReplaceGroup(group, op, cfg)
+		updated, err := applyPatchGroup(group, op, cfg)
 
 		require.NoError(t, err)
 		assert.True(t, updated)
@@ -507,7 +507,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{ExternalID: "same-id"}
 		op := patchOp{Op: "replace", Path: "externalId", Value: "same-id"}
 
-		updated, err := applyReplaceGroup(group, op, cfg)
+		updated, err := applyPatchGroup(group, op, cfg)
 
 		require.NoError(t, err)
 		assert.False(t, updated)
@@ -523,7 +523,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 			},
 		}
 
-		updated, err := applyReplaceGroup(group, op, cfg)
+		updated, err := applyPatchGroup(group, op, cfg)
 
 		require.NoError(t, err)
 		assert.True(t, updated)
@@ -534,7 +534,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{}
 		op := patchOp{Op: "replace", Path: "unsupported", Value: "value"}
 
-		updated, err := applyReplaceGroup(group, op, cfg)
+		updated, err := applyPatchGroup(group, op, cfg)
 
 		require.Error(t, err)
 		assert.False(t, updated)
@@ -544,7 +544,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{DisplayName: "Old Name", ExternalID: "ext-123"}
 		op := patchOp{Op: "replace", Path: "displayName", Value: "New Name"}
 
-		updated, err := applyReplaceGroup(group, op, externalIDCfg)
+		updated, err := applyPatchGroup(group, op, externalIDCfg)
 
 		require.NoError(t, err)
 		assert.True(t, updated)
@@ -555,18 +555,49 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{DisplayName: "Old Name"}
 		op := patchOp{Op: "replace", Path: "displayName", Value: "New Name"}
 
-		updated, err := applyReplaceGroup(group, op, cfg)
+		updated, err := applyPatchGroup(group, op, cfg)
 
 		require.Error(t, err)
 		assert.False(t, updated)
-		assert.Contains(t, err.Error(), "cannot be changed")
+		assert.ErrorContains(t, err, "cannot be changed")
+	})
+
+	t.Run("allows displayName no-op when displayName is group ID", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Same Name"}
+		op := patchOp{Op: "replace", Path: "displayName", Value: "Same Name"}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.NoError(t, err)
+		assert.False(t, updated)
+	})
+
+	t.Run("rejects externalId change when externalId is group ID", func(t *testing.T) {
+		group := &v3.Group{ExternalID: "old-id"}
+		op := patchOp{Op: "replace", Path: "externalId", Value: "new-id"}
+
+		updated, err := applyPatchGroup(group, op, externalIDCfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		assert.ErrorContains(t, err, "cannot be changed")
+	})
+
+	t.Run("allows externalId no-op when externalId is group ID", func(t *testing.T) {
+		group := &v3.Group{ExternalID: "same-id"}
+		op := patchOp{Op: "add", Path: "externalId", Value: "same-id"}
+
+		updated, err := applyPatchGroup(group, op, externalIDCfg)
+
+		require.NoError(t, err)
+		assert.False(t, updated)
 	})
 
 	t.Run("rejects invalid displayName value type", func(t *testing.T) {
 		group := &v3.Group{}
 		op := patchOp{Op: "replace", Path: "displayName", Value: 123}
 
-		updated, err := applyReplaceGroup(group, op, externalIDCfg)
+		updated, err := applyPatchGroup(group, op, externalIDCfg)
 
 		require.Error(t, err)
 		assert.False(t, updated)
@@ -576,7 +607,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{ExternalID: "old-id"}
 		op := patchOp{Op: "replace", Path: "urn:ietf:params:scim:schemas:core:2.0:Group:externalId", Value: "new-id"}
 
-		updated, err := applyReplaceGroup(group, op, cfg)
+		updated, err := applyPatchGroup(group, op, cfg)
 
 		require.NoError(t, err)
 		assert.True(t, updated)
@@ -587,11 +618,130 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{}
 		op := patchOp{Op: "replace", Path: "urn:ietf:params:scim:schemas:core:2.0:User:userName", Value: "test"}
 
-		updated, err := applyReplaceGroup(group, op, cfg)
+		updated, err := applyPatchGroup(group, op, cfg)
 
 		require.Error(t, err)
 		assert.False(t, updated)
-		assert.Contains(t, err.Error(), "does not match")
+		assert.ErrorContains(t, err, "does not match")
+	})
+
+	t.Run("add externalId", func(t *testing.T) {
+		group := &v3.Group{ExternalID: "old-id"}
+		op := patchOp{Op: "add", Path: "externalId", Value: "new-id"}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, "new-id", group.ExternalID)
+	})
+
+	t.Run("add externalId no-op when value same", func(t *testing.T) {
+		group := &v3.Group{ExternalID: "same-id"}
+		op := patchOp{Op: "add", Path: "externalId", Value: "same-id"}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.NoError(t, err)
+		assert.False(t, updated)
+	})
+
+	t.Run("add displayName when externalId is group ID", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Old Name", ExternalID: "ext-123"}
+		op := patchOp{Op: "add", Path: "displayName", Value: "New Name"}
+
+		updated, err := applyPatchGroup(group, op, externalIDCfg)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, "New Name", group.DisplayName)
+	})
+
+	t.Run("add rejects displayName change when displayName is group ID", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Old Name"}
+		op := patchOp{Op: "add", Path: "displayName", Value: "New Name"}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		assert.ErrorContains(t, err, "cannot be changed")
+	})
+
+	t.Run("add bulk", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Old", ExternalID: "old-id"}
+		op := patchOp{
+			Op:   "add",
+			Path: "",
+			Value: map[string]any{
+				"externalId": "new-id",
+			},
+		}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, "new-id", group.ExternalID)
+	})
+
+	t.Run("URN-prefixed add externalId", func(t *testing.T) {
+		group := &v3.Group{ExternalID: "old-id"}
+		op := patchOp{Op: "add", Path: "urn:ietf:params:scim:schemas:core:2.0:Group:externalId", Value: "new-id"}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, "new-id", group.ExternalID)
+	})
+
+	t.Run("add rejects unsupported path", func(t *testing.T) {
+		group := &v3.Group{}
+		op := patchOp{Op: "add", Path: "unsupported", Value: "value"}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+	})
+
+	t.Run("rejects empty attribute name in bulk", func(t *testing.T) {
+		group := &v3.Group{}
+		op := patchOp{
+			Op:   "add",
+			Path: "",
+			Value: map[string]any{
+				"": "value",
+			},
+		}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		var scimErr *Error
+		require.ErrorAs(t, err, &scimErr)
+		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
+	})
+
+	t.Run("bulk wraps inner SCIM error so callers can extract scimType", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Old Name"}
+		op := patchOp{
+			Op:   "add",
+			Path: "",
+			Value: map[string]any{
+				"displayName": "New Name",
+			},
+		}
+
+		updated, err := applyPatchGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		var scimErr *Error
+		require.ErrorAs(t, err, &scimErr)
+		assert.Equal(t, "mutability", scimErr.ScimType)
 	})
 }
 
@@ -995,6 +1145,160 @@ func TestPatchGroup(t *testing.T) {
 		err = json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, "new-external-id", resp["externalId"])
+	})
+
+	t.Run("add externalId operation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "old-external-id",
+			Provider:    provider,
+		}
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		updatedGroup := existingGroup.DeepCopy()
+		updatedGroup.ExternalID = "new-external-id"
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Update(gomock.Any()).Return(updatedGroup, nil)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groups:      groupClient,
+			groupsCache: groupCache,
+			userCache:   userCache,
+			getConfig:   testDefaultGetConfig,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":    "Add",
+					"path":  "externalId",
+					"value": "new-external-id",
+				},
+			},
+		}
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "new-external-id", resp["externalId"])
+	})
+
+	t.Run("rejects externalId change in externalId mode", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "old-external-id",
+			Provider:    provider,
+		}
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupCache,
+			getConfig: func(string) providerConfig {
+				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			},
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":    "Add",
+					"path":  "externalId",
+					"value": "new-external-id",
+				},
+			},
+		}
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
+
+		srv.PatchGroup(w, r)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Detail, "cannot be changed")
+		assert.Equal(t, "mutability", resp.ScimType)
+	})
+
+	t.Run("allows externalId no-op in externalId mode", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "same-external-id",
+			Provider:    provider,
+		}
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupCache,
+			userCache:   userCache,
+			getConfig: func(string) providerConfig {
+				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			},
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":    "Add",
+					"path":  "externalId",
+					"value": "same-external-id",
+				},
+			},
+		}
+		body, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
+
+		srv.PatchGroup(w, r)
+
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "same-external-id", resp["externalId"])
 	})
 
 	t.Run("URN-prefixed replace externalId", func(t *testing.T) {
@@ -1920,17 +2224,10 @@ func TestCreateGroup(t *testing.T) {
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		groupsCache.EXPECT().Get("grp-existing").Return(existingGroup, nil)
 
-		// When ID is provided and exists, ensureRancherGroup updates externalId if it
-		// differs, then returns created=false, which triggers a 409 Conflict.
-		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
-		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
-			assert.Equal(t, "new-ext-id", g.ExternalID)
-			return g, nil
-		})
-
+		// When ID is provided and the group exists, CreateGroup returns 409 Conflict
+		// without persisting any change. The mutability-gated update belongs to UpdateGroup.
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			groups:      groupClient,
 			getConfig:   testDefaultGetConfig,
 		}
 
@@ -1966,17 +2263,10 @@ func TestCreateGroup(t *testing.T) {
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{existingGroup}, nil)
 
-		// When found by displayName with different externalId, the group is updated
-		// but created=false is returned, which triggers a 409 Conflict.
-		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
-		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
-			assert.Equal(t, "new-ext-id", g.ExternalID)
-			return g, nil
-		})
-
+		// When a group with the same displayName already exists, CreateGroup returns
+		// 409 Conflict without mutating the existing group's externalId.
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			groups:      groupClient,
 			getConfig:   testDefaultGetConfig,
 		}
 
@@ -2419,6 +2709,48 @@ func TestUpdateGroup(t *testing.T) {
 		assert.Equal(t, groupID, resp["id"])
 		assert.Equal(t, "Engineering", resp["displayName"])
 		assert.Equal(t, "new-ext-id", resp["externalId"])
+	})
+
+	t.Run("rejects externalId change with externalId config", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "old-ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			getConfig: func(string) providerConfig {
+				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "Engineering",
+			"externalId": "new-ext-id",
+			"members": []
+		}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", groupID)
+		w := httptest.NewRecorder()
+
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Detail, "cannot be changed")
+		assert.Equal(t, "mutability", resp.ScimType)
 	})
 
 	t.Run("updates displayName with externalId config", func(t *testing.T) {
