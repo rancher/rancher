@@ -42,24 +42,19 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-    curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small \
-    openssh-clients openssl patterns-base-fips && \
-    zypper --installroot /chroot clean -a && \
-    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+      curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
 
 
 FROM chroot-builder AS chroot-builder-server
-RUN zypper refresh && \
-    zypper --installroot /chroot -n in --no-recommends \
-    git-core unzip sed shadow netcat-openbsd mkisofs && \
+RUN zypper --installroot /chroot -n in --no-recommends \
+      git-core unzip sed shadow netcat-openbsd mkisofs && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 
 FROM chroot-builder AS chroot-builder-agent
-RUN zypper refresh && \
-    zypper --installroot /chroot -n in --no-recommends \
-    jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+RUN zypper --installroot /chroot -n in --no-recommends \
+      jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
