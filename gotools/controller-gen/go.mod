@@ -4,7 +4,7 @@ go 1.25.11
 
 tool sigs.k8s.io/controller-tools/cmd/controller-gen
 
-replace golang.org/x/net => golang.org/x/net v0.38.0 // CVE-2025-22870, CVE-2025-22872
+replace golang.org/x/net => golang.org/x/net v0.56.0 // CVE-2025-22870, CVE-2025-22872, CVE-2026-25680
 
 require (
 	github.com/fatih/color v1.18.0 // indirect
@@ -21,12 +21,12 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/mod v0.29.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
-	golang.org/x/tools v0.38.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
