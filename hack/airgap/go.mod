@@ -8,7 +8,7 @@ replace (
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.4 // CVE-2025-27144
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.3.6 // CVE-2024-45310
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.15 // CVE-2025-58058
-	golang.org/x/crypto => golang.org/x/crypto v0.47.0 // CVE-2025-47914, CVE-2025-58181
+	golang.org/x/crypto => golang.org/x/crypto v0.53.0
 	golang.org/x/net => golang.org/x/net v0.56.0
 )
 
