@@ -42,7 +42,7 @@ func TestBoolUnmarshalJSON(t *testing.T) {
 			err := json.Unmarshal([]byte(tt.input), &b)
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), "invalid boolean value")
+				assert.ErrorContains(t, err, "invalid boolean value")
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, bool(b))

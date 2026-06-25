@@ -559,7 +559,7 @@ func TestApplyPatchGroup(t *testing.T) {
 
 		require.Error(t, err)
 		assert.False(t, updated)
-		assert.Contains(t, err.Error(), "cannot be changed")
+		assert.ErrorContains(t, err, "cannot be changed")
 	})
 
 	t.Run("allows displayName no-op when displayName is group ID", func(t *testing.T) {
@@ -580,7 +580,7 @@ func TestApplyPatchGroup(t *testing.T) {
 
 		require.Error(t, err)
 		assert.False(t, updated)
-		assert.Contains(t, err.Error(), "cannot be changed")
+		assert.ErrorContains(t, err, "cannot be changed")
 	})
 
 	t.Run("allows externalId no-op when externalId is group ID", func(t *testing.T) {
@@ -622,7 +622,7 @@ func TestApplyPatchGroup(t *testing.T) {
 
 		require.Error(t, err)
 		assert.False(t, updated)
-		assert.Contains(t, err.Error(), "does not match")
+		assert.ErrorContains(t, err, "does not match")
 	})
 
 	t.Run("add externalId", func(t *testing.T) {
@@ -665,7 +665,7 @@ func TestApplyPatchGroup(t *testing.T) {
 
 		require.Error(t, err)
 		assert.False(t, updated)
-		assert.Contains(t, err.Error(), "cannot be changed")
+		assert.ErrorContains(t, err, "cannot be changed")
 	})
 
 	t.Run("add bulk", func(t *testing.T) {
