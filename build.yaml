@@ -3,5 +3,5 @@ remoteDialerProxyVersion: 106.0.2+up0.5.1
 provisioningCAPIVersion: 107.0.0+up0.8.0
 cspAdapterMinVersion: 107.0.0+up7.0.0
 defaultShellVersion: rancher/shell:v0.5.3
-fleetVersion: 107.0.12+up0.13.12
+fleetVersion: 107.0.13+up0.13.13
 defaultSccOperatorImage: rancher/scc-operator:v0.4.3
