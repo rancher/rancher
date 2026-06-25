@@ -73,8 +73,8 @@ type ClusterRouter func(req *http.Request) string
 type authorizationTokenClaims struct {
 	jwt.RegisteredClaims
 
-	// Token is a reference to the underlying v3.Token associated with the
-	// authenticated user.
+	// Token is a reference to the underlying ext or v3/legacy Token
+	// associated with the authenticated user.
 	Token string `json:"token"`
 }
 
@@ -383,8 +383,21 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 				return nil, ErrMustAuthenticate
 			}
 
-			tokenName, tokenKey = token.GetFullName(), token.Status.Hash
-			logrus.Debug("Parsed (ext) tokenName and TokenKey from JWT")
+			// Indicate to ExtVerifyToken coming later that we do
+			// not have a proper token key (i.e. token secret value)
+			// to validate, and thus should bypass that check.
+			//
+			// Note that for the legacy tokens below the tokenKey
+			// can be a hash too, when the `TokenHashed` annotation
+			// is set. In that case the legacy `VerifyToken`
+			// compares the hash pulled here from the token against
+			// the stored hash in the same token, making it a
+			// trivial match, and effectively a no-op, i.e. the same
+			// kind of bypass we trigger here explicitly for the ext
+			// tokens.
+			tokenKey = ""
+			tokenName = token.GetFullName()
+			logrus.Debug("Parsed (ext) tokenName from JWT, no TokenKey")
 		} else {
 			// Falling back to legacy token
 			obj, exists, err := a.tokenIndexer.GetByKey(claims.Token)
