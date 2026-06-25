@@ -3,6 +3,7 @@ package status
 import (
 	"time"
 
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,11 +27,16 @@ func NewStatus() *Status {
 // AddCondition add condition to the conditions slice. Condition will be set to false if there is an error.
 func (s *Status) AddCondition(conditions *[]metav1.Condition, condition metav1.Condition, reason string, err error) {
 	if err != nil {
+		logrus.Debugf("ZZZZZZ status/add-condition error: %s", err)
+
 		condition.Status = metav1.ConditionFalse
 		condition.Message = err.Error()
 	} else {
 		condition.Status = metav1.ConditionTrue
 	}
+
+	logrus.Debugf("ZZZZZZ status/add-condition reason: %s", reason)
+
 	condition.Reason = reason
 	condition.LastTransitionTime = metav1.Time{Time: s.TimeNow()}
 
@@ -43,9 +49,12 @@ func (s *Status) AddCondition(conditions *[]metav1.Condition, condition metav1.C
 			c.Message = condition.Message
 			c.LastTransitionTime = metav1.Time{Time: s.TimeNow()}
 			found = true
+			logrus.Debug("ZZZZZZ status/add-condition replace")
+			// ZZZZZZ QUERY - break loop ?
 		}
 	}
 	if !found {
+		logrus.Debugf("ZZZZZZ status/add-condition append")
 		*conditions = append(*conditions, condition)
 	}
 }
