@@ -49,7 +49,6 @@ RUN zypper refresh && \
 
 
 FROM chroot-builder AS chroot-builder-server
-COPY --from=final / /chroot/
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
     git-core unzip sed shadow netcat-openbsd mkisofs && \
@@ -58,7 +57,6 @@ RUN zypper refresh && \
 
 
 FROM chroot-builder AS chroot-builder-agent
-COPY --from=final / /chroot/
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
     jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
