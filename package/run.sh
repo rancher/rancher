@@ -256,5 +256,5 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     fi
 fi
 
-exec tini -- agent
+exec catatonit -- agent
 
