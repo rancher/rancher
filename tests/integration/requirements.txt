@@ -1,6 +1,6 @@
 git+https://github.com/rancher/client-python.git@1ecfc3e6a300f5f336da4e4416c46c50d544fd77
 websocket-client==0.56.0
-PyJWT==2.12.0
+PyJWT==2.13.0
 
 flask==3.1.3
 pytest==9.0.3
@@ -12,5 +12,5 @@ netaddr==0.8.0
 requests==2.33.0
 kubernetes==12.0.1
 jinja2>=2.10
-cryptography==46.0.7
-werkzeug==3.1.6
+cryptography==48.0.1
+werkzeug==3.1.8
