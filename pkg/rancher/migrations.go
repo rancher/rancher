@@ -13,6 +13,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
@@ -61,6 +62,12 @@ const (
 	managementCleanupCompletedKey                     = "managementcleanupcompleted"
 	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
 	rke2PrimeAnnotationMigratedKey                    = "rke2PrimeAnnotationMigrated"
+
+	// disableUnusedLinodeNodeDriver migration
+	disableUnusedLinodeNodeDriverConfigMap = "disableunusedlinodenodedriver"
+	unusedLinodeNodeDriverDisabledKey      = "unusedLinodeNodeDriverDisabled"
+	linodeNodeDriverName                   = management.Linodedriver
+	linodeMachineConfigKind                = "LinodeConfig"
 )
 
 var (
@@ -90,6 +97,10 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	}
 
 	if err := migrateImportedClusterFields(wranglerContext); err != nil {
+		return err
+	}
+
+	if err := disableUnusedLinodeNodeDriver(wranglerContext); err != nil {
 		return err
 	}
 
@@ -870,4 +881,72 @@ func migrateExistingRKE2ClustersPrimeAnnotation(w *wrangler.CAPIContext) error {
 
 	cm.Data[rke2PrimeAnnotationMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+// disableUnusedLinodeNodeDriver disables the built-in linode NodeDriver
+// on the first start if and only if no provisioning cluster has
+// a MachinePool referencing a LinodeConfig machine config.
+func disableUnusedLinodeNodeDriver(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), disableUnusedLinodeNodeDriverConfigMap)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[unusedLinodeNodeDriverDisabledKey] == "true" {
+		return nil
+	}
+
+	inUse, err := isLinodeNodeDriverInUse(w)
+	if err != nil {
+		return err
+	}
+	if inUse {
+		logrus.Infof("linode node driver is in use by one or more provisioning clusters; leaving Spec.Active unchanged")
+	} else {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			nd, err := w.Mgmt.NodeDriver().Get(linodeNodeDriverName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if !nd.Spec.Active {
+				return nil
+			}
+			nd = nd.DeepCopy()
+			nd.Spec.Active = false
+			_, err = w.Mgmt.NodeDriver().Update(nd)
+			return err
+		}); err != nil {
+			return fmt.Errorf("disableUnusedLinodeNodeDriver: failed to deactivate linode NodeDriver: %w", err)
+		}
+		logrus.Infof("linode node driver is not in use by any provisioning cluster; set Spec.Active=false")
+	}
+
+	cm.Data[unusedLinodeNodeDriverDisabledKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+// isLinodeNodeDriverInUse reports whether any provisioning.cattle.io/v1
+// Cluster has a MachinePool referencing a LinodeConfig machine config.
+func isLinodeNodeDriverInUse(w *wrangler.Context) (bool, error) {
+	clusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("isLinodeNodeDriverInUse: failed to list provisioning clusters: %w", err)
+	}
+	for i := range clusters.Items {
+		c := &clusters.Items[i]
+		if c.Spec.RKEConfig == nil {
+			continue
+		}
+		for _, pool := range c.Spec.RKEConfig.MachinePools {
+			if pool.NodeConfig != nil &&
+				pool.NodeConfig.APIVersion == capr.DefaultMachineConfigAPIVersion &&
+				pool.NodeConfig.Kind == linodeMachineConfigKind {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

@@ -177,9 +177,6 @@ ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.6.12
 ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
 ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
-ENV DOCKER_MACHINE_LINODE_VERSION=v0.1.16
-ENV DOCKER_MACHINE_LINODE_CHECKSUM_amd64=d9c3b8c389a022b0e5c5e8912496c18a673fa74bb52ec6ab51c0a93e0f4de06d
-ENV DOCKER_MACHINE_LINODE_CHECKSUM_arm64=1a8336f66bffc2186f5fb77642f509b9370f177397ee71f1a8cb522e5979dbec
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.2.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
@@ -243,26 +240,13 @@ RUN case "${ARCH}" in \
         arm64) CATTLE_MACHINE_CHECKSUM="${CATTLE_MACHINE_CHECKSUM_arm64}" ;; \
         *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
     esac && \
-    case "${ARCH}" in \
-        amd64) DOCKER_MACHINE_LINODE_CHECKSUM="${DOCKER_MACHINE_LINODE_CHECKSUM_amd64}" ;; \
-        arm64) DOCKER_MACHINE_LINODE_CHECKSUM="${DOCKER_MACHINE_LINODE_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
     curl -fsSL "https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz"  > /tmp/rancher-machine.tar.gz && \
     printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
     sha256sum -c machine.sha256 && \
     rm machine.sha256 && \
     tar xvzf /tmp/rancher-machine.tar.gz -C /usr/bin && \
     rm /tmp/rancher-machine.tar.gz && \
-    chown root:root /usr/bin/rancher-machine && \
-    curl -fsSL "https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-${ARCH}.zip" > /tmp/docker-machine-driver-linode.zip && \
-    printf "%s  %s\n" "${DOCKER_MACHINE_LINODE_CHECKSUM}" "/tmp/docker-machine-driver-linode.zip" > driver-linode.sha256 && \
-    sha256sum -c driver-linode.sha256 && \
-    rm driver-linode.sha256 && \
-    unzip /tmp/docker-machine-driver-linode.zip -d /opt/drivers/management-state/bin && \
-    mkdir -p /usr/share/rancher/ui-dashboard/assets/ && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-linode /usr/share/rancher/ui-dashboard/assets/ && \
-    rm /tmp/docker-machine-driver-linode.zip
+    chown root:root /usr/bin/rancher-machine
 
 RUN case "${ARCH}" in \
         amd64) DOCKER_MACHINE_HARVESTER_CHECKSUM="${DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64}" ;; \
@@ -274,6 +258,7 @@ RUN case "${ARCH}" in \
     sha256sum -c machine-harvester.sha256 && \
     rm machine-harvester.sha256 && \
     tar xvzf /tmp/docker-machine-driver-harvester.tar.gz -C /opt/drivers/management-state/bin && \
+    mkdir -p /usr/share/rancher/ui-dashboard/assets/ && \
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 

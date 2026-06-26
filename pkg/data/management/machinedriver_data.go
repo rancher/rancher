@@ -3,8 +3,6 @@ package management
 import (
 	"fmt"
 	"maps"
-	"os"
-	"os/exec"
 	"reflect"
 	"runtime"
 	"strings"
@@ -184,17 +182,21 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := AddHarvesterMachineDriver(management); err != nil {
 		return err
 	}
-	linodeBuiltin := true
-	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
-		linodeBuiltin = isCommandAvailable("docker-machine-driver-linode")
-	}
-	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.16/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
+	// The linode docker-machine driver binary is no longer shipped inside the rancher image; it is downloaded from the
+	// upstream on first activation.
+	// Fresh installation of Rancher lands Active=false. On upgrade, Spec.Active is preserved across restarts.
+	// A one-shot migration in pkg/rancher/migrations.go (disableUnusedLinodeNodeDriver) disables the
+	// driver on first upgrade if no provisioning cluster is using it.
+	linodeDriverURL := fmt.Sprintf(
+		"https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.16/docker-machine-driver-linode_linux-%s.zip",
+		runtime.GOARCH,
+	)
 	linodeDriverChecksum := "d9c3b8c389a022b0e5c5e8912496c18a673fa74bb52ec6ab51c0a93e0f4de06d"
 	if runtime.GOARCH == "arm64" {
-		// overwrite arm driver version here
 		linodeDriverChecksum = "1a8336f66bffc2186f5fb77642f509b9370f177397ee71f1a8cb522e5979dbec"
 	}
-	if err := addMachineDriver(Linodedriver, linodeDriverURL, "", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, nil, management); err != nil {
+	if err := addMachineDriver(Linodedriver, linodeDriverURL, "", linodeDriverChecksum, []string{"api.linode.com"},
+		false, false, false, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OCIDriver, "https://github.com/rancher-plugins/rancher-machine-driver-oci/releases/download/v1.3.0/docker-machine-driver-oci-linux", "", "0a1afa6a0af85ecf3d77cc554960e36e1be5fd12b22b0155717b9289669e4021", []string{"*.oraclecloud.com"}, false, false, false, nil, management); err != nil {
@@ -387,8 +389,4 @@ func deleteMachineDriver(name, urlPrefix string, ndClient normanv3.NodeDriverInt
 	if err := ndClient.Delete(name, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		logrus.Warnf("Error deleting node driver %s: %v", name, err)
 	}
-}
-
-func isCommandAvailable(name string) bool {
-	return exec.Command("command", "-v", name).Run() == nil
 }
