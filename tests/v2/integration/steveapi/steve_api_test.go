@@ -67,7 +67,6 @@ var (
 	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
 	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	revisionReg                = regexp.MustCompile(`(revision=)[\d]+`)
-	testLabelReg               = regexp.MustCompile(`(labelSelector=test.cattle.io%2Fsteveapi%3D)[\w]+`)
 	projectTag                 = regexp.MustCompile(`(test-prj-[1-9])`)
 	namespaceTag               = regexp.MustCompile(`(test-ns-[1-9])`)
 	namespaceSecretManagerRole = rbacv1.Role{
@@ -2862,7 +2861,6 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 		if next, ok := pagination["next"].(string); ok {
 			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
 			next = revisionReg.ReplaceAllString(next, "${1}"+revisionNum)
-			next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
 			pagination["next"] = next
 			mapResp["pagination"] = pagination
 		}
