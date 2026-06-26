@@ -1622,6 +1622,18 @@ func TestSystemStoreList(t *testing.T) {
 			},
 		},
 		{
+			name: "ok, empty, nil options",
+			user: "",
+			opts: nil,
+			err:  nil,
+			toks: &ext.TokenList{Items: []ext.Token{}},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil)
+			},
+		},
+		{
 			name: "ok, not empty, not current",
 			user: properUser,
 			opts: &metav1.ListOptions{},
@@ -1734,6 +1746,131 @@ func TestSystemStoreList(t *testing.T) {
 
 			// perform test and validate results
 			toks, err := store.list(test.isadmin, test.user, test.session, test.opts)
+			if test.err != nil {
+				assert.Equal(t, test.err, err)
+				assert.Nil(t, toks)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.toks, toks)
+			}
+		})
+	}
+}
+
+func TestSystemStoreListExported(t *testing.T) {
+	tests := []struct {
+		name       string              // test name
+		opts       *metav1.ListOptions // list options
+		err        error               // expected op result, error
+		toks       *ext.TokenList      // expected op result, token list
+		storeSetup func(               // configure store backend clients
+			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList])
+	}{
+		{
+			name: "some arbitrary error",
+			opts: &metav1.ListOptions{},
+			err:  apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", errSomeError)),
+			toks: nil,
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(nil, errSomeError)
+			},
+		},
+		{
+			name: "ok, empty",
+			opts: &metav1.ListOptions{},
+			err:  nil,
+			toks: &ext.TokenList{Items: []ext.Token{}},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil)
+			},
+		},
+		{
+			name: "ok, empty, nil options",
+			opts: nil,
+			err:  nil,
+			toks: &ext.TokenList{Items: []ext.Token{}},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{}, nil)
+			},
+		},
+		{
+			name: "ok, not empty",
+			opts: &metav1.ListOptions{},
+			err:  nil,
+			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "1",
+					Continue:           "true",
+					RemainingItemCount: ptr.To(int64(2)),
+				},
+				Items: []ext.Token{
+					properToken,
+				},
+			},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{
+						ListMeta: metav1.ListMeta{
+							ResourceVersion:    "1",
+							Continue:           "true",
+							RemainingItemCount: ptr.To(int64(2)),
+						},
+						Items: []corev1.Secret{
+							properSecret,
+						},
+					}, nil)
+			},
+		},
+		{
+			name: "ok, ignore broken secrets",
+			opts: &metav1.ListOptions{},
+			err:  nil,
+			toks: &ext.TokenList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "",
+					Continue:           "",
+					RemainingItemCount: nil,
+				},
+				Items: []ext.Token{
+					properToken,
+				},
+			},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&corev1.SecretList{
+						Items: []corev1.Secret{
+							properSecret,
+							badSecret,
+						},
+					}, nil)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			// assemble and configure store from mock clients ...
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(nil)
+
+			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+			test.storeSetup(secrets)
+
+			// perform test and validate results
+			toks, err := store.List(test.opts)
 			if test.err != nil {
 				assert.Equal(t, test.err, err)
 				assert.Nil(t, toks)
