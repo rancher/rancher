@@ -283,34 +283,62 @@
     {
       "JSONResp": {
         "counts": {
-          "test1": 2,
-          "test2": 2,
-          "test3": 2,
-          "test4": 1,
-          "test5": 1
+          "test1": {
+            "total": 2
+          },
+          "test2": {
+            "total": 2
+          },
+          "test3": {
+            "total": 2
+          },
+          "test4": {
+            "total": 1
+          },
+          "test5": {
+            "total": 1
+          }
         },
         "property": "metadata.name"
       },
       "counts": {
-        "test1": 2,
-        "test2": 2,
-        "test3": 2,
-        "test4": 1,
-        "test5": 1
+        "test1": {
+          "total": 2
+        },
+        "test2": {
+          "total": 2
+        },
+        "test3": {
+          "total": 2
+        },
+        "test4": {
+          "total": 1
+        },
+        "test5": {
+          "total": 1
+        }
       },
       "property": "metadata.name"
     },
     {
       "JSONResp": {
         "counts": {
-          "test-ns-1": 5,
-          "test-ns-2": 3
+          "test-ns-1": {
+            "total": 5
+          },
+          "test-ns-2": {
+            "total": 3
+          }
         },
         "property": "metadata.namespace"
       },
       "counts": {
-        "test-ns-1": 5,
-        "test-ns-2": 3
+        "test-ns-1": {
+          "total": 5
+        },
+        "test-ns-2": {
+          "total": 3
+        }
       },
       "property": "metadata.namespace"
     }
