@@ -33,9 +33,7 @@ import (
 const (
 	Name                  = "local"
 	userNameIndex         = "authn.management.cattle.io/user-username-index"
-	gmPrincipalIndex      = "authn.management.cattle.io/groupmember-principalid-index"
 	userSearchIndex       = "authn.management.cattle.io/user-search-index"
-	groupSearchIndex      = "authn.management.cattle.io/group-search-index"
 	searchIndexDefaultLen = 6
 )
 
@@ -46,36 +44,20 @@ type PasswordVerifier interface {
 }
 
 type Provider struct {
-	userLister   v3.UserLister
-	groupLister  v3.GroupLister
-	userIndexer  cache.Indexer
-	gmIndexer    cache.Indexer
-	groupIndexer cache.Indexer
-	userMgr      user.Manager
-	pwdVerifier  PasswordVerifier
+	userLister  v3.UserLister
+	userIndexer cache.Indexer
+	pwdVerifier PasswordVerifier
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMgr user.Manager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, _ user.Manager) common.AuthProvider {
 	informer := mgmtCtx.Management.Users("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{userNameIndex: userNameIndexer, userSearchIndex: userSearchIndexer}
 	_ = informer.AddIndexers(indexers)
 
-	gmInformer := mgmtCtx.Management.GroupMembers("").Controller().Informer()
-	gmIndexers := map[string]cache.IndexFunc{gmPrincipalIndex: gmPIdIndexer}
-	_ = gmInformer.AddIndexers(gmIndexers)
-
-	gInformer := mgmtCtx.Management.Groups("").Controller().Informer()
-	gIndexers := map[string]cache.IndexFunc{groupSearchIndex: groupSearchIndexer}
-	_ = gInformer.AddIndexers(gIndexers)
-
 	l := &Provider{
-		userIndexer:  informer.GetIndexer(),
-		gmIndexer:    gmInformer.GetIndexer(),
-		groupLister:  mgmtCtx.Management.Groups("").Controller().Lister(),
-		groupIndexer: gInformer.GetIndexer(),
-		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
-		userMgr:      userMgr,
-		pwdVerifier:  pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
+		userIndexer: informer.GetIndexer(),
+		userLister:  mgmtCtx.Management.Users("").Controller().Lister(),
+		pwdVerifier: pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
 	}
 	return l
 }
@@ -149,12 +131,7 @@ func (l *Provider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, inpu
 	userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, nil)
 	userPrincipal.Me = true
 
-	groupPrincipals, err := l.getGroupPrincipals(user)
-	if err != nil {
-		return apiv3.Principal{}, nil, "", errors.Wrapf(err, "failed to get groups for %v", user.Name)
-	}
-
-	return userPrincipal, groupPrincipals, "", nil
+	return userPrincipal, []apiv3.Principal{}, "", nil
 }
 
 // isLocalUser reports whether a User resource represents a user that can log
@@ -188,100 +165,66 @@ func getLocalPrincipalID(user *apiv3.User) string {
 	return principalID
 }
 
-func (l *Provider) getGroupPrincipals(user *apiv3.User) ([]apiv3.Principal, error) {
-	groupPrincipals := []apiv3.Principal{}
+func (l *Provider) UsesUserSecrets() bool { return false }
 
-	for _, pid := range user.PrincipalIDs {
-		objs, err := l.gmIndexer.ByIndex(gmPrincipalIndex, pid)
-		if err != nil {
-			return []apiv3.Principal{}, err
-		}
+// CanRefreshPrincipals reports whether the local provider can refetch group
+// principals at refresh time. It cannot, because the local provider does not
+// own any groups: v3.Group resources are SCIM-provisioned and owned by the
+// external identity provider that created them.
+func (l *Provider) CanRefreshPrincipals() bool { return false }
 
-		for _, o := range objs {
-			gm, ok := o.(*apiv3.GroupMember)
-			if !ok {
-				continue
-			}
-
-			// find group for this member mapping
-			localGroup, err := l.groupLister.Get("", gm.GroupName)
-			if err != nil {
-				logrus.Errorf("Failed to get Group resource %v: %v", gm.GroupName, err)
-				continue
-			}
-
-			groupPrincipal := l.toPrincipal("group", localGroup.DisplayName, "", Name+"://"+localGroup.Name, nil)
-			groupPrincipal.MemberOf = true
-			groupPrincipals = append(groupPrincipals, groupPrincipal)
-		}
-	}
-
-	return groupPrincipals, nil
-}
-
-func (l *Provider) UsesUserSecrets() bool      { return false }
-func (l *Provider) CanRefreshPrincipals() bool { return true }
-
+// RefetchGroupPrincipals is a no-op for the local provider; it is never
+// invoked because CanRefreshPrincipals returns false.
 func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
-	userID := strings.SplitN(principalID, "://", 2)[1]
-	user, err := l.userLister.Get("", userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return l.getGroupPrincipals(user)
+	return []apiv3.Principal{}, nil
 }
 
 func (l *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	return l.SearchPrincipalsDedupe(searchKey, principalType, token, nil)
 }
 
-// SearchPrincipalsDedupe performs principal search, but deduplicates the results against the supplied list (that should have come from other non-local auth providers)
-// This is to avoid getting duplicate search results
+// SearchPrincipalsDedupe performs principal search, but deduplicates the
+// results against the supplied list (that should have come from other non-local
+// auth providers) to avoid duplicate search results. Only user principals are
+// returned; the local provider does not own any groups.
 func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token accessor.TokenAccessor, principalsFromOtherProviders []apiv3.Principal) ([]apiv3.Principal, error) {
+	if principalType == "group" {
+		return nil, nil
+	}
+
 	fromOtherProviders := map[string]bool{}
 	for _, p := range principalsFromOtherProviders {
 		fromOtherProviders[p.Name] = true
 	}
-	var principals []apiv3.Principal
-	var localUsers []*apiv3.User
-	var localGroups []*apiv3.Group
-	var err error
 
 	queryKey := strings.ToLower(searchKey)
+	var (
+		localUsers []*apiv3.User
+		err        error
+	)
 	if len(searchKey) > searchIndexDefaultLen {
-		localUsers, localGroups, err = l.listAllUsersAndGroups(queryKey)
+		localUsers, err = l.listAllUsers(queryKey)
 	} else {
-		localUsers, localGroups, err = l.listUsersAndGroupsByIndex(queryKey)
+		localUsers, err = l.listUsersByIndex(queryKey)
 	}
-
 	if err != nil {
-		logrus.Infof("Failed to search User/Group resources for %v: %v", searchKey, err)
-		return principals, err
+		logrus.Infof("Failed to search User resources for %v: %v", searchKey, err)
+		return nil, err
 	}
 
-	if principalType == "" || principalType == "user" {
-	User:
-		for _, user := range localUsers {
-			if !isLocalUser(user) {
-				continue
-			}
-			for _, p := range user.PrincipalIDs {
-				if fromOtherProviders[p] {
-					continue User
-				}
-			}
-			principalID := getLocalPrincipalID(user)
-			userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, token)
-			principals = append(principals, userPrincipal)
+	var principals []apiv3.Principal
+User:
+	for _, user := range localUsers {
+		if !isLocalUser(user) {
+			continue
 		}
-	}
-
-	if principalType == "" || principalType == "group" {
-		for _, group := range localGroups {
-			groupPrincipal := l.toPrincipal("group", group.DisplayName, "", Name+"://"+group.Name, token)
-			principals = append(principals, groupPrincipal)
+		for _, p := range user.PrincipalIDs {
+			if fromOtherProviders[p] {
+				continue User
+			}
 		}
+		principalID := getLocalPrincipalID(user)
+		principals = append(principals, l.toPrincipal("user", user.DisplayName, user.Username, principalID, token))
 	}
 
 	return principals, nil
@@ -293,31 +236,20 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	}
 
 	princ := apiv3.Principal{
-		ObjectMeta:  metav1.ObjectMeta{Name: id},
-		DisplayName: displayName,
-		LoginName:   loginName,
-		Provider:    Name,
-		Me:          false,
+		ObjectMeta:    metav1.ObjectMeta{Name: id},
+		DisplayName:   displayName,
+		LoginName:     loginName,
+		Provider:      Name,
+		PrincipalType: principalType,
 	}
-
-	if principalType == "user" {
-		princ.PrincipalType = "user"
-		if token != nil {
-			princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
-		}
-	} else {
-		princ.PrincipalType = "group"
-		if token != nil {
-			princ.MemberOf = l.userMgr.IsMemberOf(token, princ)
-		}
+	if token != nil {
+		princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
 	}
-
 	return princ
 }
 
 func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	// TODO implement group lookup (local groups currently not implemented, so we can skip)
-	// parsing id to get the external id and type. id looks like github_[user|org|team]://12345
+	// id looks like local://u-12345
 	var name string
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
@@ -335,72 +267,37 @@ func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 	return princ, nil
 }
 
-func (l *Provider) listAllUsersAndGroups(searchKey string) ([]*apiv3.User, []*apiv3.Group, error) {
-	var localUsers []*apiv3.User
-	var localGroups []*apiv3.Group
-
+func (l *Provider) listAllUsers(searchKey string) ([]*apiv3.User, error) {
 	allUsers, err := l.userLister.List("", labels.NewSelector())
 	if err != nil {
-		logrus.Infof("Failed to search User resources for %v: %v", searchKey, err)
-		return localUsers, localGroups, err
+		return nil, fmt.Errorf("listing users for search %q: %w", searchKey, err)
 	}
+
+	var localUsers []*apiv3.User
 	for _, user := range allUsers {
 		if !userMatchesSearchKey(user, searchKey) {
 			continue
 		}
 		localUsers = append(localUsers, user)
 	}
-
-	allGroups, err := l.groupLister.List("", labels.NewSelector())
-	if err != nil {
-		logrus.Infof("Failed to search group resources for %v: %v", searchKey, err)
-		return localUsers, localGroups, err
-	}
-	for _, group := range allGroups {
-		if !(strings.HasPrefix(group.ObjectMeta.Name, searchKey) || strings.HasPrefix(group.DisplayName, searchKey)) {
-			continue
-		}
-		localGroups = append(localGroups, group)
-	}
-	return localUsers, localGroups, err
+	return localUsers, nil
 }
 
-func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*apiv3.User, []*apiv3.Group, error) {
-	var localUsers []*apiv3.User
-	var localGroups []*apiv3.Group
-	var err error
-
+func (l *Provider) listUsersByIndex(searchKey string) ([]*apiv3.User, error) {
 	objs, err := l.userIndexer.ByIndex(userSearchIndex, searchKey)
 	if err != nil {
-		logrus.Infof("Failed to search User resources for %v: %v", searchKey, err)
-		return localUsers, localGroups, err
+		return nil, fmt.Errorf("indexing users for search %q: %w", searchKey, err)
 	}
 
+	localUsers := make([]*apiv3.User, 0, len(objs))
 	for _, obj := range objs {
 		user, ok := obj.(*apiv3.User)
 		if !ok {
-			logrus.Errorf("User isnt a user %v", obj)
-			return localUsers, localGroups, err
+			return nil, fmt.Errorf("user index returned non-User object: %T", obj)
 		}
 		localUsers = append(localUsers, user)
 	}
-
-	groupObjs, err := l.groupIndexer.ByIndex(groupSearchIndex, searchKey)
-	if err != nil {
-		logrus.Infof("Failed to search Group resources for %v: %v", searchKey, err)
-		return localUsers, localGroups, err
-	}
-
-	for _, obj := range groupObjs {
-		group, ok := obj.(*apiv3.Group)
-		if !ok {
-			logrus.Errorf("Object isnt a group %v", obj)
-			return localUsers, localGroups, err
-		}
-		localGroups = append(localGroups, group)
-	}
-	return localUsers, localGroups, err
-
+	return localUsers, nil
 }
 
 func (l *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
@@ -413,14 +310,6 @@ func userNameIndexer(obj any) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{user.Username}, nil
-}
-
-func gmPIdIndexer(obj any) ([]string, error) {
-	gm, ok := obj.(*apiv3.GroupMember)
-	if !ok {
-		return []string{}, nil
-	}
-	return []string{gm.PrincipalID}, nil
 }
 
 func userSearchIndexer(obj any) ([]string, error) {
@@ -449,19 +338,6 @@ func userSearchIndexer(obj any) ([]string, error) {
 	fieldIndexes.Insert(splitToLower(user.ObjectMeta.Name, min(len(user.ObjectMeta.Name), searchIndexDefaultLen))...)
 
 	return fieldIndexes.UnsortedList(), nil
-}
-
-func groupSearchIndexer(obj any) ([]string, error) {
-	group, ok := obj.(*apiv3.Group)
-	if !ok {
-		return []string{}, nil
-	}
-	var fieldIndexes []string
-
-	fieldIndexes = append(fieldIndexes, indexField(group.DisplayName, min(len(group.DisplayName), searchIndexDefaultLen))...)
-	fieldIndexes = append(fieldIndexes, indexField(group.ObjectMeta.Name, min(len(group.ObjectMeta.Name), searchIndexDefaultLen))...)
-
-	return fieldIndexes, nil
 }
 
 func indexField(field string, maxIndex int) []string {

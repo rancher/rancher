@@ -75,10 +75,8 @@ func TestProviderSearchPrincipal(t *testing.T) {
 	}
 
 	provider := Provider{
-		userLister:   fakeUserLister{users: testUsers},
-		userIndexer:  newTestUserIndexer(testUsers...),
-		groupIndexer: newTestGroupIndexer(),
-		groupLister:  fakeGroupLister{},
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
 	}
 
 	principalSearchTests := []struct {
@@ -206,6 +204,18 @@ func TestProviderSearchPrincipal(t *testing.T) {
 			require.Equal(t, tt.want, names)
 		})
 	}
+
+	// The local provider does not own any groups; v3.Group resources are
+	// SCIM-provisioned and belong to their external provider. A group-typed
+	// search must never return a local principal.
+	groupSearchKeys := []string{"", "test", "Engineering", "Test User", "scim"}
+	for _, key := range groupSearchKeys {
+		t.Run("group search "+key, func(t *testing.T) {
+			principals, err := provider.SearchPrincipals(key, "group", &v3.Token{})
+			require.NoError(t, err)
+			require.Empty(t, principals)
+		})
+	}
 }
 
 func TestUserSearchIndexer(t *testing.T) {
@@ -292,12 +302,6 @@ func newTestUserIndexer(indexed ...*v3.User) cache.Indexer {
 	return indexer
 }
 
-func newTestGroupIndexer(_ ...v3.Group) cache.Indexer {
-	return cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
-		groupSearchIndex: groupSearchIndexer,
-	})
-}
-
 type fakeUserLister struct {
 	users []*v3.User
 }
@@ -306,15 +310,5 @@ func (f fakeUserLister) List(namespace string, selector labels.Selector) ([]*v3.
 	return f.users, nil
 }
 func (f fakeUserLister) Get(namespace, name string) (*v3.User, error) {
-	return nil, nil
-}
-
-type fakeGroupLister struct {
-}
-
-func (f fakeGroupLister) List(namespace string, selector labels.Selector) ([]*v3.Group, error) {
-	return nil, nil
-}
-func (f fakeGroupLister) Get(namespace, name string) (*v3.Group, error) {
 	return nil, nil
 }
