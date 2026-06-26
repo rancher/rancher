@@ -91,37 +91,14 @@ func GetPrivateRegistry(importedOrHostedCluster *v3.Cluster) (registry *PrivateR
 	if clr := GetImportedPrivateClusterLevelRegistry(importedOrHostedCluster); clr != nil {
 		return clr, false
 	}
-	return getDefaultRegistryConfiguration("", ""), true
-}
-
-func getDefaultRegistryConfiguration(registryURL, pullSecretNames string) *PrivateRegistry {
+	registryURL := settings.SystemDefaultRegistry.Get()
 	if registryURL == "" {
-		registryURL = settings.SystemDefaultRegistry.Get()
+		return nil, false
 	}
-	if registryURL == "" {
-		return nil
-	}
-
-	if pullSecretNames == "" {
-		pullSecretNames = settings.SystemDefaultRegistryPullSecrets.Get()
-	}
-
-	var globalSecrets []kcorev1.SecretReference
-	for _, pullSecret := range strings.Split(pullSecretNames, ",") {
-		pullSecret = strings.TrimSpace(pullSecret)
-		if pullSecret == "" {
-			continue
-		}
-		globalSecrets = append(globalSecrets, kcorev1.SecretReference{
-			Namespace: namespaces.System,
-			Name:      pullSecret,
-		})
-	}
-
 	return &PrivateRegistry{
 		URL:         registryURL,
-		PullSecrets: globalSecrets,
-	}
+		PullSecrets: GlobalPullSecretRefs(),
+	}, true
 }
 
 // GetImportedPrivateClusterLevelRegistry returns the cluster-level registry for the given clusters.management.cattle.io/v3
@@ -199,6 +176,22 @@ func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretListe
 
 	// no registry configured
 	return "", nil, nil
+}
+
+// GlobalPullSecretRefs returns the secret references parsed from the SystemDefaultRegistryPullSecrets
+// setting.
+func GlobalPullSecretRefs() []kcorev1.SecretReference {
+	var refs []kcorev1.SecretReference
+	for _, psName := range strings.Split(settings.SystemDefaultRegistryPullSecrets.Get(), ",") {
+		psName = strings.TrimSpace(psName)
+		if psName != "" {
+			refs = append(refs, kcorev1.SecretReference{
+				Namespace: namespaces.System,
+				Name:      psName,
+			})
+		}
+	}
+	return refs
 }
 
 // GeneratePullSecretName accepts an image pull secret name and returns a new name that

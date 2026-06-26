@@ -58,16 +58,24 @@ func systemProject(clusterName, projectName string, extraLabels map[string]strin
 	}
 }
 
-func withSettings(t *testing.T, registryURL, pullSecrets string) {
+func withSettings(t *testing.T, values map[settings.Setting]string) {
 	t.Helper()
-	origRegistry := settings.SystemDefaultRegistry.Get()
-	origPullSecrets := settings.SystemDefaultRegistryPullSecrets.Get()
+	oldValues := make(map[settings.Setting]string)
+	for setting, v := range values {
+		oldValues[setting] = setting.Get()
+		if err := setting.Set(v); err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+	}
 	t.Cleanup(func() {
-		settings.SystemDefaultRegistry.Set(origRegistry)
-		settings.SystemDefaultRegistryPullSecrets.Set(origPullSecrets)
+		for setting, value := range oldValues {
+			if err := setting.Set(value); err != nil {
+				t.Error(err)
+				t.FailNow()
+			}
+		}
 	})
-	settings.SystemDefaultRegistry.Set(registryURL)
-	settings.SystemDefaultRegistryPullSecrets.Set(pullSecrets)
 }
 
 func Test_handler_labelSystemProject(t *testing.T) {
@@ -264,7 +272,11 @@ func Test_handler_labelSystemProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			withSettings(t, tt.registryURL, tt.pullSecrets)
+
+			withSettings(t, map[settings.Setting]string{
+				settings.SystemDefaultRegistry:            tt.registryURL,
+				settings.SystemDefaultRegistryPullSecrets: tt.pullSecrets,
+			})
 
 			projectCache := fake.NewMockCacheInterface[*v3.Project](ctrl)
 			if tt.setupProjectCache != nil {
@@ -544,7 +556,10 @@ func Test_handler_labelSourceGlobalRegistryPullSecret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			withSettings(t, tt.registryURL, tt.pullSecrets)
+			withSettings(t, map[settings.Setting]string{
+				settings.SystemDefaultRegistry:            tt.registryURL,
+				settings.SystemDefaultRegistryPullSecrets: tt.pullSecrets,
+			})
 
 			secretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			if tt.setupSecretCache != nil {
@@ -1359,7 +1374,11 @@ func Test_handler_manageClusterSpecificPSS(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			withSettings(t, tt.registryURL, tt.pullSecrets)
+
+			withSettings(t, map[settings.Setting]string{
+				settings.SystemDefaultRegistry:            tt.registryURL,
+				settings.SystemDefaultRegistryPullSecrets: tt.pullSecrets,
+			})
 
 			projectCache := fake.NewMockCacheInterface[*v3.Project](ctrl)
 			if tt.setupProjectCache != nil {
@@ -1604,7 +1623,10 @@ func Test_handler_labelSourceGlobalRegistryPullSecretOnChange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			withSettings(t, tt.registryURL, tt.pullSecrets)
+			withSettings(t, map[settings.Setting]string{
+				settings.SystemDefaultRegistry:            tt.registryURL,
+				settings.SystemDefaultRegistryPullSecrets: tt.pullSecrets,
+			})
 
 			secretClient := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			if tt.setupSecretClient != nil {
@@ -1741,6 +1763,11 @@ func Test_findV3ClustersUsingGlobalPullSecrets(t *testing.T) {
 			},
 		}
 	}
+
+	withSettings(t, map[settings.Setting]string{
+		settings.SystemDefaultRegistry:            "a-global-registry",
+		settings.SystemDefaultRegistryPullSecrets: "",
+	})
 
 	tests := []struct {
 		name       string
@@ -1925,7 +1952,11 @@ func Test_handler_syncClusterOnGlobalPullSecretChange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			withSettings(t, tt.registryURL, tt.pullSecrets)
+
+			withSettings(t, map[settings.Setting]string{
+				settings.SystemDefaultRegistry:            tt.registryURL,
+				settings.SystemDefaultRegistryPullSecrets: tt.pullSecrets,
+			})
 
 			clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
 			if tt.setupCache != nil {
@@ -1952,6 +1983,11 @@ func Test_handler_syncClusterOnGlobalPullSecretChange(t *testing.T) {
 func Test_handler_syncClusterOnGlobalRegistrySettingChange(t *testing.T) {
 	importedCluster := &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abcde"}}
 	localCluster := &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "local"}}
+
+	withSettings(t, map[settings.Setting]string{
+		settings.SystemDefaultRegistry:            "a-private-registry",
+		settings.SystemDefaultRegistryPullSecrets: "",
+	})
 
 	tests := []struct {
 		name            string

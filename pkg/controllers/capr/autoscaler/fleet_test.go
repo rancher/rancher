@@ -10,6 +10,7 @@ import (
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -176,7 +177,7 @@ func (s *autoscalerSuite) expectManageHelmOpSecrets(clusterName, clusterNamespac
 
 	notFound := errors.NewNotFound(schema.GroupResource{}, "")
 	// cleanupClusterScopedSecrets
-	s.secretClient.EXPECT().Delete(clusterNamespace, helmOpSecretName(clusterName, clusterNamespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(clusterNamespace, helmOpSecretName(clusterName), gomock.Any()).Return(notFound)
 	s.secretClient.EXPECT().Delete(clusterNamespace, autoscalerClusterScopedImagePullSecretName(clusterName), gomock.Any()).Return(notFound)
 	// ensureRootHelmOpSecrets — no global registry → attempt to delete both root secrets
 	s.secretClient.EXPECT().Delete("fleet-default", autoscalerHelmSecretResourceName, gomock.Any()).Return(notFound)
@@ -472,7 +473,7 @@ func (s *autoscalerSuite) TestCleanupFleet_HappyPath_CleansClusterScopedSecrets(
 	// HelmOp does not exist, so only cluster-scoped secret cleanup should run.
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
 	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
-	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(notFound)
 	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(notFound)
 
 	err := s.h.cleanupFleet(cluster)
@@ -544,7 +545,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCleanupClusterScopedSec
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
 	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
-	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(cleanupError)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(cleanupError)
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err, "Expected error when cluster-scoped secret cleanup fails")
@@ -568,7 +569,7 @@ func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteClusterScopedImag
 
 	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, notFound)
 	s.clusterCache.EXPECT().Get(cluster.Namespace, cluster.Name).Return(provCluster, nil)
-	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name, cluster.Namespace), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, helmOpSecretName(cluster.Name), gomock.Any()).Return(notFound)
 	s.secretClient.EXPECT().Delete(provCluster.Namespace, autoscalerClusterScopedImagePullSecretName(provCluster.Name), gomock.Any()).Return(cleanupError)
 
 	err := s.h.cleanupFleet(cluster)
@@ -599,6 +600,61 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyNamespace() 
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has empty namespace")
+}
+
+func (s *autoscalerSuite) TestManageHelmOpSecrets_GSDREqualsChartHost_ClusterHasOwnSDR() {
+	const (
+		chartHost      = "charts.example.com"
+		chartRepo      = "https://charts.example.com/helm/charts"
+		pullSecretName = "autoscaler-pull-secret"
+		clusterName    = "test-cluster"
+		clusterNS      = "fleet-default"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepo,
+		settings.SystemDefaultRegistry:            chartHost,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNS},
+	}
+	capiCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: clusterNS},
+	}
+	s.clusterCache.EXPECT().Get(clusterNS, clusterName).Return(provCluster, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+
+	s.secretClient.EXPECT().Delete(clusterNS, helmOpSecretName(clusterName), gomock.Any()).Return(notFound)
+	s.secretClient.EXPECT().Delete(clusterNS, autoscalerClusterScopedImagePullSecretName(clusterName), gomock.Any()).Return(notFound)
+
+	pullSecretData, err := dockerConfigSecretData(chartHost, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(sec *corev1.Secret) (*corev1.Secret, error) {
+		return sec, nil
+	})
+
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(sec *corev1.Secret) (*corev1.Secret, error) {
+		return sec, nil
+	})
+
+	helmOpSec, imagePullSec, err := s.h.manageHelmOpSecrets(capiCluster)
+	s.NoError(err)
+	s.Equal(autoscalerHelmSecretResourceName, helmOpSec)
+	s.Equal(autoscalerChartImagePullSecretName, imagePullSec,
+		"root image pull secret must be propagated even when GSDR equals the autoscaler chart host, "+
+			"because clusters with their own SDR do not get GSDR credentials in their containerd config")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters() {
