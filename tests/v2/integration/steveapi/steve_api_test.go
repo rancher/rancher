@@ -67,6 +67,7 @@ var (
 	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
 	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	revisionReg                = regexp.MustCompile(`(revision=)[\d]+`)
+	testLabelReg               = regexp.MustCompile(`(labelSelector=test.cattle.io%2Fsteveapi%3D)[\w]+`)
 	projectTag                 = regexp.MustCompile(`(test-prj-[1-9])`)
 	namespaceTag               = regexp.MustCompile(`(test-ns-[1-9])`)
 	namespaceSecretManagerRole = rbacv1.Role{
@@ -2651,7 +2652,7 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			// non-sql can't handle annotations and label fields that contain "."s because it splits on them
+			// ensure the sql filter can handle labels and annotation names containing periods
 			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
 			user:        "user-a",
 			namespace:   "test-ns-2",
@@ -2661,7 +2662,7 @@ func (s *steveAPITestSuite) TestList() {
 			},
 		},
 		{
-			// non-sql doesn't handle the '>' greater-than operator
+			// ensure the sql filter can handle the '>' greater-than operator
 			description: "user:user-a,namespace:test-ns-1,query:filter=metadata.fields[2]>0&sort=metadata.fields[2]",
 			user:        "user-a",
 			namespace:   "test-ns-1",
@@ -2861,6 +2862,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 		if next, ok := pagination["next"].(string); ok {
 			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
 			next = revisionReg.ReplaceAllString(next, "${1}"+revisionNum)
+			next = testLabelReg.ReplaceAllString(next, "${1}"+fakeTestID)
 			pagination["next"] = next
 			mapResp["pagination"] = pagination
 		}
