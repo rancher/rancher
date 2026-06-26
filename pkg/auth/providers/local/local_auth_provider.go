@@ -157,6 +157,23 @@ func (l *Provider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, inpu
 	return userPrincipal, groupPrincipals, "", nil
 }
 
+// isLocalUser reports whether a User resource represents a user that can log
+// in locally. A user is considered local if it has a local login username or a
+// local:// principal ID. SCIM-provisioned users and users created purely as a
+// side effect of external authentication (e.g. SAML/Okta) lack both and must
+// not surface in local principal search results.
+func isLocalUser(user *apiv3.User) bool {
+	if user.Username != "" {
+		return true
+	}
+	for _, p := range user.PrincipalIDs {
+		if strings.HasPrefix(p, Name+"://") {
+			return true
+		}
+	}
+	return false
+}
+
 func getLocalPrincipalID(user *apiv3.User) string {
 	// TODO error condition handling: no principal, more than one that would match
 	var principalID string
@@ -246,6 +263,9 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 	if principalType == "" || principalType == "user" {
 	User:
 		for _, user := range localUsers {
+			if !isLocalUser(user) {
+				continue
+			}
 			for _, p := range user.PrincipalIDs {
 				if fromOtherProviders[p] {
 					continue User

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,6 +62,15 @@ func TestProviderSearchPrincipal(t *testing.T) {
 			},
 			Username:    "jalice",
 			DisplayName: "Alice Johnson",
+		},
+		{
+			// SCIM-provisioned external user: no Username, only an external
+			// provider principal ID. Must not surface as a local principal.
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-scim1",
+			},
+			DisplayName:  "testuser2@example.com",
+			PrincipalIDs: []string{"okta_user://abc-uuid-1"},
 		},
 	}
 
@@ -152,6 +161,16 @@ func TestProviderSearchPrincipal(t *testing.T) {
 		{
 			searchKey: "Emile Dubois",
 			want:      []string{"local://u-56789"},
+		},
+		{
+			// SCIM-provisioned user must not appear in local search results
+			// even though they exist as a v3.User. Issue rancher/rancher#54022.
+			searchKey: "testuser2",
+			want:      nil,
+		},
+		{
+			searchKey: "testuser2@example.com",
+			want:      nil,
 		},
 	}
 
