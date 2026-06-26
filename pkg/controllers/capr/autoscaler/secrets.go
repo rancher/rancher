@@ -32,7 +32,7 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 			return "", "", err
 		}
 		if username != "" && password != "" {
-			helmOpSecretName, err = h.ensureClusterScopedHelmOpSecretInNamespace(provCluster, capiCluster, username, password)
+			helmOpSecretName, err = h.ensureClusterScopedHelmOpSecretInNamespace(capiCluster, username, password)
 			if err != nil {
 				return "", "", err
 			}
@@ -104,7 +104,7 @@ func (h *autoscalerHandler) cleanupClusterScopedSecrets(provCluster *provv1.Clus
 // ensureClusterScopedHelmOpSecretInNamespace creates or updates a basic-auth Helm secret in the
 // CAPI cluster's namespace using pre-fetched cluster-level autoscaler chart credentials.
 // Credentials are resolved once in manageHelmOpSecrets to avoid redundant secret cache reads.
-func (h *autoscalerHandler) ensureClusterScopedHelmOpSecretInNamespace(provCluster *provv1.Cluster, capiCluster *capi.Cluster, username, password string) (string, error) {
+func (h *autoscalerHandler) ensureClusterScopedHelmOpSecretInNamespace(capiCluster *capi.Cluster, username, password string) (string, error) {
 	s, err := h.upsertSecret(capiCluster.Namespace, helmOpSecretName(capiCluster.Name), "", basicAuthSecretData(username, password), ownerReference(capiCluster))
 	if err != nil {
 		return "", err
