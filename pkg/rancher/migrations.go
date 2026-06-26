@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -78,7 +79,10 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		return err
 	}
 
-	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
+	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(),
+		wranglerContext.Mgmt.Token(),
+		exttokenstore.NewSystemFromWrangler(wranglerContext),
+		"v2.6.0"); err != nil {
 		return err
 	}
 
@@ -176,7 +180,10 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 // forceUpgradeLogout will delete all dashboard tokens forcing a logout.  This is useful when there is a major frontend
 // upgrade and we want all users to be sent to a central point.  This function will check for the `forceUpgradeLogoutConfig`
 // configuration map and only run if the last migrated version is lower than the given `migrationVersion`.
-func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, tokenController v3.TokenController, migrationVersion string) error {
+func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
+	tokenController v3.TokenController,
+	extTokenStore *exttokenstore.SystemStore,
+	migrationVersion string) error {
 	cm, err := getConfigMap(configMapController, forceUpgradeLogoutConfig)
 	if err != nil || cm == nil {
 		return err
@@ -201,7 +208,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	// list all tokens that were created for the dashboard
 	allTokens, err := tokenController.Cache().List(labels.SelectorFromSet(labels.Set{tokens.TokenKindLabel: "session"}))
 	if err != nil {
-		logrus.Error("Failed to list tokens for upgrade forced logout")
+		logrus.WithError(err).Error("Failed to list tokens for upgrade forced logout")
 		return err
 	}
 
@@ -209,7 +216,24 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	for _, token := range allTokens {
 		err = tokenController.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			logrus.Errorf("Failed to delete token [%s] for upgrade forced logout", token.Name)
+			logrus.WithError(err).Errorf("Failed to delete token [%s] for upgrade forced logout", token.Name)
+		}
+	}
+
+	// list all ext tokens that were created for the dashboard.
+	allExtTokens, err := extTokenStore.List(&metav1.ListOptions{
+		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.IsLogin}.AsSelector().String(),
+	})
+	if err != nil {
+		logrus.WithError(err).Error("Failed to list ext tokens for upgrade forced logout")
+		return err
+	}
+
+	// log out all the dashboard users forcing them to be redirected to the login page
+	for _, extToken := range allExtTokens.Items {
+		err = extTokenStore.Delete(extToken.ObjectMeta.Name, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			logrus.WithError(err).Errorf("Failed to delete ext token [%s] for upgrade forced logout", extToken.Name)
 		}
 	}
 
