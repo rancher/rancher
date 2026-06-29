@@ -183,7 +183,7 @@ func (l *Provider) SearchPrincipals(searchKey, principalType string, token acces
 	return l.SearchPrincipalsDedupe(searchKey, principalType, token, nil)
 }
 
-// SearchPrincipalsDedupe performs principal search, but deduplicates the
+// SearchPrincipalsDedupe performs principal search, and deduplicates the
 // results against the supplied list (that should have come from other non-local
 // auth providers) to avoid duplicate search results. Only user principals are
 // returned; the local provider does not own any groups.
@@ -199,13 +199,13 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 
 	queryKey := strings.ToLower(searchKey)
 	var (
-		localUsers []*apiv3.User
-		err        error
+		matched []*apiv3.User
+		err     error
 	)
 	if len(searchKey) > searchIndexDefaultLen {
-		localUsers, err = l.listAllUsers(queryKey)
+		matched, err = l.listAllUsers(queryKey)
 	} else {
-		localUsers, err = l.listUsersByIndex(queryKey)
+		matched, err = l.listUsersByIndex(queryKey)
 	}
 	if err != nil {
 		logrus.Infof("Failed to search User resources for %v: %v", searchKey, err)
@@ -214,7 +214,7 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 
 	var principals []apiv3.Principal
 User:
-	for _, user := range localUsers {
+	for _, user := range matched {
 		if !isLocalUser(user) {
 			continue
 		}
@@ -273,14 +273,14 @@ func (l *Provider) listAllUsers(searchKey string) ([]*apiv3.User, error) {
 		return nil, fmt.Errorf("listing users for search %q: %w", searchKey, err)
 	}
 
-	var localUsers []*apiv3.User
+	var matched []*apiv3.User
 	for _, user := range allUsers {
 		if !userMatchesSearchKey(user, searchKey) {
 			continue
 		}
-		localUsers = append(localUsers, user)
+		matched = append(matched, user)
 	}
-	return localUsers, nil
+	return matched, nil
 }
 
 func (l *Provider) listUsersByIndex(searchKey string) ([]*apiv3.User, error) {
@@ -289,15 +289,15 @@ func (l *Provider) listUsersByIndex(searchKey string) ([]*apiv3.User, error) {
 		return nil, fmt.Errorf("indexing users for search %q: %w", searchKey, err)
 	}
 
-	localUsers := make([]*apiv3.User, 0, len(objs))
+	matched := make([]*apiv3.User, 0, len(objs))
 	for _, obj := range objs {
 		user, ok := obj.(*apiv3.User)
 		if !ok {
 			return nil, fmt.Errorf("user index returned non-User object: %T", obj)
 		}
-		localUsers = append(localUsers, user)
+		matched = append(matched, user)
 	}
-	return localUsers, nil
+	return matched, nil
 }
 
 func (l *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
