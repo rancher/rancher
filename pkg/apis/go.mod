@@ -9,7 +9,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.36.2
 	k8s.io/apiserver => k8s.io/apiserver v0.36.2
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.36.2
-	k8s.io/client-go => k8s.io/client-go v0.36.1
+	k8s.io/client-go => k8s.io/client-go v0.36.2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.36.2
 	k8s.io/component-base => k8s.io/component-base v0.36.2
 	k8s.io/component-helpers => k8s.io/component-helpers v0.36.2
