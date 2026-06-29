@@ -918,6 +918,16 @@ func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
 // call invoked by other parts of Rancher. It runs with full access. None of the
 // returned tokens are marked as current.
 func (t *SystemStore) List(options *metav1.ListOptions) (*ext.TokenList, error) {
+	// As a visible method possibly called during Rancher start (migrations)
+	// ensure that the backing namespace exists when the store is fully
+	// wired; the namespace may not exist yet on clusters that have never
+	// created ext tokens.
+	if t.namespaceClient != nil && t.namespaceCache != nil {
+		if err := t.ensureNamespace(); err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %w",
+				TokenNamespace, err))
+		}
+	}
 	return t.list(true, "", "", options)
 }
 
