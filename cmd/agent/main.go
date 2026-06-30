@@ -39,9 +39,8 @@ var (
 )
 
 const (
-	Token          = "X-API-Tunnel-Token"
-	Params         = "X-API-Tunnel-Params"
-	caFileLocation = "/etc/kubernetes/ssl/certs/serverca"
+	Token  = "X-API-Tunnel-Token"
+	Params = "X-API-Tunnel-Params"
 )
 
 func main() {
