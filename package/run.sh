@@ -97,19 +97,6 @@ check_url()
     fi
 }
 
-check_x509_cert()
-{
-    local cert=$1
-    local err
-    err=$(openssl x509 -in $cert -noout 2>&1)
-    if [ $? -eq 0 ]
-    then
-        echo ""
-    else
-        echo ${err}
-    fi
-}
-
 export CATTLE_ADDRESS
 export CATTLE_AGENT_CONNECT
 export CATTLE_INTERNAL_ADDRESS
@@ -120,6 +107,7 @@ export CATTLE_TOKEN
 export CATTLE_NODE_LABEL
 export CATTLE_WRITE_CERT_ONLY
 export CATTLE_NODE_TAINTS
+export CATTLE_CA_CHECKSUM
 
 while true; do
     case "$1" in
@@ -215,7 +203,6 @@ fi
 
 # Extract hostname from URL
 CATTLE_SERVER_HOSTNAME=$(echo $CATTLE_SERVER | sed -e 's/[^/]*\/\/\([^@]*@\)\?\([^:/]*\).*/\2/')
-CATTLE_SERVER_HOSTNAME_WITH_PORT=$(echo $CATTLE_SERVER | sed -e 's/[^/]*\/\/\([^@]*@\)\?\(.*\).*/\2/')
 # Resolve IPv4 address(es) from hostname
 RESOLVED_ADDR=$(getent ahostsv4 $CATTLE_SERVER_HOSTNAME | sed -n 's/ *STREAM.*//p')
 
@@ -223,40 +210,5 @@ RESOLVED_ADDR=$(getent ahostsv4 $CATTLE_SERVER_HOSTNAME | sed -n 's/ *STREAM.*//
 if [ "${CATTLE_SERVER_HOSTNAME}" != "${RESOLVED_ADDR}" ]; then
   info "${CATTLE_SERVER_HOSTNAME} resolves to $(echo $RESOLVED_ADDR)"
 fi
-
-if [ -n "$CATTLE_CA_CHECKSUM" ]; then
-    temp=$(mktemp)
-    curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r '.value | select(length > 0)' > $temp
-    if [ ! -s $temp ]; then
-      error "The environment variable CATTLE_CA_CHECKSUM is set but there is no CA certificate configured at $CATTLE_SERVER/v3/settings/cacerts"
-      exit 1
-    fi
-    err=$(check_x509_cert $temp)
-    if [[ $err ]]; then
-        error "Value from $CATTLE_SERVER/v3/settings/cacerts does not look like an x509 certificate (${err})"
-        error "Retrieved cacerts:"
-        cat $temp
-        exit 1
-    else
-        info "Value from $CATTLE_SERVER/v3/settings/cacerts is an x509 certificate"
-    fi
-    CATTLE_SERVER_CHECKSUM=$(sha256sum $temp | awk '{print $1}')
-    if [ $CATTLE_SERVER_CHECKSUM != $CATTLE_CA_CHECKSUM ]; then
-        rm -f $temp
-        error "Configured cacerts checksum ($CATTLE_SERVER_CHECKSUM) does not match given --ca-checksum ($CATTLE_CA_CHECKSUM)"
-        error "Please check if the correct certificate is configured at $CATTLE_SERVER/v3/settings/cacerts"
-        exit 1
-    else
-        mkdir -p /etc/kubernetes/ssl/certs
-        mv $temp /etc/kubernetes/ssl/certs/serverca
-        chmod 755 /etc/kubernetes/ssl
-        chmod 700 /etc/kubernetes/ssl/certs
-        chmod 600 /etc/kubernetes/ssl/certs/serverca
-        mkdir -p /etc/docker/certs.d/$CATTLE_SERVER_HOSTNAME_WITH_PORT
-        cp /etc/kubernetes/ssl/certs/serverca /etc/docker/certs.d/$CATTLE_SERVER_HOSTNAME_WITH_PORT/ca.crt
-
-    fi
-fi
-
 exec catatonit -- agent
 
