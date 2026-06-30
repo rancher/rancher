@@ -22,11 +22,13 @@ if [ $# -ne 0 ]; then
 fi
 
 if [ "$1" = "--" ]; then
+    export CATTLE_ENTRYPOINT_BYPASS=true
     shift 1
     exec "$@"
 fi
 
 if [ "$CLUSTER_CLEANUP" = true ]; then
+    export CATTLE_ENTRYPOINT_BYPASS=true
     exec agent
 fi
 
