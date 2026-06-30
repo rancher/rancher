@@ -29,15 +29,17 @@ import (
 // ControllerOwnerKey is the value used to identify the etcd-snapshot-save handler currently owns the beacon.
 const ControllerOwnerKey = "etcd-snapshot-save"
 
+// Step hook label prefixes for the etcdsnapshotsave operation. They follow the shared label
+// semantics documented on planv1alpha1's phase-hook label constants, but each prefix only fires
+// when the operation enters the matching step.
 const (
-	PendingPhaseLifecycleHookPrefix    = "pending.phase.hook.operation.cattle.io/"
-	InProgressPhaseLifecycleHookPrefix = "in-progress.phase.hook.operation.cattle.io/"
-	CanceledPhaseLifecycleHookPrefix   = "canceled.phase.hook.operation.cattle.io/"
-	FailedPhaseLifecycleHookPrefix     = "failed.phase.hook.operation.cattle.io/"
-	SucceededPhaseLifecycleHookPrefix  = "succeeded.phase.hook.operation.cattle.io/"
+	// SaveStepHookLabelPrefix gates the Save step before reconcileSave assigns the
+	// `<runtime> etcd-snapshot save` plan to any etcd-labeled machine-plan secret.
+	SaveStepHookLabelPrefix = "save.step.hook.operation.cattle.io/"
 
-	SaveStepLifecycleHookPrefix    = "save.step.hook.operation.cattle.io/"
-	RestartStepLifecycleHookPrefix = "restart.step.hook.operation.cattle.io/"
+	// RestartStepHookLabelPrefix gates the Restart step before reconcileRestart assigns the
+	// `systemctl restart <server-unit>` plan to any etcd-labeled machine-plan secret.
+	RestartStepHookLabelPrefix = "restart.step.hook.operation.cattle.io/"
 )
 
 // dynamicResolver is the subset of *dynamic.Controller this handler needs: Get for cluster
@@ -313,7 +315,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		return status, nil
 	}
 
-	delegated, err := h.handleHook(s, PendingPhaseLifecycleHookPrefix)
+	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -369,7 +371,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		return status, err
 	}
 
-	delegated, err := h.handleHook(s, InProgressPhaseLifecycleHookPrefix)
+	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -415,7 +417,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling snapshot save", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, SaveStepLifecycleHookPrefix)
+	delegated, err := h.handleHook(s, SaveStepHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -515,7 +517,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, RestartStepLifecycleHookPrefix)
+	delegated, err := h.handleHook(s, RestartStepHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -609,11 +611,11 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 // held by the current object).
 // The difference between canceled and failed operations is that an operation fails itself, whereas another controller
 // cancels an operation.
-// This function mostly serves to execute the CanceledPhaseLifecycleHookPrefix, if it exists
+// This function mostly serves to execute the planv1alpha1.CanceledPhaseHookLabelPrefix, if it exists
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, CanceledPhaseLifecycleHookPrefix)
+	delegated, err := h.handleHook(s, planv1alpha1.CanceledPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -646,7 +648,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, FailedPhaseLifecycleHookPrefix)
+	delegated, err := h.handleHook(s, planv1alpha1.FailedPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -679,7 +681,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, SucceededPhaseLifecycleHookPrefix)
+	delegated, err := h.handleHook(s, planv1alpha1.SucceededPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
