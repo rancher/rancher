@@ -63,7 +63,7 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	if err := validateToken(token.GetName(), token.Spec.UserID); err != nil {
 		return token, err
 	}
-	logrus.Debugf("[%s] ext CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
+	logrus.Infof("[clusterauthtoken-sync] cluster=%s token=%s ext create", token.Spec.ClusterName, token.Name)
 
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
@@ -212,7 +212,7 @@ func (h *tokenHandler) Create(token *mgmtapiv3.Token) (runtime.Object, error) {
 	if err := validateToken(token.Name, token.UserID); err != nil {
 		return token, err
 	}
-	logrus.Debugf("[%s] v3 CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
+	logrus.Infof("[clusterauthtoken-sync] cluster=%s token=%s v3 create", token.ClusterName, token.Name)
 
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
@@ -252,7 +252,17 @@ func (h *tokenHandler) Create(token *mgmtapiv3.Token) (runtime.Object, error) {
 }
 
 // createClusterAuthToken handles actions commonly taken to create a clusterAuthToken from a token.
-func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hashedValue string) error {
+func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hashedValue string) (retErr error) {
+	clusterName, tokenName := token.ObjClusterName(), token.GetName()
+	defer func() {
+		if retErr != nil {
+			logrus.Errorf("[clusterauthtoken-sync] cluster=%s token=%s createClusterAuthToken failed: %v",
+				clusterName, tokenName, retErr)
+			return
+		}
+		logrus.Infof("[clusterauthtoken-sync] cluster=%s token=%s ClusterAuthToken synced", clusterName, tokenName)
+	}()
+
 	err := h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
 		return err
