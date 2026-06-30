@@ -1,6 +1,7 @@
 package operations
 
 import (
+	caprke2v1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,7 +34,16 @@ func init() {
 				clients:      clients,
 			}, nil
 		}
-		if cluster.Spec.ControlPlaneRef.APIGroup == rkev1.SchemeGroupVersion.Group {}
+		if cluster.Spec.ControlPlaneRef.APIGroup == caprke2v1beta2.GroupVersion.Group && cluster.Spec.ControlPlaneRef.Kind == "RKE2ControlPlane" {
+			controlPlane, err := clients.Dynamic.Get(caprke2v1beta2.GroupVersion.WithKind("RKE2ControlPlane"), unstructured.GetNamespace(), unstructured.GetName())
+			if err != nil {
+				return nil, err
+			}
+			return &CAPRKE2Adapter{
+				controlPlane: controlPlane,
+				clients:      clients,
+			}, nil
+		}
 		return nil, nil
 	})
 }

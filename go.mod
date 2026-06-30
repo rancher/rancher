@@ -262,6 +262,7 @@ require (
 	github.com/pjbgf/sha1cd v0.6.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/prometheus/common v0.67.5 // indirect
+	github.com/rancher/cluster-api-provider-rke2 v0.25.0 // indirect
 	github.com/rancher/wrangler v1.1.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
@@ -408,7 +409,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
+	go.uber.org/zap v1.28.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/time v0.15.0

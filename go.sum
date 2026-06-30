@@ -621,6 +621,8 @@ github.com/rancher/apiserver v0.9.7 h1:b29KuloAFVY3PemDSUdrLmwzX/vJWpWBgr20m7xSv
 github.com/rancher/apiserver v0.9.7/go.mod h1:NLkaZ69HiT6/5OcXm2EZcydCv8PKRcIXaIphABvhX1I=
 github.com/rancher/channelserver v0.11.0 h1:R1oRG2SkGkC0EKHsa+VgBuLKHzEGVE1NMJeP/6c5vPo=
 github.com/rancher/channelserver v0.11.0/go.mod h1:ZWuXGR708g5FoMdmf+fXE2XEOztdm3bcwjdMmriY1kg=
+github.com/rancher/cluster-api-provider-rke2 v0.25.0 h1:/BVUHgficJxfSRFLwBdgkzP7Guts8wdftpF/CfpH7Vo=
+github.com/rancher/cluster-api-provider-rke2 v0.25.0/go.mod h1:O8moqon9fN6XNW9n9Viy7aS+m2y4eLWtS1FjUs/RqLQ=
 github.com/rancher/dynamiclistener v0.9.0-rc.1 h1:tmV3fgvB5pXSOMrb7G1DSno5C9XTfoyzHaDeVRhtUd0=
 github.com/rancher/dynamiclistener v0.9.0-rc.1/go.mod h1:HG2E4ZcZKAc6JymJLy74ROKMTtsKyrA1fyQSR/g/+0w=
 github.com/rancher/eks-operator v1.15.0-rc.2 h1:fJOeSZbMlzYSnL78PW8RyDtanXZgZWgMYuYo8l1S7Ik=
@@ -814,6 +816,8 @@ go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 go.uber.org/zap v1.27.1 h1:08RqriUEv8+ArZRYSTXy1LeBScaMpVSTBhCeaZYfMYc=
 go.uber.org/zap v1.27.1/go.mod h1:GB2qFLM7cTU87MWRP2mPIjqfIDnGu+VIO4V/SdhGo2E=
+go.uber.org/zap v1.28.0 h1:IZzaP1Fv73/T/pBMLk4VutPl36uNC+OSUh3JLG3FIjo=
+go.uber.org/zap v1.28.0/go.mod h1:rDLpOi171uODNm/mxFcuYWxDsqWSAVkFdX4XojSKg/Q=
 go.yaml.in/yaml/v2 v2.4.4 h1:tuyd0P+2Ont/d6e2rl3be67goVK4R6deVxCUX5vyPaQ=
 go.yaml.in/yaml/v2 v2.4.4/go.mod h1:gMZqIpDtDqOfM0uNfy0SkpRhvUryYH0Z6wdMYcacYXQ=
 go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
