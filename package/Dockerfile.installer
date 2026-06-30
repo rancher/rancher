@@ -11,10 +11,10 @@ ENV CHART_VERSION=${VERSION}
 
 # set up helm 4
 # renovate: datasource=github-release-attachments depName=helm/helm
-ENV HELM_VERSION=v4.2.2
-# renovate: datasource=github-release-attachments depName=helm/helm digestVersion=v4.2.2
+ENV HELM_VERSION=v4.2.0
+# renovate: datasource=github-release-attachments depName=helm/helm digestVersion=v4.2.0
 ENV HELM_HASH_amd64=97dbeb971be4ac4b27e3839976d9564c0fb35c6f3b1da89dd1e292d236af4096
-# renovate: datasource=github-release-attachments depName=helm/helm digestVersion=v4.2.2
+# renovate: datasource=github-release-attachments depName=helm/helm digestVersion=v4.2.0
 ENV HELM_HASH_arm64=1f8de130dfbd04de64978e7b852a7a547be1404956a366608276d2520b678670
 
 RUN if [ "${BUILDARCH}" = "amd64" ]; then \
