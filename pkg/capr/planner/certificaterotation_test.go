@@ -481,7 +481,13 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 				ServerToken: "lol",
 			}
 
-			np, joined, err := mockPlanner.planner.rotateCertificatesPlan(controlPlane, ts, controlPlane.Spec.RotateCertificates, entry, tt.joinServer)
+			// rotateCertificatesPlan now threads the parent CAPI Cluster through to
+			// generatePlanWithConfigFiles. The cert-rotation paths under test only care that the
+			// cluster object is non-nil — none of the rotation instructions read its spec — so an
+			// empty fixture is sufficient.
+			capiCluster := &capi.Cluster{}
+
+			np, joined, err := mockPlanner.planner.rotateCertificatesPlan(controlPlane, capiCluster, ts, controlPlane.Spec.RotateCertificates, entry, tt.joinServer)
 			if tt.expected.oti != nil {
 				assert.Equal(t, *tt.expected.oti, np.Instructions[tt.expected.otiIndex])
 			}

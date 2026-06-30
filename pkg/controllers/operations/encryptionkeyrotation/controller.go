@@ -105,6 +105,14 @@ func (h *handler) OnChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 	status = updateStatus(op, status)
 
 	if equality.Semantic.DeepEqual(op.Status, status) {
+		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
+		if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
+			err = h.encryptionkeyrotations.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				return status, err
+			}
+			return status, generic.ErrSkip
+		}
 		h.encryptionkeyrotations.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
 	}
 	return status, nil
@@ -190,38 +198,24 @@ func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 		adapter:    adapter,
 	}
 
-	if status.Phase == opv1alpha1.OperationPhasePending {
+	switch status.Phase {
+	case opv1alpha1.OperationPhasePending:
 		return h.handlePending(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseInProgress {
+	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
-	}
-	// Canceled, Failed and Succeeded all share the TTL deletion block below — handleCanceled
-	// runs its hook + beacon release the same way handleFailed/handleSucceeded do.
-	if status.Phase == opv1alpha1.OperationPhaseCanceled {
-		status, err = h.handleCanceled(s, status)
-	} else if status.Phase == opv1alpha1.OperationPhaseFailed {
-		status, err = h.handleFailed(s, status)
-	} else if status.Phase == opv1alpha1.OperationPhaseSucceeded {
-		status, err = h.handleSucceeded(s, status)
-	} else {
+	case opv1alpha1.OperationPhaseCanceled:
+		return h.handleCanceled(s, status)
+	case opv1alpha1.OperationPhaseFailed:
+		return h.handleFailed(s, status)
+	case opv1alpha1.OperationPhaseSucceeded:
+		return h.handleSucceeded(s, status)
+	default:
+		// Should be prevented via validation, but just in case
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
-		return status, nil
-	}
-
-	if err != nil {
-		return status, err
-	}
-
-	// Delete expired terminal CRs after cleanup has run.
-	if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
-		err = h.encryptionkeyrotations.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			return status, err
-		}
-		return status, generic.ErrSkip
 	}
 
 	return status, nil

@@ -3,7 +3,6 @@ package etcdsnapshotsave
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,7 +99,7 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	}
 	status = updateStatus(op, status)
 
-	if reflect.DeepEqual(op.Status, status) {
+	if equality.Semantic.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
 		if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
 			err = h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
@@ -236,8 +236,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
-		// canceled assumes that the beacon is released, so we can safely skip the rest of the processing
-		return status, nil
+		return h.handleCanceled(s, status)
 	case opv1alpha1.OperationPhaseFailed:
 		return h.handleFailed(s, status)
 	case opv1alpha1.OperationPhaseSucceeded:
