@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -41,11 +42,36 @@ func preStart(ctx context.Context) error {
 	}
 
 	cattleServer := os.Getenv("CATTLE_SERVER")
+	if err := printResolvedCattleServerHostname(cattleServer); err != nil {
+		return err
+	}
+
 	if cattleCAChecksum := os.Getenv("CATTLE_CA_CHECKSUM"); cattleCAChecksum != "" {
 		if err := populateRancherCACerts(ctx, cattleServer, cattleCAChecksum); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// printResolvedCattleServerHostname prints the IP(s) to which the provided CATTLE_SERVER hostname resolves
+// If an IP was already used, then it is a no-op
+func printResolvedCattleServerHostname(cattleServerEnv string) error {
+	parsed, err := url.Parse(cattleServerEnv)
+	if err != nil {
+		return err
+	}
+	cattleServerHostname := parsed.Hostname()
+
+	resolved, err := net.LookupHost(cattleServerHostname)
+	if err != nil {
+		return err
+	} else if len(resolved) == 1 && resolved[0] == cattleServerHostname {
+		// It's an IP address, nothing to resolve
+		return nil
+	}
+
+	logrus.Infof("%s resolves to %s", cattleServerHostname, strings.Join(resolved, ", "))
 	return nil
 }
 
