@@ -32,61 +32,7 @@ if [ "$CLUSTER_CLEANUP" = true ]; then
     exec agent
 fi
 
-get_address()
-{
-    local address=$1
-    # If nothing is given, return empty (it will be automatically determined later if empty)
-    if [ -z $address ]; then
-        echo ""
-    # If given address is a network interface on the system, retrieve configured IP on that interface (only the first configured IP is taken)
-    elif [ -n "$(find /sys/devices -name $address)" ]; then
-        echo $(ip addr show dev $address | grep -w inet | awk '{print $2}' | cut -f1 -d/ | head -1)
-    # Loop through cloud provider options to get IP from metadata, if not found return given value
-    else
-        case $address in
-            awslocal)
-                echo $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
-                ;;
-            awspublic)
-                echo $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-                ;;
-            doprivate)
-                echo $(curl -s http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
-                ;;
-            dopublic)
-                echo $(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
-                ;;
-            azprivate)
-                echo $(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2017-08-01&format=text")
-                ;;
-            azpublic)
-                echo $(curl -s -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-08-01&format=text")
-                ;;
-            gceinternal)
-                echo $(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip)
-                ;;
-            gceexternal)
-                echo $(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
-                ;;
-            packetlocal)
-                echo $(curl -s https://metadata.packet.net/2009-04-04/meta-data/local-ipv4)
-                ;;
-            packetpublic)
-                echo $(curl -s https://metadata.packet.net/2009-04-04/meta-data/public-ipv4)
-                ;;
-            ipify)
-                echo $(curl -s https://api.ipify.org)
-                ;;
-            *)
-                echo $address
-                ;;
-        esac
-    fi
-}
-
-export CATTLE_ADDRESS
 export CATTLE_AGENT_CONNECT
-export CATTLE_INTERNAL_ADDRESS
 export CATTLE_NODE_NAME
 export CATTLE_ROLE
 export CATTLE_SERVER
@@ -108,8 +54,8 @@ while true; do
         -p | --controlplane)            CONTROL=true                ;;
         -n | --node-name)        shift; CATTLE_NODE_NAME=$1         ;;
         -r | --no-register)             CATTLE_AGENT_CONNECT=true   ;;
-        -a | --address)          shift; CATTLE_ADDRESS=$1           ;;
-        -i | --internal-address) shift; CATTLE_INTERNAL_ADDRESS=$1  ;;
+        --address)               shift; ;; # deprecated
+        -i | --internal-address) shift; ;; # deprecated
         -l | --label)            shift; CATTLE_NODE_LABEL+=",$1"    ;;
         -o | --only-write-certs)        CATTLE_WRITE_CERT_ONLY=true ;;
         --taints)                shift; CATTLE_NODE_TAINTS+=",$1"   ;;
@@ -134,22 +80,9 @@ if [ -z "$CATTLE_NODE_NAME" ]; then
     CATTLE_NODE_NAME=$(hostname -s)
 fi
 
-export CATTLE_ADDRESS=$(get_address $CATTLE_ADDRESS)
-export CATTLE_INTERNAL_ADDRESS=$(get_address $CATTLE_INTERNAL_ADDRESS)
-
-if [ -z "$CATTLE_ADDRESS" ]; then
-    # Example output: '8.8.8.8 via 10.128.0.1 dev ens4 src 10.128.0.34 uid 0'
-    CATTLE_ADDRESS=$(ip -o route get 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
-fi
-
 if [ "$CATTLE_K8S_MANAGED" != "true" ]; then
     if [ -z "$CATTLE_TOKEN" ]; then
         error -- --token is a required option
-        exit 1
-    fi
-
-    if [ -z "$CATTLE_ADDRESS" ]; then
-        error -- --address is a required option
         exit 1
     fi
 fi
