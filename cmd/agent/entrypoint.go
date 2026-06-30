@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -42,6 +43,10 @@ func preStart(ctx context.Context) error {
 	}
 
 	cattleServer := os.Getenv("CATTLE_SERVER")
+	if err := pingCattleServer(ctx, cattleServer); err != nil {
+		return fmt.Errorf("error pinging %s: %w", cattleServer, err)
+	}
+
 	if err := printResolvedCattleServerHostname(cattleServer); err != nil {
 		return err
 	}
@@ -51,6 +56,40 @@ func preStart(ctx context.Context) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// pingCattleServer checks Rancher server's connectivity
+func pingCattleServer(ctx context.Context, cattleServerEnv string) (pingError error) {
+	pingURL := cattleServerEnv + "/ping"
+	req, err := http.NewRequestWithContext(ctx, "GET", pingURL, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if pingError != nil {
+			logrus.Errorf("%s is not accessible: %v", pingURL, pingError)
+		} else {
+			logrus.Infof("%s is accessible", pingURL)
+		}
+	}()
+
+	httpClient := http.Client{Transport: insecureHTTPTransport}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+	if _, err := io.Copy(io.Discard, res.Body); err != nil {
+		return err
+	}
+
+	if res.StatusCode != 200 {
+		return fmt.Errorf("received %q status response", res.Status)
+	}
+
 	return nil
 }
 
