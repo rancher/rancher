@@ -84,19 +84,6 @@ get_address()
     fi
 }
 
-check_url()
-{
-    local url=$1
-    local err
-    err=$(curl --insecure -sS -fL -o /dev/null --stderr - $url | head -n1 ; exit ${PIPESTATUS[0]})
-    if [ $? -eq 0 ]
-    then
-        echo ""
-    else
-        echo ${err} | sed -e 's/^curl: ([0-9]\+) //'
-    fi
-}
-
 export CATTLE_ADDRESS
 export CATTLE_AGENT_CONNECT
 export CATTLE_INTERNAL_ADDRESS
@@ -190,15 +177,6 @@ info "Environment: $(echo $(printenv | grep CATTLE | sort | sed -e 's/\(CATTLE_T
 info "Using resolv.conf: $(echo $(cat /etc/resolv.conf | grep -v ^#))"
 if grep -E -q '^nameserver 127.*.*.*|^nameserver localhost|^nameserver ::1' /etc/resolv.conf; then
     warn "Loopback address found in /etc/resolv.conf, please refer to the documentation how to configure your cluster to resolve DNS properly"
-fi
-
-CATTLE_SERVER_PING="${CATTLE_SERVER}/ping"
-err=$(check_url $CATTLE_SERVER_PING)
-if [[ $err ]]; then
-    error "${CATTLE_SERVER_PING} is not accessible (${err})"
-    exit 1
-else
-    info "${CATTLE_SERVER_PING} is accessible"
 fi
 
 exec catatonit -- agent
