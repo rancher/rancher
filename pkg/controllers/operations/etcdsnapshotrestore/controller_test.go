@@ -45,6 +45,19 @@ func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret,
 	return nil, nil
 }
 
+// The five methods below complete the ops.Adapter contract for the stub. They are not exercised
+// by the snapshot-restore controller (which only consumes runtime/dataDir/serverUnit/probes/
+// kubectl+kubeconfig paths/plans), so each returns a static, runtime-appropriate value.
+func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
+	return "/etc/rancher/" + a.runtimeCommand + "/config.yaml.d"
+}
+func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
+func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
+func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []planapi.File) {
+	return nil, nil, nil
+}
+
 func newTestScope(adapter *stubAdapter, uid types.UID) *scope {
 	cluster := &unstructured.Unstructured{}
 	cluster.SetName("test-cluster")

@@ -672,7 +672,15 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, err
 	} else if snapshot != nil && snapshot.SnapshotFile.S3 == nil {
 		if len(snapshot.OwnerReferences) == 0 {
-			// todo(jhyde): failure
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: cannot find machine by owner reference for snapshot %s/%s", s.op.Namespace, s.op.Name, snapshot.Namespace, snapshot.Name)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, "owner reference is required for s3 etcd restore")
+
+			return status, nil
 		}
 
 		ref := snapshot.OwnerReferences[0]

@@ -69,6 +69,20 @@ func (a *stubAdapter) PauseCluster(paused bool) error {
 	return nil
 }
 
+// The five methods below complete the ops.Adapter contract for the stub. None of them are
+// exercised by the encryption-key-rotation controller (which only consumes runtime/dataDir/
+// serverUnit/probes/pause/plans), so each returns a static RKE2-shaped value matching what
+// CAPRAdapter would produce for an rke2 cluster.
+func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
+	return "/etc/rancher/rke2/config.yaml.d"
+}
+func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
+func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
+func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
+	return nil, nil, nil
+}
+
 type enqueueCall struct {
 	gvk       schema.GroupVersionKind
 	namespace string
@@ -113,13 +127,18 @@ func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 	if owner != "" {
 		labels[planv1alpha1.BeaconOwnerLabel] = owner
 	}
+	// Beacon ownership lives on Status.Owner; we keep the legacy BeaconOwnerLabel populated so
+	// reclaimStaleBeaconOwnerIfNeeded (which still reads the label) sees a consistent owner.
 	return &planv1alpha1.Beacon{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fleet-default",
 			Namespace: "fleet-default",
 			Labels:    labels,
 		},
-		Status: planv1alpha1.BeaconStatus{Active: active},
+		Status: planv1alpha1.BeaconStatus{
+			Active: active,
+			Owner:  owner,
+		},
 	}
 }
 
@@ -509,11 +528,16 @@ func TestHandleFailed_HoldingBeaconReleasesAndUnpauses(t *testing.T) {
 	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
 		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
 	}
-	if len(beacons.updates) != 1 {
-		t.Fatalf("expected one beacon release update, got %d", len(beacons.updates))
+	// ReleaseBeacon writes to UpdateStatus (Status.Owner is the source of truth for beacon
+	// ownership); the legacy main-resource Update is no longer used.
+	if len(beacons.statusUpdates) != 1 {
+		t.Fatalf("expected one beacon status update (ReleaseBeacon), got %d", len(beacons.statusUpdates))
 	}
-	if _, ok := beacons.updates[0].Labels[planv1alpha1.BeaconOwnerLabel]; ok {
-		t.Fatalf("expected owner label to be cleared on release")
+	if beacons.statusUpdates[0].Status.Owner != "" {
+		t.Fatalf("expected Status.Owner to be cleared on release, got %q", beacons.statusUpdates[0].Status.Owner)
+	}
+	if len(beacons.updates) != 0 {
+		t.Fatalf("expected no main-resource updates from ReleaseBeacon, got %d", len(beacons.updates))
 	}
 }
 
@@ -537,17 +561,18 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
 		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
 	}
-	if len(beacons.statusUpdates) != 1 {
-		t.Fatalf("expected one beacon status update, got %d", len(beacons.statusUpdates))
+	// ToggleBeacon(active=false) and ReleaseBeacon both route through UpdateStatus.
+	if len(beacons.statusUpdates) != 2 {
+		t.Fatalf("expected two beacon status updates (toggle + release), got %d", len(beacons.statusUpdates))
 	}
 	if beacons.statusUpdates[0].Status.Active {
-		t.Fatalf("expected beacon to be toggled inactive")
+		t.Fatalf("expected beacon to be toggled inactive first")
 	}
-	if len(beacons.updates) != 1 {
-		t.Fatalf("expected one beacon release update, got %d", len(beacons.updates))
+	if beacons.statusUpdates[1].Status.Owner != "" {
+		t.Fatalf("expected Status.Owner to be cleared on release, got %q", beacons.statusUpdates[1].Status.Owner)
 	}
-	if _, ok := beacons.updates[0].Labels[planv1alpha1.BeaconOwnerLabel]; ok {
-		t.Fatalf("expected owner label to be cleared on release")
+	if len(beacons.updates) != 0 {
+		t.Fatalf("expected no main-resource updates from ReleaseBeacon, got %d", len(beacons.updates))
 	}
 
 	if len(dynamic.enqueueCalls) != 1 {

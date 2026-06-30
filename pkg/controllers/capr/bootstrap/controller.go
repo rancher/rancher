@@ -531,6 +531,10 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 		return nil, nil, err
 	}
 
+	for k, v := range lifecycleLabels {
+		labels[k] = v
+	}
+
 	for k, v := range bootstrap.Labels {
 		labels[k] = v
 	}

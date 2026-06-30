@@ -58,6 +58,20 @@ func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret,
 	return nil, nil
 }
 
+// The five methods below complete the ops.Adapter contract for the stub. They are not exercised
+// by the snapshot-save controller (which only consumes runtime/dataDir/serverUnit/probes/plans),
+// so each returns a static, runtime-appropriate value.
+func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
+	// Mirrors CAPRAdapter.ConfigDirectory's format: /etc/rancher/<runtime>/config.yaml.d.
+	return "/etc/rancher/" + a.runtimeCommand + "/config.yaml.d"
+}
+func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
+func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
+func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []planapi.File) {
+	return nil, nil, nil
+}
+
 // fakeDynamic satisfies the controller's dynamicResolver interface for the success-path tests.
 // Enqueue records the (gvk, namespace, name) tuple so tests can assert handleSucceeded nudged
 // the parent cluster.
@@ -131,13 +145,19 @@ func newBeacon(owner string, active bool) *planv1alpha1.Beacon {
 	if owner != "" {
 		lbls[planv1alpha1.BeaconOwnerLabel] = owner
 	}
+	// Beacon ownership lives on Status.Owner (the plan.AcquireBeacon helper writes there).
+	// We populate the legacy BeaconOwnerLabel too so any caller that still reads it (e.g.
+	// EncryptionKeyRotation's reclaimStaleBeaconOwnerIfNeeded) keeps working.
 	return &planv1alpha1.Beacon{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			Namespace: "fleet-default",
 			Labels:    lbls,
 		},
-		Status: planv1alpha1.BeaconStatus{Active: active},
+		Status: planv1alpha1.BeaconStatus{
+			Active: active,
+			Owner:  owner,
+		},
 	}
 }
 
@@ -428,14 +448,14 @@ func TestHandleFailed_HoldingBeaconReleases(t *testing.T) {
 
 	_, err := h.handleFailed(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
-	// Expect ToggleBeacon(active=false) → UpdateStatus, then ReleaseBeacon → Update.
-	if assert.Len(t, beacons.statusUpdates, 1, "ToggleBeacon should update the beacon status") {
+	// Both ToggleBeacon(active=false) and ReleaseBeacon now route through UpdateStatus
+	// (Status.Owner is the source of truth for ownership), so we expect two status updates and
+	// no main-resource updates.
+	if assert.Len(t, beacons.statusUpdates, 2, "ToggleBeacon + ReleaseBeacon should both update the beacon status") {
 		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive")
+		assert.Equal(t, "", beacons.statusUpdates[1].Status.Owner, "Status.Owner must be cleared on release")
 	}
-	if assert.Len(t, beacons.updates, 1, "ReleaseBeacon should update the beacon labels") {
-		_, hasOwner := beacons.updates[0].Labels[planv1alpha1.BeaconOwnerLabel]
-		assert.False(t, hasOwner, "owner label must be cleared")
-	}
+	assert.Empty(t, beacons.updates, "ReleaseBeacon no longer touches the main resource")
 }
 
 func TestHandleFailed_NotHoldingNoOp(t *testing.T) {
@@ -475,9 +495,12 @@ func TestHandleSucceeded_HoldingBeaconEnqueuesCluster(t *testing.T) {
 
 	_, err := h.handleSucceeded(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
-	assert.Len(t, beacons.statusUpdates, 1, "beacon must be toggled inactive on success")
-	assert.False(t, beacons.statusUpdates[0].Status.Active)
-	assert.Len(t, beacons.updates, 1, "ownership must be released on success")
+	// Both ToggleBeacon(active=false) and ReleaseBeacon route through UpdateStatus now.
+	if assert.Len(t, beacons.statusUpdates, 2, "ToggleBeacon + ReleaseBeacon should both update the beacon status") {
+		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive on success")
+		assert.Equal(t, "", beacons.statusUpdates[1].Status.Owner, "Status.Owner must be cleared on release")
+	}
+	assert.Empty(t, beacons.updates, "ReleaseBeacon no longer touches the main resource")
 	if assert.Len(t, dyn.enqueued, 1, "parent cluster must be re-enqueued") {
 		assert.Equal(t, "provisioning.cattle.io/v1, Kind=Cluster/fleet-default/test", dyn.enqueued[0])
 	}

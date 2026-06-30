@@ -42,11 +42,11 @@ const rancherAutoImportAnnotation = "cluster-api.cattle.io/rancher-auto-import"
 // CAPRKE2Provider GVKs used to build the cluster. Pulled into constants so test code doesn't
 // scatter string literals.
 var (
-	gvkCluster                = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}
-	gvkDockerCluster          = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "DockerCluster"}
-	gvkDockerMachineTemplate  = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "DockerMachineTemplate"}
-	gvkRKE2ControlPlane       = schema.GroupVersionKind{Group: "controlplane.cluster.x-k8s.io", Version: "v1beta2", Kind: "RKE2ControlPlane"}
-	gvkMgmtV3Cluster          = schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}
+	gvkCluster               = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}
+	gvkDockerCluster         = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "DockerCluster"}
+	gvkDockerMachineTemplate = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "DockerMachineTemplate"}
+	gvkRKE2ControlPlane      = schema.GroupVersionKind{Group: "controlplane.cluster.x-k8s.io", Version: "v1beta2", Kind: "RKE2ControlPlane"}
+	gvkMgmtV3Cluster         = schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}
 )
 
 // CAPRKE2Options controls cluster shape. All fields have sensible defaults; tests typically only

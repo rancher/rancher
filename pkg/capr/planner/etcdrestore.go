@@ -879,7 +879,7 @@ func (p *Planner) restoreEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, statu
 		}
 		return p.setEtcdSnapshotRestoreState(status, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhasePostRestoreNodeCleanup)
 	case rkev1.ETCDSnapshotPhasePostRestoreNodeCleanup:
-		if err = p.runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane, cluster,tokensSecret, clusterPlan); err != nil {
+		if err = p.runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane, cluster, tokensSecret, clusterPlan); err != nil {
 			return status, err
 		}
 		return p.setEtcdSnapshotRestoreState(status, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
