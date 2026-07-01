@@ -78,7 +78,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		resp.Write([]byte("invalid authImage - " + err.Error()))
 		return
 	}
-	
+
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	ops := &systemtemplate.TemplateOps{
 		AgentImage:     agentImage,

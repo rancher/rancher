@@ -117,7 +117,7 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 			},
 		}
 
-		if crt, err = s.crts.Create(crt); err != nil {
+		if _, err = s.crts.Create(crt); err != nil {
 			return "", err
 		}
 	} else if err != nil {

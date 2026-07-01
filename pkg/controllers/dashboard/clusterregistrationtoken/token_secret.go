@@ -78,7 +78,7 @@ func GetTokensFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken)
 	if crt == nil || crt.Status.TokenSecretName == "" {
 		return "", "", nil
 	}
-	
+
 	secret, err := secrets.Get(crt.Namespace, crt.Status.TokenSecretName)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get token secret %s/%s: %w", crt.Namespace, crt.Status.TokenSecretName, err)
