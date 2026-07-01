@@ -63,8 +63,6 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	if err := validateToken(token.GetName(), token.Spec.UserID); err != nil {
 		return token, err
 	}
-	logrus.Infof("[clusterauthtoken-sync] cluster=%s token=%s ext create", token.Spec.ClusterName, token.Name)
-
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.ExtUpdated(token)
@@ -212,8 +210,6 @@ func (h *tokenHandler) Create(token *mgmtapiv3.Token) (runtime.Object, error) {
 	if err := validateToken(token.Name, token.UserID); err != nil {
 		return token, err
 	}
-	logrus.Infof("[clusterauthtoken-sync] cluster=%s token=%s v3 create", token.ClusterName, token.Name)
-
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.Updated(token)
@@ -284,7 +280,6 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 		// Overwrite an existing secret.
 		existing, err := h.clusterSecret.Get(clusterAuthTokenSecret.Namespace, clusterAuthTokenSecret.Name, metav1.GetOptions{})
 		if err != nil {
-			logrus.Errorf("error migrating clusterAuthToken's secret %s: %s", clusterAuthTokenSecret.Name, err)
 			return err
 		}
 		existing = existing.DeepCopy()
