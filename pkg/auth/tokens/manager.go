@@ -159,6 +159,13 @@ func (m *Manager) updateToken(token *apiv3.Token) (*apiv3.Token, error) {
 func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
 
+	if tokenName == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("bad auth token, no name present")
+	}
+	if tokenKey == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("bad auth token, no key present")
+	}
+
 	// Support ext tokens
 	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
 		ext, err := m.extTokenStore.Get(extTokenID, "", &metav1.GetOptions{})
