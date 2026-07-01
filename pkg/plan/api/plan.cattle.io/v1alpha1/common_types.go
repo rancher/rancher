@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -82,6 +83,32 @@ const (
 	// external verifier after a key rotation) before the cluster accepts new operations.
 	SucceededPhaseHookLabelPrefix = "succeeded.phase.hook.operation.cattle.io/"
 )
+
+// hookLabelKeyMarker is the substring shared by every phase-hook and step-hook label key. Detecting
+// it is enough to know "some delegate has posted a hook here" without enumerating every registered
+// prefix — an operation-type-specific step prefix registered in a controller package still matches.
+const hookLabelKeyMarker = ".hook.operation.cattle.io/"
+
+// HasActiveLifecycleHook reports whether obj still carries at least one lifecycle-hook label
+// (phase or step). While such a label is present, the op's owning controller MUST NOT garbage
+// collect the object even after its terminal phase and TTL have expired — the delegate needs a
+// chance to observe the current phase and pop itself from the beacon's delegate chain, and it
+// signals it is done by removing the label.
+//
+// Recognises any label key that contains the shared hook-namespace marker
+// ".hook.operation.cattle.io/". This catches all phase prefixes defined above and every
+// step-level prefix exported by an operation controller package, so callers do not have to enumerate.
+func HasActiveLifecycleHook(obj metav1.Object) bool {
+	if obj == nil {
+		return false
+	}
+	for k := range obj.GetLabels() {
+		if strings.Contains(k, hookLabelKeyMarker) {
+			return true
+		}
+	}
+	return false
+}
 
 func ObjToMachineLifecycleLabels(obj runtime.Object) (map[string]string, error) {
 	labels := make(map[string]string, 5)

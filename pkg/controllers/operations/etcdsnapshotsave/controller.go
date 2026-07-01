@@ -101,7 +101,15 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 
 	if equality.Semantic.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
-		if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
+		//
+		// The HasActiveLifecycleHook guard defers TTL garbage collection while any lifecycle-hook
+		// label is still on the op. Without it, an op that has reached a terminal phase but is
+		// waiting on a delegate (handleSucceeded/handleFailed/handleCanceled returned early with
+		// WaitingForDelegate) would be deleted on the very next reconcile as soon as the TTL is
+		// past, stranding the beacon delegate and any observer polling for the terminal phase.
+		if ops.IsTerminal(status.Phase) &&
+			ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
+			!planv1alpha1.HasActiveLifecycleHook(op) {
 			err = h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return status, err

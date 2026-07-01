@@ -50,6 +50,12 @@ func buildEncryptionKeyRotationOp(namespace string, clusterRef corev1.ObjectRefe
 		Spec: opv1alpha1.EncryptionKeyRotationSpec{
 			OperationSpec: opv1alpha1.OperationSpec{
 				ClusterRef: &clusterRef,
+				// TTL=60 mirrors the save/restore test builders. Even with the controller-side
+				// HasActiveLifecycleHook guard preventing racy deletion of hook-held ops, a
+				// zero-TTL op would be deleted the instant the final hook label is cleared —
+				// racing WaitForEncryptionKeyRotationSucceeded's next poll. A 60-second window
+				// gives the wait comfortable slack.
+				TTL: 60,
 			},
 		},
 	}
