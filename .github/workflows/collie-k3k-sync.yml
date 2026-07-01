@@ -1,0 +1,31 @@
+name: collie-k3k-sync
+
+on:
+  schedule:
+    - cron: '0 * * * *' # every hour
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync project statuses
+        env:
+          PROJECT_SYNC_TOKEN: ${{ secrets.PROJECT_SYNC_TOKEN }}
+          PROJECT_OWNER: 'rancher'
+          PROJECT_59_NUMBER: '59'
+          PROJECT_49_NUMBER: '49'
+          PROJECT_59_SLICE_REPO: 'rancher/virtual-clusters-ui'
+          DRY_RUN: 'false'
+        run: node scripts/project-status-sync.mjs
