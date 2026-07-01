@@ -1,7 +1,9 @@
 package workload
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,7 +19,9 @@ import (
 )
 
 const (
-	SelectorLabel = "workload.user.cattle.io/workloadselector"
+	SelectorLabel        = "workload.user.cattle.io/workloadselector"
+	WorkloadIDAnnotation = "workload.user.cattle.io/workload-id-full"
+	MaxLabelValueLength  = 63
 )
 
 type AggregateStore struct {
@@ -142,7 +146,33 @@ func store(registries map[string]projectclient.RegistryCredential, domainToCreds
 }
 
 func resolveWorkloadID(schemaID string, data map[string]interface{}) string {
-	return fmt.Sprintf("%s-%s-%s", schemaID, data["namespaceId"], data["name"])
+	namespaceID := convert.ToString(data["namespaceId"])
+	name := convert.ToString(data["name"])
+
+	// Original format: deployment-namespace-name
+	workloadID := fmt.Sprintf("%s-%s-%s", schemaID, namespaceID, name)
+
+	// If within Kubernetes label value limit, use original format
+	if len(workloadID) <= MaxLabelValueLength {
+		return workloadID
+	}
+
+	// For long names, store full ID in annotation for debugging
+	annotations := convert.ToMapInterface(data["workloadAnnotations"])
+	if annotations == nil {
+		annotations = make(map[string]interface{})
+	}
+	annotations[WorkloadIDAnnotation] = workloadID
+	data["workloadAnnotations"] = annotations
+
+	// Create hash-based identifier to stay within Kubernetes limits
+	// Format: deployment-<12-char-hash>
+	// This allows full 63-character namespace and deployment names
+	hasher := sha256.New()
+	hasher.Write([]byte(workloadID))
+	hash := hex.EncodeToString(hasher.Sum(nil))[:12]
+
+	return fmt.Sprintf("%s-%s", schemaID, hash)
 }
 
 func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
