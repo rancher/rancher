@@ -196,8 +196,8 @@ postDelete:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %POST_DELETE_IMAGE_NAME%
-    tag: %POST_DELETE_IMAGE_TAG%
+    repository: "rancher/shell"
+    tag: "v0.6.4"
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
@@ -214,8 +214,8 @@ preUpgrade:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %PRE_UPGRADE_IMAGE_NAME%
-    tag: %PRE_UPGRADE_IMAGE_TAG%
+    repository: "rancher/shell"
+    tag: "v0.6.4"
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
 
@@ -291,3 +291,17 @@ extraObjects: []
 #         app: rancher
 #     policyTypes:
 #       - Ingress
+
+# Control additional labels and annotations on namespaces create by Rancher.
+rancherNamespaces:
+
+  # If enabled is true, the "cattle.io/managed-namespace" annotation will be applied to any new namespaces. 
+  enabled: false
+
+  # Additional labels to be added to new namespaces.
+  # labels:
+  #   foo: bar
+
+  # Additional annotaitons to be added to new namespaces. Will be appied along with the "cattle.io/managed-namespace" annotation.  
+  # annotations:
+  #   foo: bar
