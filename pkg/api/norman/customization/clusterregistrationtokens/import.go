@@ -3,8 +3,8 @@ package clusterregistrationtokens
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/docker/distribution/reference"
+	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
