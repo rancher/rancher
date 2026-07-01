@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/tests/v2prov/clients"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 // rancherAutoImportAnnotation is the annotation Turtles watches on namespaces to decide whether to
@@ -217,21 +217,27 @@ func NewCAPRKE2Cluster(cs *clients.Clients, opts CAPRKE2Options) (*CAPRKE2Fixtur
 func WaitForCAPRKE2Ready(t *testing.T, cs *clients.Clients, fx *CAPRKE2Fixture) {
 	t.Helper()
 
-	// 1) CAPI Cluster: wait for status.controlPlaneReady=true AND status.infrastructureReady=true.
-	//    These are the CAPI contract conditions that signal the cluster has a working control
-	//    plane reachable through its kubeconfig.
+	// 1) CAPI Cluster: wait for status.initialization.controlPlaneInitialized=true AND
+	//    status.initialization.infrastructureProvisioned=true. In CAPI v1beta2 the top-level
+	//    status.controlPlaneReady / status.infrastructureReady booleans were replaced by these
+	//    nested initialization fields (see ClusterInitializationStatus in
+	//    sigs.k8s.io/cluster-api/api/core/v1beta2/cluster_types.go).
 	err := utilwait.PollUntilContextTimeout(cs.Ctx, 10*time.Second, 30*time.Minute, true, func(ctx context.Context) (bool, error) {
 		capiCluster := &unstructured.Unstructured{}
 		capiCluster.SetGroupVersionKind(gvkCluster)
 		if err := cs.Client.Get(ctx, client.ObjectKey{Namespace: fx.Namespace, Name: fx.ClusterName}, capiCluster); err != nil {
 			return false, err
 		}
-		cpReady, _, _ := unstructured.NestedBool(capiCluster.Object, "status", "controlPlaneReady")
-		infraReady, _, _ := unstructured.NestedBool(capiCluster.Object, "status", "infrastructureReady")
-		return cpReady && infraReady, nil
+		cpInit, _, _ := unstructured.NestedBool(capiCluster.Object, "status", "initialization", "controlPlaneInitialized")
+		infraProv, _, _ := unstructured.NestedBool(capiCluster.Object, "status", "initialization", "infrastructureProvisioned")
+		return cpInit && infraProv, nil
 	})
 	if err != nil {
-		t.Fatalf("timed out waiting for CAPI Cluster %s/%s controlPlaneReady+infrastructureReady: %v", fx.Namespace, fx.ClusterName, err)
+		// Dump CAPI Cluster + the two objects it references (DockerCluster infra, RKE2ControlPlane)
+		// before failing. In CI the cluster is torn down when the test process exits, so this is
+		// often the only chance to see why the control plane never came up.
+		dumpCAPRKE2ObjectsOnFailure(t, cs, fx)
+		t.Fatalf("timed out waiting for CAPI Cluster %s/%s initialization (controlPlaneInitialized+infrastructureProvisioned): %v", fx.Namespace, fx.ClusterName, err)
 	}
 	t.Logf("CAPI Cluster %s/%s: control plane + infrastructure ready", fx.Namespace, fx.ClusterName)
 
@@ -344,17 +350,31 @@ func newUnstructured(gvk schema.GroupVersionKind, namespace, name string, body m
 	return u
 }
 
-// logCAPIClusterStatus is a debug helper that t.Logs the cluster's status conditions. Useful in
-// tests' failure paths when WaitForCAPRKE2Ready times out — call it from a test cleanup.
-//
-//nolint:unused // exported for tests-side use; keep available.
-func logCAPIClusterStatus(t *testing.T, cs *clients.Clients, fx *CAPRKE2Fixture) {
+// dumpCAPRKE2ObjectsOnFailure emits YAML dumps of the CAPI Cluster, the DockerCluster
+// (infrastructureRef target), and the RKE2ControlPlane (controlPlaneRef target) so a failed CI
+// run has enough state to diagnose the timeout without live cluster access. All three share the
+// same name/namespace by construction (see NewCAPRKE2Cluster).
+func dumpCAPRKE2ObjectsOnFailure(t *testing.T, cs *clients.Clients, fx *CAPRKE2Fixture) {
 	t.Helper()
-	cluster := &unstructured.Unstructured{}
-	cluster.SetGroupVersionKind(gvkCluster)
-	if err := cs.Client.Get(cs.Ctx, client.ObjectKey{Namespace: fx.Namespace, Name: fx.ClusterName}, cluster); err != nil {
-		logrus.Errorf("logCAPIClusterStatus: %v", err)
-		return
+	for _, target := range []struct {
+		label string
+		gvk   schema.GroupVersionKind
+	}{
+		{"CAPI Cluster", gvkCluster},
+		{"DockerCluster (infrastructure)", gvkDockerCluster},
+		{"RKE2ControlPlane (control plane)", gvkRKE2ControlPlane},
+	} {
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(target.gvk)
+		if err := cs.Client.Get(cs.Ctx, client.ObjectKey{Namespace: fx.Namespace, Name: fx.ClusterName}, obj); err != nil {
+			t.Logf("dump %s %s/%s: get failed: %v", target.label, fx.Namespace, fx.ClusterName, err)
+			continue
+		}
+		out, err := yaml.Marshal(obj.Object)
+		if err != nil {
+			t.Logf("dump %s %s/%s: marshal failed: %v", target.label, fx.Namespace, fx.ClusterName, err)
+			continue
+		}
+		t.Logf("dump %s %s/%s:\n%s", target.label, fx.Namespace, fx.ClusterName, string(out))
 	}
-	t.Logf("CAPI Cluster %s/%s status: %v", fx.Namespace, fx.ClusterName, cluster.Object["status"])
 }
