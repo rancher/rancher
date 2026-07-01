@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+        uses: actions/setup-node@8c91899e7fd9e6f4a8fdb62c3b0e7f9b5f11f7b4 # v4.0.2
 
       - name: Sync project statuses
         env:
