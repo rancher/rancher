@@ -674,6 +674,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 	snapshot, err := h.etcdsnapshots.Get(s.namespace, snapshotName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("[etcdsnapshotrestore] %s/%s: could not find associated etcdsnapshot.rke.cattle.io %s, assuming snapshot file", s.op.Namespace, s.op.Name, snapshotName)
+		snapshot = nil
 	} else if err != nil {
 		return status, err
 	} else if snapshot != nil && snapshot.SnapshotFile.S3 == nil {
