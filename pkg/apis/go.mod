@@ -1,6 +1,8 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.25.11
+go 1.25.0
+
+toolchain go1.25.11
 
 replace (
 	k8s.io/api => k8s.io/api v0.34.9
