@@ -153,15 +153,27 @@ func NewCAPRKE2Cluster(cs *clients.Clients, opts CAPRKE2Options) (*CAPRKE2Fixtur
 	}
 
 	// 3) RKE2ControlPlane — pins the RKE2 version, points at the DockerMachineTemplate.
+	//    machineTemplate.spec.infrastructureRef is Required by the v1beta2 CRD; the reference lives
+	//    under `.spec`, NOT directly under machineTemplate. rolloutStrategy is a non-nullable object
+	//    on the CRD (no `+optional`), so we must supply a concrete value — RollingUpdate/maxSurge=1
+	//    matches the controller default.
 	rke2ControlPlane := newUnstructured(gvkRKE2ControlPlane, ns, name, map[string]any{
 		"spec": map[string]any{
 			"version":  opts.RKE2Version,
 			"replicas": opts.Replicas,
 			"machineTemplate": map[string]any{
-				"infrastructureRef": map[string]any{
-					"apiGroup": gvkDockerMachineTemplate.Group,
-					"kind":     gvkDockerMachineTemplate.Kind,
-					"name":     name,
+				"spec": map[string]any{
+					"infrastructureRef": map[string]any{
+						"apiGroup": gvkDockerMachineTemplate.Group,
+						"kind":     gvkDockerMachineTemplate.Kind,
+						"name":     name,
+					},
+				},
+			},
+			"rolloutStrategy": map[string]any{
+				"type": "RollingUpdate",
+				"rollingUpdate": map[string]any{
+					"maxSurge": 1,
 				},
 			},
 			"serverConfig": map[string]any{
