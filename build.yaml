@@ -5,3 +5,4 @@ cspAdapterMinVersion: 107.0.0+up7.0.0
 defaultShellVersion: rancher/shell:v0.5.3
 fleetVersion: 107.0.13+up0.13.13
 defaultSccOperatorImage: rancher/scc-operator:v0.4.3
+chartAuditLogImage: rancher/mirrored-bci-micro:15.6.24.2

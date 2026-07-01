@@ -196,8 +196,8 @@ postDelete:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %POST_DELETE_IMAGE_NAME%
-    tag: %POST_DELETE_IMAGE_TAG%
+    repository: "rancher/shell"
+    tag: "v0.5.3"
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
@@ -214,8 +214,8 @@ preUpgrade:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %PRE_UPGRADE_IMAGE_NAME%
-    tag: %PRE_UPGRADE_IMAGE_TAG%
+    repository: "rancher/shell"
+    tag: "v0.5.3"
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
 

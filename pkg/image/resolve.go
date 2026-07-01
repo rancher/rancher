@@ -9,6 +9,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/buildconfig"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/settings"
 )
@@ -103,8 +104,9 @@ func setRequiredImages(osType OSType, imagesSet map[string]map[string]struct{}) 
 		addSourceToImage(imagesSet, settings.SCCOperatorImage.Get(), imageSourceCore)
 		addSourceToImage(imagesSet, settings.ShellImage.Get(), imageSourceCore)
 		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), imageSourceCore)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-busybox:15.6.24.2", imageSourceCore)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-micro:15.6.24.2", imageSourceCore)
+		// Used by Audit Log feature - sourced from build.yaml
+		addSourceToImage(imagesSet, buildconfig.ChartAuditLogImage, imageSourceCore)
+		addSourceToImage(imagesSet, strings.Replace(buildconfig.ChartAuditLogImage, "bci-micro", "bci-busybox", 1), imageSourceCore)
 		// kube-api-auth is required for ACE.
 		addSourceToImage(imagesSet, apisv3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth, imageSourceSystem)
 	}
