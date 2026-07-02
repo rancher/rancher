@@ -144,7 +144,7 @@ require (
 	github.com/rancher/gke-operator v1.11.11
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.2.4
-	github.com/rancher/machine v0.15.0-rancher127
+	github.com/rancher/machine v0.15.0-rancher127.1
 	github.com/rancher/norman v0.5.2
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.4
