@@ -77,10 +77,10 @@ func TestShouldReconcileImportedDisable(t *testing.T) {
 		t.Fatalf("expected explicit disable annotation to trigger reconciliation")
 	}
 	if !shouldReconcileImportedDisable(map[string]string{
-		day2OpsEnabledAnnotation:                 "true",
-		importedDay2OpsResetInProgressAnnotation: "true",
+		day2OpsEnabledAnnotation:        "true",
+		importedCleaningStateAnnotation: importedCleaningStateOperations,
 	}) {
-		t.Fatalf("expected reset marker to keep disable reconciliation sticky")
+		t.Fatalf("expected cleaning state to keep disable reconciliation sticky")
 	}
 }
 
@@ -134,6 +134,39 @@ func TestUninstallerSetsDeleteEnv(t *testing.T) {
 		if !ok || value != "true" {
 			t.Fatalf("expected DELETE=true in uninstall plan %s", plan.Name)
 		}
+		if len(plan.Spec.Upgrade.Env) == 0 || plan.Spec.Upgrade.Env[0].Name != "DELETE" || plan.Spec.Upgrade.Env[0].Value != "true" {
+			t.Fatalf("expected DELETE=true to be the first env in uninstall plan %s", plan.Name)
+		}
+		deleteCount := 0
+		for _, env := range plan.Spec.Upgrade.Env {
+			if env.Name == "DELETE" {
+				deleteCount++
+			}
+		}
+		if deleteCount != 1 {
+			t.Fatalf("expected exactly one DELETE env in uninstall plan %s, got %d", plan.Name, deleteCount)
+		}
+	}
+}
+
+func TestPlanNames(t *testing.T) {
+	t.Parallel()
+
+	objs := []runtime.Object{
+		upgradev1.NewPlan("cattle-system", SystemAgentUpgraderPlanName, upgradev1.Plan{}),
+		&corev1.ServiceAccount{},
+		upgradev1.NewPlan("cattle-system", SystemAgentUpgraderWindowsPlanName, upgradev1.Plan{}),
+	}
+
+	names := planNames(objs)
+	if len(names) != 2 {
+		t.Fatalf("expected 2 plan names, got %d", len(names))
+	}
+	if names[0] != SystemAgentUpgraderPlanName {
+		t.Fatalf("expected first plan name %q, got %q", SystemAgentUpgraderPlanName, names[0])
+	}
+	if names[1] != SystemAgentUpgraderWindowsPlanName {
+		t.Fatalf("expected second plan name %q, got %q", SystemAgentUpgraderWindowsPlanName, names[1])
 	}
 }
 
