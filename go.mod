@@ -171,7 +171,7 @@ require (
 	k8s.io/kubectl v0.34.9
 	k8s.io/kubernetes v1.34.9
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
-	oras.land/oras-go/v2 v2.6.0
+	oras.land/oras-go/v2 v2.6.1
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.10.6
 	sigs.k8s.io/controller-runtime v0.22.5
