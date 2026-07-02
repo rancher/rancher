@@ -56,8 +56,7 @@ func TestRoutes_IndexFileOnNotFound(t *testing.T) {
 		settings.UIOfflinePreferred.Set(origUIOffline)
 	}()
 
-	// New returns the router
-	handler := New(nil, mockCache)
+	handler := New(nil, mockCache, nil)
 
 	tests := []struct {
 		name           string

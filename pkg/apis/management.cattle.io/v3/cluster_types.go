@@ -297,6 +297,11 @@ func (c *ClusterRegistrationToken) ObjClusterName() string {
 
 type ClusterRegistrationTokenSpec struct {
 	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
+	// TTL is the duration in seconds before the token expires and is rotated. Zero disables TTL-based rotation.
+	TTL *int64 `json:"ttl,omitempty"`
+	// GracePeriod is the duration in seconds during which both the old and new tokens remain valid after
+	// rotation, allowing cluster agents time to restart and pick up the new credential.
+	GracePeriod *int64 `json:"gracePeriod,omitempty"`
 }
 
 func (c *ClusterRegistrationTokenSpec) ObjClusterName() string {
@@ -312,6 +317,9 @@ type ClusterRegistrationTokenStatus struct {
 	InsecureNodeCommand        string `json:"insecureNodeCommand"`
 	ManifestURL                string `json:"manifestUrl"`
 	Token                      string `json:"token"`
+	TokenSecretName            string `json:"tokenSecretName,omitempty"`
+	ExpiresAt                  string `json:"expiresAt,omitempty"`
+	GracePeriodExpiresAt       string `json:"gracePeriodExpiresAt,omitempty"`
 }
 
 type GenerateKubeConfigOutput struct {
