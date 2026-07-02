@@ -545,7 +545,7 @@ func (h *handler) getSnapshotsFromSnapshotFile(cluster *unstructured.Unstructure
 	if err != nil {
 		return nil, err
 	}
-	logrus.Infof("[DEBUG - getSnapshotsFromSnapshotFile] Got snapshots from snapshot file")
+	logrus.Debugf("Got snapshots from snapshot file")
 	return snapshots, nil
 }
 
