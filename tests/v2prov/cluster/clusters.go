@@ -771,10 +771,8 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 	configDir := rancherDir + "/config.yaml.d"
 
 	var configLines []string
-	configLines = append(configLines, "token: "+token)
 	configLines = append(configLines, "node-name: "+nodeName)
-	configLines = append(configLines, "service-cidr: 10.45.0.0/16")
-	configLines = append(configLines, "cluster-cidr: 10.44.0.0/16")
+	configLines = append(configLines, "token: "+token)
 
 	if isInit && distro == capr.RuntimeK3S {
 		configLines = append(configLines, "cluster-init: true")
@@ -785,9 +783,13 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 	}
 
 	if isServer {
+		configLines = append(configLines, "service-cidr: 10.45.0.0/16")
+		configLines = append(configLines, "cluster-cidr: 10.44.0.0/16")
+
 		if !etcd {
 			configLines = append(configLines, "disable-etcd: true")
 		}
+
 		if !cp {
 			configLines = append(configLines, "disable-apiserver: true")
 			configLines = append(configLines, "disable-controller-manager: true")

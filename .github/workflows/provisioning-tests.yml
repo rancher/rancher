@@ -22,6 +22,13 @@ jobs:
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetD_.*$"
           CATTLE_FEATURES: "imported-day-2-ops=true"
+        # Set_E covers the multi-node imported restore tests plus the CAPRKE2 + Docker test.
+        # V2PROV_TEST_CAPRKE2=true triggers the Turtles CAPIProvider install block in
+        # scripts/provisioning-tests, which the CAPRKE2DockerOperations test depends on.
+        - V2PROV_TEST_DIST: "rke2"
+          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetE_.*$"
+          CATTLE_FEATURES: "imported-day-2-ops=true"
+          V2PROV_TEST_CAPRKE2: "true"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
           CATTLE_FEATURES: "provisioningprebootstrap=true"
@@ -40,6 +47,10 @@ jobs:
       DRONE_BUILD_EVENT: "${{ github.event_name }}"
       V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
       V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
+      # V2PROV_TEST_CAPRKE2 is only set on the Set_E matrix entry; for all other entries the
+      # value comes through as the empty string and the script's `if [...= "true"]` gate stays
+      # closed.
+      V2PROV_TEST_CAPRKE2: "${{ matrix.V2PROV_TEST_CAPRKE2 }}"
       CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
       TAG: ${{ github.sha }}-head
       COMMIT: ${{ github.sha }}

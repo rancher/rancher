@@ -7,6 +7,7 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -33,9 +34,66 @@ func init() {
 	})
 }
 
+func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
+	return "127.0.0.1"
+}
+
+func (a *ImportedAdapter) ConfigDirectory(_ *corev1.Secret) string {
+	return fmt.Sprintf("/etc/rancher/%s/config.yaml.d", a.RuntimeCommand())
+}
+
+func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
+	if secret == nil {
+		return ""
+	}
+
+	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
+		return ""
+	}
+
+	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret)
+	if err != nil {
+		logrus.Errorf("error getting reference for machine lifecycle labels: %v", err)
+		return ""
+	}
+
+	machine, err := a.clients.Mgmt.Node().Cache().Get(ref.Namespace, ref.Name)
+	if err != nil {
+		logrus.Errorf("error getting machine %s for machine lifecycle: %v", ref.Name, err)
+		return ""
+	}
+
+	if len(machine.Status.InternalNodeStatus.Addresses) == 0 {
+		return ""
+	}
+
+	var address string
+
+	for _, addr := range machine.Status.InternalNodeStatus.Addresses {
+		if addr.Type == corev1.NodeExternalIP && address == "" {
+			address = addr.Address
+		} else if addr.Type == corev1.NodeInternalIP {
+			address = addr.Address
+		}
+	}
+
+	return address
+}
+
+func (a *ImportedAdapter) GetSupervisorPort(_ *corev1.Secret) string {
+	if a.RuntimeCommand() == "rke2" {
+		return "9345"
+	}
+	return "6443"
+}
+
 type ImportedAdapter struct {
 	cluster *mgmtv3.Cluster
 	clients *wrangler.CAPIContext
+}
+
+func (a *ImportedAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
+	return nil, nil, nil
 }
 
 // WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for

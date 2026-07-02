@@ -13,6 +13,7 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -31,6 +32,42 @@ import (
 )
 
 const ControllerOwnerKey = "etcd-snapshot-restore"
+
+// Step hook label prefixes for the etcdsnapshotrestore operation. Each prefix gates a single
+// restore step and follows the shared label semantics documented on planv1alpha1's phase-hook
+// label constants. The shutdown / restore / pod-cleanup / restart / node-cleanup / final-restart
+// sequence is unique to restore — there is no analogue on save / encryption-key-rotation.
+const (
+	// ShutdownStepHookLabelPrefix gates the Shutdown step, before the controller assigns the
+	// killall + tombstone-touch + tls/cred-directory cleanup plan to every non-Windows secret.
+	ShutdownStepHookLabelPrefix = "shutdown.step.hook.operation.cattle.io/"
+
+	// RestoreStepHookLabelPrefix gates the Restore step, before the controller assigns the
+	// `<runtime> server --cluster-reset --cluster-reset-restore-path=...` plan to the elected
+	// etcd leader.
+	RestoreStepHookLabelPrefix = "restore.step.hook.operation.cattle.io/"
+
+	// PostRestorePodCleanupStepHookLabelPrefix gates the PostRestorePodCleanup step, before the
+	// controller starts the server unit on the elected etcd leader and deletes the well-known
+	// system pods (kube-dns, CNI, ingress, etc.) that need to be re-created after the restore.
+	PostRestorePodCleanupStepHookLabelPrefix = "post-restore-pod-cleanup.step.hook.operation.cattle.io/"
+
+	// InitialRestartClusterStepHookLabelPrefix gates the first cluster restart pass — the one
+	// that points every node at the restored leader's server URL before any cluster-wide
+	// reconciliation has run. Distinct from the final restart so a delegate can target either
+	// pass without gating the other.
+	InitialRestartClusterStepHookLabelPrefix = "initial-restart-cluster.step.hook.operation.cattle.io/"
+
+	// PostRestoreNodeCleanupStepHookLabelPrefix gates the PostRestoreNodeCleanup step, before the
+	// controller runs the node-pruning script that deletes Node objects that no longer
+	// correspond to a machine in the cluster.
+	PostRestoreNodeCleanupStepHookLabelPrefix = "post-restore-node-cleanup.step.hook.operation.cattle.io/"
+
+	// RestartClusterStepHookLabelPrefix gates the final restart pass, after node cleanup. This
+	// removes the temporary server-URL override and lets each node return to its normal
+	// reconciliation.
+	RestartClusterStepHookLabelPrefix = "restart-cluster.step.hook.operation.cattle.io/"
+)
 
 // idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
 // It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
@@ -113,6 +150,8 @@ rm "$NODENAMESFILE"
 type handler struct {
 	etcdsnapshotrestores operationcontrollers.ETCDSnapshotRestoreController
 
+	etcdsnapshots rkecontrollers.ETCDSnapshotController
+
 	beacons     plancontrollers.BeaconClient
 	beaconCache plancontrollers.BeaconCache
 
@@ -129,6 +168,7 @@ type handler struct {
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		etcdsnapshotrestores: clients.Operation.ETCDSnapshotRestore(),
+		etcdsnapshots:        clients.RKE.ETCDSnapshot(),
 		beacons:              clients.Plan.Beacon(),
 		beaconCache:          clients.Plan.Beacon().Cache(),
 		secrets:              clients.Core.Secret(),
@@ -150,7 +190,13 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 
 	if reflect.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
-		if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
+		//
+		// See the equivalent guard in etcdsnapshotsave's OnChange for the rationale: while any
+		// lifecycle-hook label is still on the op, TTL garbage collection must be deferred so the
+		// delegate has a chance to observe the terminal phase and pop itself from the beacon.
+		if ops.IsTerminal(status.Phase) &&
+			ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
+			!planv1alpha1.HasActiveLifecycleHook(op) {
 			err = h.etcdsnapshotrestores.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return status, err
@@ -260,22 +306,13 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		return h.handleInProgress(s, status)
 	}
 	if status.Phase == opv1alpha1.OperationPhaseCanceled {
-		return status, nil
+		return h.handleCanceled(s, status)
 	}
 	if status.Phase == opv1alpha1.OperationPhaseFailed {
 		return h.handleFailed(s, status)
 	}
 	if status.Phase == opv1alpha1.OperationPhaseSucceeded {
 		return h.handleSucceeded(s, status)
-	}
-
-	// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
-	if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
-		err = h.etcdsnapshotrestores.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			return status, err
-		}
-		return status, generic.ErrSkip
 	}
 
 	opv1alpha1.FailedCondition.True(&status)
@@ -301,6 +338,69 @@ func (s *scope) idempotencyValue() string {
 	return string(s.op.UID)
 }
 
+// lifecycleHookDelegate returns (suffix, delegate) for the first label on the operation whose key
+// starts with prefix. Returns ("", "") when no such label is set. The suffix is informational —
+// only the delegate value is consulted to drive the beacon push.
+func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string) {
+	if s.op.Labels == nil {
+		return "", ""
+	}
+	for k, v := range s.op.Labels {
+		if strings.HasPrefix(k, prefix) {
+			return strings.TrimPrefix(k, prefix), v
+		}
+	}
+	return "", ""
+}
+
+// delegate pushes delegate onto the beacon's delegate chain if it is not already there. It is a
+// no-op when the delegate is already present, which keeps the call idempotent across the many
+// reconciles that may occur while a hook is held.
+func (h *handler) delegate(s *scope, name, delegate string) error {
+	logrus.Tracef("[etcdsnapshotrestore] %s/%s: delegating ownership of beacon to %s on behalf of %s", s.op.Namespace, s.op.Name, delegate, name)
+
+	if planapi.IsInDelegateChain(s.beacon, delegate) {
+		return nil
+	}
+
+	beacon, err := planapi.PushDelegate(s.beacon, delegate, h.beacons)
+	if err != nil {
+		return err
+	}
+	s.beacon = beacon
+	return nil
+}
+
+// handleHook is the per-handler entry point for the lifecycle-hook mechanism. It returns (true, nil)
+// whenever a label with the given prefix exists on the operation, signalling the caller to short
+// circuit. To advance past the hook the operator must clear the label AND pop the delegate; either
+// alone is insufficient because:
+//
+//   - Clearing the label but leaving the delegate on the chain lets the beacon's authority logic
+//     still report the delegate as the holder, so the owning controller may not regain its
+//     authority on the next reconcile.
+//   - Popping the delegate but leaving the label present causes this function to re-push the
+//     delegate on the very next reconcile (delegate() is no-op only if already in chain).
+func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
+	logrus.Tracef("[etcdsnapshotrestore] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
+
+	if name, delegate := h.lifecycleHookDelegate(s, prefix); delegate != "" {
+		err := h.delegate(s, name, delegate)
+		return true, err
+	}
+	return false, nil
+}
+
+// restartClusterHookPrefix picks between the InitialRestart and Restart prefixes based on which
+// step the operation is currently in. reconcileRestartCluster is reused for both restart phases,
+// so we route the hook lookup with the same step-based dispatch the caller uses.
+func restartClusterHookPrefix(step opv1alpha1.ETCDSnapshotRestoreStep) string {
+	if step == opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster {
+		return InitialRestartClusterStepHookLabelPrefix
+	}
+	return RestartClusterStepHookLabelPrefix
+}
+
 // etcdRestoreScriptPath returns the absolute path on the node where the named etcd-restore script lives.
 func etcdRestoreScriptPath(s *scope, secret *corev1.Secret, name string) string {
 	return path.Join(s.adapter.ProvisioningDataDirectory(secret), etcdRestoreBinSubdir, name)
@@ -324,6 +424,20 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
 		return status, nil
 	}
+
+	// The Pending-phase hook fires after the beacon has been acquired so external delegates can
+	// inspect the cluster (machine-plan secrets, beacon ownership) before the controller starts
+	// the actual restore workflow.
+	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.PendingCondition.True(&status)
+		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.PendingCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: acquired beacon, waiting for agents to register", s.op.Namespace, s.op.Name)
 
 	if ok, err := s.adapter.WaitForRegister(); err != nil {
@@ -347,7 +461,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-	if !planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if !planapi.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
@@ -361,6 +475,19 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	s.beacon, err = planapi.ToggleBeacon(s.beacon, true, h.beacons)
 	if err != nil {
 		return status, err
+	}
+
+	// InProgress-phase hook fires on every InProgress reconcile, ahead of step dispatch. This is
+	// the broadest hook in the restore lifecycle — useful for delegates that need to gate ALL
+	// step work uniformly without subscribing to each individual step prefix.
+	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
 	}
 
 	switch s.op.Status.Step {
@@ -396,6 +523,16 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 
 func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling shutdown", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, ShutdownStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
 
 	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithSorter(planapi.DefaultSorter()).
@@ -510,6 +647,16 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling etcd restore", s.op.Namespace, s.op.Name)
 
+	delegated, err := h.handleHook(s, RestoreStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
 	snapshotName := s.op.Spec.Args.Name
 	if snapshotName == "" {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: snapshot name is required for etcd restore", s.op.Namespace, s.op.Name)
@@ -523,7 +670,43 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	secret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
+	filter := ops.IsEtcd
+	snapshot, err := h.etcdsnapshots.Get(s.namespace, snapshotName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: could not find associated etcdsnapshot.rke.cattle.io %s, assuming snapshot file", s.op.Namespace, s.op.Name, snapshotName)
+		snapshot = nil
+	} else if err != nil {
+		return status, err
+	} else if snapshot != nil && snapshot.SnapshotFile.S3 == nil {
+		if len(snapshot.OwnerReferences) == 0 {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: cannot find machine by owner reference for snapshot %s/%s", s.op.Namespace, s.op.Name, snapshot.Namespace, snapshot.Name)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, "owner reference is required for s3 etcd restore")
+
+			return status, nil
+		}
+
+		ref := snapshot.OwnerReferences[0]
+
+		filter = func(secret *corev1.Secret) bool {
+			if secret == nil || secret.Labels == nil {
+				return false
+			}
+
+			if secret.Labels[planv1alpha1.MachineLifecycleName] == ref.Name {
+				return true
+			}
+
+			return false
+		}
+	}
+
+	// todo: elect leader based on snapshot
+	secret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, filter)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -533,9 +716,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
-	}
-
-	if secret == nil {
+	} else if secret == nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -550,8 +731,37 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	value := s.idempotencyValue()
 
+	args := []string{
+		"server",
+		"--cluster-reset",
+		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
+		"--etcd-disable-snapshots=false",
+	}
+
+	var env []string
+
+	files := []planapi.File{
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
+			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+		},
+		ops.IdempotentScriptFile(provisioningDir),
+	}
+
+	if snapshot == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
+	} else if snapshot.SnapshotFile.S3 == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
+	} else {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
+		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
+		args = append(args, s3Args...)
+		env = append(env, s3Env...)
+		files = append(files, s3Files...)
+	}
+
 	nodePlan := &planapi.Plan{
-		Files: []planapi.File{ops.IdempotentScriptFile(provisioningDir)},
+		Files: files,
 		OneTimeInstructions: []planapi.OneTimeInstruction{
 			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, planapi.OneTimeInstruction{
 				CommonInstruction: planapi.CommonInstruction{
@@ -560,15 +770,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
 				},
 			}),
-			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(),
-				[]string{
-					"server",
-					"--cluster-reset",
-					"--etcd-arg=advertise-client-urls=https://127.0.0.1:2379",
-					"--etcd-disable-snapshots=false",
-					fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName),
-					"--etcd-s3=false",
-				}, nil),
+			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
 		},
 	}
 
@@ -609,13 +811,18 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling post-restore pod cleanup", s.op.Namespace, s.op.Name)
 
-	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithLabels(planapi.Label(capr.ControlPlaneRoleLabel, "true")).
-		WithSorter(planapi.DefaultSorter()).
-		Collect()
-	if planapi.IsTransient(err) {
+	delegated, err := h.handleHook(s, PostRestorePodCleanupStepHookLabelPrefix)
+	if err != nil {
 		return status, err
-	} else if err != nil {
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	etcdSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, nil)
+	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
@@ -624,13 +831,26 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
+	} else if etcdSecret == nil {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for restore")
+
+		return status, nil
 	}
 
-	if len(secrets) == 0 {
-		secrets, err = planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
-			WithLabels(planapi.Label(capr.EtcdRoleLabel, "true")).
+	var controlPlaneSecret *corev1.Secret
+
+	if ops.IsControlPlane(etcdSecret) {
+		controlPlaneSecret = etcdSecret
+	} else {
+		secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
+			WithLabels(planapi.Label(capr.ControlPlaneRoleLabel, "true")).
 			WithSorter(planapi.DefaultSorter()).
-			WithValidator(planapi.AtLeast(1, "")).
 			Collect()
 		if planapi.IsTransient(err) {
 			return status, err
@@ -643,19 +863,21 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 			return status, nil
+		} else if len(secrets) == 0 {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		}
+
+		controlPlaneSecret = secrets[0]
 	}
 
-	if len(secrets) == 0 {
-		logrus.Warnf("[etcdsnapshotrestore] %s/%s: no suitable nodes found for pod cleanup, skipping", s.op.Namespace, s.op.Name)
-		status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster)
-		return status, nil
-	}
-
-	secret := secrets[0]
-
-	kubectl := s.adapter.KubectlPath(secret)
-	kubeconfig := s.adapter.KubeconfigPath(secret)
+	kubectl := s.adapter.KubectlPath(etcdSecret)
+	kubeconfig := s.adapter.KubeconfigPath(etcdSecret)
 
 	podSelectors := []string{
 		"kube-system:k8s-app=kube-dns",
@@ -676,22 +898,23 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		)
 	}
 
-	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	provisioningDir := s.adapter.ProvisioningDataDirectory(etcdSecret)
 	value := s.idempotencyValue()
-	waitScriptPath := etcdRestoreScriptPath(s, secret, waitForPodListScriptName)
-
-	// After `--cluster-reset` the distro process exits — it's a one-shot mode — so we need to
-	// bring the service back up before waiting for the apiserver. systemctl start is a no-op when
-	// the service is already running, so this is safe on retries.
-	unit := s.adapter.ServerUnit()
-	if secret.Labels[capr.EtcdRoleLabel] != "true" && secret.Labels[capr.ControlPlaneRoleLabel] != "true" {
-		unit = s.adapter.RuntimeCommand() + "-agent"
-	}
+	waitScriptPath := etcdRestoreScriptPath(s, etcdSecret, waitForPodListScriptName)
 
 	instructions := []planapi.OneTimeInstruction{
-		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/post-restore-start-service", value, "systemctl",
-			[]string{"start", unit}, nil),
-		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/wait-for-api-server", value, "/bin/sh",
+		ops.IdempotentInstruction(
+			provisioningDir,
+			idempotencyKey+"/post-restore-start-service",
+			value,
+			"systemctl",
+			[]string{"start", s.adapter.ServerUnit()},
+			nil),
+		ops.IdempotentInstruction(
+			provisioningDir,
+			idempotencyKey+"/wait-for-api-server",
+			value,
+			"/bin/sh",
 			[]string{
 				"-x",
 				waitScriptPath,
@@ -733,20 +956,67 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		OneTimeInstructions: instructions,
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+	if etcdSecret.Name != controlPlaneSecret.Name {
+		etcdNodePlan := &planapi.Plan{
+			OneTimeInstructions: []planapi.OneTimeInstruction{
+				ops.IdempotentInstruction(
+					provisioningDir,
+					idempotencyKey+"/post-restore-start-service",
+					value,
+					"systemctl",
+					[]string{"start", s.adapter.ServerUnit()},
+					nil),
+			},
+		}
+
+		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, 1, -1)
+		if err != nil {
+			return status, err
+		}
+
+		if planStatus.Failure() {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
+				s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
+
+			return status, nil
+		}
+
+		if wait, msg := planStatus.Wait(); wait {
+			logrus.Infof("[etcdsnapshotrestore] %s/%s: waiting for pod cleanup: %s", s.op.Namespace, s.op.Name, msg)
+
+			opv1alpha1.InProgressCondition.True(&status)
+			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
+			opv1alpha1.InProgressCondition.Message(&status, msg)
+
+			return status, nil
+		}
+
+		nodePlan.Files = append(nodePlan.Files, planapi.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", s.adapter.GetServerURL(etcdSecret), s.adapter.GetSupervisorPort(etcdSecret)))),
+			Path:    path.Join(s.adapter.ConfigDirectory(controlPlaneSecret), "zz_etcd-snapshot-restore.yaml"),
+		})
+	}
+
+	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, 1, -1)
 	if err != nil {
 		return status, err
 	}
 
 	if planStatus.Failure() {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
-			s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+			s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", secret.Namespace, secret.Name))
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
 
 		return status, nil
 	}
@@ -769,6 +1039,19 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 
 func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus, nextStep opv1alpha1.ETCDSnapshotRestoreStep) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling cluster restart", s.op.Namespace, s.op.Name)
+
+	// The same reconcile function backs both InitialRestartCluster (nextStep set) and the final
+	// RestartCluster (nextStep == ""). Route the hook check to the matching prefix so a delegate
+	// can subscribe to one restart pass without gating the other.
+	delegated, err := h.handleHook(s, restartClusterHookPrefix(s.op.Status.Step))
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
 
 	secrets, err := planapi.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithFilter(nonWindowsSecret).
@@ -796,6 +1079,20 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		value = value + "/final"
 	}
 
+	initSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
+	if err != nil {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		return status, nil
+	}
+
+	serverURL := s.adapter.GetServerURL(initSecret)
+
 	for _, secret := range secrets {
 		provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 
@@ -816,6 +1113,37 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 					[]string{"restart", unit}, nil),
 			},
 			Probes: probes,
+		}
+
+		if secret.UID != initSecret.UID {
+			if nextStep != "" {
+				nodePlan.Files = append(nodePlan.Files, planapi.File{
+					Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret)))),
+					Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+				})
+			} else {
+				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, planapi.OneTimeInstruction{
+					CommonInstruction: planapi.CommonInstruction{
+						Name:    "remove-server-arg",
+						Command: "rm",
+						Args: []string{
+							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+						},
+					},
+				})
+			}
+		} else {
+			if nextStep == "" {
+				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, planapi.OneTimeInstruction{
+					CommonInstruction: planapi.CommonInstruction{
+						Name:    "remove-server-arg",
+						Command: "rm",
+						Args: []string{
+							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+						},
+					},
+				})
+			}
 		}
 
 		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
@@ -928,6 +1256,16 @@ func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSec
 func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling post-restore node cleanup", s.op.Namespace, s.op.Name)
 
+	delegated, err := h.handleHook(s, PostRestoreNodeCleanupStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
 	initSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
@@ -1003,11 +1341,52 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 	return status, nil
 }
 
+// handleCanceled is called when an external controller cancels the operation. It runs the
+// Canceled-phase hook first so delegates can react to the cancellation, then releases the beacon
+// if this controller still owns it. Mirrors save's handleCanceled — the cancel-vs-fail
+// distinction is that an external party cancels whereas the operation fails itself.
+func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
+	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, planv1alpha1.CanceledPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	if planapi.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
+		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
+		if err != nil {
+			return status, err
+		}
+		if err := planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey); err != nil {
+			return status, err
+		}
+	}
+	return status, nil
+}
+
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
-	err := planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	// Failed-phase hook gates beacon release on the failure path. A delegate that wants to inspect
+	// the failure state (op conditions, plan-secret statuses, leftover scripts on nodes) can hold
+	// the beacon here before the next operation acquires it.
+	delegated, err := h.handleHook(s, planv1alpha1.FailedPhaseHookLabelPrefix)
 	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	if err := planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey); err != nil {
 		return status, err
 	}
 	return status, nil
@@ -1016,15 +1395,26 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
-	if planapi.HoldingBeacon(s.beacon, ControllerOwnerKey) {
-		var err error
+	// Succeeded-phase hook gates the beacon release that signals "next operation may acquire".
+	// Delegates use this to chain follow-up work (e.g. snapshotbackpopulate post-restore) before
+	// the cluster goes back to accepting new operations.
+	delegated, err := h.handleHook(s, planv1alpha1.SucceededPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.SucceededCondition.True(&status)
+		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.SucceededCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	if planapi.AuthorizedForBeacon(s.beacon, ControllerOwnerKey) {
 		s.beacon, err = planapi.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {
 			return status, err
 		}
 
-		err = planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
-		if err != nil {
+		if err := planapi.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey); err != nil {
 			return status, err
 		}
 

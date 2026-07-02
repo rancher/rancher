@@ -10,15 +10,16 @@ type ETCDSnapshotRestoreArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
 	// +optional
 	Name string `json:"name,omitempty"`
-
-	// RestoreConfig: todo
 }
 
 // ETCDSnapshotRestoreSpec defines the desired state of ETCDSnapshotRestore.
 type ETCDSnapshotRestoreSpec struct {
+	// OperationSpec is the shared spec common to all operations.
 	// +optional
 	OperationSpec `json:",inline"`
 
+	// Args contains parameters for restoring an ETCD snapshot.
+	// Mutually exclusive with SnapshotRef.
 	// +optional
 	Args ETCDSnapshotRestoreArgs `json:"args,omitempty"`
 }

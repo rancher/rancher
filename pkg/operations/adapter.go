@@ -6,8 +6,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -144,6 +144,8 @@ type Adapter interface {
 	// Scripts created for commands are typically stored here.
 	ProvisioningDataDirectory(secret *corev1.Secret) string
 
+	ConfigDirectory(secret *corev1.Secret) string
+
 	// RenderProbes renders the probes for a given machine-plan secret based on its role.
 	// `supervisor` controls whether the supervisor probe should be rendered.
 	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
@@ -161,6 +163,16 @@ type Adapter interface {
 	// machine-plan secret so the same node is reused across reconciles. Returns nil, nil when
 	// no suitable candidate exists yet.
 	FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error)
+
+	// GetServerURL returns the server url required to join nodes to this host.
+	// The URL is of the form `https://<InternalIP>:<supervisor port>`
+	GetServerURL(secret *corev1.Secret) string
+
+	GetSupervisorPort(secret *corev1.Secret) string
+
+	LoopbackAddress(secret *corev1.Secret) string
+
+	ToS3ArgsEnvAndFiles(secret *corev1.Secret) ([]string, []string, []plan.File)
 }
 
 // NewAdapter returns an Adapter for the given cluster object.

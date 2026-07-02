@@ -1,6 +1,11 @@
 package v1alpha1
 
-import "github.com/rancher/wrangler/v3/pkg/condition"
+import (
+	"strings"
+
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	"github.com/rancher/wrangler/v3/pkg/condition"
+)
 
 var (
 	// PendingCondition represents the condition state for a task or process that is awaiting execution or resolution.
@@ -44,6 +49,8 @@ const (
 	// WaitingForPlanAppliedReason surfaces when an operation is waiting for a node plan to be applied.
 	WaitingForPlanAppliedReason = "WaitingForPlanApplied"
 
+	WaitingForDelegateReason = "WaitingForDelegate"
+
 	PlanFailedReason = "PlanFailed"
 
 	// FinishedReason surfaces when an operation has reached a terminal state (success/failure).
@@ -72,3 +79,15 @@ const (
 	// but the runtime secrets-encrypt status has not yet confirmed reencrypt_finished.
 	WaitingForEncryptionKeyRotationReason = "WaitingForEncryptionKeyRotation"
 )
+
+func WaitingForDelegateMessage(beacon *planv1alpha1.Beacon) string {
+	if beacon == nil {
+		return ""
+	}
+
+	if len(beacon.Status.Delegates) == 0 {
+		return ""
+	}
+
+	return strings.Join(beacon.Status.Delegates, ",")
+}

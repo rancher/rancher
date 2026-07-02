@@ -14,7 +14,7 @@ const (
 	labelClusterName = "rke.cattle.io/cluster-name"
 	labelInitNode    = "rke.cattle.io/init-node"
 	labelEtcd        = "rke.cattle.io/etcd-role"
-	labelControl     = "rke.cattle.io/controlplane-role"
+	labelControl     = "rke.cattle.io/control-plane-role"
 	labelWorker      = "rke.cattle.io/worker-role"
 	labelOS          = "cattle.io/os"
 

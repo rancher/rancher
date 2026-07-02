@@ -118,6 +118,16 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              delegates:
+                description: |-
+                  DelegationStack tracks the chain of custody.
+                  The last element in the array is the currently active handler.
+                items:
+                  type: string
+                type: array
+              owner:
+                description: Owner denotes the primary/original owner of the beacon.
+                type: string
               registrationEndpoint:
                 description: |-
                   RegistrationEndpoint is the URL a system-agent must query to download its machine-plan and corresponding

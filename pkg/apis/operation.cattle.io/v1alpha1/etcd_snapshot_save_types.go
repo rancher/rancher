@@ -4,10 +4,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+
 // ETCDSnapshotSaveArgs contains parameters for saving an ETCD snapshot.
 // Name specifies the name of the snapshot file.
-// ETCDSnapshotCompress determines if the snapshot will be compressed.
-// ETCDSnapshotDir specifies the directory where the snapshot will be saved.
 type ETCDSnapshotSaveArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
 	// +optional
@@ -17,6 +16,7 @@ type ETCDSnapshotSaveArgs struct {
 // ETCDSnapshotSaveSpec defines the desired state of ETCDSnapshotSave.
 type ETCDSnapshotSaveSpec struct {
 	// OperationSpec is the shared spec common to all operations.
+	// +optional
 	OperationSpec `json:",inline"`
 
 	// Args contains parameters for saving an ETCD snapshot.

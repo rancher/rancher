@@ -981,7 +981,7 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 					Labels: tt.labels,
 				},
 			}
-			ref, err := MachineLifecycleLabelsToObjectReference(obj)
+			ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(obj)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, ref)

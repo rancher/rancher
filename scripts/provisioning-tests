@@ -285,6 +285,58 @@ echo "Waiting up to 5 minutes for capi-controller-manager deployment"
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-capi-system &>/dev/null \
     && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-capi-system deploy/capi-controller-manager &>/dev/null"
 
+# Optionally install the CAPRKE2 + Docker CAPI providers via Turtles.
+#
+# CAPRKE2 + Docker is heavyweight (three extra controller-managers + the Docker infrastructure)
+# so we gate it behind V2PROV_TEST_CAPRKE2 to keep the default CI run lean. Source priority:
+#
+#   1. V2PROV_TEST_CAPRKE2_MANIFEST  — absolute path to a local manifest; applied verbatim.
+#   2. V2PROV_TEST_CAPRKE2_TURTLES_REF — rancher/turtles git ref (tag/branch/SHA); the
+#      `charts/rancher-turtles-providers` chart is `helm template`-ed at that ref so the user can
+#      run against an upstream version other than the one pinned in this repo.
+#   3. Otherwise, apply the in-repo default at tests/v2prov/defaults/caprke2-providers.yaml.
+if [ "${V2PROV_TEST_CAPRKE2}" = "true" ]; then
+  if [ -n "${V2PROV_TEST_CAPRKE2_MANIFEST}" ]; then
+    echo "Installing CAPRKE2 providers from local manifest ${V2PROV_TEST_CAPRKE2_MANIFEST}"
+    kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml apply -f "${V2PROV_TEST_CAPRKE2_MANIFEST}"
+  elif [ -n "${V2PROV_TEST_CAPRKE2_TURTLES_REF}" ]; then
+    echo "Installing CAPRKE2 providers from rancher/turtles@${V2PROV_TEST_CAPRKE2_TURTLES_REF}"
+    turtles_workdir=$(mktemp -d)
+    if ! git clone --depth 1 --branch "${V2PROV_TEST_CAPRKE2_TURTLES_REF}" \
+        https://github.com/rancher/turtles "${turtles_workdir}/turtles" 2>/dev/null; then
+      # Branch-or-tag clone failed; treat the ref as a SHA and check it out post-clone.
+      git clone https://github.com/rancher/turtles "${turtles_workdir}/turtles"
+      ( cd "${turtles_workdir}/turtles" && git checkout "${V2PROV_TEST_CAPRKE2_TURTLES_REF}" )
+    fi
+    helm template caprke2-providers \
+      "${turtles_workdir}/turtles/charts/rancher-turtles-providers" \
+      --include-crds \
+      | kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml apply -f -
+    rm -rf "${turtles_workdir}"
+  else
+    echo "Installing CAPRKE2 providers from in-repo default manifest"
+    kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml apply -f tests/v2prov/defaults/caprke2-providers.yaml
+  fi
+
+  # Wait for the three provider controller-managers Turtles brings up.
+  for dep in \
+      "rke2-bootstrap-system rke2-bootstrap-controller-manager" \
+      "rke2-control-plane-system rke2-control-plane-controller-manager" \
+      "capd-system capd-controller-manager"; do
+    ns=$(echo "${dep}" | awk '{print $1}')
+    name=$(echo "${dep}" | awk '{print $2}')
+    echo "Waiting up to 5 minutes for ${name} in ${ns}"
+    ./scripts/retry \
+      --timeout 300 \
+      --sleep 2 \
+      --message-interval 30 \
+      --message "${name} was not available after {{elapsed}} seconds" \
+      --exit-command "dump_rancher_logs" \
+      "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns ${ns} &>/dev/null \
+        && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n ${ns} deploy/${name} &>/dev/null"
+  done
+fi
+
 # only push the image if we're not using the default image:tag
 if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then
   ( push_cattle_agent_image & )
