@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +34,7 @@ type ActionHandler struct {
 	TokenMgr       tokenManager
 	ClusterManager *clustermanager.Manager
 	AuthToken      requests.AuthTokenGetter
+	ExtTokenStore  *exttokenstore.SystemStore
 }
 
 // ClusterActionHandler runs the handler for the provided cluster action in the given context.
