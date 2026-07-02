@@ -914,6 +914,23 @@ func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
 	return &ext.TokenList{Items: tokens}, nil
 }
 
+// List returns all ext tokens as per the provided options. This is an internal
+// call invoked by other parts of Rancher. It runs with full access. None of the
+// returned tokens are marked as current.
+func (t *SystemStore) List(options *metav1.ListOptions) (*ext.TokenList, error) {
+	// As a visible method possibly called during Rancher start (migrations)
+	// ensure that the backing namespace exists when the store is fully
+	// wired; the namespace may not exist yet on clusters that have never
+	// created ext tokens.
+	if t.namespaceClient != nil && t.namespaceCache != nil {
+		if err := t.ensureNamespace(); err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %w",
+				TokenNamespace, err))
+		}
+	}
+	return t.list(true, "", "", options)
+}
+
 func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, options *metav1.ListOptions) (*ext.TokenList, error) {
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
@@ -1502,9 +1519,13 @@ func SessionID(ctx context.Context) (string, error) {
 // requests a filter for a different user than itself.
 func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
+	empty := metav1.ListOptions{}
 
 	// for admins we do not impose any additional restrictions over the requested
 	if fullAccess {
+		if options == nil {
+			return empty, nil
+		}
 		return *options, nil
 	}
 
@@ -1512,7 +1533,6 @@ func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptio
 	userIDSelector := labels.Set(map[string]string{
 		UserIDLabel: userName,
 	})
-	empty := metav1.ListOptions{}
 	if options == nil || *options == empty {
 		// No external filter to contend with, just set the internal filter.
 		localOptions = metav1.ListOptions{
