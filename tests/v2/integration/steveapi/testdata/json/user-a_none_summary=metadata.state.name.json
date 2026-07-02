@@ -838,7 +838,9 @@
     {
       "JSONResp": null,
       "counts": {
-        "active": 25
+        "active": {
+          "total": 25
+        }
       },
       "property": "metadata.state.name"
     }
