@@ -1,9 +1,7 @@
 package workload
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/capr"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -145,34 +144,23 @@ func store(registries map[string]projectclient.RegistryCredential, domainToCreds
 	}
 }
 
-func resolveWorkloadID(schemaID string, data map[string]interface{}) string {
-	namespaceID := convert.ToString(data["namespaceId"])
-	name := convert.ToString(data["name"])
+// resolveWorkloadID generates a workload selector label value that respects
+// Kubernetes' 63-character limit. Returns the label value and optionally the
+// full workload ID if truncation occurred (for annotation storage).
+func resolveWorkloadID(schemaID string, namespaceID string, name string) (labelValue string, fullID string) {
+	// Full format: deployment-namespace-name
+	fullID = fmt.Sprintf("%s-%s-%s", schemaID, namespaceID, name)
 
-	// Original format: deployment-namespace-name
-	workloadID := fmt.Sprintf("%s-%s-%s", schemaID, namespaceID, name)
+	// Use SafeConcatName for consistent truncation + hash behavior across Rancher
+	labelValue = capr.SafeConcatName(MaxLabelValueLength, schemaID, namespaceID, name)
 
-	// If within Kubernetes label value limit, use original format
-	if len(workloadID) <= MaxLabelValueLength {
-		return workloadID
+	// If SafeConcatName truncated/hashed the value, return fullID for annotation
+	if labelValue != fullID {
+		return labelValue, fullID
 	}
 
-	// For long names, store full ID in annotation for debugging
-	annotations := convert.ToMapInterface(data["workloadAnnotations"])
-	if annotations == nil {
-		annotations = make(map[string]interface{})
-	}
-	annotations[WorkloadIDAnnotation] = workloadID
-	data["workloadAnnotations"] = annotations
-
-	// Create hash-based identifier to stay within Kubernetes limits
-	// Format: deployment-<12-char-hash>
-	// This allows full 63-character namespace and deployment names
-	hasher := sha256.New()
-	hasher.Write([]byte(workloadID))
-	hash := hex.EncodeToString(hasher.Sum(nil))[:12]
-
-	return fmt.Sprintf("%s-%s", schemaID, hash)
+	// No truncation needed, don't store annotation
+	return labelValue, ""
 }
 
 func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
