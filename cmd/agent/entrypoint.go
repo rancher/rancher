@@ -173,7 +173,7 @@ func retrieveRancherCACerts(ctx context.Context, certsSettingsURL string) ([]byt
 	}
 
 	// Decode JSON response
-	var cacertsSetting *v3.Setting
+	var cacertsSetting v3.Setting
 	if err := json.NewDecoder(res.Body).Decode(&cacertsSetting); err != nil {
 		return nil, fmt.Errorf("failed to parse CA certificates setting: %w", err)
 	}
