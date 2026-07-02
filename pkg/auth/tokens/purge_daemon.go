@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rancher/norman/clientbase"
@@ -25,15 +26,23 @@ type extTokenPurger interface {
 	DeleteExpired() (int, error)
 }
 
+// startOnce guards StartPurgeDaemon so the daemon runs exactly once per
+// process. Rancher wires OnLeader under two distinct lock names (auth server
+// and multi-cluster manager); both fire on the same pod in single-instance
+// deployments and would otherwise spin up two purge goroutines.
+var startOnce sync.Once
+
 func StartPurgeDaemon(ctx context.Context, mgmt *config.ManagementContext) {
-	p := &purger{
-		tokenLister:      mgmt.Management.Tokens("").Controller().Lister(),
-		tokens:           mgmt.Management.Tokens(""),
-		samlTokensLister: mgmt.Management.SamlTokens("").Controller().Lister(),
-		samlTokens:       mgmt.Management.SamlTokens(""),
-		extTokenPurger:   exttokenstore.NewSystemFromWrangler(mgmt.Wrangler),
-	}
-	go wait.JitterUntil(p.purge, time.Duration(intervalSeconds)*time.Second, .1, true, ctx.Done())
+	startOnce.Do(func() {
+		p := &purger{
+			tokenLister:      mgmt.Management.Tokens("").Controller().Lister(),
+			tokens:           mgmt.Management.Tokens(""),
+			samlTokensLister: mgmt.Management.SamlTokens("").Controller().Lister(),
+			samlTokens:       mgmt.Management.SamlTokens(""),
+			extTokenPurger:   exttokenstore.NewSystemFromWrangler(mgmt.Wrangler),
+		}
+		go wait.JitterUntil(p.purge, time.Duration(intervalSeconds)*time.Second, .1, true, ctx.Done())
+	})
 }
 
 type purger struct {
