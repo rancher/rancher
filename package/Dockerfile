@@ -42,26 +42,19 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-    curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small \
-    openssh-clients openssl patterns-base-fips && \
-    zypper --installroot /chroot clean -a && \
-    rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+      catatonit curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
 
 
 FROM chroot-builder AS chroot-builder-server
-COPY --from=final / /chroot/
-RUN zypper refresh && \
-    zypper --installroot /chroot -n in --no-recommends \
-    git-core unzip sed shadow netcat-openbsd mkisofs && \
+RUN zypper --installroot /chroot -n in --no-recommends \
+      git-core unzip sed shadow netcat-openbsd mkisofs && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 
 FROM chroot-builder AS chroot-builder-agent
-COPY --from=final / /chroot/
-RUN zypper refresh && \
-    zypper --installroot /chroot -n in --no-recommends \
-    jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+RUN zypper --installroot /chroot -n in --no-recommends \
+      jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
@@ -105,29 +98,6 @@ FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
-
-
-FROM builder AS tini
-ARG ARCH
-ENV TINI_VERSION=v0.18.0
-ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
-    TINI_CHECKSUM_amd64=12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855 \
-    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
-    TINI_CHECKSUM_arm64=7c5463f55393985ee22357d976758aaaecd08defb3c5294d353732018169b019 \
-    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
-    TINI_CHECKSUM_s390x=c8aaa618ea7897f26979ea10920373e06f3e6dfeb41ef95342eda2eb5672f24d
-
-RUN case "${ARCH}" in \
-        amd64) TINI_URL="${TINI_URL_amd64}"; TINI_CHECKSUM="${TINI_CHECKSUM_amd64}" ;; \
-        arm64) TINI_URL="${TINI_URL_arm64}"; TINI_CHECKSUM="${TINI_CHECKSUM_arm64}" ;; \
-        s390x) TINI_URL="${TINI_URL_s390x}"; TINI_CHECKSUM="${TINI_CHECKSUM_s390x}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -sLf "${TINI_URL}" > /usr/bin/tini && \
-    printf "%s  %s\n" "${TINI_CHECKSUM}" "/usr/bin/tini" > tini.sha256 && \
-    sha256sum -c tini.sha256 && \
-    rm tini.sha256 && \
-    chmod +x /usr/bin/tini
 
 
 # Main stage using bci-micro as the base image
@@ -339,8 +309,6 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
     ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
     ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
-
-COPY --from=tini /usr/bin/tini /usr/bin/tini
 
 RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     case "${ARCH}" in \
@@ -602,7 +570,6 @@ COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-chart
 COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
 COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
-COPY --from=tini /usr/bin/tini /usr/bin/
 COPY --from=agent-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
