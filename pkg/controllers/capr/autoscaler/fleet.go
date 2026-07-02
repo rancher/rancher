@@ -2,6 +2,7 @@ package autoscaler
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 
@@ -68,7 +69,7 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 				Helm: &fleet.HelmOptions{
 					Chart:       getChartName(),
 					Version:     h.chartVersionsForCluster(cluster).chartVersion,
-					Repo:        settings.ClusterAutoscalerChartRepository.Get(),
+					Repo:        getChartRepository(),
 					ReleaseName: "cluster-autoscaler",
 					Values: &fleet.GenericMap{
 						Data: map[string]any{
@@ -214,6 +215,46 @@ func getChartName() string {
 	}
 
 	return "cluster-autoscaler"
+}
+
+// getChartRepository returns the chart repository URL to use for the fleet helm op.
+// If the cluster autoscaler chart repository setting and the system default registry are
+// both configured, the registry host in the URL is substituted with the system default
+// registry to support airgapped deployments.
+func getChartRepository() string {
+	repo := settings.ClusterAutoscalerChartRepository.Get()
+
+	systemDefaultRegistry := settings.SystemDefaultRegistry.Get()
+	if repo == "" || systemDefaultRegistry == "" {
+		return repo
+	}
+
+	return substituteRegistryHost(repo, systemDefaultRegistry)
+}
+
+// substituteRegistryHost replaces the registry host in the given repository URL with the
+// provided registry. It handles both OCI (oci://) and standard HTTP(S) URLs.
+func substituteRegistryHost(repoURL, registry string) string {
+	if strings.HasPrefix(repoURL, "oci://") {
+		imageRef, err := reference.ParseNamed(strings.TrimPrefix(repoURL, "oci://"))
+		if err != nil {
+			logrus.Debugf("[autoscaler] failed to parse OCI chart repository URL '%s': %v", repoURL, err)
+			return repoURL
+		}
+		path := reference.Path(imageRef)
+		if path == "" {
+			return "oci://" + registry
+		}
+		return "oci://" + registry + "/" + path
+	}
+
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		logrus.Debugf("[autoscaler] failed to parse chart repository URL '%s': %v", repoURL, err)
+		return repoURL
+	}
+	u.Host = registry
+	return u.String()
 }
 
 // getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object
