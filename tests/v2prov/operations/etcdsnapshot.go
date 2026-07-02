@@ -222,6 +222,33 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 }
 
 func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, "none", false)
+}
+
+func RunSnapshotCreateTests(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string, count int) []*rkev1.ETCDSnapshot {
+	t.Helper()
+
+	if count <= 0 {
+		t.Fatal("snapshot count must be positive")
+	}
+
+	snapshots := make([]*rkev1.ETCDSnapshot, 0, count)
+	for i := 0; i < count; i++ {
+		snapshot := RunSnapshotCreateTest(t, clients, c, configMap, targetNode)
+		snapshots = append(snapshots, snapshot)
+	}
+
+	return snapshots
+}
+
+func RunSnapshotRestoreTestWithRKEConfig(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string) {
+	t.Helper()
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, restoreRKEConfig, true)
+}
+
+func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string, incrementGeneration bool) {
+	t.Helper()
+
 	defer func() {
 		if t.Failed() {
 			data, newErr := cluster.GatherDebugData(clients, c)
@@ -232,15 +259,19 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		}
 	}()
 
+	generation := 1
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
+		if incrementGeneration && newC.Spec.RKEConfig.ETCDSnapshotRestore != nil {
+			generation = newC.Spec.RKEConfig.ETCDSnapshotRestore.Generation + 1
+		}
 		newC.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
 			Name:             snapshotName,
-			Generation:       1,
-			RestoreRKEConfig: "none",
+			Generation:       generation,
+			RestoreRKEConfig: restoreRKEConfig,
 		}
 		newC, err = clients.Provisioning.Cluster().Update(newC)
 		if err != nil {
@@ -254,7 +285,13 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot restore", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
+		restoreComplete := rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane)
+		if !incrementGeneration {
+			return restoreComplete, nil
+		}
+		return rkeControlPlane.Status.ETCDSnapshotRestore != nil &&
+			rkeControlPlane.Status.ETCDSnapshotRestore.Generation == generation &&
+			restoreComplete, nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -271,12 +308,10 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	}
 
 	ns := corev1.NamespaceDefault
-
 	if expectedConfigMap.Namespace != "" {
 		ns = expectedConfigMap.Namespace
 	}
 
-	// Check for the configmap!
 	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), expectedConfigMap.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -290,12 +325,29 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		t.Fatal(err)
 	}
 
-	// Nodes can be left in a `Deleting` state, so only check that our expected node count equals the number of nodes that are not deleting.
 	nonDeletingNodes := 0
 	for _, n := range allNodes.Items {
 		if n.GetDeletionTimestamp() == nil {
 			nonDeletingNodes++
 		}
 	}
-	assert.Equal(t, expectedNodeCount, nonDeletingNodes)
+	assert.Equal(t, expectedNodeCount, nonDeletingNodes, "Unexpected number of nodes after restore")
+}
+
+// ModifyClusterAdditionalManifest updates the AdditionalManifest field on the cluster spec.
+// This is used to validate that restore modes properly revert (or preserve) spec changes.
+func ModifyClusterAdditionalManifest(t *testing.T, clients *clients.Clients, c *v1.Cluster, value string) {
+	t.Helper()
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		newC.Spec.RKEConfig.AdditionalManifest = value
+		_, err = clients.Provisioning.Cluster().Update(newC)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
