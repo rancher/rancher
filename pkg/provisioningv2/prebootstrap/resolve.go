@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -56,8 +57,13 @@ func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1
 		return nil, fmt.Errorf("failed to get mgmt Cluster %v: %w", controlPlane.Spec.ManagementClusterName, err)
 	}
 
+	token, err := crt.GetTokenFromSecret(r.secretCache, tokens[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token for CRT %s/%s: %w", tokens[0].Namespace, tokens[0].Name, err)
+	}
+
 	// passing in nil for taints since prebootstrapping involves specific taints to uninitialized nodes
-	data, err := systemtemplate.ForCluster(mgmtCluster, tokens[0].Status.Token, nil, r.secretCache)
+	data, err := systemtemplate.ForCluster(mgmtCluster, token, nil, r.secretCache)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate pre-bootstrap cluster-agent manifest: %w", err)
 	}
