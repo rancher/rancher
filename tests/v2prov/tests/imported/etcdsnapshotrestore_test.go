@@ -95,6 +95,7 @@ func Test_Operation_SetD_ImportedETCDSnapshotRestore(t *testing.T) {
 		time.Sleep(5 * time.Second)
 	}
 
+	t.Logf("running import command: %s", importCmd)
 	out, err := cluster.ExecOnPod(clients, ns.Name, pods[0].Name, "sh", "-c",
 		fmt.Sprintf("export %s && %s", kubectlEnv, importCmd))
 	if err != nil {

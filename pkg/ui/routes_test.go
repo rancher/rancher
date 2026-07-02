@@ -68,7 +68,7 @@ func TestRoutes_Vue(t *testing.T) {
 		settings.UIOfflinePreferred.Set(origOffline)
 	}()
 
-	handler := New(nil, mockCache)
+	handler := New(nil, mockCache, nil)
 
 	tests := []struct {
 		name           string

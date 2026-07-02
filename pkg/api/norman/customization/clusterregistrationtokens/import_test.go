@@ -10,8 +10,22 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 )
+
+func newTestCRTIndexer(clusterID, token string) cache.Indexer {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		mcmauthorizer.CRTKeyIndex: func(obj interface{}) ([]string, error) {
+			return []string{token}, nil
+		},
+	})
+	_ = indexer.Add(&apimgmtv3.ClusterRegistrationToken{
+		ObjectMeta: metav1.ObjectMeta{Name: "system", Namespace: clusterID},
+	})
+	return indexer
+}
 
 func TestClusterImportHandler_ValidateAuthImage(t *testing.T) {
 	ch := &ClusterImport{
@@ -20,6 +34,7 @@ func TestClusterImportHandler_ValidateAuthImage(t *testing.T) {
 				return &apimgmtv3.Cluster{}, nil
 			},
 		},
+		CRTIndexer: newTestCRTIndexer("cluster", "token"),
 	}
 
 	tests := []struct {

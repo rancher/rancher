@@ -46,7 +46,13 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	var (
 		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
-		clusterImport  = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters(""), SecretLister: scaledContext.Core.Secrets("").Controller().Lister()}
+		clusterImport  = clusterregistrationtokens.ClusterImport{
+			Clusters:     scaledContext.Management.Clusters(""),
+			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),
+			// Reuse the CRT token indexer registered by mcmauthorizer.NewAuthorizer,
+			// which is called on the same scaledContext before routing is set up.
+			CRTIndexer: scaledContext.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+		}
 	)
 
 	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))

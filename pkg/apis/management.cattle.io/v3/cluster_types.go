@@ -106,19 +106,19 @@ type Cluster struct {
 }
 
 type ClusterSpecBase struct {
-	DesiredAgentImage                                    string                         `json:"desiredAgentImage"`
-	DesiredAuthImage                                     string                         `json:"desiredAuthImage"`
-	AgentImageOverride                                   string                         `json:"agentImageOverride"`
-	AgentEnvVars                                         []v1.EnvVar                    `json:"agentEnvVars,omitempty"`
-	DefaultPodSecurityAdmissionConfigurationTemplateName string                         `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultClusterRoleForProjectMembers                  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
-	DockerRootDir                                        string                         `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
-	EnableNetworkPolicy                                  *bool                          `json:"enableNetworkPolicy" norman:"default=false"`
-	WindowsPreferedCluster                               bool                           `json:"windowsPreferedCluster" norman:"noupdate"`
-	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint       `json:"localClusterAuthEndpoint,omitempty"`
-	ClusterSecrets                                       ClusterSecrets                 `json:"clusterSecrets" norman:"nocreate,noupdate"`
-	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization  `json:"clusterAgentDeploymentCustomization,omitempty"`
-	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization  `json:"fleetAgentDeploymentCustomization,omitempty"`
+	DesiredAgentImage                                    string                          `json:"desiredAgentImage"`
+	DesiredAuthImage                                     string                          `json:"desiredAuthImage"`
+	AgentImageOverride                                   string                          `json:"agentImageOverride"`
+	AgentEnvVars                                         []v1.EnvVar                     `json:"agentEnvVars,omitempty"`
+	DefaultPodSecurityAdmissionConfigurationTemplateName string                          `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
+	DefaultClusterRoleForProjectMembers                  string                          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
+	EnableNetworkPolicy                                  *bool                           `json:"enableNetworkPolicy" norman:"default=false"`
+	WindowsPreferedCluster                               bool                            `json:"windowsPreferedCluster" norman:"noupdate"`
+	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint        `json:"localClusterAuthEndpoint,omitempty"`
+	ClusterSecrets                                       ClusterSecrets                  `json:"clusterSecrets" norman:"nocreate,noupdate"`
+	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization   `json:"clusterAgentDeploymentCustomization,omitempty"`
+	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization   `json:"fleetAgentDeploymentCustomization,omitempty"`
 	WebhookDeploymentCustomization                       *WebhookDeploymentCustomization `json:"webhookDeploymentCustomization,omitempty"`
 }
 
@@ -323,6 +323,11 @@ func (c *ClusterRegistrationToken) ObjClusterName() string {
 
 type ClusterRegistrationTokenSpec struct {
 	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
+	// TTL is the duration in seconds before the token expires and is rotated. Zero disables TTL-based rotation.
+	TTL *int64 `json:"ttl,omitempty"`
+	// GracePeriod is the duration in seconds during which both the old and new tokens remain valid after
+	// rotation, allowing cluster agents time to restart and pick up the new credential.
+	GracePeriod *int64 `json:"gracePeriod,omitempty"`
 }
 
 func (c *ClusterRegistrationTokenSpec) ObjClusterName() string {
@@ -338,6 +343,9 @@ type ClusterRegistrationTokenStatus struct {
 	InsecureNodeCommand        string `json:"insecureNodeCommand"`
 	ManifestURL                string `json:"manifestUrl"`
 	Token                      string `json:"token"`
+	TokenSecretName            string `json:"tokenSecretName,omitempty"`
+	ExpiresAt                  string `json:"expiresAt,omitempty"`
+	GracePeriodExpiresAt       string `json:"gracePeriodExpiresAt,omitempty"`
 }
 
 type GenerateKubeConfigOutput struct {

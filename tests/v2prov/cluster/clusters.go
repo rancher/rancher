@@ -444,29 +444,83 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 		return "", err
 	}
 
+	// Wait for at least one CRT to exist
+	var crt *v3.ClusterRegistrationToken
 	for i := 0; i < 15; i++ {
 		tokens, err := clients.Mgmt.ClusterRegistrationToken().List(c.Status.ClusterName, metav1.ListOptions{})
-		if err != nil || len(tokens.Items) == 0 || tokens.Items[0].Status.NodeCommand == "" {
+		if err != nil || len(tokens.Items) == 0 {
+			logrus.Infof("[CustomCommand] Attempt %d: No CRTs found yet (err=%v)", i+1, err)
 			time.Sleep(time.Second)
 			continue
 		}
-		return strings.Replace(tokens.Items[0].Status.InsecureNodeCommand, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
+		crt = &tokens.Items[0]
+		break
+	}
+	if crt == nil {
+		return "", fmt.Errorf("timeout waiting for CRT to be created")
+	}
+	err = wait.Object(clients.Ctx, func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+		return clients.Mgmt.ClusterRegistrationToken().Watch(namespace, opts)
+	}, crt, func(obj runtime.Object) (bool, error) {
+		crt = obj.(*v3.ClusterRegistrationToken)
+		return crt.Status.TokenSecretName != "" && crt.Status.NodeCommand != "", nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("timeout waiting for CRT TokenSecretName and NodeCommand: %w", err)
+	}
+	secret, err := clients.Core.Secret().Get(crt.Namespace, crt.Status.TokenSecretName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get token secret %s/%s: %w", crt.Namespace, crt.Status.TokenSecretName, err)
+	}
+	token := string(secret.Data["token"])
+	if token == "" {
+		return "", fmt.Errorf("token not found in secret %s/%s", crt.Namespace, crt.Status.TokenSecretName)
 	}
 
-	return "", fmt.Errorf("timeout getting custom command")
+	command := strings.ReplaceAll(crt.Status.InsecureNodeCommand, "{token}", token)
+	return strings.Replace(command, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
 }
 
 func ImportCommand(clients *clients.Clients, mgmtCluster *v3.Cluster) (string, error) {
+	// Wait for at least one CRT to exist.
+	var crt *v3.ClusterRegistrationToken
 	for i := 0; i < 15; i++ {
 		tokens, err := clients.Mgmt.ClusterRegistrationToken().List(mgmtCluster.Name, metav1.ListOptions{})
-		if err != nil || len(tokens.Items) == 0 || tokens.Items[0].Status.InsecureCommand == "" {
+		if err != nil || len(tokens.Items) == 0 {
+			logrus.Infof("[ImportCommand] Attempt %d: No CRTs found yet (err=%v)", i+1, err)
 			time.Sleep(time.Second)
 			continue
 		}
-		return strings.Replace(tokens.Items[0].Status.InsecureCommand, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
+		crt = &tokens.Items[0]
+		break
+	}
+	if crt == nil {
+		return "", fmt.Errorf("timeout waiting for CRT to be created")
 	}
 
-	return "", fmt.Errorf("timeout getting import command")
+	// Wait for the CRT to have a TokenSecretName and a populated InsecureCommand.
+	// InsecureCommand contains a "{token}" placeholder that must be resolved from the secret.
+	err := wait.Object(clients.Ctx, func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+		return clients.Mgmt.ClusterRegistrationToken().Watch(namespace, opts)
+	}, crt, func(obj runtime.Object) (bool, error) {
+		crt = obj.(*v3.ClusterRegistrationToken)
+		return crt.Status.TokenSecretName != "" && crt.Status.InsecureCommand != "", nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("timeout waiting for CRT TokenSecretName and InsecureCommand: %w", err)
+	}
+
+	secret, err := clients.Core.Secret().Get(crt.Namespace, crt.Status.TokenSecretName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get token secret %s/%s: %w", crt.Namespace, crt.Status.TokenSecretName, err)
+	}
+	token := string(secret.Data["token"])
+	if token == "" {
+		return "", fmt.Errorf("token not found in secret %s/%s", crt.Namespace, crt.Status.TokenSecretName)
+	}
+
+	command := strings.ReplaceAll(crt.Status.InsecureCommand, "{token}", token)
+	return strings.Replace(command, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
 }
 
 func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
