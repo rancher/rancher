@@ -145,6 +145,7 @@ func (s *Server) OnLeader(ctx context.Context) error {
 	management := &config.ManagementContext{
 		Management: s.scaledContext.Management,
 		Core:       s.scaledContext.Core,
+		Wrangler:   s.scaledContext.Wrangler,
 	}
 
 	if err := data.AuthConfigs(management); err != nil {
