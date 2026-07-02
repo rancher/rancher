@@ -16,17 +16,17 @@ import (
 )
 
 const (
-	testShortTTLMillis = int64(60 * 1000)              // 60s
-	testLongTTLMillis  = int64(365 * 24 * 3600 * 1000) // 1y
+	testShortTTL = time.Minute
+	testLongTTL  = 365 * 24 * time.Hour
 )
 
-func newV3Token(name string, created time.Time, ttlMillis int64) *v3.Token {
+func newV3Token(name string, created time.Time, ttl time.Duration) *v3.Token {
 	return &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			CreationTimestamp: metav1.NewTime(created),
 		},
-		TTLMillis: ttlMillis,
+		TTLMillis: ttl.Milliseconds(),
 	}
 }
 
@@ -65,9 +65,9 @@ func TestPurgerDeleteExpiredV3Tokens(t *testing.T) {
 		{
 			name: "mix expired + fresh, only expired deleted",
 			tokens: []*v3.Token{
-				newV3Token("expired-1", longAgo, testShortTTLMillis),
-				newV3Token("fresh-1", recent, testLongTTLMillis),
-				newV3Token("expired-2", longAgo, testShortTTLMillis),
+				newV3Token("expired-1", longAgo, testShortTTL),
+				newV3Token("fresh-1", recent, testLongTTL),
+				newV3Token("expired-2", longAgo, testShortTTL),
 			},
 			expectedDeletes: []string{"expired-1", "expired-2"},
 			wantCount:       2,
@@ -75,7 +75,7 @@ func TestPurgerDeleteExpiredV3Tokens(t *testing.T) {
 		{
 			name: "delete returns not found is tolerated",
 			tokens: []*v3.Token{
-				newV3Token("expired-1", longAgo, testShortTTLMillis),
+				newV3Token("expired-1", longAgo, testShortTTL),
 			},
 			deleteResults: map[string]error{
 				"expired-1": clientBaseNotFound(),
@@ -86,8 +86,8 @@ func TestPurgerDeleteExpiredV3Tokens(t *testing.T) {
 		{
 			name: "per-token error surfaced, loop continues",
 			tokens: []*v3.Token{
-				newV3Token("expired-1", longAgo, testShortTTLMillis),
-				newV3Token("expired-2", longAgo, testShortTTLMillis),
+				newV3Token("expired-1", longAgo, testShortTTL),
+				newV3Token("expired-2", longAgo, testShortTTL),
 			},
 			deleteResults: map[string]error{
 				"expired-1": someErr,

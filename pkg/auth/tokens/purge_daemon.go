@@ -18,8 +18,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// intervalSeconds defines the interval at which the purge daemon runs.
-const intervalSeconds int64 = 3600 // 1h.
+// purgeInterval defines the interval at which the purge daemon runs.
+const purgeInterval = time.Hour
 
 // extTokenPurger deletes expired ext.Tokens.
 type extTokenPurger interface {
@@ -41,7 +41,7 @@ func StartPurgeDaemon(ctx context.Context, mgmt *config.ManagementContext) {
 			samlTokens:       mgmt.Management.SamlTokens(""),
 			extTokenPurger:   exttokenstore.NewSystemFromWrangler(mgmt.Wrangler),
 		}
-		go wait.JitterUntil(p.purge, time.Duration(intervalSeconds)*time.Second, .1, true, ctx.Done())
+		go wait.JitterUntil(p.purge, purgeInterval, .1, true, ctx.Done())
 	})
 }
 

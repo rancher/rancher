@@ -18,8 +18,8 @@ import (
 )
 
 // makeTokenSecret builds a token-backing Secret with the given name, creation
-// time, and TTL in milliseconds. TTL < 0 encodes an infinite lifetime.
-func makeTokenSecret(t *testing.T, name string, created time.Time, ttlMillis int64) corev1.Secret {
+// time, and TTL. A negative TTL encodes an infinite lifetime.
+func makeTokenSecret(t *testing.T, name string, created time.Time, ttl time.Duration) corev1.Secret {
 	t.Helper()
 	principalBytes, err := json.Marshal(properPrincipal)
 	require.NoError(t, err)
@@ -41,7 +41,7 @@ func makeTokenSecret(t *testing.T, name string, created time.Time, ttlMillis int
 			FieldKind:           []byte(IsLogin),
 			FieldLastUpdateTime: []byte("13:00:05"),
 			FieldPrincipal:      principalBytes,
-			FieldTTL:            []byte(strconv.FormatInt(ttlMillis, 10)),
+			FieldTTL:            []byte(strconv.FormatInt(ttl.Milliseconds(), 10)),
 			FieldUID:            []byte("uid-" + name),
 			FieldUserID:         []byte(properUser),
 		},
@@ -56,9 +56,9 @@ func TestSystemStoreDeleteExpired(t *testing.T) {
 	recent := now.Add(-1 * time.Minute)
 
 	const (
-		shortTTLMillis = int64(60 * 1000)              // 60s
-		longTTLMillis  = int64(365 * 24 * 3600 * 1000) // 1y
-		infiniteTTL    = int64(-1)
+		shortTTL    = time.Minute
+		longTTL     = 365 * 24 * time.Hour
+		infiniteTTL = -1 * time.Millisecond // negative TTL encodes infinite
 	)
 
 	someErr := errors.New("some error")
@@ -79,16 +79,16 @@ func TestSystemStoreDeleteExpired(t *testing.T) {
 		{
 			name: "all fresh, no deletes",
 			secrets: []corev1.Secret{
-				makeTokenSecret(t, "fresh-1", recent, longTTLMillis),
-				makeTokenSecret(t, "fresh-2", recent, longTTLMillis),
+				makeTokenSecret(t, "fresh-1", recent, longTTL),
+				makeTokenSecret(t, "fresh-2", recent, longTTL),
 			},
 		},
 		{
 			name: "mix expired + fresh, only expired deleted",
 			secrets: []corev1.Secret{
-				makeTokenSecret(t, "expired-1", longAgo, shortTTLMillis),
-				makeTokenSecret(t, "fresh-1", recent, longTTLMillis),
-				makeTokenSecret(t, "expired-2", longAgo, shortTTLMillis),
+				makeTokenSecret(t, "expired-1", longAgo, shortTTL),
+				makeTokenSecret(t, "fresh-1", recent, longTTL),
+				makeTokenSecret(t, "expired-2", longAgo, shortTTL),
 			},
 			expectedDeletes: []string{"expired-1", "expired-2"},
 			wantCount:       2,
@@ -96,7 +96,7 @@ func TestSystemStoreDeleteExpired(t *testing.T) {
 		{
 			name: "delete returns IsNotFound is tolerated",
 			secrets: []corev1.Secret{
-				makeTokenSecret(t, "expired-1", longAgo, shortTTLMillis),
+				makeTokenSecret(t, "expired-1", longAgo, shortTTL),
 			},
 			deleteResults: map[string]error{
 				"expired-1": apierrors.NewNotFound(GVR.GroupResource(), "expired-1"),
@@ -107,8 +107,8 @@ func TestSystemStoreDeleteExpired(t *testing.T) {
 		{
 			name: "per-token error surfaced, loop continues, count reflects only successes",
 			secrets: []corev1.Secret{
-				makeTokenSecret(t, "expired-1", longAgo, shortTTLMillis),
-				makeTokenSecret(t, "expired-2", longAgo, shortTTLMillis),
+				makeTokenSecret(t, "expired-1", longAgo, shortTTL),
+				makeTokenSecret(t, "expired-2", longAgo, shortTTL),
 			},
 			deleteResults: map[string]error{
 				"expired-1": someErr,
