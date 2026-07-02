@@ -30,8 +30,10 @@ var (
 
 const (
 	kubernetesSSLCertsDir = "/etc/kubernetes/ssl/certs"
-	caFileLocation        = kubernetesSSLCertsDir + "/serverca"
+	caFilename            = "serverca"
+	caFileLocation        = kubernetesSSLCertsDir + "/" + caFilename
 	dockerCertsDir        = "/etc/docker/certs.d"
+	dockerCertFilename    = "ca.crt"
 )
 
 // preStart is meant as a replacement for entrypoint logic.
@@ -47,12 +49,17 @@ func preStart(ctx context.Context) error {
 		return fmt.Errorf("error pinging %s: %w", cattleServer, err)
 	}
 
-	if err := printResolvedCattleServerHostname(cattleServer); err != nil {
+	if err := printResolvedCattleServerHostname(ctx, cattleServer, net.DefaultResolver); err != nil {
 		return err
 	}
 
 	if cattleCAChecksum := os.Getenv("CATTLE_CA_CHECKSUM"); cattleCAChecksum != "" {
-		if err := populateRancherCACerts(ctx, cattleServer, cattleCAChecksum); err != nil {
+		// eases testing
+		certsDestination := certsDirs{
+			kubernetesSSLCertsDir: kubernetesSSLCertsDir,
+			dockerCertsDir:        dockerCertsDir,
+		}
+		if err := populateRancherCACerts(ctx, cattleServer, cattleCAChecksum, certsDestination); err != nil {
 			return err
 		}
 	}
@@ -93,16 +100,20 @@ func pingCattleServer(ctx context.Context, cattleServerEnv string) (pingError er
 	return nil
 }
 
+type netResolver interface {
+	LookupHost(ctx context.Context, host string) (addrs []string, err error)
+}
+
 // printResolvedCattleServerHostname prints the IP(s) to which the provided CATTLE_SERVER hostname resolves
 // If an IP was already used, then it is a no-op
-func printResolvedCattleServerHostname(cattleServerEnv string) error {
+func printResolvedCattleServerHostname(ctx context.Context, cattleServerEnv string, resolver netResolver) error {
 	parsed, err := url.Parse(cattleServerEnv)
 	if err != nil {
 		return err
 	}
 	cattleServerHostname := parsed.Hostname()
 
-	resolved, err := net.LookupHost(cattleServerHostname)
+	resolved, err := resolver.LookupHost(ctx, cattleServerHostname)
 	if err != nil {
 		return err
 	} else if len(resolved) == 1 && resolved[0] == cattleServerHostname {
@@ -115,7 +126,7 @@ func printResolvedCattleServerHostname(cattleServerEnv string) error {
 }
 
 // populateRancherCACerts will retrieve root CA certificates from Rancher, verify them against the provided checksum, then finally write it to the filesystem.
-func populateRancherCACerts(ctx context.Context, cattleServerEnv string, cattleCAChecksumEnv string) error {
+func populateRancherCACerts(ctx context.Context, cattleServerEnv string, cattleCAChecksumEnv string, certs certsDirs) error {
 	certsURL := cattleServerEnv + "/v3/settings/cacerts"
 	rootCA, err := retrieveRancherCACerts(ctx, certsURL)
 	if err != nil {
@@ -137,7 +148,7 @@ func populateRancherCACerts(ctx context.Context, cattleServerEnv string, cattleC
 	}
 	logrus.Infof("Value from %s is an x509 certificate", certsURL)
 
-	return writeRootCACerts(rootCA, cattleServerEnv)
+	return certs.writeRootCACerts(rootCA, cattleServerEnv)
 }
 
 // retrieveRancherCACerts retrieves the "cacerts" setting from Rancher via the provided URL, decodes the response and returns the armored certificate payload.
@@ -168,17 +179,22 @@ func retrieveRancherCACerts(ctx context.Context, certsSettingsURL string) ([]byt
 	return []byte(value), nil
 }
 
+type certsDirs struct {
+	kubernetesSSLCertsDir string
+	dockerCertsDir        string
+}
+
 // writeRootCACerts writes the root CA certificates retrieved from Rancher to 2 different places:
 // - /etc/kubernetes/ssl/certs/serverca
 // - /etc/docker/certs.d/$CATTLE_SERVER_HOSTNAME_WITH_PORT/ca.crt
-func writeRootCACerts(rootCA []byte, cattleServerEnv string) error {
-	if err := os.MkdirAll(kubernetesSSLCertsDir, 0755); err != nil {
+func (w certsDirs) writeRootCACerts(rootCA []byte, cattleServerEnv string) error {
+	if err := os.MkdirAll(w.kubernetesSSLCertsDir, 0755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(caFileLocation, rootCA, 0600); err != nil {
+	if err := os.Chmod(w.kubernetesSSLCertsDir, 0700); err != nil {
 		return err
 	}
-	if err := os.Chmod(kubernetesSSLCertsDir, 0700); err != nil {
+	if err := os.WriteFile(filepath.Join(w.kubernetesSSLCertsDir, caFilename), rootCA, 0600); err != nil {
 		return err
 	}
 
@@ -188,7 +204,7 @@ func writeRootCACerts(rootCA []byte, cattleServerEnv string) error {
 	}
 	cattleServerHostnameWithPort := parsed.Host
 
-	dest := filepath.Join(dockerCertsDir, cattleServerHostnameWithPort, "ca.crt")
+	dest := filepath.Join(w.dockerCertsDir, cattleServerHostnameWithPort, dockerCertFilename)
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return err
 	}
