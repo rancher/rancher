@@ -51,9 +51,9 @@ const (
 
 var (
 	primaryImages = map[string]string{
-		chart.WebhookChartName:           "rancher/rancher-webhook",
 		chart.RemoteDialerProxyChartName: "rancher/remotedialer-proxy",
 		chart.TurtlesChartName:           "rancher/turtles",
+		chart.WebhookChartName:           "rancher/rancher-webhook",
 	}
 	// topLevelImagePullSecrets tracks the system charts that do not
 	// use the standard 'global.cattle.imagePullSecrets' field to accept pull
@@ -217,22 +217,14 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 			}
 		}
 
-		// webhook needs to be able to adopt the MutatingWebhookConfiguration which originally wasn't a part of the
-		// chart definition, but is now part of the chart definition
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
-		takeOwnership := chartDef.ChartName == chart.WebhookChartName
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, takeOwnership, helmOpInstallImageOverride); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, false, helmOpInstallImageOverride); err != nil {
 			logrus.Errorf("[system-charts] failed to ensure chart %q: %v", chartDef.ChartName, err)
 			return repo, err
 		}
 
 		logrus.Tracef("[system-charts] ensured chart %q in namespace %q", chartDef.ChartName, chartDef.ReleaseNamespace)
-		if chartDef.ChartName == chart.WebhookChartName {
-			if err := h.updateAppliedWebhookCustomization(); err != nil {
-				logrus.Warnf("[systemcharts] failed to update applied webhook customization status: %v", err)
-			}
-		}
 	}
 
 	logrus.Tracef("[system-charts] reconciliation complete for repo %q", repoName)
@@ -241,6 +233,36 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
+		{
+			// webhookchart controller manages the webhook on the local cluster (early install).
+			// systemcharts manages it here only for downstream clusters (MCMAgent enabled) so
+			// the same chart version and WDC-driven ConfigMap values are applied there.
+			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.WebhookChartName,
+			ChartName:           chart.WebhookChartName,
+			ExactVersionSetting: settings.RancherWebhookVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{
+					"capi": nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+				}
+				h.setPriorityClass(values, chart.WebhookChartName)
+				// Seed HA defaults (replicaCount, affinity, PDB, resources, tolerations).
+				// WDC-translated overrides arrive via the rancher-config ConfigMap.
+				if haDefaults, err := chart.WebhookHelmValues(nil); err != nil {
+					logrus.Warnf("[systemcharts] failed to get webhook HA defaults: %v", err)
+				} else {
+					values = data.MergeMaps(haDefaults, values)
+				}
+				configMapValues := h.getChartValues(chart.WebhookChartName)
+				return data.MergeMaps(values, configMapValues)
+			},
+			Enabled: func() bool {
+				return features.MCMAgent.Enabled()
+			},
+		},
 		{
 			ReleaseNamespace:    namespace.System,
 			ReleaseName:         chart.RemoteDialerProxyChartName,
@@ -264,44 +286,6 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				return ext.RDPEnabled()
 			},
 			RemoveNamespace: false,
-		},
-		{
-			ReleaseNamespace:    namespace.System,
-			ReleaseName:         chart.WebhookChartName,
-			ChartName:           chart.WebhookChartName,
-			ExactVersionSetting: settings.RancherWebhookVersion,
-			Values: func() map[string]interface{} {
-				values := map[string]interface{}{
-					// This is no longer used in the webhook chart but previous values can still be found
-					// with `helm get values -n cattle-system rancher-webhook` which can be confusing. We
-					// completely remove the previous capi values by setting it to nil here.
-					"capi": nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-				}
-				// add priority class value
-				h.setPriorityClass(values, chart.WebhookChartName)
-				// merge per-cluster webhook customization from the local cluster spec;
-				// this is overridden by any values set in the rancher-config ConfigMap below.
-				wdc, err := h.getLocalWebhookCustomization()
-				if err != nil && !errors.IsNotFound(err) {
-					logrus.Warnf("[systemcharts] failed to get local cluster for webhook values: %v", err)
-				} else {
-					// wdc is nil when the local cluster is not found; WebhookHelmValues
-					// handles nil by returning defaults that reset every customizable field.
-					helmValues, err := chart.WebhookHelmValues(wdc)
-					if err != nil {
-						logrus.Warnf("[systemcharts] failed to build webhook helm values: %v", err)
-					} else {
-						values = data.MergeMaps(values, helmValues)
-					}
-				}
-				// get custom values for the rancher-webhook; ConfigMap values take highest precedence
-				configMapValues := h.getChartValues(chart.WebhookChartName)
-				return data.MergeMaps(values, configMapValues)
-			},
-			Enabled: func() bool { return true },
 		},
 		{
 			ReleaseNamespace: "rancher-operator-system",
@@ -617,11 +601,6 @@ func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
 		return obj, nil
 	}
-	// Always re-sync when webhook deployment customization has drifted from applied state.
-	if clusterutil.WebhookDeploymentCustomizationChanged(obj) {
-		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
-		return obj, nil
-	}
 	if !features.MCM.Enabled() {
 		return obj, nil
 	}
@@ -663,51 +642,6 @@ func (h *handler) getChartValues(chartName string) map[string]interface{} {
 		logrus.Warnf("[system-charts] failed to get chart values for chart %q: %v", chartName, err)
 	}
 	return configMapValues
-}
-
-// getLocalWebhookCustomization returns the WebhookDeploymentCustomization from the local
-// management cluster, or nil if the cluster has no customization set.
-// On downstream clusters (MCMAgent enabled), webhook customization is delivered via a
-// rancher-config ConfigMap pushed by the management server's clusterdeploy controller.
-// The systemcharts controller reads those values through the existing getChartValues()
-// path, so this function returns nil in that context.
-func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomization, error) {
-	if features.MCMAgent.Enabled() {
-		// Downstream: values come from rancher-config ConfigMap, not from
-		// the cluster spec. Return nil so they are merged in getChartValues().
-		return nil, nil
-	}
-	cluster, err := h.clusterCache.Get("local")
-	if err != nil {
-		return nil, err
-	}
-	return cluster.Spec.WebhookDeploymentCustomization, nil
-}
-
-// updateAppliedWebhookCustomization reads the local cluster from cache, copies the webhook
-// customization from Spec to Status, and persists the status via UpdateStatus.
-// On downstream clusters (MCMAgent enabled), this is a no-op because the management server
-// tracks applied state via the clusterdeploy controller's manageWebhookConfig().
-func (h *handler) updateAppliedWebhookCustomization() error {
-	if features.MCMAgent.Enabled() {
-		return nil
-	}
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Read from the informer cache which is available immediately at startup,
-		// rather than h.clusters.Get() which can return "not found" for several
-		// minutes while the wrangler controller client initializes.
-		cached, err := h.clusterCache.Get("local")
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		cluster := cached.DeepCopy()
-		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
-		_, err = h.clusters.UpdateStatus(cluster)
-		return err
-	})
 }
 
 func relatedFeatures(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
