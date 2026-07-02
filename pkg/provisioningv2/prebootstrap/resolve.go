@@ -33,7 +33,10 @@ type Retriever struct {
 }
 
 func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1.RKEControlPlane) ([]plan.File, error) {
-	shouldDo, _ := r.preBootstrapCluster(controlPlane)
+	shouldDo, err := r.preBootstrapCluster(controlPlane)
+	if err != nil {
+		return nil, err
+	}
 	if !shouldDo {
 		return nil, nil
 	}
@@ -77,5 +80,5 @@ func (r *Retriever) preBootstrapCluster(cp *rkev1.RKEControlPlane) (bool, error)
 		return false, fmt.Errorf("failed to get mgmt Cluster %v: %w", cp.Spec.ManagementClusterName, err)
 	}
 
-	return capr.PreBootstrap(mgmtCluster), nil
+	return capr.ShouldPreBootstrap(r.secretCache, mgmtCluster)
 }

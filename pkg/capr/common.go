@@ -18,7 +18,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
-	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
@@ -30,10 +29,10 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/summary"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -80,6 +79,8 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
+	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
+	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
 
 	SnapshotNameAnnotation = "etcdsnapshot.rke.io/snapshot-name"
@@ -209,6 +210,13 @@ const (
 	MaximumHostnameLengthLimit = 63
 
 	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
+
+	// various sync-related annotations for the secret-sync mechanism
+	SyncAnnotation             = "provisioning.cattle.io/sync"
+	SyncPreBootstrapAnnotation = "provisioning.cattle.io/sync-bootstrap"
+	SyncNamespaceAnnotation    = "provisioning.cattle.io/sync-target-namespace"
+	SyncNameAnnotation         = "provisioning.cattle.io/sync-target-name"
+	SyncedAtAnnotation         = "provisioning.cattle.io/synced-at"
 )
 
 var (
@@ -667,14 +675,57 @@ func SafeConcatName(maxLength int, name ...string) string {
 	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
 }
 
-func PreBootstrap(mgmtCluster *v3.Cluster) bool {
-	// if the upstream rancher _does not_ have pre-bootstrapping enabled just always return false.
-	if !features.ProvisioningPreBootstrap.Enabled() {
-		logrus.Debug("[pre-bootstrap] feature-flag disabled, skipping pre-bootstrap flow")
+// SecretLister is a minimal interface for listing secrets in order to be compatible with core controllers, norman, etc
+type SecretLister interface {
+	List(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
+}
+
+// ShouldPreBootstrap determines whether the given cluster should enter the pre-bootstrap flow.
+// Until the cluster is marked pre-bootstrapped, always run the flow so every pre-bootstrap controller
+// gets a chance to do its work.
+func ShouldPreBootstrap(secretLister SecretLister, cluster *v3.Cluster) (bool, error) {
+	if v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
+		return false, nil
+	}
+
+	if cluster.Spec.FleetWorkspaceName == "" {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// AuthorizedClusterNames returns the authorized cluster names from a comma-separated annotation value.
+func AuthorizedClusterNames(authorizedClusters string) []string {
+	if authorizedClusters == "" {
+		return nil
+	}
+
+	var clusterNames []string
+	for _, authorizedCluster := range strings.Split(authorizedClusters, ",") {
+		clusterName := strings.TrimSpace(authorizedCluster)
+		if clusterName == "" {
+			continue
+		}
+		clusterNames = append(clusterNames, clusterName)
+	}
+
+	return clusterNames
+}
+
+// ClusterAuthorizedForSecret checks whether a cluster name appears in a comma-separated list of authorized clusters.
+func ClusterAuthorizedForSecret(authorizedClusters, clusterName string) bool {
+	if clusterName == "" {
 		return false
 	}
 
-	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
+	for _, authorizedCluster := range AuthorizedClusterNames(authorizedClusters) {
+		if authorizedCluster == clusterName {
+			return true
+		}
+	}
+
+	return false
 }
 
 // AutoscalerEnabledByCAPI looks at the cluster object for the ClusterAutoscalerEnabledAnnotation, and
