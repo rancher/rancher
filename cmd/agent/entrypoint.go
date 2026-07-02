@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -82,7 +83,10 @@ func pingCattleServer(ctx context.Context, cattleServerEnv string) (pingError er
 		}
 	}()
 
-	httpClient := http.Client{Transport: insecureHTTPTransport}
+	httpClient := http.Client{
+		Timeout:   5 * time.Minute,
+		Transport: insecureHTTPTransport,
+	}
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return err
@@ -159,7 +163,10 @@ func retrieveRancherCACerts(ctx context.Context, certsSettingsURL string) ([]byt
 		return nil, err
 	}
 
-	httpClient := http.Client{Transport: insecureHTTPTransport}
+	httpClient := http.Client{
+		Timeout:   5 * time.Minute,
+		Transport: insecureHTTPTransport,
+	}
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
