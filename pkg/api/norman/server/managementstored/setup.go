@@ -40,6 +40,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
@@ -165,6 +166,7 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 		TokenMgr:       tokens.NewManager(managementContext.Wrangler),
 		ClusterManager: clusterManager,
 		AuthToken:      authToken,
+		ExtTokenStore:  exttokenstore.NewSystemFromWrangler(managementContext.Wrangler),
 	}
 
 	clusterValidator := ccluster.Validator{
