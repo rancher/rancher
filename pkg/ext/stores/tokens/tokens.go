@@ -660,7 +660,8 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		// wrapped api error
+		return nil, err
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
@@ -1035,6 +1036,14 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	return newToken, nil
 }
 
+// Patch applies the given JSONPatchType to the named token. It operates
+// directly on the internal secret. Use this only for operations on labels
+// and/or annotations.
+func (t *SystemStore) Patch(name string, patch []byte) error {
+	_, err := t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
+}
+
 // UpdateLastUsedAt patches the last-used-at information of the token.
 // Called during authentication.
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
@@ -1332,6 +1341,7 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		if err == nil {
 			return ext, nil
 		}
+		// %w wraps the error, still testable for various API errors
 		return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
 	}
 
@@ -1339,16 +1349,23 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
 	// cache.
-	if v3token, err := t.v3TokenClient.Get(tokenID); err == nil {
+	v3token, errV3 := t.v3TokenClient.Get(tokenID)
+	if errV3 == nil {
 		return v3token, nil
+	}
+	if !apierrors.IsNotFound(errV3) {
+		// report transient/internal v3 errors
+		// as we cannot be sure about resource state
+		return nil, errV3
 	}
 
 	// not a v3 Token, now check for ext token
-	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+	ext, errExt := t.Get(tokenID, "", &metav1.GetOptions{})
+	if errExt == nil {
 		return ext, nil
 	}
-
-	return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	// %w wraps the error, still testable for various API errors
+	return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, errExt)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from

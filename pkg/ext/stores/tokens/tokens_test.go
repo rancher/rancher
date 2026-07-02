@@ -166,6 +166,7 @@ var (
 	errInvalidContext      = fmt.Errorf("context has no user info")
 
 	bogusNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
+	sessionNotFoundError    = apierrors.NewNotFound(GVR.GroupResource(), "session-token")
 	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
 	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
@@ -1150,7 +1151,43 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token \"session-token\"")),
+			err:  fmt.Errorf("unable to fetch token session-token: %w", sessionNotFoundError),
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// fail fetch of session token, v3 and ext, neither is found
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").
+					Return(nil, sessionNotFoundError)
+				scache.EXPECT().Get("cattle-tokens", "session-token").
+					Return(nil, sessionNotFoundError)
+
+				users.EXPECT().Get("world").
+					Return(enabledUser, nil)
+			},
+		},
+		{
+			name: "provider/principal retrieval error, not found",
+			err: fmt.Errorf("unable to fetch token session-token: %w",
+				apierrors.NewNotFound(GVR.GroupResource(), "session-token")),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1175,9 +1212,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").
-					Return(nil, errSomeError)
+					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "session-token"))
 				scache.EXPECT().Get("cattle-tokens", "session-token").
-					Return(nil, errSomeError)
+					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "session-token"))
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
@@ -1813,6 +1850,42 @@ func TestSystemStoreDelete(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSystemStorePatch(t *testing.T) {
+	t.Run("patch anything", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// assemble and configure store from mock clients ...
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+
+		type jsonPatch struct {
+			Op    string `json:"op"`
+			Path  string `json:"path"`
+			Value any    `json:"value"`
+		}
+
+		patch, err := json.Marshal([]jsonPatch{{
+			Op:    "add",
+			Path:  "/metadata/labels/cattle.io.oidc-client-placeholder",
+			Value: "true",
+		}})
+		assert.NoError(t, err)
+		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, patch).
+			Return(nil, nil).Times(1)
+
+		err = store.Patch("atoken", patch)
+		assert.NoError(t, err)
+		// note: the main check, that the patch data is passed from
+		// system store to secret client, is done by the test framework
+		// itself, as it matches the call, or misses the match
+	})
 }
 
 func TestSystemStoreUpdateLastUsedAt(t *testing.T) {

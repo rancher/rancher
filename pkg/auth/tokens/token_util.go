@@ -173,22 +173,29 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.
 // This must match the logic of `VerifyToken` above.
 func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
+	// The condition `tokenKey == ""` is an indicator that there is no
+	// proper secret value to verify. This happens when authenticating a JWT
+	// token representing an OIDC session. See `TokenFromRequest` in
+	// `pkg/auth/requests/authenticate.go`.
+
 	invalidAuthTokenErr := errors.New("invalid token")
 
 	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
 		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
 
-	// Ext token always has a hash. Only a hash.
-	hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
-	if err != nil {
-		logrus.Errorf("unable to get a hasher for token with error %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
-	}
+	if tokenKey != "" {
+		// Ext token always has a hash. Only a hash.
+		hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
+		if err != nil {
+			logrus.Errorf("unable to get a hasher for token with error %v", err)
+			return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+		}
 
-	if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
-		logrus.Errorf("VerifyHash failed with error: %v", err)
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+		if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
+			logrus.Errorf("VerifyHash failed with error: %v", err)
+			return http.StatusUnprocessableEntity, invalidAuthTokenErr
+		}
 	}
 
 	if IsExpired(storedToken) {
