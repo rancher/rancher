@@ -31,7 +31,7 @@ var (
 const (
 	kubernetesSSLCertsDir = "/etc/kubernetes/ssl/certs"
 	caFileLocation        = kubernetesSSLCertsDir + "/serverca"
-	dockerCertsDir        = " /etc/docker/certs.d"
+	dockerCertsDir        = "/etc/docker/certs.d"
 )
 
 // preStart is meant as a replacement for entrypoint logic.
