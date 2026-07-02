@@ -212,7 +212,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Controllers:        steveControllers,
 		AccessSetLookup:    wranglerContext.ASL,
 		AuthMiddleware:     steveauth.ExistingContext,
-		Next:               ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),
+		Next:               ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache(), wranglerContext.Core.Secret().Cache()),
 		ClusterRegistry:    opts.ClusterRegistry,
 		SQLCache:           features.UISQLCache.Enabled(),
 		ExtensionAPIServer: extensionAPIServer,

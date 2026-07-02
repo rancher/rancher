@@ -3,11 +3,13 @@ package clusterregistrationtoken
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr/installer"
 	util "github.com/rancher/rancher/pkg/cluster"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -23,19 +25,25 @@ const (
 	provisioningV2WindowsNodeCommandFormat         = `%s curl.exe -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
 	provisioningV2InsecureNodeCommandFormat        = "%s curl --insecure -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
 	provisioningV2InsecureWindowsNodeCommandFormat = `%s curl.exe --insecure -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
-	loginCommandFormat                             = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
+	loginCommandFormat                             = `echo "%s" | sudo docker login --username %s --password-stdin %s`
 	windowsNodeCommandFormat                       = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
+	tokenPlaceholder                               = "{token}"
 )
 
-func (h *handler) isProvisioningV2(clusterID string) bool {
-	cluster, err := h.clusters.Get(clusterID)
-	if err != nil {
-		return false
+func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRegistrationTokenStatus, error) {
+	if crt.Status.TokenSecretName == "" {
+		return crt.Status, nil
 	}
-	return cluster.Annotations["objectset.rio.cattle.io/owner-gvk"] == "provisioning.cattle.io/v1, Kind=Cluster"
+
+	clusterID := convert.ToString(crt.Spec.ClusterName)
+	crtStatus := crt.Status.DeepCopy()
+
+	return AssignCommands(crtStatus, clusterID, h.clusters)
 }
 
-func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRegistrationTokenStatus, error) {
+// AssignCommands populates the command fields in a CRT status using the "{token}" placeholder.
+// Substitution of the placeholder with the real token happens at the API layer.
+func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, clusterID string, clusters mgmtcontrollers.ClusterCache) (v32.ClusterRegistrationTokenStatus, error) {
 	checksum := systemtemplate.CAChecksum()
 	ca := ""
 	caWindows := ""
@@ -44,18 +52,9 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 		caWindows = " -CaChecksum " + checksum
 	}
 
-	token := crt.Status.Token
-	clusterID := convert.ToString(crt.Spec.ClusterName)
-	if token == "" {
-		return crt.Status, nil
-	}
-
-	crtStatus := crt.Status.DeepCopy()
-	crtStatus.Token = token
-
-	url, err := getURL(token, clusterID)
+	url, err := getURL(tokenPlaceholder, clusterID)
 	if err != nil {
-		return crt.Status, err
+		return *crtStatus, err
 	}
 
 	if url == "" {
@@ -68,30 +67,31 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 
 	rootURL, err := getRootURL()
 	if err != nil {
-		return crt.Status, err
+		return *crtStatus, err
 	}
 
-	cluster, err := h.clusters.Get(clusterID)
+	cluster, err := clusters.Get(clusterID)
 	if err != nil {
-		return crt.Status, err
+		return *crtStatus, err
 	}
 
+	isProvisioningV2 := cluster.Annotations["objectset.rio.cattle.io/owner-gvk"] == "provisioning.cattle.io/v1, Kind=Cluster"
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	if h.isProvisioningV2(clusterID) {
+	if isProvisioningV2 {
 		// for linux
 		crtStatus.NodeCommand = fmt.Sprintf(provisioningV2NodeCommandFormat,
 			AgentEnvVars(cluster, Linux),
 			rootURL+installer.SystemAgentInstallPath,
 			AgentEnvVars(cluster, Linux),
 			rootURL,
-			token,
+			tokenPlaceholder,
 			ca)
 		crtStatus.InsecureNodeCommand = fmt.Sprintf(provisioningV2InsecureNodeCommandFormat,
 			AgentEnvVars(cluster, Linux),
 			rootURL+installer.SystemAgentInstallPath,
 			AgentEnvVars(cluster, Linux),
 			rootURL,
-			token,
+			tokenPlaceholder,
 			ca)
 	} else {
 		// for linux
@@ -99,22 +99,23 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 			AgentEnvVars(cluster, Docker),
 			agentImage,
 			rootURL,
-			token,
+			tokenPlaceholder,
 			ca)
 	}
+
 	// for windows
-	if h.isProvisioningV2(clusterID) {
+	if isProvisioningV2 {
 		crtStatus.WindowsNodeCommand = fmt.Sprintf(provisioningV2WindowsNodeCommandFormat,
 			AgentEnvVars(cluster, PowerShell),
 			rootURL+installer.WindowsRke2InstallPath,
 			rootURL,
-			token,
+			tokenPlaceholder,
 			caWindows)
 		crtStatus.InsecureWindowsNodeCommand = fmt.Sprintf(provisioningV2InsecureWindowsNodeCommandFormat,
 			AgentEnvVars(cluster, PowerShell),
 			rootURL+installer.WindowsRke2InstallPath,
 			rootURL,
-			token,
+			tokenPlaceholder,
 			caWindows)
 	} else {
 		var agentImageDockerEnv string
@@ -126,7 +127,7 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 			agentImageDockerEnv,
 			agentImage,
 			rootURL,
-			token,
+			tokenPlaceholder,
 			ca,
 			getWindowsPrefixPathArg(cluster.Spec.RancherKubernetesEngineConfig))
 	}
@@ -238,6 +239,9 @@ func getURL(token, clusterID string) (string, error) {
 	}
 
 	u.Path = path
-	serverURL = u.String()
-	return serverURL, nil
+	result := u.String()
+
+	// Unescape the {token} placeholder that was auto-encoded by url.String()
+	result = strings.ReplaceAll(result, "%7Btoken%7D", "{token}")
+	return result, nil
 }
