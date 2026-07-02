@@ -390,6 +390,77 @@ if [ ! -z "${source_registry}" ]; then
     source_registry="${source_registry}/"
 fi
 
+docker_uses_containerd_snapshotter () {
+    docker info 2>/dev/null | grep -qi "containerd.snapshotter"
+}
+
+helm_available () {
+    command -v helm >/dev/null 2>&1
+}
+
+helm_oci_ga () {
+    local v major minor
+    v=$(helm version --short 2>/dev/null | sed -n 's/^v\([0-9.]*\).*/\1/p')
+    [ -z "$v" ] && return 1
+    major=${v%%.*}
+    minor=${v#*.}; minor=${minor%%.*}
+    [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -ge 8 ]; }
+}
+
+is_oci_helm_chart () {
+    [[ "$1" == *"rancher/charts/"* ]]
+}
+
+# Preflight: rancher-images.txt now ships OCI Helm chart entries that
+# 'docker push' cannot handle unless the daemon uses the containerd
+# snapshotter. If the host has neither the snapshotter nor the helm CLI, fail
+# fast with a clear message instead of producing cryptic media-type errors.
+has_oci_charts=false
+while IFS= read -r i; do
+    [ -z "${i}" ] && continue
+    if is_oci_helm_chart "${i}"; then
+        has_oci_charts=true
+        break
+    fi
+done < "${list}"
+
+use_helm_for_charts=false
+if $has_oci_charts; then
+    if ! docker_uses_containerd_snapshotter; then
+        if helm_available; then
+            if ! helm_oci_ga; then
+                echo "====================================================================="
+                echo "ERROR: helm CLI is older than v3.8.0; OCI chart support requires helm 3.8.0+ (GA)."
+                echo ""
+                echo "Please upgrade helm to v3.8.0 or later:"
+                echo "    https://helm.sh/docs/intro/install/"
+                echo ""
+                echo "For reference, older versions need HELM_EXPERIMENTAL_OCI=1 and are not supported here:"
+                echo "    v3.7.2 - last pre-GA (OCI works only with HELM_EXPERIMENTAL_OCI=1)"
+                echo "    v3.6.3 - older experimental-OCI"
+                echo "    v3.4.2 - OCI very limited"
+                echo "====================================================================="
+                exit 1
+            fi
+            echo "WARNING: Docker is not using the containerd snapshotter; falling back to helm CLI for OCI Helm charts."
+            use_helm_for_charts=true
+        else
+            echo "====================================================================="
+            echo "ERROR: List contains non-image OCI artifacts, which are not supported"
+            echo "by docker's legacy storage drivers. You must take action in order to continue."
+            echo ""
+            echo "Preferred: configure docker to use the containerd image store"
+            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine
+            echo "    NOTE: Switching image stores hides all images and containers currently present in the original docker image store."
+            echo ""
+            echo "Alternative: install the helm CLI:"
+            echo "    https://helm.sh/docs/intro/install/"
+            echo "====================================================================="
+            exit 1
+        fi
+    fi
+fi
+
 docker load --input ${images}
 
 linux_images=()
@@ -431,6 +502,9 @@ fi
 arch_list+=("linux-amd64")
 for i in "${linux_images[@]}"; do
     [ -z "${i}" ] && continue
+    if $use_helm_for_charts && is_oci_helm_chart "${i}"; then
+        continue
+    fi
     arch_suffix=""
     use_manifest=false
     if [[ (-n "${windows_image_list}") && " ${windows_images[@]}" =~ " ${i}" ]]; then
@@ -454,6 +528,34 @@ for i in "${linux_images[@]}"; do
         push_manifest "${image_name}"
     fi
 done
+
+if $use_helm_for_charts; then
+    target_oci_base="${target_registry%/}"
+    helm_push_args=()
+    target_host="${target_oci_base#http://}"
+    target_host="${target_host#https://}"
+    if [[ "${target_host}" == localhost* || "${target_host}" == 127.0.0.1* || "${target_host}" == 0.0.0.0* ]]; then
+        helm_push_args+=("--plain-http")
+    fi
+    for i in "${linux_images[@]}"; do
+        [ -z "${i}" ] && continue
+        is_oci_helm_chart "${i}" || continue
+        chart_repo="${i%:*}"
+        chart_ver_oci="${i#*:}"
+        chart_name="${chart_repo##*/}"
+        chart_ns="${chart_repo%/*}"
+        chart_file="./rancher-oci-charts/${chart_name}-${chart_ver_oci//_/+}.tgz"
+        if [ ! -f "${chart_file}" ]; then
+            echo "ERROR: Chart file missing: ${chart_file}"
+            echo "Expected location: ./rancher-oci-charts/"
+            echo "Ensure rancher-save-images.sh completed successfully and"
+            echo "rancher-oci-charts/ directory was transferred to this host."
+            exit 1
+        fi
+        echo "Helm chart push: ${chart_file} -> oci://${target_oci_base}/${chart_ns}"
+        helm push "${chart_file}" "oci://${target_oci_base}/${chart_ns}" "${helm_push_args[@]}"
+    done
+fi
 `
 	linuxSaveScript = `#!/bin/bash
 list="rancher-images.txt"
@@ -508,10 +610,102 @@ if [ ! -z "${source_registry}" ]; then
     source_registry="${source_registry}/"
 fi
 
+docker_uses_containerd_snapshotter () {
+    docker info 2>/dev/null | grep -qi "containerd.snapshotter"
+}
+
+helm_available () {
+    command -v helm >/dev/null 2>&1
+}
+
+helm_oci_ga () {
+    local v major minor
+    v=$(helm version --short 2>/dev/null | sed -n 's/^v\([0-9.]*\).*/\1/p')
+    [ -z "$v" ] && return 1
+    major=${v%%.*}
+    minor=${v#*.}; minor=${minor%%.*}
+    [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -ge 8 ]; }
+}
+
+is_oci_helm_chart () {
+    [[ "$1" == *"rancher/charts/"* ]]
+}
+
+# Preflight: rancher-images.txt now ships OCI Helm chart entries that
+# 'docker pull' cannot handle unless the daemon uses the containerd
+# snapshotter. If the host has neither the snapshotter nor the helm CLI, fail
+# fast with a clear message instead of producing cryptic media-type errors.
+has_oci_charts=false
+while IFS= read -r i; do
+    [ -z "${i}" ] && continue
+    if is_oci_helm_chart "${i}"; then
+        has_oci_charts=true
+        break
+    fi
+done < "${list}"
+
+use_helm_for_charts=false
+if $has_oci_charts; then
+    if ! docker_uses_containerd_snapshotter; then
+        if helm_available; then
+            if ! helm_oci_ga; then
+                echo "====================================================================="
+                echo "ERROR: helm CLI is older than v3.8.0; OCI chart support requires helm 3.8.0+ (GA)."
+                echo ""
+                echo "Please upgrade helm to v3.8.0 or later:"
+                echo "    https://helm.sh/docs/intro/install/"
+                echo ""
+                echo "For reference, older versions need HELM_EXPERIMENTAL_OCI=1 and are not supported here:"
+                echo "    v3.7.2 - last pre-GA (OCI works only with HELM_EXPERIMENTAL_OCI=1)"
+                echo "    v3.6.3 - older experimental-OCI"
+                echo "    v3.4.2 - OCI very limited"
+                echo "====================================================================="
+                exit 1
+            fi
+            echo "WARNING: Docker is not using the containerd snapshotter; falling back to helm CLI for OCI Helm charts."
+            use_helm_for_charts=true
+        else
+            echo "====================================================================="
+            echo "ERROR: List contains non-image OCI artifacts, which are not supported"
+            echo "by docker's legacy storage drivers. You must take action in order to continue."
+            echo ""
+            echo "Preferred: configure docker to use the containerd image store"
+            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine
+            echo "    NOTE: Switching image stores hides all images and containers currently present in the original docker image store."
+            echo ""
+            echo "Alternative: install the helm CLI:"
+            echo "    https://helm.sh/docs/intro/install/"
+            echo "====================================================================="
+            exit 1
+        fi
+    fi
+fi
+
+if $use_helm_for_charts; then
+    mkdir -p ./rancher-oci-charts
+fi
+
 pulled=""
 while IFS= read -r i; do
     [ -z "${i}" ] && continue
     i="${source_registry}${i}"
+    if $use_helm_for_charts && is_oci_helm_chart "${i}"; then
+        chart_version="${i#*:}"
+        echo "Pulling chart: ${i}..."
+        helm_error=$(helm pull "oci://${i%:*}" --version "${chart_version//_/+}" -d ./rancher-oci-charts 2>&1)
+        if [ $? -eq 0 ]; then
+            echo "Chart pull success: ${i}"
+        else
+            echo "Chart pull FAILED: ${i}"
+            echo "Error output:"
+            echo "${helm_error}"
+            echo ""
+            echo "ERROR: OCI Helm charts are required for Prime functionality."
+            echo "Cannot proceed with incomplete artifact set."
+            exit 1
+        fi
+        continue
+    fi
     if docker pull "${i}" > /dev/null 2>&1; then
         echo "Image pull success: ${i}"
         pulled="${pulled} ${i}"
@@ -524,8 +718,18 @@ while IFS= read -r i; do
     fi
 done < "${list}"
 
-echo "Creating ${images} with $(echo ${pulled} | wc -w | tr -d '[:space:]') images"
-docker save $(echo ${pulled}) | gzip --stdout > ${images}
+if [ -n "${pulled}" ]; then
+    echo "Creating ${images} with $(echo ${pulled} | wc -w | tr -d '[:space:]') images"
+    docker save $(echo ${pulled}) | gzip --stdout > ${images}
+else
+    echo "No docker images pulled; skipping ${images}."
+fi
+
+if $use_helm_for_charts; then
+    chart_count=$(ls ./rancher-oci-charts/*.tgz 2>/dev/null | wc -l)
+    echo ""
+    echo "OCI Helm charts saved in ./rancher-oci-charts/ (${chart_count} files). Used by rancher-load-images.sh. Remove with: rm -rf ./rancher-oci-charts"
+fi
 `
 	linuxMirrorScript = "#!/bin/sh\nset -e -x\n\n"
 	windowsLoadScript = `$ErrorActionPreference = 'Stop'
