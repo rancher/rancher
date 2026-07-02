@@ -261,6 +261,10 @@ func (m *nodesSyncer) reconcileAll() error {
 		if restoring, err := m.isClusterRestoring(); restoring {
 			return nil
 		} else if err != nil {
+			// if cluster no longer exists; nothing to reconcile
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 	}
