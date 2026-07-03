@@ -62,6 +62,10 @@ func (t *Token) GetFullName() string {
 	return t.ObjectMeta.Name
 }
 
+func (t *Token) GetKind() string {
+	return "v3"
+}
+
 func (t *Token) GetIsEnabled() bool {
 	return t.Enabled == nil || *t.Enabled
 }
