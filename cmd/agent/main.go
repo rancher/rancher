@@ -63,13 +63,13 @@ func main() {
 	var err error
 	ctx := context.Background()
 
+	configureLogrus()
+
 	if shouldRunPrestart() {
 		if err := preStart(ctx); err != nil {
 			logrus.Fatal(err)
 		}
 	}
-
-	configureLogrus()
 
 	logserver.StartServerWithDefaults()
 
