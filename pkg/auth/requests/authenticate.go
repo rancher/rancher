@@ -435,6 +435,12 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
 		}
 
+		if tokenClaims != nil {
+			if err := a.validateOIDCClientForToken(tokenClaims); err != nil {
+				return nil, err
+			}
+		}
+
 		return storedToken, nil
 	}
 
