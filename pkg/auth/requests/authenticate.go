@@ -383,9 +383,9 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 				return nil, ErrMustAuthenticate
 			}
 
-			// Indicate to ExtVerifyToken coming later that we do
-			// not have a proper token key (i.e. token secret value)
-			// to validate, and thus should bypass that check.
+			// Indicate that we do not have a proper token key to
+			// validate, i.e. no token secret value, and thus should
+			// use ExtVerifyTokenWithoutKey later.
 			//
 			// Note that for the legacy tokens below the tokenKey
 			// can be a hash too, when the `TokenHashed` annotation
@@ -431,8 +431,15 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, fmt.Errorf("failed to retrieve auth token, error: %v: %w",
 				err, ErrMustAuthenticate)
 		}
-		if _, err := tokens.ExtVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
-			return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
+		if tokenKey != "" {
+			if _, err := tokens.ExtVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
+				return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
+			}
+		} else {
+			// From the JWT path
+			if _, err := tokens.ExtVerifyTokenWithoutKey(storedToken, extTokenName); err != nil {
+				return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
+			}
 		}
 
 		if tokenClaims != nil {

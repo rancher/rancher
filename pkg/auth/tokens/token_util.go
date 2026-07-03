@@ -184,18 +184,40 @@ func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, er
 		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
 
-	if tokenKey != "" {
-		// Ext token always has a hash. Only a hash.
-		hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
-		if err != nil {
-			logrus.Errorf("unable to get a hasher for token with error %v", err)
-			return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
-		}
+	// Ext token always has a hash. Only a hash.
+	hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
+	if err != nil {
+		logrus.Errorf("unable to get a hasher for token with error %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+	}
 
-		if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
-			logrus.Errorf("VerifyHash failed with error: %v", err)
-			return http.StatusUnprocessableEntity, invalidAuthTokenErr
-		}
+	if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
+		logrus.Errorf("VerifyHash failed with error: %v", err)
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	if IsExpired(storedToken) {
+		return http.StatusGone, errors.New("must authenticate, expired")
+	}
+
+	if IsIdleExpired(storedToken, time.Now()) {
+		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+	}
+
+	return http.StatusOK, nil
+}
+
+// Given a stored token (without hashed key), check only if it is bad in
+// general, or expired in some way.
+func ExtVerifyTokenWithoutKey(storedToken *ext.Token, tokenName string) (int, error) {
+	// We have no proper secret value to verify. This happens when
+	// authenticating a JWT token representing an OIDC session. See
+	// `TokenFromRequest` in `pkg/auth/requests/authenticate.go`.
+
+	invalidAuthTokenErr := errors.New("invalid token")
+
+	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
 
 	if IsExpired(storedToken) {
