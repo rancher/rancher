@@ -47,13 +47,12 @@ func shouldRunPrestart() bool {
 	for _, arg := range []string{
 		// Explicit entrypoint logic bypass
 		"CATTLE_ENTRYPOINT_BYPASS",
-		// "special modes:
+		// Special modes used in main():
 		"CLUSTER_CLEANUP",
 		"BINDING_CLEANUP",
 		"AD_GUID_CLEANUP",
 	} {
 		if os.Getenv(arg) == "true" {
-			// "special" mode
 			return false
 		}
 	}
