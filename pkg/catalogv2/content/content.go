@@ -233,9 +233,9 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	// If the commit status of the repository is not an empty string
-	// Return the Chart through Git without checking the secret
-	if repo.status.Commit != "" {
+	if repo.status.Commit != "" && !isRemoteChart(chart) {
+		// Git-based ClusterRepos can include the chart tarballs as part of the repository.
+		// Retrieve the chart from the local file.
 		return git.Chart(namespace, name, repo.status.URL, chart)
 	}
 
@@ -261,6 +261,14 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	default:
 		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 	}
+}
+
+func isRemoteChart(chart *repo.ChartVersion) bool {
+	if len(chart.URLs) == 0 {
+		return false
+	}
+	location := chart.URLs[0]
+	return strings.Contains(chart.URLs[0], "://") && !strings.HasSuffix(location, "file://")
 }
 
 // Info retrieves detailed information about a specific Helm chart from a Helm repository.
