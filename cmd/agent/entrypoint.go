@@ -177,8 +177,13 @@ func retrieveRancherCACerts(ctx context.Context, certsSettingsURL string) ([]byt
 	if err := json.NewDecoder(res.Body).Decode(&cacertsSetting); err != nil {
 		return nil, fmt.Errorf("failed to parse CA certificates setting: %w", err)
 	}
+	value := cacertsSetting.Value
+
 	// Ensure it ends with newline (expected by the checksum)
-	value := strings.TrimSuffix(cacertsSetting.Value, "\n") + "\n"
+	if len(value) > 0 && value[len(value)-1] != '\n' {
+		value = value + "\n"
+	}
+
 	return []byte(value), nil
 }
 
