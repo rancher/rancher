@@ -159,6 +159,8 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	t.Logf("phase 1: rancher-system-agent is active on pod %s/%s", ns.Name, pods[0].Name)
 
 	initialMachinePlanSecretName := phase1Identity.MachinePlanSecrets[0].Name
+	initialMachinePlanSecretUID := phase1Identity.MachinePlanSecrets[0].UID
+	initialPlanTokenSecretName := phase1Identity.PlanTokenSecrets[0].Name
 	waitForConnectionInfoSecretName(t, clients, ns.Name, pods[0].Name, initialMachinePlanSecretName, importedIdentityWaitTimeout)
 	t.Logf("phase 1: connection info points to initial machine-plan secret %s", initialMachinePlanSecretName)
 
@@ -169,7 +171,6 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	if _, err := setClusterAnnotation(t, clients, mgmtCluster.Name, opsEnabledAnnotation, "false"); err != nil {
 		t.Fatal(err)
 	}
-
 	phase2Cluster := waitForImportedResetComplete(t, clients, mgmtCluster.Name, importedResetWaitTimeout)
 	assert.Equal(t, "false", phase2Cluster.Annotations[opsEnabledAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[importedCleaningStateAnnotation])
@@ -206,8 +207,20 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	t.Logf("phase 3 identity: %s", summarizeImportedPlanIdentity(phase3Identity))
 
 	newMachinePlanSecretName := phase3Identity.MachinePlanSecrets[0].Name
+	newMachinePlanSecretUID := phase3Identity.MachinePlanSecrets[0].UID
+	newPlanTokenSecretName := phase3Identity.PlanTokenSecrets[0].Name
 	assert.NotEqual(t, initialMachinePlanSecretName, newMachinePlanSecretName)
-	t.Logf("phase 3: recreated machine-plan secret changed from %s to %s", initialMachinePlanSecretName, newMachinePlanSecretName)
+	assert.NotEqual(t, initialMachinePlanSecretUID, newMachinePlanSecretUID)
+	assert.NotEqual(t, initialPlanTokenSecretName, newPlanTokenSecretName)
+	t.Logf(
+		"phase 3: imported plan identity was recreated with new machine-plan secret %s (was %s), new uid %s (was %s), and token changed from %s to %s",
+		newMachinePlanSecretName,
+		initialMachinePlanSecretName,
+		newMachinePlanSecretUID,
+		initialMachinePlanSecretUID,
+		initialPlanTokenSecretName,
+		newPlanTokenSecretName,
+	)
 
 	waitForSystemAgentActiveState(t, clients, ns.Name, pods[0].Name, true, importedSystemAgentTransitionTimeout)
 	waitForConnectionInfoSecretName(t, clients, ns.Name, pods[0].Name, newMachinePlanSecretName, importedIdentityWaitTimeout)
