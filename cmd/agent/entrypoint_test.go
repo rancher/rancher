@@ -30,9 +30,8 @@ func (m *mockResolver) LookupHost(ctx context.Context, host string) ([]string, e
 
 func TestPreStart_Bypass(t *testing.T) {
 	t.Setenv("CATTLE_ENTRYPOINT_BYPASS", "true")
-	err := preStart(t.Context())
-	if err != nil {
-		t.Fatalf("expected no error when bypass env is true, got: %v", err)
+	if shouldRunPrestart() {
+		t.Fatalf("expected preStart to be skipped when CATTLE_ENTRYPOINT_BYPASS is true")
 	}
 }
 
