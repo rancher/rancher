@@ -449,15 +449,16 @@ func createIDToken(oidcClient *v3.OIDCClient, rancherToken accessor.TokenAccesso
 
 // CreateAccessToken creates and returns a JWT access token.
 func CreateAccessToken(oidcClient *v3.OIDCClient, rancherToken accessor.TokenAccessor, scopes []string, kid string, now time.Time) *jwt.Token {
-	// store ext tokens in canonical form, i.e. with an `ext/` prefix.
+	// store token name and kind separately
 	accessClaims := jwt.MapClaims{
-		"aud":   []string{oidcClient.Status.ClientID},
-		"exp":   now.Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
-		"iss":   settings.ServerURL.Get() + "/oidc",
-		"iat":   now.Unix(),
-		"sub":   rancherToken.GetUserID(),
-		"scope": scopes,
-		"token": rancherToken.GetFullName(),
+		"aud":        []string{oidcClient.Status.ClientID},
+		"exp":        now.Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
+		"iss":        settings.ServerURL.Get() + "/oidc",
+		"iat":        now.Unix(),
+		"sub":        rancherToken.GetUserID(),
+		"scope":      scopes,
+		"token":      rancherToken.GetName(),
+		"token_kind": rancherToken.GetKind(),
 	}
 	authProvider := rancherToken.GetAuthProvider()
 	if authProvider != "" {

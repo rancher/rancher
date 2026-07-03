@@ -76,6 +76,8 @@ type authorizationTokenClaims struct {
 	// Token is a reference to the underlying ext or v3/legacy Token
 	// associated with the authenticated user.
 	Token string `json:"token"`
+	// Kind is an enum ("v3", "ext") telling us what kind of token we have
+	Kind string `json:"token_kind"`
 }
 
 type tokenAuthenticator struct {
@@ -363,10 +365,12 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	var tokenClaims *authorizationTokenClaims
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
 	var inJWTPath bool
+	var isExtToken bool
 	if tokenName == "" || tokenKey == "" {
 		if !features.OIDCProvider.Enabled() {
 			return nil, ErrMustAuthenticate
 		}
+
 		inJWTPath = true
 
 		logrus.Debug("Could not parse tokenName and tokenKey from request - attempting JWT authentication")
@@ -376,7 +380,8 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, ErrMustAuthenticate
 		}
 
-		if _, found := strings.CutPrefix(claims.Token, "ext/"); found {
+		isExtToken = claims.Kind == "ext"
+		if isExtToken {
 			// Detected ext token in OIDC session. Note we do not
 			// have a proper token key to validate, i.e. no token
 			// secret value, and thus will use ExtVerifyTokenWithoutKey
@@ -413,11 +418,19 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 
 	lookupUsingClient := false
 
-	if extTokenName, found := strings.CutPrefix(tokenName, "ext/"); found {
+	if !inJWTPath {
+		extTokenName, isExt := strings.CutPrefix(tokenName, "ext/")
+		isExtToken = isExt
+		if isExt {
+			tokenName = extTokenName
+		}
+	}
+
+	if isExtToken {
 		// Ext token detected. Perform roughly the same process as for legacy tokens, using
 		// a different store.  No indexer/cache in play here.
 
-		storedToken, err := a.extTokenStore.Get(extTokenName, "", &metav1.GetOptions{})
+		storedToken, err := a.extTokenStore.Get(tokenName, "", &metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				if inJWTPath {
@@ -429,11 +442,11 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 				err, ErrMustAuthenticate)
 		}
 		if inJWTPath {
-			if _, err := tokens.ExtVerifyTokenWithoutKey(storedToken, extTokenName); err != nil {
+			if _, err := tokens.ExtVerifyTokenWithoutKey(storedToken, tokenName); err != nil {
 				return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
 			}
 		} else {
-			if _, err := tokens.ExtVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
+			if _, err := tokens.ExtVerifyToken(storedToken, tokenName, tokenKey); err != nil {
 				return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
 			}
 		}
