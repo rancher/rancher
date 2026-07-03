@@ -1938,8 +1938,8 @@ func TestSystemStoreDelete(t *testing.T) {
 	}
 }
 
-func TestSystemStorePatch(t *testing.T) {
-	t.Run("patch anything", func(t *testing.T) {
+func TestSystemStoreAddLabel(t *testing.T) {
+	t.Run("add label", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		// assemble and configure store from mock clients ...
@@ -1951,12 +1951,6 @@ func TestSystemStorePatch(t *testing.T) {
 
 		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 
-		type jsonPatch struct {
-			Op    string `json:"op"`
-			Path  string `json:"path"`
-			Value any    `json:"value"`
-		}
-
 		patch, err := json.Marshal([]jsonPatch{{
 			Op:    "add",
 			Path:  "/metadata/labels/cattle.io.oidc-client-placeholder",
@@ -1966,11 +1960,39 @@ func TestSystemStorePatch(t *testing.T) {
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, patch).
 			Return(nil, nil).Times(1)
 
-		err = store.Patch("atoken", patch)
+		err = store.AddLabel("atoken", "cattle.io.oidc-client-placeholder", "true")
 		assert.NoError(t, err)
-		// note: the main check, that the patch data is passed from
-		// system store to secret client, is done by the test framework
-		// itself, as it matches the call, or misses the match
+		// note that the main check, that the patch is correct, is done
+		// by the test framework itself, as it matches the call, or
+		// misses the match
+	})
+
+	t.Run("add label with special characters", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// assemble and configure store from mock clients ...
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+
+		patch, err := json.Marshal([]jsonPatch{{
+			Op:    "add",
+			Path:  "/metadata/labels/cattle.io~1test",
+			Value: "true",
+		}})
+		assert.NoError(t, err)
+		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, patch).
+			Return(nil, nil).Times(1)
+
+		err = store.AddLabel("atoken", "cattle.io/test", "true")
+		assert.NoError(t, err)
+		// note that the main check, that the patch is correct, is done
+		// by the test framework itself, as it matches the call, or
+		// misses the match
 	})
 }
 

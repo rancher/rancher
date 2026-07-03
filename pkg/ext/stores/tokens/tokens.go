@@ -126,6 +126,12 @@ type SystemStore struct {
 	tableConverter  rest.TableConvertor // custom column formatting
 }
 
+type jsonPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
 // NewFromWrangler is a convenience function for creating a token store.
 // It initializes the returned store from the provided wrangler context.
 func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
@@ -1055,11 +1061,22 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	return newToken, nil
 }
 
-// Patch applies the given JSONPatchType to the named token. It operates
-// directly on the internal secret. Use this only for operations on labels
-// and/or annotations.
-func (t *SystemStore) Patch(name string, patch []byte) error {
-	_, err := t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+// AddLabel adds a custom label to the named ext token. This is done directly on
+// the secret.
+func (t *SystemStore) AddLabel(name, key, value string) error {
+	// Due to the presence of `SecretKindLabel` in the labels we can be
+	// sure that the secret has labels, simplifying patch construction.
+
+	escapedKey := strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
+	patch, err := json.Marshal([]jsonPatch{{
+		Op:    "add",
+		Path:  "/metadata/labels/" + escapedKey,
+		Value: value,
+	}})
+	if err != nil {
+		return err
+	}
+	_, err = t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
 	return err
 }
 
@@ -1068,11 +1085,7 @@ func (t *SystemStore) Patch(name string, patch []byte) error {
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]jsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastUsedAt,
 		Value: nowEncoded,
@@ -1090,11 +1103,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.Token, error) {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]jsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastActivitySeen,
 		Value: nowEncoded,
@@ -1120,11 +1129,7 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.T
 // Called by refreshAttributes.
 func (t *SystemStore) Disable(name string) error {
 	// Operate directly on the backend secret holding the token
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]jsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldEnabled,
 		Value: base64.StdEncoding.EncodeToString([]byte("false")),

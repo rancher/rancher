@@ -497,32 +497,32 @@ func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient
 }
 
 func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, rancherToken accessor.TokenAccessor) error {
-	var patch []byte
-	var err error
-	if rancherToken.GetLabels() != nil {
-		patch, err = json.Marshal([]jsonPatch{{
-			Op:    "add",
-			Path:  "/metadata/labels/cattle.io.oidc-client-" + oidcClientName,
-			Value: "true",
-		}})
-	} else {
-		patch, err = json.Marshal([]jsonPatch{{
-			Op:   "add",
-			Path: "/metadata/labels",
-			Value: map[string]string{
-				"cattle.io.oidc-client-" + oidcClientName: "true",
-			},
-		}})
-	}
-	if err != nil {
-		return err
-	}
 	name := rancherToken.GetName()
+	var err error
 	switch rancherToken.(type) {
 	case *v3.Token:
+		var patch []byte
+		if rancherToken.GetLabels() != nil {
+			patch, err = json.Marshal([]jsonPatch{{
+				Op:    "add",
+				Path:  "/metadata/labels/cattle.io.oidc-client-" + oidcClientName,
+				Value: "true",
+			}})
+		} else {
+			patch, err = json.Marshal([]jsonPatch{{
+				Op:   "add",
+				Path: "/metadata/labels",
+				Value: map[string]string{
+					"cattle.io.oidc-client-" + oidcClientName: "true",
+				},
+			}})
+		}
+		if err != nil {
+			return err
+		}
 		_, err = h.tokenClient.Patch(name, types.JSONPatchType, patch)
 	case *ext.Token:
-		err = h.extTokenStore.Patch(name, patch)
+		err = h.extTokenStore.AddLabel(name, "cattle.io.oidc-client-"+oidcClientName, "true")
 	default:
 		return fmt.Errorf("unsupported token type %T", rancherToken)
 	}
