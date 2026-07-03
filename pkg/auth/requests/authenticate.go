@@ -362,10 +362,12 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 
 	var tokenClaims *authorizationTokenClaims
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
+	var inJWTPath bool
 	if tokenName == "" || tokenKey == "" {
 		if !features.OIDCProvider.Enabled() {
 			return nil, ErrMustAuthenticate
 		}
+		inJWTPath = true
 
 		logrus.Debug("Could not parse tokenName and tokenKey from request - attempting JWT authentication")
 		claims, err := a.parseTokenFromJWT(tokenAuthValue)
@@ -374,18 +376,11 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, ErrMustAuthenticate
 		}
 
-		if extTokenName, found := strings.CutPrefix(claims.Token, "ext/"); found {
-			// Detected ext token in OIDC session. Perform the same
-			// process as for legacy tokens, using a different store.
-			token, err := a.extTokenStore.Get(extTokenName, "", &metav1.GetOptions{})
-			if err != nil {
-				logrus.Errorf("Unknown ext token in OAuth Token: %s", claims.Token)
-				return nil, ErrMustAuthenticate
-			}
-
-			// Indicate that we do not have a proper token key to
-			// validate, i.e. no token secret value, and thus should
-			// use ExtVerifyTokenWithoutKey later.
+		if _, found := strings.CutPrefix(claims.Token, "ext/"); found {
+			// Detected ext token in OIDC session. Note we do not
+			// have a proper token key to validate, i.e. no token
+			// secret value, and thus will use ExtVerifyTokenWithoutKey
+			// later.
 			//
 			// Note that for the legacy tokens below the tokenKey
 			// can be a hash too, when the `TokenHashed` annotation
@@ -395,8 +390,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			// trivial match, and effectively a no-op, i.e. the same
 			// kind of bypass we trigger here explicitly for the ext
 			// tokens.
-			tokenKey = ""
-			tokenName = token.GetFullName()
+			tokenName = claims.Token
 			logrus.Debug("Parsed (ext) tokenName from JWT, no TokenKey")
 		} else {
 			// Falling back to legacy token
@@ -426,18 +420,20 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		storedToken, err := a.extTokenStore.Get(extTokenName, "", &metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
+				if inJWTPath {
+					logrus.Errorf("Unknown ext token in OAuth Token: %s", tokenName)
+				}
 				return nil, ErrMustAuthenticate
 			}
 			return nil, fmt.Errorf("failed to retrieve auth token, error: %v: %w",
 				err, ErrMustAuthenticate)
 		}
-		if tokenKey != "" {
-			if _, err := tokens.ExtVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
+		if inJWTPath {
+			if _, err := tokens.ExtVerifyTokenWithoutKey(storedToken, extTokenName); err != nil {
 				return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
 			}
 		} else {
-			// From the JWT path
-			if _, err := tokens.ExtVerifyTokenWithoutKey(storedToken, extTokenName); err != nil {
+			if _, err := tokens.ExtVerifyToken(storedToken, extTokenName, tokenKey); err != nil {
 				return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
 			}
 		}
