@@ -42,6 +42,12 @@ const (
 // The logic has been migrated from that shell script to native Go
 func preStart(ctx context.Context) error {
 	cattleServer := os.Getenv("CATTLE_SERVER")
+	if !strings.Contains(cattleServer, "://") {
+		// the original entrypoint used curl, which can work without a "protocol://" scheme.
+		// according to it's manpage, it defaults to HTTP, except some smart detection of the protocol based on the hostname (e.g. "ftp.")
+		cattleServer = "http://" + cattleServer
+	}
+
 	if err := pingCattleServer(ctx, cattleServer); err != nil {
 		return fmt.Errorf("error pinging %s: %w", cattleServer, err)
 	}
