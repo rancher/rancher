@@ -28,7 +28,7 @@ RUN if [ "${BUILDARCH}" = "amd64" ]; then \
     rm -f /tmp/helm.tar.gz
 
 # renovate: datasource=github-release-attachments depName=mikefarah/yq
-ENV YQ_VERSION=v4.44.2
+ENV YQ_VERSION=v4.53.3
 ENV YQ_CHECKSUM_amd64=e4c2570249e3993e33ffa44e592b5eee8545bd807bfbeb596c2986d86cb6c85c
 ENV YQ_CHECKSUM_arm64=79c22d98b2ff517cb8b1c20499350cbc1e8c753483c8f72a37a299e6e9872a98
 
