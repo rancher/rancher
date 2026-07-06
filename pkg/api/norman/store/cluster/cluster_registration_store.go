@@ -45,7 +45,7 @@ func (r *RegistrationTokenStore) List(apiContext *types.APIContext, schema *type
 	return items, nil
 }
 
-func (r *RegistrationTokenStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
+func (r *RegistrationTokenStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]any, error) {
 	events, err := r.Store.Watch(apiContext, schema, opt)
 	if err != nil || events == nil {
 		return events, err
