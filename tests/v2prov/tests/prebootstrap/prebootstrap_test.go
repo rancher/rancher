@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func Test_PreBootstrap_Provisioning_Flow(t *testing.T) {
+func Test_General_PreBootstrap_Provisioning_Flow(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
