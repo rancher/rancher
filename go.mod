@@ -127,7 +127,7 @@ require (
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.9
-	github.com/rancher/machine v0.15.0-rancher144
+	github.com/rancher/machine v0.15.0-rancher145
 	github.com/rancher/muchang v0.1.1
 	github.com/rancher/norman v0.9.7
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
