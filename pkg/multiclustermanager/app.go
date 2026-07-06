@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
-	managementcrds "github.com/rancher/rancher/pkg/crds/management"
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
@@ -65,10 +64,6 @@ func BuildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	}
 
 	scaledContext.Wrangler = wranglerContext
-
-	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
-		return nil, nil, nil, err
-	}
 
 	dialerFactory, err := dialer.NewFactory(scaledContext, wranglerContext)
 	if err != nil {
