@@ -493,8 +493,6 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters
 	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
 }
 
-// Test cases for substituteRegistryHost function
-
 func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_ReplacesHost() {
 	result := substituteRegistryHost("oci://registry.rancher.io/rancher/cluster-autoscaler", "my-registry.company.com")
 	s.Equal("oci://my-registry.company.com/rancher/cluster-autoscaler", result)
@@ -537,8 +535,6 @@ func (s *autoscalerSuite) withChartRepositorySettings(repoURL, systemRegistry st
 
 	fn()
 }
-
-// Test cases for getChartRepository function
 
 func (s *autoscalerSuite) TestGetChartRepository_NoSystemRegistry_ReturnsOriginal() {
 	s.withChartRepositorySettings("oci://registry.rancher.io/rancher/cluster-autoscaler", "", func() {
