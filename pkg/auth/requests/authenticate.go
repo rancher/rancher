@@ -386,15 +386,6 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			// have a proper token key to validate, i.e. no token
 			// secret value, and thus will use ExtVerifyTokenWithoutKey
 			// later.
-			//
-			// Note that for the legacy tokens below the tokenKey
-			// can be a hash too, when the `TokenHashed` annotation
-			// is set. In that case the legacy `VerifyToken`
-			// compares the hash pulled here from the token against
-			// the stored hash in the same token, making it a
-			// trivial match, and effectively a no-op, i.e. the same
-			// kind of bypass we trigger here explicitly for the ext
-			// tokens.
 			tokenName = claims.Token
 			logrus.Debug("Parsed (ext) tokenName from JWT, no TokenKey")
 		} else {
@@ -406,7 +397,6 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			}
 
 			token := obj.(*apiv3.Token)
-
 			tokenName, tokenKey = token.Name, token.Token
 			logrus.Debug("Parsed tokenName and TokenKey from JWT")
 		}
@@ -430,6 +420,12 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		// Ext token detected. Perform roughly the same process as for legacy tokens, using
 		// a different store.  No indexer/cache in play here.
 
+		if tokenClaims != nil {
+			if err := a.validateOIDCClientForToken(tokenClaims); err != nil {
+				return nil, err
+			}
+		}
+
 		storedToken, err := a.extTokenStore.Get(tokenName, "", &metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -448,12 +444,6 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		} else {
 			if _, err := tokens.ExtVerifyToken(storedToken, tokenName, tokenKey); err != nil {
 				return nil, fmt.Errorf("failed to verify token: %v: %w", err, ErrMustAuthenticate)
-			}
-		}
-
-		if tokenClaims != nil {
-			if err := a.validateOIDCClientForToken(tokenClaims); err != nil {
-				return nil, err
 			}
 		}
 
@@ -491,10 +481,16 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, err
 		}
 	}
-
-	if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
-		logrus.Debugf("auth: Error verifying token %s: %v", tokenName, err)
-		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
+	if inJWTPath {
+		if _, err := tokens.VerifyTokenWithoutKey(storedToken, tokenName); err != nil {
+			logrus.Debugf("auth: Error verifying token %s: %v", tokenName, err)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
+		}
+	} else {
+		if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
+			logrus.Debugf("auth: Error verifying token %s: %v", tokenName, err)
+			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
+		}
 	}
 
 	return storedToken, nil

@@ -170,6 +170,24 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 	return http.StatusOK, nil
 }
 
+// Given a stored token without proper key, check only if it is bad in general,
+// or expired in some way.
+func VerifyTokenWithoutKey(storedToken *apiv3.Token, tokenName string) (int, error) {
+	if storedToken == nil || storedToken.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
+
+	if IsExpired(storedToken) {
+		return http.StatusGone, errors.New("must authenticate, expired")
+	}
+
+	if IsIdleExpired(storedToken, time.Now()) {
+		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+	}
+
+	return http.StatusOK, nil
+}
+
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.
 // This must match the logic of `VerifyToken` above.
 func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
