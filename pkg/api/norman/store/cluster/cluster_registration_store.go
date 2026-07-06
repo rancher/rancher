@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 )
 
 type RegistrationTokenStore struct {
@@ -23,7 +24,7 @@ func (r *RegistrationTokenStore) ByID(apiContext *types.APIContext, schema *type
 		return data, nil
 	}
 
-	return r.populateCommands(data)
+	return r.populateCommands(data), nil
 }
 
 func (r *RegistrationTokenStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
@@ -38,48 +39,88 @@ func (r *RegistrationTokenStore) List(apiContext *types.APIContext, schema *type
 
 	// Populate commands for each CRT in the list
 	for i := range items {
-		items[i], _ = r.populateCommands(items[i])
+		items[i] = r.populateCommands(items[i])
 	}
 
 	return items, nil
 }
 
-func (r *RegistrationTokenStore) populateCommands(data map[string]interface{}) (map[string]interface{}, error) {
+func (r *RegistrationTokenStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
+	events, err := r.Store.Watch(apiContext, schema, opt)
+	if err != nil || events == nil {
+		return events, err
+	}
+
+	if r.SecretCache == nil {
+		return events, nil
+	}
+
+	out := make(chan map[string]interface{})
+	go func() {
+		defer close(out)
+		for data := range events {
+			data = r.populateCommands(data)
+			out <- data
+		}
+	}()
+
+	return out, nil
+}
+
+var commandFields = []string{
+	"command",
+	"insecureCommand",
+	"manifestUrl",
+	"nodeCommand",
+	"insecureNodeCommand",
+	"windowsNodeCommand",
+	"insecureWindowsNodeCommand",
+}
+
+func (r *RegistrationTokenStore) populateCommands(data map[string]interface{}) map[string]interface{} {
 	tokenSecretName := convert.ToString(data["tokenSecretName"])
+	logrus.Tracef("[CRT norman] populateCommands: tokenSecretName=%s clusterId=%v", tokenSecretName, data["clusterId"])
 	if tokenSecretName == "" {
-		return data, nil
+		return r.clearCommands(data)
 	}
 
 	ns := convert.ToString(data["clusterId"])
 	if ns == "" {
-		return data, nil
+		return r.clearCommands(data)
 	}
 
 	secret, err := r.SecretCache.Get(ns, tokenSecretName)
 	if err != nil {
-		return data, nil
+		logrus.Tracef("[CRT norman] error getting secret %s, clearing commands", tokenSecretName)
+		return r.clearCommands(data)
 	}
 
 	token := string(secret.Data["token"])
 	if token == "" {
-		return data, nil
+		logrus.Tracef("[CRT norman] empty token in secret %s, clearing commands", tokenSecretName)
+		return r.clearCommands(data)
 	}
 
 	data["token"] = token
 
-	r.replaceTokenPlaceholder(data, "command", token)
-	r.replaceTokenPlaceholder(data, "insecureCommand", token)
-	r.replaceTokenPlaceholder(data, "manifestUrl", token)
-	r.replaceTokenPlaceholder(data, "nodeCommand", token)
-	r.replaceTokenPlaceholder(data, "insecureNodeCommand", token)
-	r.replaceTokenPlaceholder(data, "windowsNodeCommand", token)
-	r.replaceTokenPlaceholder(data, "insecureWindowsNodeCommand", token)
+	for _, field := range commandFields {
+		r.replaceTokenPlaceholder(data, field, token)
+	}
 
-	return data, nil
+	return data
 }
 
 func (r *RegistrationTokenStore) replaceTokenPlaceholder(data map[string]interface{}, field, token string) {
 	if val, ok := data[field].(string); ok && val != "" {
 		data[field] = strings.ReplaceAll(val, "{token}", token)
 	}
+}
+
+func (r *RegistrationTokenStore) clearCommands(data map[string]interface{}) map[string]interface{} {
+	for _, field := range commandFields {
+		if _, ok := data[field]; ok {
+			data[field] = ""
+		}
+	}
+	return data
 }
