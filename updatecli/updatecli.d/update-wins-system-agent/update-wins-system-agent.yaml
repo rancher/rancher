@@ -34,29 +34,85 @@ actions:
       description: 'Bump patch versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
 
 sources:
+  wins-current-version:
+    name: 'Get current Wins version from package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
+    transformers:
+      - find: 'v\S+'
+
+  system-agent-current-version:
+    name: 'Get current System Agent version from package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
+    transformers:
+      - find: 'v\S+'
+
   wins-release:
     name: 'Get latest upstream Wins version'
     kind: githubrelease
+    dependson:
+      - 'wins-current-version'
     spec:
       owner: '{{ .repos.wins.owner }}'
       repository: '{{ .repos.wins.repo }}'
       key: tagname
       typefilter:
-        latest: true
+        release: true
+        prerelease: true
       username: '{{ .scm.username }}'
       token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: semver
+        pattern: '~{{ source "wins-current-version" }}'
 
   system-agent-release:
     name: 'Get latest upstream System Agent version'
     kind: githubrelease
+    dependson:
+      - 'system-agent-current-version'
     spec:
       owner: '{{ .repos.system_agent.owner }}'
       repository: '{{ .repos.system_agent.repo }}'
       key: tagname
       typefilter:
-        latest: true
+        release: true
+        prerelease: true
       username: '{{ .scm.username }}'
       token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: semver
+        pattern: '~{{ source "system-agent-current-version" }}'
+
+  wins-checksum:
+    name: 'Get sha256 for wins.exe from {{ source "wins-release" }}'
+    kind: shell
+    dependson:
+      - 'wins-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256sum.txt | grep " wins.exe$" | cut -d " " -f1'
+
+  wins-checksum-install:
+    name: 'Get sha256 for install.ps1 from {{ source "wins-release" }}'
+    kind: shell
+    dependson:
+      - 'wins-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256sum.txt | grep " install.ps1$" | cut -d " " -f1'
+
+  wins-checksum-uninstall:
+    name: 'Get sha256 for uninstall.ps1 from {{ source "wins-release" }}'
+    kind: shell
+    dependson:
+      - 'wins-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256sum.txt | grep " uninstall.ps1$" | cut -d " " -f1'
 
   system-agent-checksum-amd64:
     name: 'Get sha256 for rancher-system-agent-amd64 from {{ source "system-agent-release" }}'
@@ -121,6 +177,36 @@ targets:
       file: 'package/Dockerfile'
       matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
       replacepattern: '$1 CATTLE_WINS_AGENT_VERSION={{ source "wins-release" }}'
+
+  update-dockerfile-wins-checksum:
+    name: 'Update ENV CATTLE_WINS_AGENT_CHECKSUM in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-checksum'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_CHECKSUM[=\s]\S+'
+      replacepattern: '$1 CATTLE_WINS_AGENT_CHECKSUM={{ source "wins-checksum" }}'
+
+  update-dockerfile-wins-checksum-install:
+    name: 'Update ENV CATTLE_WINS_AGENT_CHECKSUM_install in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-checksum-install'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_CHECKSUM_install[=\s]\S+'
+      replacepattern: '$1 CATTLE_WINS_AGENT_CHECKSUM_install={{ source "wins-checksum-install" }}'
+
+  update-dockerfile-wins-checksum-uninstall:
+    name: 'Update ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-checksum-uninstall'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_CHECKSUM_uninstall[=\s]\S+'
+      replacepattern: '$1 CATTLE_WINS_AGENT_CHECKSUM_uninstall={{ source "wins-checksum-uninstall" }}'
 
   update-dockerfile-system-agent-release:
     name: 'Update ENV CATTLE_SYSTEM_AGENT_VERSION to {{ source "system-agent-release" }} in Dockerfile'
