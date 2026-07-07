@@ -44,6 +44,8 @@ const (
 	importedIdentityWaitTimeout          = 10 * time.Minute
 	importedResetWaitTimeout             = 20 * time.Minute
 	importedSystemAgentTransitionTimeout = 15 * time.Minute
+
+	systemAgentUpgraderPlanName = "system-agent-upgrader"
 )
 
 type importedPlanIdentity struct {
@@ -153,6 +155,7 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	assert.Len(t, phase1Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase1Identity.PlanRoles, 1)
 	assert.Len(t, phase1Identity.PlanRoleBindings, 1)
+	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, ns.Name, pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 1 identity: %s", summarizeImportedPlanIdentity(phase1Identity))
 
 	waitForSystemAgentActiveState(t, clients, ns.Name, pods[0].Name, true, importedSystemAgentTransitionTimeout)
@@ -204,6 +207,7 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	assert.Len(t, phase3Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase3Identity.PlanRoles, 1)
 	assert.Len(t, phase3Identity.PlanRoleBindings, 1)
+	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, ns.Name, pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 3 identity: %s", summarizeImportedPlanIdentity(phase3Identity))
 
 	newMachinePlanSecretName := phase3Identity.MachinePlanSecrets[0].Name
@@ -276,6 +280,66 @@ func waitForImportedAPIServer(t *testing.T, clients *clients.Clients, namespace,
 	})
 	if err != nil {
 		t.Fatalf("timed out waiting for downstream API server to be ready: %v (lastErr=%v output=%q)", err, lastErr, strings.TrimSpace(lastOut))
+	}
+}
+
+func waitForDownstreamSystemAgentPlanDeleteMode(
+	t *testing.T,
+	clients *clients.Clients,
+	namespace, podName, kubectlEnv, expectedDelete string,
+	timeout time.Duration,
+) {
+	t.Helper()
+
+	var (
+		lastOutput      string
+		lastErr         error
+		lastDeleteValue string
+		lastDeleteCount int
+	)
+	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, timeout, true, func(_ context.Context) (bool, error) {
+		lastOutput, lastErr = cluster.ExecOnPod(
+			clients,
+			namespace,
+			podName,
+			"sh",
+			"-c",
+			fmt.Sprintf(
+				"export %s && kubectl -n cattle-system get plans.upgrade.cattle.io %s --ignore-not-found -o jsonpath='{range .spec.upgrade.envs[*]}{.name}={.value}{\"\\n\"}{end}'",
+				kubectlEnv,
+				systemAgentUpgraderPlanName,
+			),
+		)
+		if lastErr != nil {
+			return false, nil
+		}
+
+		lastDeleteCount = 0
+		lastDeleteValue = ""
+		for _, line := range strings.Split(strings.TrimSpace(lastOutput), "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "DELETE=") {
+				continue
+			}
+			lastDeleteCount++
+			lastDeleteValue = strings.TrimSpace(strings.TrimPrefix(line, "DELETE="))
+		}
+
+		return lastDeleteCount == 1 && lastDeleteValue == expectedDelete, nil
+	})
+	if err != nil {
+		t.Fatalf(
+			"timed out waiting for downstream plan %s DELETE=%s exactly once on pod %s/%s: %v (lastDeleteCount=%d lastDeleteValue=%q lastErr=%v output=%q)",
+			systemAgentUpgraderPlanName,
+			expectedDelete,
+			namespace,
+			podName,
+			err,
+			lastDeleteCount,
+			lastDeleteValue,
+			lastErr,
+			strings.TrimSpace(lastOutput),
+		)
 	}
 }
 

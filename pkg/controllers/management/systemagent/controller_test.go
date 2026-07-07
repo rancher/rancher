@@ -86,7 +86,7 @@ func TestShouldReconcileImportedDisable(t *testing.T) {
 	}
 }
 
-func TestInstallerDoesNotForceDelete(t *testing.T) {
+func TestInstallerSetsDeleteFalseEnv(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
@@ -96,141 +96,49 @@ func TestInstallerDoesNotForceDelete(t *testing.T) {
 				AgentEnvVars: []corev1.EnvVar{
 					{Name: "FOO", Value: "bar"},
 					{Name: "DELETE", Value: "false"},
+					{Name: "STRICT_VERIFY", Value: "custom-strict"},
 				},
 			},
 		},
 	}
 
-	plans := renderedPlans(installer(cluster, "stv-aggregation"))
+	plans := renderedPlans(installer(cluster))
 	if len(plans) != 2 {
 		t.Fatalf("expected 2 rendered plans, got %d", len(plans))
 	}
 	for _, plan := range plans {
-		if value, ok := envVar(plan.Spec.Upgrade.Env, "DELETE"); ok && value == "true" {
-			t.Fatalf("did not expect installer to force DELETE=true for plan %s", plan.Name)
+		value, ok := envVar(plan.Spec.Upgrade.Env, "DELETE")
+		if !ok || value != "false" {
+			t.Fatalf("expected DELETE=false in install plan %s", plan.Name)
 		}
-	}
-	if plans[0].Name != SystemAgentUpgraderPlanName {
-		t.Fatalf("expected linux install plan %q, got %q", SystemAgentUpgraderPlanName, plans[0].Name)
-	}
-	if plans[1].Name != SystemAgentUpgraderWindowsPlanName {
-		t.Fatalf("expected windows install plan %q, got %q", SystemAgentUpgraderWindowsPlanName, plans[1].Name)
-	}
-}
-
-func TestInstallerSetsGenerationAsFirstEnv(t *testing.T) {
-	t.Parallel()
-
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "c-m-abc",
-			Annotations: map[string]string{
-				importedSystemAgentGenerationAnnotation: "7",
-			},
-		},
-		Spec: apimgmtv3.ClusterSpec{
-			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
-				AgentEnvVars: []corev1.EnvVar{
-					{Name: "FOO", Value: "bar"},
-					{Name: "SYSTEM_AGENT_GENERATION", Value: "user-value"},
-				},
-			},
-		},
-	}
-
-	plans := renderedPlans(installer(cluster, "stv-aggregation"))
-	if len(plans) != 2 {
-		t.Fatalf("expected 2 rendered plans, got %d", len(plans))
-	}
-	for _, plan := range plans {
-		if len(plan.Spec.Upgrade.Env) == 0 {
-			t.Fatalf("expected env vars in install plan %s", plan.Name)
+		if len(plan.Spec.Upgrade.Env) == 0 || plan.Spec.Upgrade.Env[0].Name != "DELETE" || plan.Spec.Upgrade.Env[0].Value != "false" {
+			t.Fatalf("expected DELETE=false to be the first env in install plan %s", plan.Name)
 		}
-		first := plan.Spec.Upgrade.Env[0]
-		if first.Name != "SYSTEM_AGENT_GENERATION" || first.Value != "7" {
-			t.Fatalf("expected SYSTEM_AGENT_GENERATION=7 as first env in install plan %s, got %s=%s", plan.Name, first.Name, first.Value)
-		}
-		value, ok := envVar(plan.Spec.Upgrade.Env, "SYSTEM_AGENT_GENERATION")
-		if !ok || value != "7" {
-			t.Fatalf("expected SYSTEM_AGENT_GENERATION=7 in install plan %s", plan.Name)
-		}
-	}
-}
-
-func TestShouldBumpImportedSystemAgentGenerationOnEnableTransition(t *testing.T) {
-	t.Parallel()
-
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "c-m-abc",
-			Annotations: map[string]string{
-				day2OpsEnabledAnnotation:                "true",
-				importedSystemAgentGenerationAnnotation: "3",
-			},
-		},
-		Status: apimgmtv3.ClusterStatus{
-			Conditions: []apimgmtv3.ClusterCondition{
-				{
-					Type:   apimgmtv3.ClusterConditionType(importedDay2OpsResetCondition),
-					Status: "False",
-					Reason: importedResetCompleteReason,
-				},
-			},
-		},
-	}
-
-	if !shouldBumpImportedSystemAgentGeneration(cluster) {
-		t.Fatalf("expected generation bump when entering enabled state after reset completion")
-	}
-}
-
-func TestShouldNotBumpImportedSystemAgentGenerationOnRepeatedEnabledReconcile(t *testing.T) {
-	t.Parallel()
-
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "c-m-abc",
-			Annotations: map[string]string{
-				day2OpsEnabledAnnotation:                "true",
-				importedSystemAgentGenerationAnnotation: "3",
-			},
-		},
-		Status: apimgmtv3.ClusterStatus{
-			Conditions: []apimgmtv3.ClusterCondition{
-				{
-					Type:   apimgmtv3.ClusterConditionType(importedDay2OpsResetCondition),
-					Status: "False",
-					Reason: "",
-				},
-			},
-		},
-	}
-
-	if shouldBumpImportedSystemAgentGeneration(cluster) {
-		t.Fatalf("did not expect generation bump on steady enabled reconcile")
-	}
-}
-
-func TestNextImportedSystemAgentGeneration(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		current string
-		want    string
-	}{
-		{name: "empty starts at one", current: "", want: "1"},
-		{name: "increments existing value", current: "3", want: "4"},
-		{name: "invalid resets to one", current: "invalid", want: "1"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := nextImportedSystemAgentGeneration(tt.current)
-			if got != tt.want {
-				t.Fatalf("expected next generation %q, got %q", tt.want, got)
+		deleteCount := 0
+		for _, env := range plan.Spec.Upgrade.Env {
+			if env.Name == "DELETE" {
+				deleteCount++
 			}
-		})
+		}
+		if deleteCount != 1 {
+			t.Fatalf("expected exactly one DELETE env in install plan %s, got %d", plan.Name, deleteCount)
+		}
+		roleNoneValue, ok := envVar(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE")
+		if !ok || roleNoneValue != "true" {
+			t.Fatalf("expected CATTLE_ROLE_NONE=true in install plan %s", plan.Name)
+		}
+		if roleNoneCount := envVarCount(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE"); roleNoneCount != 1 {
+			t.Fatalf("expected exactly one CATTLE_ROLE_NONE env in install plan %s, got %d", plan.Name, roleNoneCount)
+		}
+		if strictValue, ok := envVar(plan.Spec.Upgrade.Env, "STRICT_VERIFY"); !ok || strictValue != "custom-strict" {
+			t.Fatalf("expected STRICT_VERIFY=custom-strict in install plan %s", plan.Name)
+		}
+	}
+	if !hasPlanName(plans, SystemAgentUpgraderPlanName) {
+		t.Fatalf("expected install plan %q to be rendered", SystemAgentUpgraderPlanName)
+	}
+	if !hasPlanName(plans, SystemAgentUpgraderWindowsPlanName) {
+		t.Fatalf("expected install plan %q to be rendered", SystemAgentUpgraderWindowsPlanName)
 	}
 }
 
@@ -244,12 +152,13 @@ func TestUninstallerSetsDeleteEnv(t *testing.T) {
 				AgentEnvVars: []corev1.EnvVar{
 					{Name: "FOO", Value: "bar"},
 					{Name: "DELETE", Value: "false"},
+					{Name: "STRICT_VERIFY", Value: "custom-strict"},
 				},
 			},
 		},
 	}
 
-	plans := renderedPlans(uninstaller(cluster, "stv-aggregation"))
+	plans := renderedPlans(uninstaller(cluster))
 	if len(plans) != 2 {
 		t.Fatalf("expected 2 rendered plans, got %d", len(plans))
 	}
@@ -270,12 +179,51 @@ func TestUninstallerSetsDeleteEnv(t *testing.T) {
 		if deleteCount != 1 {
 			t.Fatalf("expected exactly one DELETE env in uninstall plan %s, got %d", plan.Name, deleteCount)
 		}
+		roleNoneValue, ok := envVar(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE")
+		if !ok || roleNoneValue != "true" {
+			t.Fatalf("expected CATTLE_ROLE_NONE=true in uninstall plan %s", plan.Name)
+		}
+		if roleNoneCount := envVarCount(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE"); roleNoneCount != 1 {
+			t.Fatalf("expected exactly one CATTLE_ROLE_NONE env in uninstall plan %s, got %d", plan.Name, roleNoneCount)
+		}
+		if strictValue, ok := envVar(plan.Spec.Upgrade.Env, "STRICT_VERIFY"); !ok || strictValue != "custom-strict" {
+			t.Fatalf("expected STRICT_VERIFY=custom-strict in uninstall plan %s", plan.Name)
+		}
 	}
-	if plans[0].Name != SystemAgentUpgraderUninstallPlanName {
-		t.Fatalf("expected linux uninstall plan %q, got %q", SystemAgentUpgraderUninstallPlanName, plans[0].Name)
+	if !hasPlanName(plans, SystemAgentUpgraderPlanName) {
+		t.Fatalf("expected uninstall plan %q to be rendered", SystemAgentUpgraderPlanName)
 	}
-	if plans[1].Name != SystemAgentUpgraderWindowsUninstallPlanName {
-		t.Fatalf("expected windows uninstall plan %q, got %q", SystemAgentUpgraderWindowsUninstallPlanName, plans[1].Name)
+	if !hasPlanName(plans, SystemAgentUpgraderWindowsPlanName) {
+		t.Fatalf("expected uninstall plan %q to be rendered", SystemAgentUpgraderWindowsPlanName)
+	}
+}
+
+func TestInstallerForcesRoleNoneEnv(t *testing.T) {
+	t.Parallel()
+
+	cluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+		Spec: apimgmtv3.ClusterSpec{
+			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+				AgentEnvVars: []corev1.EnvVar{
+					{Name: "CATTLE_ROLE_NONE", Value: "false"},
+				},
+			},
+		},
+	}
+
+	plans := renderedPlans(installer(cluster))
+	if len(plans) != 2 {
+		t.Fatalf("expected 2 rendered plans, got %d", len(plans))
+	}
+	for _, plan := range plans {
+		roleNoneValue, ok := envVar(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE")
+		if !ok || roleNoneValue != "true" {
+			t.Fatalf("expected CATTLE_ROLE_NONE=true in install plan %s", plan.Name)
+		}
+		if roleNoneCount := envVarCount(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE"); roleNoneCount != 1 {
+			t.Fatalf("expected exactly one CATTLE_ROLE_NONE env in install plan %s, got %d", plan.Name, roleNoneCount)
+		}
 	}
 }
 
@@ -286,7 +234,7 @@ func TestUninstallerIncludesSharedSUCObjects(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
 	}
 
-	objs := uninstaller(cluster, "stv-aggregation")
+	objs := uninstaller(cluster)
 
 	hasServiceAccount := false
 	hasClusterRole := false
@@ -313,24 +261,29 @@ func TestUninstallerIncludesSharedSUCObjects(t *testing.T) {
 	}
 }
 
-func TestPlanNames(t *testing.T) {
+func TestPlanEnvForcesRoleNoneAndPreservesStrictVerify(t *testing.T) {
 	t.Parallel()
 
-	objs := []runtime.Object{
-		upgradev1.NewPlan("cattle-system", SystemAgentUpgraderPlanName, upgradev1.Plan{}),
-		&corev1.ServiceAccount{},
-		upgradev1.NewPlan("cattle-system", SystemAgentUpgraderWindowsPlanName, upgradev1.Plan{}),
+	cluster := &apimgmtv3.Cluster{
+		Spec: apimgmtv3.ClusterSpec{
+			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+				AgentEnvVars: []corev1.EnvVar{
+					{Name: "STRICT_VERIFY", Value: "custom-strict"},
+					{Name: "CATTLE_ROLE_NONE", Value: "false"},
+				},
+			},
+		},
 	}
 
-	names := planNames(objs)
-	if len(names) != 2 {
-		t.Fatalf("expected 2 plan names, got %d", len(names))
+	env := planEnv(cluster)
+	if roleNoneValue, ok := envVar(env, "CATTLE_ROLE_NONE"); !ok || roleNoneValue != "true" {
+		t.Fatalf("expected forced CATTLE_ROLE_NONE=true, got %q", roleNoneValue)
 	}
-	if names[0] != SystemAgentUpgraderPlanName {
-		t.Fatalf("expected first plan name %q, got %q", SystemAgentUpgraderPlanName, names[0])
+	if roleNoneCount := envVarCount(env, "CATTLE_ROLE_NONE"); roleNoneCount != 1 {
+		t.Fatalf("expected exactly one CATTLE_ROLE_NONE env, got %d", roleNoneCount)
 	}
-	if names[1] != SystemAgentUpgraderWindowsPlanName {
-		t.Fatalf("expected second plan name %q, got %q", SystemAgentUpgraderWindowsPlanName, names[1])
+	if strictValue, ok := envVar(env, "STRICT_VERIFY"); !ok || strictValue != "custom-strict" {
+		t.Fatalf("expected STRICT_VERIFY=custom-strict, got %q", strictValue)
 	}
 }
 
@@ -352,4 +305,23 @@ func envVar(env []corev1.EnvVar, name string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func envVarCount(env []corev1.EnvVar, name string) int {
+	count := 0
+	for i := range env {
+		if env[i].Name == name {
+			count++
+		}
+	}
+	return count
+}
+
+func hasPlanName(plans []*upgradev1.Plan, name string) bool {
+	for i := range plans {
+		if plans[i].Name == name {
+			return true
+		}
+	}
+	return false
 }
