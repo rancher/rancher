@@ -118,9 +118,9 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.15.0-rc.2
 	github.com/rancher/ali-operator v1.15.0-rc.2
-	github.com/rancher/apiserver v0.9.7
+	github.com/rancher/apiserver v0.9.8
 	github.com/rancher/channelserver v0.11.0
-	github.com/rancher/dynamiclistener v0.9.0-rc.1
+	github.com/rancher/dynamiclistener v0.9.0-rc.3
 	github.com/rancher/eks-operator v1.15.0-rc.2
 	github.com/rancher/fleet/pkg/apis v0.16.0-rc.2
 	github.com/rancher/gke-operator v1.15.0-rc.2
@@ -129,7 +129,7 @@ require (
 	github.com/rancher/lasso v0.2.9
 	github.com/rancher/machine v0.15.0-rancher145
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.9.7
+	github.com/rancher/norman v0.9.8
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
@@ -414,7 +414,7 @@ require (
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/time v0.15.0
-	golang.org/x/tools v0.45.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	gopkg.in/inf.v0 v0.9.1 // indirect
