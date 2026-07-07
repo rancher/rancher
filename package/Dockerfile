@@ -42,7 +42,7 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-      curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
+      catatonit curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
 
 
 FROM chroot-builder AS chroot-builder-server
@@ -100,29 +100,6 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
 
-FROM builder AS tini
-ARG ARCH
-ENV TINI_VERSION=v0.18.0
-ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
-    TINI_CHECKSUM_amd64=12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855 \
-    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
-    TINI_CHECKSUM_arm64=7c5463f55393985ee22357d976758aaaecd08defb3c5294d353732018169b019 \
-    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
-    TINI_CHECKSUM_s390x=c8aaa618ea7897f26979ea10920373e06f3e6dfeb41ef95342eda2eb5672f24d
-
-RUN case "${ARCH}" in \
-        amd64) TINI_URL="${TINI_URL_amd64}"; TINI_CHECKSUM="${TINI_CHECKSUM_amd64}" ;; \
-        arm64) TINI_URL="${TINI_URL_arm64}"; TINI_CHECKSUM="${TINI_CHECKSUM_arm64}" ;; \
-        s390x) TINI_URL="${TINI_URL_s390x}"; TINI_CHECKSUM="${TINI_CHECKSUM_s390x}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -sLf "${TINI_URL}" > /usr/bin/tini && \
-    printf "%s  %s\n" "${TINI_CHECKSUM}" "/usr/bin/tini" > tini.sha256 && \
-    sha256sum -c tini.sha256 && \
-    rm tini.sha256 && \
-    chmod +x /usr/bin/tini
-
-
 # Main stage using bci-micro as the base image
 FROM final AS base
 # Copy binaries and configuration files from builder to micro
@@ -162,9 +139,9 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher144
-ENV CATTLE_MACHINE_CHECKSUM_amd64=f4b2f736f6955d97880e2f7c2e6aaa5c037c7be126bf66b446d80771cf791e9d
-ENV CATTLE_MACHINE_CHECKSUM_arm64=ea196f25a6d67a6f4c18b0b8128785f0d68ab1a38a3bbb76507544d77b183baf
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher145
+ENV CATTLE_MACHINE_CHECKSUM_amd64=7cf9e1a42982429d05d66c106d4560269cdfc617f84417013c72a56f1171f668
+ENV CATTLE_MACHINE_CHECKSUM_arm64=8f0f1084b5af73c71d982b652b086421ad26468c9e7d27ded00813de133ac174
 ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.6.12
@@ -180,8 +157,8 @@ ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.6
 ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=7db00430a1c047e6627681446a99219815156e971043ba7a22a083d69fafe44a
 ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=e536ded30af40bdfa53a1010e39dfe2f72f5add499b564b9516c1385ee3a98c5
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.15.0-rc.2
-ENV CATTLE_WINS_AGENT_CHECKSUM=b2f88e836c66ce4153eae0c8c4b50c999ddfdbfcd9b699819738b6a043f1493c
+ENV CATTLE_WINS_AGENT_VERSION=v0.15.0-rc.3
+ENV CATTLE_WINS_AGENT_CHECKSUM=67af6e466bf7ab8daba97ccc83b2d54607b19360d2f1981c347d0762dfd3f7b2
 ENV CATTLE_WINS_AGENT_CHECKSUM_install=86725633b000e46dbbee43228c96d5ab7aa26e7cfcba9561d82ccdd6c96f5d61
 ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=bcc0f990176079f7dc69e668907230ac785d4676e037eef5b70cf3316e614adc
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -189,10 +166,9 @@ ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT=https://raw.githubusercontent.com/rancher
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
-# make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.15.0-rc.3
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=bffe785762c751bf1022db191a133e0a7b3213a0981988bb54cfd33344e0b08c
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=6f0014cf2945bc5abb98f773fe601d5f164333a226fdc818ba1c7026796f4442
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.15.0-rc.4
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=f93508ced99b60944bfc1683f04350a1832bcd008a8316c324087a565b4cec9b
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=d01ffc528fb9f3737ef8ac04dcd44102cf8c46b806e2c180fcb8c9dcf9f1149b
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=2deaab5392ca8b24e52438be75fc1414db0bbb674c6e623e6d1fd86f227afc2a
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
@@ -332,8 +308,6 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
     ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
     ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
-
-COPY --from=tini /usr/bin/tini /usr/bin/tini
 
 RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     case "${ARCH}" in \
@@ -595,7 +569,6 @@ COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-chart
 COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
 COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
-COPY --from=tini /usr/bin/tini /usr/bin/
 COPY --from=agent-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
