@@ -64,6 +64,7 @@ sources:
       repository: '{{ .repos.wins.repo }}'
       key: tagname
       typefilter:
+        release: true
         prerelease: true
       username: '{{ .scm.username }}'
       token: '{{ requiredEnv .scm.token }}'
@@ -81,6 +82,7 @@ sources:
       repository: '{{ .repos.system_agent.repo }}'
       key: tagname
       typefilter:
+        release: true
         prerelease: true
       username: '{{ .scm.username }}'
       token: '{{ requiredEnv .scm.token }}'
