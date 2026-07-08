@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -25,7 +24,6 @@ import (
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/wrangler"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/gvk"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -67,7 +65,6 @@ type handler struct {
 	bundles                   fleetcontrollers.BundleClient
 	provClusters              rocontrollers.ClusterCache
 	controlPlanes             v1.RKEControlPlaneCache
-	secretCache               corecontrollers.SecretCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -76,7 +73,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		bundles:                   clients.Fleet.Bundle(),
 		provClusters:              clients.Provisioning.Cluster().Cache(),
 		controlPlanes:             clients.RKE.RKEControlPlane().Cache(),
-		secretCache:               clients.Core.Secret().Cache(),
 	}
 
 	v1.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(),
@@ -126,17 +122,13 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		if err != nil {
 			return nil, status, err
 		}
-		tokenValue, err := clusterregistrationtoken.GetTokenFromSecret(h.secretCache, token)
-		if err != nil {
-			return nil, status, err
-		}
-		if tokenValue == "" {
+		if token.Status.Token == "" {
 			return nil, status, fmt.Errorf("token not yet generated for %s/%s", token.Namespace, token.Name)
 		}
 
 		digest := sha256.New()
 		digest.Write([]byte(settings.InternalServerURL.Get()))
-		digest.Write([]byte(tokenValue))
+		digest.Write([]byte(token.Status.Token))
 		digest.Write([]byte(systemtemplate.InternalCAChecksum()))
 		d := digest.Sum(nil)
 		secretName += hex.EncodeToString(d[:])[:12]
@@ -148,7 +140,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 			},
 			Data: map[string][]byte{
 				"CATTLE_SERVER":      []byte(settings.InternalServerURL.Get()),
-				"CATTLE_TOKEN":       []byte(tokenValue),
+				"CATTLE_TOKEN":       []byte(token.Status.Token),
 				"CATTLE_CA_CHECKSUM": []byte(systemtemplate.InternalCAChecksum()),
 			},
 		})

@@ -42,21 +42,6 @@ func (m *MockmanagerInterface) EXPECT() *MockmanagerInterfaceMockRecorder {
 	return m.recorder
 }
 
-// checkIfRoleTemplateGrantsCRTAccess mocks base method.
-func (m *MockmanagerInterface) checkIfRoleTemplateGrantsCRTAccess(arg0 string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "checkIfRoleTemplateGrantsCRTAccess", arg0)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// checkIfRoleTemplateGrantsCRTAccess indicates an expected call of checkIfRoleTemplateGrantsCRTAccess.
-func (mr *MockmanagerInterfaceMockRecorder) checkIfRoleTemplateGrantsCRTAccess(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "checkIfRoleTemplateGrantsCRTAccess", reflect.TypeOf((*MockmanagerInterface)(nil).checkIfRoleTemplateGrantsCRTAccess), arg0)
-}
-
 // checkReferencedRoles mocks base method.
 func (m *MockmanagerInterface) checkReferencedRoles(arg0, arg1 string, arg2 int) (bool, error) {
 	m.ctrl.T.Helper()

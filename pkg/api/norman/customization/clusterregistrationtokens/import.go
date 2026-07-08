@@ -28,8 +28,8 @@ func validateAuthImage(authImage string) error {
 }
 
 type ClusterImport struct {
-	Clusters     v3.ClusterInterface
-	CRTIndexer   k8scache.Indexer
+	Clusters   v3.ClusterInterface
+	CRTIndexer k8scache.Indexer
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {

@@ -12,7 +12,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
-	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -52,6 +51,7 @@ type RKE2ConfigServer struct {
 	serviceAccounts          corecontrollers.ServiceAccountClient
 	secretsCache             corecontrollers.SecretCache
 	secrets                  corecontrollers.SecretController
+	settings                 mgmtcontroller.SettingCache
 	machineCache             capicontrollers.MachineCache
 	machines                 capicontrollers.MachineClient
 	bootstrapCache           rkecontroller.RKEBootstrapCache
@@ -70,19 +70,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 
 	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(tokenIndex,
 		func(obj *v3.ClusterRegistrationToken) ([]string, error) {
-			current, previous, err := crt.GetTokensFromSecret(clients.Core.Secret().Cache(), obj)
-			if err != nil {
-				logrus.Warnf("failed to resolve CRT token for %s/%s: %v", obj.Namespace, obj.Name, err)
-				return nil, nil
-			}
-			if current == "" {
-				return nil, nil
-			}
-			tokens := []string{current}
-			if previous != "" {
-				tokens = append(tokens, previous)
-			}
-			return tokens, nil
+			return []string{obj.Status.Token}, nil
 		})
 
 	return &RKE2ConfigServer{
