@@ -293,6 +293,12 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 			newStatus.URL = repoSpec.GitRepo
 			newStatus.Branch = repoSpec.GitBranch
 			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+
+			// Bootstrap succeeded via git.Head() and BuildOrGetIndex(), which initialises the repository from the current local checkout. Set ShouldNotSkip to force exactly one immediate follow-up reconcile
+			// so shouldSkip() bypasses the refresh-interval gate and the next reconcile runs git.Update(), synchronising the repository with the latest upstream commit instead of waiting for RefreshInterval.
+			if err == nil {
+				newStatus.ShouldNotSkip = true
+			}
 		}
 	} else if repoSpec.GitRepo != "" {
 		commit, err = git.Update(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)
