@@ -520,22 +520,6 @@ func (s *autoscalerSuite) TestSubstituteRegistryHost_InvalidURL_ReturnsOriginal(
 	s.Equal(original, result)
 }
 
-// withChartRepositorySettings sets the chart repository and system default registry settings
-// for the duration of fn, then restores the original values.
-func (s *autoscalerSuite) withChartRepositorySettings(repoURL, systemRegistry string, fn func()) {
-	originalRepo := settings.ClusterAutoscalerChartRepository.Get()
-	originalRegistry := settings.SystemDefaultRegistry.Get()
-
-	_ = settings.ClusterAutoscalerChartRepository.Set(repoURL)
-	_ = settings.SystemDefaultRegistry.Set(systemRegistry)
-	defer func() {
-		_ = settings.ClusterAutoscalerChartRepository.Set(originalRepo)
-		_ = settings.SystemDefaultRegistry.Set(originalRegistry)
-	}()
-
-	fn()
-}
-
 func (s *autoscalerSuite) TestGetChartRepository_NoSystemRegistry_ReturnsOriginal() {
 	s.withChartRepositorySettings("oci://registry.rancher.io/rancher/cluster-autoscaler", "", func() {
 		result := getChartRepository()
@@ -570,4 +554,20 @@ func (s *autoscalerSuite) TestGetChartRepository_BothSet_HTTPChart_SubstitutesRe
 			s.Equal("https://my-registry.company.com/charts", result)
 		},
 	)
+}
+
+// withChartRepositorySettings sets the chart repository and system default registry settings
+// for the duration of fn, then restores the original values.
+func (s *autoscalerSuite) withChartRepositorySettings(repoURL, systemRegistry string, fn func()) {
+	originalRepo := settings.ClusterAutoscalerChartRepository.Get()
+	originalRegistry := settings.SystemDefaultRegistry.Get()
+
+	_ = settings.ClusterAutoscalerChartRepository.Set(repoURL)
+	_ = settings.SystemDefaultRegistry.Set(systemRegistry)
+	defer func() {
+		_ = settings.ClusterAutoscalerChartRepository.Set(originalRepo)
+		_ = settings.SystemDefaultRegistry.Set(originalRegistry)
+	}()
+
+	fn()
 }
