@@ -453,17 +453,21 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		s.clientState.DeleteState(w, r, relayState)
 	}
 
+	// TODO: Validate that there is only one assertion.
+	assertion := assertionInfo.Assertions[0]
+
 	// Validate the assertion's time conditions.
 	now := time.Now()
-	if err := checkAssertionTimeConditions(now, assertion.Conditions); err != nil {
+	notOnOrAfter, err := checkAssertionTimeConditions(now, assertion.Conditions)
+	if err != nil {
 		log.Errorf("SAML: Rejected assertion ID %q: %v", assertion.ID, err)
 		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
 	}
 
 	assertionExpiry := now.Add(time.Hour)
-	if assertion.Conditions != nil && !assertion.Conditions.NotOnOrAfter.IsZero() {
-		assertionExpiry = assertion.Conditions.NotOnOrAfter
+	if notOnOrAfter != nil && !notOnOrAfter.IsZero() {
+		assertionExpiry = *notOnOrAfter
 	}
 	if s.assertionCache.seen(assertion.ID, assertionExpiry) {
 		log.Errorf("SAML: Rejected previous assertion ID %q", assertion.ID)
@@ -753,18 +757,32 @@ func validateFinalRedirectURL(redirectURL string, rancherServerURL string) (stri
 // checkAssertionTimeConditions returns an error if now falls outside the
 // assertion's [NotBefore, NotOnOrAfter) validity window. A nil or zero-valued
 // bound is treated as unbounded on that side.
-func checkAssertionTimeConditions(now time.Time, conditions *saml.Conditions) error {
+//
+// Returns the parsed NotOnOrAfter field from the conditions as the latest an
+// assertion is valid until.
+func checkAssertionTimeConditions(now time.Time, conditions *types.Conditions) (*time.Time, error) {
 	if conditions == nil {
-		return nil
-	}
-	if !conditions.NotBefore.IsZero() && now.Before(conditions.NotBefore) {
-		return fmt.Errorf("current time %s is before NotBefore %s", now, conditions.NotBefore)
-	}
-	if !conditions.NotOnOrAfter.IsZero() && !now.Before(conditions.NotOnOrAfter) {
-		return fmt.Errorf("current time %s is on or after NotOnOrAfter %s", now, conditions.NotOnOrAfter)
+		return nil, nil
 	}
 
-	return nil
+	notOnOrAfter, err := parseAssertionTime(conditions.NotOnOrAfter)
+	if err != nil {
+		return nil, fmt.Errorf("validating assertion NotOnOrAfter: %w", err)
+	}
+
+	notBefore, err := parseAssertionTime(conditions.NotBefore)
+	if err != nil {
+		return nil, fmt.Errorf("validating assertion NotBefore: %w", err)
+	}
+
+	if !notBefore.IsZero() && now.Before(*notBefore) {
+		return nil, fmt.Errorf("current time %s is before NotBefore %v", now, notBefore)
+	}
+	if !notOnOrAfter.IsZero() && !now.Before(*notOnOrAfter) {
+		return nil, fmt.Errorf("current time %s is on or after NotOnOrAfter %v", now, notOnOrAfter)
+	}
+
+	return notOnOrAfter, nil
 }
 
 // assertionCache tracks recently seen SAML assertion IDs to prevent replay attacks.
@@ -804,4 +822,17 @@ func (c *assertionCache) evict() {
 			delete(c.entries, id)
 		}
 	}
+}
+
+func parseAssertionTime(s string) (*time.Time, error) {
+	if s == "" {
+		return new(time.Time), nil
+	}
+
+	parsed, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
 }

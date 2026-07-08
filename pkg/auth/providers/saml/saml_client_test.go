@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/russellhaering/gosaml2/types"
 	"github.com/stretchr/testify/assert"
@@ -257,8 +256,12 @@ func TestCheckAssertionTimeConditions(t *testing.T) {
 	past := now.Add(-time.Minute)
 	future := now.Add(time.Minute)
 
+	rfc3339 := func(t time.Time) string {
+		return t.Format(time.RFC3339)
+	}
+
 	tests := map[string]struct {
-		conditions *saml.Conditions
+		conditions *types.Conditions
 		wantErr    bool
 	}{
 		"nil conditions": {
@@ -266,35 +269,35 @@ func TestCheckAssertionTimeConditions(t *testing.T) {
 			wantErr:    false,
 		},
 		"valid window: NotBefore in past, NotOnOrAfter in future": {
-			conditions: &saml.Conditions{NotBefore: past, NotOnOrAfter: future},
+			conditions: &types.Conditions{NotBefore: rfc3339(past), NotOnOrAfter: rfc3339(future)},
 			wantErr:    false,
 		},
 		"NotBefore in the future": {
-			conditions: &saml.Conditions{NotBefore: future},
+			conditions: &types.Conditions{NotBefore: rfc3339(future)},
 			wantErr:    true,
 		},
 		"NotOnOrAfter in the past": {
-			conditions: &saml.Conditions{NotOnOrAfter: past},
+			conditions: &types.Conditions{NotOnOrAfter: rfc3339(past)},
 			wantErr:    true,
 		},
 		"NotOnOrAfter exactly equal to now (on or after boundary)": {
-			conditions: &saml.Conditions{NotOnOrAfter: now},
+			conditions: &types.Conditions{NotOnOrAfter: rfc3339(now)},
 			wantErr:    true,
 		},
 		"NotBefore exactly equal to now (valid: now is not before itself)": {
-			conditions: &saml.Conditions{NotBefore: now},
+			conditions: &types.Conditions{NotBefore: rfc3339(now)},
 			wantErr:    false,
 		},
 		"only NotBefore set, in the past": {
-			conditions: &saml.Conditions{NotBefore: past},
+			conditions: &types.Conditions{NotBefore: rfc3339(past)},
 			wantErr:    false,
 		},
 		"only NotOnOrAfter set, in the future": {
-			conditions: &saml.Conditions{NotOnOrAfter: future},
+			conditions: &types.Conditions{NotOnOrAfter: rfc3339(future)},
 			wantErr:    false,
 		},
 		"zero-value Conditions (both bounds unset)": {
-			conditions: &saml.Conditions{},
+			conditions: &types.Conditions{},
 			wantErr:    false,
 		},
 	}
@@ -302,11 +305,14 @@ func TestCheckAssertionTimeConditions(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			err := checkAssertionTimeConditions(now, tc.conditions)
+			notOnOrAfter, err := checkAssertionTimeConditions(now, tc.conditions)
 			if tc.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				if tc.conditions != nil && tc.conditions.NotOnOrAfter != "" {
+					assert.Equal(t, rfc3339(*notOnOrAfter), tc.conditions.NotOnOrAfter)
+				}
 			}
 		})
 	}
