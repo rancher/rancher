@@ -1332,7 +1332,7 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		if err == nil {
 			return ext, nil
 		}
-		return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
+		return nil, fmt.Errorf("unable to fetch token %q: %w", tokenID, err)
 	}
 
 	// checking for a v3 Token first, as it is the currently more common
@@ -1344,11 +1344,12 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	}
 
 	// not a v3 Token, now check for ext token
-	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+	ext, err := t.Get(tokenID, "", &metav1.GetOptions{})
+	if err == nil {
 		return ext, nil
 	}
 
-	return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	return nil, fmt.Errorf("unable to fetch token %q: %w", tokenID, err)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from

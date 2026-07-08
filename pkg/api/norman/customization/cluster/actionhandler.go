@@ -109,6 +109,7 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 	}, nil
 }
 
+// generateKubeConfig is only used by ImportYamlHandler, to provide a cluster kube config
 func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
 	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)
 	if err != nil {
@@ -121,7 +122,7 @@ func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster 
 	}
 
 	userID := authToken.GetUserID()
-	tokenName := authToken.GetName()
+	tokenName := authToken.GetName() // todo full name later, force fast path
 
 	// Create a proper ext token, commit it to kubernetes, and pass the
 	// resulting bearer token on.
@@ -161,13 +162,13 @@ func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster 
 	return a.ClusterManager.KubeConfig(cluster.ID, kcNewToken.Status.BearerToken), nil
 }
 
-// actionUserInfo implements [user.Info] to pass the session token by name into
-// the ext token system store.
+// actionUserInfo implements [k8s.io/apiserver/pkg/authentication/user.Info] to
+// pass the session token by name into the ext token system store.
 type actionUserInfo struct {
 	authTokenName string
 }
 
-// implements [user.Info]
+// implements [k8s.io/apiserver/pkg/authentication/user.Info]
 func (a *actionUserInfo) GetName() string     { return "" }
 func (a *actionUserInfo) GetUID() string      { return "" }
 func (a *actionUserInfo) GetGroups() []string { return []string{} }

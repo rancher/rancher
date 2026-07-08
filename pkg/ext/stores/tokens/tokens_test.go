@@ -166,6 +166,7 @@ var (
 	errInvalidContext      = fmt.Errorf("context has no user info")
 
 	bogusNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
+	sessionNotFoundError    = apierrors.NewNotFound(GVR.GroupResource(), "session-token")
 	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
 	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
@@ -1150,7 +1151,8 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token \"session-token\"")),
+			err: apierrors.NewInternalError(fmt.Errorf("unable to fetch token \"session-token\": %w",
+				sessionNotFoundError)),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1175,9 +1177,9 @@ func TestStoreCreate(t *testing.T) {
 				auth.EXPECT().SessionID(gomock.Any()).
 					Return("session-token", nil)
 				token.EXPECT().Get("session-token").
-					Return(nil, errSomeError)
+					Return(nil, sessionNotFoundError)
 				scache.EXPECT().Get("cattle-tokens", "session-token").
-					Return(nil, errSomeError)
+					Return(nil, sessionNotFoundError)
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
