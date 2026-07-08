@@ -236,6 +236,7 @@ func (h *handler) reconcileExistingCRT(obj *v3.ClusterRegistrationToken) (*v3.Cl
 	}
 
 	obj = obj.DeepCopy()
+	original := obj.DeepCopy()
 
 	if err := h.handleTTL(obj); err != nil {
 		return nil, err
@@ -246,9 +247,10 @@ func (h *handler) reconcileExistingCRT(obj *v3.ClusterRegistrationToken) (*v3.Cl
 		return nil, err
 	}
 
-	if !equality.Semantic.DeepEqual(obj.Status, newStatus) {
-		obj.Status = newStatus
+	if equality.Semantic.DeepEqual(original.Status, newStatus) {
+		return obj, nil
 	}
+	obj.Status = newStatus
 
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest, err := h.clusterRegistrationTokenController.Get(obj.Namespace, obj.Name, metav1.GetOptions{})
@@ -354,7 +356,10 @@ func (h *handler) rotateToken(obj *v3.ClusterRegistrationToken, ttl int64) error
 	newExpiresAt := now.Add(time.Duration(ttl) * time.Minute).UTC().Format(time.RFC3339)
 	newGracePeriodExpiresAt := now.Add(time.Duration(gracePeriod) * time.Minute).UTC().Format(time.RFC3339)
 
-	newToken, _ := randomtoken.Generate()
+	newToken, err := randomtoken.Generate()
+	if err != nil {
+		return err
+	}
 
 	updated := existing.DeepCopy()
 	updated.Data[previousTokenDataKey] = existing.Data[tokenDataKey]
