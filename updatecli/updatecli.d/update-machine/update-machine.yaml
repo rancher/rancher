@@ -1,0 +1,166 @@
+name: '{{ .machine.manifest }}'
+pipelineid: '{{ .machine.pipelineid }}'
+
+scms:
+  default:
+    kind: github
+    spec:
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repo }}'
+      branch: '{{ .scm.branch }}'
+      user: '{{ .scm.user }}'
+      email: '{{ .scm.email }}'
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      commitusingapi: {{ .scm.commitusingapi }}
+      commitmessage:
+        squash: {{ .scm.commitmessage.squash }}
+        type: '{{ .machine.commitmessage.type }}'
+        scope: '{{ .machine.commitmessage.scope }}'
+        title: 'Bump machine to {{ source "machine-release" }}'
+        body: 'Bumps `github.com/rancher/machine` from `{{ source "machine-current-version" }}` to `{{ source "machine-release" }}`. Updates go.mod/go.sum, Dockerfile.runtime, package/Dockerfile, and pkg/settings/setting.go.'
+
+actions:
+  rancher-pr:
+    kind: github/pullrequest
+    scmid: 'default'
+    spec:
+      labels:
+        - 'dependencies'
+      mergemethod: '{{ .scm.mergemethod }}'
+      title: '[{{ .scm.branch }}] bump machine to {{ source "machine-release" }}'
+      description: 'Bumps `github.com/rancher/machine` from `{{ source "machine-current-version" }}` to `{{ source "machine-release" }}` and refreshes the runtime/package machine versions, checksums, and machine provision image.'
+
+sources:
+  machine-current-version:
+    name: 'Get current Rancher Machine version from go.mod'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'go.mod'
+      matchpattern: 'github\.com/rancher/machine v\S+'
+    transformers:
+      - find: 'v\S+'
+
+  machine-release:
+    name: 'Get latest upstream Rancher Machine version'
+    kind: shell
+    spec:
+      command: 'git ls-remote --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git | cut -f2 | sed -E "s#refs/tags/##; s/\\^\\{\\}$//" | sort -u | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+-rancher[0-9]+(\\.[0-9]+)?$" | sort -V | tail -n1'
+
+  machine-checksum-amd64:
+    name: 'Get sha256 for rancher-machine-amd64.tar.gz from {{ source "machine-release" }}'
+    kind: shell
+    dependson:
+      - 'machine-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}/releases/download/{{ source "machine-release" }}/rancher-machine-amd64.tar.gz | sha256sum'
+    transformers:
+      - find: '\S+'
+
+  machine-checksum-arm64:
+    name: 'Get sha256 for rancher-machine-arm64.tar.gz from {{ source "machine-release" }}'
+    kind: shell
+    dependson:
+      - 'machine-release'
+    spec:
+      command: 'curl -sLf https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}/releases/download/{{ source "machine-release" }}/rancher-machine-arm64.tar.gz | sha256sum'
+    transformers:
+      - find: '\S+'
+
+  machine-module-sum:
+    name: 'Get go.sum module hash for {{ source "machine-release" }}'
+    kind: shell
+    dependson:
+      - 'machine-release'
+    spec:
+      command: 'GOTOOLCHAIN=auto go mod download -json github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}@{{ source "machine-release" }} | grep ''"Sum":'' | sed -E ''s/.*"Sum": "([^"]+)".*/\1/'''
+
+  machine-go-mod-sum:
+    name: 'Get go.sum go.mod hash for {{ source "machine-release" }}'
+    kind: shell
+    dependson:
+      - 'machine-release'
+    spec:
+      command: 'GOTOOLCHAIN=auto go mod download -json github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}@{{ source "machine-release" }} | grep ''"GoModSum":'' | sed -E ''s/.*"GoModSum": "([^"]+)".*/\1/'''
+
+targets:
+  update-go-mod-machine-version:
+    name: 'Update github.com/rancher/machine to {{ source "machine-release" }} in go.mod'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-release'
+    spec:
+      file: 'go.mod'
+      matchpattern: 'github\.com/rancher/machine v\S+'
+      replacepattern: 'github.com/rancher/machine {{ source "machine-release" }}'
+
+  update-go-sum-machine-module-hash:
+    name: 'Update github.com/rancher/machine module hash in go.sum'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-module-sum'
+    spec:
+      file: 'go.sum'
+      matchpattern: 'github\.com/rancher/machine v[^/ ]+ h1:\S+'
+      replacepattern: 'github.com/rancher/machine {{ source "machine-release" }} {{ source "machine-module-sum" }}'
+
+  update-go-sum-machine-go-mod-hash:
+    name: 'Update github.com/rancher/machine go.mod hash in go.sum'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-go-mod-sum'
+    spec:
+      file: 'go.sum'
+      matchpattern: 'github\.com/rancher/machine v\S+/go\.mod h1:\S+'
+      replacepattern: 'github.com/rancher/machine {{ source "machine-release" }}/go.mod {{ source "machine-go-mod-sum" }}'
+
+  update-dockerfile-runtime-machine-version:
+    name: 'Update ENV CATTLE_MACHINE_VERSION to {{ source "machine-release" }} in Dockerfile.runtime'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-release'
+    spec:
+      file: 'Dockerfile.runtime'
+      matchpattern: 'ENV CATTLE_MACHINE_VERSION=\S+'
+      replacepattern: 'ENV CATTLE_MACHINE_VERSION={{ source "machine-release" }}'
+
+  update-package-dockerfile-machine-version:
+    name: 'Update ENV CATTLE_MACHINE_VERSION to {{ source "machine-release" }} in package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-release'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV CATTLE_MACHINE_VERSION=\S+'
+      replacepattern: 'ENV CATTLE_MACHINE_VERSION={{ source "machine-release" }}'
+
+  update-package-dockerfile-machine-checksum-amd64:
+    name: 'Update ENV CATTLE_MACHINE_CHECKSUM_amd64 in package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-checksum-amd64'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV CATTLE_MACHINE_CHECKSUM_amd64=\S+'
+      replacepattern: 'ENV CATTLE_MACHINE_CHECKSUM_amd64={{ source "machine-checksum-amd64" }}'
+
+  update-package-dockerfile-machine-checksum-arm64:
+    name: 'Update ENV CATTLE_MACHINE_CHECKSUM_arm64 in package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-checksum-arm64'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV CATTLE_MACHINE_CHECKSUM_arm64=\S+'
+      replacepattern: 'ENV CATTLE_MACHINE_CHECKSUM_arm64={{ source "machine-checksum-arm64" }}'
+
+  update-pkg-settings-machine-provision-image:
+    name: 'Update machine provision image to {{ source "machine-release" }} in pkg/settings/setting.go'
+    kind: file
+    scmid: 'default'
+    sourceid: 'machine-release'
+    spec:
+      file: 'pkg/settings/setting.go'
+      matchpattern: 'rancher/machine:v[^"]+'
+      replacepattern: 'rancher/machine:{{ source "machine-release" }}'
