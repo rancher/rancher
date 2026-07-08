@@ -10,7 +10,7 @@ Rancher is an open source container management platform built for organizations 
 <!-- stable v2.14.3 DO NOT REMOVE THIS LINE -->
 * v2.14.3 - `rancher/rancher:v2.14.3` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.14.3).
   
-To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
+To get automated notifications of our latest release, you can watch the announcements category in our [forums](https://forums.suse.com/c/announcements/12), or subscribe to the RSS feed `https://forums.suse.com/c/announcements/12.rss`.
 
 ## Quick Start
 
@@ -52,7 +52,7 @@ For security issues, please first check our [security policy](https://github.com
 
 # License
 
-Copyright (c) 2014-2025 [SUSE](http://rancher.com)
+Copyright (c) 2014-2026 [SUSE](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
