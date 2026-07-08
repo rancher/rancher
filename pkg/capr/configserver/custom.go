@@ -38,26 +38,28 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1
 		return nil, nil
 	}
 
-	tokens, err := r.clusterTokenCache.GetByIndex(tokenIndex, token)
+	secrets, err := r.secretsCache.GetByIndex(crtTokenIndex, token)
 	if err != nil {
 		return nil, err
 	}
 
 	data := dataFromHeaders(req)
 
-	if len(tokens) == 0 {
+	if len(secrets) == 0 {
 		return nil, nil
 	}
 
+	namespace := secrets[0].Namespace
+
 	imported := false
-	if mgmtNameRegexp.MatchString(tokens[0].Namespace) {
+	if mgmtNameRegexp.MatchString(namespace) {
 		imported = true
 	}
 
 	secretName := machineRequestSecretName(imported, machineID)
-	secret, err := r.secretsCache.Get(tokens[0].Namespace, secretName)
+	secret, err := r.secretsCache.Get(namespace, secretName)
 	if apierror.IsNotFound(err) {
-		secret, err = r.createSecret(tokens[0].Namespace, secretName, data)
+		secret, err = r.createSecret(namespace, secretName, data)
 	}
 	if err != nil {
 		return nil, err

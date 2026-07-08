@@ -49,9 +49,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		clusterImport  = clusterregistrationtokens.ClusterImport{
 			Clusters:     scaledContext.Management.Clusters(""),
 			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),
-			// Reuse the CRT token indexer registered by mcmauthorizer.NewAuthorizer,
-			// which is called on the same scaledContext before routing is set up.
-			CRTIndexer: scaledContext.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+			// Reuses the SecretTokenIndex indexer registered by mcmauthorizer.NewAuthorizer.
+			SecretIndexer: scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
 		}
 	)
 
