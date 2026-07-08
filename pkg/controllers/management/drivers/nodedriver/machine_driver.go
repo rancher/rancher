@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,19 +42,14 @@ const (
 func Register(ctx context.Context, management *config.ManagementContext) {
 	nodeDriverClient := management.Management.NodeDrivers("")
 	nodeDriverLifecycle := &Lifecycle{
-		nodeDriverClient: nodeDriverClient,
-		schemaClient:     management.Management.DynamicSchemas(""),
-		schemaLister:     management.Management.DynamicSchemas("").Controller().Lister(),
-		secretStore:      management.Core.Secrets(""),
-		nsStore:          management.Core.Namespaces(""),
-		schemas:          management.Schemas,
+		nodeDriverClient:     nodeDriverClient,
+		schemaClient:         management.Management.DynamicSchemas(""),
+		schemaLister:         management.Management.DynamicSchemas("").Controller().Lister(),
+		secretStore:          management.Core.Secrets(""),
+		nsStore:              management.Core.Namespaces(""),
+		schemas:              management.Schemas,
+		dockerMachineVersion: getRancherMachineVersion(),
 	}
-
-	version, err := getRancherMachineVersion()
-	if err != nil {
-		logrus.Warnf("error getting rancher-machine version: %v", err)
-	}
-	nodeDriverLifecycle.dockerMachineVersion = version
 
 	nodeDriverClient.AddLifecycle(ctx, "node-driver-controller", nodeDriverLifecycle)
 }
@@ -508,8 +503,10 @@ func updateDefault(credField v32.Field, val, kind string) v32.Field {
 	return credField
 }
 
-func getRancherMachineVersion() (string, error) {
-	cmd := exec.Command("rancher-machine", "--version")
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+func getRancherMachineVersion() string {
+	version := "unknown"
+	if sp := strings.Split(settings.MachineProvisionImage.Get(), ":"); len(sp) >= 2 {
+		version = sp[len(sp)-1] // tag
+	}
+	return fmt.Sprintf("rancher-machine version %s", version)
 }

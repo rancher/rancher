@@ -20,14 +20,12 @@
 #   - K3s binaries (for integration tests that spin up a local cluster)
 #   - k3d (for provisioning tests)
 #   - golangci-lint (amd64 only)
-#   - rancher-machine
 #   - Python 3.11 + tox (for validation/integration test suites)
 
 FROM registry.suse.com/bci/golang:1.26.5
 
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher145
 ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
 ENV HELM_UNITTEST_VERSION=1.1.0
 # k3d ci version
@@ -43,7 +41,6 @@ RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
 # prevents `detected dubious ownership in repository` git error due to uid/gid not matching when using bind mounts
 RUN git config -f /etc/gitconfig --add safe.directory /go/src/github.com/rancher/rancher
 
-RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 RUN if [ "${ARCH}" != "s390x" ]; then \
         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
     fi

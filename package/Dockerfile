@@ -139,11 +139,7 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher145
-ENV CATTLE_MACHINE_CHECKSUM_amd64=7cf9e1a42982429d05d66c106d4560269cdfc617f84417013c72a56f1171f668
-ENV CATTLE_MACHINE_CHECKSUM_arm64=8f0f1084b5af73c71d982b652b086421ad26468c9e7d27ded00813de133ac174
 ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
-ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.6.12
 ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
 ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
@@ -209,22 +205,10 @@ COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-cha
 
 
 RUN case "${ARCH}" in \
-        amd64) CATTLE_MACHINE_CHECKSUM="${CATTLE_MACHINE_CHECKSUM_amd64}" ;; \
-        arm64) CATTLE_MACHINE_CHECKSUM="${CATTLE_MACHINE_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    case "${ARCH}" in \
         amd64) DOCKER_MACHINE_LINODE_CHECKSUM="${DOCKER_MACHINE_LINODE_CHECKSUM_amd64}" ;; \
         arm64) DOCKER_MACHINE_LINODE_CHECKSUM="${DOCKER_MACHINE_LINODE_CHECKSUM_arm64}" ;; \
         *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
     esac && \
-    curl -fsSL "https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz"  > /tmp/rancher-machine.tar.gz && \
-    printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
-    sha256sum -c machine.sha256 && \
-    rm machine.sha256 && \
-    tar xvzf /tmp/rancher-machine.tar.gz -C /usr/bin && \
-    rm /tmp/rancher-machine.tar.gz && \
-    chown root:root /usr/bin/rancher-machine && \
     curl -fsSL "https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-${ARCH}.zip" > /tmp/docker-machine-driver-linode.zip && \
     printf "%s  %s\n" "${DOCKER_MACHINE_LINODE_CHECKSUM}" "/tmp/docker-machine-driver-linode.zip" > driver-linode.sha256 && \
     sha256sum -c driver-linode.sha256 && \

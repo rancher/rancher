@@ -54,9 +54,6 @@ fi
 # Hard link driver binaries
 cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/management-state
 
-# Hard link rancher-machine into the jail
-cp -l /usr/bin/rancher-machine /opt/jail/$NAME/usr/bin
-
 # Hard link ssh into the jail
 cp -l /usr/bin/ssh /opt/jail/$NAME/usr/bin
 
