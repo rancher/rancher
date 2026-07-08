@@ -116,7 +116,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/rancher/aks-operator v1.15.0-rc.2
+	github.com/rancher/aks-operator v1.15.0-rc.3
 	github.com/rancher/ali-operator v1.15.0-rc.2
 	github.com/rancher/apiserver v0.9.7
 	github.com/rancher/channelserver v0.11.0
