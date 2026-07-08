@@ -49,8 +49,8 @@ github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee h1:W5t00kpgFd
 github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/onsi/gomega v1.41.0 h1:OwKp4pXNgVxf6sCplzYo794OFNuoL2q2SBMU5NSWOjA=
-github.com/onsi/gomega v1.41.0/go.mod h1:M/Uqpu/8qTjtzCLUA2zJHX9Iilrau25x1PdoSRbWh5A=
+github.com/onsi/gomega v1.42.1 h1:iN1rCUX+44NZ1Dc97MPoeFYbFR0vh8zxoxMFwKdyZ6I=
+github.com/onsi/gomega v1.42.1/go.mod h1:REff/hsDsodHoKlWsP2mAPhu1+5/6hVYNf9rIEBpeSg=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
@@ -72,8 +72,8 @@ github.com/rancher/eks-operator v1.15.0-rc.2 h1:fJOeSZbMlzYSnL78PW8RyDtanXZgZWgM
 github.com/rancher/eks-operator v1.15.0-rc.2/go.mod h1:1IR5/LPJVm2MUNPPbUZbGLRadYdQsqB7LEiC6ToIkKs=
 github.com/rancher/fleet/pkg/apis v0.16.0-rc.2 h1:UlY/H1hosSSS6vOm2bjqJwmfb5cltbVTtDzW/AAxiA0=
 github.com/rancher/fleet/pkg/apis v0.16.0-rc.2/go.mod h1:XTTBOcNYFmS9T1gIoTUOKlDlZAIIpTspDOSEGmCE1Xc=
-github.com/rancher/gke-operator v1.15.0-rc.2 h1:Q5rZcMroS3peK+2NmpUi+77F1mFitgifqD+KI7ye7jM=
-github.com/rancher/gke-operator v1.15.0-rc.2/go.mod h1:nEHw8ZiG6Os1g1JVDPtfpKNMlAZQNV/rvNMxozeua6w=
+github.com/rancher/gke-operator v1.15.0-rc.3 h1:Y7FJhsX5hD4TMcP/YyHF4qjPAGNefiEbtfMkO3wuGi0=
+github.com/rancher/gke-operator v1.15.0-rc.3/go.mod h1:sXMGacwR+aeqjDWdPWgWa1jiYWkVXB+gqPEQl9OWLP8=
 github.com/rancher/lasso v0.2.9 h1:5Xk9Qid+YDOLpa6s5xalcSR0cA5BMbgWcaOZ8kdNU7k=
 github.com/rancher/lasso v0.2.9/go.mod h1:PMtxoVahRQvhEAi1HVOfyLDe1CrtGwTqOtkPVjSSkns=
 github.com/rancher/norman v0.9.7 h1:za9JjsWBUi+0rY3EJ3JdAZFQsadu7fpfC3MHi9a21uE=
