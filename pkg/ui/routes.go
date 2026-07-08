@@ -10,12 +10,12 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 )
 
-func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrationTokenCache, secretCache corecontrollers.SecretCache) http.Handler {
+func New(_ v3.PreferenceCache, secretCache corecontrollers.SecretCache) http.Handler {
 	router := mux.NewRouter()
 	router.UseEncodedPath()
 
 	router.Handle("/", PreferredIndex())
-	router.Handle("/cacerts", cacerts.Handler(clusterRegistrationTokenCache, secretCache))
+	router.Handle("/cacerts", cacerts.Handler(secretCache))
 	router.Handle("/asset-manifest.json", ember.ServeAsset())
 	router.Handle("/crossdomain.xml", ember.ServeAsset())
 	router.Handle("/dashboard", http.RedirectHandler("/dashboard/", http.StatusFound))

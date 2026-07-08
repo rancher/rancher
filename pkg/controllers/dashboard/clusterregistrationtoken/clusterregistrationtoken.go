@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -58,7 +57,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.Mgmt.ClusterRegistrationToken().OnChange(ctx, "cluster-registration-token", h.onChange)
 	clients.Mgmt.ClusterRegistrationToken().OnRemove(ctx, "cluster-registration-token-cleanup", h.onRemove)
 	clients.Mgmt.Cluster().OnChange(ctx, "cluster-registration-token-trigger", h.onClusterChange)
-	clients.Core.Secret().OnChange(ctx, "crt-token-secret-reindex", h.onSecretChange)
 	clients.Mgmt.Feature().OnChange(ctx, "crt-ttl-feature-trigger", h.onFeatureChange)
 	clients.Mgmt.Setting().OnChange(ctx, "crt-ttl-setting-trigger", h.onSettingChange)
 }
@@ -78,24 +76,6 @@ func (h *handler) onClusterChange(key string, obj *v3.Cluster) (*v3.Cluster, err
 	}
 
 	return obj, nil
-}
-
-// onSecretChange watches CRT token secrets and enqueues the owning CRT when
-// the secret data changes. This ensures CRT indexers are refreshed after token
-// rotation, since the indexer runs on CRT events but reads from the secret cache.
-// By the time this handler fires, the secret informer cache is already updated,
-// so the enqueued CRT reconciliation will re-index with correct data.
-func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secret, error) {
-	if secret == nil || !strings.HasPrefix(secret.Name, secretPrefix) {
-		return secret, nil
-	}
-	for _, ref := range secret.OwnerReferences {
-		if ref.Kind == "ClusterRegistrationToken" {
-			h.clusterRegistrationTokenController.Enqueue(secret.Namespace, ref.Name)
-			break
-		}
-	}
-	return secret, nil
 }
 
 // onFeatureChange re-enqueues all CRTs without an ExpiresAt when the
@@ -256,6 +236,7 @@ func (h *handler) reconcileExistingCRT(obj *v3.ClusterRegistrationToken) (*v3.Cl
 	}
 
 	obj = obj.DeepCopy()
+	original := obj.DeepCopy()
 
 	if err := h.handleTTL(obj); err != nil {
 		return nil, err
@@ -266,9 +247,10 @@ func (h *handler) reconcileExistingCRT(obj *v3.ClusterRegistrationToken) (*v3.Cl
 		return nil, err
 	}
 
-	if !equality.Semantic.DeepEqual(obj.Status, newStatus) {
-		obj.Status = newStatus
+	if equality.Semantic.DeepEqual(original.Status, newStatus) {
+		return obj, nil
 	}
+	obj.Status = newStatus
 
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest, err := h.clusterRegistrationTokenController.Get(obj.Namespace, obj.Name, metav1.GetOptions{})
@@ -374,7 +356,10 @@ func (h *handler) rotateToken(obj *v3.ClusterRegistrationToken, ttl int64) error
 	newExpiresAt := now.Add(time.Duration(ttl) * time.Minute).UTC().Format(time.RFC3339)
 	newGracePeriodExpiresAt := now.Add(time.Duration(gracePeriod) * time.Minute).UTC().Format(time.RFC3339)
 
-	newToken, _ := randomtoken.Generate()
+	newToken, err := randomtoken.Generate()
+	if err != nil {
+		return err
+	}
 
 	updated := existing.DeepCopy()
 	updated.Data[previousTokenDataKey] = existing.Data[tokenDataKey]
