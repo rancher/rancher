@@ -7,17 +7,17 @@ import (
 	"path/filepath"
 	"testing"
 
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestRoutes_IndexFileOnNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockCache := fake.NewMockCacheInterface[*apimgmtv3.ClusterRegistrationToken](ctrl)
-	// cacerts.Handler calls AddIndexer
+	mockCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	// cacerts.Handler calls AddIndexer on the secret cache
 	mockCache.EXPECT().AddIndexer(gomock.Any(), gomock.Any()).AnyTimes()
 
 	tempDir, err := os.MkdirTemp("", "ui-test")
@@ -56,7 +56,7 @@ func TestRoutes_IndexFileOnNotFound(t *testing.T) {
 		settings.UIOfflinePreferred.Set(origUIOffline)
 	}()
 
-	handler := New(nil, mockCache, nil)
+	handler := New(nil, mockCache)
 
 	tests := []struct {
 		name           string

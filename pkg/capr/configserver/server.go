@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
 	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
@@ -42,11 +41,11 @@ const (
 )
 
 var (
-	tokenIndex = "tokenIndex"
+	tokenIndex    = "tokenIndex"
+	crtTokenIndex = "crtTokenIndex"
 )
 
 type RKE2ConfigServer struct {
-	clusterTokenCache        mgmtcontroller.ClusterRegistrationTokenCache
 	clusterTokens            mgmtcontroller.ClusterRegistrationTokenController
 	serviceAccountsCache     corecontrollers.ServiceAccountCache
 	serviceAccounts          corecontrollers.ServiceAccountClient
@@ -70,29 +69,15 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		return nil, nil
 	})
 
-	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(tokenIndex,
-		func(obj *v3.ClusterRegistrationToken) ([]string, error) {
-			current, previous, err := crt.GetTokensFromSecret(clients.Core.Secret().Cache(), obj)
-			if err != nil {
-				logrus.Warnf("failed to resolve CRT token for %s/%s: %v", obj.Namespace, obj.Name, err)
-				return nil, nil
-			}
-			if current == "" {
-				return nil, nil
-			}
-			tokens := []string{current}
-			if previous != "" {
-				tokens = append(tokens, previous)
-			}
-			return tokens, nil
-		})
+	clients.Core.Secret().Cache().AddIndexer(crtTokenIndex, func(obj *corev1.Secret) ([]string, error) {
+		return crt.SecretTokenIndexValues(obj), nil
+	})
 
 	configSrv := &RKE2ConfigServer{
 		serviceAccountsCache:     clients.Core.ServiceAccount().Cache(),
 		serviceAccounts:          clients.Core.ServiceAccount(),
 		secretsCache:             clients.Core.Secret().Cache(),
 		secrets:                  clients.Core.Secret(),
-		clusterTokenCache:        clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:            clients.Mgmt.ClusterRegistrationToken(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
