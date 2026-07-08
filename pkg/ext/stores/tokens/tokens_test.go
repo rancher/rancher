@@ -1151,7 +1151,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  fmt.Errorf("unable to fetch token session-token: %w", sessionNotFoundError),
+			err:  fmt.Errorf("unable to fetch token \"session-token\": %w", sessionNotFoundError),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1186,7 +1186,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error, not found",
-			err: fmt.Errorf("unable to fetch token session-token: %w",
+			err: fmt.Errorf("unable to fetch token \"session-token\": %w",
 				apierrors.NewNotFound(GVR.GroupResource(), "session-token")),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
@@ -1214,7 +1214,7 @@ func TestStoreCreate(t *testing.T) {
 				token.EXPECT().Get("session-token").
 					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "session-token"))
 				scache.EXPECT().Get("cattle-tokens", "session-token").
-					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "session-token"))
+					Return(nil, sessionNotFoundError)
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
