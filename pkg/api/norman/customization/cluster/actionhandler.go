@@ -109,16 +109,21 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 	}, nil
 }
 
-// generateKubeConfig is only used by ImportYamlHandler, to provide a cluster kube config
-func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
+// generateKubeConfigBearer is the core of generateKubeConfig providing the
+// bearer token to place into the final clientcmdapi.Config
+func (a ActionHandler) generateKubeConfigBearer(apiContext *types.APIContext) (string, error) {
+	if a.ExtTokenStore == nil {
+		return "", fmt.Errorf("ext token store is not configured")
+	}
+
 	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get session token: %w", err)
+		return "", fmt.Errorf("failed to get session token: %w", err)
 	}
 
 	defaultTokenTTL, err := tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get default token TTL: %w", err)
+		return "", fmt.Errorf("failed to get default token TTL: %w", err)
 	}
 
 	userID := authToken.GetUserID()
@@ -156,10 +161,19 @@ func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster 
 		&metav1.CreateOptions{},
 		nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return a.ClusterManager.KubeConfig(cluster.ID, kcNewToken.Status.BearerToken), nil
+	return kcNewToken.Status.BearerToken, nil
+}
+
+// generateKubeConfig is only used by ImportYamlHandler, to provide a cluster kube config
+func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
+	bearer, err := a.generateKubeConfigBearer(apiContext)
+	if err != nil {
+		return nil, err
+	}
+	return a.ClusterManager.KubeConfig(cluster.ID, bearer), nil
 }
 
 // actionUserInfo implements [k8s.io/apiserver/pkg/authentication/user.Info] to
