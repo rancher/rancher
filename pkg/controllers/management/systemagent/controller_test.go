@@ -4,16 +4,19 @@ import (
 	"testing"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestResetBeaconWait(t *testing.T) {
+func TestDisableBeaconWait(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -26,10 +29,10 @@ func TestResetBeaconWait(t *testing.T) {
 			name: "no beacon",
 		},
 		{
-			name: "owned by reset",
+			name: "owned by disable",
 			beacon: &planv1alpha1.Beacon{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{planv1alpha1.BeaconOwnerLabel: resetBeaconOwnerKey},
+					Labels: map[string]string{planv1alpha1.BeaconOwnerLabel: disableBeaconOwnerKey},
 				},
 			},
 		},
@@ -44,7 +47,7 @@ func TestResetBeaconWait(t *testing.T) {
 			wantMsg:  "waiting for beacon release from \"etcd-snapshot-save\"",
 		},
 		{
-			name: "active without owner does not block reset",
+			name: "active without owner does not block disable",
 			beacon: &planv1alpha1.Beacon{
 				Status: planv1alpha1.BeaconStatus{Active: true},
 			},
@@ -53,7 +56,7 @@ func TestResetBeaconWait(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wait, message := resetBeaconWait(tt.beacon)
+			wait, message := disableBeaconWait(tt.beacon)
 			if wait != tt.wantWait {
 				t.Fatalf("expected wait=%t, got %t", tt.wantWait, wait)
 			}
@@ -287,6 +290,105 @@ func TestPlanEnvForcesRoleNoneAndPreservesStrictVerify(t *testing.T) {
 	}
 }
 
+func TestHasOperationsReturnsTrueForClusterNamespace(t *testing.T) {
+	t.Parallel()
+
+	saveCache := &fakeETCDSnapshotSaveCache{
+		items: []*opv1alpha1.ETCDSnapshotSave{
+			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-save"}},
+		},
+	}
+	h := &handler{
+		etcdSnapshotSaveCache: saveCache,
+	}
+
+	hasOps, err := h.hasOperations("c-m-test")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !hasOps {
+		t.Fatalf("expected hasOperations to return true")
+	}
+	if saveCache.lastNamespace != "c-m-test" {
+		t.Fatalf("expected namespace-scoped list in c-m-test, got %q", saveCache.lastNamespace)
+	}
+}
+
+func TestDeleteOperationsDeletesNamespacedOperationsAndSkipsDeleting(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	saveCache := &fakeETCDSnapshotSaveCache{
+		items: []*opv1alpha1.ETCDSnapshotSave{
+			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-save"}},
+		},
+	}
+	restoreCache := &fakeETCDSnapshotRestoreCache{
+		items: []*opv1alpha1.ETCDSnapshotRestore{
+			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-restore", DeletionTimestamp: &now}},
+		},
+	}
+	rotationCache := &fakeEncryptionKeyRotationCache{
+		items: []*opv1alpha1.EncryptionKeyRotation{
+			{ObjectMeta: metav1.ObjectMeta{Namespace: "c-m-test", Name: "op-rotation"}},
+		},
+	}
+
+	saveClient := &fakeETCDSnapshotSaveClient{}
+	restoreClient := &fakeETCDSnapshotRestoreClient{}
+	rotationClient := &fakeEncryptionKeyRotationClient{}
+
+	h := &handler{
+		etcdSnapshotSaveCache:    saveCache,
+		etcdSnapshotRestoreCache: restoreCache,
+		encryptionRotationCache:  rotationCache,
+		etcdSnapshotSaves:        saveClient,
+		etcdSnapshotRestores:     restoreClient,
+		encryptionRotations:      rotationClient,
+	}
+
+	remaining, err := h.deleteOperations("c-m-test")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !remaining {
+		t.Fatalf("expected remaining=true while operations still exist or are deleting")
+	}
+	if len(saveClient.deleted) != 1 || saveClient.deleted[0] != (namespacedName{namespace: "c-m-test", name: "op-save"}) {
+		t.Fatalf("expected save delete for c-m-test/op-save, got %+v", saveClient.deleted)
+	}
+	if len(rotationClient.deleted) != 1 || rotationClient.deleted[0] != (namespacedName{namespace: "c-m-test", name: "op-rotation"}) {
+		t.Fatalf("expected rotation delete for c-m-test/op-rotation, got %+v", rotationClient.deleted)
+	}
+	if len(restoreClient.deleted) != 0 {
+		t.Fatalf("expected deleting restore to be skipped, got deletes %+v", restoreClient.deleted)
+	}
+	if saveCache.lastNamespace != "c-m-test" || restoreCache.lastNamespace != "c-m-test" || rotationCache.lastNamespace != "c-m-test" {
+		t.Fatalf("expected namespace-scoped list for all operation kinds")
+	}
+}
+
+func TestDeleteOperationsReturnsFalseWhenNoOperationsExist(t *testing.T) {
+	t.Parallel()
+
+	h := &handler{
+		etcdSnapshotSaveCache:    &fakeETCDSnapshotSaveCache{},
+		etcdSnapshotRestoreCache: &fakeETCDSnapshotRestoreCache{},
+		encryptionRotationCache:  &fakeEncryptionKeyRotationCache{},
+		etcdSnapshotSaves:        &fakeETCDSnapshotSaveClient{},
+		etcdSnapshotRestores:     &fakeETCDSnapshotRestoreClient{},
+		encryptionRotations:      &fakeEncryptionKeyRotationClient{},
+	}
+
+	remaining, err := h.deleteOperations("c-m-empty")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if remaining {
+		t.Fatalf("expected remaining=false when no operations exist")
+	}
+}
+
 func renderedPlans(objs []runtime.Object) []*upgradev1.Plan {
 	plans := make([]*upgradev1.Plan, 0, len(objs))
 	for i := range objs {
@@ -324,4 +426,84 @@ func hasPlanName(plans []*upgradev1.Plan, name string) bool {
 		}
 	}
 	return false
+}
+
+type namespacedName struct {
+	namespace string
+	name      string
+}
+
+type fakeETCDSnapshotSaveCache struct {
+	operationcontrollers.ETCDSnapshotSaveCache
+	items           []*opv1alpha1.ETCDSnapshotSave
+	err             error
+	lastNamespace   string
+	lastHasSelector bool
+}
+
+func (f *fakeETCDSnapshotSaveCache) List(namespace string, selector labels.Selector) ([]*opv1alpha1.ETCDSnapshotSave, error) {
+	f.lastNamespace = namespace
+	f.lastHasSelector = selector != nil
+	return f.items, f.err
+}
+
+type fakeETCDSnapshotRestoreCache struct {
+	operationcontrollers.ETCDSnapshotRestoreCache
+	items           []*opv1alpha1.ETCDSnapshotRestore
+	err             error
+	lastNamespace   string
+	lastHasSelector bool
+}
+
+func (f *fakeETCDSnapshotRestoreCache) List(namespace string, selector labels.Selector) ([]*opv1alpha1.ETCDSnapshotRestore, error) {
+	f.lastNamespace = namespace
+	f.lastHasSelector = selector != nil
+	return f.items, f.err
+}
+
+type fakeEncryptionKeyRotationCache struct {
+	operationcontrollers.EncryptionKeyRotationCache
+	items           []*opv1alpha1.EncryptionKeyRotation
+	err             error
+	lastNamespace   string
+	lastHasSelector bool
+}
+
+func (f *fakeEncryptionKeyRotationCache) List(namespace string, selector labels.Selector) ([]*opv1alpha1.EncryptionKeyRotation, error) {
+	f.lastNamespace = namespace
+	f.lastHasSelector = selector != nil
+	return f.items, f.err
+}
+
+type fakeETCDSnapshotSaveClient struct {
+	operationcontrollers.ETCDSnapshotSaveClient
+	deleted []namespacedName
+	err     error
+}
+
+func (f *fakeETCDSnapshotSaveClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
+	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
+	return f.err
+}
+
+type fakeETCDSnapshotRestoreClient struct {
+	operationcontrollers.ETCDSnapshotRestoreClient
+	deleted []namespacedName
+	err     error
+}
+
+func (f *fakeETCDSnapshotRestoreClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
+	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
+	return f.err
+}
+
+type fakeEncryptionKeyRotationClient struct {
+	operationcontrollers.EncryptionKeyRotationClient
+	deleted []namespacedName
+	err     error
+}
+
+func (f *fakeEncryptionKeyRotationClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
+	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
+	return f.err
 }

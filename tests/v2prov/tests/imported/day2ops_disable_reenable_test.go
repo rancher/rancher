@@ -36,13 +36,11 @@ const (
 	opsEnabledAnnotation                 = "operations.cattle.io/ops-enabled"
 	importedCleaningStateAnnotation      = "operations.cattle.io/imported-cleaning-state"
 	appliedSystemAgentHashAnnotation     = "management.cattle.io/applied-system-agent-upgrader-hash"
-	importedDay2OpsResetConditionType    = "ImportedDay2OpsReset"
-	importedDay2OpsResetCompleteReason   = "ResetComplete"
 	systemAgentConnectionInfoPath        = "/var/lib/rancher/agent/rancher2_connection_info.json"
 	importedDay2OpsFeatureName           = "imported-day-2-ops"
 	importedNodeAPIServerWaitTimeout     = 5 * time.Minute
 	importedIdentityWaitTimeout          = 10 * time.Minute
-	importedResetWaitTimeout             = 20 * time.Minute
+	importedDisableWaitTimeout           = 20 * time.Minute
 	importedSystemAgentTransitionTimeout = 15 * time.Minute
 
 	systemAgentUpgraderPlanName = "system-agent-upgrader"
@@ -174,12 +172,12 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	if _, err := setClusterAnnotation(t, clients, mgmtCluster.Name, opsEnabledAnnotation, "false"); err != nil {
 		t.Fatal(err)
 	}
-	phase2Cluster := waitForImportedResetComplete(t, clients, mgmtCluster.Name, importedResetWaitTimeout)
+	phase2Cluster := waitForImportedDay2OpsDisabled(t, clients, mgmtCluster.Name, importedDisableWaitTimeout)
 	assert.Equal(t, "false", phase2Cluster.Annotations[opsEnabledAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[importedCleaningStateAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[appliedSystemAgentHashAnnotation])
 
-	phase2Identity := waitForImportedPlanIdentity(t, clients, mgmtCluster.Name, 0, true, importedResetWaitTimeout)
+	phase2Identity := waitForImportedPlanIdentity(t, clients, mgmtCluster.Name, 0, true, importedDisableWaitTimeout)
 	assert.Len(t, phase2Identity.MachinePlanSecrets, 0)
 	assert.Len(t, phase2Identity.PlanServiceAccount, 0)
 	assert.Len(t, phase2Identity.PlanTokenSecrets, 0)
@@ -383,7 +381,7 @@ func waitForAppliedSystemAgentHash(t *testing.T, clients *clients.Clients, clust
 	return hash
 }
 
-func waitForImportedResetComplete(t *testing.T, clients *clients.Clients, clusterName string, timeout time.Duration) *v3.Cluster {
+func waitForImportedDay2OpsDisabled(t *testing.T, clients *clients.Clients, clusterName string, timeout time.Duration) *v3.Cluster {
 	t.Helper()
 
 	var clusterObj *v3.Cluster
@@ -394,11 +392,7 @@ func waitForImportedResetComplete(t *testing.T, clients *clients.Clients, cluste
 			return false, err
 		}
 
-		cond := getClusterCondition(clusterObj, importedDay2OpsResetConditionType)
-		if cond == nil {
-			return false, nil
-		}
-		if cond.Status != "False" || cond.Reason != importedDay2OpsResetCompleteReason {
+		if clusterObj.Annotations[opsEnabledAnnotation] != "false" {
 			return false, nil
 		}
 		if clusterObj.Annotations[importedCleaningStateAnnotation] != "" {
@@ -410,18 +404,9 @@ func waitForImportedResetComplete(t *testing.T, clients *clients.Clients, cluste
 		return true, nil
 	})
 	if err != nil {
-		t.Fatalf("timed out waiting for imported reset to complete on cluster %s: %v", clusterName, err)
+		t.Fatalf("timed out waiting for imported day2ops to be disabled on cluster %s: %v", clusterName, err)
 	}
 	return clusterObj
-}
-
-func getClusterCondition(clusterObj *v3.Cluster, conditionType string) *v3.ClusterCondition {
-	for i := range clusterObj.Status.Conditions {
-		if clusterObj.Status.Conditions[i].Type == v3.ClusterConditionType(conditionType) {
-			return &clusterObj.Status.Conditions[i]
-		}
-	}
-	return nil
 }
 
 func setClusterAnnotation(t *testing.T, clients *clients.Clients, clusterName, key, value string) (*v3.Cluster, error) {

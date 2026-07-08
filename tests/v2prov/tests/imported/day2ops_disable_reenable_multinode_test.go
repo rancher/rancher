@@ -126,12 +126,12 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_MultiNode(t 
 		t.Fatal(err)
 	}
 
-	phase2Cluster := waitForImportedResetComplete(t, clients, mgmtCluster.Name, importedResetWaitTimeout)
+	phase2Cluster := waitForImportedDay2OpsDisabled(t, clients, mgmtCluster.Name, importedDisableWaitTimeout)
 	assert.Equal(t, "false", phase2Cluster.Annotations[opsEnabledAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[importedCleaningStateAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[appliedSystemAgentHashAnnotation])
 
-	phase2Identity := waitForImportedPlanIdentity(t, clients, mgmtCluster.Name, 0, true, importedResetWaitTimeout)
+	phase2Identity := waitForImportedPlanIdentity(t, clients, mgmtCluster.Name, 0, true, importedDisableWaitTimeout)
 	assert.Len(t, phase2Identity.MachinePlanSecrets, 0)
 	assert.Len(t, phase2Identity.PlanServiceAccount, 0)
 	assert.Len(t, phase2Identity.PlanTokenSecrets, 0)
