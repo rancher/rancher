@@ -172,7 +172,17 @@ func (h *handler) OnChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 }
 
 func (h *handler) UninstallSystemAgent(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
-	beacon, err := h.beaconCache.Get(cluster.Name, cluster.Name)
+	ref, err := h.clusterOwner(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = ref.Name
+	}
+
+	beacon, err := h.beaconCache.Get(namespace, ref.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return cluster, err
 	} else if err == nil {

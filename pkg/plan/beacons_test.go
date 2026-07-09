@@ -6,18 +6,6 @@ import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 )
 
-func TestAuthorizedForBeacon(t *testing.T) {
-
-}
-
-func TestIsOwningBeaconHolder(t *testing.T) {
-
-}
-
-func TestIsDelegateBeaconHolder(t *testing.T) {
-
-}
-
 func TestPushDelegate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -58,8 +46,4 @@ func TestPushDelegate(t *testing.T) {
 
 		})
 	}
-}
-
-func TestPopDelegate(t *testing.T) {
-
 }

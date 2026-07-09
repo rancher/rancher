@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -146,17 +147,23 @@ func Message(results []PlanStatus) string {
 		if res.Secret == nil {
 			continue
 		}
-		nodeName := res.Secret.Name
+		name := res.Secret.Name
+		if res.Secret.Labels != nil {
+			machineName := res.Secret.Labels[planv1alpha1.MachineLifecycleNameLabel]
+			if machineName != "" {
+				name = machineName
+			}
+		}
 
 		// Order of evaluation sets the bucket for each node
 		if res.Failing && !res.Failed {
-			buckets["failing plan"] = append(buckets["failing plan"], nodeName)
+			buckets["failing plan"] = append(buckets["failing plan"], name)
 		} else if res.Pending {
-			buckets["waiting for plan to be picked up"] = append(buckets["waiting for plan to be picked up"], nodeName)
+			buckets["waiting for plan to be picked up"] = append(buckets["waiting for plan to be picked up"], name)
 		} else if res.InProgress {
-			buckets["waiting for plan applied"] = append(buckets["waiting for plan applied"], nodeName)
+			buckets["waiting for plan applied"] = append(buckets["waiting for plan applied"], name)
 		} else if res.Applied && !res.ProbesPassed {
-			buckets["waiting for probes"] = append(buckets["waiting for probes"], nodeName)
+			buckets["waiting for probes"] = append(buckets["waiting for probes"], name)
 		}
 	}
 

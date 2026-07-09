@@ -149,6 +149,8 @@ func PopDelegate(beacon *planv1alpha1.Beacon, delegate string, beacons plancontr
 		return beacon, nil
 	}
 
+	beacon = beacon.DeepCopy()
+
 	beacon.Status.Delegates = beacon.Status.Delegates[:len(beacon.Status.Delegates)-1]
 	beacon, err := beacons.UpdateStatus(beacon)
 	return beacon, err
