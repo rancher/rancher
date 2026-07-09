@@ -561,15 +561,16 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
 		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
 	}
-	// ToggleBeacon(active=false) and ReleaseBeacon both route through UpdateStatus.
-	if len(beacons.statusUpdates) != 2 {
-		t.Fatalf("expected two beacon status updates (toggle + release), got %d", len(beacons.statusUpdates))
+	// ReleaseBeacon on the owner path clears Active + Owner + Delegates in a single
+	// UpdateStatus call — no separate ToggleBeacon is needed.
+	if len(beacons.statusUpdates) != 1 {
+		t.Fatalf("expected one beacon status update (release), got %d", len(beacons.statusUpdates))
 	}
 	if beacons.statusUpdates[0].Status.Active {
-		t.Fatalf("expected beacon to be toggled inactive first")
+		t.Fatalf("expected beacon to be toggled inactive on release")
 	}
-	if beacons.statusUpdates[1].Status.Owner != "" {
-		t.Fatalf("expected Status.Owner to be cleared on release, got %q", beacons.statusUpdates[1].Status.Owner)
+	if beacons.statusUpdates[0].Status.Owner != "" {
+		t.Fatalf("expected Status.Owner to be cleared on release, got %q", beacons.statusUpdates[0].Status.Owner)
 	}
 	if len(beacons.updates) != 0 {
 		t.Fatalf("expected no main-resource updates from ReleaseBeacon, got %d", len(beacons.updates))

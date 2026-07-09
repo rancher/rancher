@@ -1552,8 +1552,10 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 		return status, nil
 	}
 
-	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
-		if err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
+	// Owner and mid-chain delegates both go through ReleaseBeacon: it clears the beacon fully
+	// for the owner, or removes the delegate slot from the chain otherwise.
+	if plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -1576,9 +1578,10 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 		return status, nil
 	}
 
-	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
-		if err != nil {
+	// Owner performs full teardown via ReleaseBeacon; a mid-chain delegate is removed from the
+	// chain by the same call. Non-participants are no-op.
+	if plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -1602,12 +1605,15 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 		return status, nil
 	}
 
-	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
-		if err != nil {
+	// Owner does the full teardown + enqueues the cluster; a mid-chain delegate just removes
+	// itself. Only owner cleanup implies downstream reconciliation, so only owner enqueues.
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
+	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
-
+	}
+	if owning {
 		// enqueue original object to ensure it is processed by requisite controllers
 		gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
 		_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())

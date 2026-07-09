@@ -821,8 +821,11 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.EncryptionKeyRotati
 		return status, err
 	}
 
-	if plan.IsOwningBeaconHolder(s.beacon, beaconOwnerKey(s.op)) {
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op)); err != nil {
+	// Owner and mid-chain delegates both go through ReleaseBeacon: it clears the beacon fully
+	// for the owner, or removes the delegate slot from the chain otherwise.
+	ownerKey := beaconOwnerKey(s.op)
+	if plan.IsOwningBeaconHolder(s.beacon, ownerKey) || plan.IsInDelegateChain(s.beacon, ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -851,8 +854,13 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotation
 		return status, err
 	}
 
-	if err := plan.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op)); err != nil {
-		return status, err
+	// Owner performs full teardown via ReleaseBeacon; a mid-chain delegate is removed from the
+	// chain by the same call. Non-participants are no-op.
+	ownerKey := beaconOwnerKey(s.op)
+	if plan.IsOwningBeaconHolder(s.beacon, ownerKey) || plan.IsInDelegateChain(s.beacon, ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
+			return status, err
+		}
 	}
 	return status, nil
 }
@@ -880,16 +888,18 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotat
 		return status, err
 	}
 
-	if plan.AuthorizedForBeacon(s.beacon, beaconOwnerKey(s.op)) {
-		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
-		if err != nil {
+	// Owner does the full teardown + enqueues the cluster; a mid-chain delegate just removes
+	// itself. Only owner cleanup implies downstream reconciliation, so only owner enqueues.
+	// ReleaseBeacon handles Active=false + Owner="" + Delegates=nil in a single UpdateStatus for
+	// the owner path — no separate ToggleBeacon call is needed.
+	ownerKey := beaconOwnerKey(s.op)
+	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
+	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
 			return status, err
 		}
-
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, beaconOwnerKey(s.op)); err != nil {
-			return status, err
-		}
-
+	}
+	if owning {
 		// enqueue original object to ensure it is processed by requisite controllers
 		gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
 		_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
