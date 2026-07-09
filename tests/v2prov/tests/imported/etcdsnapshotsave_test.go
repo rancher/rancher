@@ -67,6 +67,7 @@ func Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testing.T) {
 		hookName     = "v2prov-e2e-test"
 		delegateName = "v2prov-e2e-test-delegate"
 	)
+	preflightHookKey := etcdsnapshotsave.PreflightStepHookLabelPrefix + hookName
 	saveHookKey := etcdsnapshotsave.SaveStepHookLabelPrefix + hookName
 	restartHookKey := etcdsnapshotsave.RestartStepHookLabelPrefix + hookName
 	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
@@ -75,6 +76,7 @@ func Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testing.T) {
 	// phase/step handler, so the controller only checks the relevant key when it enters that
 	// handler — they don't interfere with each other.
 	op := CreateETCDSnapshotSaveOp(t, cs, fx.ns.Name, fx.clusterRef, WithSaveLabels(map[string]string{
+		preflightHookKey: delegateName,
 		saveHookKey:      delegateName,
 		restartHookKey:   delegateName,
 		succeededHookKey: delegateName,
@@ -84,16 +86,22 @@ func Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testing.T) {
 	// mgmt clusters use namespace == name.
 	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 
-	// --- Checkpoint 1: Save step ---
+	// Op should be InProgress at the preflight step. The controller's reconcileSave runs the hook
+	// check before assigning any plans, so no etcd-snapshot save has been issued downstream yet.
+	cp := WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, preflightHookKey, delegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepPreflight)
+	t.Logf("paused at Preflight step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
+	// (Inspection point — see godoc above.)
+	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, preflightHookKey, delegateName)
+
 	// Op should be InProgress at the Save step. The controller's reconcileSave runs the hook
 	// check before assigning any plans, so no etcd-snapshot save has been issued downstream yet.
-	cp := WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, saveHookKey, delegateName,
+	cp = WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, saveHookKey, delegateName,
 		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepSave)
 	t.Logf("paused at Save step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
 	// (Inspection point — see godoc above.)
 	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, saveHookKey, delegateName)
 
-	// --- Checkpoint 2: Restart step ---
 	// The save plan has now been issued and applied (otherwise the controller would not have
 	// transitioned to Restart). reconcileRestart runs its hook check before assigning the
 	// systemctl-restart plan.
@@ -102,7 +110,6 @@ func Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testing.T) {
 	t.Logf("paused at Restart step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
 	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, restartHookKey, delegateName)
 
-	// --- Checkpoint 3: Succeeded phase ---
 	// Phase transitioned to Succeeded but the hook gates beacon release. handleSucceeded's hook
 	// check runs before the beacon ToggleBeacon/ReleaseBeacon pair, so the beacon's owner field is
 	// still set to the controller and our delegate is still on the chain.

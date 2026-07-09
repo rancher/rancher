@@ -249,6 +249,7 @@ func Test_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *testing.T) 
 		phase opv1alpha1.OperationPhase
 		step  opv1alpha1.ETCDSnapshotRestoreStep
 	}{
+		{"Preflight", etcdsnapshotrestore.PreflightStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepPreflight},
 		{"Shutdown", etcdsnapshotrestore.ShutdownStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepShutdown},
 		{"Restore", etcdsnapshotrestore.RestoreStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepRestore},
 		{"PostRestorePodCleanup", etcdsnapshotrestore.PostRestorePodCleanupStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup},

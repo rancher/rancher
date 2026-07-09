@@ -46,6 +46,21 @@ const (
 	RestartStepHookLabelPrefix = "restart.step.hook.operation.cattle.io/"
 )
 
+// stepHookPrefixFor returns the step-hook label prefix for the given snapshot-save step, or "" for
+// an unknown / empty step. Used by handleInProgress to decide whether beacon-authorization loss is
+// explained by an active step-scoped delegation vs a genuine loss.
+func stepHookPrefixFor(step opv1alpha1.ETCDSnapshotSaveStep) string {
+	switch step {
+	case opv1alpha1.ETCDSnapshotSaveStepPreflight:
+		return PreflightStepHookLabelPrefix
+	case opv1alpha1.ETCDSnapshotSaveStepSave:
+		return SaveStepHookLabelPrefix
+	case opv1alpha1.ETCDSnapshotSaveStepRestart:
+		return RestartStepHookLabelPrefix
+	}
+	return ""
+}
+
 // dynamicResolver is the subset of *dynamic.Controller this handler needs: Get for cluster
 // lookup during onChange dispatch, and Enqueue for nudging the parent cluster controller after a
 // successful operation. It's an interface so tests can substitute a stub — *dynamic.Controller
@@ -302,15 +317,22 @@ func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling pending", s.op.Namespace, s.op.Name)
 
-	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, s.ownerKey)
-	if err != nil {
-		return status, err
-	}
-	if beacon == nil {
-		opv1alpha1.PendingCondition.True(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
-		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
-		return status, nil
+	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
+	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
+	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise attempt to acquire;
+	// a nil return means another controller currently owns it and we must keep waiting.
+	if !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		acquired, err := plan.AcquireBeacon(s.beacon, h.beacons, s.ownerKey)
+		if err != nil {
+			return status, err
+		}
+		if acquired == nil {
+			opv1alpha1.PendingCondition.True(&status)
+			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
+			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+			return status, nil
+		}
+		s.beacon = acquired
 	}
 
 	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
@@ -352,13 +374,26 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling in-progress", s.op.Namespace, s.op.Name)
 
-	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
-		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
+	stepPrefix := stepHookPrefixFor(s.op.Status.Step)
+
+	// Stage 1 (loose): the op must appear SOMEWHERE in the ownership chain (owner or any
+	// delegate). Being absent entirely means the beacon was reassigned to another controller and
+	// we can't recover. If a step hook is currently active on the op, treat the absence as a
+	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
+	// have popped us in service of the hook and will restore ownership when the hook clears.
+	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+			opv1alpha1.InProgressCondition.True(&status)
+			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+			return status, nil
+		}
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon reassigned, aborting", s.op.Namespace, s.op.Name)
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
-		opv1alpha1.FailedCondition.Message(&status, "Beacon acquired by another controller, aborting")
+		opv1alpha1.FailedCondition.Message(&status, "beacon reassigned, aborting")
 
 		return status, nil
 	}
@@ -376,6 +411,27 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		opv1alpha1.InProgressCondition.True(&status)
 		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	// Stage 2 (strict): after the InProgress-phase hook has been handled, the op must be the
+	// primary owner or the most-recent delegate on the chain to drive step work. If a step hook
+	// is still active on the op, treat the missing-top state as an intentional delegation and
+	// wait; otherwise this is a genuine beacon loss and we fail.
+	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
+		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+			opv1alpha1.InProgressCondition.True(&status)
+			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+			return status, nil
+		}
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
+		opv1alpha1.FailedCondition.Message(&status, "Beacon acquired by another controller, aborting")
+
 		return status, nil
 	}
 
