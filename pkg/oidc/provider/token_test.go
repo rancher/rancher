@@ -101,6 +101,12 @@ func TestTokenEndpoint(t *testing.T) {
 		Scope:         []string{"openid", "profile", "offline_access"},
 		CodeChallenge: oauth2.S256ChallengeFromVerifier(fakeCodeVerifier),
 	}
+	fakeExtSessionOfflineAccess := &session.Session{
+		ClientID:      fakeClientID,
+		TokenName:     "ext/" + fakeTokenName,
+		Scope:         []string{"openid", "profile", "offline_access"},
+		CodeChallenge: oauth2.S256ChallengeFromVerifier(fakeCodeVerifier),
+	}
 	fakeOIDCClient := &v3.OIDCClient{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeClientName,
@@ -352,6 +358,62 @@ func TestTokenEndpoint(t *testing.T) {
 			},
 			wantExpiresIn: ptr.To(int64(fakeTokenLifespan)),
 		},
+		"authorization_code returns an id_token and access_token, ext token, slow path, no ext/ prefix, offline access": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "authorization_code")
+				data.Set("code", fakeCode)
+				data.Set("code_verifier", fakeCodeVerifier)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.sessionClient.EXPECT().GetAndRemove(fakeCode).Return(fakeSessionOfflineAccess, nil)
+				m.secretCache.EXPECT().Get("cattle-oidc-client-secrets", fakeClientID).Return(fakeClientk8sSecret, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{fakeOIDCClient}, nil)
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "token not found"))
+				m.extSecrets.EXPECT().Get(exttokenstore.TokenNamespace, fakeTokenName).Return(&fakeSecret, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(fakeUser, nil)
+				m.useAttributeLister.EXPECT().Get(fakeUserID).Return(fakeUserAttributes, nil)
+				m.signingKeyGetter.EXPECT().GetSigningKey().Return(privateKey, fakeSigningKey, nil)
+				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
+				m.extSecretsClient.EXPECT().Patch(exttokenstore.TokenNamespace, fakeTokenName, types.JSONPatchType, tokenPatchExt).
+					Return(&fakeSecret, nil)
+			},
+			wantIdTokenClaims: &jwt.MapClaims{
+				"aud":           []any{fakeClientID},
+				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
+				"iss":           settings.ServerURL.Get() + "/oidc",
+				"iat":           float64(fakeTime().Unix()),
+				"name":          fakeUsername,
+				"sub":           fakeUserID,
+				"auth_provider": fakeAuthProvider,
+			},
+			wantAccessTokenClaims: &jwt.MapClaims{
+				"aud":           []any{fakeClientID},
+				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
+				"iss":           settings.ServerURL.Get() + "/oidc",
+				"iat":           float64(fakeTime().Unix()),
+				"sub":           fakeUserID,
+				"auth_provider": fakeAuthProvider,
+				"scope":         fakeScopesOfflineAccess,
+				"token":         fakeToken.Name,
+				"token_kind":    "ext",
+			},
+			wantRefreshTokenClaims: &jwt.MapClaims{
+				"aud":                []any{fakeClientID},
+				"exp":                float64(fakeTime().Add(fakeRefreshTokenLifespan * time.Second).Unix()),
+				"iat":                float64(fakeTime().Unix()),
+				"sub":                fakeUserID,
+				"auth_provider":      fakeAuthProvider,
+				"scope":              []any{"openid", "profile", "offline_access"},
+				"rancher_token_hash": rancherTokenHash,
+			},
+			wantExpiresIn: ptr.To(int64(fakeTokenLifespan)),
+		},
 		"authorization_code returns an id_token and access_token, ext token, fast path, ext/ prefix": {
 			req: func() *http.Request {
 				data := url.Values{}
@@ -412,6 +474,63 @@ func TestTokenEndpoint(t *testing.T) {
 				m.sessionClient.EXPECT().GetAndRemove(fakeCode).Return(nil, errors.NewNotFound(schema.GroupResource{}, "secret not found"))
 			},
 			wantError: `{"error":"invalid_request","error_description":"invalid code"}`,
+		},
+		"authorization_code returns an id_token and access_token, ext token, fast path, ext/ prefix, offline access": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "authorization_code")
+				data.Set("code", fakeCode)
+				data.Set("code_verifier", fakeCodeVerifier)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s",
+					base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.sessionClient.EXPECT().GetAndRemove(fakeCode).Return(fakeExtSessionOfflineAccess, nil)
+				m.secretCache.EXPECT().Get("cattle-oidc-client-secrets", fakeClientID).Return(fakeClientk8sSecret, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).
+					Return([]*v3.OIDCClient{fakeOIDCClient}, nil)
+				m.extSecrets.EXPECT().Get(exttokenstore.TokenNamespace, fakeTokenName).Return(&fakeSecret, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(fakeUser, nil)
+				m.useAttributeLister.EXPECT().Get(fakeUserID).Return(fakeUserAttributes, nil)
+				m.signingKeyGetter.EXPECT().GetSigningKey().Return(privateKey, fakeSigningKey, nil)
+				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
+				m.extSecretsClient.EXPECT().Patch(exttokenstore.TokenNamespace, fakeTokenName, types.JSONPatchType, tokenPatchExt).
+					Return(&fakeSecret, nil)
+			},
+			wantIdTokenClaims: &jwt.MapClaims{
+				"aud":           []any{fakeClientID},
+				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
+				"iss":           settings.ServerURL.Get() + "/oidc",
+				"iat":           float64(fakeTime().Unix()),
+				"name":          fakeUsername,
+				"sub":           fakeUserID,
+				"auth_provider": fakeAuthProvider,
+			},
+			wantAccessTokenClaims: &jwt.MapClaims{
+				"aud":           []any{fakeClientID},
+				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
+				"iss":           settings.ServerURL.Get() + "/oidc",
+				"iat":           float64(fakeTime().Unix()),
+				"sub":           fakeUserID,
+				"auth_provider": fakeAuthProvider,
+				"scope":         fakeScopesOfflineAccess,
+				"token":         fakeToken.Name,
+				"token_kind":    "ext",
+			},
+			wantRefreshTokenClaims: &jwt.MapClaims{
+				"aud":                []any{fakeClientID},
+				"exp":                float64(fakeTime().Add(fakeRefreshTokenLifespan * time.Second).Unix()),
+				"iat":                float64(fakeTime().Unix()),
+				"sub":                fakeUserID,
+				"auth_provider":      fakeAuthProvider,
+				"scope":              []any{"openid", "profile", "offline_access"},
+				"rancher_token_hash": rancherTokenHash,
+			},
+			wantExpiresIn: ptr.To(int64(fakeTokenLifespan)),
 		},
 		"authorization_code fails for an invalid client secret": {
 			req: func() *http.Request {
