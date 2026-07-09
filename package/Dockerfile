@@ -248,7 +248,7 @@ RUN case "${ARCH}" in \
 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.1-k3s1 \
+COPY --from=rancher/k3s:v1.36.2-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
