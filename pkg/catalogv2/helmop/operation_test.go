@@ -221,6 +221,27 @@ func Test_Render(t *testing.T) {
 			},
 			failMsg: "takeOwnership true should force server-side even if serverSide is false",
 		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test12",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": true,
+							"serverSide":    true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--force-conflicts=true", "--server-side=true", "--take-ownership=true", "test12", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "takeOwnership true and serverSide true should resolve correctly to server-side=true without duplication",
+		},
 	}
 
 	for _, testCase := range testCases {
