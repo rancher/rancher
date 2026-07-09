@@ -127,6 +127,10 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 		return secret, nil
 	}
 
+	if !planv1alpha1.HasClusterLifecycleLabels(secret) {
+		return secret, nil
+	}
+
 	ref, err := planv1alpha1.ClusterLifecycleLabelsToObjectReference(secret, secret.Namespace, h.restMapper)
 	if err != nil {
 		return secret, err

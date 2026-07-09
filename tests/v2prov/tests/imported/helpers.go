@@ -75,7 +75,9 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 	for _, p := range pools {
 		want += p.Quantity
 	}
-	assert.Len(t, pods, want)
+	if len(pods) != want {
+		t.Fatalf("expected %d pod(s) for imported pools, got %d", want, len(pods))
+	}
 
 	mgmtCluster, err := cluster.NewImported(clients, &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{

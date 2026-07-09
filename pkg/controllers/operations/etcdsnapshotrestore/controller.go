@@ -584,9 +584,9 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 
 			status.SetPhase(opv1alpha1.OperationPhaseCanceled)
 
-			opv1alpha1.FailedCondition.True(&status)
-			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
+			opv1alpha1.CanceledCondition.True(&status)
+			opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+			opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
 
 			return status, nil
 		}
