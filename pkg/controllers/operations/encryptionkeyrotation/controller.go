@@ -909,7 +909,7 @@ func beaconOwnerKey(op *opv1alpha1.EncryptionKeyRotation) string {
 // Non-matching owners are left untouched so this controller only reclaims its own
 // operation type.
 func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
-	if s.beacon == nil || s.beacon.Labels == nil {
+	if s.beacon == nil {
 		return nil
 	}
 

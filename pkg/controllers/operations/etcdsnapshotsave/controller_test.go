@@ -390,7 +390,7 @@ func TestHandlePending_TransitionsToInProgress(t *testing.T) {
 	got, err := h.handlePending(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, got.Phase)
-	assert.Equal(t, opv1alpha1.ETCDSnapshotSaveStepSave, got.Step)
+	assert.Equal(t, opv1alpha1.ETCDSnapshotSaveStepPreflight, got.Step)
 }
 
 func TestHandlePending_WaitForRegisterErrorBubbles(t *testing.T) {
