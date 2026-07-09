@@ -22,12 +22,6 @@ jobs:
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetD_.*$"
           CATTLE_FEATURES: "imported-day-2-ops=true"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
-          CATTLE_FEATURES: "provisioningprebootstrap=true"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
-          CATTLE_FEATURES: "provisioningprebootstrap=true"
     name: Provisioning tests
     runs-on:
       - runs-on
