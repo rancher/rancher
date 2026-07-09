@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
-	"github.com/rancher/rancher/pkg/api/steve/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/api/steve/clusters"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
 	"github.com/rancher/rancher/pkg/api/steve/machine"
@@ -21,7 +20,6 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 		return err
 	}
 	machine.Register(server, config)
-	clusterregistrationtoken.Register(server, config)
 	navlinks.Register(ctx, server)
 	settings.Register(server)
 	disallow.Register(server)

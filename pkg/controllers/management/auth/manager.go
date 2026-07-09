@@ -105,7 +105,6 @@ type managerInterface interface {
 	grantManagementPlanePrivileges(string, map[string]string, v1.Subject, interface{}) error
 	grantManagementClusterScopedPrivilegesInProjectNamespace(string, string, map[string]string, v1.Subject, *v3.ClusterRoleTemplateBinding) error
 	grantManagementProjectScopedPrivilegesInClusterNamespace(string, string, map[string]string, v1.Subject, *v3.ProjectRoleTemplateBinding) error
-	checkIfRoleTemplateGrantsCRTAccess(string) (bool, error)
 }
 
 type manager struct {
@@ -693,22 +692,6 @@ func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.
 	//toLower
 	rbac.ToLowerRoleTemplates(roles)
 	return roles, nil
-}
-
-// checkIfRoleTemplateGrantsCRTAccess checks if a RoleTemplate or any of its referenced RoleTemplates
-// grant access to clusterregistrationtokens
-func (m *manager) checkIfRoleTemplateGrantsCRTAccess(roleTemplateName string) (bool, error) {
-	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
-	if err != nil {
-		return false, err
-	}
-
-	for _, role := range roles {
-		if grantsCRTAccessFromRoleTemplate(role, m.crLister) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // reconcileDesiredMGMTPlaneRoleBindings ensures that the desired management plane role bindings

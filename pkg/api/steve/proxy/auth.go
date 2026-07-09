@@ -5,12 +5,9 @@ import (
 	"strings"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -20,30 +17,15 @@ const (
 )
 
 type clusterProxyAuthorizer struct {
-	tokenCache  v3.ClusterRegistrationTokenCache
-	secretCache corecontrollers.SecretCache
+	tokenCache v3.ClusterRegistrationTokenCache
 }
 
 func NewAuthorizer(wrangler *wrangler.Context) remotedialer.Authorizer {
-	secretCache := wrangler.Core.Secret().Cache()
 	a := &clusterProxyAuthorizer{
-		tokenCache:  wrangler.Mgmt.ClusterRegistrationToken().Cache(),
-		secretCache: secretCache,
+		tokenCache: wrangler.Mgmt.ClusterRegistrationToken().Cache(),
 	}
 	a.tokenCache.AddIndexer(tokenIndex, func(obj *apimgmtv3.ClusterRegistrationToken) ([]string, error) {
-		current, previous, err := crt.GetTokensFromSecret(secretCache, obj)
-		if err != nil {
-			logrus.Warnf("failed to resolve CRT token for %s/%s: %v", obj.Namespace, obj.Name, err)
-			return nil, nil
-		}
-		if current == "" {
-			return nil, nil
-		}
-		tokens := []string{current}
-		if previous != "" {
-			tokens = append(tokens, previous)
-		}
-		return tokens, nil
+		return []string{obj.Status.Token}, nil
 	})
 
 	return a.Authorize
