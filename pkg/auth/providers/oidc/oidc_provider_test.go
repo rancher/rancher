@@ -61,7 +61,7 @@ func TestValidateACR(t *testing.T) {
 
 func TestParseACRFromAccessToken(t *testing.T) {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	suffix := base64.URLEncoding.EncodeToString([]byte(`{}`))
+	suffix := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
 	validClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
 	invalidBase64Claims := "invalid_base64_claims"
 	noAcrClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"1234567890"}`))
