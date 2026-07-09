@@ -629,8 +629,8 @@ github.com/rancher/fleet/pkg/apis v0.16.0-rc.2 h1:UlY/H1hosSSS6vOm2bjqJwmfb5cltb
 github.com/rancher/fleet/pkg/apis v0.16.0-rc.2/go.mod h1:XTTBOcNYFmS9T1gIoTUOKlDlZAIIpTspDOSEGmCE1Xc=
 github.com/rancher/gke-operator v1.15.0-rc.2 h1:Q5rZcMroS3peK+2NmpUi+77F1mFitgifqD+KI7ye7jM=
 github.com/rancher/gke-operator v1.15.0-rc.2/go.mod h1:nEHw8ZiG6Os1g1JVDPtfpKNMlAZQNV/rvNMxozeua6w=
-github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1 h1:vRtxuvIF0UarXIAwGYNwSFoRYJadVnOrD8kx2qrZyN8=
-github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1/go.mod h1:xavYr3cNyyAeA72nMVB60+q/EJ8Anu+loQWFJyXOeP8=
+github.com/rancher/jsonpath v0.0.0-20260423141252-c4e0c565a09f h1:eXPhsmHBuA6Xroj9rwsqieGD+J0eqwPavkYQrpS0hJk=
+github.com/rancher/jsonpath v0.0.0-20260423141252-c4e0c565a09f/go.mod h1:xavYr3cNyyAeA72nMVB60+q/EJ8Anu+loQWFJyXOeP8=
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379 h1:/DKzOm5Du2jPLE5rXPGhsb0XeT68kWEIRi6jnzMeyGk=
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379/go.mod h1:IfqyXrTiCAg8rTJodbGApTiORgujJnBH+QyHHJlFSII=
 github.com/rancher/lasso v0.2.9 h1:5Xk9Qid+YDOLpa6s5xalcSR0cA5BMbgWcaOZ8kdNU7k=
