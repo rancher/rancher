@@ -502,11 +502,13 @@ func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, ranc
 	var err error
 	switch rancherToken.(type) {
 	case *v3.Token:
+		escapedName := strings.ReplaceAll(strings.ReplaceAll(oidcClientName, "~", "~0"), "/", "~1")
+
 		var patch []byte
 		if rancherToken.GetLabels() != nil {
 			patch, err = json.Marshal([]jsonPatch{{
 				Op:    "add",
-				Path:  "/metadata/labels/cattle.io.oidc-client-" + oidcClientName,
+				Path:  "/metadata/labels/cattle.io.oidc-client-" + escapedName,
 				Value: "true",
 			}})
 		} else {
@@ -514,7 +516,7 @@ func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, ranc
 				Op:   "add",
 				Path: "/metadata/labels",
 				Value: map[string]string{
-					"cattle.io.oidc-client-" + oidcClientName: "true",
+					"cattle.io.oidc-client-" + escapedName: "true",
 				},
 			}})
 		}
