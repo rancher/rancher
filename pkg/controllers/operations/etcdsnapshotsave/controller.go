@@ -25,13 +25,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// ControllerOwnerKey is the value used to identify the etcd-snapshot-save handler currently owns the beacon.
-const ControllerOwnerKey = "etcd-snapshot-save"
-
-// Step hook label prefixes for the etcdsnapshotsave operation. They follow the shared label
-// semantics documented on planv1alpha1's phase-hook label constants, but each prefix only fires
-// when the operation enters the matching step.
 const (
+	// ControllerOwnerKey is the value used to identify the etcd-snapshot-save handler currently owns the beacon.
+	ControllerOwnerKey = "etcd-snapshot-save"
+
+	// Step hook label prefixes for the etcdsnapshotsave operation. They follow the shared label
+	// semantics documented on planv1alpha1's phase-hook label constants, but each prefix only fires
+	// when the operation enters the matching step.
+
 	// PreflightStepHookLabelPrefix gates the Preflight step, before the controller performs
 	// the necessary preflight checks to determine whether or not the operation can proceed.
 	PreflightStepHookLabelPrefix = "preflight.step.hook.operation.cattle.io/"
@@ -129,6 +130,8 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 // It is built fresh on every invocation and threaded through the phase handlers so they don't
 // each have to re-derive the same data.
 type scope struct {
+	ownerKey string
+
 	op        *opv1alpha1.ETCDSnapshotSave
 	namespace string
 
@@ -219,6 +222,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	}
 
 	s := &scope{
+		ownerKey:   plan.ControllerOwnerKey(op, ControllerOwnerKey),
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
@@ -237,14 +241,13 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		return h.handleFailed(s, status)
 	case opv1alpha1.OperationPhaseSucceeded:
 		return h.handleSucceeded(s, status)
-	default:
-		// Should be prevented via validation, but just in case
-		status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
-		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
 	}
+
+	status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+	opv1alpha1.FailedCondition.True(&status)
+	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
+	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
 
 	return status, nil
 }
@@ -299,7 +302,7 @@ func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling pending", s.op.Namespace, s.op.Name)
 
-	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, s.ownerKey)
 	if err != nil {
 		return status, err
 	}
@@ -349,7 +352,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling in-progress", s.op.Namespace, s.op.Name)
 
-	if !plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
+	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
@@ -747,14 +750,8 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 		return status, nil
 	}
 
-	if plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
-		var err error
-		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
-		if err != nil {
-			return status, err
-		}
-
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
 		if err != nil {
 			return status, err
 		}
@@ -780,14 +777,8 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 		return status, nil
 	}
 
-	if plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
-		var err error
-		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
-		if err != nil {
-			return status, err
-		}
-
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
 		if err != nil {
 			return status, err
 		}
@@ -813,14 +804,8 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveSt
 		return status, nil
 	}
 
-	if plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
-		var err error
-		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
-		if err != nil {
-			return status, err
-		}
-
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
 		if err != nil {
 			return status, err
 		}
@@ -829,6 +814,7 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveSt
 		gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
 		_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
 	}
+
 	return status, nil
 }
 

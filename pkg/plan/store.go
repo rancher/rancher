@@ -70,7 +70,7 @@ func (p *PlanStatus) Failure() bool {
 	return p.Failed
 }
 
-// Waiting returns true if the plan is in a transient state, and a message indicating why.
+// Waiting returns true if the plan is in a transient state.
 func (p *PlanStatus) Waiting() bool {
 	switch {
 	case p.Pending:

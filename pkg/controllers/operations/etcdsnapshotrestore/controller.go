@@ -30,13 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const ControllerOwnerKey = "etcd-snapshot-restore"
-
-// Step hook label prefixes for the etcdsnapshotrestore operation. Each prefix gates a single
-// restore step and follows the shared label semantics documented on planv1alpha1's phase-hook
-// label constants. The shutdown / restore / pod-cleanup / restart / node-cleanup / final-restart
-// sequence is unique to restore — there is no analogue on save / encryption-key-rotation.
 const (
+	ControllerOwnerKey = "etcd-snapshot-restore"
+
+	// Step hook label prefixes for the etcdsnapshotrestore operation. Each prefix gates a single
+	// restore step and follows the shared label semantics documented on planv1alpha1's phase-hook
+	// label constants. The shutdown / restore / pod-cleanup / restart / node-cleanup / final-restart
+	// sequence is unique to restore — there is no analogue on save / encryption-key-rotation.
+
 	// PreflightStepHookLabelPrefix gates the Preflight step, before the controller performs
 	// the necessary preflight checks to determine whether or not the operation can proceed.
 	PreflightStepHookLabelPrefix = "preflight.step.hook.operation.cattle.io/"
@@ -70,22 +71,20 @@ const (
 	// removes the temporary server-URL override and lets each node return to its normal
 	// reconciliation.
 	RestartClusterStepHookLabelPrefix = "restart-cluster.step.hook.operation.cattle.io/"
-)
 
-// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
-// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
-const idempotencyKey = "etcd-restore"
+	// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
+	// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
+	idempotencyKey = "etcd-restore"
 
-// etcdRestoreBinSubdir is the relative path (under the distro data directory) that holds the
-// helper scripts the controller writes to nodes during the restore.
-const etcdRestoreBinSubdir = "etcd-restore/bin"
+	// etcdRestoreBinSubdir is the relative path (under the distro data directory) that holds the
+	// helper scripts the controller writes to nodes during the restore.
+	etcdRestoreBinSubdir = "etcd-restore/bin"
 
-const (
 	waitForPodListScriptName = "wait_for_pod_list.sh"
-	nodeCleanupScriptName    = "clean_up_nodes.sh"
-)
 
-const waitForPodListScript = `#!/bin/sh
+	nodeCleanupScriptName = "clean_up_nodes.sh"
+
+	waitForPodListScript = `#!/bin/sh
 
 i=0
 
@@ -99,7 +98,7 @@ done
 exit 1
 `
 
-const nodeCleanupScript = `#!/bin/sh
+	nodeCleanupScript = `#!/bin/sh
 
 if [ -z "$KUBECTL" ]; then
         echo "Must define KUBECTL environment variable"
@@ -149,6 +148,7 @@ done < "$TMPALLNODES"
 rm "$TMPALLNODES"
 rm "$NODENAMESFILE"
 `
+)
 
 type handler struct {
 	etcdsnapshotrestores operationcontrollers.ETCDSnapshotRestoreController
@@ -285,6 +285,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 	}
 
 	s := &scope{
+		ownerKey:   plan.ControllerOwnerKey(op, ControllerOwnerKey),
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
@@ -292,21 +293,20 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		adapter:    a,
 	}
 
-	if status.Phase == opv1alpha1.OperationPhasePending {
+	switch status.Phase {
+	case opv1alpha1.OperationPhasePending:
 		return h.handlePending(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseInProgress {
+	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseCanceled {
+	case opv1alpha1.OperationPhaseCanceled:
 		return h.handleCanceled(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseFailed {
+	case opv1alpha1.OperationPhaseFailed:
 		return h.handleFailed(s, status)
-	}
-	if status.Phase == opv1alpha1.OperationPhaseSucceeded {
+	case opv1alpha1.OperationPhaseSucceeded:
 		return h.handleSucceeded(s, status)
 	}
+
+	status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
@@ -316,6 +316,8 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 }
 
 type scope struct {
+	ownerKey string
+
 	op        *opv1alpha1.ETCDSnapshotRestore
 	namespace string
 
@@ -407,7 +409,7 @@ func nonWindowsSecret(secret *corev1.Secret) bool {
 }
 
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, s.ownerKey)
 	if err != nil {
 		return status, err
 	}
@@ -428,6 +430,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 		opv1alpha1.PendingCondition.True(&status)
 		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 		opv1alpha1.PendingCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+
 		return status, nil
 	}
 
@@ -437,9 +440,11 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 		return status, err
 	} else if !ok {
 		logrus.Infof("[etcdsnapshotrestore] %s/%s: waiting for system-agents to connect", s.op.Namespace, s.op.Name)
+
 		opv1alpha1.PendingCondition.True(&status)
 		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForRegistrationReason)
 		opv1alpha1.PendingCondition.Message(&status, "waiting for system-agents to connect")
+
 		return status, nil
 	}
 
@@ -450,11 +455,12 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
+
 	return status, nil
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-	if !plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
+	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
@@ -813,7 +819,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		}
 	}
 
-	secret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, filter)
+	secret, err := s.adapter.FindOrElectLeader(s.ownerKey, filter)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -929,7 +935,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		return status, nil
 	}
 
-	etcdSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, nil)
+	etcdSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, nil)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -1191,7 +1197,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		value = value + "/final"
 	}
 
-	initSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
+	initSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -1391,7 +1397,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	initSecret, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsEtcd)
+	initSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
@@ -1483,12 +1489,8 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 		return status, nil
 	}
 
-	if plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
-		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
-		if err != nil {
-			return status, err
-		}
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey); err != nil {
+	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
+		if err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -1511,9 +1513,13 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 		return status, nil
 	}
 
-	if err := plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey); err != nil {
-		return status, err
+	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
+		if err != nil {
+			return status, err
+		}
 	}
+
 	return status, nil
 }
 
@@ -1533,13 +1539,9 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 		return status, nil
 	}
 
-	if plan.AuthorizedForBeacon(s.beacon, ControllerOwnerKey) {
-		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
+	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
 		if err != nil {
-			return status, err
-		}
-
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey); err != nil {
 			return status, err
 		}
 
@@ -1547,6 +1549,7 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 		gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
 		_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
 	}
+
 	return status, nil
 }
 

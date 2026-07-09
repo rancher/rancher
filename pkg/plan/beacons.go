@@ -3,6 +3,7 @@ package plan
 import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // AcquireBeacon acquires a beacon if it is not already owned by the desired owner.
@@ -15,6 +16,8 @@ import (
 func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, desired string) (*planv1alpha1.Beacon, error) {
 	if beacon == nil {
 		return nil, nil
+	} else if AuthorizedForBeacon(beacon, desired) {
+		return beacon, nil
 	} else if owner := beacon.Status.Owner; owner == "" {
 		beacon = beacon.DeepCopy()
 	} else if owner != desired {
@@ -29,6 +32,7 @@ func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 }
 
 // ReleaseBeacon releases a beacon if it is owned by the expected owner.
+// Will also remove the beacon from the delegate chain if it is actively delegated.
 // If the beacon is not owned by the expected owner, no action is taken.
 func ReleaseBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, expected string) error {
 	if beacon == nil {
@@ -38,14 +42,22 @@ func ReleaseBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 	if beacon.Status.Owner == expected {
 		beacon = beacon.DeepCopy()
 
-		// reset beacon owner to nothing
+		beacon.Status.Active = false
 		beacon.Status.Owner = ""
-
-		// remove any delegates if set
 		beacon.Status.Delegates = nil
 
 		_, err := beacons.UpdateStatus(beacon)
 		return err
+	}
+
+	// only remove if actively delegated
+	if len(beacon.Status.Delegates) > 0 {
+		if beacon.Status.Delegates[len(beacon.Status.Delegates)-1] == expected {
+			beacon = beacon.DeepCopy()
+			beacon.Status.Delegates = beacon.Status.Delegates[:len(beacon.Status.Delegates)-1]
+			_, err := beacons.UpdateStatus(beacon)
+			return err
+		}
 	}
 
 	return nil
@@ -65,7 +77,7 @@ func ToggleBeacon(beacon *planv1alpha1.Beacon, active bool, beacons plancontroll
 }
 
 // AuthorizedForBeacon returns true if the beacon is owned by the desired owner.
-// If desiredOwner is empty string, validates nothing is holding beacon.
+// If desired is empty string, validates nothing is holding beacon.
 func AuthorizedForBeacon(beacon *planv1alpha1.Beacon, desired string) bool {
 	if IsDelegateBeaconHolder(beacon, desired) {
 		return true
@@ -80,6 +92,24 @@ func IsOwningBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
 	}
 
 	return beacon.Status.Owner == desired
+}
+
+func IsActiveBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
+	if beacon == nil {
+		return false
+	}
+
+	if beacon.Status.Owner == desired {
+		return true
+	}
+
+	if len(beacon.Status.Delegates) > 0 {
+		if beacon.Status.Delegates[len(beacon.Status.Delegates)-1] == desired {
+			return true
+		}
+	}
+
+	return false
 }
 
 func IsDelegateBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
@@ -154,4 +184,17 @@ func PopDelegate(beacon *planv1alpha1.Beacon, delegate string, beacons plancontr
 	beacon.Status.Delegates = beacon.Status.Delegates[:len(beacon.Status.Delegates)-1]
 	beacon, err := beacons.UpdateStatus(beacon)
 	return beacon, err
+}
+
+func ControllerOwnerKey(obj metav1.Object, prefix string) string {
+	if obj == nil {
+		return ""
+	}
+
+	key := obj.GetName()
+	if namespace := obj.GetNamespace(); namespace != "" {
+		key = namespace + "/" + key
+	}
+
+	return prefix + "/" + key
 }
