@@ -114,7 +114,9 @@ func defaultAdapter() *stubAdapter {
 	}
 }
 
-// newScope wires together the common per-reconcile context for the tests.
+// newScope wires together the common per-reconcile context for the tests. The ownerKey mirrors
+// what the real controller computes in onChange (plan.ControllerOwnerKey(op, ControllerOwnerKey))
+// so beacon fixtures created with `testOwnerKey` will match ownership + delegate checks.
 func newScope(op *opv1alpha1.ETCDSnapshotSave, beacon *planv1alpha1.Beacon, adapter *stubAdapter) *scope {
 	cluster := &unstructured.Unstructured{}
 	cluster.SetName("test")
@@ -122,6 +124,7 @@ func newScope(op *opv1alpha1.ETCDSnapshotSave, beacon *planv1alpha1.Beacon, adap
 	cluster.SetAPIVersion("provisioning.cattle.io/v1")
 	cluster.SetKind("Cluster")
 	return &scope{
+		ownerKey:   planapi.ControllerOwnerKey(op, ControllerOwnerKey),
 		op:         op,
 		beacon:     beacon,
 		namespace:  "fleet-default",
@@ -129,6 +132,11 @@ func newScope(op *opv1alpha1.ETCDSnapshotSave, beacon *planv1alpha1.Beacon, adap
 		adapter:    adapter,
 	}
 }
+
+// testOwnerKey is the fully-qualified beacon owner key for the canonical `newOp()` operation.
+// Tests that want to build a beacon owned by "us" pass this to newBeacon, instead of the plain
+// ControllerOwnerKey prefix which no longer matches what the handler computes at reconcile time.
+var testOwnerKey = planapi.ControllerOwnerKey(newOp(), ControllerOwnerKey)
 
 func newOp() *opv1alpha1.ETCDSnapshotSave {
 	return &opv1alpha1.ETCDSnapshotSave{
@@ -370,7 +378,7 @@ func TestHandlePending_WaitingForRegistration(t *testing.T) {
 	adapter.waitForRegisterOK = false
 
 	h := &handler{beacons: beacons}
-	s := newScope(newOp(), newBeacon(ControllerOwnerKey, false), adapter)
+	s := newScope(newOp(), newBeacon(testOwnerKey, false), adapter)
 
 	got, err := h.handlePending(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -385,7 +393,7 @@ func TestHandlePending_TransitionsToInProgress(t *testing.T) {
 	h := &handler{beacons: beacons}
 	a := defaultAdapter()
 	a.waitForRegisterOK = true
-	s := newScope(newOp(), newBeacon(ControllerOwnerKey, false), a)
+	s := newScope(newOp(), newBeacon(testOwnerKey, false), a)
 
 	got, err := h.handlePending(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
@@ -402,7 +410,7 @@ func TestHandlePending_WaitForRegisterErrorBubbles(t *testing.T) {
 	adapter.waitForRegisterOK = false
 
 	h := &handler{beacons: &fakeBeaconClient{}}
-	_, err := h.handlePending(newScope(newOp(), newBeacon(ControllerOwnerKey, false), adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	_, err := h.handlePending(newScope(newOp(), newBeacon(testOwnerKey, false), adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.ErrorIs(t, err, sentinel)
 }
 
@@ -427,7 +435,7 @@ func TestHandleInProgress_UnknownStep(t *testing.T) {
 	h := &handler{beacons: &fakeBeaconClient{}}
 	op := newOp()
 	op.Status.Step = "Whatever"
-	s := newScope(op, newBeacon(ControllerOwnerKey, false), defaultAdapter())
+	s := newScope(op, newBeacon(testOwnerKey, false), defaultAdapter())
 
 	got, err := h.handleInProgress(s, opv1alpha1.ETCDSnapshotSaveStatus{Step: "Whatever"})
 	assert.NoError(t, err)
@@ -442,16 +450,15 @@ func TestHandleFailed_HoldingBeaconReleases(t *testing.T) {
 
 	beacons := &fakeBeaconClient{}
 	h := &handler{beacons: beacons}
-	s := newScope(newOp(), newBeacon(ControllerOwnerKey, true), defaultAdapter())
+	s := newScope(newOp(), newBeacon(testOwnerKey, true), defaultAdapter())
 
 	_, err := h.handleFailed(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
-	// Both ToggleBeacon(active=false) and ReleaseBeacon now route through UpdateStatus
-	// (Status.Owner is the source of truth for ownership), so we expect two status updates and
-	// no main-resource updates.
-	if assert.Len(t, beacons.statusUpdates, 2, "ToggleBeacon + ReleaseBeacon should both update the beacon status") {
-		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive")
-		assert.Equal(t, "", beacons.statusUpdates[1].Status.Owner, "Status.Owner must be cleared on release")
+	// ReleaseBeacon on the owner path clears Active + Owner + Delegates in a single UpdateStatus
+	// call, so we expect exactly one status update and no main-resource update.
+	if assert.Len(t, beacons.statusUpdates, 1, "ReleaseBeacon should update the beacon status") {
+		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive on release")
+		assert.Equal(t, "", beacons.statusUpdates[0].Status.Owner, "Status.Owner must be cleared on release")
 	}
 	assert.Empty(t, beacons.updates, "ReleaseBeacon no longer touches the main resource")
 }
@@ -489,14 +496,15 @@ func TestHandleSucceeded_HoldingBeaconEnqueuesCluster(t *testing.T) {
 	beacons := &fakeBeaconClient{}
 	dyn := &fakeDynamic{}
 	h := &handler{beacons: beacons, dynamic: dyn}
-	s := newScope(newOp(), newBeacon(ControllerOwnerKey, true), defaultAdapter())
+	s := newScope(newOp(), newBeacon(testOwnerKey, true), defaultAdapter())
 
 	_, err := h.handleSucceeded(s, opv1alpha1.ETCDSnapshotSaveStatus{})
 	assert.NoError(t, err)
-	// Both ToggleBeacon(active=false) and ReleaseBeacon route through UpdateStatus now.
-	if assert.Len(t, beacons.statusUpdates, 2, "ToggleBeacon + ReleaseBeacon should both update the beacon status") {
-		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive on success")
-		assert.Equal(t, "", beacons.statusUpdates[1].Status.Owner, "Status.Owner must be cleared on release")
+	// ReleaseBeacon on the owner path clears Active + Owner + Delegates in a single UpdateStatus
+	// call.
+	if assert.Len(t, beacons.statusUpdates, 1, "ReleaseBeacon should update the beacon status") {
+		assert.False(t, beacons.statusUpdates[0].Status.Active, "beacon must be toggled inactive on release")
+		assert.Equal(t, "", beacons.statusUpdates[0].Status.Owner, "Status.Owner must be cleared on release")
 	}
 	assert.Empty(t, beacons.updates, "ReleaseBeacon no longer touches the main resource")
 	if assert.Len(t, dyn.enqueued, 1, "parent cluster must be re-enqueued") {

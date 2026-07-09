@@ -806,9 +806,10 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 		return status, nil
 	}
 
-	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
-		if err != nil {
+	// Owner and mid-chain delegates both go through ReleaseBeacon: it clears the beacon fully
+	// for the owner, or removes the delegate slot from the chain otherwise.
+	if plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -833,9 +834,11 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 		return status, nil
 	}
 
-	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
-		if err != nil {
+	// ReleaseBeacon does the appropriate cleanup in a single UpdateStatus call: if we're the
+	// owner it clears Active + Owner + Delegates; if we're in the delegate chain it removes us
+	// from the chain (any position). The owner-vs-chain guard just avoids the no-op call.
+	if plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -843,10 +846,11 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 	return status, nil
 }
 
-// handleSucceeded mirrors handleFailed for the Succeeded terminal phase: toggles the beacon off,
-// releases ownership, and then nudges the parent cluster controller (snapshotbackpopulate, RKE
-// controlplane, etc.) by enqueueing the cluster object so any post-operation reconciliation runs
-// promptly rather than waiting for the next periodic resync.
+// handleSucceeded mirrors handleFailed for the Succeeded terminal phase: releases the beacon
+// (owner path clears it fully, delegate path pops us off the chain) and, on the owner path,
+// nudges the parent cluster controller (snapshotbackpopulate, RKE controlplane, etc.) by
+// enqueueing the cluster object so any post-operation reconciliation runs promptly rather than
+// waiting for the next periodic resync.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
@@ -860,12 +864,15 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveSt
 		return status, nil
 	}
 
-	if plan.IsActiveBeaconHolder(s.beacon, s.ownerKey) {
-		err = plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
-		if err != nil {
+	// Owner and mid-chain delegates both go through ReleaseBeacon; only the owner enqueues the
+	// parent cluster, since only the owner terminating implies downstream reconciliation.
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
+	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
-
+	}
+	if owning {
 		// enqueue original object to ensure it is processed by requisite controllers
 		gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
 		_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())

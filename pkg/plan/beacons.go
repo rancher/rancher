@@ -31,9 +31,15 @@ func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 	return beacons.UpdateStatus(beacon)
 }
 
-// ReleaseBeacon releases a beacon if it is owned by the expected owner.
-// Will also remove the beacon from the delegate chain if it is actively delegated.
-// If the beacon is not owned by the expected owner, no action is taken.
+// ReleaseBeacon releases a beacon on behalf of `expected`:
+//   - If `expected` is the primary owner, the beacon is fully torn down (Active=false, Owner="",
+//     Delegates=nil).
+//   - Otherwise, if `expected` appears anywhere in the delegate chain, it is removed from the
+//     chain. This is broader than PopDelegate (which only pops the top) because a terminating
+//     operation may hold a mid-chain slot — its dependent delegates should already have popped
+//     themselves off by the time we run cleanup, but if they haven't we still need to prevent
+//     leaking our own reference.
+//   - If `expected` is neither the owner nor in the chain, no action is taken.
 func ReleaseBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, expected string) error {
 	if beacon == nil {
 		return nil
@@ -50,14 +56,23 @@ func ReleaseBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 		return err
 	}
 
-	// only remove if actively delegated
-	if len(beacon.Status.Delegates) > 0 {
-		if beacon.Status.Delegates[len(beacon.Status.Delegates)-1] == expected {
-			beacon = beacon.DeepCopy()
-			beacon.Status.Delegates = beacon.Status.Delegates[:len(beacon.Status.Delegates)-1]
-			_, err := beacons.UpdateStatus(beacon)
-			return err
+	// Remove every occurrence of `expected` from the delegate chain. Under normal operation
+	// there is at most one, but the loop is cheap and covers the pathological case where a
+	// controller pushed itself onto the chain twice.
+	removed := false
+	filtered := beacon.Status.Delegates[:0:0]
+	for _, delegate := range beacon.Status.Delegates {
+		if delegate == expected {
+			removed = true
+			continue
 		}
+		filtered = append(filtered, delegate)
+	}
+	if removed {
+		beacon = beacon.DeepCopy()
+		beacon.Status.Delegates = filtered
+		_, err := beacons.UpdateStatus(beacon)
+		return err
 	}
 
 	return nil
