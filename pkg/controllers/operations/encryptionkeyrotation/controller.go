@@ -48,6 +48,19 @@ const (
 	RestartStepHookLabelPrefix = "restart.step.hook.operation.cattle.io/"
 )
 
+// stepHookPrefixFor returns the step-hook label prefix for the given rotation step, or "" for an
+// unknown / empty step. Used by handleInProgress to decide whether beacon-authorization loss is
+// explained by an active step-scoped delegation vs a genuine loss.
+func stepHookPrefixFor(step opv1alpha1.EncryptionKeyRotationStep) string {
+	switch step {
+	case opv1alpha1.EncryptionKeyRotationStepRotate:
+		return RotateStepHookLabelPrefix
+	case opv1alpha1.EncryptionKeyRotationStepRestart:
+		return RestartStepHookLabelPrefix
+	}
+	return ""
+}
+
 // dynamicResolver is the subset of *dynamic.Controller this handler needs:
 // Get for resolving cluster refs and Enqueue for nudging the backing cluster
 // after terminal beacon transitions.
@@ -274,30 +287,37 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		return status, err
 	}
 
-	beacon, err := plan.AcquireBeacon(s.beacon, h.beacons, ownerKey)
-	if err != nil {
-		return status, err
-	}
-	if beacon == nil {
-		opv1alpha1.PendingCondition.True(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
-		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon acquisition")
-		return status, nil
+	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
+	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
+	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise attempt to acquire;
+	// a nil return means another controller currently owns it and we must keep waiting.
+	if !plan.IsInDelegateChain(s.beacon, ownerKey) {
+		acquired, err := plan.AcquireBeacon(s.beacon, h.beacons, ownerKey)
+		if err != nil {
+			return status, err
+		}
+		if acquired == nil {
+			opv1alpha1.PendingCondition.True(&status)
+			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
+			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon acquisition")
+			return status, nil
+		}
+		s.beacon = acquired
 	}
 
 	desiredOwnerRef := fmt.Sprintf("%s/%s/%s", s.op.Namespace, s.op.Name, s.op.UID)
-	if beacon.Annotations == nil || beacon.Annotations[beaconOwnerRefAnnotation] != desiredOwnerRef {
-		beacon = beacon.DeepCopy()
+	if s.beacon.Annotations == nil || s.beacon.Annotations[beaconOwnerRefAnnotation] != desiredOwnerRef {
+		beacon := s.beacon.DeepCopy()
 		if beacon.Annotations == nil {
 			beacon.Annotations = map[string]string{}
 		}
 		beacon.Annotations[beaconOwnerRefAnnotation] = desiredOwnerRef
-		beacon, err = h.beacons.Update(beacon)
+		updated, err := h.beacons.Update(beacon)
 		if err != nil {
 			return status, err
 		}
+		s.beacon = updated
 	}
-	s.beacon = beacon
 
 	// Pending-phase hook fires after beacon acquisition + owner-ref tagging so a delegate can
 	// inspect the recorded ownership before the controller starts driving the rotation.
@@ -335,13 +355,27 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	if !plan.AuthorizedForBeacon(s.beacon, beaconOwnerKey(s.op)) {
+	ownerKey := beaconOwnerKey(s.op)
+	stepPrefix := stepHookPrefixFor(s.op.Status.Step)
+
+	// Stage 1 (loose): the op must appear SOMEWHERE in the ownership chain (owner or any
+	// delegate). Being absent entirely means the beacon was reassigned to another controller and
+	// we can't recover. If a step hook is currently active on the op, treat the absence as a
+	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
+	// have popped us in service of the hook and will restore ownership when the hook clears.
+	if !plan.IsOwningBeaconHolder(s.beacon, ownerKey) && !plan.IsInDelegateChain(s.beacon, ownerKey) {
+		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+			opv1alpha1.InProgressCondition.True(&status)
+			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+			return status, nil
+		}
 		status.Phase = opv1alpha1.OperationPhaseFailed
 		status.LastUpdated = metav1.Now()
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
-		opv1alpha1.FailedCondition.Message(&status, "beacon acquired by another controller, aborting")
+		opv1alpha1.FailedCondition.Message(&status, "beacon reassigned, aborting")
 
 		return status, nil
 	}
@@ -362,6 +396,27 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 		opv1alpha1.InProgressCondition.True(&status)
 		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	// Stage 2 (strict): after the InProgress-phase hook has been handled, the op must be the
+	// primary owner or the most-recent delegate on the chain to drive step work. If a step hook
+	// is still active on the op, treat the missing-top state as an intentional delegation and
+	// wait; otherwise this is a genuine beacon loss and we fail.
+	if !plan.AuthorizedForBeacon(s.beacon, ownerKey) {
+		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+			opv1alpha1.InProgressCondition.True(&status)
+			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+			return status, nil
+		}
+		status.Phase = opv1alpha1.OperationPhaseFailed
+		status.LastUpdated = metav1.Now()
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
+		opv1alpha1.FailedCondition.Message(&status, "beacon acquired by another controller, aborting")
+
 		return status, nil
 	}
 

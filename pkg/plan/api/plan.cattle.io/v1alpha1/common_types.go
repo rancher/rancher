@@ -115,6 +115,23 @@ func HasActiveLifecycleHook(obj metav1.Object) bool {
 	return false
 }
 
+// HasStepHookLabel reports whether obj carries at least one label whose key begins with the given
+// step-hook prefix (e.g. "rotate.step.hook.operation.cattle.io/"). Callers use this to detect
+// that the operation is in the middle of a step-scoped delegation and thus the operation may not
+// currently sit at the top of the beacon's delegate chain — the delegate the step hook pushed is
+// there instead. An empty prefix returns false (no label match).
+func HasStepHookLabel(obj metav1.Object, stepPrefix string) bool {
+	if obj == nil || stepPrefix == "" {
+		return false
+	}
+	for k := range obj.GetLabels() {
+		if strings.HasPrefix(k, stepPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // ObjToMachineLifecycleLabels returns the three-key lifecycle-label map that identifies a machine
 // object. Kind + Group are read from the object's TypeMeta; cache-fetched objects typically have
 // empty TypeMeta and callers must repopulate it before calling this.
