@@ -96,7 +96,7 @@ sources:
     dependson:
       - 'wins-release'
     spec:
-      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256sum.txt | grep " wins.exe$" | cut -d " " -f1'
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256.txt | grep " wins.exe$" | cut -d " " -f1'
 
   wins-checksum-install:
     name: 'Get sha256 for install.ps1 from {{ source "wins-release" }}'
@@ -104,7 +104,7 @@ sources:
     dependson:
       - 'wins-release'
     spec:
-      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256sum.txt | grep " install.ps1$" | cut -d " " -f1'
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256.txt | grep " install.ps1$" | cut -d " " -f1'
 
   wins-checksum-uninstall:
     name: 'Get sha256 for uninstall.ps1 from {{ source "wins-release" }}'
@@ -112,7 +112,7 @@ sources:
     dependson:
       - 'wins-release'
     spec:
-      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256sum.txt | grep " uninstall.ps1$" | cut -d " " -f1'
+      command: 'curl -sLf https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}/releases/download/{{ source "wins-release" }}/sha256.txt | grep " uninstall.ps1$" | cut -d " " -f1'
 
   system-agent-checksum-amd64:
     name: 'Get sha256 for rancher-system-agent-amd64 from {{ source "system-agent-release" }}'
