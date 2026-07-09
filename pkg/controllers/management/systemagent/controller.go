@@ -56,12 +56,6 @@ const (
 	systemAgentPlanEnvSecretName              = "stv-aggregation"
 	disableBeaconOwnerKey                     = "imported-day2ops-disable"
 	importedDay2OpsDisableRequeueInterval     = 5 * time.Second
-
-	importedCleaningStateOperations   = "operations"
-	importedCleaningStateBeacon       = "beacon"
-	importedCleaningStateMachinePlans = "machine-plans"
-	importedCleaningStateUninstall    = "uninstall"
-	importedCleaningStateSUC          = "suc"
 )
 
 var (
@@ -289,7 +283,7 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		if !needed {
 			return h.clearClusterAnnotations(cluster)
 		}
-		cluster, err = h.setCleaningState(cluster, importedCleaningStateOperations)
+		cluster, err = h.setCleaningState(cluster, apimgmtv3.ImportedDay2OpsCleaningStateOperations)
 		if err != nil {
 			return cluster, err
 		}
@@ -298,7 +292,7 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 	}
 
 	switch state {
-	case importedCleaningStateOperations:
+	case apimgmtv3.ImportedDay2OpsCleaningStateOperations:
 		beacon, err := h.beaconCache.Get(cluster.Name, cluster.Name)
 		if apierrors.IsNotFound(err) {
 			beacon = nil
@@ -331,14 +325,14 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 			return cluster, nil
 		}
 
-		cluster, err = h.setCleaningState(cluster, importedCleaningStateUninstall)
+		cluster, err = h.setCleaningState(cluster, apimgmtv3.ImportedDay2OpsCleaningStateUninstall)
 		if err != nil {
 			return cluster, err
 		}
 		h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
 		return cluster, nil
 
-	case importedCleaningStateUninstall:
+	case apimgmtv3.ImportedDay2OpsCleaningStateUninstall:
 		clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)
 		if err != nil {
 			return cluster, err
@@ -362,14 +356,14 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 			return cluster, nil
 		}
 
-		cluster, err = h.setCleaningState(cluster, importedCleaningStateSUC)
+		cluster, err = h.setCleaningState(cluster, apimgmtv3.ImportedDay2OpsCleaningStateSUC)
 		if err != nil {
 			return cluster, err
 		}
 		h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
 		return cluster, nil
 
-	case importedCleaningStateSUC:
+	case apimgmtv3.ImportedDay2OpsCleaningStateSUC:
 		clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)
 		if err != nil {
 			return cluster, err
@@ -381,14 +375,14 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 			return cluster, nil
 		}
 
-		cluster, err = h.setCleaningState(cluster, importedCleaningStateMachinePlans)
+		cluster, err = h.setCleaningState(cluster, apimgmtv3.ImportedDay2OpsCleaningStateMachinePlans)
 		if err != nil {
 			return cluster, err
 		}
 		h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
 		return cluster, nil
 
-	case importedCleaningStateMachinePlans:
+	case apimgmtv3.ImportedDay2OpsCleaningStateMachinePlans:
 		if remaining, err := h.deleteMachinePlans(cluster.Name); err != nil {
 			return cluster, err
 		} else if remaining {
@@ -396,14 +390,14 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 			return cluster, nil
 		}
 
-		cluster, err := h.setCleaningState(cluster, importedCleaningStateBeacon)
+		cluster, err := h.setCleaningState(cluster, apimgmtv3.ImportedDay2OpsCleaningStateBeacon)
 		if err != nil {
 			return cluster, err
 		}
 		h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
 		return cluster, nil
 
-	case importedCleaningStateBeacon:
+	case apimgmtv3.ImportedDay2OpsCleaningStateBeacon:
 		if remaining, err := h.deleteBeacon(cluster.Name); err != nil {
 			return cluster, err
 		} else if remaining {
@@ -414,7 +408,7 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		return h.clearClusterAnnotations(cluster)
 
 	default:
-		cluster, err := h.setCleaningState(cluster, importedCleaningStateOperations)
+		cluster, err := h.setCleaningState(cluster, apimgmtv3.ImportedDay2OpsCleaningStateOperations)
 		if err != nil {
 			return cluster, err
 		}
@@ -446,7 +440,60 @@ func (h *handler) disableNeeded(cluster *apimgmtv3.Cluster) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return len(machinePlans) > 0, nil
+	if len(machinePlans) > 0 {
+		return true, nil
+	}
+
+	serviceAccounts, err := h.importedPlanServiceAccounts(cluster.Name)
+	if err != nil {
+		return false, err
+	}
+	if len(serviceAccounts) > 0 {
+		return true, nil
+	}
+
+	secrets, err := h.secretCache.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return false, err
+	}
+	for i := range secrets {
+		if secrets[i].Type != corev1.SecretTypeServiceAccountToken {
+			continue
+		}
+		if strings.HasSuffix(secrets[i].Labels[serviceaccounttoken.ServiceAccountSecretLabel], "-machine-plan") {
+			return true, nil
+		}
+	}
+
+	roles, err := h.roles.List(cluster.Name, metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for i := range roles.Items {
+		if strings.HasSuffix(roles.Items[i].Name, "-machine-plan") {
+			return true, nil
+		}
+	}
+
+	roleBindings, err := h.roleBindings.List(cluster.Name, metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for i := range roleBindings.Items {
+		if !strings.HasSuffix(roleBindings.Items[i].Name, "-machine-plan") {
+			continue
+		}
+		for j := range roleBindings.Items[i].Subjects {
+			subject := roleBindings.Items[i].Subjects[j]
+			if subject.Kind == "ServiceAccount" &&
+				subject.Name == roleBindings.Items[i].Name &&
+				(subject.Namespace == "" || subject.Namespace == cluster.Name) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 // hasOperations reports whether any imported day2ops operation CRs still reference the cluster.
@@ -615,6 +662,9 @@ func (h *handler) deleteImportedPlanIdentity(serviceAccount *corev1.ServiceAccou
 		return err
 	}
 	for i := range tokenSecrets {
+		if tokenSecrets[i].Type != corev1.SecretTypeServiceAccountToken {
+			continue
+		}
 		if tokenSecrets[i].DeletionTimestamp != nil {
 			continue
 		}

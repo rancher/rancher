@@ -5,15 +5,22 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	rbaccontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestDisableBeaconWait(t *testing.T) {
@@ -83,7 +90,7 @@ func TestShouldReconcileImportedDisable(t *testing.T) {
 	}
 	if !shouldReconcileImportedDisable(map[string]string{
 		day2OpsEnabledAnnotation:        "true",
-		importedCleaningStateAnnotation: importedCleaningStateOperations,
+		importedCleaningStateAnnotation: apimgmtv3.ImportedDay2OpsCleaningStateOperations,
 	}) {
 		t.Fatalf("expected cleaning state to keep disable reconciliation sticky")
 	}
@@ -389,6 +396,111 @@ func TestDeleteOperationsReturnsFalseWhenNoOperationsExist(t *testing.T) {
 	}
 }
 
+func TestDisableNeededReturnsTrueForLeftoverImportedPlanIdentity(t *testing.T) {
+	t.Parallel()
+
+	cluster := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}}
+
+	h := &handler{
+		beaconCache:              &fakeBeaconCache{notFound: true},
+		etcdSnapshotSaveCache:    &fakeETCDSnapshotSaveCache{},
+		etcdSnapshotRestoreCache: &fakeETCDSnapshotRestoreCache{},
+		encryptionRotationCache:  &fakeEncryptionKeyRotationCache{},
+		secretCache: &fakeSecretCache{
+			items: []*corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "c-m-test",
+						Name:      "leftover-machine-plan-token",
+						Labels: map[string]string{
+							serviceaccounttoken.ServiceAccountSecretLabel: "leftover-machine-plan",
+						},
+					},
+					Type: corev1.SecretTypeServiceAccountToken,
+				},
+			},
+		},
+		serviceAccountCache: &fakeServiceAccountCache{},
+		roles: &fakeRoleClient{
+			items: []rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "leftover-machine-plan", Namespace: "c-m-test"}},
+			},
+		},
+		roleBindings: &fakeRoleBindingClient{
+			items: []rbacv1.RoleBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "leftover-machine-plan", Namespace: "c-m-test"},
+					Subjects: []rbacv1.Subject{
+						{Kind: "ServiceAccount", Name: "leftover-machine-plan", Namespace: "c-m-test"},
+					},
+				},
+			},
+		},
+	}
+
+	needed, err := h.disableNeeded(cluster)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !needed {
+		t.Fatalf("expected disableNeeded to keep reconciling for leftover imported plan identity resources")
+	}
+}
+
+func TestDeleteImportedPlanIdentityDeletesOnlyServiceAccountTokenSecrets(t *testing.T) {
+	t.Parallel()
+
+	h := &handler{
+		secretCache: &fakeSecretCache{
+			items: []*corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "c-m-test",
+						Name:      "plan-token",
+						Labels: map[string]string{
+							serviceaccounttoken.ServiceAccountSecretLabel: "node-machine-plan",
+						},
+					},
+					Type: corev1.SecretTypeServiceAccountToken,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "c-m-test",
+						Name:      "plan-opaque",
+						Labels: map[string]string{
+							serviceaccounttoken.ServiceAccountSecretLabel: "node-machine-plan",
+						},
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+			},
+		},
+		secrets:         &fakeSecretClient{},
+		roleBindings:    &fakeRoleBindingClient{},
+		roles:           &fakeRoleClient{},
+		serviceAccounts: &fakeServiceAccountClient{},
+	}
+
+	err := h.deleteImportedPlanIdentity(&corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "node-machine-plan",
+			Namespace: "c-m-test",
+			Labels: map[string]string{
+				capr.RoleLabel:        capr.RolePlan,
+				capr.ClusterNameLabel: "c-m-test",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	secretClient := h.secrets.(*fakeSecretClient)
+	if len(secretClient.deleted) != 1 || secretClient.deleted[0] != (namespacedName{namespace: "c-m-test", name: "plan-token"}) {
+		t.Fatalf("expected only service-account token secret to be deleted, got %+v", secretClient.deleted)
+	}
+}
+
 func renderedPlans(objs []runtime.Object) []*upgradev1.Plan {
 	plans := make([]*upgradev1.Plan, 0, len(objs))
 	for i := range objs {
@@ -504,6 +616,101 @@ type fakeEncryptionKeyRotationClient struct {
 }
 
 func (f *fakeEncryptionKeyRotationClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
+	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
+	return f.err
+}
+
+type fakeBeaconCache struct {
+	plancontrollers.BeaconCache
+	beacon    *planv1alpha1.Beacon
+	err       error
+	notFound  bool
+	namespace string
+	name      string
+}
+
+func (f *fakeBeaconCache) Get(namespace, name string) (*planv1alpha1.Beacon, error) {
+	f.namespace = namespace
+	f.name = name
+	if f.notFound {
+		return nil, apierrors.NewNotFound(schema.GroupResource{
+			Group:    planv1alpha1.SchemeGroupVersion.Group,
+			Resource: "beacons",
+		}, name)
+	}
+	return f.beacon, f.err
+}
+
+type fakeSecretCache struct {
+	corecontrollers.SecretCache
+	items []*corev1.Secret
+	err   error
+}
+
+func (f *fakeSecretCache) List(string, labels.Selector) ([]*corev1.Secret, error) {
+	return f.items, f.err
+}
+
+type fakeSecretClient struct {
+	corecontrollers.SecretClient
+	deleted []namespacedName
+	err     error
+}
+
+func (f *fakeSecretClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
+	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
+	return f.err
+}
+
+type fakeServiceAccountCache struct {
+	corecontrollers.ServiceAccountCache
+	items []*corev1.ServiceAccount
+	err   error
+}
+
+func (f *fakeServiceAccountCache) List(string, labels.Selector) ([]*corev1.ServiceAccount, error) {
+	return f.items, f.err
+}
+
+type fakeServiceAccountClient struct {
+	corecontrollers.ServiceAccountClient
+	deleted []namespacedName
+	err     error
+}
+
+func (f *fakeServiceAccountClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
+	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
+	return f.err
+}
+
+type fakeRoleClient struct {
+	rbaccontrollers.RoleClient
+	items   []rbacv1.Role
+	deleted []namespacedName
+	err     error
+}
+
+func (f *fakeRoleClient) List(string, metav1.ListOptions) (*rbacv1.RoleList, error) {
+	return &rbacv1.RoleList{Items: f.items}, f.err
+}
+
+func (f *fakeRoleClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
+	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
+	return f.err
+}
+
+type fakeRoleBindingClient struct {
+	rbaccontrollers.RoleBindingClient
+	items   []rbacv1.RoleBinding
+	deleted []namespacedName
+	err     error
+}
+
+func (f *fakeRoleBindingClient) List(string, metav1.ListOptions) (*rbacv1.RoleBindingList, error) {
+	return &rbacv1.RoleBindingList{Items: f.items}, f.err
+}
+
+func (f *fakeRoleBindingClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
 	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
 	return f.err
 }

@@ -273,8 +273,9 @@ func waitForDownstreamSystemAgentPlanUninstallMode(
 		return lastUninstallCount == 1 && lastUninstallValue == expectedUninstall, nil
 	})
 	if err != nil {
+		planState := dumpDownstreamSystemAgentPlanState(clients, namespace, podName, kubectlEnv)
 		t.Fatalf(
-			"timed out waiting for downstream plan %s UNINSTALL=%s exactly once on pod %s/%s: %v (lastUninstallCount=%d lastUninstallValue=%q lastErr=%v output=%q)",
+			"timed out waiting for downstream plan %s UNINSTALL=%s exactly once on pod %s/%s: %v (lastUninstallCount=%d lastUninstallValue=%q lastErr=%v output=%q planState=%q)",
 			systemAgentUpgraderPlanName,
 			expectedUninstall,
 			namespace,
@@ -284,8 +285,28 @@ func waitForDownstreamSystemAgentPlanUninstallMode(
 			lastUninstallValue,
 			lastErr,
 			strings.TrimSpace(lastOutput),
+			planState,
 		)
 	}
+}
+
+func dumpDownstreamSystemAgentPlanState(clients *clients.Clients, namespace, podName, kubectlEnv string) string {
+	output, err := cluster.ExecOnPod(
+		clients,
+		namespace,
+		podName,
+		"sh",
+		"-c",
+		fmt.Sprintf(
+			"export %s && kubectl -n cattle-system get plans.upgrade.cattle.io %s --ignore-not-found -o jsonpath='name={.metadata.name}{\"\\n\"}generation={.metadata.generation}{\"\\n\"}resourceVersion={.metadata.resourceVersion}{\"\\n\"}latestHash={.status.latestHash}{\"\\n\"}latestVersion={.status.latestVersion}{\"\\n\"}applying={.status.applying}{\"\\n\"}conditions={range .status.conditions[*]}{.type}={.status}:{.reason}:{.message}{\"\\n\"}{end}envs={range .spec.upgrade.envs[*]}{.name}={.value}{\"\\n\"}{end}'",
+			kubectlEnv,
+			systemAgentUpgraderPlanName,
+		),
+	)
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return strings.TrimSpace(output)
 }
 
 func waitForClusterAnnotationValue(t *testing.T, clients *clients.Clients, clusterName, annotation, expected string, timeout time.Duration) *v3.Cluster {
