@@ -459,6 +459,10 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	return status, nil
 }
 
+// reconcilePreflight is responsible for determining if an etcd snapshot taken on this node may be restored.
+// It will grep for the `token` key in both the config file and directory (e.g., /etc/rancher/rke2/config.yaml &
+// /etc/rancher/rke2/config.yaml.d).
+// It will validate both json and yaml formatted config files.
 func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
 

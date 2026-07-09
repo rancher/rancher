@@ -98,7 +98,8 @@ func ResolveMgmtTokenCaller(
 	ownerNS := mgmtCluster.Labels[capr.CAPIClusterOwnerNSLabel]
 
 	// Both labels must be set together — mixed state is misconfiguration and we refuse to
-	// silently default to "imported", which is exactly today's regex-based failure mode.
+	// silently default to "imported", which has historically been the case with the prior
+	// regex-based failure mode.
 	if (ownerName == "") != (ownerNS == "") {
 		return nil, fmt.Errorf(
 			"mgmt cluster %s carries only one of %s/%s; both must be set for a CAPI-native cluster",
