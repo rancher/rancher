@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Provision the local k3d cluster the CAPRKE2 v2prov test targets. Idempotent.
+#
+# The cluster is created on the `kind` docker network (CAPD hardcodes that name — see
+# sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/docker/manager.go `DefaultNetwork`)
+# with the host docker socket bind-mounted into the server node (CAPD's upstream manager.yaml
+# mounts /var/run/docker.sock via hostPath, so the node must expose it). Together these two
+# invariants let CAPD's controller pod reach the host docker daemon AND route to the workload
+# containers CAPD spawns.
+#
+# After this script exits:
+#   1. Run Rancher locally (`dev-scripts/quick` or a GoLand target). Rancher will pick up the
+#      k3d kubeconfig from ~/.kube/config and install Turtles into the cluster.
+#   2. `make install-caprke2-providers` — installs CAPI + CAPD + CAPRKE2 providers.
+#   3. `V2PROV_TEST_CAPRKE2=true go test -v \
+#          -run '^Test_Operation_SetE_CAPRKE2DockerOperations$' \
+#          ./tests/v2prov/tests/imported/...`
+#
+# Environment:
+#   CAPRKE2_DEV_CLUSTER — k3d cluster name (default: local-caprke2).
+#   K3S_VERSION         — k3s image tag (default: v1.33.5-k3s1).
+set -eo pipefail
+
+cluster="${CAPRKE2_DEV_CLUSTER:-local-caprke2}"
+k3s_version="${K3S_VERSION:-v1.33.5-k3s1}"
+
+for bin in docker k3d kubectl; do
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    echo "error: '$bin' not found on PATH; install it and re-run." >&2
+    exit 1
+  fi
+done
+
+if ! docker network inspect kind >/dev/null 2>&1; then
+  echo "Creating docker network 'kind' (CAPD hardcodes this name)"
+  docker network create kind >/dev/null
+fi
+
+if k3d cluster list --output json 2>/dev/null | grep -q "\"name\": \"${cluster}\""; then
+  echo "k3d cluster '${cluster}' already exists — reusing"
+else
+  echo "Creating k3d cluster '${cluster}' on the 'kind' network with docker socket mounted"
+  k3d cluster create "${cluster}" \
+    --image "rancher/k3s:${k3s_version}" \
+    --network kind \
+    --volume /var/run/docker.sock:/var/run/docker.sock@server:0 \
+    --k3s-arg "--disable=traefik@server:0"
+fi
+
+# Point the developer's default kubectl context at the new cluster so Rancher, which reads
+# ~/.kube/config, targets it when they start it up next.
+kubectl config use-context "k3d-${cluster}" >/dev/null
+
+cat <<EOF
+
+k3d cluster '${cluster}' ready. Next:
+  1) Start Rancher locally (dev-scripts/quick, or your GoLand run target).
+     Rancher reads ~/.kube/config, which now points at k3d-${cluster}.
+  2) Once Rancher is up and has installed Turtles into the cluster:
+       make install-caprke2-providers
+  3) Then run the test:
+       V2PROV_TEST_CAPRKE2=true go test -v -failfast -timeout 60m \\
+         -run '^Test_Operation_SetE_CAPRKE2DockerOperations\$' \\
+         ./tests/v2prov/tests/imported/...
+
+Teardown when finished:  make dev-env-cleanup
+EOF

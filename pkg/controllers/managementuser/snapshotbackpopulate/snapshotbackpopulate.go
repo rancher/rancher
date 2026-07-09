@@ -20,11 +20,13 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
@@ -33,10 +35,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
@@ -62,9 +66,11 @@ type handler struct {
 	clusterRef corev1.ObjectReference
 
 	dynamic                dynamicClient
+	restMapper             meta.RESTMapper
 	etcdSnapshotCache      rkev1controllers.ETCDSnapshotCache
 	etcdSnapshotController rkev1controllers.ETCDSnapshotController
 	beaconCache            plancontrollers.BeaconCache
+	capiMachineCache       capicontrollers.MachineCache
 
 	nodeCache                  corecontrollers.NodeCache
 	etcdSnapshotFileController k3scontrollers.ETCDSnapshotFileController
@@ -73,20 +79,22 @@ type handler struct {
 
 // Register sets up the v2provisioning snapshot backpopulate controller. This controller is responsible for monitoring
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
-func Register(ctx context.Context, userContext *config.UserContext, cluster *apimgmtv3.Cluster) {
+func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wrangler.CAPIContext, cluster *apimgmtv3.Cluster) {
 	logrus.Debugf("[snapshotbackpopulate] Registering controller for cluster %s", userContext.ClusterName)
 	h := handler{
 		dynamic:                    userContext.Management.Wrangler.Dynamic,
+		restMapper:                 userContext.Management.Wrangler.RESTMapper,
 		etcdSnapshotCache:          userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
 		etcdSnapshotController:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
 		beaconCache:                userContext.Management.Wrangler.Plan.Beacon().Cache(),
+		capiMachineCache:           capiCtx.CAPI.Machine().Cache(),
 		nodeCache:                  userContext.Corew.Node().Cache(),
 		etcdSnapshotFileController: userContext.K3s.V1().ETCDSnapshotFile(),
 		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
 	}
 
-	// todo: find a better way to do this
-	if cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+	switch {
+	case cluster.Annotations["provisioning.cattle.io/administrated"] == "true":
 		provCluster, err := userContext.Management.Wrangler.Provisioning.Cluster().Cache().GetByIndex(provcluster.ByCluster, cluster.Name)
 		if err != nil {
 			logrus.Errorf("error getting provisioning cluster %s: %v", cluster.Name, err)
@@ -96,14 +104,23 @@ func Register(ctx context.Context, userContext *config.UserContext, cluster *api
 			logrus.Errorf("expected 1 provisioning cluster for cluster %s, got %d", cluster.Name, len(provCluster))
 			return
 		}
-		// get provisioning cluster
 		h.clusterRef = corev1.ObjectReference{
 			APIVersion: provCluster[0].APIVersion,
 			Kind:       provCluster[0].Kind,
 			Namespace:  provCluster[0].GetNamespace(),
 			Name:       provCluster[0].GetName(),
 		}
-	} else {
+	case cluster.Labels[capr.CAPIClusterOwnerLabel] != "" && cluster.Labels[capr.CAPIClusterOwnerNSLabel] != "":
+		// Turtles-imported CAPI cluster: the mgmt cluster is a shell whose labels back-reference
+		// the real CAPI Cluster. Use that as the cluster ref so beacon lookups, snapshot owner
+		// references, and lifecycle labels resolve against the CAPI-native object graph.
+		h.clusterRef = corev1.ObjectReference{
+			APIVersion: capi.GroupVersion.String(),
+			Kind:       "Cluster",
+			Namespace:  cluster.Labels[capr.CAPIClusterOwnerNSLabel],
+			Name:       cluster.Labels[capr.CAPIClusterOwnerLabel],
+		}
+	default:
 		h.clusterRef = corev1.ObjectReference{
 			APIVersion: apimgmtv3.SchemeGroupVersion.String(),
 			Kind:       apimgmtv3.Kind("Cluster").Kind,
@@ -139,7 +156,7 @@ func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rke
 	}
 
 	// Abort if anything is holding the beacon
-	if !planapi.HoldingBeacon(beacon, "") {
+	if !planapi.AuthorizedForBeacon(beacon, "") {
 		h.etcdSnapshotController.EnqueueAfter(snapshot.Namespace, snapshot.Name, 1*time.Minute)
 		return snapshot, nil
 	}
@@ -215,7 +232,7 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 	}
 
 	// Abort if anything is holding the beacon
-	if !planapi.HoldingBeacon(beacon, "") {
+	if !planapi.AuthorizedForBeacon(beacon, "") {
 		h.etcdSnapshotFileController.EnqueueAfter(downstream.Name, 1*time.Minute)
 		return downstream, nil
 	}
@@ -459,40 +476,12 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 
 	if storage == Local {
 		if len(upstream.OwnerReferences) == 0 {
-			// make API call to downstream cluster to find node object, and extract lifecycle labels
-			node, err := h.nodeCache.Get(downstream.Spec.NodeName)
+			ownerRef, err := h.machineOwnerReferenceForNode(cluster, downstream.Spec.NodeName)
 			if err != nil {
-				logrus.Errorf("error getting node %s for snapshot %s/%s: %v", downstream.Spec.NodeName, namespace, snapshotName, err)
+				logrus.Errorf("error resolving machine owner for node %s / snapshot %s/%s: %v", downstream.Spec.NodeName, namespace, snapshotName, err)
 				return nil, err
 			}
-
-			ref, err := MachineLifecycleLabelsToObjectReference(node)
-			if err != nil {
-				logrus.Errorf("error getting node reference for snapshot %s/%s: %v", namespace, snapshotName, err)
-				return nil, err
-			}
-
-			o, err := h.dynamic.Get(ref.GroupVersionKind(), ref.Namespace, ref.Name)
-			if err != nil {
-				logrus.Errorf("error getting node %s for snapshot %s/%s: %v", downstream.Spec.NodeName, namespace, snapshotName, err)
-				return nil, err
-			}
-
-			metaObj, err := meta.Accessor(o)
-			if err != nil {
-				logrus.Errorf("error getting node %s for snapshot %s/%s: %v", downstream.Spec.NodeName, namespace, snapshotName, err)
-				return nil, err
-			}
-
-			// set owner reference to local cluster machine representation
-			upstream.OwnerReferences = []metav1.OwnerReference{
-				{
-					APIVersion: ref.APIVersion,
-					Kind:       ref.Kind,
-					Name:       ref.Name,
-					UID:        metaObj.GetUID(),
-				},
-			}
+			upstream.OwnerReferences = []metav1.OwnerReference{ownerRef}
 		}
 		upstream.Labels[capr.NodeNameLabel] = downstream.Spec.NodeName
 	} else {
@@ -515,6 +504,72 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 	}
 
 	return upstream, nil
+}
+
+// machineOwnerReferenceForNode returns the owner reference (a machine-like object) that a local
+// etcd snapshot from the given downstream node should carry. Behaviour differs by cluster ref
+// kind:
+//
+//   - CAPI-native (h.clusterRef is a cluster.x-k8s.io Cluster): look up the CAPI Machine in the
+//     CAPI Cluster's namespace whose Status.NodeRef.Name matches nodeName. The downstream Node's
+//     plan.cattle.io/machine-* labels point at the mgmt v3 Node shell (stamped by nodesyncer),
+//     which is NOT the lifecycle owner we want for CAPI-native clusters.
+//
+//   - Otherwise (v2prov / imported RKE2/K3s): read the downstream Node's MachineLifecycle labels
+//     and dereference to whatever machine object they name (CAPI Machine for v2prov, mgmt v3
+//     Node for imported). This is the pre-existing behaviour.
+func (h *handler) machineOwnerReferenceForNode(cluster *unstructured.Unstructured, nodeName string) (metav1.OwnerReference, error) {
+	if h.clusterRef.APIVersion == capi.GroupVersion.String() && h.clusterRef.Kind == "Cluster" {
+		machines, err := h.capiMachineCache.List(h.clusterRef.Namespace, labels.SelectorFromSet(labels.Set{
+			capi.ClusterNameLabel: h.clusterRef.Name,
+		}))
+		if err != nil {
+			return metav1.OwnerReference{}, err
+		}
+		for _, m := range machines {
+			if m.Status.NodeRef.IsDefined() && m.Status.NodeRef.Name == nodeName {
+				return metav1.OwnerReference{
+					APIVersion: capi.GroupVersion.String(),
+					Kind:       "Machine",
+					Name:       m.Name,
+					UID:        m.UID,
+				}, nil
+			}
+		}
+		return metav1.OwnerReference{}, fmt.Errorf("no CAPI Machine in %s (cluster %s) has NodeRef.Name=%s",
+			h.clusterRef.Namespace, h.clusterRef.Name, nodeName)
+	}
+
+	node, err := h.nodeCache.Get(nodeName)
+	if err != nil {
+		return metav1.OwnerReference{}, err
+	}
+	// Derive the mgmt-side namespace from the clusterRef. For imported RKE2/K3s the clusterRef
+	// points at a cluster-scoped mgmt v3 Cluster, and its mgmt v3 Node lives in the namespace
+	// named after the cluster. For v2prov the clusterRef is namespace-scoped and the CAPI
+	// Machine lives alongside it. (The CAPI-native branch is handled above and never reaches here.)
+	machineNamespace := h.clusterRef.Namespace
+	if machineNamespace == "" {
+		machineNamespace = h.clusterRef.Name
+	}
+	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(node, machineNamespace, h.restMapper)
+	if err != nil {
+		return metav1.OwnerReference{}, err
+	}
+	o, err := h.dynamic.Get(ref.GroupVersionKind(), ref.Namespace, ref.Name)
+	if err != nil {
+		return metav1.OwnerReference{}, err
+	}
+	metaObj, err := meta.Accessor(o)
+	if err != nil {
+		return metav1.OwnerReference{}, err
+	}
+	return metav1.OwnerReference{
+		APIVersion: ref.APIVersion,
+		Kind:       ref.Kind,
+		Name:       ref.Name,
+		UID:        metaObj.GetUID(),
+	}, nil
 }
 
 // getCluster returns the provisioning cluster associated with the current userContext.
@@ -556,74 +611,4 @@ func getLogPrefix(cluster *unstructured.Unstructured) string {
 	}
 	suffix = schema.FromAPIVersionAndKind(cluster.GetAPIVersion(), cluster.GetKind()).String() + "/" + suffix
 	return fmt.Sprintf("[snapshotbackpopulate] %s:", suffix)
-}
-
-func (h *handler) hasMachineLifecycleLabels(upstream *rkev1.ETCDSnapshot) bool {
-	if upstream.Labels == nil {
-		return false
-	}
-	group := upstream.Labels[planv1alpha1.MachineLifecycleGroup]
-	if group == "" {
-		return false
-	}
-	version := upstream.Labels[planv1alpha1.MachineLifecycleVersion]
-	if version == "" {
-		return false
-	}
-	kind := upstream.Labels[planv1alpha1.MachineLifecycleKind]
-	if kind == "" {
-		return false
-	}
-	// theoretically could be a non-namespaced resource, but in practice this doesn't exist
-	namespace := upstream.Labels[planv1alpha1.MachineLifecycleNamespace]
-	if namespace == "" {
-		return false
-	}
-	name := upstream.Labels[planv1alpha1.MachineLifecycleName]
-	return name != ""
-}
-
-func MachineLifecycleLabelsToObjectReference(obj metav1.Object) (*corev1.ObjectReference, error) {
-	prefix := fmt.Sprintf("object %s", obj.GetName())
-	if obj.GetNamespace() != "" {
-		prefix = fmt.Sprintf("object %s/%s", obj.GetNamespace(), obj.GetName())
-	}
-
-	labels := obj.GetLabels()
-	if labels == nil {
-		return nil, fmt.Errorf("%s has no labels", prefix)
-	}
-
-	group := labels[planv1alpha1.MachineLifecycleGroup]
-	if group == "" {
-		return nil, fmt.Errorf("%s has no group label", prefix)
-	}
-
-	version := labels[planv1alpha1.MachineLifecycleVersion]
-	if version == "" {
-		return nil, fmt.Errorf("%s has no version label", prefix)
-	}
-
-	kind := labels[planv1alpha1.MachineLifecycleKind]
-	if kind == "" {
-		return nil, fmt.Errorf("%s has no kind label", prefix)
-	}
-
-	namespace := labels[planv1alpha1.MachineLifecycleNamespace]
-	if namespace == "" {
-		return nil, fmt.Errorf("%s has no namespace label", prefix)
-	}
-
-	name := labels[planv1alpha1.MachineLifecycleName]
-	if name == "" {
-		return nil, fmt.Errorf("%s has no name label", prefix)
-	}
-
-	gvr := schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
-	return &corev1.ObjectReference{
-		APIVersion: gvr.GroupVersion().String(),
-		Kind:       gvr.Kind,
-		Name:       name,
-		Namespace:  namespace,
-	}, nil
 }

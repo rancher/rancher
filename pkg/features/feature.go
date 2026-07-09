@@ -213,7 +213,7 @@ var (
 	ImportedDay2Ops = newFeature(
 		"imported-day-2-ops",
 		"Enable day 2 ops for imported clusters",
-		false,
+		true,
 		false,
 		true,
 	)

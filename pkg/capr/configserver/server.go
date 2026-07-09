@@ -47,12 +47,14 @@ var (
 
 type RKE2ConfigServer struct {
 	clusterTokens            mgmtcontroller.ClusterRegistrationTokenController
+	mgmtClusterCache         mgmtcontroller.ClusterCache
 	serviceAccountsCache     corecontrollers.ServiceAccountCache
 	serviceAccounts          corecontrollers.ServiceAccountClient
 	secretsCache             corecontrollers.SecretCache
 	secrets                  corecontrollers.SecretController
 	machineCache             capicontrollers.MachineCache
 	machines                 capicontrollers.MachineClient
+	capiClusterCache         capicontrollers.ClusterCache
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
 	k8s                      kubernetes.Interface
@@ -79,6 +81,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		secretsCache:             clients.Core.Secret().Cache(),
 		secrets:                  clients.Core.Secret(),
 		clusterTokens:            clients.Mgmt.ClusterRegistrationToken(),
+		mgmtClusterCache:         clients.Mgmt.Cluster().Cache(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
 		k8s:                      clients.K8s,
@@ -92,13 +95,13 @@ func (r *RKE2ConfigServer) DeferCAPIResources(clients *wrangler.Context) {
 	clients.DeferredCAPIRegistration.DeferFunc(func(clients *wrangler.CAPIContext) {
 		r.machineCache = clients.CAPI.Machine().Cache()
 		r.machines = clients.CAPI.Machine()
+		r.capiClusterCache = clients.CAPI.Cluster().Cache()
 		r.capiAvailable = true
 		logrus.Debug("[rke2configserver] Initialized CAPI clients after deferred func execution")
 	})
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	// todo(jhyde): only CAPI available if not imported
 	if !r.capiAvailable {
 		logrus.Debug("[rke2configserver] CAPI not ready yet")
 		rw.WriteHeader(http.StatusServiceUnavailable)

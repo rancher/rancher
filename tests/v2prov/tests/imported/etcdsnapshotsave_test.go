@@ -1,102 +1,118 @@
 package imported
 
 import (
-	"fmt"
 	"testing"
-	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/capr"
+	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotsave"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
-	"github.com/rancher/rancher/tests/v2prov/defaults"
-	"github.com/rancher/rancher/tests/v2prov/namespace"
-	"github.com/rancher/rancher/tests/v2prov/registry"
-	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// Test_Operation_SetD_ImportedETCDSnapshotSave brings up an imported single-node cluster and drives
+// a plain ETCDSnapshotSave operation through the operation.cattle.io/v1alpha1 controller to the
+// Succeeded phase. This is the baseline path — no lifecycle hooks attached — so the controller
+// acquires the beacon, runs Save+Restart, and releases the beacon on its own.
 func Test_Operation_SetD_ImportedETCDSnapshotSave(t *testing.T) {
-	clients, err := clients.New()
+	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clients.Close()
+	defer cs.Close()
 
-	ns, err := namespace.Random(clients)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	registryCACert, err := registry.EnsureRegistryCache(clients)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pods, err := cluster.NewImportedClusterPods(clients, ns.Name, defaults.SomeK8sVersion, []cluster.ImportedNodePool{
+	fx := setUpImportedCluster(t, cs, "test-imported-snapshot", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
-	}, nil, registryCACert)
+	})
+
+	RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+}
+
+// Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook brings up an imported single-node
+// cluster and walks an ETCDSnapshotSave through every state-machine checkpoint by attaching a
+// lifecycle-hook label for each step + the Succeeded phase. At each checkpoint the test:
+//
+//  1. Waits for the operation to land in the expected (phase, step) AND for the controller to push
+//     the named delegate onto the beacon — proving the hook actually fired and the controller
+//     observed the label.
+//  2. (Hook-of-the-future) Inspects intermediate state. For ETCDSnapshotSave the steps are
+//     mechanical (assign save plan → assign restart plan), so the only assertion we make is
+//     "reached this checkpoint". For richer operations — ETCDSnapshotRestore (Shutdown / Restore /
+//     PodCleanup / Restart / NodeCleanup) and EncryptionKeyRotation — this is where a test would
+//     read plan secrets, validate their instructions, or even override the system-agent plan to
+//     simulate a partial failure.
+//  3. Clears the hook label and pops the delegate, releasing the controller to do the actual
+//     step work before reaching the next gated checkpoint.
+//
+// This is the canonical pattern for any future hook-driven operation test in this package: the
+// step-level pauses give the test deterministic interleavings with the controller without having
+// to race on watch events.
+func Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testing.T) {
+	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cs.Close()
 
-	assert.Len(t, pods, 1)
-
-	mgmtCluster, err := cluster.NewImported(clients, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-snapshot",
-		},
+	fx := setUpImportedCluster(t, cs, "test-imported-snapshot-lifecycle-hook", []cluster.ImportedNodePool{
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	importCmd, err := cluster.ImportCommand(clients, mgmtCluster)
-	handleError(t, clients, mgmtCluster.Name, err)
+	// hookName is the suffix appended after the controller's well-known prefix — the controller
+	// doesn't interpret it, it just trims the prefix off and reads the label value as the delegate.
+	// Reusing one name + one delegate keeps the assertions simple; in a real multi-stakeholder
+	// hook scenario each hooking controller would pick a unique suffix.
+	const (
+		hookName     = "v2prov-e2e-test"
+		delegateName = "v2prov-e2e-test-delegate"
+	)
+	saveHookKey := etcdsnapshotsave.SaveStepHookLabelPrefix + hookName
+	restartHookKey := etcdsnapshotsave.RestartStepHookLabelPrefix + hookName
+	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
-	assert.NotEmpty(t, importCmd)
+	// Attach all three hook labels up front. Each prefix is scoped to a specific
+	// phase/step handler, so the controller only checks the relevant key when it enters that
+	// handler — they don't interfere with each other.
+	op := CreateETCDSnapshotSaveOp(t, cs, fx.ns.Name, fx.clusterRef, WithSaveLabels(map[string]string{
+		saveHookKey:      delegateName,
+		restartHookKey:   delegateName,
+		succeededHookKey: delegateName,
+	}))
 
-	distro := capr.GetRuntime(defaults.SomeK8sVersion)
-	kubeconfig := fmt.Sprintf("/etc/rancher/%s/%s.yaml", distro, distro)
-	binDir := fmt.Sprintf("/var/lib/rancher/%s/bin", distro)
-	kubectlEnv := fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
+	// The mgmt-cluster beacon lives in the namespace named after the cluster — cluster-scoped
+	// mgmt clusters use namespace == name.
+	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 
-	// Wait for the inner API server to be responsive, not just the kubeconfig file.
-	for i := 0; i < 60; i++ {
-		_, err := cluster.ExecOnPod(clients, ns.Name, pods[0].Name,
-			"sh", "-c", fmt.Sprintf("export %s && kubectl get nodes", kubectlEnv))
-		if err == nil {
-			break
-		}
-		if i == 59 {
-			t.Fatalf("timed out waiting for %s API server to be ready: %v", distro, err)
-		}
-		time.Sleep(5 * time.Second)
-	}
+	// --- Checkpoint 1: Save step ---
+	// Op should be InProgress at the Save step. The controller's reconcileSave runs the hook
+	// check before assigning any plans, so no etcd-snapshot save has been issued downstream yet.
+	cp := WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, saveHookKey, delegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepSave)
+	t.Logf("paused at Save step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
+	// (Inspection point — see godoc above.)
+	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, saveHookKey, delegateName)
 
-	// Execute the import command on the init pod with the local kubeconfig and kubectl.
-	shell := fmt.Sprintf("export %s && %s", kubectlEnv, importCmd)
-	out, err := cluster.ExecOnPod(clients, ns.Name, pods[0].Name, "sh", "-c", shell)
-	if err != nil {
-		t.Fatalf("import command failed: %v\noutput: %s", err, out)
-	}
+	// --- Checkpoint 2: Restart step ---
+	// The save plan has now been issued and applied (otherwise the controller would not have
+	// transitioned to Restart). reconcileRestart runs its hook check before assigning the
+	// systemctl-restart plan.
+	cp = WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, restartHookKey, delegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepRestart)
+	t.Logf("paused at Restart step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
+	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, restartHookKey, delegateName)
 
-	err = wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
-		mgmtCluster = obj.(*v3.Cluster)
-		return v3.Ready.IsTrue(mgmtCluster), nil
-	})
-	handleError(t, clients, mgmtCluster.Name, err)
+	// --- Checkpoint 3: Succeeded phase ---
+	// Phase transitioned to Succeeded but the hook gates beacon release. handleSucceeded's hook
+	// check runs before the beacon ToggleBeacon/ReleaseBeacon pair, so the beacon's owner field is
+	// still set to the controller and our delegate is still on the chain.
+	cp = WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, succeededHookKey, delegateName,
+		opv1alpha1.OperationPhaseSucceeded, "")
+	t.Logf("paused at Succeeded phase: phase=%s delegates=%v", cp.Op.Status.Phase, cp.Beacon.Status.Delegates)
+	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, succeededHookKey, delegateName)
 
-	RunETCDSnapshotSaveOperationTest(t, clients, ns.Name, corev1.ObjectReference{
-		APIVersion: "management.cattle.io/v3",
-		Kind:       "Cluster",
-		Name:       mgmtCluster.Name,
-	})
+	// All hooks cleared — the controller's next reconcile should drain the delegate chain (it's
+	// already drained by AdvancePastSnapshotSaveHook) and release the beacon.
+	final := WaitForSnapshotSaveSucceeded(t, cs, op, beaconNS, beaconName)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, final.Status.Phase)
 }

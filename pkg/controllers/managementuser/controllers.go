@@ -106,7 +106,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 			cluster.K3s = k3s.New(cluster.ControllerFactory)
-			snapshotbackpopulate.Register(ctx, cluster, clusterRec)
+			snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
 		}
 		cluster.Plan = upgrade.New(cluster.ControllerFactory)
 		rkecontrolplanecondition.Register(ctx,
@@ -127,7 +127,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 				for _, resource := range resources.APIResources {
 					if resource.Kind == "ETCDSnapshotFile" {
 						cluster.K3s = k3s.New(cluster.ControllerFactory)
-						snapshotbackpopulate.Register(ctx, cluster, clusterRec)
+						snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
 						found = true
 						break
 					}
@@ -138,7 +138,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 			}
 		}
 	}
-	machinerole.Register(ctx, cluster)
+	machinerole.Register(ctx, cluster, capi)
 }
 
 func RegisterFollower(cluster *config.UserContext) error {

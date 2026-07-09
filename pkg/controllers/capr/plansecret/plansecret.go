@@ -14,16 +14,21 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	planapi "github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
 type handler struct {
+	restMapper           meta.RESTMapper
 	secrets              corecontrollers.SecretClient
+	clusterCache         capicontrollers.ClusterCache
 	machinesCache        capicontrollers.MachineCache
 	machinesClient       capicontrollers.MachineClient
 	etcdSnapshotsClient  rkev1controllers.ETCDSnapshotClient
@@ -33,7 +38,9 @@ type handler struct {
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := handler{
+		restMapper:           clients.RESTMapper,
 		secrets:              clients.Core.Secret(),
+		clusterCache:         clients.CAPI.Cluster().Cache(),
 		machinesCache:        clients.CAPI.Machine().Cache(),
 		machinesClient:       clients.CAPI.Machine(),
 		etcdSnapshotsClient:  clients.RKE.ETCDSnapshot(),
@@ -114,6 +121,29 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 		if err != nil {
 			return secret, err
 		}
+	}
+
+	if secret.Labels == nil {
+		return secret, nil
+	}
+
+	ref, err := planv1alpha1.ClusterLifecycleLabelsToObjectReference(secret, secret.Namespace, h.restMapper)
+	if err != nil {
+		return secret, err
+	}
+
+	if ref.APIVersion != capi.GroupVersion.String() || ref.Kind != "Cluster" {
+		return secret, nil
+	}
+
+	cluster, err := h.clusterCache.Get(secret.Namespace, ref.Name)
+	if err != nil {
+		return secret, err
+	}
+
+	// only execute rest if the machine-plan is CAPR
+	if cluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup || cluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
+		return secret, nil
 	}
 
 	// plan-state:failed is written by the agent when failure is definitive (takes priority over checksum-based detection).

@@ -6,8 +6,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -123,6 +123,18 @@ var (
 // the Adapter interface exposes all methods required for constructing a node plan for the supported types.
 // The adapter currently supports v2prov, CAPR and imported clusters.
 type Adapter interface {
+	// BeaconRef returns the (namespace, name) where the cluster's beacon lives — and,
+	// by convention, where its machine-plan secrets and etcd-snapshot CRs also live. Operation
+	// controllers use this to resolve cluster-scoped state regardless of what ClusterRef the
+	// user (or UI) supplied on the operation:
+	//   - v2prov (CAPR): (controlPlane.Namespace, controlPlane.Name) — the provv1.Cluster's
+	//     namespace (typically fleet-default) alongside the CAPI cluster of the same name.
+	//   - CAPRKE2 (turtles-imported): (cluster.Namespace, cluster.Name) — the CAPI cluster's
+	//     own namespace.
+	//   - Imported RKE2/K3s: (cluster.Name, cluster.Name) — the mgmt v3 Cluster is
+	//     cluster-scoped, so its name doubles as the namespace convention.
+	BeaconRef() (namespace, name string)
+
 	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
 	// all expected nodes.
 	WaitForRegister() (bool, error)
@@ -144,6 +156,10 @@ type Adapter interface {
 	// Scripts created for commands are typically stored here.
 	ProvisioningDataDirectory(secret *corev1.Secret) string
 
+	ConfigFile(secret *corev1.Secret) string
+
+	ConfigDirectory(secret *corev1.Secret) string
+
 	// RenderProbes renders the probes for a given machine-plan secret based on its role.
 	// `supervisor` controls whether the supervisor probe should be rendered.
 	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
@@ -161,6 +177,16 @@ type Adapter interface {
 	// machine-plan secret so the same node is reused across reconciles. Returns nil, nil when
 	// no suitable candidate exists yet.
 	FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error)
+
+	// GetServerURL returns the server url required to join nodes to this host.
+	// The URL is of the form `https://<InternalIP>:<supervisor port>`
+	GetServerURL(secret *corev1.Secret) string
+
+	GetSupervisorPort(secret *corev1.Secret) string
+
+	LoopbackAddress(secret *corev1.Secret) string
+
+	ToS3ArgsEnvAndFiles(secret *corev1.Secret) ([]string, []string, []plan.File)
 }
 
 // NewAdapter returns an Adapter for the given cluster object.
@@ -262,5 +288,5 @@ func MachineName(secret *corev1.Secret) string {
 	if secret == nil || secret.Labels == nil {
 		return ""
 	}
-	return secret.Labels[capr.MachineNameLabel]
+	return secret.Labels[planv1alpha1.MachineLifecycleNameLabel]
 }

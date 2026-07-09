@@ -201,6 +201,7 @@ spec:
                   Step is the current step of the operation.
                   Step is typically only valid during the InProgress phase.
                 enum:
+                - Preflight
                 - Save
                 - Restart
                 type: string

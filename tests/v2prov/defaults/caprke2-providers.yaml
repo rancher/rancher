@@ -1,0 +1,61 @@
+# Default CAPI provider set used by the v2prov CAPRKE2 integration test.
+#
+# This is the minimum Turtles CAPIProvider configuration required to run a CAPRKE2 cluster on top
+# of the CAPI Docker infrastructure provider. It is applied by `scripts/provisioning-tests` ONLY
+# when V2PROV_TEST_CAPRKE2=true. Users can override the source via:
+#
+#   - V2PROV_TEST_CAPRKE2_MANIFEST=/abs/path/manifest.yaml  — apply a local manifest verbatim.
+#   - V2PROV_TEST_CAPRKE2_TURTLES_REF=<tag|branch|sha>      — render the
+#     rancher/turtles `charts/rancher-turtles-providers` chart at that ref instead of this file.
+#
+# Three CAPIProviders are required:
+#   1. rke2-bootstrap         (kind=bootstrap, name=rke2)         — produces the bootstrap secret
+#                                                                   from a RKE2Config/RKE2ConfigTemplate.
+#   2. rke2-control-plane     (kind=controlPlane, name=rke2)      — reconciles the RKE2ControlPlane.
+#   3. docker (infrastructure)(kind=infrastructure, name=docker)  — runs DockerCluster/DockerMachine
+#                                                                   on the host's docker socket.
+#
+# Each provider's namespace is also created (Turtles places each provider's controller-manager
+# deployment in a per-provider namespace).
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rke2-bootstrap-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rke2-control-plane-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: capd-system
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: rke2-bootstrap
+  namespace: rke2-bootstrap-system
+spec:
+  name: rke2
+  type: bootstrap
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: rke2-control-plane
+  namespace: rke2-control-plane-system
+spec:
+  name: rke2
+  type: controlPlane
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: docker
+  namespace: capd-system
+spec:
+  name: docker
+  type: infrastructure

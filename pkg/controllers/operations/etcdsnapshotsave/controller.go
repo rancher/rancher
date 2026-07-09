@@ -3,7 +3,7 @@ package etcdsnapshotsave
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"strings"
 	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
@@ -17,8 +17,8 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +27,23 @@ import (
 
 // ControllerOwnerKey is the value used to identify the etcd-snapshot-save handler currently owns the beacon.
 const ControllerOwnerKey = "etcd-snapshot-save"
+
+// Step hook label prefixes for the etcdsnapshotsave operation. They follow the shared label
+// semantics documented on planv1alpha1's phase-hook label constants, but each prefix only fires
+// when the operation enters the matching step.
+const (
+	// PreflightStepHookLabelPrefix gates the Preflight step, before the controller performs
+	// the necessary preflight checks to determine whether or not the operation can proceed.
+	PreflightStepHookLabelPrefix = "preflight.step.hook.operation.cattle.io/"
+
+	// SaveStepHookLabelPrefix gates the Save step before reconcileSave assigns the
+	// `<runtime> etcd-snapshot save` plan to any etcd-labeled machine-plan secret.
+	SaveStepHookLabelPrefix = "save.step.hook.operation.cattle.io/"
+
+	// RestartStepHookLabelPrefix gates the Restart step before reconcileRestart assigns the
+	// `systemctl restart <server-unit>` plan to any etcd-labeled machine-plan secret.
+	RestartStepHookLabelPrefix = "restart.step.hook.operation.cattle.io/"
+)
 
 // dynamicResolver is the subset of *dynamic.Controller this handler needs: Get for cluster
 // lookup during onChange dispatch, and Enqueue for nudging the parent cluster controller after a
@@ -85,9 +102,17 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	}
 	status = updateStatus(op, status)
 
-	if reflect.DeepEqual(op.Status, status) {
+	if equality.Semantic.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
-		if ops.IsTerminal(status.Phase) && ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) {
+		//
+		// The HasActiveLifecycleHook guard defers TTL garbage collection while any lifecycle-hook
+		// label is still on the op. Without it, an op that has reached a terminal phase but is
+		// waiting on a delegate (handleSucceeded/handleFailed/handleCanceled returned early with
+		// WaitingForDelegate) would be deleted on the very next reconcile as soon as the TTL is
+		// past, stranding the beacon delegate and any observer polling for the terminal phase.
+		if ops.IsTerminal(status.Phase) &&
+			ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
+			!planv1alpha1.HasActiveLifecycleHook(op) {
 			err = h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return status, err
@@ -98,6 +123,18 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		h.etcdsnapshotsaves.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
 	}
 	return status, nil
+}
+
+// scope bundles the per-reconcile values derived from the operation, parent cluster, and beacon.
+// It is built fresh on every invocation and threaded through the phase handlers so they don't
+// each have to re-derive the same data.
+type scope struct {
+	op        *opv1alpha1.ETCDSnapshotSave
+	namespace string
+
+	beacon     *planv1alpha1.Beacon
+	clusterObj *unstructured.Unstructured
+	adapter    ops.Adapter
 }
 
 // onChange resolves the parent cluster reference, locates the cluster's beacon, builds an Adapter
@@ -157,30 +194,20 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 
 	ustr := unstructured.Unstructured{Object: ustrMap}
 
-	namespace := op.Spec.ClusterRef.Namespace
-	if namespace == "" {
-		mapping, err := h.clients.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return status, err
-		}
-		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
-			// For namespace-scoped objects, assume namespace is the same as the snapshot object
-			namespace = op.Namespace
-		} else {
-			// For cluster-scoped objects, assume namespace is the name of the object
-			namespace = op.Spec.ClusterRef.Name
-		}
+	a, err := ops.NewAdapter(h.clients, &ustr)
+	if err != nil {
+		return status, err
 	}
 
-	beacon, err := h.beacons.Get(namespace, ustr.GetName(), metav1.GetOptions{})
+	// Resolve the beacon (and every other cluster-scoped artifact — plan secrets, snapshot CRs)
+	// via the adapter, not the op.Spec.ClusterRef. See the equivalent block in
+	// etcdsnapshotrestore/controller.go for the full rationale.
+	namespace, beaconName := a.BeaconRef()
+
+	beacon, err := h.beacons.Get(namespace, beaconName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) && status.Phase == opv1alpha1.OperationPhasePending {
-		// If the beacon is not found during pending phase, allow time for the beacon to be created.
-		key := fmt.Sprintf("apiVersion=%s, kind=%s", ustr.GetAPIVersion(), ustr.GetKind())
-		if ustr.GetNamespace() != "" {
-			key += fmt.Sprintf(", namespace=%s", ustr.GetNamespace())
-		}
-		key += fmt.Sprintf(", name=%s", ustr.GetName())
-		logrus.Warnf("[etcdsnapshotsave]: %s/%s failed to find beacon for %s", op.Namespace, op.Name, key)
+		logrus.Warnf("[etcdsnapshotsave]: %s/%s failed to find beacon %s/%s (clusterRef apiVersion=%s kind=%s name=%s)",
+			op.Namespace, op.Name, namespace, beaconName, ustr.GetAPIVersion(), ustr.GetKind(), ustr.GetName())
 
 		opv1alpha1.PendingCondition.True(&status)
 		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
@@ -188,11 +215,6 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 
 		return status, nil
 	} else if err != nil {
-		return status, err
-	}
-
-	a, err := ops.NewAdapter(h.clients, &ustr)
-	if err != nil {
 		return status, err
 	}
 
@@ -210,8 +232,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
-		// canceled assumes that the beacon is released, so we can safely skip the rest of the processing
-		return status, nil
+		return h.handleCanceled(s, status)
 	case opv1alpha1.OperationPhaseFailed:
 		return h.handleFailed(s, status)
 	case opv1alpha1.OperationPhaseSucceeded:
@@ -228,16 +249,46 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	return status, nil
 }
 
-// scope bundles the per-reconcile values derived from the operation, parent cluster, and beacon.
-// It is built fresh on every invocation and threaded through the phase handlers so they don't
-// each have to re-derive the same data.
-type scope struct {
-	op        *opv1alpha1.ETCDSnapshotSave
-	namespace string
+func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string) {
+	if s.op.Labels == nil {
+		return "", ""
+	}
 
-	beacon     *planv1alpha1.Beacon
-	clusterObj *unstructured.Unstructured
-	adapter    ops.Adapter
+	for k, v := range s.op.Labels {
+		if strings.HasPrefix(k, prefix) {
+			return strings.TrimPrefix(k, prefix), v
+		}
+	}
+
+	return "", ""
+}
+
+func (h *handler) delegate(s *scope, name, delegate string) error {
+	logrus.Tracef("[etcdsnapshotsave] %s/%s: delegating ownership of beacon to %s on behalf of %s", s.op.Namespace, s.op.Name, delegate, name)
+
+	if plan.IsInDelegateChain(s.beacon, delegate) {
+		return nil
+	}
+
+	beacon, err := plan.PushDelegate(s.beacon, delegate, h.beacons)
+	if err != nil {
+		return err
+	}
+
+	s.beacon = beacon
+
+	return nil
+}
+
+func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
+	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling before hook", s.op.Namespace, s.op.Name)
+
+	if name, delegate := h.lifecycleHookDelegate(s, prefix); delegate != "" {
+		err := h.delegate(s, name, delegate)
+		return true, err
+	}
+
+	return false, nil
 }
 
 // handlePending advances a Pending operation through the prerequisite checks: acquire the
@@ -259,6 +310,16 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		return status, nil
 	}
 
+	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.PendingCondition.True(&status)
+		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.PendingCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: acquired beacon, waiting for agents to register", s.op.Namespace, s.op.Name)
 
 	if ok, err := s.adapter.WaitForRegister(); err != nil {
@@ -271,10 +332,10 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		return status, nil
 	}
 
-	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to save", s.op.Namespace, s.op.Name)
+	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to preflight", s.op.Namespace, s.op.Name)
 
 	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
-	status.SetStep(opv1alpha1.ETCDSnapshotSaveStepSave)
+	status.SetStep(opv1alpha1.ETCDSnapshotSaveStepPreflight)
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
@@ -288,7 +349,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling in-progress", s.op.Namespace, s.op.Name)
 
-	if !plan.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	if !plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
@@ -305,7 +366,19 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		return status, err
 	}
 
+	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
 	switch s.op.Status.Step {
+	case opv1alpha1.ETCDSnapshotSaveStepPreflight:
+		return h.reconcilePreflight(s, status)
 	case opv1alpha1.ETCDSnapshotSaveStepSave:
 		return h.reconcileSave(s, status)
 	case opv1alpha1.ETCDSnapshotSaveStepRestart:
@@ -316,13 +389,112 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf(
-			"current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\"]",
+			"current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\"]",
 			status.Step,
+			opv1alpha1.ETCDSnapshotSaveStepPreflight,
 			opv1alpha1.ETCDSnapshotSaveStepSave,
 			opv1alpha1.ETCDSnapshotSaveStepRestart))
 
 	}
 
+	return status, nil
+}
+
+func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
+	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, PreflightStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithSorter(plan.DefaultSorter()).
+		WithFilter(ops.IsEtcd).
+		WithValidator(plan.AtLeast(1, "")).
+		Collect()
+	if plan.IsTransient(err) {
+		return status, err
+	} else if err != nil {
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as canceled: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+
+		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		return status, nil
+	}
+
+	concurrency := len(secrets)
+	results := make([]plan.PlanStatus, 0, concurrency)
+
+	for _, secret := range secrets {
+		nodePlan := &plan.Plan{
+			OneTimeInstructions: []plan.OneTimeInstruction{
+				{
+					CommonInstruction: plan.CommonInstruction{
+						Name:    "preflight",
+						Command: "/bin/sh",
+						Args: []string{
+							"-c",
+							fmt.Sprintf(`grep -rE -q '^[[:space:]]*[\x27\x22 ]?token[\x27\x22 ]?[[:space:]]*:[[:space:]]*[\x27\x22 ]*[^[:space:]\x27\x22]+' %s %s/ 2>/dev/null || (exit 1)`,
+								s.adapter.ConfigFile(secret),
+								s.adapter.ConfigDirectory(secret),
+							),
+						},
+					},
+				},
+			},
+		}
+
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		if err != nil {
+			return status, err
+		}
+
+		results = append(results, *planStatus)
+
+		if planStatus.Failure() {
+			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: preflight check failed for %s/%s",
+				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+			status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
+
+			return status, nil
+		}
+
+		if planStatus.Waiting() {
+			logrus.Debugf("[etcdsnapshotsave] %s/%s: waiting for preflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+			concurrency--
+			if concurrency <= 0 {
+				break
+			}
+		}
+	}
+
+	if concurrency < len(secrets) {
+		msg := plan.Message(results)
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: %s", status.Step, msg))
+
+		return status, nil
+	}
+
+	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to save", s.op.Namespace, s.op.Name)
+
+	status.SetStep(opv1alpha1.ETCDSnapshotSaveStepSave)
 	return status, nil
 }
 
@@ -340,6 +512,16 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 // Once every etcd secret has applied the plan, transitions to the Restart step.
 func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling snapshot save", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, SaveStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
 
 	// collect etcd nodes belonging to cluster
 	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
@@ -359,6 +541,9 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
+
+	concurrency := len(secrets)
+	results := make([]plan.PlanStatus, 0, concurrency)
 
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
@@ -393,6 +578,8 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			return status, err
 		}
 
+		results = append(results, *planStatus)
+
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
@@ -405,15 +592,23 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			return status, nil
 		}
 
-		if wait, msg := planStatus.Wait(); wait {
-			logrus.Infof("[etcdsnapshotsave] %s/%s: waiting for snapshot save: %s", s.op.Namespace, s.op.Name, msg)
+		if planStatus.Waiting() {
+			logrus.Debugf("[etcdsnapshotsave] %s/%s: waiting for snapshot save for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			opv1alpha1.InProgressCondition.True(&status)
-			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
-			opv1alpha1.InProgressCondition.Message(&status, msg)
-
-			return status, nil
+			concurrency--
+			if concurrency <= 0 {
+				break
+			}
 		}
+	}
+
+	if concurrency < len(secrets) {
+		msg := plan.Message(results)
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: %s", status.Step, msg))
+
+		return status, nil
 	}
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: transitioning to restart", s.op.Namespace, s.op.Name)
@@ -430,6 +625,16 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 // a wait message. After all secrets have applied the restart, marks the operation Succeeded.
 func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling service restart", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, RestartStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
 
 	// collect etcd nodes belonging to cluster
 	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
@@ -449,6 +654,9 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
+
+	concurrency := 1
+	results := make([]plan.PlanStatus, 0, concurrency)
 
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
@@ -477,6 +685,8 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			return status, err
 		}
 
+		results = append(results, *planStatus)
+
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
@@ -489,15 +699,23 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			return status, nil
 		}
 
-		if wait, msg := planStatus.Wait(); wait {
-			logrus.Infof("[etcdsnapshotsave] %s/%s: waiting for systemctl restart: %s", s.op.Namespace, s.op.Name, msg)
+		if planStatus.Waiting() {
+			logrus.Debugf("[etcdsnapshotsave] %s/%s: waiting for systemctl restart for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			opv1alpha1.InProgressCondition.True(&status)
-			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
-			opv1alpha1.InProgressCondition.Message(&status, msg)
-
-			return status, nil
+			concurrency--
+			if concurrency <= 0 {
+				break
+			}
 		}
+	}
+
+	if concurrency < 1 {
+		msg := plan.Message(results)
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: %s", status.Step, msg))
+
+		return status, nil
 	}
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: marking as success", s.op.Namespace, s.op.Name)
@@ -511,6 +729,40 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	return status, nil
 }
 
+// handleCanceled (unlike other handler functions) will attempt to release the beacon (if it is
+// held by the current object).
+// The difference between canceled and failed operations is that an operation fails itself, whereas another controller
+// cancels an operation.
+// This function mostly serves to execute the planv1alpha1.CanceledPhaseHookLabelPrefix, if it exists
+func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
+	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, planv1alpha1.CanceledPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	if plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
+		var err error
+		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
+		if err != nil {
+			return status, err
+		}
+
+		err = plan.ReleaseBeacon(s.beacon, h.beacons, ControllerOwnerKey)
+		if err != nil {
+			return status, err
+		}
+	}
+
+	return status, nil
+}
+
 // handleFailed releases the beacon when the operation has reached the Failed terminal phase, so
 // the next operation in line can acquire it. The toggle-off step pairs with handleSucceeded's
 // behaviour so the beacon's Active flag accurately reflects whether any operation is currently
@@ -518,7 +770,17 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
-	if plan.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	delegated, err := h.handleHook(s, planv1alpha1.FailedPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	if plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
 		var err error
 		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {
@@ -541,7 +803,17 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
-	if plan.HoldingBeacon(s.beacon, ControllerOwnerKey) {
+	delegated, err := h.handleHook(s, planv1alpha1.SucceededPhaseHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.SucceededCondition.True(&status)
+		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.SucceededCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	if plan.IsOwningBeaconHolder(s.beacon, ControllerOwnerKey) {
 		var err error
 		s.beacon, err = plan.ToggleBeacon(s.beacon, false, h.beacons)
 		if err != nil {

@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -35,6 +37,9 @@ import (
 // - Applied && ProbesPassed
 // - Failed
 type PlanStatus struct {
+	// Secret is the machine-plan secret containing the plan.
+	Secret *corev1.Secret
+
 	// Pending is true if the plan is waiting to be applied.
 	Pending bool
 
@@ -64,23 +69,164 @@ func (p *PlanStatus) Failure() bool {
 	return p.Failed
 }
 
-// Wait returns true if the plan is in a transient state, and a message indicating why.
-func (p *PlanStatus) Wait() (bool, string) {
+// Waiting returns true if the plan is in a transient state, and a message indicating why.
+func (p *PlanStatus) Waiting() bool {
 	switch {
 	case p.Pending:
-		return true, "waiting for plan to be picked up"
+		return true
 	case p.InProgress:
-		return true, "waiting for plan to be applied"
+		return true
 	case p.Applied && !p.ProbesPassed:
-		return true, "waiting for probes"
+		return true
 	case p.Applied && p.ProbesPassed:
-		return false, "plan successfully applied"
+		return false
 	case p.Failing && !p.Failed:
-		return true, "waiting for plan to succeed or reach failure limit"
+		return true
 	case p.Failed:
-		return false, "plan failed to be applied"
+		return false
 	}
-	return false, ""
+	return false
+}
+
+func (p *PlanStatus) String() string {
+	switch {
+	case p.Pending:
+		return "waiting for plan to be picked up"
+	case p.InProgress:
+		return "waiting for plan to be applied"
+	case p.Applied && !p.ProbesPassed:
+		return "waiting for probes"
+	case p.Applied && p.ProbesPassed:
+		return "plan successfully applied"
+	case p.Failing && !p.Failed:
+		return "waiting for plan to succeed or reach failure limit"
+	case p.Failed:
+		return "plan failed to be applied"
+	}
+	return ""
+}
+
+// Message aggregates a slice of PlanStatus structures into a single, human-readable status string.
+//
+// Nodes are bucketed by their active operational phase according to a strict priority hierarchy:
+//  1. failing plan (Failing == true, Failed == false)
+//  2. waiting for plan to be picked up (Pending == true)
+//  3. waiting for plan applied (InProgress == true)
+//  4. waiting for probes (Applied == true, ProbesPassed == false)
+//
+// Nodes that do not fit into these buckets (e.g., fully successfully applied or strictly failed) are ignored.
+// Within each bucket, node names are sorted lexicographically to guarantee deterministic outputs.
+//
+// Output string patterns adapt dynamically based on the node count per bucket:
+//   - 1 node: "bucket_text for X"
+//   - 2 nodes: "bucket_text for X & 1 other node"
+//   - 3+ nodes: "bucket_text for X & N other nodes"
+//
+// If multiple statuses are present across the cluster, their resulting summary strings are joined
+// with a comma and space, ordered by the phase priority listed above. Returns an empty string if
+// results is empty or if no active statuses match the tracked progress buckets.
+//
+// Message length is unlimited but has a bounded size of 1124, 112 for all plan states, plus 253*4 for node names, and
+// 15 bytes for "& N other nodes", plus however many digits N contains, though in practice it will be difficult to reach
+// over 5 digits.
+//
+// As the result of this function may vary wildly between reconciliations, its intended purpose is to be used solely by
+// handlers that have a fixed enqueue period to prevent thrashing. For example, a simple plan application for 100 nodes
+// can cause at worst 100 status updates if each machine-plan state transition retriggers the handler if the message is
+// used in a condition.
+func Message(results []PlanStatus) string {
+	if len(results) == 0 {
+		return ""
+	}
+
+	// Group node names by their current message bucket
+	buckets := make(map[string][]string)
+
+	for _, res := range results {
+		if res.Secret == nil {
+			continue
+		}
+		nodeName := res.Secret.Name
+
+		// Order of evaluation sets the bucket for each node
+		if res.Failing && !res.Failed {
+			buckets["failing plan"] = append(buckets["failing plan"], nodeName)
+		} else if res.Pending {
+			buckets["waiting for plan to be picked up"] = append(buckets["waiting for plan to be picked up"], nodeName)
+		} else if res.InProgress {
+			buckets["waiting for plan applied"] = append(buckets["waiting for plan applied"], nodeName)
+		} else if res.Applied && !res.ProbesPassed {
+			buckets["waiting for probes"] = append(buckets["waiting for probes"], nodeName)
+		}
+	}
+
+	if len(buckets) == 0 {
+		return ""
+	}
+
+	// Helper to determine priority ranking (lower number = higher priority)
+	getPriority := func(bucket string) int {
+		switch bucket {
+		case "failing plan":
+			return 1
+		case "waiting for plan to be picked up":
+			return 2
+		case "waiting for plan applied":
+			return 3
+		case "waiting for probes":
+			return 4
+		default:
+			return 5
+		}
+	}
+
+	type msgGroup struct {
+		text     string
+		priority int
+	}
+	var groups []msgGroup
+
+	// Format each bucket independently
+	for bucket, nodes := range buckets {
+		if len(nodes) == 0 {
+			continue
+		}
+
+		// Sort node names lexicographically within their own bucket
+		sort.Strings(nodes)
+
+		var formatted string
+		count := len(nodes)
+
+		if count == 1 {
+			formatted = fmt.Sprintf("%s for %s", bucket, nodes[0])
+		} else if count == 2 {
+			formatted = fmt.Sprintf("%s for %s & 1 other node", bucket, nodes[0])
+		} else {
+			formatted = fmt.Sprintf("%s for %s & %d other nodes", bucket, nodes[0], count-1)
+		}
+
+		groups = append(groups, msgGroup{
+			text:     formatted,
+			priority: getPriority(bucket),
+		})
+	}
+
+	// Sort the message groups: primarily by priority, secondarily lexicographically
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].priority != groups[j].priority {
+			return groups[i].priority < groups[j].priority
+		}
+		return groups[i].text < groups[j].text
+	})
+
+	// Flatten sorted groups into the final comma-separated string
+	var finalMsgs []string
+	for _, g := range groups {
+		finalMsgs = append(finalMsgs, g.text)
+	}
+
+	return strings.Join(finalMsgs, ", ")
 }
 
 type Store struct {
@@ -142,7 +288,9 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 		secret.Annotations = map[string]string{}
 	}
 
-	result := &PlanStatus{}
+	result := &PlanStatus{
+		Secret: secret,
+	}
 
 	if !bytes.Equal(secret.Data["plan"], data) {
 		result.Pending = true
@@ -167,6 +315,7 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 		if err != nil {
 			return nil, err
 		}
+		result.Secret = secret
 	} else {
 		result.Pending = false
 		result.InProgress = true

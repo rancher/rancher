@@ -10,11 +10,13 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -25,6 +27,8 @@ import (
 
 type handler struct {
 	ctx          context.Context
+	restMapper   meta.RESTMapper
+	clusterCache capicontrollers.ClusterCache
 	machineCache capicontrollers.MachineCache
 	secrets      corecontrollers.SecretClient
 	secretCache  corecontrollers.SecretCache
@@ -33,6 +37,8 @@ type handler struct {
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		ctx:          ctx,
+		restMapper:   clients.RESTMapper,
+		clusterCache: clients.CAPI.Cluster().Cache(),
 		machineCache: clients.CAPI.Machine().Cache(),
 		secrets:      clients.Core.Secret(),
 		secretCache:  clients.Core.Secret().Cache(),
@@ -43,6 +49,25 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, error) {
 	if secret == nil || secret.DeletionTimestamp != nil || secret.Labels[capr.MachineNameLabel] == "" || secret.Type != capr.SecretTypeMachinePlan {
+		return secret, nil
+	}
+
+	ref, err := planv1alpha1.ClusterLifecycleLabelsToObjectReference(secret, secret.Namespace, h.restMapper)
+	if err != nil {
+		return secret, err
+	}
+
+	if ref.APIVersion != capi.GroupVersion.String() || ref.Kind != "Cluster" {
+		return secret, nil
+	}
+
+	cluster, err := h.clusterCache.Get(secret.Namespace, ref.Name)
+	if err != nil {
+		return secret, err
+	}
+
+	// only execute rest if the machine-plan is CAPR
+	if cluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup || cluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
 		return secret, nil
 	}
 

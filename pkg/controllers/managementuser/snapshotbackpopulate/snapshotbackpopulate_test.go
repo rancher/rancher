@@ -21,12 +21,30 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 )
+
+// testRESTMapper returns a RESTMapper that resolves the handful of GroupKinds these tests need.
+// Namespaced by default; management.cattle.io/v3 Cluster is registered as cluster-scoped so the
+// cluster-lifecycle tests can assert the scope-based namespace override.
+func testRESTMapper() meta.RESTMapper {
+	m := meta.NewDefaultRESTMapper([]schema.GroupVersion{
+		{Group: "cluster.x-k8s.io", Version: "v1beta2"},
+		{Group: "provisioning.cattle.io", Version: "v1"},
+		{Group: "management.cattle.io", Version: "v3"},
+	})
+	m.Add(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "provisioning.cattle.io", Version: "v1", Kind: "Cluster"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Node"}, meta.RESTScopeNamespace)
+	m.Add(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, meta.RESTScopeRoot)
+	return m
+}
 
 type dynamicClientFake struct {
 	obj runtime.Object
@@ -326,6 +344,7 @@ func TestOnDownstreamChange(t *testing.T) {
 			Name:       "test-cluster",
 		},
 		dynamic:                    dynamicSuccess,
+		restMapper:                 testRESTMapper(),
 		etcdSnapshotCache:          etcdSnapshotCache,
 		etcdSnapshotController:     etcdSnapshotController,
 		beaconCache:                beaconCache,
@@ -441,11 +460,9 @@ func TestOnDownstreamChange(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 			Labels: map[string]string{
-				planv1alpha1.MachineLifecycleGroup:     "cluster.x-k8s.io",
-				planv1alpha1.MachineLifecycleVersion:   "v1beta2",
-				planv1alpha1.MachineLifecycleKind:      "Machine",
-				planv1alpha1.MachineLifecycleNamespace: "test-namespace",
-				planv1alpha1.MachineLifecycleName:      "test-machine",
+				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "test-machine",
 			},
 		},
 	}
@@ -607,11 +624,9 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cp-0",
 			Labels: map[string]string{
-				planv1alpha1.MachineLifecycleGroup:     "cluster.x-k8s.io",
-				planv1alpha1.MachineLifecycleVersion:   "v1beta2",
-				planv1alpha1.MachineLifecycleKind:      "Machine",
-				planv1alpha1.MachineLifecycleNamespace: "fleet-default",
-				planv1alpha1.MachineLifecycleName:      "machine-0",
+				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "machine-0",
 			},
 		},
 	}
@@ -624,6 +639,7 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 			Name:       "example",
 		},
 		dynamic:                    &dynamicClientFake{obj: cluster},
+		restMapper:                 testRESTMapper(),
 		etcdSnapshotCache:          etcdSnapshotCache,
 		etcdSnapshotController:     etcdSnapshotController,
 		beaconCache:                beaconCache,
@@ -881,18 +897,26 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 	t.Parallel()
 
 	allLabels := map[string]string{
-		planv1alpha1.MachineLifecycleGroup:     "cluster.x-k8s.io",
-		planv1alpha1.MachineLifecycleVersion:   "v1beta2",
-		planv1alpha1.MachineLifecycleKind:      "Machine",
-		planv1alpha1.MachineLifecycleNamespace: "fleet-default",
-		planv1alpha1.MachineLifecycleName:      "test-machine",
+		planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+		planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+		planv1alpha1.MachineLifecycleNameLabel:  "test-machine",
+	}
+
+	drop := func(key string) map[string]string {
+		l := make(map[string]string, len(allLabels))
+		for k, v := range allLabels {
+			l[k] = v
+		}
+		delete(l, key)
+		return l
 	}
 
 	tests := []struct {
-		name      string
-		labels    map[string]string
-		expectRef *corev1.ObjectReference
-		expectErr bool
+		name             string
+		labels           map[string]string
+		contextNamespace string
+		expectRef        *corev1.ObjectReference
+		expectErr        bool
 	}{
 		{
 			name:      "no labels",
@@ -900,78 +924,55 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "missing group",
-			labels: func() map[string]string {
-				l := make(map[string]string)
-				for k, v := range allLabels {
-					l[k] = v
-				}
-				delete(l, planv1alpha1.MachineLifecycleGroup)
-				return l
-			}(),
+			name:      "missing kind",
+			labels:    drop(planv1alpha1.MachineLifecycleKindLabel),
 			expectErr: true,
 		},
 		{
-			name: "missing version",
-			labels: func() map[string]string {
-				l := make(map[string]string)
-				for k, v := range allLabels {
-					l[k] = v
-				}
-				delete(l, planv1alpha1.MachineLifecycleVersion)
-				return l
-			}(),
+			name:      "missing name",
+			labels:    drop(planv1alpha1.MachineLifecycleNameLabel),
 			expectErr: true,
 		},
 		{
-			name: "missing kind",
-			labels: func() map[string]string {
-				l := make(map[string]string)
-				for k, v := range allLabels {
-					l[k] = v
-				}
-				delete(l, planv1alpha1.MachineLifecycleKind)
-				return l
-			}(),
-			expectErr: true,
+			name: "unknown group",
+			labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "not.a.real.group",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "test-machine",
+			},
+			contextNamespace: "fleet-default",
+			expectErr:        true,
 		},
 		{
-			name: "missing namespace",
-			labels: func() map[string]string {
-				l := make(map[string]string)
-				for k, v := range allLabels {
-					l[k] = v
-				}
-				delete(l, planv1alpha1.MachineLifecycleNamespace)
-				return l
-			}(),
-			expectErr: true,
-		},
-		{
-			name: "missing name",
-			labels: func() map[string]string {
-				l := make(map[string]string)
-				for k, v := range allLabels {
-					l[k] = v
-				}
-				delete(l, planv1alpha1.MachineLifecycleName)
-				return l
-			}(),
-			expectErr: true,
-		},
-		{
-			name:   "all labels present",
-			labels: allLabels,
+			name:             "namespace comes from context, not label",
+			labels:           allLabels,
+			contextNamespace: "fleet-default",
 			expectRef: &corev1.ObjectReference{
 				APIVersion: "cluster.x-k8s.io/v1beta2",
 				Kind:       "Machine",
 				Name:       "test-machine",
 				Namespace:  "fleet-default",
 			},
-			expectErr: false,
+		},
+		{
+			name: "stale namespace label is ignored (spoofing check)",
+			labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel:                   "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:                    "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:                    "test-machine",
+				"plan.cattle.io/machine-namespace-legacy-ignored-by-code": "other-tenant-ns",
+			},
+			contextNamespace: "fleet-default",
+			expectRef: &corev1.ObjectReference{
+				APIVersion: "cluster.x-k8s.io/v1beta2",
+				Kind:       "Machine",
+				Name:       "test-machine",
+				Namespace:  "fleet-default",
+			},
 		},
 	}
 
+	mapper := testRESTMapper()
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
@@ -981,7 +982,7 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 					Labels: tt.labels,
 				},
 			}
-			ref, err := MachineLifecycleLabelsToObjectReference(obj)
+			ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(obj, tt.contextNamespace, mapper)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, ref)
