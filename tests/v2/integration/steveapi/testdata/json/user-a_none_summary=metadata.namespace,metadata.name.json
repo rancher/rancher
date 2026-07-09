@@ -838,40 +838,80 @@
     {
       "JSONResp": {
         "counts": {
-          "test1": 5,
-          "test2": 5,
-          "test3": 5,
-          "test4": 5,
-          "test5": 5
+          "test1": {
+            "total": 5
+          },
+          "test2": {
+            "total": 5
+          },
+          "test3": {
+            "total": 5
+          },
+          "test4": {
+            "total": 5
+          },
+          "test5": {
+            "total": 5
+          }
         },
         "property": "metadata.name"
       },
       "counts": {
-        "test1": 5,
-        "test2": 5,
-        "test3": 5,
-        "test4": 5,
-        "test5": 5
+        "test1": {
+          "total": 5
+        },
+        "test2": {
+          "total": 5
+        },
+        "test3": {
+          "total": 5
+        },
+        "test4": {
+          "total": 5
+        },
+        "test5": {
+          "total": 5
+        }
       },
       "property": "metadata.name"
     },
     {
       "JSONResp": {
         "counts": {
-          "test-ns-1": 5,
-          "test-ns-2": 5,
-          "test-ns-3": 5,
-          "test-ns-4": 5,
-          "test-ns-5": 5
+          "test-ns-1": {
+            "total": 5
+          },
+          "test-ns-2": {
+            "total": 5
+          },
+          "test-ns-3": {
+            "total": 5
+          },
+          "test-ns-4": {
+            "total": 5
+          },
+          "test-ns-5": {
+            "total": 5
+          }
         },
         "property": "metadata.namespace"
       },
       "counts": {
-        "test-ns-1": 5,
-        "test-ns-2": 5,
-        "test-ns-3": 5,
-        "test-ns-4": 5,
-        "test-ns-5": 5
+        "test-ns-1": {
+          "total": 5
+        },
+        "test-ns-2": {
+          "total": 5
+        },
+        "test-ns-3": {
+          "total": 5
+        },
+        "test-ns-4": {
+          "total": 5
+        },
+        "test-ns-5": {
+          "total": 5
+        }
       },
       "property": "metadata.namespace"
     }

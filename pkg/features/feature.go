@@ -122,12 +122,19 @@ var (
 		true,
 		false,
 		true)
-	UISQLCache = newFeature(
-		"ui-sql-cache",
-		"Improve performance by enabling SQLite-backed caching. This also enables server-side pagination and other scaling based performance improvements.",
-		true,
-		false,
-		true)
+	UISQLCache = func() *Feature {
+		feature := newFeature(
+			"ui-sql-cache",
+			"Improve performance by enabling SQLite-backed caching. This also enables server-side pagination and other scaling based performance improvements.",
+			true,
+			false,
+			true)
+		if !feature.Enabled() {
+			logrus.Warnf("the 'ui-sql-cache' feature is permanently enabled; overriding configured value")
+			feature.Set(true)
+		}
+		return feature
+	}()
 	RKE1UI = newFeature(
 		"rke1-ui",
 		"Enable RKE1 provisioning in the Rancher UI",

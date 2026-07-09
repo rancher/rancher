@@ -221,6 +221,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err := dashboardcrds.Create(ctx, restConfig); err != nil {
 		return nil, fmt.Errorf("failed to create CRDs: %w", err)
 	}
+	if !features.UISQLCache.Enabled() {
+		logrus.Warn("UISQLCache feature is permanently enabled.")
+	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
 		logrus.Info("fleet can't be turned off when MCM is enabled. Turning on fleet feature")
@@ -298,7 +301,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		AuthMiddleware:  steveauth.ExistingContext,
 		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Core.Secret().Cache()),
 		ClusterRegistry: opts.ClusterRegistry,
-		SQLCache:        features.UISQLCache.Enabled(),
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
 			GCInterval:  gcInterval,
 			GCKeepCount: gcKeepCount,

@@ -48,14 +48,18 @@
     {
       "JSONResp": null,
       "counts": {
-        "test2": 1
+        "test2": {
+          "total": 1
+        }
       },
       "property": "metadata.name"
     },
     {
       "JSONResp": null,
       "counts": {
-        "test-ns-2": 1
+        "test-ns-2": {
+          "total": 1
+        }
       },
       "property": "metadata.namespace"
     }
