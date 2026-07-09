@@ -191,11 +191,6 @@ func VerifyTokenWithoutKey(storedToken *apiv3.Token, tokenName string) (int, err
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.
 // This must match the logic of `VerifyToken` above.
 func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
-	// The condition `tokenKey == ""` is an indicator that there is no
-	// proper secret value to verify. This happens when authenticating a JWT
-	// token representing an OIDC session. See `TokenFromRequest` in
-	// `pkg/auth/requests/authenticate.go`.
-
 	invalidAuthTokenErr := errors.New("invalid token")
 
 	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
