@@ -261,7 +261,11 @@ func (c *ManagementContext) WithAgent(userAgent string) *ManagementContext {
 func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() error {
 	f := w.deferredStartAsync(ctx, register)
 	return func() error {
-		go f()
+		go func() {
+			if err := f(); err != nil {
+				logrus.Errorf("deferred controller start failed for cluster %s: %v", w.ClusterName, err)
+			}
+		}()
 		return nil
 	}
 }

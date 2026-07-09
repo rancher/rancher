@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"sync/atomic"
 
 	clusterapiv3 "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
@@ -38,7 +39,7 @@ type tokenHandler struct {
 	clusterUserAttribute       clusterv3.ClusterUserAttributeInterface
 	clusterUserAttributeLister clusterv3.ClusterUserAttributeLister
 	tokenIndexer               cache.Indexer
-	extTokenIndexer            cache.Indexer
+	extTokenIndexer            atomic.Value // holds cache.Indexer; written once by the EXT API DeferFunc, read by v3 remove handlers
 	userLister                 managementv3.UserLister
 	userAttributeLister        managementv3.UserAttributeLister
 	clusterSecret              wcore.SecretClient
@@ -444,10 +445,9 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 		return err
 	}
 
-	// skip ext tokens if feature is disabled
 	var extTokens []any
-	if h.extTokenIndexer != nil {
-		extTokens, err = h.extTokenIndexer.ByIndex(tokenByUserAndClusterIndex, key)
+	if idx, ok := h.extTokenIndexer.Load().(cache.Indexer); ok {
+		extTokens, err = idx.ByIndex(tokenByUserAndClusterIndex, key)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
