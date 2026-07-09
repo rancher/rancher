@@ -18,7 +18,7 @@ import (
 	capiv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-// The four Test_Operation_SetE_CAPRKE2Docker* tests below exercise the same operations
+// The four Test_Imported_Operation_SetE_CAPRKE2Docker* tests below exercise the same operations
 // (ETCDSnapshotSave → ETCDSnapshotRestore → EncryptionKeyRotation) against progressively larger
 // CAPRKE2 topologies:
 //
@@ -39,14 +39,14 @@ import (
 //	# run Rancher locally (dev-scripts/quick, or your GoLand run target)
 //	make install-caprke2-providers   # waits for Rancher/Turtles, then applies the provider set
 //	V2PROV_TEST_CAPRKE2=true go test -v \
-//	  -run '^Test_Operation_SetE_CAPRKE2Docker' \
+//	  -run '^Test_Imported_Operation_SetE_CAPRKE2Docker' \
 //	  ./tests/v2prov/tests/imported/...
 //
 // See dev-scripts/dev-env and dev-scripts/install-caprke2-providers for the invariants.
 
-// Test_Operation_SetE_CAPRKE2DockerOperations is the historical single-server smoke test. Kept
+// Test_Imported_Operation_SetE_CAPRKE2DockerOperations is the historical single-server smoke test. Kept
 // as the smallest topology for fast local iteration.
-func Test_Operation_SetE_CAPRKE2DockerOperations(t *testing.T) {
+func Test_Imported_Operation_SetE_CAPRKE2DockerOperations(t *testing.T) {
 	runCAPRKE2OperationsTest(t, cluster.CAPRKE2Options{
 		NamePrefix:          "v2prov-caprke2",
 		Replicas:            1,
@@ -54,23 +54,23 @@ func Test_Operation_SetE_CAPRKE2DockerOperations(t *testing.T) {
 	})
 }
 
-func Test_Operation_SetE_CAPRKE2DockerOperations_OneServerOneAgent(t *testing.T) {
+func Test_Imported_Operation_SetE_CAPRKE2DockerOperations_OneServerOneAgent(t *testing.T) {
 	runCAPRKE2OperationsTest(t, cluster.CAPRKE2Options{
-		NamePrefix:     "v2prov-caprke2-1s1a",
-		Replicas:       1,
-		WorkerReplicas: 1,
+		NamePrefix:          "v2prov-caprke2-1s1a",
+		Replicas:            1,
+		WorkerReplicas:      1,
 		UseSnapshotFileName: true,
 	})
 }
 
-func Test_Operation_SetE_CAPRKE2DockerOperations_ThreeServers(t *testing.T) {
+func Test_Imported_Operation_SetE_CAPRKE2DockerOperations_ThreeServers(t *testing.T) {
 	runCAPRKE2OperationsTest(t, cluster.CAPRKE2Options{
 		NamePrefix: "v2prov-caprke2-3s",
 		Replicas:   3,
 	})
 }
 
-func Test_Operation_SetE_CAPRKE2DockerOperations_ThreeServersThreeAgents(t *testing.T) {
+func Test_Imported_Operation_SetE_CAPRKE2DockerOperations_ThreeServersThreeAgents(t *testing.T) {
 	runCAPRKE2OperationsTest(t, cluster.CAPRKE2Options{
 		NamePrefix:     "v2prov-caprke2-3s3a",
 		Replicas:       3,

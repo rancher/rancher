@@ -30,11 +30,11 @@ func skipUnlessRKE2(t *testing.T) {
 	}
 }
 
-// Test_Operation_SetD_ImportedEncryptionKeyRotation brings up a single-node imported RKE2 cluster
+// Test_Imported_Operation_SetD_ImportedEncryptionKeyRotation brings up a single-node imported RKE2 cluster
 // and drives a plain EncryptionKeyRotation operation through the operation.cattle.io/v1alpha1
 // controller to Succeeded. Baseline path — no hooks attached — so the controller acquires the
 // beacon, runs Rotate + Restart, releases the beacon, and TTL-deletes the CR.
-func Test_Operation_SetD_ImportedEncryptionKeyRotation(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotation(t *testing.T) {
 	skipUnlessRKE2(t)
 
 	cs, err := clients.New()
@@ -50,12 +50,12 @@ func Test_Operation_SetD_ImportedEncryptionKeyRotation(t *testing.T) {
 	RunEncryptionKeyRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
 }
 
-// Test_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRoles exercises imported-cluster
+// Test_Imported_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRoles exercises imported-cluster
 // EKR restart ordering on a mixed RKE2 server topology: one init+etcd node, one etcd-only node,
 // one additional control-plane node. This validates the plan.DefaultSorter()-driven restart
 // sequence (init+etcd → etcd-only → control-plane) and the final-hash-match contract that only
 // applies on the last control-plane node.
-func Test_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRoles(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRoles(t *testing.T) {
 	skipUnlessRKE2(t)
 
 	cs, err := clients.New()
@@ -110,7 +110,7 @@ func Test_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRoles(t *te
 	assert.Contains(t, encStatus, "Server Encryption Hashes: All hashes match")
 }
 
-// Test_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook walks an EncryptionKeyRotation
+// Test_Imported_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook walks an EncryptionKeyRotation
 // through every state-machine checkpoint by attaching a lifecycle-hook label for each step + the
 // Succeeded phase. At each checkpoint the test:
 //
@@ -127,7 +127,7 @@ func Test_Operation_SetD_ImportedEncryptionKeyRotation_MultiNodeMixedRoles(t *te
 // Because the controller drives the actual rotation between checkpoints, this test also confirms
 // the post-rotation secrets-encrypt status reports reencrypt_finished + hashes match — the hook
 // framework should be transparent to the underlying operation's correctness.
-func Test_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook(t *testing.T) {
 	skipUnlessRKE2(t)
 
 	cs, err := clients.New()
@@ -245,4 +245,3 @@ func importedNodesReady(output string, expectedNodeNames []string) bool {
 	}
 	return true
 }
-

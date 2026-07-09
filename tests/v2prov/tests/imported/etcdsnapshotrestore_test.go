@@ -127,13 +127,13 @@ func runRestoreScenario(
 	cm.assertRestored(t, fx)
 }
 
-// Test_Operation_SetD_ImportedETCDSnapshotRestore brings up an imported single-node cluster,
+// Test_Imported_Operation_SetD_ImportedETCDSnapshotRestore brings up an imported single-node cluster,
 // creates a ConfigMap inside the downstream cluster, takes a snapshot via ETCDSnapshotSave,
 // deletes the ConfigMap, runs ETCDSnapshotRestore, then verifies the ConfigMap returns. This
 // exercises the operations-controller-driven restore path end-to-end against an imported cluster
 // (where there is no provisioning.cattle.io Cluster or RKEControlPlane to drive the restore via
 // spec).
-func Test_Operation_SetD_ImportedETCDSnapshotRestore(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestore(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -149,11 +149,11 @@ func Test_Operation_SetD_ImportedETCDSnapshotRestore(t *testing.T) {
 	runRestoreScenario(t, cs, fx, 1, "imported-init-0", false)
 }
 
-// Test_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles is the same proof-of-restore as
+// Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles is the same proof-of-restore as
 // the single-node variant, but with 3 nodes each holding all three roles. Three etcd members
 // produce three snapshot files (one per node). The restore is driven from imported-node-2 to
 // deliberately exercise the non-init etcd path.
-func Test_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles(t *testing.T) {
+func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -169,11 +169,11 @@ func Test_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles(t *testing.T)
 	runRestoreScenario(t, cs, fx, 3, "imported-node-2", true)
 }
 
-// Test_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach is the same proof-of-restore but
+// Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach is the same proof-of-restore but
 // with three nodes each pinned to a single role (one etcd, one control-plane, one worker). The
 // single etcd node means exactly one snapshot file even though the cluster has three nodes —
 // covers the topology where roles are not collocated.
-func Test_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach(t *testing.T) {
+func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +190,7 @@ func Test_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach(t *testing.T) 
 	runRestoreScenario(t, cs, fx, 1, "imported-init-0", true)
 }
 
-// Test_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook walks an ETCDSnapshotRestore through
+// Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook walks an ETCDSnapshotRestore through
 // every state-machine checkpoint by attaching a lifecycle-hook label for each step + the
 // Succeeded phase. At each checkpoint the test:
 //
@@ -208,7 +208,7 @@ func Test_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach(t *testing.T) 
 // Because the controller drives the actual restore between checkpoints, this test also verifies
 // the proof-of-restore ConfigMap returns at the end — the hook framework should be transparent to
 // the underlying operation's correctness.
-func Test_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)

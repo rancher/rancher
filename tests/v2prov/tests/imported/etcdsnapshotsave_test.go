@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test_Operation_SetD_ImportedETCDSnapshotSave brings up an imported single-node cluster and drives
+// Test_Imported_Operation_SetD_ImportedETCDSnapshotSave brings up an imported single-node cluster and drives
 // a plain ETCDSnapshotSave operation through the operation.cattle.io/v1alpha1 controller to the
 // Succeeded phase. This is the baseline path — no lifecycle hooks attached — so the controller
 // acquires the beacon, runs Save+Restart, and releases the beacon on its own.
-func Test_Operation_SetD_ImportedETCDSnapshotSave(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedETCDSnapshotSave(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -29,7 +29,7 @@ func Test_Operation_SetD_ImportedETCDSnapshotSave(t *testing.T) {
 	RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
 }
 
-// Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook brings up an imported single-node
+// Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook brings up an imported single-node
 // cluster and walks an ETCDSnapshotSave through every state-machine checkpoint by attaching a
 // lifecycle-hook label for each step + the Succeeded phase. At each checkpoint the test:
 //
@@ -48,7 +48,7 @@ func Test_Operation_SetD_ImportedETCDSnapshotSave(t *testing.T) {
 // This is the canonical pattern for any future hook-driven operation test in this package: the
 // step-level pauses give the test deterministic interleavings with the controller without having
 // to race on watch events.
-func Test_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
