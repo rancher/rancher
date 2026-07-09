@@ -160,6 +160,67 @@ func Test_Render(t *testing.T) {
 			},
 			failMsg: "take ownership false should not add force-conflicts or server-side",
 		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test9",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"serverSide": false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--server-side=false", "test9", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "serverSide false should add --server-side=false",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "install",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test10",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"serverSide": true,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"install", "--server-side=true", "test10", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "serverSide true should add --server-side=true",
+		},
+		{
+			commands: Commands{
+				Command{
+					Operation:   "upgrade",
+					ChartFile:   "test-chart-v1.1.0.tgz",
+					Chart:       []byte("test-chart"),
+					ReleaseName: "test11",
+					ArgObjects: []interface{}{
+						map[string]interface{}{
+							"takeOwnership": true,
+							"serverSide":    false,
+						},
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"operation000":          []byte(strings.Join([]string{"upgrade", "--force-conflicts=true", "--server-side=true", "--take-ownership=true", "test11", "/home/shell/helm/test-chart-v1.1.0.tgz"}, "\x00")),
+				"test-chart-v1.1.0.tgz": []byte("test-chart"),
+			},
+			failMsg: "takeOwnership true should force server-side even if serverSide is false",
+		},
 	}
 
 	for _, testCase := range testCases {
