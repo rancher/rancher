@@ -1270,6 +1270,16 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
+	} else if initSecret == nil {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restart", s.op.Namespace, s.op.Name)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+		opv1alpha1.FailedCondition.Message(&status, "no eligible etcd leader for restart")
+
+		return status, nil
 	}
 
 	serverURL := s.adapter.GetServerURL(initSecret)
