@@ -18,16 +18,11 @@ import (
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
-	"github.com/rancher/rancher/tests/v2prov/defaults"
-	"github.com/rancher/rancher/tests/v2prov/namespace"
-	"github.com/rancher/rancher/tests/v2prov/registry"
-	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 )
@@ -65,9 +60,9 @@ type machinePlanFeedbackState struct {
 	ProbesPassed     string
 }
 
-// Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave validates the imported day2ops
+// Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave validates the imported day2ops
 // disable/re-enable lifecycle and verifies ETCDSnapshotSave still succeeds after re-enable.
-func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -76,26 +71,7 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 
 	assertImportedDay2OpsFeatureEnabled(t, clients)
 
-	ns, err := namespace.Random(clients)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	registryCACert, err := registry.EnsureRegistryCache(clients)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pods, err := cluster.NewImportedClusterPods(clients, ns.Name, defaults.SomeK8sVersion, []cluster.ImportedNodePool{
-		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
-	}, nil, registryCACert)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Len(t, pods, 1)
-	t.Logf("created imported cluster pod %s/%s", ns.Name, pods[0].Name)
-
-	mgmtCluster, err := cluster.NewImported(clients, &v3.Cluster{
+	fixture := setUpImportedCluster(t, clients, &v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "c-",
 			Annotations: map[string]string{
@@ -106,78 +82,48 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 			ImportedConfig: &v3.ImportedConfig{},
 			DisplayName:    "test-imported-day2ops-disable-reenable-snapshot",
 		},
+	}, []cluster.ImportedNodePool{
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("created management cluster %s", mgmtCluster.Name)
+	assert.Len(t, fixture.pods, 1)
+	t.Logf("created imported cluster pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
+	t.Logf("management cluster %s reached Ready", fixture.mgmtCluster.Name)
 
-	importCmd, err := cluster.ImportCommand(clients, mgmtCluster)
-	handleError(t, clients, mgmtCluster.Name, err)
-	assert.NotEmpty(t, importCmd)
-
-	distro := capr.GetRuntime(defaults.SomeK8sVersion)
-	kubeconfig := fmt.Sprintf("/etc/rancher/%s/%s.yaml", distro, distro)
-	binDir := fmt.Sprintf("/var/lib/rancher/%s/bin", distro)
-	kubectlEnv := fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
-
-	waitForImportedAPIServer(t, clients, ns.Name, pods[0].Name, kubectlEnv)
-	t.Logf("downstream API server is reachable for cluster %s", mgmtCluster.Name)
-
-	out, err := cluster.ExecOnPod(clients, ns.Name, pods[0].Name, "sh", "-c", fmt.Sprintf("export %s && %s", kubectlEnv, importCmd))
-	if err != nil {
-		t.Fatalf("import command failed: %v\noutput: %s", err, out)
-	}
-	t.Logf("import command completed for cluster %s", mgmtCluster.Name)
-
-	err = wait.ClusterObject(clients.Ctx, clients.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
-		mgmtCluster = obj.(*v3.Cluster)
-		return v3.Ready.IsTrue(mgmtCluster), nil
-	})
-	handleError(t, clients, mgmtCluster.Name, err)
-	t.Logf("management cluster %s reached Ready", mgmtCluster.Name)
-
-	clusterRef := corev1.ObjectReference{
-		APIVersion: "management.cattle.io/v3",
-		Kind:       "Cluster",
-		Name:       mgmtCluster.Name,
-	}
-
-	phase1Cluster := waitForClusterAnnotationValue(t, clients, mgmtCluster.Name, opsEnabledAnnotation, "true", importedIdentityWaitTimeout)
+	phase1Cluster := waitForClusterAnnotationValue(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "true", importedIdentityWaitTimeout)
 	assert.Equal(t, "true", phase1Cluster.Annotations[opsEnabledAnnotation])
-	t.Logf("phase 1: ops-enabled=true observed on cluster %s", mgmtCluster.Name)
+	t.Logf("phase 1: ops-enabled=true observed on cluster %s", fixture.mgmtCluster.Name)
 
-	phase1Identity := waitForImportedPlanIdentity(t, clients, mgmtCluster.Name, 1, true, importedIdentityWaitTimeout)
+	phase1Identity := waitForImportedPlanIdentity(t, clients, fixture.mgmtCluster.Name, 1, true, importedIdentityWaitTimeout)
 	assert.Len(t, phase1Identity.MachinePlanSecrets, 1)
 	assert.Len(t, phase1Identity.PlanServiceAccount, 1)
 	assert.Len(t, phase1Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase1Identity.PlanRoles, 1)
 	assert.Len(t, phase1Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, ns.Name, pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 1 identity: %s", summarizeImportedPlanIdentity(phase1Identity))
 
-	waitForSystemAgentActiveState(t, clients, ns.Name, pods[0].Name, true, importedSystemAgentTransitionTimeout)
-	t.Logf("phase 1: rancher-system-agent is active on pod %s/%s", ns.Name, pods[0].Name)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, true, importedSystemAgentTransitionTimeout)
+	t.Logf("phase 1: rancher-system-agent is active on pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
 
 	initialMachinePlanSecretName := phase1Identity.MachinePlanSecrets[0].Name
 	initialMachinePlanSecretUID := phase1Identity.MachinePlanSecrets[0].UID
 	initialPlanTokenSecretName := phase1Identity.PlanTokenSecrets[0].Name
-	waitForConnectionInfoSecretName(t, clients, ns.Name, pods[0].Name, initialMachinePlanSecretName, importedIdentityWaitTimeout)
+	waitForConnectionInfoSecretName(t, clients, fixture.ns.Name, fixture.pods[0].Name, initialMachinePlanSecretName, importedIdentityWaitTimeout)
 	t.Logf("phase 1: connection info points to initial machine-plan secret %s", initialMachinePlanSecretName)
 
-	initialHash := waitForAppliedSystemAgentHash(t, clients, mgmtCluster.Name, importedIdentityWaitTimeout)
+	initialHash := waitForAppliedSystemAgentHash(t, clients, fixture.mgmtCluster.Name, importedIdentityWaitTimeout)
 	t.Logf("phase 1: applied system-agent hash=%s", initialHash)
 
-	t.Logf("phase 2: disabling imported day2ops on cluster %s", mgmtCluster.Name)
-	if _, err := setClusterAnnotation(t, clients, mgmtCluster.Name, opsEnabledAnnotation, "false"); err != nil {
+	t.Logf("phase 2: disabling imported day2ops on cluster %s", fixture.mgmtCluster.Name)
+	if _, err := setClusterAnnotation(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "false"); err != nil {
 		t.Fatal(err)
 	}
-	phase2Cluster := waitForImportedDay2OpsDisabled(t, clients, mgmtCluster.Name, importedDisableWaitTimeout)
+	phase2Cluster := waitForImportedDay2OpsDisabled(t, clients, fixture.mgmtCluster.Name, importedDisableWaitTimeout)
 	assert.Equal(t, "false", phase2Cluster.Annotations[opsEnabledAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[importedCleaningStateAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[appliedSystemAgentHashAnnotation])
 
-	phase2Identity := waitForImportedPlanIdentity(t, clients, mgmtCluster.Name, 0, true, importedDisableWaitTimeout)
+	phase2Identity := waitForImportedPlanIdentity(t, clients, fixture.mgmtCluster.Name, 0, true, importedDisableWaitTimeout)
 	assert.Len(t, phase2Identity.MachinePlanSecrets, 0)
 	assert.Len(t, phase2Identity.PlanServiceAccount, 0)
 	assert.Len(t, phase2Identity.PlanTokenSecrets, 0)
@@ -185,27 +131,27 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	assert.Len(t, phase2Identity.PlanRoleBindings, 0)
 	t.Logf("phase 2 identity: %s", summarizeImportedPlanIdentity(phase2Identity))
 
-	waitForSystemAgentActiveState(t, clients, ns.Name, pods[0].Name, false, importedSystemAgentTransitionTimeout)
-	t.Logf("phase 2: rancher-system-agent is inactive on pod %s/%s", ns.Name, pods[0].Name)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, false, importedSystemAgentTransitionTimeout)
+	t.Logf("phase 2: rancher-system-agent is inactive on pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
 
-	t.Logf("phase 3: re-enabling imported day2ops on cluster %s", mgmtCluster.Name)
-	if _, err := setClusterAnnotation(t, clients, mgmtCluster.Name, opsEnabledAnnotation, "true"); err != nil {
+	t.Logf("phase 3: re-enabling imported day2ops on cluster %s", fixture.mgmtCluster.Name)
+	if _, err := setClusterAnnotation(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "true"); err != nil {
 		t.Fatal(err)
 	}
 
-	phase3Cluster := waitForClusterAnnotationValue(t, clients, mgmtCluster.Name, opsEnabledAnnotation, "true", importedIdentityWaitTimeout)
+	phase3Cluster := waitForClusterAnnotationValue(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "true", importedIdentityWaitTimeout)
 	assert.Equal(t, "true", phase3Cluster.Annotations[opsEnabledAnnotation])
-	phase3Hash := waitForAppliedSystemAgentHash(t, clients, mgmtCluster.Name, importedIdentityWaitTimeout)
+	phase3Hash := waitForAppliedSystemAgentHash(t, clients, fixture.mgmtCluster.Name, importedIdentityWaitTimeout)
 	assert.NotEmpty(t, phase3Hash)
 	t.Logf("phase 3: applied system-agent hash=%s", phase3Hash)
 
-	phase3Identity := waitForImportedPlanIdentity(t, clients, mgmtCluster.Name, 1, true, importedIdentityWaitTimeout)
+	phase3Identity := waitForImportedPlanIdentity(t, clients, fixture.mgmtCluster.Name, 1, true, importedIdentityWaitTimeout)
 	assert.Len(t, phase3Identity.MachinePlanSecrets, 1)
 	assert.Len(t, phase3Identity.PlanServiceAccount, 1)
 	assert.Len(t, phase3Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase3Identity.PlanRoles, 1)
 	assert.Len(t, phase3Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, ns.Name, pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 3 identity: %s", summarizeImportedPlanIdentity(phase3Identity))
 
 	newMachinePlanSecretName := phase3Identity.MachinePlanSecrets[0].Name
@@ -224,13 +170,13 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 		newPlanTokenSecretName,
 	)
 
-	waitForSystemAgentActiveState(t, clients, ns.Name, pods[0].Name, true, importedSystemAgentTransitionTimeout)
-	waitForConnectionInfoSecretName(t, clients, ns.Name, pods[0].Name, newMachinePlanSecretName, importedIdentityWaitTimeout)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, true, importedSystemAgentTransitionTimeout)
+	waitForConnectionInfoSecretName(t, clients, fixture.ns.Name, fixture.pods[0].Name, newMachinePlanSecretName, importedIdentityWaitTimeout)
 	t.Logf("phase 3: rancher-system-agent is active and connection info points to %s", newMachinePlanSecretName)
 
-	preSaveFeedback := getMachinePlanFeedbackState(t, clients, mgmtCluster.Name, newMachinePlanSecretName)
+	preSaveFeedback := getMachinePlanFeedbackState(t, clients, fixture.mgmtCluster.Name, newMachinePlanSecretName)
 	t.Logf("pre-save machine-plan feedback on %s: %s", newMachinePlanSecretName, formatMachinePlanFeedbackState(preSaveFeedback))
-	saveOp := RunETCDSnapshotSaveOperationTest(t, clients, ns.Name, clusterRef)
+	saveOp := RunETCDSnapshotSaveOperationTest(t, clients, fixture.ns.Name, fixture.clusterRef)
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, saveOp.Status.Phase)
 	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&saveOp.Status))
 	assert.NotContains(t, opv1alpha1.InProgressCondition.GetMessage(&saveOp.Status), planner.WaitingPlanStatusMessage)
@@ -239,7 +185,7 @@ func Test_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T
 	waitForMachinePlanFeedbackAfterOperation(
 		t,
 		clients,
-		mgmtCluster.Name,
+		fixture.mgmtCluster.Name,
 		newMachinePlanSecretName,
 		preSaveFeedback,
 		saveOp.CreationTimestamp.Time,
