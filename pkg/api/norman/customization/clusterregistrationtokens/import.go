@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -28,8 +28,8 @@ func validateAuthImage(authImage string) error {
 }
 
 type ClusterImport struct {
-	Clusters     v3.ClusterInterface
-	CRTIndexer   k8scache.Indexer
+	Clusters   v3.ClusterInterface
+	CRTIndexer k8scache.Indexer
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
@@ -88,7 +88,7 @@ func (ch *ClusterImport) isValidToken(clusterID, token string) bool {
 		return false
 	}
 	for _, obj := range objs {
-		crt, ok := obj.(*v32.ClusterRegistrationToken)
+		crt, ok := obj.(*apimgmtv3.ClusterRegistrationToken)
 		if ok && crt.Namespace == clusterID {
 			return true
 		}

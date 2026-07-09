@@ -5,7 +5,6 @@ import (
 	"fmt"
 	v3apis "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
-	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	image2 "github.com/rancher/rancher/pkg/image"
@@ -13,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/apply"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -23,7 +21,6 @@ import (
 
 type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
-	secretCache               corecontrollers.SecretCache
 	apply                     apply.Apply
 }
 
@@ -36,7 +33,6 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			clients.Core.ServiceAccount(),
 			clients.Core.ConfigMap()),
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
-		secretCache:               clients.Core.Secret().Cache(),
 	}
 
 	clients.Mgmt.ClusterRegistrationToken().OnChange(ctx, "cluster-registration-token", h.onChange)
@@ -54,36 +50,25 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 //
 // The logic is triggered on every update to a ClusterRegistrationToken, as the job
 // requires the most recent token to run `kubectl` successfully.
-func (h *handler) onChange(_ string, obj *v3apis.ClusterRegistrationToken) (_ *v3apis.ClusterRegistrationToken, err error) {
-	if obj == nil || obj.Namespace != "local" || obj.DeletionTimestamp != nil || obj.Status.TokenSecretName == "" {
-		return obj, nil
-	}
-
-	token, err := crt.GetTokenFromSecret(h.secretCache, obj)
-	if err != nil {
-		return nil, err
-	}
-	if token == "" {
+func (h *handler) onChange(key string, obj *v3apis.ClusterRegistrationToken) (_ *v3apis.ClusterRegistrationToken, err error) {
+	if obj == nil || obj.Namespace != "local" || obj.DeletionTimestamp != nil || obj.Status.Token == "" {
 		return obj, nil
 	}
 
 	if err := h.apply.
 		WithSetID("rke2-machine-config-cleanup").
 		WithDynamicLookup().
-		WithNoDelete().ApplyObjects(cleanupObjects(token)...); err != nil {
+		WithNoDelete().ApplyObjects(cleanupObjects(obj.Status.Token)...); err != nil {
 		return nil, err
 	}
 
 	return obj, nil
 }
 
-// cleanupObjects returns the service account, cluster role+binding, config map, and cronjob required for periodically
-// cleaning up outdated and unowned machine configs.
 func cleanupObjects(token string) []runtime.Object {
 	url := settings.ServerURL.Get()
 	ca := systemtemplate.CAChecksum()
 	image := image2.Resolve(settings.AgentImage.Get())
-
 	fleetNamespace := fleet.ClustersDefaultNamespace
 	prefix := "rke2-machineconfig-cleanup"
 

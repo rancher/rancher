@@ -19,7 +19,6 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -399,19 +398,10 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 
 func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
 	crt := obj.(*v3.ClusterRegistrationToken)
-	current, previous, err := clusterregistrationtoken.GetTokensFromSecret(t.SecretLister, crt)
-	if err != nil {
-		logrus.Warnf("failed to resolve CRT token for %s/%s: %v", crt.Namespace, crt.Name, err)
+	if crt.Status.Token == "" {
 		return nil, nil
 	}
-	if current == "" {
-		return nil, nil
-	}
-	tokens := []string{current}
-	if previous != "" {
-		tokens = append(tokens, previous)
-	}
-	return tokens, nil
+	return []string{crt.Status.Token}, nil
 }
 
 func (t *Authorizer) nodeIndex(obj interface{}) ([]string, error) {

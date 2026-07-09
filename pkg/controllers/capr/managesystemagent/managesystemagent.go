@@ -14,7 +14,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
@@ -161,17 +160,13 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 		if err != nil {
 			return cluster, err
 		}
-		tokenValue, err := clusterregistrationtoken.GetTokenFromSecret(h.secrets.Cache(), token)
-		if err != nil {
-			return cluster, err
-		}
-		if tokenValue == "" {
+		if token.Status.Token == "" {
 			return cluster, fmt.Errorf("token not yet generated for %s/%s", token.Namespace, token.Name)
 		}
 
 		digest := sha256.New()
 		digest.Write([]byte(settings.InternalServerURL.Get()))
-		digest.Write([]byte(tokenValue))
+		digest.Write([]byte(token.Status.Token))
 		digest.Write([]byte(systemtemplate.InternalCAChecksum()))
 		d := digest.Sum(nil)
 		secretName += hex.EncodeToString(d[:])[:12]
@@ -183,7 +178,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 			},
 			Data: map[string][]byte{
 				"CATTLE_SERVER":      []byte(settings.InternalServerURL.Get()),
-				"CATTLE_TOKEN":       []byte(tokenValue),
+				"CATTLE_TOKEN":       []byte(token.Status.Token),
 				"CATTLE_CA_CHECKSUM": []byte(systemtemplate.InternalCAChecksum()),
 			},
 		})
