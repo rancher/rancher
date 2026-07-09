@@ -4,9 +4,7 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	clusterregistrationtoken "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
@@ -32,7 +30,6 @@ func NewManager(management *config.ManagementContext) *Manager {
 		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		tokens:       management.Management.Tokens(""),
 		users:        management.Management.Users(""),
-		secretLister: management.Core.Secrets("").Controller().Lister(),
 	}
 }
 
@@ -46,7 +43,6 @@ func NewManagerFromScale(management *config.ScaledContext) *Manager {
 		tokens:       management.Management.Tokens(""),
 		tokenLister:  management.Management.Tokens("").Controller().Lister(),
 		users:        management.Management.Users(""),
-		secretLister: management.Core.Secrets("").Controller().Lister(),
 	}
 }
 
@@ -59,7 +55,6 @@ type Manager struct {
 	tokens       v3.TokenInterface
 	tokenLister  v3.TokenLister
 	users        v3.UserInterface
-	secretLister corev1.SecretLister
 }
 
 func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
@@ -113,16 +108,13 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 			},
 		}
 
-		if _, err = s.crts.Create(crt); err != nil {
+		if _, err := s.crts.Create(crt); err != nil {
 			return "", err
 		}
 	} else if err != nil {
 		return "", err
 	} else {
-		token, err = clusterregistrationtoken.GetTokenFromSecret(s.secretLister, crt)
-		if err != nil {
-			return "", err
-		}
+		token = crt.Status.Token
 	}
 
 	return token, nil

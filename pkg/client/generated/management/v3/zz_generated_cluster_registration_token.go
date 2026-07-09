@@ -11,9 +11,6 @@ const (
 	ClusterRegistrationTokenFieldCommand                    = "command"
 	ClusterRegistrationTokenFieldCreated                    = "created"
 	ClusterRegistrationTokenFieldCreatorID                  = "creatorId"
-	ClusterRegistrationTokenFieldExpiresAt                  = "expiresAt"
-	ClusterRegistrationTokenFieldGracePeriod                = "gracePeriod"
-	ClusterRegistrationTokenFieldGracePeriodExpiresAt       = "gracePeriodExpiresAt"
 	ClusterRegistrationTokenFieldInsecureCommand            = "insecureCommand"
 	ClusterRegistrationTokenFieldInsecureNodeCommand        = "insecureNodeCommand"
 	ClusterRegistrationTokenFieldInsecureWindowsNodeCommand = "insecureWindowsNodeCommand"
@@ -25,9 +22,7 @@ const (
 	ClusterRegistrationTokenFieldOwnerReferences            = "ownerReferences"
 	ClusterRegistrationTokenFieldRemoved                    = "removed"
 	ClusterRegistrationTokenFieldState                      = "state"
-	ClusterRegistrationTokenFieldTTL                        = "ttl"
 	ClusterRegistrationTokenFieldToken                      = "token"
-	ClusterRegistrationTokenFieldTokenSecretName            = "tokenSecretName"
 	ClusterRegistrationTokenFieldTransitioning              = "transitioning"
 	ClusterRegistrationTokenFieldTransitioningMessage       = "transitioningMessage"
 	ClusterRegistrationTokenFieldUUID                       = "uuid"
@@ -41,9 +36,6 @@ type ClusterRegistrationToken struct {
 	Command                    string            `json:"command,omitempty" yaml:"command,omitempty"`
 	Created                    string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                  string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	ExpiresAt                  string            `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
-	GracePeriod                *int64            `json:"gracePeriod,omitempty" yaml:"gracePeriod,omitempty"`
-	GracePeriodExpiresAt       string            `json:"gracePeriodExpiresAt,omitempty" yaml:"gracePeriodExpiresAt,omitempty"`
 	InsecureCommand            string            `json:"insecureCommand,omitempty" yaml:"insecureCommand,omitempty"`
 	InsecureNodeCommand        string            `json:"insecureNodeCommand,omitempty" yaml:"insecureNodeCommand,omitempty"`
 	InsecureWindowsNodeCommand string            `json:"insecureWindowsNodeCommand,omitempty" yaml:"insecureWindowsNodeCommand,omitempty"`
@@ -55,9 +47,7 @@ type ClusterRegistrationToken struct {
 	OwnerReferences            []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed                    string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                      string            `json:"state,omitempty" yaml:"state,omitempty"`
-	TTL                        *int64            `json:"ttl,omitempty" yaml:"ttl,omitempty"`
 	Token                      string            `json:"token,omitempty" yaml:"token,omitempty"`
-	TokenSecretName            string            `json:"tokenSecretName,omitempty" yaml:"tokenSecretName,omitempty"`
 	Transitioning              string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage       string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                       string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

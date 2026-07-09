@@ -33,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/remotecommand"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -346,111 +344,16 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 		return "", err
 	}
 
-	// Wait for at least one CRT to exist
-	var crt *v3.ClusterRegistrationToken
 	for i := 0; i < 15; i++ {
 		tokens, err := clients.Mgmt.ClusterRegistrationToken().List(c.Status.ClusterName, metav1.ListOptions{})
-		if err != nil || len(tokens.Items) == 0 {
-			logrus.Infof("[CustomCommand] Attempt %d: No CRTs found yet (err=%v)", i+1, err)
+		if err != nil || len(tokens.Items) == 0 || tokens.Items[0].Status.NodeCommand == "" {
 			time.Sleep(time.Second)
 			continue
 		}
-		crt = &tokens.Items[0]
-		break
-	}
-	if crt == nil {
-		return "", fmt.Errorf("timeout waiting for CRT to be created")
-	}
-	err = wait.Object(clients.Ctx, func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-		return clients.Mgmt.ClusterRegistrationToken().Watch(namespace, opts)
-	}, crt, func(obj runtime.Object) (bool, error) {
-		crt = obj.(*v3.ClusterRegistrationToken)
-		return crt.Status.TokenSecretName != "" && crt.Status.NodeCommand != "", nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("timeout waiting for CRT TokenSecretName and NodeCommand: %w", err)
-	}
-	secret, err := clients.Core.Secret().Get(crt.Namespace, crt.Status.TokenSecretName, metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to get token secret %s/%s: %w", crt.Namespace, crt.Status.TokenSecretName, err)
-	}
-	token := string(secret.Data["token"])
-	if token == "" {
-		return "", fmt.Errorf("token not found in secret %s/%s", crt.Namespace, crt.Status.TokenSecretName)
+		return strings.Replace(tokens.Items[0].Status.InsecureNodeCommand, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
 	}
 
-	command := strings.ReplaceAll(crt.Status.InsecureNodeCommand, "{token}", token)
-	return strings.Replace(command, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
-}
-
-func ImportCommand(clients *clients.Clients, mgmtCluster *v3.Cluster) (string, error) {
-	// Wait for at least one CRT to exist.
-	var crt *v3.ClusterRegistrationToken
-	for i := 0; i < 15; i++ {
-		tokens, err := clients.Mgmt.ClusterRegistrationToken().List(mgmtCluster.Name, metav1.ListOptions{})
-		if err != nil || len(tokens.Items) == 0 {
-			logrus.Infof("[ImportCommand] Attempt %d: No CRTs found yet (err=%v)", i+1, err)
-			time.Sleep(time.Second)
-			continue
-		}
-		crt = &tokens.Items[0]
-		break
-	}
-	if crt == nil {
-		return "", fmt.Errorf("timeout waiting for CRT to be created")
-	}
-
-	// Wait for the CRT to have a TokenSecretName and a populated InsecureCommand.
-	// InsecureCommand contains a "{token}" placeholder that must be resolved from the secret.
-	err := wait.Object(clients.Ctx, func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-		return clients.Mgmt.ClusterRegistrationToken().Watch(namespace, opts)
-	}, crt, func(obj runtime.Object) (bool, error) {
-		crt = obj.(*v3.ClusterRegistrationToken)
-		return crt.Status.TokenSecretName != "" && crt.Status.InsecureCommand != "", nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("timeout waiting for CRT TokenSecretName and InsecureCommand: %w", err)
-	}
-
-	secret, err := clients.Core.Secret().Get(crt.Namespace, crt.Status.TokenSecretName, metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to get token secret %s/%s: %w", crt.Namespace, crt.Status.TokenSecretName, err)
-	}
-	token := string(secret.Data["token"])
-	if token == "" {
-		return "", fmt.Errorf("token not found in secret %s/%s", crt.Namespace, crt.Status.TokenSecretName)
-	}
-
-	command := strings.ReplaceAll(crt.Status.InsecureCommand, "{token}", token)
-	return strings.Replace(command, "curl", "curl --retry-connrefused --retry-delay 5 --retry 30", -1), nil
-}
-
-func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...string) (string, error) {
-	req := clients.K8s.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(namespace).
-		Name(podName).
-		SubResource("exec").
-		VersionedParams(&corev1.PodExecOptions{
-			Command: cmd,
-			Stdout:  true,
-			Stderr:  true,
-		}, scheme.ParameterCodec)
-
-	executor, err := remotecommand.NewSPDYExecutor(clients.RESTConfig, "POST", req.URL())
-	if err != nil {
-		return "", fmt.Errorf("failed to create executor: %w", err)
-	}
-
-	var stdout, stderr strings.Builder
-	err = executor.StreamWithContext(clients.Ctx, remotecommand.StreamOptions{
-		Stdout: &stdout,
-		Stderr: &stderr,
-	})
-	if err != nil {
-		return stdout.String(), fmt.Errorf("exec failed: %w: %s", err, stderr.String())
-	}
-	return stdout.String(), nil
+	return "", fmt.Errorf("timeout getting custom command")
 }
 
 // getPodLogs gathers the logs from the specified pod in a manner similar to `kubectl logs`

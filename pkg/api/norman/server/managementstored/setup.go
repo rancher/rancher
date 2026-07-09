@@ -211,8 +211,7 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterRegistrationTokenType)
 	schema.Store = &cluster.RegistrationTokenStore{
-		Store:       schema.Store,
-		SecretCache: management.Wrangler.Core.Secret().Cache(),
+		Store: schema.Store,
 	}
 }
 
