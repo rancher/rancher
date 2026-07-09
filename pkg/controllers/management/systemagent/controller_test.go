@@ -89,7 +89,7 @@ func TestShouldReconcileImportedDisable(t *testing.T) {
 	}
 }
 
-func TestInstallerSetsDeleteFalseEnv(t *testing.T) {
+func TestInstallerSetsUninstallFalseEnv(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
@@ -98,7 +98,7 @@ func TestInstallerSetsDeleteFalseEnv(t *testing.T) {
 			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 				AgentEnvVars: []corev1.EnvVar{
 					{Name: "FOO", Value: "bar"},
-					{Name: "DELETE", Value: "false"},
+					{Name: "UNINSTALL", Value: "false"},
 					{Name: "STRICT_VERIFY", Value: "custom-strict"},
 				},
 			},
@@ -110,21 +110,21 @@ func TestInstallerSetsDeleteFalseEnv(t *testing.T) {
 		t.Fatalf("expected 2 rendered plans, got %d", len(plans))
 	}
 	for _, plan := range plans {
-		value, ok := envVar(plan.Spec.Upgrade.Env, "DELETE")
+		value, ok := envVar(plan.Spec.Upgrade.Env, "UNINSTALL")
 		if !ok || value != "false" {
-			t.Fatalf("expected DELETE=false in install plan %s", plan.Name)
+			t.Fatalf("expected UNINSTALL=false in install plan %s", plan.Name)
 		}
-		if len(plan.Spec.Upgrade.Env) == 0 || plan.Spec.Upgrade.Env[0].Name != "DELETE" || plan.Spec.Upgrade.Env[0].Value != "false" {
-			t.Fatalf("expected DELETE=false to be the first env in install plan %s", plan.Name)
+		if len(plan.Spec.Upgrade.Env) == 0 || plan.Spec.Upgrade.Env[0].Name != "UNINSTALL" || plan.Spec.Upgrade.Env[0].Value != "false" {
+			t.Fatalf("expected UNINSTALL=false to be the first env in install plan %s", plan.Name)
 		}
-		deleteCount := 0
+		uninstallCount := 0
 		for _, env := range plan.Spec.Upgrade.Env {
-			if env.Name == "DELETE" {
-				deleteCount++
+			if env.Name == "UNINSTALL" {
+				uninstallCount++
 			}
 		}
-		if deleteCount != 1 {
-			t.Fatalf("expected exactly one DELETE env in install plan %s, got %d", plan.Name, deleteCount)
+		if uninstallCount != 1 {
+			t.Fatalf("expected exactly one UNINSTALL env in install plan %s, got %d", plan.Name, uninstallCount)
 		}
 		roleNoneValue, ok := envVar(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE")
 		if !ok || roleNoneValue != "true" {
@@ -145,7 +145,7 @@ func TestInstallerSetsDeleteFalseEnv(t *testing.T) {
 	}
 }
 
-func TestUninstallerSetsDeleteEnv(t *testing.T) {
+func TestUninstallerSetsUninstallEnv(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
@@ -154,7 +154,7 @@ func TestUninstallerSetsDeleteEnv(t *testing.T) {
 			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 				AgentEnvVars: []corev1.EnvVar{
 					{Name: "FOO", Value: "bar"},
-					{Name: "DELETE", Value: "false"},
+					{Name: "UNINSTALL", Value: "false"},
 					{Name: "STRICT_VERIFY", Value: "custom-strict"},
 				},
 			},
@@ -166,21 +166,21 @@ func TestUninstallerSetsDeleteEnv(t *testing.T) {
 		t.Fatalf("expected 2 rendered plans, got %d", len(plans))
 	}
 	for _, plan := range plans {
-		value, ok := envVar(plan.Spec.Upgrade.Env, "DELETE")
+		value, ok := envVar(plan.Spec.Upgrade.Env, "UNINSTALL")
 		if !ok || value != "true" {
-			t.Fatalf("expected DELETE=true in uninstall plan %s", plan.Name)
+			t.Fatalf("expected UNINSTALL=true in uninstall plan %s", plan.Name)
 		}
-		if len(plan.Spec.Upgrade.Env) == 0 || plan.Spec.Upgrade.Env[0].Name != "DELETE" || plan.Spec.Upgrade.Env[0].Value != "true" {
-			t.Fatalf("expected DELETE=true to be the first env in uninstall plan %s", plan.Name)
+		if len(plan.Spec.Upgrade.Env) == 0 || plan.Spec.Upgrade.Env[0].Name != "UNINSTALL" || plan.Spec.Upgrade.Env[0].Value != "true" {
+			t.Fatalf("expected UNINSTALL=true to be the first env in uninstall plan %s", plan.Name)
 		}
-		deleteCount := 0
+		uninstallCount := 0
 		for _, env := range plan.Spec.Upgrade.Env {
-			if env.Name == "DELETE" {
-				deleteCount++
+			if env.Name == "UNINSTALL" {
+				uninstallCount++
 			}
 		}
-		if deleteCount != 1 {
-			t.Fatalf("expected exactly one DELETE env in uninstall plan %s, got %d", plan.Name, deleteCount)
+		if uninstallCount != 1 {
+			t.Fatalf("expected exactly one UNINSTALL env in uninstall plan %s, got %d", plan.Name, uninstallCount)
 		}
 		roleNoneValue, ok := envVar(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE")
 		if !ok || roleNoneValue != "true" {

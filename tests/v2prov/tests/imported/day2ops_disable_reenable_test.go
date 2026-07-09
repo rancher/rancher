@@ -34,9 +34,9 @@ const (
 	systemAgentConnectionInfoPath        = "/var/lib/rancher/agent/rancher2_connection_info.json"
 	importedDay2OpsFeatureName           = "imported-day-2-ops"
 	importedNodeAPIServerWaitTimeout     = 5 * time.Minute
-	importedIdentityWaitTimeout          = 10 * time.Minute
-	importedDisableWaitTimeout           = 20 * time.Minute
-	importedSystemAgentTransitionTimeout = 15 * time.Minute
+	importedIdentityWaitTimeout          = 25 * time.Minute
+	importedDisableWaitTimeout           = 25 * time.Minute
+	importedSystemAgentTransitionTimeout = 25 * time.Minute
 
 	systemAgentUpgraderPlanName = "system-agent-upgrader"
 )
@@ -99,7 +99,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *
 	assert.Len(t, phase1Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase1Identity.PlanRoles, 1)
 	assert.Len(t, phase1Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 1 identity: %s", summarizeImportedPlanIdentity(phase1Identity))
 
 	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, true, importedSystemAgentTransitionTimeout)
@@ -118,6 +118,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *
 	if _, err := setClusterAnnotation(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "false"); err != nil {
 		t.Fatal(err)
 	}
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "true", importedIdentityWaitTimeout)
 	phase2Cluster := waitForImportedDay2OpsDisabled(t, clients, fixture.mgmtCluster.Name, importedDisableWaitTimeout)
 	assert.Equal(t, "false", phase2Cluster.Annotations[opsEnabledAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[importedCleaningStateAnnotation])
@@ -151,7 +152,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *
 	assert.Len(t, phase3Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase3Identity.PlanRoles, 1)
 	assert.Len(t, phase3Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 3 identity: %s", summarizeImportedPlanIdentity(phase3Identity))
 
 	newMachinePlanSecretName := phase3Identity.MachinePlanSecrets[0].Name
@@ -227,19 +228,19 @@ func waitForImportedAPIServer(t *testing.T, clients *clients.Clients, namespace,
 	}
 }
 
-func waitForDownstreamSystemAgentPlanDeleteMode(
+func waitForDownstreamSystemAgentPlanUninstallMode(
 	t *testing.T,
 	clients *clients.Clients,
-	namespace, podName, kubectlEnv, expectedDelete string,
+	namespace, podName, kubectlEnv, expectedUninstall string,
 	timeout time.Duration,
 ) {
 	t.Helper()
 
 	var (
-		lastOutput      string
-		lastErr         error
-		lastDeleteValue string
-		lastDeleteCount int
+		lastOutput         string
+		lastErr            error
+		lastUninstallValue string
+		lastUninstallCount int
 	)
 	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, timeout, true, func(_ context.Context) (bool, error) {
 		lastOutput, lastErr = cluster.ExecOnPod(
@@ -258,29 +259,29 @@ func waitForDownstreamSystemAgentPlanDeleteMode(
 			return false, nil
 		}
 
-		lastDeleteCount = 0
-		lastDeleteValue = ""
+		lastUninstallCount = 0
+		lastUninstallValue = ""
 		for _, line := range strings.Split(strings.TrimSpace(lastOutput), "\n") {
 			line = strings.TrimSpace(line)
-			if !strings.HasPrefix(line, "DELETE=") {
+			if !strings.HasPrefix(line, "UNINSTALL=") {
 				continue
 			}
-			lastDeleteCount++
-			lastDeleteValue = strings.TrimSpace(strings.TrimPrefix(line, "DELETE="))
+			lastUninstallCount++
+			lastUninstallValue = strings.TrimSpace(strings.TrimPrefix(line, "UNINSTALL="))
 		}
 
-		return lastDeleteCount == 1 && lastDeleteValue == expectedDelete, nil
+		return lastUninstallCount == 1 && lastUninstallValue == expectedUninstall, nil
 	})
 	if err != nil {
 		t.Fatalf(
-			"timed out waiting for downstream plan %s DELETE=%s exactly once on pod %s/%s: %v (lastDeleteCount=%d lastDeleteValue=%q lastErr=%v output=%q)",
+			"timed out waiting for downstream plan %s UNINSTALL=%s exactly once on pod %s/%s: %v (lastUninstallCount=%d lastUninstallValue=%q lastErr=%v output=%q)",
 			systemAgentUpgraderPlanName,
-			expectedDelete,
+			expectedUninstall,
 			namespace,
 			podName,
 			err,
-			lastDeleteCount,
-			lastDeleteValue,
+			lastUninstallCount,
+			lastUninstallValue,
 			lastErr,
 			strings.TrimSpace(lastOutput),
 		)

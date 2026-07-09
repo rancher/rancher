@@ -56,7 +56,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_Mul
 	phase1Cluster := waitForClusterAnnotationValue(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "true", importedIdentityWaitTimeout)
 	assert.Equal(t, "true", phase1Cluster.Annotations[opsEnabledAnnotation])
 
-	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 
 	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, true, importedSystemAgentTransitionTimeout)
 	phase1SecretSet := waitForPodsConnectionInfoToMatchNodePlanIdentity(t, clients, fixture.mgmtCluster.Name, fixture.ns.Name, expectedNodeByPod, importedIdentityWaitTimeout)
@@ -73,7 +73,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_Mul
 	if _, err := setClusterAnnotation(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "false"); err != nil {
 		t.Fatal(err)
 	}
-
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "true", importedIdentityWaitTimeout)
 	phase2Cluster := waitForImportedDay2OpsDisabled(t, clients, fixture.mgmtCluster.Name, importedDisableWaitTimeout)
 	assert.Equal(t, "false", phase2Cluster.Annotations[opsEnabledAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[importedCleaningStateAnnotation])
@@ -96,7 +96,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_Mul
 	assert.Equal(t, "true", phase3Cluster.Annotations[opsEnabledAnnotation])
 	assert.NotEmpty(t, waitForAppliedSystemAgentHash(t, clients, fixture.mgmtCluster.Name, importedIdentityWaitTimeout))
 
-	waitForDownstreamSystemAgentPlanDeleteMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 
 	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, true, importedSystemAgentTransitionTimeout)
 	phase3SecretSet := waitForPodsConnectionInfoToMatchNodePlanIdentity(t, clients, fixture.mgmtCluster.Name, fixture.ns.Name, expectedNodeByPod, importedIdentityWaitTimeout)
