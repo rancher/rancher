@@ -8,6 +8,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
+	k8sprovider "github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
@@ -47,6 +48,86 @@ func TestShouldReconcileImportedDisable(t *testing.T) {
 		importedCleaningStateAnnotation: apimgmtv3.ImportedDay2OpsCleaningStateOperations,
 	}) {
 		t.Fatalf("expected cleaning state to keep disable reconciliation sticky")
+	}
+}
+
+func TestShouldInstall(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cluster *apimgmtv3.Cluster
+		want    bool
+	}{
+		{
+			name: "local cluster is skipped",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "local"},
+			},
+			want: false,
+		},
+		{
+			name: "administrated cluster is skipped",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "c-m-admin",
+					Annotations: map[string]string{"provisioning.cattle.io/administrated": "true"},
+				},
+				Status: apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
+			},
+			want: false,
+		},
+		{
+			name: "imported rke2 cluster is handled",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "c-m-rke2"},
+				Status:     apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverRke2},
+			},
+			want: true,
+		},
+		{
+			name: "imported k3s cluster is handled",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "c-m-k3s"},
+				Status:     apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverK3s},
+			},
+			want: true,
+		},
+		{
+			name: "provider label rke2 fallback is handled",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "c-m-capr-rke2",
+					Labels: map[string]string{k8sprovider.ProviderKey: "rke2"},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "provider label k3s fallback is handled",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "c-m-capr-k3s",
+					Labels: map[string]string{k8sprovider.ProviderKey: "k3s"},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "unrelated cluster is ignored",
+			cluster: &apimgmtv3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "c-m-other"},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldInstall(tt.cluster); got != tt.want {
+				t.Fatalf("expected shouldInstall=%t, got %t", tt.want, got)
+			}
+		})
 	}
 }
 

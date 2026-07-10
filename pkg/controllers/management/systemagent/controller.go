@@ -10,9 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	lassodynamic "github.com/rancher/lasso/pkg/dynamic"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	k8sprovider "github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -34,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
+	capiv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
@@ -64,6 +68,29 @@ const (
 	importedDay2OpsDisableRequeueInterval     = 5 * time.Second
 )
 
+// OperationsEnabledForCluster checks if imported day2ops is enabled for a given cluster.
+func OperationsEnabledForCluster(cluster *apimgmtv3.Cluster) bool {
+	if cluster == nil {
+		return false
+	}
+
+	value := ""
+	if cluster.Annotations != nil {
+		value = cluster.Annotations[day2OpsEnabledAnnotation]
+	}
+
+	switch value {
+	case "true":
+		return true
+	case "false":
+		return false
+	case "system-default":
+		fallthrough
+	default:
+		return settings.ImportedClusterDay2OpsEnabledDefault.Get() == "true"
+	}
+}
+
 var (
 	// installCounter keeps track of the number of clusters for which the handler is concurrently installing or upgrading
 	// the resources needed for upgrading system-agent.
@@ -75,6 +102,7 @@ var (
 type handler struct {
 	ctx     context.Context
 	manager *clustermanager.Manager
+	dynamic *lassodynamic.Controller
 
 	clusters    mgmtcontrollers.ClusterController
 	beacons     plancontrollers.BeaconClient
@@ -100,6 +128,7 @@ func Register(ctx context.Context, w *wrangler.Context, manager *clustermanager.
 	h := &handler{
 		ctx:                      ctx,
 		manager:                  manager,
+		dynamic:                  w.Dynamic,
 		clusters:                 w.Mgmt.Cluster(),
 		beacons:                  w.Plan.Beacon(),
 		beaconCache:              w.Plan.Beacon().Cache(),
@@ -118,9 +147,72 @@ func Register(ctx context.Context, w *wrangler.Context, manager *clustermanager.
 		roleBindings:             w.RBAC.RoleBinding(),
 		roleBindingCache:         w.RBAC.RoleBinding().Cache(),
 	}
-	if features.ImportedDay2Ops.Enabled() {
-		w.Mgmt.Cluster().OnChange(ctx, "imported-system-agent-setup", h.onChange)
+	w.Mgmt.Cluster().OnChange(ctx, "imported-system-agent-setup", h.onChange)
+}
+
+// shouldInstall matches the historical scope of this controller: imported RKE2/K3s and
+// imported CAPR-backed RKE2/K3s clusters, while skipping provisioned/administrated clusters.
+func shouldInstall(cluster *apimgmtv3.Cluster) bool {
+	if cluster == nil {
+		return false
 	}
+
+	if cluster.Name == "local" {
+		return false
+	}
+
+	if cluster.Annotations != nil && cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+		return false
+	}
+
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+		return true
+	}
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 {
+		return true
+	}
+
+	if cluster.Labels != nil && cluster.Labels[k8sprovider.ProviderKey] == "rke2" {
+		return true
+	}
+	if cluster.Labels != nil && cluster.Labels[k8sprovider.ProviderKey] == "k3s" {
+		return true
+	}
+
+	return false
+}
+
+func (h *handler) clusterOwner(cluster *apimgmtv3.Cluster) (*corev1.ObjectReference, error) {
+	if cluster.Labels != nil &&
+		cluster.Labels["cluster-api.cattle.io/capi-cluster-owner"] != "" &&
+		cluster.Labels["cluster-api.cattle.io/capi-cluster-owner-ns"] != "" {
+		capiCluster, err := h.dynamic.Get(
+			capiv1beta2.GroupVersion.WithKind("Cluster"),
+			cluster.Labels["cluster-api.cattle.io/capi-cluster-owner-ns"],
+			cluster.Labels["cluster-api.cattle.io/capi-cluster-owner"],
+		)
+		if err != nil {
+			return nil, err
+		}
+		m, err := meta.Accessor(capiCluster)
+		if err != nil {
+			return nil, err
+		}
+		return &corev1.ObjectReference{
+			APIVersion: capiv1beta2.GroupVersion.String(),
+			Kind:       "Cluster",
+			Namespace:  m.GetNamespace(),
+			Name:       m.GetName(),
+			UID:        m.GetUID(),
+		}, nil
+	}
+
+	return &corev1.ObjectReference{
+		APIVersion: cluster.APIVersion,
+		Kind:       "Cluster",
+		Name:       cluster.Name,
+		UID:        cluster.UID,
+	}, nil
 }
 
 func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
@@ -128,36 +220,22 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 		return cluster, nil
 	}
 
-	if cluster.Name == "local" {
+	if !shouldInstall(cluster) {
 		return cluster, nil
 	}
 
-	// only applies to imported RKE2/K3s cluster
-	if cluster.Status.Driver != apimgmtv3.ClusterDriverK3s && cluster.Status.Driver != apimgmtv3.ClusterDriverRke2 {
-		return cluster, nil
-	}
-
-	if cluster.Annotations[day2OpsEnabledAnnotation] == "" {
-		if settings.ImportedClusterDay2OpsEnabledDefault.Get() == "true" {
-			cluster := cluster.DeepCopy()
-			if cluster.Annotations == nil {
-				cluster.Annotations = map[string]string{}
-			}
-			cluster.Annotations[day2OpsEnabledAnnotation] = "true"
-			logrus.Infof("[importedsystemagent] cluster %s: setting %s to true", cluster.Name, day2OpsEnabledAnnotation)
-			return h.clusters.Update(cluster)
-		}
-		return cluster, nil
-	}
+	enabled := features.ImportedDay2Ops.Enabled() && OperationsEnabledForCluster(cluster)
 
 	// Once imported disable has started, keep reconciling disable until it reaches a safe terminal
 	// point, even if ops-enabled is flipped back to true.
 	if shouldReconcileImportedDisable(cluster.Annotations) {
 		return h.reconcileImportedDisable(cluster)
 	}
-	if cluster.Annotations[day2OpsEnabledAnnotation] != "true" {
-		return cluster, nil
+
+	if !enabled {
+		return h.reconcileImportedDisable(cluster)
 	}
+
 	return h.reconcileImportedEnable(cluster)
 }
 
@@ -178,18 +256,28 @@ func (h *handler) reconcileImportedEnable(cluster *apimgmtv3.Cluster) (*apimgmtv
 
 // reconcileImportedInstall ensures the imported system-agent upgrade resources exist and match the current template hash.
 func (h *handler) reconcileImportedInstall(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
-	_, err := h.beaconCache.Get(cluster.Name, cluster.Name)
+	ref, err := h.clusterOwner(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = ref.Name
+	}
+
+	_, err = h.beaconCache.Get(namespace, ref.Name)
 	if apierrors.IsNotFound(err) {
 		_, err = h.beacons.Create(&planv1alpha1.Beacon{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      cluster.Name,
-				Namespace: cluster.Name,
+				Name:      ref.Name,
+				Namespace: namespace,
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion: cluster.APIVersion,
-						Kind:       cluster.Kind,
-						Name:       cluster.Name,
-						UID:        cluster.UID,
+						APIVersion: ref.APIVersion,
+						Kind:       ref.Kind,
+						Name:       ref.Name,
+						UID:        ref.UID,
 					},
 				},
 			}})
@@ -305,9 +393,18 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 
 	switch state {
 	case apimgmtv3.ImportedDay2OpsCleaningStateOperations:
+		ref, err := h.clusterOwner(cluster)
+		if err != nil {
+			return nil, err
+		}
+		namespace := ref.Namespace
+		if namespace == "" {
+			namespace = ref.Name
+		}
+
 		// First block new day2ops work by taking the beacon, then remove any in-flight
 		// operation CRs before starting the system-agent uninstall rollout.
-		beacon, err := h.beaconCache.Get(cluster.Name, cluster.Name)
+		beacon, err := h.beaconCache.Get(namespace, ref.Name)
 		if apierrors.IsNotFound(err) {
 			beacon = nil
 		} else if err != nil {
@@ -441,7 +538,7 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 	case apimgmtv3.ImportedDay2OpsCleaningStateBeacon:
 		// Release the imported beacon last so new operations cannot start until all imported
 		// day2ops bookkeeping and delivery resources have been removed.
-		if remaining, err := h.deleteBeacon(cluster.Name); err != nil {
+		if remaining, err := h.deleteBeacon(cluster); err != nil {
 			return cluster, err
 		} else if remaining {
 			h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
@@ -468,7 +565,16 @@ func (h *handler) disableNeeded(cluster *apimgmtv3.Cluster) (bool, error) {
 		return true, nil
 	}
 
-	_, err := h.beaconCache.Get(cluster.Name, cluster.Name)
+	ref, err := h.clusterOwner(cluster)
+	if err != nil {
+		return false, err
+	}
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = ref.Name
+	}
+
+	_, err = h.beaconCache.Get(namespace, ref.Name)
 	if err == nil {
 		return true, nil
 	}
@@ -740,8 +846,17 @@ func (h *handler) deleteImportedPlanIdentity(serviceAccount *corev1.ServiceAccou
 }
 
 // deleteBeacon deletes the imported beacon and returns true while it is still present.
-func (h *handler) deleteBeacon(clusterName string) (bool, error) {
-	beacon, err := h.beacons.Get(clusterName, clusterName, metav1.GetOptions{})
+func (h *handler) deleteBeacon(cluster *apimgmtv3.Cluster) (bool, error) {
+	ref, err := h.clusterOwner(cluster)
+	if err != nil {
+		return false, err
+	}
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = ref.Name
+	}
+
+	beacon, err := h.beacons.Get(namespace, ref.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -749,7 +864,7 @@ func (h *handler) deleteBeacon(clusterName string) (bool, error) {
 		return false, err
 	}
 	if beacon.DeletionTimestamp == nil {
-		if err := h.beacons.Delete(clusterName, clusterName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := h.beacons.Delete(namespace, ref.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
 	}
