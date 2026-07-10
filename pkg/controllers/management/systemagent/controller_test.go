@@ -558,13 +558,13 @@ func TestDisableNeededReturnsTrueForLeftoverImportedPlanIdentity(t *testing.T) {
 			},
 		},
 		serviceAccountCache: &fakeServiceAccountCache{},
-		roles: &fakeRoleClient{
-			items: []rbacv1.Role{
+		roleCache: &fakeRoleCache{
+			items: []*rbacv1.Role{
 				{ObjectMeta: metav1.ObjectMeta{Name: "leftover-machine-plan", Namespace: "c-m-test"}},
 			},
 		},
-		roleBindings: &fakeRoleBindingClient{
-			items: []rbacv1.RoleBinding{
+		roleBindingCache: &fakeRoleBindingCache{
+			items: []*rbacv1.RoleBinding{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "leftover-machine-plan", Namespace: "c-m-test"},
 					Subjects: []rbacv1.Subject{
@@ -863,13 +863,8 @@ func (f *fakeServiceAccountClient) Delete(namespace, name string, _ *metav1.Dele
 
 type fakeRoleClient struct {
 	rbaccontrollers.RoleClient
-	items   []rbacv1.Role
 	deleted []namespacedName
 	err     error
-}
-
-func (f *fakeRoleClient) List(string, metav1.ListOptions) (*rbacv1.RoleList, error) {
-	return &rbacv1.RoleList{Items: f.items}, f.err
 }
 
 func (f *fakeRoleClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
@@ -877,18 +872,33 @@ func (f *fakeRoleClient) Delete(namespace, name string, _ *metav1.DeleteOptions)
 	return f.err
 }
 
-type fakeRoleBindingClient struct {
-	rbaccontrollers.RoleBindingClient
-	items   []rbacv1.RoleBinding
-	deleted []namespacedName
-	err     error
+type fakeRoleCache struct {
+	rbaccontrollers.RoleCache
+	items []*rbacv1.Role
+	err   error
 }
 
-func (f *fakeRoleBindingClient) List(string, metav1.ListOptions) (*rbacv1.RoleBindingList, error) {
-	return &rbacv1.RoleBindingList{Items: f.items}, f.err
+func (f *fakeRoleCache) List(string, labels.Selector) ([]*rbacv1.Role, error) {
+	return f.items, f.err
+}
+
+type fakeRoleBindingClient struct {
+	rbaccontrollers.RoleBindingClient
+	deleted []namespacedName
+	err     error
 }
 
 func (f *fakeRoleBindingClient) Delete(namespace, name string, _ *metav1.DeleteOptions) error {
 	f.deleted = append(f.deleted, namespacedName{namespace: namespace, name: name})
 	return f.err
+}
+
+type fakeRoleBindingCache struct {
+	rbaccontrollers.RoleBindingCache
+	items []*rbacv1.RoleBinding
+	err   error
+}
+
+func (f *fakeRoleBindingCache) List(string, labels.Selector) ([]*rbacv1.RoleBinding, error) {
+	return f.items, f.err
 }

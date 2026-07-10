@@ -91,7 +91,9 @@ type handler struct {
 	secrets                  corecontrollers.SecretClient
 	secretCache              corecontrollers.SecretCache
 	roles                    rbaccontrollers.RoleClient
+	roleCache                rbaccontrollers.RoleCache
 	roleBindings             rbaccontrollers.RoleBindingClient
+	roleBindingCache         rbaccontrollers.RoleBindingCache
 }
 
 func Register(ctx context.Context, w *wrangler.Context, manager *clustermanager.Manager) {
@@ -112,7 +114,9 @@ func Register(ctx context.Context, w *wrangler.Context, manager *clustermanager.
 		secrets:                  w.Core.Secret(),
 		secretCache:              w.Core.Secret().Cache(),
 		roles:                    w.RBAC.Role(),
+		roleCache:                w.RBAC.Role().Cache(),
 		roleBindings:             w.RBAC.RoleBinding(),
+		roleBindingCache:         w.RBAC.RoleBinding().Cache(),
 	}
 	if features.ImportedDay2Ops.Enabled() {
 		w.Mgmt.Cluster().OnChange(ctx, "imported-system-agent-setup", h.onChange)
@@ -671,28 +675,28 @@ func (h *handler) hasImportedPlanIdentityResources(clusterName string) (bool, er
 		}
 	}
 
-	roles, err := h.roles.List(clusterName, metav1.ListOptions{})
+	roles, err := h.roleCache.List(clusterName, labels.Everything())
 	if err != nil {
 		return false, err
 	}
-	for i := range roles.Items {
-		if strings.HasSuffix(roles.Items[i].Name, "-machine-plan") {
+	for i := range roles {
+		if strings.HasSuffix(roles[i].Name, "-machine-plan") {
 			return true, nil
 		}
 	}
 
-	roleBindings, err := h.roleBindings.List(clusterName, metav1.ListOptions{})
+	roleBindings, err := h.roleBindingCache.List(clusterName, labels.Everything())
 	if err != nil {
 		return false, err
 	}
-	for i := range roleBindings.Items {
-		if !strings.HasSuffix(roleBindings.Items[i].Name, "-machine-plan") {
+	for i := range roleBindings {
+		if !strings.HasSuffix(roleBindings[i].Name, "-machine-plan") {
 			continue
 		}
-		for j := range roleBindings.Items[i].Subjects {
-			subject := roleBindings.Items[i].Subjects[j]
+		for j := range roleBindings[i].Subjects {
+			subject := roleBindings[i].Subjects[j]
 			if subject.Kind == "ServiceAccount" &&
-				subject.Name == roleBindings.Items[i].Name &&
+				subject.Name == roleBindings[i].Name &&
 				(subject.Namespace == "" || subject.Namespace == clusterName) {
 				return true, nil
 			}
