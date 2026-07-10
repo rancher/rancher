@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/machinerole"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/machineroletaint"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nsserviceaccount"
@@ -139,6 +140,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 		}
 	}
 	machinerole.Register(ctx, cluster)
+	machineroletaint.Register(ctx, cluster, capi)
 }
 
 func RegisterFollower(cluster *config.UserContext) error {
