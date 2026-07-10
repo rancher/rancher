@@ -19,6 +19,10 @@ const (
 	secretPrefix         = "crt-token-"
 	tokenDataKey         = "token"
 	previousTokenDataKey = "previousToken"
+	// expiresAt and gracePeriodExpiresAt keys store the rotation schedule next to the
+	// token it governs. Required to stay idempotent against duplicate rotation triggers.
+	expiresAtDataKey            = "expiresAt"
+	gracePeriodExpiresAtDataKey = "gracePeriodExpiresAt"
 )
 
 func SecretName(crtName string) string {
@@ -76,7 +80,7 @@ func NewTokenSecret(crt *v3.ClusterRegistrationToken, token string, expiresAt st
 	}
 
 	if expiresAt != "" {
-		data["expiresAt"] = []byte(expiresAt)
+		data[expiresAtDataKey] = []byte(expiresAt)
 	}
 
 	return &corev1.Secret{
