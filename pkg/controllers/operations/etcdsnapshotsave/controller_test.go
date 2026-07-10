@@ -41,7 +41,11 @@ type stubAdapter struct {
 	probes             map[string]planapi.Probe
 }
 
-func (a *stubAdapter) BeaconRef() (string, string) { return "test-namespace", "test-cluster" }
+func (a *stubAdapter) BeaconRef() (string, string)   { return "test-namespace", "test-cluster" }
+func (a *stubAdapter) EtcdSnapshotNamespace() string { return "test-namespace" }
+func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
+	return &unstructured.Unstructured{}, nil
+}
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }

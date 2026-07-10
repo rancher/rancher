@@ -263,6 +263,11 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		return status, err
 	}
 
+	clusterObj, err := a.ClusterObject()
+	if err != nil {
+		return status, err
+	}
+
 	// Resolve the beacon (and every other cluster-scoped artifact — plan secrets, snapshot CRs)
 	// via the adapter, not the op.Spec.ClusterRef. When the UI creates ops against the mgmt v3
 	// Cluster, ClusterRef points there but the real state lives in the underlying provisioner's
@@ -289,7 +294,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
-		clusterObj: &ustr,
+		clusterObj: clusterObj,
 		adapter:    a,
 	}
 
@@ -848,37 +853,38 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 	}
 
 	filter := ops.IsEtcd
-	snapshot, err := h.etcdsnapshots.Get(s.namespace, snapshotName, metav1.GetOptions{})
+	snapshot, err := h.etcdsnapshots.Get(s.adapter.EtcdSnapshotNamespace(), snapshotName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		logrus.Debugf("[etcdsnapshotrestore] %s/%s: could not find associated etcdsnapshot.rke.cattle.io %s, assuming snapshot file", s.op.Namespace, s.op.Name, snapshotName)
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: could not find associated etcdsnapshot.rke.cattle.io %s/%s, assuming snapshot file", s.op.Namespace, s.op.Name, s.adapter.EtcdSnapshotNamespace(), snapshotName)
 		snapshot = nil
 	} else if err != nil {
 		return status, err
 	} else if snapshot != nil && snapshot.SnapshotFile.S3 == nil {
-		if len(snapshot.OwnerReferences) == 0 {
-			logrus.Errorf("[etcdsnapshotrestore] %s/%s: cannot find machine by owner reference for snapshot %s/%s", s.op.Namespace, s.op.Name, snapshot.Namespace, snapshot.Name)
+		// Prefer the snapshot's stamped MachineLifecycleNameLabel (used by CAPRKE2 where the
+		// owner ref is a mgmt v3 Node but plan secrets are labelled with the CAPI Machine's
+		// name). Fall back to OwnerReferences[0].Name for v2prov/imported paths that predate the
+		// label.
+		machineName := snapshot.Labels[planv1alpha1.MachineLifecycleNameLabel]
+		if machineName == "" && len(snapshot.OwnerReferences) > 0 {
+			machineName = snapshot.OwnerReferences[0].Name
+		}
+		if machineName == "" {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: cannot correlate machine for snapshot %s/%s (no lifecycle label, no owner reference)", s.op.Namespace, s.op.Name, snapshot.Namespace, snapshot.Name)
 
 			status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 			opv1alpha1.FailedCondition.True(&status)
 			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
-			opv1alpha1.FailedCondition.Message(&status, "owner reference is required for s3 etcd restore")
+			opv1alpha1.FailedCondition.Message(&status, "machine correlation is required for local etcd restore")
 
 			return status, nil
 		}
-
-		ref := snapshot.OwnerReferences[0]
 
 		filter = func(secret *corev1.Secret) bool {
 			if secret == nil || secret.Labels == nil {
 				return false
 			}
-
-			if secret.Labels[planv1alpha1.MachineLifecycleNameLabel] == ref.Name {
-				return true
-			}
-
-			return false
+			return secret.Labels[planv1alpha1.MachineLifecycleNameLabel] == machineName
 		}
 	}
 

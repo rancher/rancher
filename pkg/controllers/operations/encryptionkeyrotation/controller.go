@@ -178,6 +178,11 @@ func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 		return status, err
 	}
 
+	clusterObj, err := adapter.ClusterObject()
+	if err != nil {
+		return status, err
+	}
+
 	// Resolve the beacon via the adapter, not op.Spec.ClusterRef. See
 	// etcdsnapshotrestore/controller.go for the full rationale.
 	namespace, beaconName := adapter.BeaconRef()
@@ -200,7 +205,7 @@ func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
-		clusterObj: &ustr,
+		clusterObj: clusterObj,
 		adapter:    adapter,
 	}
 

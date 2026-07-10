@@ -39,6 +39,12 @@ func (a *CAPRAdapter) BeaconRef() (string, string) {
 	return a.controlPlane.Namespace, a.controlPlane.Name
 }
 
+// EtcdSnapshotNamespace returns the RKEControlPlane namespace — the same namespace hosts the
+// provv1.Cluster and its etcd-snapshot CRs.
+func (a *CAPRAdapter) EtcdSnapshotNamespace() string {
+	return a.controlPlane.Namespace
+}
+
 func (a *CAPRAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(a.controlPlane)
 	if err != nil {

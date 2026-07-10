@@ -30,6 +30,15 @@ type stubAdapter struct {
 	waitForRegisterOK bool
 }
 
+func (a *stubAdapter) EtcdSnapshotNamespace() string {
+	return "test-namespace"
+}
+
+func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (a *stubAdapter) BeaconRef() (string, string)                       { return "test-namespace", "test-cluster" }
 func (a *stubAdapter) WaitForRegister() (bool, error)                    { return a.waitForRegisterOK, nil }
 func (a *stubAdapter) PauseCluster(_ bool) error                         { return nil }

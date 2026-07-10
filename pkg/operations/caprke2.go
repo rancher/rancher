@@ -38,6 +38,12 @@ type CAPRKE2Adapter struct {
 	cluster      *capiv1beta2.Cluster
 	controlPlane *controlplanev1beta2.RKE2ControlPlane
 	clients      *wrangler.CAPIContext
+	// mgmtClusterName is the name of the turtles mgmt v3 Cluster shell that back-references this
+	// CAPI Cluster. It is populated on the turtles-imported dispatch path (see imported.go's
+	// turtlesCAPIAdapter → capiClusterAdapter chain) and is used to locate mgmt-side artifacts
+	// that live under `<mgmtClusterName>` — currently just the rkev1.ETCDSnapshot CRs. Empty when
+	// the adapter is created via the direct-CAPI factory (no mgmt shell in play).
+	mgmtClusterName string
 }
 
 // BeaconRef returns the CAPI cluster's (namespace, name). Turtles-imported CAPRKE2 clusters
@@ -45,6 +51,17 @@ type CAPRKE2Adapter struct {
 // in the CAPI cluster's namespace, not the mgmt-shell namespace.
 func (a *CAPRKE2Adapter) BeaconRef() (string, string) {
 	return a.cluster.Namespace, a.cluster.Name
+}
+
+// EtcdSnapshotNamespace returns the mgmt v3 Cluster name that back-references this CAPI Cluster
+// — where snapshotbackpopulate writes rkev1.ETCDSnapshot CRs. Falls back to the CAPI Cluster's
+// namespace when no mgmt shell is in play (direct-CAPI factory path), which keeps snapshot
+// namespace resolution consistent with BeaconRef in that case.
+func (a *CAPRKE2Adapter) EtcdSnapshotNamespace() string {
+	if a.mgmtClusterName != "" {
+		return a.mgmtClusterName
+	}
+	return a.cluster.Namespace
 }
 
 func (a *CAPRKE2Adapter) ClusterObject() (*unstructured.Unstructured, error) {

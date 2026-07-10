@@ -21,7 +21,7 @@ func init() {
 			return nil, err
 		}
 
-		return capiClusterAdapter(clients, cluster)
+		return capiClusterAdapter(clients, cluster, "")
 	})
 }
 
@@ -30,7 +30,11 @@ func init() {
 // (nil, nil) when the control-plane ref points at an unsupported kind (caller should treat this
 // as unsupported cluster type). Callers that reach this via the mgmt-cluster dispatch path (see
 // imported.go) rely on this helper to keep the CAPI-side logic in one place.
-func capiClusterAdapter(clients *wrangler.CAPIContext, cluster *capiv1beta2.Cluster) (Adapter, error) {
+//
+// mgmtClusterName is the mgmt v3 Cluster shell name for turtles-imported dispatch paths (empty
+// when called from the direct-CAPI factory). It is threaded into CAPRKE2Adapter so it can
+// resolve the mgmt-side snapshot namespace independently of the CAPI Cluster's namespace.
+func capiClusterAdapter(clients *wrangler.CAPIContext, cluster *capiv1beta2.Cluster, mgmtClusterName string) (Adapter, error) {
 	if cluster.Spec.ControlPlaneRef.APIGroup == controlplanev1beta2.GroupVersion.Group && cluster.Spec.ControlPlaneRef.Kind == "RKE2ControlPlane" {
 		obj, err := clients.Dynamic.Get(controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlane"), cluster.Namespace, cluster.Name)
 		if err != nil {
@@ -51,9 +55,10 @@ func capiClusterAdapter(clients *wrangler.CAPIContext, cluster *capiv1beta2.Clus
 		}
 
 		return &CAPRKE2Adapter{
-			cluster:      cluster,
-			controlPlane: controlPlane,
-			clients:      clients,
+			cluster:         cluster,
+			controlPlane:    controlPlane,
+			clients:         clients,
+			mgmtClusterName: mgmtClusterName,
 		}, nil
 	}
 

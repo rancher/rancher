@@ -252,6 +252,7 @@ func TestOnUpstreamChange(t *testing.T) {
 						Namespace:  "test-namespace",
 						Name:       "test-cluster",
 					},
+					snapshotNamespace:          "test-namespace",
 					etcdSnapshotFileController: etcdSnapshotFileController,
 				}
 			},
@@ -292,6 +293,7 @@ func TestOnUpstreamChange(t *testing.T) {
 						Namespace:  "test-namespace",
 						Name:       "test-cluster",
 					},
+					snapshotNamespace:          "test-namespace",
 					etcdSnapshotFileController: etcdSnapshotFileController,
 					etcdSnapshotController:     etcdSnapshotController,
 				}
@@ -343,6 +345,7 @@ func TestOnDownstreamChange(t *testing.T) {
 			Namespace:  "test-namespace",
 			Name:       "test-cluster",
 		},
+		snapshotNamespace:          "test-namespace",
 		dynamic:                    dynamicSuccess,
 		restMapper:                 testRESTMapper(),
 		etcdSnapshotCache:          etcdSnapshotCache,
@@ -638,6 +641,7 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 			Namespace:  "fleet-default",
 			Name:       "example",
 		},
+		snapshotNamespace:          "fleet-default",
 		dynamic:                    &dynamicClientFake{obj: cluster},
 		restMapper:                 testRESTMapper(),
 		etcdSnapshotCache:          etcdSnapshotCache,
@@ -872,7 +876,10 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			cache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
 			tt.cacheFunc(cache)
-			h := handler{}
+			// snapshotNamespace mirrors the namespace snapshots are written to. All fixtures use
+			// "test-namespace" for the cluster's own ns, and for the non-CAPRKE2 paths in this
+			// test file that ns equals h.snapshotNamespace.
+			h := handler{snapshotNamespace: tt.cluster.GetNamespace()}
 			h.etcdSnapshotCache = cache
 			snapshots, err := h.getSnapshotsFromSnapshotFile(tt.cluster, tt.snapshotFile)
 			if tt.expectErr {

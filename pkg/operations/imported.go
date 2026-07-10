@@ -81,7 +81,7 @@ func turtlesCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) 
 		return nil, fmt.Errorf("mgmt cluster %s references CAPI cluster %s/%s: %w",
 			cluster.Name, ownerNS, ownerName, err)
 	}
-	return capiClusterAdapter(clients, capiCluster)
+	return capiClusterAdapter(clients, capiCluster, cluster.Name)
 }
 
 // administratedCAPIAdapter returns a CAPR adapter when cluster is a v2prov-administrated shell —
@@ -106,7 +106,9 @@ func administratedCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Clu
 		return nil, fmt.Errorf("finding CAPI cluster %s/%s for administrated mgmt cluster %s: %w",
 			prov.Namespace, prov.Name, cluster.Name, err)
 	}
-	return capiClusterAdapter(clients, capiCluster)
+	// v2prov clusters never take the CAPRKE2 branch (they route to CAPRAdapter), so the
+	// mgmt-cluster-name parameter is inert here — pass empty.
+	return capiClusterAdapter(clients, capiCluster, "")
 }
 
 // BeaconRef returns the mgmt v3 Cluster's name-as-namespace + name convention. The mgmt v3
@@ -115,6 +117,12 @@ func administratedCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Clu
 // secrets stamped by systemagent, etc.).
 func (a *ImportedAdapter) BeaconRef() (string, string) {
 	return a.cluster.Name, a.cluster.Name
+}
+
+// EtcdSnapshotNamespace returns the mgmt v3 Cluster's namespace convention (name-as-namespace).
+// Snapshots on generic imported RKE2/K3s clusters live alongside the mgmt v3 Nodes.
+func (a *ImportedAdapter) EtcdSnapshotNamespace() string {
+	return a.cluster.Name
 }
 
 func (a *ImportedAdapter) ClusterObject() (*unstructured.Unstructured, error) {
