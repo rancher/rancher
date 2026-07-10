@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -16,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8scache "k8s.io/client-go/tools/cache"
 )
@@ -29,8 +29,8 @@ func validateAuthImage(authImage string) error {
 }
 
 type ClusterImport struct {
-	Clusters   v3.ClusterInterface
-	CRTIndexer k8scache.Indexer
+	Clusters      v3.ClusterInterface
+	SecretIndexer k8scache.Indexer
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
@@ -83,14 +83,14 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 }
 
 func (ch *ClusterImport) isValidToken(clusterID, token string) bool {
-	objs, err := ch.CRTIndexer.ByIndex(mcmauthorizer.CRTKeyIndex, token)
+	objs, err := ch.SecretIndexer.ByIndex(mcmauthorizer.SecretTokenIndex, token)
 	if err != nil {
-		logrus.Errorf("[cluster-registration-tokens] CRT index lookup failed: %v", err)
+		logrus.Errorf("[cluster-registration-tokens] CRT token secret index lookup failed: %v", err)
 		return false
 	}
 	for _, obj := range objs {
-		crt, ok := obj.(*v32.ClusterRegistrationToken)
-		if ok && crt.Namespace == clusterID {
+		secret, ok := obj.(*corev1.Secret)
+		if ok && secret.Namespace == clusterID {
 			return true
 		}
 	}
