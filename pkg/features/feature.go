@@ -98,12 +98,6 @@ var (
 		true,
 		true,
 		true)
-	RKE1CustomNodeCleanup = newFeature(
-		"rke1-custom-node-cleanup",
-		"Enable cleanup RKE1 custom cluster nodes when they are deleted",
-		true,
-		true,
-		true)
 	HarvesterBaremetalContainerWorkload = newFeature(
 		"harvester-baremetal-container-workload",
 		"Deploy container workloads to underlying harvester cluster",
@@ -127,12 +121,6 @@ var (
 		"Improve performance by enabling SQLite-backed caching. This also enables server-side pagination and other scaling based performance improvements.",
 		true,
 		false,
-		true)
-	RKE1UI = newFeature(
-		"rke1-ui",
-		"Enable RKE1 provisioning in the Rancher UI",
-		true,
-		true,
 		true)
 	ProvisioningPreBootstrap = newFeature(
 		"provisioningprebootstrap",
@@ -248,7 +236,7 @@ var (
 	CRTTokenTTLRotation = newFeature(
 		"crt-token-ttl-rotation",
 		"Enable TTL-based automatic rotation of ClusterRegistrationToken credentials",
-		true,
+		false,
 		true,
 		true,
 	)
