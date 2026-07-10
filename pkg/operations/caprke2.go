@@ -47,6 +47,15 @@ func (a *CAPRKE2Adapter) BeaconRef() (string, string) {
 	return a.cluster.Namespace, a.cluster.Name
 }
 
+func (a *CAPRKE2Adapter) ClusterObject() (*unstructured.Unstructured, error) {
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(a.cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
 // ToS3ArgsEnvAndFiles returns the S3 args/env/files that should be appended to an etcd-snapshot
 // save operation for this cluster. CAPRKE2 does not yet model S3 snapshot configuration on the
 // RKE2ControlPlane in a form that the operations controllers consume, so this is a no-op for now

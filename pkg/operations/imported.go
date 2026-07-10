@@ -117,6 +117,15 @@ func (a *ImportedAdapter) BeaconRef() (string, string) {
 	return a.cluster.Name, a.cluster.Name
 }
 
+func (a *ImportedAdapter) ClusterObject() (*unstructured.Unstructured, error) {
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(a.cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
 	return "127.0.0.1"
 }

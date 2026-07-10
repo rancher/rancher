@@ -217,6 +217,11 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		return status, err
 	}
 
+	clusterObj, err := a.ClusterObject()
+	if err != nil {
+		return status, err
+	}
+
 	// Resolve the beacon (and every other cluster-scoped artifact — plan secrets, snapshot CRs)
 	// via the adapter, not the op.Spec.ClusterRef. See the equivalent block in
 	// etcdsnapshotrestore/controller.go for the full rationale.
@@ -241,7 +246,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
-		clusterObj: &ustr,
+		clusterObj: clusterObj,
 		adapter:    a,
 	}
 

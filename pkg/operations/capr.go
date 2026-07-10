@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
-	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
@@ -21,36 +20,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-func init() {
-	RegisterAdapter(rkev1.SchemeGroupVersion.WithKind("RKEControlPlane"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
-		controlPlane, err := clients.RKE.RKEControlPlane().Cache().Get(unstructured.GetNamespace(), unstructured.GetName())
-		if err != nil {
-			return nil, err
-		}
-		return &CAPRAdapter{
-			controlPlane: controlPlane,
-			clients:      clients,
-		}, nil
-	})
-	RegisterAdapter(provv1.SchemeGroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
-		controlPlane, err := clients.RKE.RKEControlPlane().Cache().Get(unstructured.GetNamespace(), unstructured.GetName())
-		if err != nil {
-			return nil, err
-		}
-		return &CAPRAdapter{
-			controlPlane: controlPlane,
-			clients:      clients,
-		}, nil
-	})
-}
-
 // CAPRAdapter is an implementation of the Adapter interface for CAPR clusters.
 type CAPRAdapter struct {
+	cluster      *capi.Cluster
 	controlPlane *rkev1.RKEControlPlane
 	clients      *wrangler.CAPIContext
 }
@@ -59,6 +37,15 @@ type CAPRAdapter struct {
 // Cluster, CAPI Cluster, and beacon all share (controlPlane.Namespace, controlPlane.Name).
 func (a *CAPRAdapter) BeaconRef() (string, string) {
 	return a.controlPlane.Namespace, a.controlPlane.Name
+}
+
+func (a *CAPRAdapter) ClusterObject() (*unstructured.Unstructured, error) {
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(a.controlPlane)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
 }
 
 func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) (args []string, env []string, files []plan.File) {

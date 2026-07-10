@@ -135,6 +135,11 @@ type Adapter interface {
 	//     cluster-scoped, so its name doubles as the namespace convention.
 	BeaconRef() (namespace, name string)
 
+	// ClusterObject returns the cluster object for this adapter.
+	// This is not necessarily the object this operation was created for - for example, for CAPRKE2 clusters, the UI
+	// will create an operation for the management cluster object, but the true object is the CAPI cluster.
+	ClusterObject() (*unstructured.Unstructured, error)
+
 	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
 	// all expected nodes.
 	WaitForRegister() (bool, error)
