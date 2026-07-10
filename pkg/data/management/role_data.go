@@ -244,9 +244,10 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("config.istio.io").resources("apikeys", "authorizations", "checknothings", "circonuses", "deniers", "fluentds", "handlers", "kubernetesenvs", "kuberneteses", "listcheckers", "listentries", "logentries", "memquotas", "metrics", "opas", "prometheuses", "quotas", "quotaspecbindings", "quotaspecs", "rbacs", "reportnothings", "rules", "solarwindses", "stackdrivers", "statsds", "stdios").verbs("*").
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
-		addRule().apiGroups("security.istio.io").resources("authorizationpolicies", "requestauthentications").verbs("*").
-		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs("*").
-		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs("*").
+		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
+		addRule().apiGroups("security.istio.io").resources("requestauthentications").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
+		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
+		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
