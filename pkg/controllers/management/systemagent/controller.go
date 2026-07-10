@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 )
@@ -47,6 +49,10 @@ const (
 	AppliedSystemAgentUpgraderHashAnnotation = "management.cattle.io/applied-system-agent-upgrader-hash"
 	day2OpsEnabledAnnotation                 = "operations.cattle.io/ops-enabled"
 	importedCleaningStateAnnotation          = "operations.cattle.io/imported-cleaning-state"
+	importedUninstallRolloutIDAnnotation     = "operations.cattle.io/imported-uninstall-rollout-id"
+
+	systemAgentUpgraderRolloutIDLabel = "management.cattle.io/system-agent-upgrader-rollout-id"
+	systemAgentUpgraderRunIDEnvName   = "SYSTEM_AGENT_UPGRADER_RUN_ID"
 
 	SystemAgentUpgraderPlanName               = "system-agent-upgrader"
 	SystemAgentUpgraderWindowsPlanName        = "system-agent-upgrader-windows"
@@ -204,13 +210,10 @@ func (h *handler) reconcileImportedInstall(cluster *apimgmtv3.Cluster) (*apimgmt
 
 	result := installer(cluster)
 
-	// Calculate a hash value of the templates
-	data, err := json.Marshal(result)
+	hash, err := renderedObjectsHash(result)
 	if err != nil {
 		return cluster, err
 	}
-	sum := sha256.Sum256(data)
-	hash := hex.EncodeToString(sum[:])
 
 	val, ok := cluster.Annotations[AppliedSystemAgentUpgraderHashAnnotation]
 	identityExists, _, err := h.importedPlanIdentityExists(cluster.Name)
@@ -333,6 +336,15 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		return cluster, nil
 
 	case apimgmtv3.ImportedDay2OpsCleaningStateUninstall:
+		cluster, rolloutID, created, err := h.ensureUninstallRollout(cluster)
+		if err != nil {
+			return cluster, err
+		}
+		if created {
+			h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
+			return cluster, nil
+		}
+
 		clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)
 		if err != nil {
 			return cluster, err
@@ -342,11 +354,11 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 			return cluster, nil
 		}
 
-		if err := h.applyUninstallPlans(cluster, clusterCtx); err != nil {
+		if err := h.applyUninstallPlans(cluster, clusterCtx, rolloutID); err != nil {
 			return cluster, err
 		}
 
-		complete, message, err := h.uninstallComplete(clusterCtx)
+		complete, message, err := h.uninstallComplete(clusterCtx, rolloutID)
 		if err != nil {
 			return cluster, err
 		}
@@ -419,7 +431,9 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 
 // disableNeeded returns true while imported day2ops resources still exist or disable bookkeeping is still present.
 func (h *handler) disableNeeded(cluster *apimgmtv3.Cluster) (bool, error) {
-	if cluster.Annotations[importedCleaningStateAnnotation] != "" || cluster.Annotations[AppliedSystemAgentUpgraderHashAnnotation] != "" {
+	if cluster.Annotations[importedCleaningStateAnnotation] != "" ||
+		cluster.Annotations[AppliedSystemAgentUpgraderHashAnnotation] != "" ||
+		cluster.Annotations[importedUninstallRolloutIDAnnotation] != "" {
 		return true, nil
 	}
 
@@ -705,9 +719,38 @@ func (h *handler) deleteBeacon(clusterName string) (bool, error) {
 	return true, nil
 }
 
+func (h *handler) ensureUninstallRollout(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, string, bool, error) {
+	if cluster.Annotations[importedUninstallRolloutIDAnnotation] != "" {
+		return cluster, cluster.Annotations[importedUninstallRolloutIDAnnotation], false, nil
+	}
+
+	rolloutID := string(uuid.NewUUID())
+
+	updatedCluster := cluster.DeepCopy()
+	if updatedCluster.Annotations == nil {
+		updatedCluster.Annotations = map[string]string{}
+	}
+	updatedCluster.Annotations[importedUninstallRolloutIDAnnotation] = rolloutID
+
+	updated, err := h.clusters.Update(updatedCluster)
+	if err != nil {
+		return cluster, "", false, err
+	}
+	return updated, rolloutID, true, nil
+}
+
+func renderedObjectsHash(objs []runtime.Object) (string, error) {
+	data, err := json.Marshal(objs)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
+}
+
 // applyUninstallPlans renders and applies the imported system-agent uninstall plans downstream.
-func (h *handler) applyUninstallPlans(cluster *apimgmtv3.Cluster, clusterCtx *config.UserContext) error {
-	result := uninstaller(cluster)
+func (h *handler) applyUninstallPlans(cluster *apimgmtv3.Cluster, clusterCtx *config.UserContext, rolloutID string) error {
+	result := uninstaller(cluster, rolloutID)
 
 	applier, err := apply.NewForConfig(&clusterCtx.RESTConfig)
 	if err != nil {
@@ -724,9 +767,9 @@ func (h *handler) applyUninstallPlans(cluster *apimgmtv3.Cluster, clusterCtx *co
 	return nil
 }
 
-// uninstallComplete waits for the rendered uninstall plans to exist, be uninstall-shaped, complete,
-// and finish applying on every node.
-func (h *handler) uninstallComplete(clusterCtx *config.UserContext) (bool, string, error) {
+// uninstallComplete waits for the rendered uninstall plans to exist, match the current
+// rollout, and finish applying on every targeted node.
+func (h *handler) uninstallComplete(clusterCtx *config.UserContext, rolloutID string) (bool, string, error) {
 	for _, name := range []string{SystemAgentUpgraderPlanName, SystemAgentUpgraderWindowsPlanName} {
 		plan, err := h.getDownstreamPlan(clusterCtx, name)
 		if err != nil {
@@ -738,59 +781,103 @@ func (h *handler) uninstallComplete(clusterCtx *config.UserContext) (bool, strin
 		if plan.Spec.Upgrade == nil {
 			return false, fmt.Sprintf("waiting for uninstall plan %s to reconcile: upgrade spec is empty", name), nil
 		}
-		uninstallSeen := false
-		for i := range plan.Spec.Upgrade.Env {
-			if plan.Spec.Upgrade.Env[i].Name == "UNINSTALL" && plan.Spec.Upgrade.Env[i].Value == "true" {
-				uninstallSeen = true
-				break
-			}
+
+		nodes, err := h.planTargetedNodes(clusterCtx, plan)
+		if err != nil {
+			return false, "", err
 		}
-		if !uninstallSeen {
-			return false, fmt.Sprintf("waiting for uninstall plan %s to reconcile: UNINSTALL=true env not observed yet", name), nil
-		}
-		// The windows plan is rendered for all clusters, but Linux-only imported clusters have no
-		// matching windows nodes. Skip wait gating for plans that currently target no nodes.
-		if plan.Name == SystemAgentUpgraderWindowsPlanName {
-			hasTargets, err := h.planTargetsNodes(clusterCtx, plan)
-			if err != nil {
-				return false, "", err
-			}
-			if !hasTargets {
-				continue
-			}
-		}
-		if !upgradev1.PlanComplete.IsTrue(plan) {
-			msg := upgradev1.PlanComplete.GetMessage(plan)
-			if msg == "" {
-				msg = upgradev1.PlanComplete.GetReason(plan)
-			}
-			if msg == "" {
-				msg = "plan not complete yet"
-			}
-			return false, fmt.Sprintf("waiting for uninstall plan %s completion: %s", name, msg), nil
-		}
-		if len(plan.Status.Applying) > 0 {
-			return false, fmt.Sprintf("waiting for uninstall plan %s to finish applying on nodes: %s", name, strings.Join(plan.Status.Applying, ",")), nil
+		if ready, message := uninstallPlanReady(plan, rolloutID, nodes); !ready {
+			return false, fmt.Sprintf("waiting for uninstall plan %s: %s", name, message), nil
 		}
 	}
 	return true, "", nil
 }
 
-func (h *handler) planTargetsNodes(clusterCtx *config.UserContext, planObj *upgradev1.Plan) (bool, error) {
-	if planObj == nil || planObj.Spec.NodeSelector == nil {
-		return true, nil
+func uninstallPlanReady(plan *upgradev1.Plan, rolloutID string, nodes []corev1.Node) (bool, string) {
+	uninstallValue, uninstallCount := envVarValue(plan.Spec.Upgrade.Env, "UNINSTALL")
+	if uninstallCount != 1 || uninstallValue != "true" {
+		return false, "UNINSTALL=true env not observed exactly once"
 	}
-	selector, err := metav1.LabelSelectorAsSelector(planObj.Spec.NodeSelector)
+
+	runIDValue, runIDCount := envVarValue(plan.Spec.Upgrade.Env, systemAgentUpgraderRunIDEnvName)
+	if runIDCount != 1 || runIDValue != rolloutID {
+		return false, fmt.Sprintf("%s=%s env not observed exactly once", systemAgentUpgraderRunIDEnvName, rolloutID)
+	}
+
+	if plan.Spec.PostCompleteLabels[systemAgentUpgraderRolloutIDLabel] != rolloutID {
+		return false, fmt.Sprintf("postCompleteLabels.%s=%s not observed", systemAgentUpgraderRolloutIDLabel, rolloutID)
+	}
+
+	// Plan conditions alone are not a freshness proof because this controller reuses the
+	// same SUC plan across install and uninstall. Require the per-node rollout receipt first.
+	// The windows plan is rendered for all clusters, but Linux-only imported clusters have no
+	// matching windows nodes. Skip wait gating for plans that currently target no nodes.
+	if plan.Name == SystemAgentUpgraderWindowsPlanName && len(nodes) == 0 {
+		return true, ""
+	}
+	if len(nodes) == 0 {
+		return false, "no targeted nodes observed yet"
+	}
+
+	for i := range nodes {
+		if nodes[i].Labels[systemAgentUpgraderRolloutIDLabel] != rolloutID {
+			return false, fmt.Sprintf("node %s missing %s=%s", nodes[i].Name, systemAgentUpgraderRolloutIDLabel, rolloutID)
+		}
+	}
+
+	if !upgradev1.PlanComplete.IsTrue(plan) {
+		msg := upgradev1.PlanComplete.GetMessage(plan)
+		if msg == "" {
+			msg = upgradev1.PlanComplete.GetReason(plan)
+		}
+		if msg == "" {
+			msg = "plan not complete yet"
+		}
+		return false, fmt.Sprintf("completion condition not met: %s", msg)
+	}
+	if len(plan.Status.Applying) > 0 {
+		return false, fmt.Sprintf("still applying on nodes: %s", strings.Join(plan.Status.Applying, ","))
+	}
+
+	return true, ""
+}
+
+func envVarValue(env []corev1.EnvVar, name string) (string, int) {
+	value := ""
+	count := 0
+	for i := range env {
+		if env[i].Name != name {
+			continue
+		}
+		count++
+		value = env[i].Value
+	}
+	return value, count
+}
+
+func (h *handler) planTargetedNodes(clusterCtx *config.UserContext, planObj *upgradev1.Plan) ([]corev1.Node, error) {
+	selector := labels.Everything()
+	if planObj != nil && planObj.Spec.NodeSelector != nil {
+		var err error
+		selector, err = metav1.LabelSelectorAsSelector(planObj.Spec.NodeSelector)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	hostnameRequirement, err := labels.NewRequirement(corev1.LabelHostname, selection.Exists, nil)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
+	selector = selector.Add(*hostnameRequirement)
+
 	nodes, err := clusterCtx.K8sClient.CoreV1().Nodes().List(h.ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return len(nodes.Items) > 0, nil
+	return nodes.Items, nil
 }
 
 // getDownstreamPlan reads a downstream SUC plan through the dynamic client so disable can poll its status.
@@ -920,12 +1007,14 @@ func (h *handler) clearClusterAnnotations(cluster *apimgmtv3.Cluster) (*apimgmtv
 		return cluster, nil
 	}
 	if cluster.Annotations[importedCleaningStateAnnotation] == "" &&
-		cluster.Annotations[AppliedSystemAgentUpgraderHashAnnotation] == "" {
+		cluster.Annotations[AppliedSystemAgentUpgraderHashAnnotation] == "" &&
+		cluster.Annotations[importedUninstallRolloutIDAnnotation] == "" {
 		return cluster, nil
 	}
 	cluster = cluster.DeepCopy()
 	delete(cluster.Annotations, importedCleaningStateAnnotation)
 	delete(cluster.Annotations, AppliedSystemAgentUpgraderHashAnnotation)
+	delete(cluster.Annotations, importedUninstallRolloutIDAnnotation)
 	return h.clusters.Update(cluster)
 }
 
@@ -966,22 +1055,29 @@ func SystemAgentUpgraderVersion() string {
 
 // installer renders the imported system-agent SUC resources for the enabled state.
 func installer(cluster *apimgmtv3.Cluster) []runtime.Object {
-	plans := buildSUCPlanObjects(cluster, withUninstallEnv(planEnv(cluster), "false"))
+	plans := buildSUCPlanObjects(cluster, withUninstallEnv(planEnv(cluster), "false", ""), nil)
 	return append(plans, sharedSUCObjects()...)
 }
 
 // uninstaller renders the imported system-agent SUC resources with UNINSTALL=true for teardown.
-func uninstaller(cluster *apimgmtv3.Cluster) []runtime.Object {
-	plans := buildSUCPlanObjects(cluster, withUninstallEnv(planEnv(cluster), "true"))
+func uninstaller(cluster *apimgmtv3.Cluster, rolloutID string) []runtime.Object {
+	plans := buildSUCPlanObjects(
+		cluster,
+		withUninstallEnv(planEnv(cluster), "true", rolloutID),
+		map[string]string{systemAgentUpgraderRolloutIDLabel: rolloutID},
+	)
 	return append(plans, sharedSUCObjects()...)
 }
 
 // UNINSTALL must be first because SUC digest reconciliation has proven sensitive to env ordering.
-func withUninstallEnv(env []corev1.EnvVar, value string) []corev1.EnvVar {
-	result := make([]corev1.EnvVar, 0, len(env)+1)
-	result = append(result, corev1.EnvVar{Name: "UNINSTALL", Value: value})
+func withUninstallEnv(env []corev1.EnvVar, uninstallValue, rolloutID string) []corev1.EnvVar {
+	result := make([]corev1.EnvVar, 0, len(env)+2)
+	result = append(result, corev1.EnvVar{Name: "UNINSTALL", Value: uninstallValue})
+	if rolloutID != "" {
+		result = append(result, corev1.EnvVar{Name: systemAgentUpgraderRunIDEnvName, Value: rolloutID})
+	}
 	for _, entry := range env {
-		if entry.Name == "UNINSTALL" {
+		if entry.Name == "UNINSTALL" || entry.Name == systemAgentUpgraderRunIDEnvName {
 			continue
 		}
 		result = append(result, entry)
@@ -1031,7 +1127,7 @@ func planEnv(cluster *apimgmtv3.Cluster) []corev1.EnvVar {
 }
 
 // buildSUCPlanObjects renders linux/windows SUC plans for imported system-agent management.
-func buildSUCPlanObjects(cluster *apimgmtv3.Cluster, env []corev1.EnvVar) []runtime.Object {
+func buildSUCPlanObjects(cluster *apimgmtv3.Cluster, env []corev1.EnvVar, postCompleteLabels map[string]string) []runtime.Object {
 	upgradeImage := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
 	version := SystemAgentUpgraderVersion()
 
@@ -1080,16 +1176,28 @@ func buildSUCPlanObjects(cluster *apimgmtv3.Cluster, env []corev1.EnvVar) []runt
 					},
 				}},
 			},
+			PostCompleteLabels: copyLabels(postCompleteLabels),
 		},
 	})
 	plans = append(plans, plan)
 
-	windowsPlan := winsUpgradePlan(cluster, env)
+	windowsPlan := winsUpgradePlan(cluster, env, postCompleteLabels)
 
 	// todo: redeploy support
 	plans = append(plans, windowsPlan)
 
 	return plans
+}
+
+func copyLabels(labelMap map[string]string) map[string]string {
+	if len(labelMap) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(labelMap))
+	for key, value := range labelMap {
+		result[key] = value
+	}
+	return result
 }
 
 func sharedSUCObjects() []runtime.Object {
@@ -1128,7 +1236,7 @@ func sharedSUCObjects() []runtime.Object {
 	}
 }
 
-func winsUpgradePlan(cluster *apimgmtv3.Cluster, env []corev1.EnvVar) *upgradev1.Plan {
+func winsUpgradePlan(cluster *apimgmtv3.Cluster, env []corev1.EnvVar, postCompleteLabels map[string]string) *upgradev1.Plan {
 	winsUpgradeImage := strings.SplitN(settings.WinsAgentUpgradeImage.Get(), ":", 2)
 	winsVersion := "latest"
 	if len(winsUpgradeImage) == 2 {
@@ -1180,6 +1288,7 @@ func winsUpgradePlan(cluster *apimgmtv3.Cluster, env []corev1.EnvVar) *upgradev1
 					},
 				}},
 			},
+			PostCompleteLabels: copyLabels(postCompleteLabels),
 		},
 	})
 }

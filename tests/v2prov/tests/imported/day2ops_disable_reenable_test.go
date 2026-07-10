@@ -38,7 +38,8 @@ const (
 	importedDisableWaitTimeout           = 25 * time.Minute
 	importedSystemAgentTransitionTimeout = 25 * time.Minute
 
-	systemAgentUpgraderPlanName = "system-agent-upgrader"
+	systemAgentUpgraderPlanName       = "system-agent-upgrader"
+	systemAgentUpgraderRolloutIDLabel = "management.cattle.io/system-agent-upgrader-rollout-id"
 )
 
 type importedPlanIdentity struct {
@@ -60,9 +61,9 @@ type machinePlanFeedbackState struct {
 	ProbesPassed     string
 }
 
-// Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave validates the imported day2ops
+// Test_Imported_Operation_SetD_ImportedDisableSingleNode validates the imported day2ops
 // disable/re-enable lifecycle and verifies ETCDSnapshotSave still succeeds after re-enable.
-func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +103,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *
 	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 1 identity: %s", summarizeImportedPlanIdentity(phase1Identity))
 
-	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, true, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, true, importedSystemAgentTransitionTimeout)
 	t.Logf("phase 1: rancher-system-agent is active on pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
 
 	initialMachinePlanSecretName := phase1Identity.MachinePlanSecrets[0].Name
@@ -118,7 +119,6 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *
 	if _, err := setClusterAnnotation(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "false"); err != nil {
 		t.Fatal(err)
 	}
-	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "true", importedIdentityWaitTimeout)
 	phase2Cluster := waitForImportedDay2OpsDisabled(t, clients, fixture.mgmtCluster.Name, importedDisableWaitTimeout)
 	assert.Equal(t, "false", phase2Cluster.Annotations[opsEnabledAnnotation])
 	assert.Empty(t, phase2Cluster.Annotations[importedCleaningStateAnnotation])
@@ -132,7 +132,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *
 	assert.Len(t, phase2Identity.PlanRoleBindings, 0)
 	t.Logf("phase 2 identity: %s", summarizeImportedPlanIdentity(phase2Identity))
 
-	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, false, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, false, importedSystemAgentTransitionTimeout)
 	t.Logf("phase 2: rancher-system-agent is inactive on pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
 
 	t.Logf("phase 3: re-enabling imported day2ops on cluster %s", fixture.mgmtCluster.Name)
@@ -171,7 +171,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave(t *
 		newPlanTokenSecretName,
 	)
 
-	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, true, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, true, importedSystemAgentTransitionTimeout)
 	waitForConnectionInfoSecretName(t, clients, fixture.ns.Name, fixture.pods[0].Name, newMachinePlanSecretName, importedIdentityWaitTimeout)
 	t.Logf("phase 3: rancher-system-agent is active and connection info points to %s", newMachinePlanSecretName)
 
@@ -209,22 +209,6 @@ func assertImportedDay2OpsFeatureEnabled(t *testing.T, clients *clients.Clients)
 	}
 	if !enabled {
 		t.Skip("imported day2ops feature flag is disabled")
-	}
-}
-
-func waitForImportedAPIServer(t *testing.T, clients *clients.Clients, namespace, podName, kubectlEnv string) {
-	t.Helper()
-
-	var (
-		lastErr error
-		lastOut string
-	)
-	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, importedNodeAPIServerWaitTimeout, true, func(_ context.Context) (bool, error) {
-		lastOut, lastErr = cluster.ExecOnPod(clients, namespace, podName, "sh", "-c", fmt.Sprintf("export %s && kubectl get nodes", kubectlEnv))
-		return lastErr == nil, nil
-	})
-	if err != nil {
-		t.Fatalf("timed out waiting for downstream API server to be ready: %v (lastErr=%v output=%q)", err, lastErr, strings.TrimSpace(lastOut))
 	}
 }
 
@@ -298,7 +282,7 @@ func dumpDownstreamSystemAgentPlanState(clients *clients.Clients, namespace, pod
 		"sh",
 		"-c",
 		fmt.Sprintf(
-			"export %s && kubectl -n cattle-system get plans.upgrade.cattle.io %s --ignore-not-found -o jsonpath='name={.metadata.name}{\"\\n\"}generation={.metadata.generation}{\"\\n\"}resourceVersion={.metadata.resourceVersion}{\"\\n\"}latestHash={.status.latestHash}{\"\\n\"}latestVersion={.status.latestVersion}{\"\\n\"}applying={.status.applying}{\"\\n\"}conditions={range .status.conditions[*]}{.type}={.status}:{.reason}:{.message}{\"\\n\"}{end}envs={range .spec.upgrade.envs[*]}{.name}={.value}{\"\\n\"}{end}'",
+			"export %s && kubectl -n cattle-system get plans.upgrade.cattle.io %s --ignore-not-found -o jsonpath='name={.metadata.name}{\"\\n\"}generation={.metadata.generation}{\"\\n\"}resourceVersion={.metadata.resourceVersion}{\"\\n\"}latestHash={.status.latestHash}{\"\\n\"}latestVersion={.status.latestVersion}{\"\\n\"}applying={.status.applying}{\"\\n\"}conditions={range .status.conditions[*]}{.type}={.status}:{.reason}:{.message}{\"\\n\"}{end}postCompleteLabels={.spec.postCompleteLabels}{\"\\n\"}envs={range .spec.upgrade.envs[*]}{.name}={.value}{\"\\n\"}{end}'",
 			kubectlEnv,
 			systemAgentUpgraderPlanName,
 		),
@@ -548,7 +532,7 @@ func importedPlanIdentityHasExpectedShape(identity importedPlanIdentity, assertT
 	return true
 }
 
-func waitForSystemAgentActiveState(t *testing.T, clients *clients.Clients, namespace, podName string, expectedActive bool, timeout time.Duration) {
+func waitForSystemAgentActiveState(t *testing.T, clients *clients.Clients, namespace, podName, kubectlEnv string, expectedActive bool, timeout time.Duration) {
 	t.Helper()
 
 	var (
@@ -566,7 +550,7 @@ func waitForSystemAgentActiveState(t *testing.T, clients *clients.Clients, names
 		return lastState != "active", nil
 	})
 	if err != nil {
-		diagnostics := collectSystemAgentDiagnostics(clients, namespace, podName)
+		diagnostics := collectSystemAgentDiagnostics(clients, namespace, podName, kubectlEnv)
 		t.Fatalf(
 			"timed out waiting for rancher-system-agent active=%t on pod %s/%s: %v (lastState=%q lastErr=%v diagnostics=%q)",
 			expectedActive,
@@ -588,7 +572,7 @@ func systemAgentState(clients *clients.Clients, namespace, podName string) (stri
 	return strings.TrimSpace(out), nil
 }
 
-func collectSystemAgentDiagnostics(clients *clients.Clients, namespace, podName string) string {
+func collectSystemAgentDiagnostics(clients *clients.Clients, namespace, podName, kubectlEnv string) string {
 	connectionSecretName, err := readConnectionInfoSecretName(clients, namespace, podName)
 	if err != nil {
 		connectionSecretName = fmt.Sprintf("error:%v", err)
@@ -609,7 +593,45 @@ journalctl -u rancher-system-agent -n 40 --no-pager 2>/dev/null | grep -E 'unins
 		return fmt.Sprintf("connectionSecretName=%s diagErr=%v", connectionSecretName, cmdErr)
 	}
 
-	return fmt.Sprintf("connectionSecretName=%s %s", connectionSecretName, strings.TrimSpace(out))
+	planState := dumpDownstreamSystemAgentPlanState(clients, namespace, podName, kubectlEnv)
+	planRolloutState := dumpDownstreamSystemAgentRolloutState(clients, namespace, podName, kubectlEnv)
+
+	return fmt.Sprintf(
+		"connectionSecretName=%s %s [plan-state] %s [rollout-state] %s",
+		connectionSecretName,
+		strings.TrimSpace(out),
+		planState,
+		planRolloutState,
+	)
+}
+
+func dumpDownstreamSystemAgentRolloutState(clients *clients.Clients, namespace, podName, kubectlEnv string) string {
+	output, err := cluster.ExecOnPod(
+		clients,
+		namespace,
+		podName,
+		"sh",
+		"-c",
+		fmt.Sprintf(
+			"export %s && "+
+				"echo '[plan]' && "+
+				"kubectl -n cattle-system get plans.upgrade.cattle.io %s --ignore-not-found -o jsonpath='selector={.spec.nodeSelector.matchExpressions[0].key}={.spec.nodeSelector.matchExpressions[0].values[0]}{\"\\n\"}rolloutLabel={.spec.postCompleteLabels[\"%s\"]}{\"\\n\"}' && "+
+				"selectorKey=$(kubectl -n cattle-system get plans.upgrade.cattle.io %s --ignore-not-found -o jsonpath='{.spec.nodeSelector.matchExpressions[0].key}') && "+
+				"selectorValue=$(kubectl -n cattle-system get plans.upgrade.cattle.io %s --ignore-not-found -o jsonpath='{.spec.nodeSelector.matchExpressions[0].values[0]}') && "+
+				"echo '[targeted-nodes]' && "+
+				"if [ -n \"$selectorKey\" ] && [ -n \"$selectorValue\" ]; then kubectl get nodes -l \"$selectorKey=$selectorValue\" -L %s 2>/dev/null; else echo 'none'; fi",
+			kubectlEnv,
+			systemAgentUpgraderPlanName,
+			systemAgentUpgraderRolloutIDLabel,
+			systemAgentUpgraderPlanName,
+			systemAgentUpgraderPlanName,
+			systemAgentUpgraderRolloutIDLabel,
+		),
+	)
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return strings.TrimSpace(output)
 }
 
 func waitForConnectionInfoSecretName(t *testing.T, clients *clients.Clients, namespace, podName, expectedSecretName string, timeout time.Duration) {

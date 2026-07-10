@@ -17,9 +17,9 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-// Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_MultiNode validates imported
+// Test_Imported_Operation_SetD_ImportedDisableMultiNode validates imported
 // day2ops disable/re-enable lifecycle and ETCDSnapshotSave on a two-node imported RKE2 topology.
-func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_MultiNode(t *testing.T) {
+func Test_Imported_Operation_SetD_ImportedDisableMultiNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_Mul
 
 	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 
-	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, true, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, fixture.kubectlEnv, true, importedSystemAgentTransitionTimeout)
 	phase1SecretSet := waitForPodsConnectionInfoToMatchNodePlanIdentity(t, clients, fixture.mgmtCluster.Name, fixture.ns.Name, expectedNodeByPod, importedIdentityWaitTimeout)
 	phase1Identity := waitForImportedPlanIdentity(t, clients, fixture.mgmtCluster.Name, len(phase1SecretSet), true, importedIdentityWaitTimeout)
 	assert.Len(t, phase1Identity.MachinePlanSecrets, len(phase1SecretSet))
@@ -86,7 +86,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_Mul
 	assert.Len(t, phase2Identity.PlanRoles, 0)
 	assert.Len(t, phase2Identity.PlanRoleBindings, 0)
 
-	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, false, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, fixture.kubectlEnv, false, importedSystemAgentTransitionTimeout)
 
 	if _, err := setClusterAnnotation(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "true"); err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_Mul
 
 	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
 
-	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, true, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveStateOnPods(t, clients, fixture.ns.Name, podNames, fixture.kubectlEnv, true, importedSystemAgentTransitionTimeout)
 	phase3SecretSet := waitForPodsConnectionInfoToMatchNodePlanIdentity(t, clients, fixture.mgmtCluster.Name, fixture.ns.Name, expectedNodeByPod, importedIdentityWaitTimeout)
 	phase3Identity := waitForImportedPlanIdentity(t, clients, fixture.mgmtCluster.Name, len(phase3SecretSet), true, importedIdentityWaitTimeout)
 	assert.Len(t, phase3Identity.MachinePlanSecrets, len(phase3SecretSet))
@@ -127,11 +127,11 @@ func Test_Imported_Operation_SetD_ImportedDay2OpsDisableReenableSnapshotSave_Mul
 	)
 }
 
-func waitForSystemAgentActiveStateOnPods(t *testing.T, clients *clients.Clients, namespace string, podNames []string, expectedActive bool, timeout time.Duration) {
+func waitForSystemAgentActiveStateOnPods(t *testing.T, clients *clients.Clients, namespace string, podNames []string, kubectlEnv string, expectedActive bool, timeout time.Duration) {
 	t.Helper()
 
 	for i := range podNames {
-		waitForSystemAgentActiveState(t, clients, namespace, podNames[i], expectedActive, timeout)
+		waitForSystemAgentActiveState(t, clients, namespace, podNames[i], kubectlEnv, expectedActive, timeout)
 	}
 }
 
