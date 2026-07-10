@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Tear down the CAPRKE2 local dev cluster created by dev-scripts/dev-env.
+#
+# Environment:
+#   CAPRKE2_DEV_CLUSTER — k3d cluster name (default: local-caprke2).
+set -eo pipefail
+
+cluster="${CAPRKE2_DEV_CLUSTER:-local-caprke2}"
+
+if command -v k3d >/dev/null 2>&1 && k3d cluster list --output json 2>/dev/null | grep -q "\"name\": \"${cluster}\""; then
+  echo "Deleting k3d cluster '${cluster}'"
+  k3d cluster delete "${cluster}"
+else
+  echo "k3d cluster '${cluster}' not present; skipping cluster delete"
+fi
+
+# Only remove the `kind` network if nothing else is attached to it — leaving it alone if a
+# real kind cluster (or another CAPI/CAPD environment) is using it.
+if docker network inspect kind >/dev/null 2>&1; then
+  attached=$(docker network inspect kind --format '{{range .Containers}}{{.Name}} {{end}}' | tr -d '[:space:]')
+  if [ -z "$attached" ]; then
+    echo "Removing docker network 'kind' (no containers attached)"
+    docker network rm kind >/dev/null || true
+  else
+    echo "Leaving docker network 'kind' in place (still in use by: $attached)"
+  fi
+fi

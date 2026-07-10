@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Install the CAPRKE2 + CAPI Docker provider set required by the v2prov CAPRKE2 test.
+# LOCAL DEV ONLY — CI has no CAPRKE2 matrix entry and the test t.Skip's without V2PROV_TEST_CAPRKE2=true.
+#
+# Preferred invocation:  make install-caprke2-providers
+# Direct invocation is fine too; kubectl uses standard config precedence (KUBECONFIG or ~/.kube/config).
+#
+# Prerequisites:
+#   - A cluster reachable via kubectl, shaped for CAPRKE2 (on the `kind` docker network with the
+#     host docker socket bind-mounted into the server node). Run `make dev-env` to create one.
+#   - Rancher up against that cluster with Turtles enabled — this script waits for Turtles'
+#     `capiproviders.turtles-capi.cattle.io` CRD to appear before applying the provider manifest.
+#     Start Rancher first (e.g. `dev-scripts/quick`) if that wait times out.
+#
+# Environment:
+#   V2PROV_TEST_CAPRKE2_MANIFEST    — absolute path to a local manifest; applied verbatim.
+#   V2PROV_TEST_CAPRKE2_TURTLES_REF — rancher/turtles git ref (tag/branch/SHA); the
+#                                     `charts/rancher-turtles-providers` chart is `helm template`-ed
+#                                     at that ref so the user can run against an upstream version
+#                                     other than the one pinned in this repo.
+#   (neither set)                   — apply tests/v2prov/defaults/caprke2-providers.yaml.
+set -eo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+
+# scripts/retry's --exit-command needs a callable name; stub it (was previously provided by
+# scripts/provisioning-tests via `export -f dump_rancher_logs`; that CI path is gone).
+dump_rancher_logs() { :; }
+export -f dump_rancher_logs
+
+# Wait for Turtles' CRD to be established. Rancher installs the rancher-turtles chart the first
+# time it comes up; on a fresh `make dev-env` cluster this can take a minute or two after Rancher
+# starts. If it never appears the user probably hasn't started Rancher yet — give an actionable
+# message and bail.
+echo "Waiting for Turtles CRD capiproviders.turtles-capi.cattle.io to appear (start Rancher first if this hangs)"
+if ! "${repo_root}/scripts/retry" \
+    --timeout 300 \
+    --sleep 2 \
+    --message-interval 30 \
+    --message "Turtles CRD not established after {{elapsed}} seconds — is Rancher running with Turtles enabled?" \
+    "kubectl get crd capiproviders.turtles-capi.cattle.io &>/dev/null \
+      && kubectl wait --for=condition=Established crd/capiproviders.turtles-capi.cattle.io --timeout=10s &>/dev/null"; then
+  echo "Turtles CRD never appeared. Start Rancher against this cluster (e.g. dev-scripts/quick) and re-run." >&2
+  exit 1
+fi
+
+# CAPD (CAPI Docker provider) hardcodes the Docker network it attaches every DockerCluster/
+# DockerMachine LB + node container to as "kind" — see
+# sigs.k8s.io/cluster-api/test/infrastructure/docker/internal/docker/manager.go (DefaultNetwork).
+# It does NOT create the network itself; `make dev-env` handles this too but keep the check
+# here so direct invocations against another cluster aren't dependent on the ordering.
+if ! docker network inspect kind >/dev/null 2>&1; then
+  echo "Creating docker network 'kind' for CAPD (does not exist)"
+  docker network create kind
+fi
+
+if [ -n "${V2PROV_TEST_CAPRKE2_MANIFEST}" ]; then
+  echo "Installing CAPRKE2 providers from local manifest ${V2PROV_TEST_CAPRKE2_MANIFEST}"
+  kubectl apply -f "${V2PROV_TEST_CAPRKE2_MANIFEST}"
+elif [ -n "${V2PROV_TEST_CAPRKE2_TURTLES_REF}" ]; then
+  echo "Installing CAPRKE2 providers from rancher/turtles@${V2PROV_TEST_CAPRKE2_TURTLES_REF}"
+  turtles_workdir=$(mktemp -d)
+  if ! git clone --depth 1 --branch "${V2PROV_TEST_CAPRKE2_TURTLES_REF}" \
+      https://github.com/rancher/turtles "${turtles_workdir}/turtles" 2>/dev/null; then
+    # Branch-or-tag clone failed; treat the ref as a SHA and check it out post-clone.
+    git clone https://github.com/rancher/turtles "${turtles_workdir}/turtles"
+    ( cd "${turtles_workdir}/turtles" && git checkout "${V2PROV_TEST_CAPRKE2_TURTLES_REF}" )
+  fi
+  helm template caprke2-providers \
+    "${turtles_workdir}/turtles/charts/rancher-turtles-providers" \
+    --include-crds \
+    | kubectl apply -f -
+  rm -rf "${turtles_workdir}"
+else
+  echo "Installing CAPRKE2 providers from in-repo default manifest"
+  kubectl apply -f "${repo_root}/tests/v2prov/defaults/caprke2-providers.yaml"
+fi
+
+# Wait for the three provider controller-managers Turtles brings up.
+for dep in \
+    "rke2-bootstrap-system rke2-bootstrap-controller-manager" \
+    "rke2-control-plane-system rke2-control-plane-controller-manager" \
+    "capd-system capd-controller-manager"; do
+  ns=$(echo "${dep}" | awk '{print $1}')
+  name=$(echo "${dep}" | awk '{print $2}')
+  echo "Waiting up to 5 minutes for ${name} in ${ns}"
+  "${repo_root}/scripts/retry" \
+    --timeout 300 \
+    --sleep 2 \
+    --message-interval 30 \
+    --message "${name} was not available after {{elapsed}} seconds" \
+    --exit-command "dump_rancher_logs" \
+    "kubectl get ns ${ns} &>/dev/null \
+      && kubectl rollout status -w -n ${ns} deploy/${name} &>/dev/null"
+done

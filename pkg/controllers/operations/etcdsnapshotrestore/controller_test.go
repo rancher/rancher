@@ -30,6 +30,16 @@ type stubAdapter struct {
 	waitForRegisterOK bool
 }
 
+func (a *stubAdapter) EtcdSnapshotNamespace() string {
+	return "test-namespace"
+}
+
+func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *stubAdapter) BeaconRef() (string, string)                       { return "test-namespace", "test-cluster" }
 func (a *stubAdapter) WaitForRegister() (bool, error)                    { return a.waitForRegisterOK, nil }
 func (a *stubAdapter) PauseCluster(_ bool) error                         { return nil }
 func (a *stubAdapter) RuntimeCommand() string                            { return a.runtimeCommand }
@@ -43,6 +53,22 @@ func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectl
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
+}
+
+// The six methods below complete the ops.Adapter contract for the stub. They are not exercised
+// by the snapshot-restore controller (which only consumes runtime/dataDir/serverUnit/probes/
+// kubectl+kubeconfig paths/plans), so each returns a static, runtime-appropriate value.
+func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string {
+	return "/etc/rancher/" + a.runtimeCommand + "/config.yaml"
+}
+func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
+	return "/etc/rancher/" + a.runtimeCommand + "/config.yaml.d"
+}
+func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
+func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
+func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []planapi.File) {
+	return nil, nil, nil
 }
 
 func newTestScope(adapter *stubAdapter, uid types.UID) *scope {

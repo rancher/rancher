@@ -113,6 +113,11 @@ func (in *BeaconStatus) DeepCopyInto(out *BeaconStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Delegates != nil {
+		in, out := &in.Delegates, &out.Delegates
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

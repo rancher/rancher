@@ -4,10 +4,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+
 // ETCDSnapshotSaveArgs contains parameters for saving an ETCD snapshot.
 // Name specifies the name of the snapshot file.
-// ETCDSnapshotCompress determines if the snapshot will be compressed.
-// ETCDSnapshotDir specifies the directory where the snapshot will be saved.
 type ETCDSnapshotSaveArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
 	// +optional
@@ -17,6 +16,7 @@ type ETCDSnapshotSaveArgs struct {
 // ETCDSnapshotSaveSpec defines the desired state of ETCDSnapshotSave.
 type ETCDSnapshotSaveSpec struct {
 	// OperationSpec is the shared spec common to all operations.
+	// +optional
 	OperationSpec `json:",inline"`
 
 	// Args contains parameters for saving an ETCD snapshot.
@@ -28,6 +28,10 @@ type ETCDSnapshotSaveSpec struct {
 type ETCDSnapshotSaveStep string
 
 const (
+	// ETCDSnapshotSaveStepPreflight indicates the step is performing preflight checks to determine if the operation
+	// will succeed.
+	ETCDSnapshotSaveStepPreflight ETCDSnapshotSaveStep = "Preflight"
+
 	// ETCDSnapshotSaveStepSave indicates the step is to save the snapshot.
 	ETCDSnapshotSaveStepSave ETCDSnapshotSaveStep = "Save"
 
@@ -42,7 +46,7 @@ type ETCDSnapshotSaveStatus struct {
 
 	// Step is the current step of the operation.
 	// Step is typically only valid during the InProgress phase.
-	// +kubebuilder:validation:Enum=Save;Restart
+	// +kubebuilder:validation:Enum=Preflight;Save;Restart
 	// +optional
 	Step ETCDSnapshotSaveStep `json:"step,omitempty"`
 }
