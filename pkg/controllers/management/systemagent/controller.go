@@ -159,13 +159,14 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 
 // reconcileImportedEnable clears any disable bookkeeping before continuing the normal install path.
 func (h *handler) reconcileImportedEnable(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
-	var err error
-	cluster, changed, err := h.clearCleaningState(cluster)
-	if err != nil {
-		return cluster, err
-	}
-	if changed {
-		return cluster, nil
+	if cluster.Annotations[importedCleaningStateAnnotation] != "" {
+		cluster = cluster.DeepCopy()
+		delete(cluster.Annotations, importedCleaningStateAnnotation)
+		updated, err := h.clusters.Update(cluster)
+		if err != nil {
+			return cluster, err
+		}
+		return updated, nil
 	}
 
 	return h.reconcileImportedInstall(cluster)
@@ -210,23 +211,26 @@ func (h *handler) reconcileImportedInstall(cluster *apimgmtv3.Cluster) (*apimgmt
 
 	result := installer(cluster)
 
-	hash, err := renderedObjectsHash(result)
+	data, err := json.Marshal(result)
 	if err != nil {
 		return cluster, err
 	}
+	sum := sha256.Sum256(data)
+	hash := hex.EncodeToString(sum[:])
 
 	val, ok := cluster.Annotations[AppliedSystemAgentUpgraderHashAnnotation]
-	identityExists, _, err := h.importedPlanIdentityExists(cluster.Name)
+	identityState, err := h.importedPlanIdentity(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
-	if ok && hash == val && identityExists {
+	waitMessage := identityState.waitMessage()
+	if ok && hash == val && waitMessage == "" {
 		logrus.Debugf("[importedsystemagent] cluster %s/%s: applied templates for system-agent-upgrader is up to date. "+
 			"To trigger a force redeployment, remove the %s annotation from the corresponding management cluster object",
 			cluster.Namespace, cluster.Name, AppliedSystemAgentUpgraderHashAnnotation)
 		return cluster, nil
 	}
-	if ok && hash == val && !identityExists {
+	if ok && hash == val && waitMessage != "" {
 		logrus.Infof("[importedsystemagent] cluster %s/%s: applied hash is current, but imported plan identity is incomplete; reapplying system-agent-upgrader templates", cluster.Namespace, cluster.Name)
 	}
 
@@ -252,11 +256,12 @@ func (h *handler) reconcileImportedInstall(cluster *apimgmtv3.Cluster) (*apimgmt
 		return cluster, err
 	}
 
-	identityExists, waitMessage, err := h.importedPlanIdentityExists(cluster.Name)
+	identityState, err = h.importedPlanIdentity(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
-	if !identityExists {
+	waitMessage = identityState.waitMessage()
+	if waitMessage != "" {
 		logrus.Debugf("[importedsystemagent] cluster %s/%s: %s", cluster.Namespace, cluster.Name, waitMessage)
 		h.clusters.EnqueueAfter(cluster.Name, 5*time.Second)
 		return cluster, nil
@@ -296,6 +301,8 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 
 	switch state {
 	case apimgmtv3.ImportedDay2OpsCleaningStateOperations:
+		// First block new day2ops work by taking the beacon, then remove any in-flight
+		// operation CRs before starting the system-agent uninstall rollout.
 		beacon, err := h.beaconCache.Get(cluster.Name, cluster.Name)
 		if apierrors.IsNotFound(err) {
 			beacon = nil
@@ -304,10 +311,16 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		}
 
 		// Disable waits for the current holder to finish instead of preempting it.
-		if wait, message := disableBeaconWait(beacon); wait {
-			logrus.Debugf("[importedsystemagent] cluster %s/%s: %s", cluster.Namespace, cluster.Name, message)
-			h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
-			return cluster, nil
+		if beacon != nil {
+			owner := ""
+			if beacon.Labels != nil {
+				owner = beacon.Labels[planv1alpha1.BeaconOwnerLabel]
+			}
+			if owner != "" && owner != disableBeaconOwnerKey {
+				logrus.Debugf("[importedsystemagent] cluster %s/%s: waiting for beacon release from %q", cluster.Namespace, cluster.Name, owner)
+				h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
+				return cluster, nil
+			}
 		}
 		// Disable takes the beacon before deleting operation CRs to block new starts while cleanup runs.
 		if beacon != nil {
@@ -336,13 +349,24 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		return cluster, nil
 
 	case apimgmtv3.ImportedDay2OpsCleaningStateUninstall:
-		cluster, rolloutID, created, err := h.ensureUninstallRollout(cluster)
-		if err != nil {
-			return cluster, err
-		}
-		if created {
-			h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)
-			return cluster, nil
+		// Render and apply the uninstall plan, then wait for the current rollout ID to be
+		// acknowledged on every targeted node before tearing down downstream SUC resources.
+		rolloutID := cluster.Annotations[importedUninstallRolloutIDAnnotation]
+		if rolloutID == "" {
+			rolloutID = string(uuid.NewUUID())
+
+			cluster = cluster.DeepCopy()
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[importedUninstallRolloutIDAnnotation] = rolloutID
+
+			updated, err := h.clusters.Update(cluster)
+			if err != nil {
+				return cluster, err
+			}
+			h.clusters.EnqueueAfter(updated.Name, importedDay2OpsDisableRequeueInterval)
+			return updated, nil
 		}
 
 		clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)
@@ -376,6 +400,8 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		return cluster, nil
 
 	case apimgmtv3.ImportedDay2OpsCleaningStateSUC:
+		// Once uninstall has completed on the targeted nodes, remove the downstream SUC plans
+		// and shared RBAC objects that were used to deliver the rollout.
 		clusterCtx, err := h.manager.UserContextNoControllersReconnecting(cluster.Name, false)
 		if err != nil {
 			return cluster, err
@@ -395,6 +421,8 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		return cluster, nil
 
 	case apimgmtv3.ImportedDay2OpsCleaningStateMachinePlans:
+		// After SUC is gone, delete the imported machine-plan secrets and their associated
+		// service account identity so re-enable starts from a clean imported plan state.
 		if remaining, err := h.deleteMachinePlans(cluster.Name); err != nil {
 			return cluster, err
 		} else if remaining {
@@ -410,6 +438,8 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 		return cluster, nil
 
 	case apimgmtv3.ImportedDay2OpsCleaningStateBeacon:
+		// Release the imported beacon last so new operations cannot start until all imported
+		// day2ops bookkeeping and delivery resources have been removed.
 		if remaining, err := h.deleteBeacon(cluster.Name); err != nil {
 			return cluster, err
 		} else if remaining {
@@ -450,64 +480,15 @@ func (h *handler) disableNeeded(cluster *apimgmtv3.Cluster) (bool, error) {
 		return hasOperations, err
 	}
 
-	machinePlans, err := h.machinePlanSecrets(cluster.Name)
+	identityState, err := h.importedPlanIdentity(cluster.Name)
 	if err != nil {
 		return false, err
 	}
-	if len(machinePlans) > 0 {
+	if identityState.exists() {
 		return true, nil
 	}
 
-	serviceAccounts, err := h.importedPlanServiceAccounts(cluster.Name)
-	if err != nil {
-		return false, err
-	}
-	if len(serviceAccounts) > 0 {
-		return true, nil
-	}
-
-	secrets, err := h.secretCache.List(cluster.Name, labels.Everything())
-	if err != nil {
-		return false, err
-	}
-	for i := range secrets {
-		if secrets[i].Type != corev1.SecretTypeServiceAccountToken {
-			continue
-		}
-		if strings.HasSuffix(secrets[i].Labels[serviceaccounttoken.ServiceAccountSecretLabel], "-machine-plan") {
-			return true, nil
-		}
-	}
-
-	roles, err := h.roles.List(cluster.Name, metav1.ListOptions{})
-	if err != nil {
-		return false, err
-	}
-	for i := range roles.Items {
-		if strings.HasSuffix(roles.Items[i].Name, "-machine-plan") {
-			return true, nil
-		}
-	}
-
-	roleBindings, err := h.roleBindings.List(cluster.Name, metav1.ListOptions{})
-	if err != nil {
-		return false, err
-	}
-	for i := range roleBindings.Items {
-		if !strings.HasSuffix(roleBindings.Items[i].Name, "-machine-plan") {
-			continue
-		}
-		for j := range roleBindings.Items[i].Subjects {
-			subject := roleBindings.Items[i].Subjects[j]
-			if subject.Kind == "ServiceAccount" &&
-				subject.Name == roleBindings.Items[i].Name &&
-				(subject.Namespace == "" || subject.Namespace == cluster.Name) {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
+	return h.hasImportedPlanIdentityResources(cluster.Name)
 }
 
 // hasOperations reports whether any imported day2ops operation CRs still reference the cluster.
@@ -591,27 +572,23 @@ func (h *handler) deleteOperations(clusterName string) (bool, error) {
 func (h *handler) deleteMachinePlans(clusterName string) (bool, error) {
 	remaining := false
 
-	secrets, err := h.machinePlanSecrets(clusterName)
+	identityState, err := h.importedPlanIdentity(clusterName)
 	if err != nil {
 		return false, err
 	}
-	for i := range secrets {
+	for i := range identityState.machinePlanSecrets {
 		remaining = true
-		if secrets[i].DeletionTimestamp != nil {
+		if identityState.machinePlanSecrets[i].DeletionTimestamp != nil {
 			continue
 		}
-		if err := h.secrets.Delete(secrets[i].Namespace, secrets[i].Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := h.secrets.Delete(identityState.machinePlanSecrets[i].Namespace, identityState.machinePlanSecrets[i].Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
 	}
 
-	serviceAccounts, err := h.importedPlanServiceAccounts(clusterName)
-	if err != nil {
-		return false, err
-	}
-	for i := range serviceAccounts {
+	for i := range identityState.serviceAccounts {
 		remaining = true
-		if err := h.deleteImportedPlanIdentity(serviceAccounts[i]); err != nil {
+		if err := h.deleteImportedPlanIdentity(identityState.serviceAccounts[i]); err != nil {
 			return false, err
 		}
 	}
@@ -644,26 +621,85 @@ func (h *handler) importedPlanServiceAccounts(clusterName string) ([]*corev1.Ser
 	}))
 }
 
-// importedPlanIdentityExists checks only for imported machine-plan secret and plan service account presence.
-// It does not prove the full identity set (token secret, role, rolebinding) is fully coherent yet.
-func (h *handler) importedPlanIdentityExists(clusterName string) (bool, string, error) {
+type importedPlanIdentityState struct {
+	machinePlanSecrets []*corev1.Secret
+	serviceAccounts    []*corev1.ServiceAccount
+}
+
+func (s importedPlanIdentityState) exists() bool {
+	return len(s.machinePlanSecrets) > 0 || len(s.serviceAccounts) > 0
+}
+
+func (s importedPlanIdentityState) waitMessage() string {
+	if len(s.machinePlanSecrets) == 0 {
+		return "waiting for imported machine-plan secret creation"
+	}
+	if len(s.serviceAccounts) == 0 {
+		return "waiting for imported machine-plan service account creation"
+	}
+	return ""
+}
+
+func (h *handler) importedPlanIdentity(clusterName string) (importedPlanIdentityState, error) {
 	machinePlans, err := h.machinePlanSecrets(clusterName)
 	if err != nil {
-		return false, "", err
-	}
-	if len(machinePlans) == 0 {
-		return false, "waiting for imported machine-plan secret creation", nil
+		return importedPlanIdentityState{}, err
 	}
 
 	serviceAccounts, err := h.importedPlanServiceAccounts(clusterName)
 	if err != nil {
-		return false, "", err
-	}
-	if len(serviceAccounts) == 0 {
-		return false, "waiting for imported machine-plan service account creation", nil
+		return importedPlanIdentityState{}, err
 	}
 
-	return true, "", nil
+	return importedPlanIdentityState{
+		machinePlanSecrets: machinePlans,
+		serviceAccounts:    serviceAccounts,
+	}, nil
+}
+
+func (h *handler) hasImportedPlanIdentityResources(clusterName string) (bool, error) {
+	secrets, err := h.secretCache.List(clusterName, labels.Everything())
+	if err != nil {
+		return false, err
+	}
+	for i := range secrets {
+		if secrets[i].Type != corev1.SecretTypeServiceAccountToken {
+			continue
+		}
+		if strings.HasSuffix(secrets[i].Labels[serviceaccounttoken.ServiceAccountSecretLabel], "-machine-plan") {
+			return true, nil
+		}
+	}
+
+	roles, err := h.roles.List(clusterName, metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for i := range roles.Items {
+		if strings.HasSuffix(roles.Items[i].Name, "-machine-plan") {
+			return true, nil
+		}
+	}
+
+	roleBindings, err := h.roleBindings.List(clusterName, metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for i := range roleBindings.Items {
+		if !strings.HasSuffix(roleBindings.Items[i].Name, "-machine-plan") {
+			continue
+		}
+		for j := range roleBindings.Items[i].Subjects {
+			subject := roleBindings.Items[i].Subjects[j]
+			if subject.Kind == "ServiceAccount" &&
+				subject.Name == roleBindings.Items[i].Name &&
+				(subject.Namespace == "" || subject.Namespace == clusterName) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 // deleteImportedPlanIdentity removes the imported machine-plan service account,
@@ -676,10 +712,10 @@ func (h *handler) deleteImportedPlanIdentity(serviceAccount *corev1.ServiceAccou
 		return err
 	}
 	for i := range tokenSecrets {
-		if tokenSecrets[i].Type != corev1.SecretTypeServiceAccountToken {
+		if tokenSecrets[i].Type != corev1.SecretTypeServiceAccountToken || tokenSecrets[i].DeletionTimestamp != nil {
 			continue
 		}
-		if tokenSecrets[i].DeletionTimestamp != nil {
+		if tokenSecrets[i].Labels[serviceaccounttoken.ServiceAccountSecretLabel] != serviceAccount.Name {
 			continue
 		}
 		if err := h.secrets.Delete(tokenSecrets[i].Namespace, tokenSecrets[i].Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -717,35 +753,6 @@ func (h *handler) deleteBeacon(clusterName string) (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-func (h *handler) ensureUninstallRollout(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, string, bool, error) {
-	if cluster.Annotations[importedUninstallRolloutIDAnnotation] != "" {
-		return cluster, cluster.Annotations[importedUninstallRolloutIDAnnotation], false, nil
-	}
-
-	rolloutID := string(uuid.NewUUID())
-
-	updatedCluster := cluster.DeepCopy()
-	if updatedCluster.Annotations == nil {
-		updatedCluster.Annotations = map[string]string{}
-	}
-	updatedCluster.Annotations[importedUninstallRolloutIDAnnotation] = rolloutID
-
-	updated, err := h.clusters.Update(updatedCluster)
-	if err != nil {
-		return cluster, "", false, err
-	}
-	return updated, rolloutID, true, nil
-}
-
-func renderedObjectsHash(objs []runtime.Object) (string, error) {
-	data, err := json.Marshal(objs)
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), nil
 }
 
 // applyUninstallPlans renders and applies the imported system-agent uninstall plans downstream.
@@ -987,20 +994,6 @@ func (h *handler) setCleaningState(cluster *apimgmtv3.Cluster, state string) (*a
 	return updated, nil
 }
 
-// clearCleaningState removes the imported cleanup phase annotation.
-func (h *handler) clearCleaningState(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, bool, error) {
-	if cluster.Annotations[importedCleaningStateAnnotation] == "" {
-		return cluster, false, nil
-	}
-	cluster = cluster.DeepCopy()
-	delete(cluster.Annotations, importedCleaningStateAnnotation)
-	updated, err := h.clusters.Update(cluster)
-	if err != nil {
-		return cluster, false, err
-	}
-	return updated, true, nil
-}
-
 // clearClusterAnnotations removes imported disable bookkeeping while preserving the user's ops-enabled choice.
 func (h *handler) clearClusterAnnotations(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if cluster.Annotations == nil {
@@ -1016,25 +1009,6 @@ func (h *handler) clearClusterAnnotations(cluster *apimgmtv3.Cluster) (*apimgmtv
 	delete(cluster.Annotations, AppliedSystemAgentUpgraderHashAnnotation)
 	delete(cluster.Annotations, importedUninstallRolloutIDAnnotation)
 	return h.clusters.Update(cluster)
-}
-
-// disableBeaconWait returns the user-facing wait reason when another controller still owns the beacon.
-func disableBeaconWait(beacon *planv1alpha1.Beacon) (bool, string) {
-	if beacon == nil {
-		return false, ""
-	}
-	owner := ""
-	if beacon.Labels != nil {
-		owner = beacon.Labels[planv1alpha1.BeaconOwnerLabel]
-	}
-	switch {
-	case owner == disableBeaconOwnerKey:
-		return false, ""
-	case owner != "":
-		return true, fmt.Sprintf("waiting for beacon release from %q", owner)
-	default:
-		return false, ""
-	}
 }
 
 // shouldReconcileImportedDisable keeps disable reconciliation sticky once disable has started or disable is explicit.
@@ -1055,28 +1029,44 @@ func SystemAgentUpgraderVersion() string {
 
 // installer renders the imported system-agent SUC resources for the enabled state.
 func installer(cluster *apimgmtv3.Cluster) []runtime.Object {
-	plans := buildSUCPlanObjects(cluster, withUninstallEnv(planEnv(cluster), "false", ""), nil)
-	return append(plans, sharedSUCObjects()...)
+	env := installPlanEnv(planEnv(cluster))
+	return append([]runtime.Object{
+		linuxUpgradePlan(cluster, env),
+		winsUpgradePlan(cluster, env),
+	}, sharedSUCObjects()...)
 }
 
 // uninstaller renders the imported system-agent SUC resources with UNINSTALL=true for teardown.
 func uninstaller(cluster *apimgmtv3.Cluster, rolloutID string) []runtime.Object {
-	plans := buildSUCPlanObjects(
-		cluster,
-		withUninstallEnv(planEnv(cluster), "true", rolloutID),
-		map[string]string{systemAgentUpgraderRolloutIDLabel: rolloutID},
-	)
-	return append(plans, sharedSUCObjects()...)
+	env := uninstallPlanEnv(planEnv(cluster), rolloutID)
+	linuxPlan := linuxUpgradePlan(cluster, env)
+	windowsPlan := winsUpgradePlan(cluster, env)
+
+	// Uninstall rollout tracking is only needed for the teardown path.
+	linuxPlan.Spec.PostCompleteLabels = map[string]string{systemAgentUpgraderRolloutIDLabel: rolloutID}
+	windowsPlan.Spec.PostCompleteLabels = map[string]string{systemAgentUpgraderRolloutIDLabel: rolloutID}
+
+	return append([]runtime.Object{linuxPlan, windowsPlan}, sharedSUCObjects()...)
 }
 
 // UNINSTALL must be first because SUC digest reconciliation has proven sensitive to env ordering.
-func withUninstallEnv(env []corev1.EnvVar, uninstallValue, rolloutID string) []corev1.EnvVar {
-	result := make([]corev1.EnvVar, 0, len(env)+2)
-	result = append(result, corev1.EnvVar{Name: "UNINSTALL", Value: uninstallValue})
-	if rolloutID != "" {
-		result = append(result, corev1.EnvVar{Name: systemAgentUpgraderRunIDEnvName, Value: rolloutID})
+func installPlanEnv(base []corev1.EnvVar) []corev1.EnvVar {
+	result := make([]corev1.EnvVar, 0, len(base)+1)
+	result = append(result, corev1.EnvVar{Name: "UNINSTALL", Value: "false"})
+	for _, entry := range base {
+		if entry.Name == "UNINSTALL" || entry.Name == systemAgentUpgraderRunIDEnvName {
+			continue
+		}
+		result = append(result, entry)
 	}
-	for _, entry := range env {
+	return result
+}
+
+func uninstallPlanEnv(base []corev1.EnvVar, rolloutID string) []corev1.EnvVar {
+	result := make([]corev1.EnvVar, 0, len(base)+2)
+	result = append(result, corev1.EnvVar{Name: "UNINSTALL", Value: "true"})
+	result = append(result, corev1.EnvVar{Name: systemAgentUpgraderRunIDEnvName, Value: rolloutID})
+	for _, entry := range base {
 		if entry.Name == "UNINSTALL" || entry.Name == systemAgentUpgraderRunIDEnvName {
 			continue
 		}
@@ -1126,15 +1116,11 @@ func planEnv(cluster *apimgmtv3.Cluster) []corev1.EnvVar {
 	return env
 }
 
-// buildSUCPlanObjects renders linux/windows SUC plans for imported system-agent management.
-func buildSUCPlanObjects(cluster *apimgmtv3.Cluster, env []corev1.EnvVar, postCompleteLabels map[string]string) []runtime.Object {
+func linuxUpgradePlan(cluster *apimgmtv3.Cluster, env []corev1.EnvVar) *upgradev1.Plan {
 	upgradeImage := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
 	version := SystemAgentUpgraderVersion()
 
-	// todo: data directory detection
-	var plans []runtime.Object
-
-	plan := upgradev1.NewPlan(namespaces.System, SystemAgentUpgraderPlanName, upgradev1.Plan{
+	return upgradev1.NewPlan(namespaces.System, SystemAgentUpgraderPlanName, upgradev1.Plan{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				UpgradeDigestAnnotation: "spec.upgrade.envs,spec.upgrade.envFrom",
@@ -1176,28 +1162,8 @@ func buildSUCPlanObjects(cluster *apimgmtv3.Cluster, env []corev1.EnvVar, postCo
 					},
 				}},
 			},
-			PostCompleteLabels: copyLabels(postCompleteLabels),
 		},
 	})
-	plans = append(plans, plan)
-
-	windowsPlan := winsUpgradePlan(cluster, env, postCompleteLabels)
-
-	// todo: redeploy support
-	plans = append(plans, windowsPlan)
-
-	return plans
-}
-
-func copyLabels(labelMap map[string]string) map[string]string {
-	if len(labelMap) == 0 {
-		return nil
-	}
-	result := make(map[string]string, len(labelMap))
-	for key, value := range labelMap {
-		result[key] = value
-	}
-	return result
 }
 
 func sharedSUCObjects() []runtime.Object {
@@ -1236,7 +1202,7 @@ func sharedSUCObjects() []runtime.Object {
 	}
 }
 
-func winsUpgradePlan(cluster *apimgmtv3.Cluster, env []corev1.EnvVar, postCompleteLabels map[string]string) *upgradev1.Plan {
+func winsUpgradePlan(cluster *apimgmtv3.Cluster, env []corev1.EnvVar) *upgradev1.Plan {
 	winsUpgradeImage := strings.SplitN(settings.WinsAgentUpgradeImage.Get(), ":", 2)
 	winsVersion := "latest"
 	if len(winsUpgradeImage) == 2 {
@@ -1288,7 +1254,6 @@ func winsUpgradePlan(cluster *apimgmtv3.Cluster, env []corev1.EnvVar, postComple
 					},
 				}},
 			},
-			PostCompleteLabels: copyLabels(postCompleteLabels),
 		},
 	})
 }

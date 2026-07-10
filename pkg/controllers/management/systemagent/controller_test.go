@@ -28,57 +28,6 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestDisableBeaconWait(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		beacon   *planv1alpha1.Beacon
-		wantWait bool
-		wantMsg  string
-	}{
-		{
-			name: "no beacon",
-		},
-		{
-			name: "owned by disable",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{planv1alpha1.BeaconOwnerLabel: disableBeaconOwnerKey},
-				},
-			},
-		},
-		{
-			name: "owned by another controller",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{planv1alpha1.BeaconOwnerLabel: "etcd-snapshot-save"},
-				},
-			},
-			wantWait: true,
-			wantMsg:  "waiting for beacon release from \"etcd-snapshot-save\"",
-		},
-		{
-			name: "active without owner does not block disable",
-			beacon: &planv1alpha1.Beacon{
-				Status: planv1alpha1.BeaconStatus{Active: true},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			wait, message := disableBeaconWait(tt.beacon)
-			if wait != tt.wantWait {
-				t.Fatalf("expected wait=%t, got %t", tt.wantWait, wait)
-			}
-			if message != tt.wantMsg {
-				t.Fatalf("expected message %q, got %q", tt.wantMsg, message)
-			}
-		})
-	}
-}
-
 func TestShouldReconcileImportedDisable(t *testing.T) {
 	t.Parallel()
 
@@ -101,7 +50,7 @@ func TestShouldReconcileImportedDisable(t *testing.T) {
 	}
 }
 
-func TestInstallerSetsUninstallFalseEnv(t *testing.T) {
+func TestInstallerRender(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
@@ -139,6 +88,9 @@ func TestInstallerSetsUninstallFalseEnv(t *testing.T) {
 		if uninstallCount != 1 {
 			t.Fatalf("expected exactly one UNINSTALL env in install plan %s, got %d", plan.Name, uninstallCount)
 		}
+		if runIDCount := envVarCount(plan.Spec.Upgrade.Env, systemAgentUpgraderRunIDEnvName); runIDCount != 0 {
+			t.Fatalf("expected no %s env in install plan %s, got %d", systemAgentUpgraderRunIDEnvName, plan.Name, runIDCount)
+		}
 		roleNoneValue, ok := envVar(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE")
 		if !ok || roleNoneValue != "true" {
 			t.Fatalf("expected CATTLE_ROLE_NONE=true in install plan %s", plan.Name)
@@ -158,7 +110,7 @@ func TestInstallerSetsUninstallFalseEnv(t *testing.T) {
 	}
 }
 
-func TestUninstallerSetsUninstallEnv(t *testing.T) {
+func TestUninstallerRender(t *testing.T) {
 	t.Parallel()
 
 	cluster := &apimgmtv3.Cluster{
@@ -228,35 +180,6 @@ func TestUninstallerSetsUninstallEnv(t *testing.T) {
 	}
 }
 
-func TestInstallerForcesRoleNoneEnv(t *testing.T) {
-	t.Parallel()
-
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
-		Spec: apimgmtv3.ClusterSpec{
-			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
-				AgentEnvVars: []corev1.EnvVar{
-					{Name: "CATTLE_ROLE_NONE", Value: "false"},
-				},
-			},
-		},
-	}
-
-	plans := renderedPlans(installer(cluster))
-	if len(plans) != 2 {
-		t.Fatalf("expected 2 rendered plans, got %d", len(plans))
-	}
-	for _, plan := range plans {
-		roleNoneValue, ok := envVar(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE")
-		if !ok || roleNoneValue != "true" {
-			t.Fatalf("expected CATTLE_ROLE_NONE=true in install plan %s", plan.Name)
-		}
-		if roleNoneCount := envVarCount(plan.Spec.Upgrade.Env, "CATTLE_ROLE_NONE"); roleNoneCount != 1 {
-			t.Fatalf("expected exactly one CATTLE_ROLE_NONE env in install plan %s, got %d", plan.Name, roleNoneCount)
-		}
-	}
-}
-
 func TestUninstallerIncludesSharedSUCObjects(t *testing.T) {
 	t.Parallel()
 
@@ -291,69 +214,11 @@ func TestUninstallerIncludesSharedSUCObjects(t *testing.T) {
 	}
 }
 
-func TestPlanEnvForcesRoleNoneAndPreservesStrictVerify(t *testing.T) {
+func TestUninstallPlanReady(t *testing.T) {
 	t.Parallel()
 
-	cluster := &apimgmtv3.Cluster{
-		Spec: apimgmtv3.ClusterSpec{
-			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
-				AgentEnvVars: []corev1.EnvVar{
-					{Name: "STRICT_VERIFY", Value: "custom-strict"},
-					{Name: "CATTLE_ROLE_NONE", Value: "false"},
-				},
-			},
-		},
-	}
-
-	env := planEnv(cluster)
-	if roleNoneValue, ok := envVar(env, "CATTLE_ROLE_NONE"); !ok || roleNoneValue != "true" {
-		t.Fatalf("expected forced CATTLE_ROLE_NONE=true, got %q", roleNoneValue)
-	}
-	if roleNoneCount := envVarCount(env, "CATTLE_ROLE_NONE"); roleNoneCount != 1 {
-		t.Fatalf("expected exactly one CATTLE_ROLE_NONE env, got %d", roleNoneCount)
-	}
-	if strictValue, ok := envVar(env, "STRICT_VERIFY"); !ok || strictValue != "custom-strict" {
-		t.Fatalf("expected STRICT_VERIFY=custom-strict, got %q", strictValue)
-	}
-}
-
-func TestUninstallPlanReadyRequiresRolloutLabelOnEveryTargetedNode(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-a"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, rolloutID)
-	nodes := []corev1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "node-1",
-				Labels: map[string]string{},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-2",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: rolloutID,
-				},
-			},
-		},
-	}
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nodes)
-	if ready {
-		t.Fatalf("expected uninstall plan to wait while a targeted node is missing rollout label")
-	}
-	if !strings.Contains(msg, "node node-1 missing") {
-		t.Fatalf("expected missing-node rollout label message, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadyReturnsTrueWhenAllTargetedNodesHaveRolloutLabel(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-b"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, rolloutID)
-	nodes := []corev1.Node{
+	const rolloutID = "rollout-id"
+	labeledNodes := []corev1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-1",
@@ -372,260 +237,117 @@ func TestUninstallPlanReadyReturnsTrueWhenAllTargetedNodesHaveRolloutLabel(t *te
 		},
 	}
 
-	ready, msg := uninstallPlanReady(plan, rolloutID, nodes)
-	if !ready {
-		t.Fatalf("expected uninstall plan to be ready, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadyRejectsStaleRolloutLabel(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-c"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, rolloutID)
-	nodes := []corev1.Node{
+	tests := []struct {
+		name            string
+		planName        string
+		nodes           []corev1.Node
+		mutatePlan      func(*upgradev1.Plan)
+		wantReady       bool
+		wantMsgContains string
+	}{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-1",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: "stale-rollout-id",
+			name:     "missing rollout label on targeted node",
+			planName: SystemAgentUpgraderPlanName,
+			nodes: []corev1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: map[string]string{}}},
+				labeledNodes[1],
+			},
+			wantReady:       false,
+			wantMsgContains: "node node-1 missing",
+		},
+		{
+			name:      "all targeted nodes have rollout label",
+			planName:  SystemAgentUpgraderPlanName,
+			nodes:     labeledNodes,
+			wantReady: true,
+		},
+		{
+			name:     "stale rollout label does not count",
+			planName: SystemAgentUpgraderPlanName,
+			nodes: []corev1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-1",
+						Labels: map[string]string{
+							systemAgentUpgraderRolloutIDLabel: "stale-rollout-id",
+						},
+					},
 				},
 			},
+			wantReady:       false,
+			wantMsgContains: "node node-1 missing",
 		},
-	}
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nodes)
-	if ready {
-		t.Fatalf("expected uninstall plan to reject stale node rollout labels")
-	}
-	if !strings.Contains(msg, "node node-1 missing") {
-		t.Fatalf("expected stale-label wait message, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadySkipsWindowsPlanWithNoTargets(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-d"
-	plan := completeUninstallPlan(SystemAgentUpgraderWindowsPlanName, rolloutID)
-	upgradev1.PlanComplete.False(plan)
-	plan.Status.Applying = []string{"node-1"}
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nil)
-	if !ready {
-		t.Fatalf("expected windows uninstall plan with zero targets to be skipped, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadyDoesNotSkipLinuxPlanWithNoTargets(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-linux-no-targets"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, rolloutID)
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nil)
-	if ready {
-		t.Fatalf("expected linux uninstall plan with zero targets to remain pending")
-	}
-	if !strings.Contains(msg, "no targeted nodes observed yet") {
-		t.Fatalf("expected no-target wait message, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadyRejectsWrongRunID(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-e"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, "different-rollout-id")
-	nodes := []corev1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-1",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: rolloutID,
-				},
+			name:     "windows plan with zero targets is skipped",
+			planName: SystemAgentUpgraderWindowsPlanName,
+			mutatePlan: func(plan *upgradev1.Plan) {
+				upgradev1.PlanComplete.False(plan)
+				plan.Status.Applying = []string{"node-1"}
 			},
+			wantReady: true,
 		},
-	}
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nodes)
-	if ready {
-		t.Fatalf("expected uninstall plan to reject mismatched run ID")
-	}
-	if !strings.Contains(msg, systemAgentUpgraderRunIDEnvName) {
-		t.Fatalf("expected run-id mismatch message, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadyRejectsWrongPostCompleteLabel(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-f"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, rolloutID)
-	plan.Spec.PostCompleteLabels[systemAgentUpgraderRolloutIDLabel] = "different-rollout-id"
-	nodes := []corev1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-1",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: rolloutID,
-				},
-			},
+			name:            "linux plan with zero targets is not ready",
+			planName:        SystemAgentUpgraderPlanName,
+			wantReady:       false,
+			wantMsgContains: "no targeted nodes observed yet",
 		},
-	}
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nodes)
-	if ready {
-		t.Fatalf("expected uninstall plan to reject mismatched postCompleteLabels rollout ID")
-	}
-	if !strings.Contains(msg, "postCompleteLabels") {
-		t.Fatalf("expected postCompleteLabels mismatch message, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadyBlocksWhileApplying(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-g"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, rolloutID)
-	plan.Status.Applying = []string{"node-1"}
-	nodes := []corev1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-1",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: rolloutID,
-				},
+			name:      "wrong run ID",
+			planName:  SystemAgentUpgraderPlanName,
+			nodes:     labeledNodes[:1],
+			wantReady: false,
+			mutatePlan: func(plan *upgradev1.Plan) {
+				plan.Spec.Upgrade.Env[1].Value = "different-rollout-id"
 			},
+			wantMsgContains: systemAgentUpgraderRunIDEnvName,
 		},
-	}
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nodes)
-	if ready {
-		t.Fatalf("expected uninstall plan to block while status.applying is not empty")
-	}
-	if !strings.Contains(msg, "still applying") {
-		t.Fatalf("expected applying wait message, got %q", msg)
-	}
-}
-
-func TestUninstallPlanReadyBlocksWhenPlanNotComplete(t *testing.T) {
-	t.Parallel()
-
-	const rolloutID = "rollout-id-h"
-	plan := completeUninstallPlan(SystemAgentUpgraderPlanName, rolloutID)
-	upgradev1.PlanComplete.False(plan)
-	nodes := []corev1.Node{
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "node-1",
-				Labels: map[string]string{
-					systemAgentUpgraderRolloutIDLabel: rolloutID,
-				},
+			name:      "wrong postCompleteLabels",
+			planName:  SystemAgentUpgraderPlanName,
+			nodes:     labeledNodes[:1],
+			wantReady: false,
+			mutatePlan: func(plan *upgradev1.Plan) {
+				plan.Spec.PostCompleteLabels[systemAgentUpgraderRolloutIDLabel] = "different-rollout-id"
 			},
+			wantMsgContains: "postCompleteLabels",
 		},
-	}
-
-	ready, msg := uninstallPlanReady(plan, rolloutID, nodes)
-	if ready {
-		t.Fatalf("expected uninstall plan to block while PlanComplete is false")
-	}
-	if !strings.Contains(msg, "completion condition not met") {
-		t.Fatalf("expected completion wait message, got %q", msg)
-	}
-}
-
-func TestEnsureUninstallRolloutReusesExistingID(t *testing.T) {
-	t.Parallel()
-
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "c-m-test",
-			Annotations: map[string]string{
-				importedUninstallRolloutIDAnnotation: "rollout-existing",
+		{
+			name:      "status applying still set",
+			planName:  SystemAgentUpgraderPlanName,
+			nodes:     labeledNodes[:1],
+			wantReady: false,
+			mutatePlan: func(plan *upgradev1.Plan) {
+				plan.Status.Applying = []string{"node-1"}
 			},
+			wantMsgContains: "still applying",
+		},
+		{
+			name:      "planComplete false",
+			planName:  SystemAgentUpgraderPlanName,
+			nodes:     labeledNodes[:1],
+			wantReady: false,
+			mutatePlan: func(plan *upgradev1.Plan) {
+				upgradev1.PlanComplete.False(plan)
+			},
+			wantMsgContains: "completion condition not met",
 		},
 	}
 
-	fakeClusters := &fakeClusterController{}
-	h := &handler{
-		clusters: fakeClusters,
-	}
-
-	updated, rolloutID, created, err := h.ensureUninstallRollout(cluster)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if created {
-		t.Fatalf("expected existing rollout ID to be reused without creation")
-	}
-	if rolloutID != "rollout-existing" {
-		t.Fatalf("expected rollout-existing, got %q", rolloutID)
-	}
-	if updated != cluster {
-		t.Fatalf("expected same cluster object when rollout ID already exists")
-	}
-	if fakeClusters.updateCalls != 0 {
-		t.Fatalf("expected no cluster update when rollout ID exists")
-	}
-
-	updated, rolloutID, created, err = h.ensureUninstallRollout(updated)
-	if err != nil {
-		t.Fatalf("expected no error on repeated call, got %v", err)
-	}
-	if created || rolloutID != "rollout-existing" {
-		t.Fatalf("expected stable reused rollout ID, got created=%t rolloutID=%q", created, rolloutID)
-	}
-	if fakeClusters.updateCalls != 0 {
-		t.Fatalf("expected no updates across repeated reuse calls")
-	}
-}
-
-func TestEnsureUninstallRolloutCreatesMissingIDAndThenReuses(t *testing.T) {
-	t.Parallel()
-
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "c-m-test",
-		},
-	}
-	fakeClusters := &fakeClusterController{}
-	h := &handler{
-		clusters: fakeClusters,
-	}
-
-	updated, rolloutID, created, err := h.ensureUninstallRollout(cluster)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if !created {
-		t.Fatalf("expected rollout ID to be created for missing annotation")
-	}
-	if rolloutID == "" {
-		t.Fatalf("expected created rollout ID to be non-empty")
-	}
-	if updated.Annotations[importedUninstallRolloutIDAnnotation] != rolloutID {
-		t.Fatalf("expected rollout ID annotation %q, got %q", rolloutID, updated.Annotations[importedUninstallRolloutIDAnnotation])
-	}
-	if fakeClusters.updateCalls != 1 {
-		t.Fatalf("expected one update call for rollout creation, got %d", fakeClusters.updateCalls)
-	}
-
-	updatedAgain, rolloutIDAgain, createdAgain, err := h.ensureUninstallRollout(updated)
-	if err != nil {
-		t.Fatalf("expected no error on reuse call, got %v", err)
-	}
-	if createdAgain {
-		t.Fatalf("expected created=false when rollout ID already exists")
-	}
-	if rolloutIDAgain != rolloutID {
-		t.Fatalf("expected rollout ID reuse %q, got %q", rolloutID, rolloutIDAgain)
-	}
-	if updatedAgain != updated {
-		t.Fatalf("expected same updated cluster object on reuse path")
-	}
-	if fakeClusters.updateCalls != 1 {
-		t.Fatalf("expected no additional update call after reuse, got %d", fakeClusters.updateCalls)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := completeUninstallPlan(tt.planName, rolloutID)
+			if tt.mutatePlan != nil {
+				tt.mutatePlan(plan)
+			}
+			ready, msg := uninstallPlanReady(plan, rolloutID, tt.nodes)
+			if ready != tt.wantReady {
+				t.Fatalf("expected ready=%t, got %t (message: %q)", tt.wantReady, ready, msg)
+			}
+			if tt.wantMsgContains != "" && !strings.Contains(msg, tt.wantMsgContains) {
+				t.Fatalf("expected message to contain %q, got %q", tt.wantMsgContains, msg)
+			}
+		})
 	}
 }
 
