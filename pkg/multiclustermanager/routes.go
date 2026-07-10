@@ -46,9 +46,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		clusterImport  = clusterregistrationtokens.ClusterImport{
 			Clusters: scaledContext.Management.Clusters(""),
-			// Reuse the CRT token indexer registered by mcmauthorizer.NewAuthorizer,
-			// which is called on the same scaledContext before routing is set up.
-			CRTIndexer: scaledContext.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+			// Reuses the SecretTokenIndex indexer registered by mcmauthorizer.NewAuthorizer.
+			SecretIndexer: scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
 		}
 	)
 

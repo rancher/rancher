@@ -8,43 +8,44 @@ import (
 	"net/http"
 	"strings"
 
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
-	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var (
 	tokenHash = "tokenByHash"
 )
 
-func Handler(clusterRegistrationToken v3.ClusterRegistrationTokenCache, secretCache corecontrollers.SecretCache) http.HandlerFunc {
-	clusterRegistrationToken.AddIndexer(tokenHash, func(obj *apimgmtv3.ClusterRegistrationToken) ([]string, error) {
-		current, previous, err := crt.GetTokensFromSecret(secretCache, obj)
-		if err != nil {
-			logrus.Warnf("failed to resolve CRT token for %s/%s: %v", obj.Namespace, obj.Name, err)
+// hashToken returns the base64-encoded SHA-256 of a plaintext CRT token, the
+// form agents present in the Authorization header.
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return base64.StdEncoding.EncodeToString(sum[:])
+}
+
+// Handler indexes CRT token secrets by token hash and serves CA certs,
+// signing responses with an HMAC so agents can verify authenticity.
+func Handler(secretCache corecontrollers.SecretCache) http.HandlerFunc {
+	secretCache.AddIndexer(tokenHash, func(obj *corev1.Secret) ([]string, error) {
+		tokens := crt.SecretTokenIndexValues(obj)
+		if len(tokens) == 0 {
 			return nil, nil
 		}
-		if current == "" {
-			return nil, nil
-		}
-		currentHash := sha256.Sum256([]byte(current))
-		hashes := []string{base64.StdEncoding.EncodeToString(currentHash[:])}
-		if previous != "" {
-			prevHash := sha256.Sum256([]byte(previous))
-			hashes = append(hashes, base64.StdEncoding.EncodeToString(prevHash[:]))
+		hashes := make([]string, 0, len(tokens))
+		for _, token := range tokens {
+			hashes = append(hashes, hashToken(token))
 		}
 		return hashes, nil
 	})
 	return func(rw http.ResponseWriter, req *http.Request) {
-		handler(clusterRegistrationToken, secretCache, rw, req)
+		handler(secretCache, rw, req)
 	}
 }
 
-func handler(clusterRegistrationToken v3.ClusterRegistrationTokenCache, secretCache corecontrollers.SecretCache, rw http.ResponseWriter, req *http.Request) {
+func handler(secretCache corecontrollers.SecretCache, rw http.ResponseWriter, req *http.Request) {
 	ca := settings.CACerts.Get()
 	if v, ok := req.Context().Value(tls.InternalAPI).(bool); ok && v {
 		ca = settings.InternalCACerts.Get()
@@ -63,23 +64,19 @@ func handler(clusterRegistrationToken v3.ClusterRegistrationTokenCache, secretCa
 	authorization := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
 
 	if authorization != "" && nonce != "" {
-		crts, err := clusterRegistrationToken.GetByIndex(tokenHash, authorization)
-		if err == nil && len(crts) > 0 {
-			current, previous, err := crt.GetTokensFromSecret(secretCache, crts[0])
-			if err != nil {
-				logrus.Warnf("failed to resolve CRT token for HMAC: %v", err)
-			} else {
-				// Use whichever token the agent authenticated with.
-				// During grace period both current and previous are indexed;
-				// the HMAC must be keyed with the token that matches the
-				// authorization hash the agent sent.
-				token := current
-				if previous != "" {
-					prevHash := sha256.Sum256([]byte(previous))
-					if authorization == base64.StdEncoding.EncodeToString(prevHash[:]) {
-						token = previous
-					}
+		secrets, err := secretCache.GetByIndex(tokenHash, authorization)
+		if err == nil && len(secrets) > 0 {
+			// During a rotation grace period the secret carries both the
+			// current and previous token; key the HMAC with whichever token
+			// matches the hash the agent authenticated with.
+			var token string
+			for _, t := range crt.SecretTokenIndexValues(secrets[0]) {
+				if authorization == hashToken(t) {
+					token = t
+					break
 				}
+			}
+			if token != "" {
 				digest := hmac.New(sha512.New, []byte(token))
 				digest.Write([]byte(nonce))
 				digest.Write([]byte{0})
