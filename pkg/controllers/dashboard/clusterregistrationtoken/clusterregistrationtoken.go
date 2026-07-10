@@ -303,8 +303,7 @@ func (h *handler) handleTTL(obj *v3.ClusterRegistrationToken) error {
 	}
 
 	if obj.Status.ExpiresAt == "" {
-		h.setExpiresAt(obj, ttl)
-		return nil
+		return h.setExpiresAt(obj, ttl)
 	}
 
 	expiry, err := time.Parse(time.RFC3339, obj.Status.ExpiresAt)
@@ -320,7 +319,7 @@ func (h *handler) handleTTL(obj *v3.ClusterRegistrationToken) error {
 	return h.rotateToken(obj, ttl)
 }
 
-func (h *handler) setExpiresAt(obj *v3.ClusterRegistrationToken, ttl int64) {
+func (h *handler) setExpiresAt(obj *v3.ClusterRegistrationToken, ttl int64) error {
 	ttlDuration := time.Duration(ttl) * time.Minute
 	jitter := computeJitter(ttlDuration)
 
@@ -334,6 +333,7 @@ func (h *handler) setExpiresAt(obj *v3.ClusterRegistrationToken, ttl int64) {
 	}
 
 	logrus.Infof("CRT %s/%s: ExpiresAt empty, set to %s", obj.Namespace, obj.Name, obj.Status.ExpiresAt)
+	return nil
 }
 
 func (h *handler) rotateToken(obj *v3.ClusterRegistrationToken, ttl int64) error {
@@ -343,10 +343,15 @@ func (h *handler) rotateToken(obj *v3.ClusterRegistrationToken, ttl int64) error
 		return err
 	}
 
-	if expiresAtBytes, ok := existing.Data["expiresAt"]; ok {
+	if expiresAtBytes, ok := existing.Data[expiresAtDataKey]; ok {
 		expiresAt, err := time.Parse(time.RFC3339, string(expiresAtBytes))
 		if err == nil && expiresAt.After(time.Now()) {
 			obj.Status.ExpiresAt = string(expiresAtBytes)
+			if _, hasPrev := existing.Data[previousTokenDataKey]; hasPrev {
+				if gp, ok := existing.Data[gracePeriodExpiresAtDataKey]; ok && len(gp) > 0 {
+					obj.Status.GracePeriodExpiresAt = string(gp)
+				}
+			}
 			return nil
 		}
 	}
@@ -364,7 +369,8 @@ func (h *handler) rotateToken(obj *v3.ClusterRegistrationToken, ttl int64) error
 	updated := existing.DeepCopy()
 	updated.Data[previousTokenDataKey] = existing.Data[tokenDataKey]
 	updated.Data[tokenDataKey] = []byte(newToken)
-	updated.Data["expiresAt"] = []byte(newExpiresAt)
+	updated.Data[expiresAtDataKey] = []byte(newExpiresAt)
+	updated.Data[gracePeriodExpiresAtDataKey] = []byte(newGracePeriodExpiresAt)
 
 	if _, err = h.secrets.Update(updated); err != nil {
 		return err
@@ -385,6 +391,7 @@ func (h *handler) cleanupGracePeriod(obj *v3.ClusterRegistrationToken) error {
 	if _, hasPrev := existing.Data[previousTokenDataKey]; hasPrev {
 		updated := existing.DeepCopy()
 		delete(updated.Data, previousTokenDataKey)
+		delete(updated.Data, gracePeriodExpiresAtDataKey)
 		if _, err := h.secrets.Update(updated); err != nil {
 			return err
 		}
