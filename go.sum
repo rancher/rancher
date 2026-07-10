@@ -621,8 +621,8 @@ github.com/rancher/apiserver v0.9.7 h1:b29KuloAFVY3PemDSUdrLmwzX/vJWpWBgr20m7xSv
 github.com/rancher/apiserver v0.9.7/go.mod h1:NLkaZ69HiT6/5OcXm2EZcydCv8PKRcIXaIphABvhX1I=
 github.com/rancher/channelserver v0.11.0 h1:R1oRG2SkGkC0EKHsa+VgBuLKHzEGVE1NMJeP/6c5vPo=
 github.com/rancher/channelserver v0.11.0/go.mod h1:ZWuXGR708g5FoMdmf+fXE2XEOztdm3bcwjdMmriY1kg=
-github.com/rancher/dynamiclistener v0.9.0-rc.1 h1:tmV3fgvB5pXSOMrb7G1DSno5C9XTfoyzHaDeVRhtUd0=
-github.com/rancher/dynamiclistener v0.9.0-rc.1/go.mod h1:HG2E4ZcZKAc6JymJLy74ROKMTtsKyrA1fyQSR/g/+0w=
+github.com/rancher/dynamiclistener v0.9.0 h1:IppFgaKHBN4H0CeFLRiFDzUfZuoB7C8RvW+TuEAamDM=
+github.com/rancher/dynamiclistener v0.9.0/go.mod h1:3Hcbw5m/9/RMas1eeghac6pdN2/cJ2BkNcIDjOCcEQg=
 github.com/rancher/eks-operator v1.15.0-rc.2 h1:fJOeSZbMlzYSnL78PW8RyDtanXZgZWgMYuYo8l1S7Ik=
 github.com/rancher/eks-operator v1.15.0-rc.2/go.mod h1:1IR5/LPJVm2MUNPPbUZbGLRadYdQsqB7LEiC6ToIkKs=
 github.com/rancher/fleet/pkg/apis v0.16.0-rc.2 h1:UlY/H1hosSSS6vOm2bjqJwmfb5cltbVTtDzW/AAxiA0=
