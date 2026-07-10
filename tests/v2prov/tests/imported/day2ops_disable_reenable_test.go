@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
+	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -72,24 +73,17 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 
 	assertImportedDay2OpsFeatureEnabled(t, clients)
 
-	fixture := setUpImportedCluster(t, clients, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-			Annotations: map[string]string{
-				opsEnabledAnnotation: "true",
-			},
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-day2ops-disable-reenable-snapshot",
-		},
-	}, []cluster.ImportedNodePool{
+	fixture := setUpImportedCluster(t, clients, "test-imported-day2ops-disable-reenable-snapshot", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
+	kubectlEnv := importedKubectlEnv()
 	assert.Len(t, fixture.pods, 1)
 	t.Logf("created imported cluster pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
 	t.Logf("management cluster %s reached Ready", fixture.mgmtCluster.Name)
 
+	if _, err := setClusterAnnotation(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "true"); err != nil {
+		t.Fatal(err)
+	}
 	phase1Cluster := waitForClusterAnnotationValue(t, clients, fixture.mgmtCluster.Name, opsEnabledAnnotation, "true", importedIdentityWaitTimeout)
 	assert.Equal(t, "true", phase1Cluster.Annotations[opsEnabledAnnotation])
 	t.Logf("phase 1: ops-enabled=true observed on cluster %s", fixture.mgmtCluster.Name)
@@ -100,10 +94,10 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 	assert.Len(t, phase1Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase1Identity.PlanRoles, 1)
 	assert.Len(t, phase1Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 1 identity: %s", summarizeImportedPlanIdentity(phase1Identity))
 
-	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, true, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, true, importedSystemAgentTransitionTimeout)
 	t.Logf("phase 1: rancher-system-agent is active on pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
 
 	initialMachinePlanSecretName := phase1Identity.MachinePlanSecrets[0].Name
@@ -132,7 +126,7 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 	assert.Len(t, phase2Identity.PlanRoleBindings, 0)
 	t.Logf("phase 2 identity: %s", summarizeImportedPlanIdentity(phase2Identity))
 
-	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, false, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, false, importedSystemAgentTransitionTimeout)
 	t.Logf("phase 2: rancher-system-agent is inactive on pod %s/%s", fixture.ns.Name, fixture.pods[0].Name)
 
 	t.Logf("phase 3: re-enabling imported day2ops on cluster %s", fixture.mgmtCluster.Name)
@@ -152,7 +146,7 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 	assert.Len(t, phase3Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase3Identity.PlanRoles, 1)
 	assert.Len(t, phase3Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
 	t.Logf("phase 3 identity: %s", summarizeImportedPlanIdentity(phase3Identity))
 
 	newMachinePlanSecretName := phase3Identity.MachinePlanSecrets[0].Name
@@ -171,7 +165,7 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 		newPlanTokenSecretName,
 	)
 
-	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, fixture.kubectlEnv, true, importedSystemAgentTransitionTimeout)
+	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, true, importedSystemAgentTransitionTimeout)
 	waitForConnectionInfoSecretName(t, clients, fixture.ns.Name, fixture.pods[0].Name, newMachinePlanSecretName, importedIdentityWaitTimeout)
 	t.Logf("phase 3: rancher-system-agent is active and connection info points to %s", newMachinePlanSecretName)
 
@@ -331,6 +325,13 @@ func waitForAppliedSystemAgentHash(t *testing.T, clients *clients.Clients, clust
 		t.Fatalf("timed out waiting for cluster %s applied system-agent hash: %v", clusterName, err)
 	}
 	return hash
+}
+
+func importedKubectlEnv() string {
+	distro := capr.GetRuntime(defaults.SomeK8sVersion)
+	kubeconfig := fmt.Sprintf("/etc/rancher/%s/%s.yaml", distro, distro)
+	binDir := fmt.Sprintf("/var/lib/rancher/%s/bin", distro)
+	return fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
 }
 
 func waitForImportedDay2OpsDisabled(t *testing.T, clients *clients.Clients, clusterName string, timeout time.Duration) *v3.Cluster {

@@ -316,10 +316,7 @@ func (h *handler) reconcileImportedDisable(cluster *apimgmtv3.Cluster) (*apimgmt
 
 		// Disable waits for the current holder to finish instead of preempting it.
 		if beacon != nil {
-			owner := ""
-			if beacon.Labels != nil {
-				owner = beacon.Labels[planv1alpha1.BeaconOwnerLabel]
-			}
+			owner := beacon.Status.Owner
 			if owner != "" && owner != disableBeaconOwnerKey {
 				logrus.Debugf("[importedsystemagent] cluster %s/%s: waiting for beacon release from %q", cluster.Namespace, cluster.Name, owner)
 				h.clusters.EnqueueAfter(cluster.Name, importedDay2OpsDisableRequeueInterval)

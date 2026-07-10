@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotrestore"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -14,7 +13,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // configMapProof drives the standard "create CM → snapshot → delete CM → restore → CM is back"
@@ -142,15 +140,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestore(t *testing.T) {
 	}
 	defer cs.Close()
 
-	fx := setUpImportedCluster(t, cs, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-restore",
-		},
-	}, []cluster.ImportedNodePool{
+	fx := setUpImportedCluster(t, cs, "test-imported-restore", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
@@ -170,15 +160,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesAllRoles(t *t
 	}
 	defer cs.Close()
 
-	fx := setUpImportedCluster(t, cs, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-restore-3-nodes-all-roles",
-		},
-	}, []cluster.ImportedNodePool{
+	fx := setUpImportedCluster(t, cs, "test-imported-restore-3-nodes-all-roles", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 3},
 	})
 
@@ -198,15 +180,7 @@ func Test_Imported_Operation_SetE_ImportedETCDSnapshotRestore3NodesOneEach(t *te
 	}
 	defer cs.Close()
 
-	fx := setUpImportedCluster(t, cs, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-restore-3-nodes-1-each",
-		},
-	}, []cluster.ImportedNodePool{
+	fx := setUpImportedCluster(t, cs, "test-imported-restore-3-nodes-1-each", []cluster.ImportedNodePool{
 		{ETCD: true, Quantity: 1},
 		{ControlPlane: true, Quantity: 1},
 		{Worker: true, Quantity: 1},
@@ -241,15 +215,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *te
 	}
 	defer cs.Close()
 
-	fx := setUpImportedCluster(t, cs, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-restore-lifecycle-hook",
-		},
-	}, []cluster.ImportedNodePool{
+	fx := setUpImportedCluster(t, cs, "test-imported-restore-lifecycle-hook", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 

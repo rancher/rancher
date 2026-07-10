@@ -3,14 +3,12 @@ package imported
 import (
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotsave"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test_Imported_Operation_SetD_ImportedETCDSnapshotSave brings up an imported single-node cluster and drives
@@ -24,15 +22,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotSave(t *testing.T) {
 	}
 	defer cs.Close()
 
-	fx := setUpImportedCluster(t, cs, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-snapshot",
-		},
-	}, []cluster.ImportedNodePool{
+	fx := setUpImportedCluster(t, cs, "test-imported-snapshot", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
@@ -65,15 +55,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testi
 	}
 	defer cs.Close()
 
-	fx := setUpImportedCluster(t, cs, &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "c-",
-		},
-		Spec: v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-			DisplayName:    "test-imported-snapshot-lifecycle-hook",
-		},
-	}, []cluster.ImportedNodePool{
+	fx := setUpImportedCluster(t, cs, "test-imported-snapshot-lifecycle-hook", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
