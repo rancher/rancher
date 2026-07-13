@@ -343,7 +343,15 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 			// Reset engine state for isolation.
 			appliedVersion = ""
 			SamlProviders[GenericSAMLName] = &Provider{name: GenericSAMLName}
-			t.Cleanup(func() { delete(SamlProviders, GenericSAMLName) })
+			t.Cleanup(func() {
+				delete(SamlProviders, GenericSAMLName)
+				handlerMu.Lock()
+				delete(routeHandlers, "GenericSAMLACS")
+				delete(routeHandlers, "GenericSAMLSLO")
+				delete(routeHandlers, "GenericSAMLSLOGet")
+				delete(routeHandlers, "GenericSAMLMetadata")
+				handlerMu.Unlock()
+			})
 
 			cfg := base()
 			cfg.ResourceVersion = "test-" + string(rune('a'+i))
@@ -363,8 +371,12 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 			assert.Equal(t, tt.wantIDPInit, sp.AllowIDPInitiated)
 			assert.Equal(t, tt.wantForce, sp.ForceAuthn)
 
-			assert.NotNil(t, getRouteHandler("GenericSAMLACS"))
-			assert.NotNil(t, getRouteHandler("GenericSAMLMetadata"))
+			handlerMu.RLock()
+			_, acsRegistered := routeHandlers["GenericSAMLACS"]
+			_, metaRegistered := routeHandlers["GenericSAMLMetadata"]
+			handlerMu.RUnlock()
+			assert.True(t, acsRegistered, "GenericSAMLACS route handler should be registered")
+			assert.True(t, metaRegistered, "GenericSAMLMetadata route handler should be registered")
 		})
 	}
 }
