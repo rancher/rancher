@@ -2,7 +2,7 @@ module github.com/rancher/rancher/airgap
 
 go 1.25.0
 
-toolchain go1.25.11
+toolchain go1.25.12
 
 replace github.com/docker/docker => github.com/docker/docker v28.5.2+incompatible // Highest available on legacy module path
 
