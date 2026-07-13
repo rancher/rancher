@@ -151,7 +151,7 @@ require (
 	golang.org/x/mod v0.37.0
 	golang.org/x/net v0.56.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/sync v0.22.0
 	golang.org/x/text v0.38.0
 	google.golang.org/api v0.286.0
 	google.golang.org/grpc v1.81.1
@@ -171,7 +171,7 @@ require (
 	k8s.io/kubectl v0.36.2
 	k8s.io/kubernetes v1.36.2
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
-	oras.land/oras-go/v2 v2.6.1
+	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.13.2
 	sigs.k8s.io/controller-runtime v0.24.1
