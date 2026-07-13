@@ -43,6 +43,28 @@ func TestTokenReviewAuthAuthenticate(t *testing.T) {
 			wantGroups:  []string{"devs"},
 			wantHasAuth: true,
 		},
+		"when the authenticated user is the error user a token review is done": {
+			userInfo: &user.DefaultInfo{
+				Name: errorUserName,
+			},
+			authorization:    "Bearer token-review-token",
+			wantReviewCalled: true,
+			wantReviewToken:  "token-review-token",
+			reviewResponse: &authenticationv1.TokenReview{
+				Status: authenticationv1.TokenReviewStatus{
+					Authenticated: false,
+					User: authenticationv1.UserInfo{
+						Username: "u-123",
+						UID:      "u-123",
+						Groups:   []string{"devs"},
+					},
+				},
+			},
+			wantName:    "u-123",
+			wantUID:     "u-123",
+			wantGroups:  []string{"devs"},
+			wantHasAuth: false,
+		},
 		"failed auth and token review return error": {
 			userInfo: &user.DefaultInfo{
 				Name: "system:cattle:error",
@@ -50,6 +72,7 @@ func TestTokenReviewAuthAuthenticate(t *testing.T) {
 			authorization:    "Bearer token-review-token",
 			reviewErr:        "token review create failed",
 			wantName:         "system:cattle:error",
+			wantHasAuth:      false,
 			wantReviewCalled: true,
 			wantReviewToken:  "token-review-token",
 		},
@@ -75,14 +98,14 @@ func TestTokenReviewAuthAuthenticate(t *testing.T) {
 			wantReviewCalled: true,
 			wantReviewToken:  "review-success-token",
 		},
-		"failed auth and token review success with unauthenticated status returns not authenticated": {
+		"failed auth and token review success with unauthenticated status still returns review user": {
 			userInfo: &user.DefaultInfo{
-				Name: "system:cattle:error",
+				Name: errorUserName,
 			},
 			authorization: "Bearer review-not-authenticated-token",
 			reviewResponse: &authenticationv1.TokenReview{
 				Status: authenticationv1.TokenReviewStatus{
-					// The token review returns Not Authenticated
+					// The token review has returns Not Authenticated
 					Authenticated: false,
 					User: authenticationv1.UserInfo{
 						Username: "impersonated-user",
@@ -94,8 +117,45 @@ func TestTokenReviewAuthAuthenticate(t *testing.T) {
 			wantName:         "impersonated-user",
 			wantUID:          "uid-2",
 			wantGroups:       []string{"group-a"},
+			wantHasAuth:      false,
 			wantReviewCalled: true,
 			wantReviewToken:  "review-not-authenticated-token",
+		},
+		"token review status error with unauthenticated status should not authenticate": {
+			userInfo: &user.DefaultInfo{
+				Name: errorUserName,
+			},
+			authorization: "Bearer some-token",
+			reviewResponse: &authenticationv1.TokenReview{
+				Status: authenticationv1.TokenReviewStatus{
+					Authenticated: false,
+					Error:         "token has been revoked",
+				},
+			},
+			wantName:         errorUserName,
+			wantHasAuth:      false,
+			wantReviewCalled: true,
+			wantReviewToken:  "some-token",
+		},
+		"token review status error with authenticated true should not authenticate": {
+			userInfo: &user.DefaultInfo{
+				Name: errorUserName,
+			},
+			authorization: "Bearer some-token",
+			reviewResponse: &authenticationv1.TokenReview{
+				Status: authenticationv1.TokenReviewStatus{
+					Authenticated: true,
+					Error:         "token lookup failed",
+					User: authenticationv1.UserInfo{
+						Username: "some-user",
+						UID:      "uid-3",
+					},
+				},
+			},
+			wantName:         errorUserName,
+			wantHasAuth:      false,
+			wantReviewCalled: true,
+			wantReviewToken:  "some-token",
 		},
 	}
 
@@ -103,13 +163,13 @@ func TestTokenReviewAuthAuthenticate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			var reviewCalled bool
+			reviewCalled := 0
 			var reviewToken string
 
 			authClient := &fakeAuthenticationV1{
 				tokenReviews: &fakeTokenReviewInterface{
 					create: func(_ context.Context, createdReview *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error) {
-						reviewCalled = true
+						reviewCalled++
 						reviewToken = createdReview.Spec.Token
 
 						if tt.reviewErr != "" {
@@ -139,8 +199,13 @@ func TestTokenReviewAuthAuthenticate(t *testing.T) {
 			assert.Equal(t, tt.wantName, respUser.GetName())
 			assert.Equal(t, tt.wantUID, respUser.GetUID())
 			assert.Equal(t, tt.wantGroups, respUser.GetGroups())
-			assert.Equal(t, tt.wantReviewCalled, reviewCalled)
-			assert.Equal(t, tt.wantReviewToken, reviewToken)
+
+			if tt.wantReviewCalled {
+				require.Equal(t, 1, reviewCalled)
+				assert.Equal(t, tt.wantReviewToken, reviewToken)
+			} else {
+				assert.Equal(t, 0, reviewCalled)
+			}
 		})
 	}
 }
