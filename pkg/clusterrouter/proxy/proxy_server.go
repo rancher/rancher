@@ -41,7 +41,7 @@ type ClusterContextGetter interface {
 type RemoteService struct {
 	sync.Mutex
 
-	cluster   *v3.Cluster
+	cluster   *v32.Cluster
 	transport transportGetter
 	url       urlGetter
 
@@ -77,14 +77,14 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v32.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
 	return NewRemote(cluster, clusterLister, factory, clusterContextGetter)
 }
 
-func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
+func NewLocal(localConfig *rest.Config, cluster *v32.Cluster) (*RemoteService, error) {
 	// the gvk is ignored by us, so just pass in any gvk
 	hostURL, _, err := rest.DefaultServerURL(localConfig.Host, localConfig.APIPath, schema.GroupVersion{}, true)
 	if err != nil {
@@ -116,7 +116,7 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 	return rs, nil
 }
 
-func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
+func NewRemote(cluster *v32.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
@@ -217,7 +217,7 @@ func (r *RemoteService) getTransport() (http.RoundTripper, error) {
 	return transport, nil
 }
 
-func (r *RemoteService) cacertChanged(cluster *v3.Cluster) bool {
+func (r *RemoteService) cacertChanged(cluster *v32.Cluster) bool {
 	return r.caCert != cluster.Status.CACert
 }
 
@@ -310,7 +310,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	httpProxy.ServeHTTP(rw, req)
 }
 
-func (r *RemoteService) Cluster() *v3.Cluster {
+func (r *RemoteService) Cluster() *v32.Cluster {
 	return r.cluster
 }
 
