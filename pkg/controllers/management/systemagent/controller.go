@@ -51,7 +51,7 @@ import (
 const (
 	UpgradeDigestAnnotation                  = "upgrade.cattle.io/digest"
 	AppliedSystemAgentUpgraderHashAnnotation = "management.cattle.io/applied-system-agent-upgrader-hash"
-	day2OpsEnabledAnnotation                 = "operations.cattle.io/ops-enabled"
+	day2OpsEnabledAnnotation                 = "rancher.io/operations-enabled"
 	importedCleaningStateAnnotation          = "operations.cattle.io/imported-cleaning-state"
 	importedUninstallRolloutIDAnnotation     = "operations.cattle.io/imported-uninstall-rollout-id"
 
