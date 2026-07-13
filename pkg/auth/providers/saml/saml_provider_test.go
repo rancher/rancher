@@ -20,6 +20,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -483,4 +485,22 @@ func (p *mockLdapProvider) GetUserExtraAttributesFromToken(token accessor.TokenA
 
 func (p *mockLdapProvider) IsDisabledProvider() (bool, error) {
 	panic("IsDisabledProvider Unimplemented!")
+}
+
+func TestFormSamlRedirectURLGenericSAML(t *testing.T) {
+	cfg := map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	}
+	got := formSamlRedirectURLFromMap(cfg, GenericSAMLName)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login", got)
+}
+
+func TestTransformToAuthProviderGenericSAML(t *testing.T) {
+	p := &Provider{name: GenericSAMLName}
+	out, err := p.TransformToAuthProvider(map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login",
+		out[publicclient.GenericSAMLProviderFieldRedirectURL])
 }
