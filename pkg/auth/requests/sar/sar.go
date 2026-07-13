@@ -1,3 +1,4 @@
+//go:generate go tool -modfile ../../../../gotools/mockgen/go.mod mockgen -package=mocks -destination=..//mocks/sar.go github.com/rancher/rancher/pkg/auth/requests/sar SubjectAccessReview
 package sar
 
 import (
