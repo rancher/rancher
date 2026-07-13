@@ -52,11 +52,17 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	scaledContext.Wrangler.Mgmt.Cluster().OnChange(ctx, "user-controllers-controller", u.sync)
 
 	go func() {
+		// temporary measure to recover user controllers not able to successfully start
+		// TODO: find a better way to implement retries for Manager.Start()
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-u.forcedResync():
+			case <-ticker.C:
 			}
 
 			backoff := wait.Backoff{
