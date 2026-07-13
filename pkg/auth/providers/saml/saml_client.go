@@ -198,6 +198,23 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 		sp.AuthnNameIDFormat = saml.UnspecifiedNameIDFormat
 	}
 
+	if name == GenericSAMLName {
+		nameIDFormat, err := mapNameIDFormat(configToSet.NameIDFormat)
+		if err != nil {
+			return fmt.Errorf("SAML: %w", err)
+		}
+		sp.AuthnNameIDFormat = nameIDFormat
+
+		signatureMethod, err := mapSignatureMethod(configToSet.SignatureMethod)
+		if err != nil {
+			return fmt.Errorf("SAML: %w", err)
+		}
+		sp.SignatureMethod = signatureMethod
+
+		sp.AllowIDPInitiated = configToSet.AllowIdpInitiated
+		sp.ForceAuthn = configToSet.ForceAuthn
+	}
+
 	provider.serviceProvider = &sp
 
 	cookieStore := ClientCookies{
@@ -238,6 +255,11 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 		setRouteHandler("ShibbolethSLO", provider.ServeHTTP)
 		setRouteHandler("ShibbolethSLOGet", provider.ServeHTTP)
 		setRouteHandler("ShibbolethMetadata", provider.ServeHTTP)
+	case GenericSAMLName:
+		setRouteHandler("GenericSAMLACS", provider.ServeHTTP)
+		setRouteHandler("GenericSAMLSLO", provider.ServeHTTP)
+		setRouteHandler("GenericSAMLSLOGet", provider.ServeHTTP)
+		setRouteHandler("GenericSAMLMetadata", provider.ServeHTTP)
 	}
 
 	log.Debugf("SAML [InitializeSamlServiceProvider]: /v1-saml handlers for %s on root %p active", name, root)
@@ -280,6 +302,11 @@ func AuthHandler() http.Handler {
 	root.HandleFunc("POST /v1-saml/shibboleth/saml/slo", getRouteHandler("ShibbolethSLO"))
 	root.HandleFunc("GET /v1-saml/shibboleth/saml/slo", getRouteHandler("ShibbolethSLOGet"))
 	root.HandleFunc("GET /v1-saml/shibboleth/saml/metadata", getRouteHandler("ShibbolethMetadata"))
+
+	root.HandleFunc("POST /v1-saml/genericsaml/saml/acs", getRouteHandler("GenericSAMLACS"))
+	root.HandleFunc("POST /v1-saml/genericsaml/saml/slo", getRouteHandler("GenericSAMLSLO"))
+	root.HandleFunc("GET /v1-saml/genericsaml/saml/slo", getRouteHandler("GenericSAMLSLOGet"))
+	root.HandleFunc("GET /v1-saml/genericsaml/saml/metadata", getRouteHandler("GenericSAMLMetadata"))
 
 	log.Debugf("SAML [AuthHandler]: /v1-saml routes made, mux is %p", root)
 	return root

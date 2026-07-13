@@ -4,6 +4,9 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +14,10 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetUserIdFromRelayState(t *testing.T) {
@@ -249,6 +255,118 @@ func TestAssertionCache(t *testing.T) {
 		// The live entry must still be detected as a replay.
 		assert.True(t, c.seen("id-live", liveExpiry))
 	})
+}
+
+func genericSAMLTestKeyAndCert(t *testing.T) (keyPEM string, certPEM string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "rancher-test-sp"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+
+	keyPEM = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}))
+	certPEM = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: der,
+	}))
+	return keyPEM, certPEM
+}
+
+const genericSAMLTestIDPMetadata = `<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://idp.example.com/metadata">
+  <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://idp.example.com/sso"/>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://idp.example.com/slo"/>
+  </IDPSSODescriptor>
+</EntityDescriptor>`
+
+func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
+	keyPEM, certPEM := genericSAMLTestKeyAndCert(t)
+	force := true
+
+	base := func() *apiv3.SamlConfig {
+		return &apiv3.SamlConfig{
+			IDPMetadataContent: genericSAMLTestIDPMetadata,
+			SpCert:             certPEM,
+			SpKey:              keyPEM,
+			RancherAPIHost:     "https://rancher.example.com",
+			EntityID:           "https://rancher.example.com/v1-saml/genericsaml/saml/metadata",
+		}
+	}
+
+	tests := []struct {
+		name        string
+		mutate      func(c *apiv3.SamlConfig)
+		wantNameID  saml.NameIDFormat
+		wantSigAlg  string
+		wantIDPInit bool
+		wantForce   *bool
+		wantErr     bool
+	}{
+		{
+			name:       "defaults",
+			mutate:     func(c *apiv3.SamlConfig) {},
+			wantNameID: saml.UnspecifiedNameIDFormat,
+			wantSigAlg: dsig.RSASHA256SignatureMethod,
+		},
+		{
+			name: "explicit knobs",
+			mutate: func(c *apiv3.SamlConfig) {
+				c.NameIDFormat = "emailAddress"
+				c.SignatureMethod = "RSA-SHA1"
+				c.AllowIdpInitiated = true
+				c.ForceAuthn = &force
+			},
+			wantNameID:  saml.EmailAddressNameIDFormat,
+			wantSigAlg:  dsig.RSASHA1SignatureMethod,
+			wantIDPInit: true,
+			wantForce:   &force,
+		},
+		{
+			name:    "invalid nameIDFormat errors",
+			mutate:  func(c *apiv3.SamlConfig) { c.NameIDFormat = "bogus" },
+			wantErr: true,
+		},
+	}
+
+	for i, tt := range tests {
+		tt := tt
+		i := i
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset engine state for isolation.
+			appliedVersion = ""
+			SamlProviders[GenericSAMLName] = &Provider{name: GenericSAMLName}
+			t.Cleanup(func() { delete(SamlProviders, GenericSAMLName) })
+
+			cfg := base()
+			cfg.ResourceVersion = "test-" + string(rune('a'+i))
+			tt.mutate(cfg)
+
+			err := InitializeSamlServiceProvider(cfg, GenericSAMLName)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			sp := SamlProviders[GenericSAMLName].serviceProvider
+			require.NotNil(t, sp)
+			assert.Equal(t, tt.wantNameID, sp.AuthnNameIDFormat)
+			assert.Equal(t, tt.wantSigAlg, sp.SignatureMethod)
+			assert.Equal(t, tt.wantIDPInit, sp.AllowIDPInitiated)
+			assert.Equal(t, tt.wantForce, sp.ForceAuthn)
+
+			assert.NotNil(t, getRouteHandler("GenericSAMLACS"))
+			assert.NotNil(t, getRouteHandler("GenericSAMLMetadata"))
+		})
+	}
 }
 
 func TestCheckAssertionTimeConditions(t *testing.T) {
