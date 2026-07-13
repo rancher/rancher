@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
+
+func TestGenericSAMLTypeMapsToProviderName(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "genericsaml", nameFromType(client.GenericSAMLConfigType))
+	assert.Equal(t, "genericSAMLConfig", client.GenericSAMLConfigType)
+}
 
 func TestIsSAMLProvider(t *testing.T) {
 	t.Parallel()

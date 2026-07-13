@@ -179,6 +179,17 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
+		MustImportAndCustomize(&PublicVersion, v3.GenericSAMLProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "samlLoginInput",
+					Output: "samlLoginOutput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
 		MustImport(&PublicVersion, v3.SamlLoginInput{}).
 		MustImport(&PublicVersion, v3.SamlLoginOutput{}).
 		// OpenLdap provider
