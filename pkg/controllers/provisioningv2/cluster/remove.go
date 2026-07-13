@@ -96,7 +96,17 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 		if capiClusterErr != nil && !apierrors.IsNotFound(capiClusterErr) {
 			return "", capiClusterErr
 		}
-
+		// Cache can be not up-to-date right after Rancher restart, so fall back to direct API read.
+		if apierrors.IsNotFound(capiClusterErr) {
+			capiCluster, capiClusterErr = h.capiClusters.Get(cluster.Namespace, cluster.Name, metav1.GetOptions{})
+			if capiClusterErr != nil {
+				if apierrors.IsNotFound(capiClusterErr) {
+					capiCluster = nil
+				} else {
+					return "", capiClusterErr
+				}
+			}
+		}
 		if capiCluster != nil {
 			if capiCluster.DeletionTimestamp == nil {
 				// Deleting the CAPI cluster will start the process of deleting Machines, Bootstraps, etc.
