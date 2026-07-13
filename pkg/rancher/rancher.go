@@ -224,17 +224,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	// Disable the linode node driver (if unused) and remove its DynamicSchema
 	// objects and generated CRDs before any informers start.
-	//
-	// This must happen here — before MultiClusterManager.Start and
-	// steveserver.New — because once lasso's dynamic controller starts it
-	// caches the RESTMappings for any CRDs it finds in discovery. Those
-	// mappings are never evicted on CRD deletion, so deleting the linode CRDs
-	// after lasso starts causes it to keep resurrecting watchers for the
-	// deleted GVKs, producing a perpetual "failed to list *unstructured.Unstructured"
-	// 404 loop in the logs. Deleting the CRDs here ensures lasso never caches
-	// them and no watches are ever started for them.
-	if err := disableUnusedLinodeNodeDriver(wranglerContext); err != nil {
-		return nil, fmt.Errorf("failed to reconcile linode node driver: %w", err)
+	if features.MCM.Enabled() && features.ProvisioningV2.Enabled() {
+		if err := disableUnusedLinodeNodeDriver(wranglerContext); err != nil {
+			return nil, fmt.Errorf("failed to reconcile linode node driver: %w", err)
+		}
 	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
