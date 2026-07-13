@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	opsEnabledAnnotation                 = "operations.cattle.io/ops-enabled"
+	opsEnabledAnnotation                 = "rancher.io/operations-enabled"
 	importedCleaningStateAnnotation      = "operations.cattle.io/imported-cleaning-state"
 	appliedSystemAgentHashAnnotation     = "management.cattle.io/applied-system-agent-upgrader-hash"
 	systemAgentConnectionInfoPath        = "/var/lib/rancher/agent/rancher2_connection_info.json"
