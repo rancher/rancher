@@ -23,6 +23,10 @@ func TestGenericSAMLTypeMapsToProviderName(t *testing.T) {
 	assert.Equal(t, "genericSAMLConfig", client.GenericSAMLConfigType)
 }
 
+func TestGenericSAMLIsSAMLProviderType(t *testing.T) {
+	assert.True(t, IsSAMLProviderType(client.GenericSAMLConfigType))
+}
+
 func TestIsSAMLProvider(t *testing.T) {
 	t.Parallel()
 
