@@ -1,16 +1,18 @@
+//go:generate go tool -modfile ../../../../gotools/mockgen/go.mod mockgen -package=mocks -destination=../mocks/sar.go github.com/rancher/rancher/pkg/auth/requests/sar SubjectAccessReview
 package sar
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	authV1 "k8s.io/api/authorization/v1"
+	authv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
+	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 // SubjectAccessReview checks if a user can impersonate as another user or group
@@ -25,62 +27,45 @@ type SubjectAccessReview interface {
 	UserCanImpersonateServiceAccount(req *http.Request, user string, groups []string, sa string) (bool, error)
 }
 
+// subjectAccessReview implements SubjectAccessReview interface.
 type subjectAccessReview struct {
-	sarClientGetter SubjectAccessReviewClientGetter
+	sarClient authorizationv1.SubjectAccessReviewInterface
 }
 
-type SubjectAccessReviewClientGetter interface {
-	SubjectAccessReviewForCluster(request *http.Request) (v1.SubjectAccessReviewInterface, error)
-}
-
-func NewSubjectAccessReview(getter SubjectAccessReviewClientGetter) SubjectAccessReview {
+// NewSubjectAccessReview creates a new SubjectAccessReview with the given
+// SubjectAccessReviewInterface client for performing SAR checks.
+func NewSubjectAccessReview(sarClient authorizationv1.SubjectAccessReviewInterface) SubjectAccessReview {
 	return subjectAccessReview{
-		sarClientGetter: getter,
+		sarClient: sarClient,
 	}
 }
 
 // UserCanImpersonateUser checks if user can impersonate as impUser
-func (sar subjectAccessReview) UserCanImpersonateUser(req *http.Request, user string, groups []string, impUser string) (bool, error) {
-	userContext, err := sar.sarClientGetter.SubjectAccessReviewForCluster(req)
-	if err != nil {
-		return false, err
-	}
-	return sar.checkUserCanImpersonateUser(req.Context(), userContext, user, groups, impUser)
+func (s subjectAccessReview) UserCanImpersonateUser(req *http.Request, user string, groups []string, impUser string) (bool, error) {
+	return s.checkUserCanImpersonateUser(req.Context(), user, groups, impUser)
 }
 
 // UserCanImpersonateGroup checks if user can impersonate as the group
-func (sar subjectAccessReview) UserCanImpersonateGroup(req *http.Request, user string, groups []string, group string) (bool, error) {
-	userContext, err := sar.sarClientGetter.SubjectAccessReviewForCluster(req)
-	if err != nil {
-		return false, err
-	}
-	return sar.checkUserCanImpersonateGroup(req.Context(), userContext, user, groups, group)
+func (s subjectAccessReview) UserCanImpersonateGroup(req *http.Request, user string, groups []string, group string) (bool, error) {
+	return s.checkUserCanImpersonateGroup(req.Context(), user, groups, group)
 }
 
 // UserCanImpersonateExtras checks if user can impersonate extras
-func (sar subjectAccessReview) UserCanImpersonateExtras(req *http.Request, user string, groups []string, impExtras map[string][]string) (bool, error) {
-	userContext, err := sar.sarClientGetter.SubjectAccessReviewForCluster(req)
-	if err != nil {
-		return false, err
-	}
-	return sar.checkUserCanImpersonateExtras(req.Context(), userContext, user, groups, impExtras)
+func (s subjectAccessReview) UserCanImpersonateExtras(req *http.Request, user string, groups []string, impExtras map[string][]string) (bool, error) {
+	return s.checkUserCanImpersonateExtras(req.Context(), user, groups, impExtras)
 }
 
 // UserCanImpersonateServiceAccount checks if user can impersonate as the service account
-func (sar subjectAccessReview) UserCanImpersonateServiceAccount(req *http.Request, user string, groups []string, sa string) (bool, error) {
-	userContext, err := sar.sarClientGetter.SubjectAccessReviewForCluster(req)
-	if err != nil {
-		return false, err
-	}
-	return sar.checkUserCanImpersonateServiceAccount(req.Context(), userContext, user, groups, sa)
+func (s subjectAccessReview) UserCanImpersonateServiceAccount(req *http.Request, user string, groups []string, sa string) (bool, error) {
+	return s.checkUserCanImpersonateServiceAccount(req.Context(), user, groups, sa)
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateUser(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user string, groups []string, impUser string) (bool, error) {
-	review := authV1.SubjectAccessReview{
-		Spec: authV1.SubjectAccessReviewSpec{
+func (s subjectAccessReview) checkUserCanImpersonateUser(ctx context.Context, user string, groups []string, impUser string) (bool, error) {
+	review := authv1.SubjectAccessReview{
+		Spec: authv1.SubjectAccessReviewSpec{
 			User:   user,
 			Groups: groups,
-			ResourceAttributes: &authV1.ResourceAttributes{
+			ResourceAttributes: &authv1.ResourceAttributes{
 				Verb:     "impersonate",
 				Resource: "users",
 				Name:     impUser,
@@ -88,7 +73,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateUser(ctx context.Context, 
 		},
 	}
 
-	result, err := sarClient.Create(ctx, &review, metav1.CreateOptions{})
+	result, err := s.sarClient.Create(ctx, &review, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -96,12 +81,12 @@ func (sar subjectAccessReview) checkUserCanImpersonateUser(ctx context.Context, 
 	return result.Status.Allowed, nil
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateGroup(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user string, groups []string, group string) (bool, error) {
-	review := authV1.SubjectAccessReview{
-		Spec: authV1.SubjectAccessReviewSpec{
+func (s subjectAccessReview) checkUserCanImpersonateGroup(ctx context.Context, user string, groups []string, group string) (bool, error) {
+	review := authv1.SubjectAccessReview{
+		Spec: authv1.SubjectAccessReviewSpec{
 			User:   user,
 			Groups: groups,
-			ResourceAttributes: &authV1.ResourceAttributes{
+			ResourceAttributes: &authv1.ResourceAttributes{
 				Verb:     "impersonate",
 				Resource: "groups",
 				Name:     group,
@@ -109,7 +94,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateGroup(ctx context.Context,
 		},
 	}
 
-	result, err := sarClient.Create(ctx, &review, metav1.CreateOptions{})
+	result, err := s.sarClient.Create(ctx, &review, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -118,14 +103,17 @@ func (sar subjectAccessReview) checkUserCanImpersonateGroup(ctx context.Context,
 	return result.Status.Allowed, nil
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateExtras(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user string, groups []string, extras map[string][]string) (bool, error) {
+func (s subjectAccessReview) checkUserCanImpersonateExtras(ctx context.Context, user string, groups []string, extras map[string][]string) (bool, error) {
 	for name, values := range extras {
+		if err := validateExtraKey(name); err != nil {
+			return false, err
+		}
 		for _, value := range values {
-			review := authV1.SubjectAccessReview{
-				Spec: authV1.SubjectAccessReviewSpec{
+			review := authv1.SubjectAccessReview{
+				Spec: authv1.SubjectAccessReviewSpec{
 					User:   user,
 					Groups: groups,
-					ResourceAttributes: &authV1.ResourceAttributes{
+					ResourceAttributes: &authv1.ResourceAttributes{
 						Verb:     "impersonate",
 						Resource: "userextras/" + name,
 						Name:     value,
@@ -133,7 +121,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateExtras(ctx context.Context
 				},
 			}
 
-			result, err := sarClient.Create(ctx, &review, metav1.CreateOptions{})
+			result, err := s.sarClient.Create(ctx, &review, metav1.CreateOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -147,16 +135,16 @@ func (sar subjectAccessReview) checkUserCanImpersonateExtras(ctx context.Context
 	return true, nil
 }
 
-func (sar subjectAccessReview) checkUserCanImpersonateServiceAccount(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user string, groups []string, sa string) (bool, error) {
+func (s subjectAccessReview) checkUserCanImpersonateServiceAccount(ctx context.Context, user string, groups []string, sa string) (bool, error) {
 	saNamespace, saName, err := parseServiceAccountUsername(sa)
 	if err != nil {
 		return false, err
 	}
-	review := authV1.SubjectAccessReview{
-		Spec: authV1.SubjectAccessReviewSpec{
+	review := authv1.SubjectAccessReview{
+		Spec: authv1.SubjectAccessReviewSpec{
 			User:   user,
 			Groups: groups,
-			ResourceAttributes: &authV1.ResourceAttributes{
+			ResourceAttributes: &authv1.ResourceAttributes{
 				Verb:      "impersonate",
 				Resource:  "serviceaccounts",
 				Namespace: saNamespace,
@@ -165,7 +153,7 @@ func (sar subjectAccessReview) checkUserCanImpersonateServiceAccount(ctx context
 		},
 	}
 
-	result, err := sarClient.Create(ctx, &review, metav1.CreateOptions{})
+	result, err := s.sarClient.Create(ctx, &review, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -182,4 +170,14 @@ func parseServiceAccountUsername(username string) (namespace string, name string
 	namespace = tokens[0]
 	name = tokens[1]
 	return namespace, name, nil
+}
+
+func validateExtraKey(name string) error {
+	if name == "" {
+		return errors.New("extra key must not be empty")
+	}
+	if strings.Contains(name, "/") {
+		return fmt.Errorf("extra key %q must not contain '/'", name)
+	}
+	return nil
 }

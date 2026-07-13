@@ -111,7 +111,10 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	unauthed.PathPrefix("/v1-public").Handler(v1PublicAPI)
 
 	// Authenticated routes
-	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))
+	handler := sar.NewSubjectAccessReview(
+		scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews())
+
+	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, handler)
 	saAuth := auth.ToMiddleware(requests.NewServiceAccountAuth(scaledContext, clustermanager.ToRESTConfig))
 	accessControlHandler := rbac.NewAccessControlHandler()
 
