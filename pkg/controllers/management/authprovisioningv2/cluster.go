@@ -27,7 +27,7 @@ func (h *handler) OnCluster(key string, cluster *v1.Cluster) (*v1.Cluster, error
 		return cluster, nil
 	}
 
-	// Ensure the finalizer is present on all provisioning clusters
+	// Ensure the finalizer is present on all non-deleting provisioning clusters
 	if cluster.DeletionTimestamp == nil && !slices.Contains(cluster.Finalizers, capiResourcesCleanupFinalizer) {
 		clusterCopy := cluster.DeepCopy()
 		clusterCopy.Finalizers = append(clusterCopy.Finalizers, capiResourcesCleanupFinalizer)

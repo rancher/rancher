@@ -96,7 +96,7 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 		if capiClusterErr != nil && !apierrors.IsNotFound(capiClusterErr) {
 			return "", capiClusterErr
 		}
-		// Cache can be not up-to-date right after Rancher restart, so fall back to direct API read.
+		// Cache may not be up to date immediately after a Rancher restart, so fall back to a direct API read.
 		if apierrors.IsNotFound(capiClusterErr) {
 			capiCluster, capiClusterErr = h.capiClusters.Get(cluster.Namespace, cluster.Name, metav1.GetOptions{})
 			if capiClusterErr != nil {
