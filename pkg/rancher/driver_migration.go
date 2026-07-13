@@ -87,7 +87,7 @@ func disableUnusedLinodeNodeDriver(w *wrangler.Context) error {
 	if inUse {
 		logrus.Info("disableUnusedLinodeNodeDriver: linode node driver is in use by one or more provisioning clusters; leaving state unchanged")
 	} else {
-		logrus.Info("disableUnusedLinodeNodeDriver: deactivating the not in-used linode node driver")
+		logrus.Info("disableUnusedLinodeNodeDriver: deactivating the unused linode node driver")
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// 1. Deactivate the NodeDriver CR.
 			nd, err := w.Mgmt.NodeDriver().Get(linodeDriver, v1.GetOptions{})
@@ -151,6 +151,9 @@ func disableUnusedLinodeNodeDriver(w *wrangler.Context) error {
 
 	// Persist the marker regardless of in-use status so the evaluation never
 	// re-runs on subsequent starts (admin's choices are preserved thereafter).
+	if cm.Data == nil {
+		cm.Data = make(map[string]string, 1)
+	}
 	cm.Data[linodeDisableCheckKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
