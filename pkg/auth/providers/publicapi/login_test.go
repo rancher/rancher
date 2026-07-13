@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 )
 
@@ -39,6 +40,18 @@ func TestProviderInputForType(t *testing.T) {
 			wantName:     "local",
 		},
 		{
+			name:         "OKTA SAML provider",
+			providerType: client.OKTAProviderType,
+			wantType:     client.OKTAProviderType,
+			wantName:     saml.OKTAName,
+		},
+		{
+			name:         "generic SAML provider",
+			providerType: client.GenericSAMLProviderType,
+			wantType:     client.GenericSAMLProviderType,
+			wantName:     saml.GenericSAMLName,
+		},
+		{
 			name:         "unknown provider returns nil",
 			providerType: "unknownProvider",
 			wantNil:      true,
@@ -60,6 +73,10 @@ func TestProviderInputForType(t *testing.T) {
 			if tt.providerType == client.GoogleOAuthProviderType || tt.providerType == "googleOauthProvider" {
 				_, ok := got.(*apiv3.GoogleOauthLogin)
 				assert.True(t, ok, "expected *apiv3.GoogleOauthLogin")
+			}
+			if tt.providerType == client.OKTAProviderType || tt.providerType == client.GenericSAMLProviderType {
+				_, ok := got.(*apiv3.SamlLoginInput)
+				assert.True(t, ok, "expected *apiv3.SamlLoginInput")
 			}
 		})
 	}
