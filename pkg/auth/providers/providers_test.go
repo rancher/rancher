@@ -10,10 +10,18 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
+
+func TestGenericSAMLTypeMapsToProviderName(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "genericsaml", nameFromType(client.GenericSAMLConfigType))
+	assert.Equal(t, "genericSAMLConfig", client.GenericSAMLConfigType)
+}
 
 func TestIsSAMLProvider(t *testing.T) {
 	t.Parallel()

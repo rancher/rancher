@@ -231,6 +231,10 @@ type OKTAProvider struct {
 	SamlProvider `json:",inline"`
 }
 
+type GenericSAMLProvider struct {
+	SamlProvider `json:",inline"`
+}
+
 type SamlLoginInput struct {
 	GenericLogin     `json:",inline"`
 	FinalRedirectURL string `json:"finalRedirectUrl"`
