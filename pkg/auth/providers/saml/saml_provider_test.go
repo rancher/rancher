@@ -20,6 +20,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -667,4 +669,22 @@ func TestSearchPrincipalsUserSearchError(t *testing.T) {
 	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
 	require.ErrorContains(t, err, "cache is not synced")
 	assert.Nil(t, got)
+}
+
+func TestFormSamlRedirectURLGenericSAML(t *testing.T) {
+	cfg := map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	}
+	got := formSamlRedirectURLFromMap(cfg, GenericSAMLName)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login", got)
+}
+
+func TestTransformToAuthProviderGenericSAML(t *testing.T) {
+	p := &Provider{name: GenericSAMLName}
+	out, err := p.TransformToAuthProvider(map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login",
+		out[publicclient.GenericSAMLProviderFieldRedirectURL])
 }
