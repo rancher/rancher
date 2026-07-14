@@ -37,6 +37,7 @@ type Interface interface {
 	AuthProvider() AuthProviderController
 	AuthToken() AuthTokenController
 	AzureADProvider() AzureADProviderController
+	CRMigration() CRMigrationController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
 	ClusterProxyConfig() ClusterProxyConfigController
@@ -113,6 +114,10 @@ func (v *version) AuthToken() AuthTokenController {
 
 func (v *version) AzureADProvider() AzureADProviderController {
 	return generic.NewNonNamespacedController[*v3.AzureADProvider, *v3.AzureADProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADProvider"}, "azureadproviders", v.controllerFactory)
+}
+
+func (v *version) CRMigration() CRMigrationController {
+	return generic.NewNonNamespacedController[*v3.CRMigration, *v3.CRMigrationList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CRMigration"}, "crmigrations", v.controllerFactory)
 }
 
 func (v *version) CloudCredential() CloudCredentialController {
