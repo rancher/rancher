@@ -34,6 +34,7 @@ var (
 	AuthProviderResourceName                              = "authproviders"
 	AuthTokenResourceName                                 = "authtokens"
 	AzureADProviderResourceName                           = "azureadproviders"
+	CRMigrationResourceName                               = "crmigrations"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
 	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
@@ -111,6 +112,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AuthTokenList{},
 		&AzureADProvider{},
 		&AzureADProviderList{},
+		&CRMigration{},
+		&CRMigrationList{},
 		&CloudCredential{},
 		&CloudCredentialList{},
 		&Cluster{},
