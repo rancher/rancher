@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -219,8 +220,8 @@ func TestSyncGroupMembers(t *testing.T) {
 				provider: {Items: []v3.Principal{}},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(existingAttr, false, nil)
 
 		updatedAttr := existingAttr.DeepCopy()
 		updatedAttr.GroupPrincipals[provider] = v3.Principals{
@@ -237,14 +238,57 @@ func TestSyncGroupMembers(t *testing.T) {
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(updatedAttr, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{newMember})
 		require.NoError(t, err)
+	})
+
+	t.Run("adds member that has no attribute yet", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		newMember := scimMember{Value: "u-new", Display: "new.user"}
+		user := &v3.User{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "management.cattle.io/v3", Kind: "User"},
+			ObjectMeta: metav1.ObjectMeta{Name: "u-new", UID: "uid-new"},
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+		userCache.EXPECT().Get("u-new").Return(user, nil).AnyTimes()
+
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-new").Return(&v3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: "u-new"},
+			GroupPrincipals: map[string]v3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}, true, nil)
+
+		var created *v3.UserAttribute
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(a *v3.UserAttribute) (*v3.UserAttribute, error) {
+			created = a
+			return a, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
+		}
+
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{newMember})
+		require.NoError(t, err)
+
+		require.NotNil(t, created)
+		items := created.GroupPrincipals[provider].Items
+		require.Len(t, items, 1)
+		assert.Equal(t, groupPrincipalName(provider, groupName), items[0].Name)
 	})
 
 	t.Run("removes members not in new list", func(t *testing.T) {
@@ -272,7 +316,8 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		// Remove the member.
 		userCache.EXPECT().Get("u-mo773yttt4").Return(existingUser, nil)
-		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(existingAttr, false, nil)
 
 		updatedAttr := existingAttr.DeepCopy()
 		updatedAttr.GroupPrincipals[provider] = v3.Principals{Items: []v3.Principal{}}
@@ -283,6 +328,7 @@ func TestSyncGroupMembers(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			userAttributes:     userAttrClient,
 			getConfig:          testDefaultGetConfig,
 		}
@@ -388,8 +434,8 @@ func TestUpdateGroupMemberDisplayName(t *testing.T) {
 			},
 		}
 
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(memberID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(memberID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -400,8 +446,8 @@ func TestUpdateGroupMemberDisplayName(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
 		}
 
 		err := srv.updateGroupMemberDisplayName(provider, principalName, "Engineering", memberID)
@@ -422,12 +468,12 @@ func TestUpdateGroupMemberDisplayName(t *testing.T) {
 			},
 		}
 
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(memberID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(memberID).Return(existingAttr, false, nil)
 
 		// No Update call expected.
 		srv := &SCIMServer{
-			userAttributeCache: userAttributeCache,
+			userMGR: userMGR,
 		}
 
 		err := srv.updateGroupMemberDisplayName(provider, principalName, "Engineering", memberID)
@@ -467,6 +513,9 @@ func TestSyncGroupMembersUpdatesStaleDisplayName(t *testing.T) {
 	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 	userAttributeCache.EXPECT().Get(memberID).Return(existingAttr, nil).AnyTimes()
 
+	userMGR := mocks.NewMockManager(ctrl)
+	userMGR.EXPECT().EnsureAndGetUserAttribute(memberID).Return(existingAttr, false, nil)
+
 	userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 	userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
 		items := attr.GroupPrincipals[provider].Items
@@ -479,6 +528,7 @@ func TestSyncGroupMembersUpdatesStaleDisplayName(t *testing.T) {
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
 		userAttributes:     userAttrClient,
+		userMGR:            userMGR,
 		getConfig:          testDefaultGetConfig,
 	}
 
@@ -809,10 +859,11 @@ func TestPatchGroup(t *testing.T) {
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
-		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta:      metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{provider: {Items: []v3.Principal{}}},
-		}, nil)
+		}, false, nil)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
 
 		// For final getRancherGroupMembers call.
@@ -833,6 +884,7 @@ func TestPatchGroup(t *testing.T) {
 			groupsCache:        groupCache,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			userAttributes:     userAttrClient,
 			getConfig:          testDefaultGetConfig,
 		}
@@ -1037,7 +1089,6 @@ func TestPatchGroup(t *testing.T) {
 
 		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 
 		existingGroup := &v3.Group{
@@ -1051,23 +1102,24 @@ func TestPatchGroup(t *testing.T) {
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 		}, nil)
-		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{
 				provider: {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"}}},
 			},
-		}, nil)
+		}, false, nil)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
 
 		// For final getRancherGroupMembers call.
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 
 		srv := &SCIMServer{
-			groupsCache:        groupCache,
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			groupsCache:    groupCache,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -1374,10 +1426,11 @@ func TestPatchGroup(t *testing.T) {
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 		}, nil).Times(2)
-		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta:      metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{provider: {Items: []v3.Principal{}}},
-		}, nil)
+		}, false, nil)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
 
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
@@ -1397,6 +1450,7 @@ func TestPatchGroup(t *testing.T) {
 			groupsCache:        groupCache,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			userAttributes:     userAttrClient,
 			getConfig:          testDefaultGetConfig,
 		}
@@ -1430,7 +1484,6 @@ func TestPatchGroup(t *testing.T) {
 
 		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 
 		existingGroup := &v3.Group{
@@ -1443,22 +1496,23 @@ func TestPatchGroup(t *testing.T) {
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 		}, nil)
-		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{
 				provider: {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"}}},
 			},
-		}, nil)
+		}, false, nil)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
 
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 
 		srv := &SCIMServer{
-			groupsCache:        groupCache,
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			groupsCache:    groupCache,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -1862,7 +1916,9 @@ func TestCreateGroup(t *testing.T) {
 			},
 		}
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2) // Once for getRancherGroupMembers, once for addGroupMember
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil) // getRancherGroupMembers
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-user1").Return(userAttr, false, nil)
 
 		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttributeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -1878,6 +1934,7 @@ func TestCreateGroup(t *testing.T) {
 			groups:             groupClient,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			userAttributes:     userAttributeClient,
 			getConfig:          testDefaultGetConfig,
 		}
@@ -2878,7 +2935,9 @@ func TestUpdateGroup(t *testing.T) {
 			},
 		}
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2)
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-user1").Return(userAttr, false, nil)
 
 		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttributeClient.EXPECT().Update(gomock.Any()).Return(userAttr, nil)
@@ -2887,6 +2946,7 @@ func TestUpdateGroup(t *testing.T) {
 			groupsCache:        groupsCache,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			userAttributes:     userAttributeClient,
 			getConfig:          testDefaultGetConfig,
 		}
@@ -3092,7 +3152,9 @@ func TestUpdateGroup(t *testing.T) {
 			},
 		}
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2)
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-user1").Return(userAttr, false, nil)
 
 		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttributeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -3106,6 +3168,7 @@ func TestUpdateGroup(t *testing.T) {
 			groupsCache:        groupsCache,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			userAttributes:     userAttributeClient,
 			getConfig:          testDefaultGetConfig,
 		}
@@ -3203,7 +3266,9 @@ func TestDeleteGroup(t *testing.T) {
 			},
 		}
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2)
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute("u-user1").Return(userAttr, false, nil)
 
 		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttributeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -3218,6 +3283,7 @@ func TestDeleteGroup(t *testing.T) {
 			groups:             groupClient,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			userAttributes:     userAttributeClient,
 			getConfig:          testDefaultGetConfig,
 		}
