@@ -452,7 +452,7 @@ if $has_oci_charts; then
             echo "by docker's legacy storage drivers. You must take action in order to continue."
             echo ""
             echo "Preferred: configure docker to use the containerd image store"
-            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine
+            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine"
             echo "    NOTE: Switching image stores hides all images and containers currently present in the original docker image store."
             echo ""
             echo "Alternative: install the helm CLI:"
@@ -672,7 +672,7 @@ if $has_oci_charts; then
             echo "by docker's legacy storage drivers. You must take action in order to continue."
             echo ""
             echo "Preferred: configure docker to use the containerd image store"
-            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine
+            echo "    https://docs.docker.com/engine/storage/containerd/#enable-containerd-image-store-on-docker-engine"
             echo "    NOTE: Switching image stores hides all images and containers currently present in the original docker image store."
             echo ""
             echo "Alternative: install the helm CLI:"
