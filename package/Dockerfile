@@ -47,6 +47,7 @@ RUN zypper refresh && \
 
 FROM chroot-builder AS chroot-builder-server
 RUN zypper --installroot /chroot -n in --no-recommends \
+      perl-base `# required by c_hash script` \
       git-core unzip sed shadow && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
