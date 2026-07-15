@@ -437,3 +437,5 @@ require (
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 )
+
+replace github.com/rancher/wrangler/v3 => github.com/crobby/wrangler/v3 v3.0.0-20260715104920-281a32baff28
