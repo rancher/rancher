@@ -140,7 +140,6 @@ func parentSchemaWithField(name, field string) *mgmtv3.DynamicSchema {
 // teardown path (deactivate NodeDriver, delete schemas, remove fields, delete
 // CRDs). All operations tolerate NotFound.
 func setupTeardownExpectations(
-	ctrl *gomock.Controller,
 	mockND *ctrlfake.MockNonNamespacedControllerInterface[*mgmtv3.NodeDriver, *mgmtv3.NodeDriverList],
 	mockDS *ctrlfake.MockNonNamespacedControllerInterface[*mgmtv3.DynamicSchema, *mgmtv3.DynamicSchemaList],
 	mockCRD *ctrlfake.MockNonNamespacedControllerInterface[*apiextv1.CustomResourceDefinition, *apiextv1.CustomResourceDefinitionList],
@@ -339,15 +338,28 @@ func TestDisableUnusedLinodeNodeDriver(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			// ConfigMap mock.
+			// disableUnusedLinodeNodeDriver() now does an initial marker read and,
+			// when it needs to persist the marker, a second Get inside a
+			// retry-on-conflict closure before Create/Update.
 			mockCM := ctrlfake.NewMockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 			if tt.storedCM != nil {
 				mockCM.EXPECT().
 					Get(cattleNamespace, linodeDisableCheckConfigMap, v1.GetOptions{}).
 					Return(tt.storedCM, nil)
+				if tt.wantMarkerWrite {
+					mockCM.EXPECT().
+						Get(cattleNamespace, linodeDisableCheckConfigMap, v1.GetOptions{}).
+						Return(tt.storedCM, nil)
+				}
 			} else {
 				mockCM.EXPECT().
 					Get(cattleNamespace, linodeDisableCheckConfigMap, v1.GetOptions{}).
 					Return(nil, markerNotFound())
+				if tt.wantMarkerWrite {
+					mockCM.EXPECT().
+						Get(cattleNamespace, linodeDisableCheckConfigMap, v1.GetOptions{}).
+						Return(nil, markerNotFound())
+				}
 			}
 
 			markerWritten := false
@@ -383,7 +395,7 @@ func TestDisableUnusedLinodeNodeDriver(t *testing.T) {
 			mockCRD := ctrlfake.NewMockNonNamespacedControllerInterface[*apiextv1.CustomResourceDefinition, *apiextv1.CustomResourceDefinitionList](ctrl)
 
 			if tt.expectTeardown {
-				setupTeardownExpectations(ctrl, mockND, mockDS, mockCRD, tt.ndActive)
+				setupTeardownExpectations(mockND, mockDS, mockCRD, tt.ndActive)
 			} else if !markerPresent && tt.clusterListErr == nil {
 				// Check if driver is actually in use to determine if we expect NodeDriver.Get to be called
 				isLinodeInUse := false
