@@ -12,6 +12,7 @@ replace (
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	github.com/rancher/rancher/pkg/plan => ./pkg/plan
+	github.com/rancher/wrangler/v3 => github.com/crobby/wrangler/v3 v3.0.0-20260715104920-281a32baff28
 	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
@@ -437,5 +438,3 @@ require (
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 )
-
-replace github.com/rancher/wrangler/v3 => github.com/crobby/wrangler/v3 v3.0.0-20260715104920-281a32baff28
