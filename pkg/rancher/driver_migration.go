@@ -64,18 +64,8 @@ func disableUnusedLinodeNodeDriver(w *wrangler.Context) error {
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("DisableUnusedLinodeNodeDriver: failed to get marker ConfigMap: %w", err)
 	}
-	if apierrors.IsNotFound(err) {
-		cm = &corev1.ConfigMap{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      linodeDisableCheckConfigMap,
-				Namespace: cattleNamespace,
-			},
-			Data: make(map[string]string, 1),
-		}
-	}
-
 	// Marker already set on a previous start: nothing to do.
-	if cm.Data[linodeDisableCheckKey] == "true" {
+	if cm != nil && cm.Data[linodeDisableCheckKey] == "true" {
 		return nil
 	}
 
@@ -149,13 +139,42 @@ func disableUnusedLinodeNodeDriver(w *wrangler.Context) error {
 		}
 	}
 
-	// Persist the marker regardless of in-use status so the evaluation never
-	// re-runs on subsequent starts (admin's choices are preserved thereafter).
-	if cm.Data == nil {
-		cm.Data = make(map[string]string, 1)
-	}
-	cm.Data[linodeDisableCheckKey] = "true"
-	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cm, err := w.Core.ConfigMap().Get(cattleNamespace, linodeDisableCheckConfigMap, v1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			cm = &corev1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: cattleNamespace,
+					Name:      linodeDisableCheckConfigMap,
+				},
+				Data: make(map[string]string, 1),
+			}
+		} else if err != nil {
+			return err
+		}
+
+		// Marker already set by another Rancher pod: nothing to do.
+		if cm != nil && cm.Data[linodeDisableCheckKey] == "true" {
+			return nil
+		}
+
+		// Persist the marker regardless of in-use status so the evaluation never
+		// re-runs on subsequent starts (admin's choices are preserved thereafter).
+		if cm.Data == nil {
+			cm.Data = make(map[string]string, 1)
+		}
+		cm.Data[linodeDisableCheckKey] = "true"
+
+		if cm.ResourceVersion == "" {
+			_, err = w.Core.ConfigMap().Create(cm)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		}
+		_, err = w.Core.ConfigMap().Update(cm)
+		return err
+	})
 }
 
 // linodeNodeDriverInUse reports whether any provisioning.cattle.io/v1 Cluster
