@@ -138,7 +138,7 @@ func (h *handler) onRemove(_ string, obj *v3.ClusterRegistrationToken) (*v3.Clus
 }
 
 func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.ClusterRegistrationToken, err error) {
-	if obj == nil {
+	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
 
@@ -164,7 +164,7 @@ func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.
 		var expiresAt string
 		ttl := getTTL(obj)
 		if ttl > 0 && isTTLRotationEnabled() {
-			expiresAt = computeExpiresAt(obj.CreationTimestamp.Time, ttl)
+			expiresAt = computeExpiresAt(obj.CreationTimestamp.Time, ttl, time.Now())
 		}
 
 		if err := h.ensureTokenSecret(obj, token, expiresAt); err != nil {
@@ -265,8 +265,9 @@ func computeTTLDecision(now time.Time, obj *v3.ClusterRegistrationToken, data ma
 		}
 
 		d.gracePeriodExpiresAt = ""
+		d.deleteKeys = []string{gracePeriodExpiresAtDataKey}
 		if _, hasPrev := data[previousTokenDataKey]; hasPrev {
-			d.deleteKeys = []string{previousTokenDataKey, gracePeriodExpiresAtDataKey}
+			d.deleteKeys = append(d.deleteKeys, previousTokenDataKey)
 		}
 		return d, nil
 	}
@@ -277,7 +278,7 @@ func computeTTLDecision(now time.Time, obj *v3.ClusterRegistrationToken, data ma
 
 	ea, ok := data[expiresAtDataKey]
 	if !ok || len(ea) == 0 {
-		expiresAt := computeExpiresAt(creationTime, ttl)
+		expiresAt := computeExpiresAt(creationTime, ttl, now)
 		d.setData = map[string][]byte{expiresAtDataKey: []byte(expiresAt)}
 		d.expiresAt = expiresAt
 		return d, nil
@@ -303,10 +304,17 @@ func computeTTLDecision(now time.Time, obj *v3.ClusterRegistrationToken, data ma
 	newGracePeriodExpiresAt := now.Add(time.Duration(gracePeriod) * time.Minute).UTC().Format(time.RFC3339)
 
 	d.setData = map[string][]byte{
-		previousTokenDataKey:        data[tokenDataKey],
 		tokenDataKey:                []byte(newToken),
 		expiresAtDataKey:            []byte(newExpiresAt),
 		gracePeriodExpiresAtDataKey: []byte(newGracePeriodExpiresAt),
+	}
+	if oldToken, ok := data[tokenDataKey]; ok && len(oldToken) > 0 {
+		d.setData[previousTokenDataKey] = oldToken
+	} else {
+		// tokenDataKey should always be populated once the token secret exists; reaching rotation without one
+		// indicates the secret was corrupted.
+		logrus.Warnf("CRT %s/%s: %s is missing a valid token at rotation time; proceeding without a previousToken",
+			obj.Namespace, obj.Name, obj.Status.TokenSecretName)
 	}
 	d.expiresAt = newExpiresAt
 	d.gracePeriodExpiresAt = newGracePeriodExpiresAt
@@ -314,7 +322,7 @@ func computeTTLDecision(now time.Time, obj *v3.ClusterRegistrationToken, data ma
 }
 
 func (h *handler) handleTTL(obj *v3.ClusterRegistrationToken) (time.Duration, error) {
-	secret, err := h.secretCache.Get(obj.Namespace, SecretName(obj.Name))
+	secret, err := h.secretCache.Get(obj.Namespace, obj.Status.TokenSecretName)
 	if err != nil {
 		return 0, err
 	}
@@ -449,12 +457,11 @@ func (h *handler) ensureTokenSecret(crt *v3.ClusterRegistrationToken, token stri
 
 // computeExpiresAt computes a jittered expiry from creationTime + ttl,
 // falling back to now + jitter if that candidate is already in the past.
-func computeExpiresAt(creationTime time.Time, ttl int64) string {
+func computeExpiresAt(creationTime time.Time, ttl int64, now time.Time) string {
 	ttlDuration := time.Duration(ttl) * time.Minute
 	jitter := ComputeJitter(ttlDuration)
 
 	candidate := creationTime.Add(ttlDuration).Add(jitter)
-	now := time.Now()
 	if candidate.After(now) {
 		return candidate.UTC().Format(time.RFC3339)
 	}
