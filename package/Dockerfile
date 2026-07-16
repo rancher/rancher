@@ -54,10 +54,15 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
-      jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
-    zypper --installroot /chroot clean -a && \
+      jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat
+# Add repo and packages made by Rancher in OBS.
+# At the end of this file, please update the kubectl symbolic link according to
+# the installed version.
+RUN zypper addrepo --refresh https://download.opensuse.org/repositories/isv:/Rancher:/dependencies/pkgs rancher-obs-deps && \
+    zypper --gpg-auto-import-keys refresh --force && \
+    zypper --installroot /chroot -n in --from rancher-obs-deps kubectl1.36
+RUN zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
-
 
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
@@ -539,21 +544,8 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
 
-ARG ARCH
-ENV KUBECTL_VERSION=v1.36.0
-ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
-ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
-
-RUN case "${ARCH}" in \
-        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
-        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
-    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
-    sha256sum -c kubectl.sha256 && \
-    rm kubectl.sha256 && \
-    chmod +x /usr/bin/kubectl
+# Create symbolic link.
+RUN ln -s /usr/bin/kubectl1.36 /usr/bin/kubectl
 
 LABEL io.cattle.agent=true
 
