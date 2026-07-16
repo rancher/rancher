@@ -14,26 +14,12 @@ runs:
     - name: Install Helm dependencies
       env:
          HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
-         HELM_VERSION: ${{ steps.env.outputs.HELM_VERSION }}
-         HELM_CHECKSUM_amd64: ${{ steps.env.outputs.HELM_CHECKSUM_amd64 }}
-         HELM_CHECKSUM_arm64: ${{ steps.env.outputs.HELM_CHECKSUM_arm64 }}
       shell: bash
       run: |
-        set -ex
-        OS_ARCH=$(uname -m)
-        if [ "$OS_ARCH" = "x86_64" ]; then
-          ARCH="amd64"
-          HELM_CHECKSUM="${HELM_CHECKSUM_amd64}"
-        elif [ "$OS_ARCH" = "aarch64" ]; then
-          ARCH="arm64"
-          HELM_CHECKSUM="${HELM_CHECKSUM_arm64}"
-        fi
-        HELM_URL="https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz"
-        curl "${HELM_URL}" -o /tmp/helm.tar.gz && \
-        echo "${HELM_CHECKSUM}  /tmp/helm.tar.gz" | sha256sum -c - && \
-        tar xvzf /tmp/helm.tar.gz --strip-components=1 -C /tmp/ && \
-        mv /tmp/helm /usr/bin/helm && \
-        chmod +x /usr/bin/helm
+        # Add repo and packages made by Rancher in OBS.
+        RUN zypper addrepo --refresh https://download.opensuse.org/repositories/isv:/Rancher:/dependencies/pkgs rancher-obs-deps && \
+        zypper --gpg-auto-import-keys refresh --force && \
+        zypper -n in --from rancher-obs-deps helm yq
         helm plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION} --verify=false;
     - name: Build
       shell: bash
