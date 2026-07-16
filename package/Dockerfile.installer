@@ -2,45 +2,14 @@ FROM --platform=$BUILDPLATFORM registry.suse.com/bci/bci-base:15.7 AS build
 
 RUN zypper in -y wget git
 
-# All downloaded binaries are used at the build layer only,
-# therefore they can be based off the BUILD PLATFORM architecture.
-ARG BUILDARCH
+# Add repo and packages made by Rancher in OBS.
+RUN zypper addrepo --refresh https://download.opensuse.org/repositories/isv:/Rancher:/dependencies/pkgs rancher-obs-deps && \
+    zypper --gpg-auto-import-keys refresh --force && \
+    zypper -n in --from rancher-obs-deps helm yq
 
+ARG BUILDARCH
 ARG VERSION
 ENV CHART_VERSION=${VERSION}
-
-# set up helm 4
-# renovate: datasource=github-release-attachments depName=helm/helm
-ENV HELM_VERSION=v4.2.0
-ENV HELM_CHECKSUM_amd64=97dbeb971be4ac4b27e3839976d9564c0fb35c6f3b1da89dd1e292d236af4096
-ENV HELM_CHECKSUM_arm64=1f8de130dfbd04de64978e7b852a7a547be1404956a366608276d2520b678670
-
-RUN if [ "${BUILDARCH}" = "amd64" ]; then \
-        HELM_CHECKSUM="${HELM_CHECKSUM_amd64}"; \
-    elif [ "${BUILDARCH}" = "arm64" ]; then \
-        HELM_CHECKSUM="${HELM_CHECKSUM_arm64}"; \
-    fi; \
-    wget "https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz" -O /tmp/helm.tar.gz && \
-    echo "${HELM_CHECKSUM}  /tmp/helm.tar.gz" | sha256sum -c - && \
-    tar -xzf /tmp/helm.tar.gz --strip-components=1 -C /usr/bin && \
-    chown root:root /usr/bin/helm && \
-    chmod +x /usr/bin/helm && \
-    rm -f /tmp/helm.tar.gz
-
-# renovate: datasource=github-release-attachments depName=mikefarah/yq
-ENV YQ_VERSION=v4.44.2
-ENV YQ_CHECKSUM_amd64=e4c2570249e3993e33ffa44e592b5eee8545bd807bfbeb596c2986d86cb6c85c
-ENV YQ_CHECKSUM_arm64=79c22d98b2ff517cb8b1c20499350cbc1e8c753483c8f72a37a299e6e9872a98
-
-RUN if [ "${BUILDARCH}" = "amd64" ]; then \
-        YQ_CHECKSUM="${YQ_CHECKSUM_amd64}"; \
-    elif [ "${BUILDARCH}" = "arm64" ]; then \
-        YQ_CHECKSUM="${YQ_CHECKSUM_arm64}"; \
-    fi; \
-    wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O /tmp/yq.tar.gz && \
-    echo "${YQ_CHECKSUM}  /tmp/yq.tar.gz" | sha256sum -c - && \
-    tar xzf /tmp/yq.tar.gz && mv yq_linux_${BUILDARCH} /usr/bin/yq && \
-    rm -f /tmp/yq.tar.gz
 
 WORKDIR /src
 COPY .git/ /src/.git/
