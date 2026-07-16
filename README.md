@@ -27,7 +27,7 @@ See [Installing/Upgrading Rancher](https://ranchermanager.docs.rancher.com/v2.14
 * Operating Systems
   * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
 * Hardware & Software
-  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/v2.14/pages-for-subheaders/installation-requirements) for hardware and software requirements.
+  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/v2.14/getting-started/installation-and-upgrade/installation-requirements) for hardware and software requirements.
 
 ### Using Rancher
 
