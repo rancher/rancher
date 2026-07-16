@@ -7,7 +7,14 @@ set -eo pipefail
 
 cluster="${CAPRKE2_DEV_CLUSTER:-local-caprke2}"
 
-if command -v k3d >/dev/null 2>&1 && k3d cluster list --output json 2>/dev/null | grep -q "\"name\": \"${cluster}\""; then
+for bin in docker jq k3d; do
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    echo "error: '$bin' not found on PATH; install it and re-run." >&2
+    exit 1
+  fi
+done
+
+if k3d cluster list --output json 2>/dev/null | jq "(map(select(.name == \"${cluster}\")) | first) // error (\"Cluster ${cluster} does not exist\")"; then
   echo "Deleting k3d cluster '${cluster}'"
   k3d cluster delete "${cluster}"
 else
