@@ -20,7 +20,7 @@ Open your browser to https://localhost
 
 ## Installation
 
-See [Installing/Upgrading Rancher]([https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-and-upgrade](https://ranchermanager.docs.rancher.com/v2.14/getting-started/installation-and-upgrade)) for all installation options.
+See [Installing/Upgrading Rancher](https://ranchermanager.docs.rancher.com/v2.14/getting-started/installation-and-upgrade) for all installation options.
 
 ### Minimum Requirements
 
