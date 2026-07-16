@@ -92,21 +92,20 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 			}
 		}
 
+		// The CAPI cluster informer cache may not be synced yet immediately after a
+		// Rancher restart, which would produce a false "not found" below and cause us
+		// to release this finalizer without ever deleting the CAPI cluster. If the
+		// cache is not synced, re-enqueue the provisioning cluster and try again later.
+		if !h.capiClusters.Informer().HasSynced() {
+			h.clusters.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
+			return "", generic.ErrSkip
+		}
+
 		capiCluster, capiClusterErr := h.capiClustersCache.Get(cluster.Namespace, cluster.Name)
 		if capiClusterErr != nil && !apierrors.IsNotFound(capiClusterErr) {
 			return "", capiClusterErr
 		}
-		// Cache may not be up to date immediately after a Rancher restart, so fall back to a direct API read.
-		if apierrors.IsNotFound(capiClusterErr) {
-			capiCluster, capiClusterErr = h.capiClusters.Get(cluster.Namespace, cluster.Name, metav1.GetOptions{})
-			if capiClusterErr != nil {
-				if apierrors.IsNotFound(capiClusterErr) {
-					capiCluster = nil
-				} else {
-					return "", capiClusterErr
-				}
-			}
-		}
+
 		if capiCluster != nil {
 			if capiCluster.DeletionTimestamp == nil {
 				// Deleting the CAPI cluster will start the process of deleting Machines, Bootstraps, etc.
