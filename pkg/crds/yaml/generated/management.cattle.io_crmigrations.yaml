@@ -1,0 +1,267 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: crmigrations.management.cattle.io
+spec:
+  group: management.cattle.io
+  names:
+    kind: CRMigration
+    listKind: CRMigrationList
+    plural: crmigrations
+    singular: crmigration
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.summary
+      name: Summary
+      type: string
+    - jsonPath: .status.totalResourcesMigrated
+      name: Resources Migrated
+      type: integer
+    name: v3
+    schema:
+      openAPIV3Schema:
+        description: |-
+          CRMigration is the source of truth for a single Rancher custom resource
+          migration. It tracks the configuration of the migration, a history of every
+          time the migration was run, and the current status of the migration.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec is the specification of the desired configuration for
+              the migration.
+            properties:
+              batchDelay:
+                description: |-
+                  BatchDelay optionally overrides the global migration-default-batch-delay
+                  setting for this migration. It controls how long, in seconds, to pause
+                  between batches.
+                minimum: 0
+                type: integer
+              batchSize:
+                description: |-
+                  BatchSize optionally overrides the global migration-default-batch-size
+                  setting for this migration. It controls how many migrations are attempted
+                  before pausing.
+                minimum: 1
+                type: integer
+              cveFixNumbers:
+                description: CVEFixNumbers optionally lists the CVE numbers that this
+                  migration fixes.
+                items:
+                  type: string
+                type: array
+              description:
+                description: Description is a human readable description of what is
+                  being migrated and why.
+                type: string
+              manualRunRequestID:
+                description: |-
+                  ManualRunRequestID is a mechanism to trigger a manual run of the migration.
+                  It is used when auto-apply is disabled, or when a migration needs to be
+                  re-run (for example after an error or after it has already completed).
+
+                  To request a run, set this to a new, unique value (any string that differs
+                  from the previous value, such as a timestamp or UUID). The controller runs
+                  the migration once whenever this value differs from
+                  status.observedRunRequestID, then records the handled value in status so the
+                  same request is not processed again. Re-applying the same value is a no-op.
+                type: string
+              versionAffected:
+                description: |-
+                  VersionAffected is the version of Rancher impacted by this migration. It can
+                  be a range (for example ">= 2.11.4 < 2.13.0").
+                type: string
+            type: object
+          status:
+            description: Status is the most recently observed status of the migration.
+            properties:
+              conditions:
+                description: |-
+                  Conditions represent the latest available observations of the migration's
+                  state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              lastUpdateTime:
+                description: LastUpdateTime is when the status was last updated.
+                format: date-time
+                type: string
+              migrationRuns:
+                description: |-
+                  MigrationRuns is a history of each time this migration was run. Entries
+                  must be ordered from most recent to oldest.
+                items:
+                  description: MigrationRun records a single execution of a migration.
+                  properties:
+                    errors:
+                      description: Errors is a list of all errors that occurred during
+                        this migration run.
+                      items:
+                        description: MigrationError describes a single error that
+                          occurred during a migration run.
+                        properties:
+                          message:
+                            description: |-
+                              Message is the full error message. Developers should take care not to log
+                              sensitive data such as secrets, tokens, or passwords here.
+                            type: string
+                          reason:
+                            description: Reason is a more detailed explanation of
+                              the issue.
+                            type: string
+                          type:
+                            description: Type is the type of error.
+                            type: string
+                        type: object
+                      maxItems: 100
+                      type: array
+                    migrationEndTime:
+                      description: MigrationEndTime is when this migration run was
+                        completed.
+                      format: date-time
+                      type: string
+                    migrationStartTime:
+                      description: MigrationStartTime is when this specific migration
+                        run was started.
+                      format: date-time
+                      type: string
+                    migrationsFailed:
+                      description: MigrationsFailed is the number of migrations that
+                        failed during this run.
+                      minimum: 0
+                      type: integer
+                    migrationsPerformedSuccessfully:
+                      description: |-
+                        MigrationsPerformedSuccessfully is the number of migrations successfully
+                        completed during this run.
+                      minimum: 0
+                      type: integer
+                    summary:
+                      description: Summary is the end result of the migration run.
+                      enum:
+                      - Complete
+                      - In Progress
+                      - Error
+                      - Not Run
+                      type: string
+                    version:
+                      description: Version is the version of Rancher in which the
+                        migration was run.
+                      type: string
+                  type: object
+                maxItems: 20
+                type: array
+              migrationsRequired:
+                description: |-
+                  MigrationsRequired is a best estimate count of the number of migrations
+                  that need to be performed, as determined by the Getter. The migration is
+                  considered complete when this number is 0.
+                minimum: 0
+                type: integer
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the most recent generation observed by the
+                  controller. It corresponds to the CRMigration's metadata.generation.
+                format: int64
+                type: integer
+              observedRunRequestID:
+                description: |-
+                  ObservedRunRequestID is the most recent spec.manualRunRequestID handled by
+                  the controller. When it differs from spec.manualRunRequestID, a manual run
+                  has been requested and not yet processed.
+                type: string
+              summary:
+                description: Summary is the state of the whole migration.
+                enum:
+                - Complete
+                - In Progress
+                - Error
+                - Not Run
+                type: string
+              totalResourcesMigrated:
+                description: |-
+                  TotalResourcesMigrated is the number of resources that have been migrated.
+                  It should be the sum of all migrationRuns.migrationsPerformedSuccessfully.
+                minimum: 0
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
