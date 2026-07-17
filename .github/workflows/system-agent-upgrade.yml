@@ -43,6 +43,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
       - name: Update system agent in files
         run:  ./scripts/system-agent-upgrade
       - name: Check for repository changes

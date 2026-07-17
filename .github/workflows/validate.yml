@@ -25,14 +25,14 @@ jobs:
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
-          cache: ${{ github.event_name == 'pull_request' }}
+          cache: ${{ github.event_name == 'pull_request' }} # zizmor: ignore[cache-poisoning] -- validation-only dependency cache; release workflows are separate.
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: ${{ env.GOLANG_CI_LINT_VERSION }}
           args: -v
           only-new-issues: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000') }}
-          skip-cache: false
+          skip-cache: false # zizmor: ignore[cache-poisoning] -- validation-only linter cache; release workflows are separate.
         # only use cache on pull requests
       - name: Validate (modules)
         run: ./scripts/validate

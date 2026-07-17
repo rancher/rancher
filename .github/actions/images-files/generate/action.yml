@@ -14,12 +14,14 @@ runs:
     - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
       with:
         go-version: '${{ steps.env.outputs.GO_VERSION }}'
-        cache: ${{ github.event_name == 'pull_request' }}
+        cache: false
     - name: Download data.json
       shell: bash
+      env:
+        CATTLE_KDM_BRANCH: ${{ steps.env.outputs.CATTLE_KDM_BRANCH }}
       run: |
         mkdir -p "$ARTIFACTS_BASE_DIR"
-        curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > "./$ARTIFACTS_BASE_DIR/data.json"
+        curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/$CATTLE_KDM_BRANCH/data.json" > "./$ARTIFACTS_BASE_DIR/data.json"
         cp "./$ARTIFACTS_BASE_DIR/data.json" "./$ARTIFACTS_BASE_DIR/rancher-data.json"
     - name: Create components and images files
       shell: bash

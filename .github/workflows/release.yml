@@ -88,7 +88,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
     permissions:
       contents: read
       id-token: write
@@ -177,7 +177,7 @@ jobs:
         uses: ./.github/actions/merge-manifests
   create-images-files:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26:latest
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # latest
     permissions:
       contents: read
     env:
@@ -208,7 +208,7 @@ jobs:
           path: /tmp/artifacts
   docker-image-digests:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
     needs: [create-images-files, merge-server-agent-installer-manifests]
     env:
       ARTIFACTS_BASE_DIR: "dist"
@@ -240,7 +240,7 @@ jobs:
           path: /tmp/artifacts
   publish-artifacts:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
     needs: [merge-server-agent-installer-manifests, create-images-files, docker-image-digests]
     permissions:
       contents: write
@@ -304,7 +304,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
     needs: [publish-artifacts, merge-server-agent-installer-manifests, docker-image-digests]
     permissions:
       contents: read
