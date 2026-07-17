@@ -222,6 +222,14 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, fmt.Errorf("failed to create CRDs: %w", err)
 	}
 
+	// Disable the linode node driver (if unused) and remove its DynamicSchema
+	// objects and generated CRDs before any informers start.
+	if features.MCM.Enabled() && features.ProvisioningV2.Enabled() {
+		if err := disableUnusedLinodeNodeDriver(wranglerContext); err != nil {
+			return nil, fmt.Errorf("failed to reconcile linode node driver: %w", err)
+		}
+	}
+
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
 		logrus.Info("fleet can't be turned off when MCM is enabled. Turning on fleet feature")
 		if err := features.SetFeature(wranglerContext.Mgmt.Feature(), features.Fleet.Name(), true); err != nil {
