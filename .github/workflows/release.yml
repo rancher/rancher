@@ -272,18 +272,6 @@ jobs:
           path: /tmp/artifacts
           name: images-digests
           merge-multiple: true
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
-      - name: Create App Token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        id: app-token
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.PRIVATE_KEY }}
       - name: create draft release
         shell: bash
         run: |
@@ -301,7 +289,7 @@ jobs:
 
           gh release create "${TAG}" -R "${GITHUB_REPOSITORY}" --draft --prerelease --title "${TAG}" --notes-file /tmp/artifacts/rancher-components.txt  "${ALL_ARTIFACTS[@]}"
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
