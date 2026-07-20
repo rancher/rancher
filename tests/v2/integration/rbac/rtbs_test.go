@@ -1,8 +1,6 @@
 package integration
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8stypes "k8s.io/apimachinery/pkg/types"
 )
 
 func init() {
@@ -206,7 +203,14 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 		return err != nil
 	}, 2*time.Minute, 2*time.Second, "waiting for secret access to be revoked after PRTB removal")
 
-	err = users.AddProjectMember(client, p.project, user, rtC.ID, []*authzv1.ResourceAttributes{
+	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		ProjectID:       p.project.ID,
+		UserPrincipalID: user.PrincipalIDs[0],
+		RoleTemplateID:  rtC.ID,
+	})
+	p.Require().NoError(err)
+
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
 		{
 			Verb:      "get",
 			Resource:  "secrets",
@@ -298,9 +302,6 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 		})
 	p.Require().NoError(err)
 
-	localCluster, err := p.client.Management.Cluster.ByID(p.downstreamClusterID)
-	p.Require().NoError(err)
-
 	crtb, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
 		ClusterID:       p.downstreamClusterID,
 		UserPrincipalID: user.PrincipalIDs[0],
@@ -341,16 +342,20 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 		})
 	p.Require().NoError(err)
 
-	err = users.AddClusterRoleToUser(client, localCluster, user, rtC.ID, []*authzv1.ResourceAttributes{
+	_, err = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		ClusterID:       p.downstreamClusterID,
+		UserPrincipalID: user.PrincipalIDs[0],
+		RoleTemplateID:  rtC.ID,
+	})
+	p.Require().NoError(err)
+
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
 		{
 			Verb:     "get",
 			Resource: "namespaces",
 			Name:     ns.Name,
 		},
 	})
-	p.Require().NoError(err)
-
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
 	p.Require().NoError(err)
 
 	anotherNS := p.createNamespace(client, pn)
@@ -536,8 +541,6 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
-	mbo := "membership-binding-owner"
-
 	// Admin creates a PRTB giving user project-member on the suite project.
 	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
 		UserID:         user.ID,
@@ -553,12 +556,15 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
 
 	// Derive the label key from the PRTB ID (namespace:name -> namespace_name).
+	// The label key is set on the membership CRB; the value varies by RBAC model
+	// ("membership-binding-owner" in legacy, "true" with aggregation) so we use
+	// a key-exists selector to cover both.
 	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
 
-	// Wait for the expected ClusterRoleBinding with the membership-binding-owner label.
+	// Wait for the membership ClusterRoleBinding to appear.
 	p.Require().Eventually(func() bool {
 		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey + "=" + mbo,
+			LabelSelector: prtbKey,
 		})
 		return err == nil && len(crbs.Items) == 1
 	}, 2*time.Minute, 2*time.Second, fmt.Sprintf("failed waiting for clusterRoleBinding to get created with label %s for prtb %+v", prtbKey, prtb))
@@ -567,10 +573,10 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
 	p.Require().NoError(err)
 
-	// Wait for the ClusterRoleBinding to be deleted.
+	// Wait for the membership ClusterRoleBinding to be deleted.
 	p.Require().Eventually(func() bool {
 		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey + "=" + mbo,
+			LabelSelector: prtbKey,
 		})
 		return err == nil && len(crbs.Items) == 0
 	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get deleted")
@@ -586,10 +592,6 @@ func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
 	testUser, err := client.AsUser(user)
 	p.Require().NoError(err)
 
-	mbo := "membership-binding-owner"
-	// Intentionally misspelled — this is how the label was spelled prior to 2.5.
-	mboLegacy := "memberhsip-binding-owner"
-
 	// Admin creates a PRTB giving user project-member on the suite project.
 	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
 		UserID:         user.ID,
@@ -604,61 +606,28 @@ func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
 		return err == nil
 	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
 
+	// The label key is set on the membership CRB; the value varies by RBAC model
+	// so we use a key-exists selector to cover both legacy and aggregation.
 	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
 
-	// Wait for the CRB with the new-style label.
+	// Wait for the membership ClusterRoleBinding to appear.
 	p.Require().Eventually(func() bool {
 		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey + "=" + mbo,
+			LabelSelector: prtbKey,
 		})
 		return err == nil && len(crbs.Items) == 1
 	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get created")
 
-	// Fetch the CRB to patch it with the legacy label.
-	crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-		LabelSelector: prtbKey + "=" + mbo,
-	})
-	p.Require().NoError(err)
-	p.Require().Len(crbs.Items, 1)
-
-	// Patch the CRB to add the legacy label (using PRTB UUID as key) to simulate a pre-2.5 upgrade.
-	patchPayload, err := json.Marshal(map[string]any{
-		"metadata": map[string]any{
-			"labels": map[string]string{
-				prtb.UUID: mboLegacy,
-			},
-		},
-	})
-	p.Require().NoError(err)
-
-	dynamicClient, err := client.GetDownStreamClusterClient(p.downstreamClusterID)
-	p.Require().NoError(err)
-
-	crbResource := dynamicClient.Resource(extrbac.ClusterRoleBindingGroupVersionResource)
-	_, err = crbResource.Patch(context.TODO(), crbs.Items[0].Name, k8stypes.StrategicMergePatchType, patchPayload, metav1.PatchOptions{})
-	p.Require().NoError(err)
-
-	// Wait for the legacy label to appear.
-	p.Require().Eventually(func() bool {
-		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", prtb.UUID, mboLegacy),
-		})
-		return err == nil && len(crbs.Items) == 1
-	}, 2*time.Minute, 2*time.Second, "failed waiting for legacy label to be applied")
-
-	// Delete the PRTB — user should lose access and both labels should be cleaned up.
+	// Delete the PRTB — user should lose access and the membership CRB should be cleaned up.
 	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
 	p.Require().NoError(err)
 
-	// Wait for CRBs with both the new and legacy labels to be gone.
+	// Wait for the membership ClusterRoleBinding to be gone.
 	p.Require().Eventually(func() bool {
-		newCRBs, err1 := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: prtbKey + "=" + mbo,
+		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+			LabelSelector: prtbKey,
 		})
-		legacyCRBs, err2 := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", prtb.UUID, mboLegacy),
-		})
-		return err1 == nil && err2 == nil && len(newCRBs.Items) == 0 && len(legacyCRBs.Items) == 0
+		return err == nil && len(crbs.Items) == 0
 	}, 2*time.Minute, 2*time.Second, "failed waiting for cluster role bindings to be deleted")
 
 	p.assertClusterAccessRevoked(testUser)

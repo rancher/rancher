@@ -544,7 +544,7 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 	s.clusterID, err = clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
 
-	mgmtCluster, err := client.Management.Cluster.ByID(s.clusterID)
+	_, err = client.Management.Cluster.ByID(s.clusterID)
 	require.NoError(s.T(), err)
 
 	// create projects
@@ -704,13 +704,37 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 		for _, binding := range access {
 			switch b := binding.(type) {
 			case management.ClusterRoleTemplateBinding:
-				err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, b.RoleTemplateID, nil)
+				_, err = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+					ClusterID:       s.clusterID,
+					UserPrincipalID: userObj.PrincipalIDs[0],
+					RoleTemplateID:  b.RoleTemplateID,
+				})
 				require.NoError(s.T(), err)
+				userClient, uErr := s.client.AsUser(userObj)
+				require.NoError(s.T(), uErr)
+				require.Eventually(s.T(), func() bool {
+					_, clErr := userClient.Management.Cluster.ByID(s.clusterID)
+					return clErr == nil
+				}, 2*time.Minute, 2*time.Second, "user never gained cluster access after CRTB")
 			case management.ProjectRoleTemplateBinding:
-				err = users.AddProjectMember(client, projectMap[b.ProjectID], userObj, b.RoleTemplateID, nil)
+				_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+					ProjectID:       projectMap[b.ProjectID].ID,
+					UserPrincipalID: userObj.PrincipalIDs[0],
+					RoleTemplateID:  b.RoleTemplateID,
+				})
 				require.NoError(s.T(), err)
+				userClient, uErr := s.client.AsUser(userObj)
+				require.NoError(s.T(), uErr)
+				require.Eventually(s.T(), func() bool {
+					_, clErr := userClient.Management.Cluster.ByID(s.clusterID)
+					return clErr == nil
+				}, 2*time.Minute, 2*time.Second, "user never gained cluster access after PRTB")
 			case rbacv1.RoleBinding:
-				_ = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member", nil)
+				_, _ = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+					ClusterID:       s.clusterID,
+					UserPrincipalID: userObj.PrincipalIDs[0],
+					RoleTemplateID:  "cluster-member",
+				})
 				subject := rbacv1.Subject{
 					Kind: "User",
 					Name: userObj.ID,
