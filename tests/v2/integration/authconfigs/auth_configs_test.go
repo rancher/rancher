@@ -49,6 +49,7 @@ func (s *AuthConfigTestSuite) TestAuthConfigsExistAndCannotBeDeleted() {
 		"cognitoConfig":         false,
 		"freeIpaConfig":         false,
 		"genericOIDCConfig":     false,
+		"genericSAMLConfig":     false,
 		"githubAppConfig":       false,
 		"githubConfig":          false,
 		"googleOauthConfig":     false,
@@ -138,6 +139,7 @@ func (s *AuthConfigTestSuite) TestAuthConfigActions() {
 	// Configs that should have testAndEnable action.
 	testAndEnableConfigs := []string{
 		"adfsConfig",
+		"genericSAMLConfig",
 		"keyCloakConfig",
 		"oktaConfig",
 		"pingConfig",
