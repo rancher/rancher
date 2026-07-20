@@ -1,8 +1,10 @@
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
+	"strings"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
@@ -19,6 +21,32 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 )
+
+const (
+	rke2NodeArgsAnnotation = "rke2.io/node-args"
+	k3sNodeArgsAnnotation  = "k3s.io/node-args"
+
+	defaultRKE2DataDirectory = "/var/lib/rancher/rke2"
+	defaultK3sDataDirectory  = "/var/lib/rancher/k3s"
+)
+
+// dataDirFromNodeArgs parses a JSON []string node-args slice and extracts --data-dir or -d values.
+// Accepts forms: --data-dir <path>, --data-dir=<path>, -d <path>, -d=<path>. Returns empty string
+// when none is found.
+func dataDirFromNodeArgs(args []string) string {
+	for i, a := range args {
+		if a == "--data-dir" || a == "-d" {
+			if i+1 < len(args) && args[i+1] != "" {
+				return args[i+1]
+			}
+		} else if strings.HasPrefix(a, "--data-dir=") {
+			return strings.TrimPrefix(a, "--data-dir=")
+		} else if strings.HasPrefix(a, "-d=") {
+			return strings.TrimPrefix(a, "-d=")
+		}
+	}
+	return ""
+}
 
 func init() {
 	// The Rancher UI creates day-2 operations with ClusterRef pointing at the mgmtv3.Cluster
@@ -185,7 +213,7 @@ func (a *ImportedAdapter) GetServerURL(secret *corev1.Secret) string {
 }
 
 func (a *ImportedAdapter) GetSupervisorPort(_ *corev1.Secret) string {
-	if a.RuntimeCommand() == "rke2" {
+	if a.RuntimeCommand() == capr.RuntimeRKE2 {
 		return "9345"
 	}
 	return "6443"
@@ -253,27 +281,87 @@ func (a *ImportedAdapter) WaitForRegister() (bool, error) {
 	return len(expectedMachines) == 0, nil
 }
 
-// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).
+// RuntimeCommand returns the command used to interact with the distro CLI (RKE2/K3S).
 func (a *ImportedAdapter) RuntimeCommand() string {
-	if a.cluster.Status.Provider == "rke2" {
-		return "rke2"
+	if a.cluster.Status.Provider == capr.RuntimeRKE2 {
+		return capr.RuntimeRKE2
 	}
-	return "k3s"
+	return capr.RuntimeK3S
 }
 
 // ServerUnit returns the systemd unit name for a distro server node.
 func (a *ImportedAdapter) ServerUnit() string {
-	if a.cluster.Status.Provider == "rke2" {
-		return "rke2-server"
+	if a.cluster.Status.Provider == capr.RuntimeRKE2 {
+		return capr.RuntimeRKE2 + "-server"
 	}
-	return "k3s"
+	return capr.RuntimeK3S
 }
 
-func (a *ImportedAdapter) DistroDataDirectory(_ *corev1.Secret) string {
-	if a.cluster.Status.Provider == "rke2" {
-		return "/var/lib/rancher/rke2"
+func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
+	// default based on cluster provider
+	defaultDir := defaultRKE2DataDirectory
+	if a.RuntimeCommand() == capr.RuntimeK3S {
+		defaultDir = defaultK3sDataDirectory
 	}
-	return "/var/lib/rancher/k3s"
+
+	// Select exactly one annotation key based on the cluster runtime
+	annotationKey := rke2NodeArgsAnnotation
+	if a.RuntimeCommand() == capr.RuntimeK3S {
+		annotationKey = k3sNodeArgsAnnotation
+		defaultDir = defaultK3sDataDirectory
+	}
+
+	if secret == nil {
+		logrus.Debugf("[imported adapter] nil secret provided to DistroDataDirectory, returning default %s", defaultDir)
+		return defaultDir
+	}
+	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
+		logrus.Debugf("[imported adapter] secret %s/%s missing machine lifecycle labels, returning default %s", secret.Namespace, secret.Name, defaultDir)
+		return defaultDir
+	}
+
+	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret, secret.Namespace, a.clients.RESTMapper)
+	if err != nil {
+		logrus.Debugf("[imported adapter] unable to resolve machine lifecycle labels for %s/%s: %v", secret.Namespace, secret.Name, err)
+		return defaultDir
+	}
+
+	node, err := a.clients.Mgmt.Node().Cache().Get(ref.Namespace, ref.Name)
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[imported adapter] node %s/%s not found for secret %s/%s", ref.Namespace, ref.Name, secret.Namespace, secret.Name)
+		return defaultDir
+	}
+	if err != nil {
+		logrus.Debugf("[imported adapter] error fetching node %s/%s: %v", ref.Namespace, ref.Name, err)
+		return defaultDir
+	}
+	if node == nil {
+		logrus.Debugf("[imported adapter] node %s/%s is nil for secret %s/%s, returning default %s", ref.Namespace, ref.Name, secret.Namespace, secret.Name, defaultDir)
+		return defaultDir
+	}
+
+	// Only consider the selected annotation key
+	if node.Status.NodeAnnotations == nil {
+		logrus.Debugf("[imported adapter] no node annotations found for node %s/%s, returning default %s", ref.Namespace, ref.Name, defaultDir)
+		return defaultDir
+	}
+
+	v, ok := node.Status.NodeAnnotations[annotationKey]
+	if !ok || v == "" {
+		logrus.Debugf("[imported adapter] missing or empty %s for node %s/%s, returning default %s", annotationKey, ref.Namespace, ref.Name, defaultDir)
+		return defaultDir
+	}
+
+	var args []string
+	if err := json.Unmarshal([]byte(v), &args); err != nil {
+		logrus.Debugf("[imported adapter] unable to parse %s JSON for node %s/%s: %v", annotationKey, ref.Namespace, ref.Name, err)
+		return defaultDir
+	}
+	if dd := dataDirFromNodeArgs(args); dd != "" {
+		return dd
+	}
+	logrus.Debugf("[imported adapter] %s did not contain a usable --data-dir/-d flag for node %s/%s, returning default %s", annotationKey, ref.Namespace, ref.Name, defaultDir)
+	return defaultDir
 }
 
 func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -282,7 +370,8 @@ func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 }
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
-// Currently custom data directories, probes, and using ipv4 as the primary ip family are not supported.
+// Currently custom data directories, probes, and using ipv4 as the primary ip family are supported
+// per-node via DistroDataDirectory.
 func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
@@ -303,14 +392,16 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		probeNames = append(probeNames, KubeletProbeName)
 	}
 
+	// Add Calico probe for imported RKE2 nodes that are not etcd-only and not Windows.
+	if runtime == capr.RuntimeRKE2 && !And(IsEtcd, Not(IsControlPlane))(secret) && !IsWindows(secret) {
+		probeNames = append(probeNames, CalicoProbeName)
+	}
+
 	for _, probeName := range probeNames {
 		probes[probeName] = AllProbes[probeName]
 	}
 
-	dataDir := "/var/lib/rancher/rke2"
-	if runtime == capr.RuntimeK3S {
-		dataDir = "/var/lib/rancher/k3s"
-	}
+	dataDir := a.DistroDataDirectory(secret)
 
 	// only support ipv4, need to implement per-node extraction mechanism
 	loopbackAddress := "127.0.0.1"
@@ -432,14 +523,14 @@ func (a *ImportedAdapter) FindOrElectLeader(operation string, filter Filter) (*c
 }
 
 func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) string {
-	if a.cluster.Status.Provider == "k3s" {
+	if a.RuntimeCommand() == capr.RuntimeK3S {
 		return "/usr/local/bin/kubectl"
 	}
 	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
 }
 
 func (a *ImportedAdapter) KubeconfigPath(_ *corev1.Secret) string {
-	if a.cluster.Status.Provider == "k3s" {
+	if a.RuntimeCommand() == capr.RuntimeK3S {
 		return "/etc/rancher/k3s/k3s.yaml"
 	}
 	return "/etc/rancher/rke2/rke2.yaml"
