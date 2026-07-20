@@ -229,6 +229,21 @@ func TestApplyRouteInjection_BareCredentialIDInHeader(t *testing.T) {
 	assert.Contains(t, err.Error(), "user")
 }
 
+func TestApplyRouteInjection_BareCredentialIDInHeader(t *testing.T) {
+	// A proxy with no authorizer or credentials — neither is reached because the
+	// secretGetter closure fails first when there is no user in the request context.
+	p := &proxy{}
+	req, _ := http.NewRequest(http.MethodGet, "https://api.example.com/path", nil)
+	route := &mgmt.ProxyEndpointRoute{
+		CredentialInjection: &mgmt.CredentialInjectionSpec{Mode: "bearer", TokenField: "token"},
+	}
+
+	// Bare credential IDs are accepted for server-defined route injection.
+	err := p.applyRouteInjection(req, "cattle-global-data/my-cred", route)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user")
+}
+
 // --- perRouteTLSTransport ---
 
 func TestPerRouteTLSTransport_UsesInsecureTransportWhenFlagSet(t *testing.T) {
