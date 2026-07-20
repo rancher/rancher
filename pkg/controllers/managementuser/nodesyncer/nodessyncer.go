@@ -141,6 +141,10 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (*corev1.Node, error) {
 
 	cluster, err := n.nodesSyncer.clusterLister.Get("", n.clusterNamespace)
 	if err != nil {
+		// if cluster no longer exists; nothing to sync
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -261,6 +265,10 @@ func (m *nodesSyncer) reconcileAll() error {
 		if restoring, err := m.isClusterRestoring(); restoring {
 			return nil
 		} else if err != nil {
+			// if cluster no longer exists; nothing to reconcile
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 	}
