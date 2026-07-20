@@ -58,9 +58,16 @@ func (a arbitrary) sign(req *http.Request, secrets SecretGetter, auth string) er
 	if err != nil {
 		return err
 	}
+	fields := []string{"headers"}
+	if !requiredFieldsExist(data, fields) {
+		return fmt.Errorf("required fields %s not set", fields)
+	}
 	splitHeaders := strings.Split(data["headers"], ",")
 	for _, header := range splitHeaders {
 		val := strings.SplitN(header, "=", 2)
+		if len(val) != 2 || val[0] == "" || val[1] == "" {
+			return fmt.Errorf("arbitrary: malformed header pair %q: expected Name=Value", header)
+		}
 		req.Header.Set(val[0], val[1])
 	}
 	return nil
