@@ -45,12 +45,10 @@ func makeRequest(body map[string]interface{}) *http.Request {
 // --- arbitrary signer ---
 
 func TestArbitrarySign_WithCredential(t *testing.T) {
-	sg := makeSecretGetter(map[string]string{
-		"tokenField":    "secret-token-value",
-		"usernameField": "alice",
-	})
+	// Specifying credID means we need an actual secret-getter
+	sg := makeSecretGetter(nil)
 	req := makeRequest(nil)
-	auth := "arbitrary credID=cattle-global-data/my-cred headers=X-Token=tokenField;X-User=usernameField"
+	auth := "arbitrary credID=cattle-global-data/my-cred headers=X-Token=secret-token-value,X-User=alice"
 	err := arbitrary{}.sign(req, sg, auth)
 	require.NoError(t, err)
 	assert.Equal(t, "secret-token-value", req.Header.Get("X-Token"))
@@ -87,7 +85,8 @@ func TestArbitrarySign_FieldNotInSecret(t *testing.T) {
 	req := makeRequest(nil)
 	auth := "arbitrary credID=cattle-global-data/my-cred headers=X-Token=tokenField"
 	err := arbitrary{}.sign(req, sg, auth)
-	assert.ErrorContains(t, err, `field "tokenField" not found in credential`)
+	require.NoError(t, err)
+	assert.Equal(t, "tokenField", req.Header.Get("X-Token"))
 }
 
 func TestArbitrarySign_SecretGetterError(t *testing.T) {
@@ -98,18 +97,108 @@ func TestArbitrarySign_SecretGetterError(t *testing.T) {
 }
 
 func TestArbitrarySign_MultipleHeaders(t *testing.T) {
-	sg := makeSecretGetter(map[string]string{
-		"f1": "v1",
-		"f2": "v2",
-		"f3": "v3",
-	})
+	sg := makeSecretGetter(nil)
 	req := makeRequest(nil)
-	auth := "arbitrary credID=cattle-global-data/my-cred headers=H1=f1;H2=f2;H3=f3"
+	auth := "arbitrary credID=cattle-global-data/my-cred headers=H1=v1,H2=v2,H3=v3"
 	err := arbitrary{}.sign(req, sg, auth)
 	require.NoError(t, err)
 	assert.Equal(t, "v1", req.Header.Get("H1"))
 	assert.Equal(t, "v2", req.Header.Get("H2"))
 	assert.Equal(t, "v3", req.Header.Get("H3"))
+}
+
+// --- headerinject signer ---
+
+func TestHeaderInject_WithCredential(t *testing.T) {
+	sg := makeSecretGetter(map[string]string{
+		"tokenField":    "secret-token-value",
+		"usernameField": "alice",
+	})
+	req := makeRequest(nil)
+	auth := "headerinject credID=cattle-global-data/my-cred headers=X-Token=tokenField;X-User=usernameField"
+	err := headerinject{}.sign(req, sg, auth)
+	require.NoError(t, err)
+	assert.Equal(t, "secret-token-value", req.Header.Get("X-Token"))
+	assert.Equal(t, "alice", req.Header.Get("X-User"))
+}
+
+func TestHeaderInject_MalformedPair(t *testing.T) {
+	sg := makeSecretGetter(map[string]string{"tokenField": "val"})
+	req := makeRequest(nil)
+	auth := "headerinject credID=cattle-global-data/my-cred headers=X-Token"
+	err := headerinject{}.sign(req, sg, auth)
+	assert.ErrorContains(t, err, "malformed header pair")
+}
+
+func TestHeaderInject_FieldNotInSecret(t *testing.T) {
+	sg := makeSecretGetter(map[string]string{"otherField": "val"})
+	req := makeRequest(nil)
+	auth := "headerinject credID=cattle-global-data/my-cred headers=X-Token=tokenField"
+	err := headerinject{}.sign(req, sg, auth)
+	assert.ErrorContains(t, err, `field "tokenField" not found in credential`)
+}
+
+func TestSigner_HeaderDelimiterContract(t *testing.T) {
+	type testCase struct {
+		description  string
+		signer       Signer
+		auth         string
+		secretFields map[string]string
+		expected     map[string]string
+		expectedErr  string
+	}
+
+	tests := []testCase{
+		{
+			description: "arbitrary uses comma delimiter for multiple headers",
+			signer:      arbitrary{},
+			auth:        "arbitrary headers=H1=v1,H2=v2",
+			expected:    map[string]string{"H1": "v1", "H2": "v2"},
+		},
+		{
+			description: "arbitrary treats semicolon as part of literal value (no multi-header split)",
+			signer:      arbitrary{},
+			auth:        "arbitrary headers=H1=v1;H2=v2",
+			expected:    map[string]string{"H1": "v1;H2=v2"},
+		},
+		{
+			description: "headerinject uses semicolon delimiter for multiple headers",
+			signer:      headerinject{},
+			auth:        "headerinject credID=cattle-global-data/my-cred headers=H1=f1;H2=f2",
+			secretFields: map[string]string{
+				"f1": "v1",
+				"f2": "v2",
+			},
+			expected: map[string]string{"H1": "v1", "H2": "v2"},
+		},
+		{
+			description: "headerinject does not accept comma-delimited multi-header syntax",
+			signer:      headerinject{},
+			auth:        "headerinject credID=cattle-global-data/my-cred headers=H1=f1,H2=f2",
+			secretFields: map[string]string{
+				"f1": "v1",
+				"f2": "v2",
+			},
+			expectedErr: `field "f1,H2=f2" not found in credential`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			req := makeRequest(nil)
+			err := test.signer.sign(req, makeSecretGetter(test.secretFields), test.auth)
+
+			if test.expectedErr != "" {
+				assert.ErrorContains(t, err, test.expectedErr)
+				return
+			}
+
+			require.NoError(t, err)
+			for header, val := range test.expected {
+				assert.Equal(t, val, req.Header.Get(header))
+			}
+		})
+	}
 }
 
 // --- bodyinject signer ---
@@ -212,4 +301,8 @@ func TestNewSigner_BodyInject(t *testing.T) {
 
 func TestNewSigner_Arbitrary(t *testing.T) {
 	assert.IsType(t, arbitrary{}, newSigner("arbitrary headers=X-Foo=bar"))
+}
+
+func TestNewSigner_HeaderInject(t *testing.T) {
+	assert.IsType(t, headerinject{}, newSigner("headerinject credID=x headers=X-Foo=bar"))
 }
