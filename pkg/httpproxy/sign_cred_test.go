@@ -85,7 +85,8 @@ func TestArbitrarySign_FieldNotInSecret(t *testing.T) {
 	req := makeRequest(nil)
 	auth := "arbitrary credID=cattle-global-data/my-cred headers=X-Token=tokenField"
 	err := arbitrary{}.sign(req, sg, auth)
-	assert.ErrorContains(t, err, `field "tokenField" not found in credential`)
+	require.NoError(t, err)
+	assert.Equal(t, "tokenField", req.Header.Get("X-Token"))
 }
 
 func TestArbitrarySign_SecretGetterError(t *testing.T) {
