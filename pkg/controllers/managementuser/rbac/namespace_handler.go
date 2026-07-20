@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
+	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
@@ -269,41 +270,47 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	}
 	hasPRTBs := len(prtbs) > 0
 
-	for _, prtb := range prtbs {
-		prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding)
-		if !ok {
-			return false, errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
-		}
+	// When aggregation is enabled, the per-namespace RoleBindings for PRTBs are owned by the
+	// roletemplate-aggregation controllers, which create them with aggregation labels and remove
+	// them when the PRTB is deleted. Creating the legacy bindings here would leak RoleBindings that
+	// the aggregation removal handler does not clean up, leaving stale namespace access behind.
+	if !features.AggregatedRoleTemplates.Enabled() {
+		for _, prtb := range prtbs {
+			prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding)
+			if !ok {
+				return false, errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
+			}
 
-		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
-			continue
-		}
-
-		if prtb.RoleTemplateName == "" {
-			logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", prtb.Name)
-			continue
-		}
-
-		rt, err := n.m.rtLister.Get(prtb.RoleTemplateName)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", prtb.Name, prtb.RoleTemplateName)
+			if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
 				continue
 			}
-			return false, err
-		}
 
-		roles := map[string]*v3.RoleTemplate{}
-		if err := n.m.gatherRoles(rt, roles, 0); err != nil {
-			return false, err
-		}
+			if prtb.RoleTemplateName == "" {
+				logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", prtb.Name)
+				continue
+			}
 
-		if err := n.m.ensureRoles(roles); err != nil {
-			return false, errors.Wrap(err, "couldn't ensure roles")
-		}
+			rt, err := n.m.rtLister.Get(prtb.RoleTemplateName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", prtb.Name, prtb.RoleTemplateName)
+					continue
+				}
+				return false, err
+			}
 
-		if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
-			return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
+			roles := map[string]*v3.RoleTemplate{}
+			if err := n.m.gatherRoles(rt, roles, 0); err != nil {
+				return false, err
+			}
+
+			if err := n.m.ensureRoles(roles); err != nil {
+				return false, errors.Wrap(err, "couldn't ensure roles")
+			}
+
+			if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
+				return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
+			}
 		}
 	}
 
