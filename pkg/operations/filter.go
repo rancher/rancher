@@ -30,6 +30,13 @@ func IsControlPlane(secret *corev1.Secret) bool {
 	return secret != nil && secret.Labels != nil && secret.Labels[capr.ControlPlaneRoleLabel] == "true"
 }
 
+// IsWorker returns true when the secret carries the rke.cattle.io/worker-role="true" label.
+// This label signals the node runs regular workload components and may be combined with
+// etcd/control-plane labels for mixed-role nodes.
+func IsWorker(secret *corev1.Secret) bool {
+	return secret != nil && secret.Labels != nil && secret.Labels[capr.WorkerRoleLabel] == "true"
+}
+
 // IsWindows returns true when the secret carries the cattle.io/os="windows" label. Windows nodes
 // require different plan instructions (PowerShell vs bash, different filesystem paths, etc.) and
 // are often excluded from etcd/control-plane plans (Windows can only run worker nodes in a
