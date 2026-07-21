@@ -255,7 +255,7 @@ func getCRTBByRoleTemplateName(crtb *v3.ClusterRoleTemplateBinding) ([]string, e
 	return []string{}, nil
 }
 
-// getPRTBByProjectName indexes a PRTB by its ProjectName (<cluster-name>:<project-name>). This value
+// getPRTBByProjectName indexes a PRTB by its ProjectName (<cluster-id>:<project-id>). This value
 // matches the field.cattle.io/projectId annotation set on namespaces, so the aggregation namespace
 // enqueuer can resolve the PRTBs belonging to a namespace's project.
 func getPRTBByProjectName(prtb *v3.ProjectRoleTemplateBinding) ([]string, error) {

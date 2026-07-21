@@ -275,10 +275,10 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	// them when the PRTB is deleted. Creating the legacy bindings here would leak RoleBindings that
 	// the aggregation removal handler does not clean up, leaving stale namespace access behind.
 	if !features.AggregatedRoleTemplates.Enabled() {
-		for _, prtb := range prtbs {
-			prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding)
+		for _, obj := range prtbs {
+			prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 			if !ok {
-				return false, errors.Wrapf(err, "object %v is not valid project role template binding", prtb)
+				return false, errors.Wrapf(err, "object %v is not valid project role template binding", obj)
 			}
 
 			if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {

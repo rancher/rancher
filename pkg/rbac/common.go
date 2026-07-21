@@ -58,7 +58,7 @@ const (
 	// the RoleTemplate across all clusters.
 	PRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-cluster-and-roletemplate-name"
 	CRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-cluster-and-roletemplate-name"
-	// PRTBByProjectNameIndex keys PRTBs by their ProjectName (<cluster-name>:<project-name>), which
+	// PRTBByProjectNameIndex keys PRTBs by their ProjectName (<cluster-id>:<project-id>), which
 	// matches the field.cattle.io/projectId annotation on namespaces. Used by the aggregation
 	// namespace enqueuer to reconcile the PRTBs of a project when one of its namespaces changes.
 	PRTBByProjectNameIndex              = "auth.management.cattle.io/prtb-by-project-name"
