@@ -57,6 +57,10 @@ func configExists(data map[string]interface{}) bool {
 	}
 	return false
 }
+// Note: the check above accepts any "*Config" suffix, including "genericConfig".
+// This means generic (non-cloud-provider) credentials are supported as long as
+// callers include a "genericConfig" field in their data, e.g.:
+//   { "genericConfig": { "apiKey": "...", "username": "..." } }
 
 func decodeNonPasswordFields(data map[string]interface{}) error {
 	for key, val := range data {
@@ -162,6 +166,19 @@ func (s *Store) processHarvesterCloudCredential(data map[string]any) error {
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	if err := s.processHarvesterCloudCredential(data); err != nil {
 		return nil, fmt.Errorf("failed to process harvester cloud credential: %w", err)
+	}
+
+	// Stamp the credential with the creating user's ID so it can be filtered by owner.
+	// This label is used for auditing and owner-based list filtering; access control
+	// is still enforced via Kubernetes RBAC on the underlying secret.
+	if apiContext.Request != nil {
+		if labels, ok := data["labels"].(map[string]interface{}); ok {
+			labels["cattle.io/creator"] = apiContext.Request.Header.Get("Impersonate-User")
+		} else {
+			data["labels"] = map[string]interface{}{
+				"cattle.io/creator": apiContext.Request.Header.Get("Impersonate-User"),
+			}
+		}
 	}
 
 	return s.Store.Create(apiContext, schema, data)
