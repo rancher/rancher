@@ -75,8 +75,7 @@ func TestProviderInputForType(t *testing.T) {
 				assert.True(t, ok, "expected *apiv3.GoogleOauthLogin")
 			}
 			if tt.providerType == client.OKTAProviderType || tt.providerType == client.GenericSAMLProviderType {
-				_, ok := got.(*apiv3.SamlLoginInput)
-				assert.True(t, ok, "expected *apiv3.SamlLoginInput")
+				assert.IsType(t, &apiv3.SamlLoginInput{}, got)
 			}
 		})
 	}

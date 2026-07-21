@@ -280,8 +280,6 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		tt := tt
-		i := i
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset engine state for isolation.
 			appliedVersion = ""
