@@ -46,6 +46,7 @@ func RegisterIndexers(wranglerContext *wrangler.Context) {
 	wranglerContext.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(rbac.CRTBByRoleTemplateNameIndex, getCRTBByRoleTemplateName)
 	wranglerContext.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(rbac.PRTBByClusterAndRoleTemplateNameIndex, getPRTBByClusterAndRoleTemplateName)
 	wranglerContext.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(rbac.CRTBByClusterAndRoleTemplateNameIndex, getCRTBByClusterAndRoleTemplateName)
+	wranglerContext.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(rbac.PRTBByProjectNameIndex, getPRTBByProjectName)
 }
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
@@ -252,6 +253,16 @@ func getCRTBByRoleTemplateName(crtb *v3.ClusterRoleTemplateBinding) ([]string, e
 		return []string{crtb.RoleTemplateName}, nil
 	}
 	return []string{}, nil
+}
+
+// getPRTBByProjectName indexes a PRTB by its ProjectName (<cluster-name>:<project-name>). This value
+// matches the field.cattle.io/projectId annotation set on namespaces, so the aggregation namespace
+// enqueuer can resolve the PRTBs belonging to a namespace's project.
+func getPRTBByProjectName(prtb *v3.ProjectRoleTemplateBinding) ([]string, error) {
+	if prtb == nil || prtb.ProjectName == "" {
+		return []string{}, nil
+	}
+	return []string{prtb.ProjectName}, nil
 }
 
 // getPRTBByClusterAndRoleTemplateName indexes a PRTB by <cluster-name>/<roletemplate-name> so the
