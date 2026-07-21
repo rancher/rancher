@@ -48,6 +48,67 @@ spec:
                   allowlist. These are expected to be domain names, and not URL paths.
                 items:
                   properties:
+                    credentialInjection:
+                      description: |-
+                        CredentialInjection defines how credentials are applied to proxied requests for this domain.
+                        When set, clients only need to supply a credential ID via X-API-CattleAuth-Header;
+                        the proxy applies credentials according to this server-defined pattern.
+                      properties:
+                        fields:
+                          description: |-
+                            Fields maps credential secret keys to header names (headerinject) or JSON body keys (bodyinject).
+                            Required when Mode is "headerinject" or "bodyinject".
+                          items:
+                            description: |-
+                              InjectionFieldMapping pairs a destination key (header name or JSON body key) with the name
+                              of the field to read from the credential secret.
+                            properties:
+                              key:
+                                description: Key is the header name (for headerinject)
+                                  or the top-level JSON body key (for bodyinject).
+                                type: string
+                              secretField:
+                                description: |-
+                                  SecretField is the name of the field within the credential secret to read the value from.
+                                  For secrets created via the cloudCredential API the field name is the portion after the
+                                  config-type prefix (e.g. for "genericConfig-apiKey" the SecretField is "apiKey").
+                                type: string
+                            required:
+                            - key
+                            - secretField
+                            type: object
+                          type: array
+                        mode:
+                          description: |-
+                            Mode controls how the credential is applied to the request.
+                            "bearer"      – sets Authorization: Bearer <token>
+                            "basic"       – sets Authorization: Basic base64(username:password)
+                            "headerinject" – sets one or more arbitrary request headers
+                            "bodyinject"  – merges fields into the top-level JSON request body
+                          enum:
+                          - bearer
+                          - basic
+                          - headerinject
+                          - bodyinject
+                          type: string
+                        passwordField:
+                          description: |-
+                            PasswordField is the key within the credential secret whose value is used as the Basic-auth password.
+                            Required when Mode is "basic".
+                          type: string
+                        tokenField:
+                          description: |-
+                            TokenField is the key within the credential secret whose value is used as the Bearer token.
+                            Required when Mode is "bearer".
+                          type: string
+                        usernameField:
+                          description: |-
+                            UsernameField is the key within the credential secret whose value is used as the Basic-auth username.
+                            Required when Mode is "basic".
+                          type: string
+                      required:
+                      - mode
+                      type: object
                     domain:
                       description: |-
                         Domain is the domain to be added to the proxy allowlist.
@@ -78,6 +139,11 @@ spec:
                       maxLength: 253
                       pattern: ^(\*\.?)?([a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]?|(%\.([a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]?|%))+)(\.(([a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]?)|%))*\.[a-zA-Z][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]$
                       type: string
+                    insecureSkipTLSVerify:
+                      description: |-
+                        InsecureSkipTLSVerify disables TLS certificate verification when proxying to this domain.
+                        Use this only for development or when the endpoint uses a self-signed certificate.
+                      type: boolean
                   required:
                   - domain
                   type: object
