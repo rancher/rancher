@@ -25,7 +25,6 @@ func TestMapNameIDFormat(t *testing.T) {
 		{name: "unknown errors", in: "bogus", wantErr: true},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := mapNameIDFormat(tt.in)
@@ -54,7 +53,6 @@ func TestMapSignatureMethod(t *testing.T) {
 		{name: "unknown errors", in: "MD5", wantErr: true},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := mapSignatureMethod(tt.in)

@@ -55,7 +55,7 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 func TestConfiguredGenericSAMLProviderHasNoLdap(t *testing.T) {
 	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
 	// just enough scaffolding to run the Configure function.
-	ctx := context.Background()
+	ctx := t.Context()
 	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
 	require.NoError(t, err, "Failed to create NewScaledContext")
 
