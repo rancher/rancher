@@ -53,9 +53,6 @@ func FlagToField(flag cli.Flag) (string, v32.Field, error) {
 		field.Description = v.Usage
 		field.Nullable = true
 		field.Default.StringSliceValue = v.Value
-	case *BoolPointerFlag:
-		field.Type = "boolean"
-		field.Description = v.Usage
 	default:
 		return name, field, fmt.Errorf("unknown type of flag %v: %v", flag, reflect.TypeOf(flag))
 	}
