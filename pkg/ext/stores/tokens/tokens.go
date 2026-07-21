@@ -808,19 +808,11 @@ func (t *SystemStore) DeleteCollection(options *metav1.ListOptions) error {
 	}
 
 	// Deliberately using client instead of the cache as the latter may not be yet synced/populated.
-	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
-	if err != nil {
+	if err := t.secretClient.DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, localOptions); err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil // namespace absent - no tokens exist.
+			return nil
 		}
-		return apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
-	}
-
-	for _, s := range secrets.Items {
-		err = t.secretClient.Delete(TokenNamespace, s.Name, &metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", s.Name, err))
-		}
+		return apierrors.NewInternalError(fmt.Errorf("failed to delete tokens: %w", err))
 	}
 
 	return nil

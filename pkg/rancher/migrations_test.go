@@ -46,16 +46,13 @@ func TestForceUpgradeLogout(t *testing.T) {
 
 		// migrate ext tokens
 		secrets.EXPECT().
-			List(exttokenstore.TokenNamespace, metav1.ListOptions{
-				LabelSelector: labels.Set{
-					exttokenstore.KindLabel: exttokenstore.IsLogin,
-				}.AsSelector().String(),
-			}).Return(&corev1.SecretList{
-			Items: []corev1.Secret{
-				{ObjectMeta: metav1.ObjectMeta{Name: "extsession"}},
-			}}, nil)
-		secrets.EXPECT().Delete(exttokenstore.TokenNamespace, "extsession", gomock.Any()).
-			Return(nil)
+			DeleteCollection(exttokenstore.TokenNamespace,
+				metav1.DeleteOptions{},
+				metav1.ListOptions{
+					LabelSelector: labels.Set{
+						exttokenstore.KindLabel: exttokenstore.IsLogin,
+					}.AsSelector().String(),
+				}).Return(nil)
 	}
 
 	tests := map[string]struct {
@@ -170,8 +167,8 @@ func TestForceUpgradeLogout(t *testing.T) {
 			) {
 				cmCache.EXPECT().Get(cattleNamespace, forceUpgradeLogoutConfig).
 					Return(&corev1.ConfigMap{Data: map[string]string{}}, nil)
-				
-				commonMigrationSetup (ctrl, cmCache, tokens, secrets)
+
+				commonMigrationSetup(ctrl, cmCache, tokens, secrets)
 
 				configmaps.EXPECT().Create(&corev1.ConfigMap{
 					Data: map[string]string{

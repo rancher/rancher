@@ -1767,81 +1767,41 @@ func TestSystemStoreDeleteCollection(t *testing.T) {
 		{
 			name: "some arbitrary error",
 			opts: &metav1.ListOptions{},
-			err:  apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", errSomeError)),
+			err:  apierrors.NewInternalError(fmt.Errorf("failed to delete tokens: %w", errSomeError)),
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List(TokenNamespace, gomock.Any()).
-					Return(nil, errSomeError)
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, gomock.Any()).
+					Return(errSomeError)
 			},
 		},
 		{
-			name: "namespace not found, not an error, nothing to delete",
+			name: "namespace not found error, ignored",
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List(TokenNamespace, gomock.Any()).
-					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), TokenNamespace))
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, metav1.ListOptions{}).
+					Return(apierrors.NewNotFound(GVR.GroupResource(), TokenNamespace))
 			},
 		},
 		{
-			name: "ok, empty",
+			name: "empty options",
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List(TokenNamespace, gomock.Any()).
-					Return(&corev1.SecretList{}, nil)
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, metav1.ListOptions{}).
+					Return(nil)
 			},
 		},
 		{
-			name: "ok, empty, nil options",
+			name: "nil options",
 			opts: nil,
 			err:  nil,
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
-					List(TokenNamespace, gomock.Any()).
-					Return(&corev1.SecretList{}, nil)
-			},
-		},
-		{
-			name: "ok, not empty",
-			opts: &metav1.ListOptions{},
-			err:  nil,
-			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
-				secrets.EXPECT().Delete(TokenNamespace, properSecret.Name, gomock.Any()).
+					DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, metav1.ListOptions{}).
 					Return(nil)
-				secrets.EXPECT().
-					List(TokenNamespace, gomock.Any()).
-					Return(&corev1.SecretList{
-						ListMeta: metav1.ListMeta{
-							ResourceVersion:    "1",
-							Continue:           "true",
-							RemainingItemCount: ptr.To(int64(2)),
-						},
-						Items: []corev1.Secret{
-							properSecret,
-						},
-					}, nil)
-			},
-		},
-		{
-			name: "ok, delete broken secrets as well",
-			opts: &metav1.ListOptions{},
-			err:  nil,
-			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
-				secrets.EXPECT().Delete(TokenNamespace, properSecret.Name, gomock.Any()).
-					Return(nil)
-				secrets.EXPECT().Delete(TokenNamespace, badSecret.Name, gomock.Any()).
-					Return(nil)
-				secrets.EXPECT().
-					List(TokenNamespace, gomock.Any()).
-					Return(&corev1.SecretList{
-						Items: []corev1.Secret{
-							properSecret,
-							badSecret,
-						},
-					}, nil)
 			},
 		},
 	}
