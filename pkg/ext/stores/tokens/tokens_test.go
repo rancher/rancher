@@ -1602,7 +1602,6 @@ func TestSystemStoreList(t *testing.T) {
 			user: "",
 			opts: &metav1.ListOptions{},
 			err:  apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", errSomeError)),
-			toks: nil,
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -1757,12 +1756,11 @@ func TestSystemStoreList(t *testing.T) {
 	}
 }
 
-func TestSystemStoreListExported(t *testing.T) {
+func TestSystemStoreDeleteCollection(t *testing.T) {
 	tests := []struct {
 		name       string              // test name
 		opts       *metav1.ListOptions // list options
 		err        error               // expected op result, error
-		toks       *ext.TokenList      // expected op result, token list
 		storeSetup func(               // configure store backend clients
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList])
 	}{
@@ -1770,7 +1768,6 @@ func TestSystemStoreListExported(t *testing.T) {
 			name: "some arbitrary error",
 			opts: &metav1.ListOptions{},
 			err:  apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", errSomeError)),
-			toks: nil,
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -1778,10 +1775,19 @@ func TestSystemStoreListExported(t *testing.T) {
 			},
 		},
 		{
+			name: "namespace not found, not an error, nothing to delete",
+			opts: &metav1.ListOptions{},
+			err:  nil,
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					Return(nil, apierrors.NewNotFound(GVR.GroupResource(), TokenNamespace))
+			},
+		},
+		{
 			name: "ok, empty",
 			opts: &metav1.ListOptions{},
 			err:  nil,
-			toks: &ext.TokenList{Items: []ext.Token{}},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -1792,7 +1798,6 @@ func TestSystemStoreListExported(t *testing.T) {
 			name: "ok, empty, nil options",
 			opts: nil,
 			err:  nil,
-			toks: &ext.TokenList{Items: []ext.Token{}},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					List(TokenNamespace, gomock.Any()).
@@ -1803,17 +1808,9 @@ func TestSystemStoreListExported(t *testing.T) {
 			name: "ok, not empty",
 			opts: &metav1.ListOptions{},
 			err:  nil,
-			toks: &ext.TokenList{
-				ListMeta: metav1.ListMeta{
-					ResourceVersion:    "1",
-					Continue:           "true",
-					RemainingItemCount: ptr.To(int64(2)),
-				},
-				Items: []ext.Token{
-					properToken,
-				},
-			},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().Delete(TokenNamespace, properSecret.Name, gomock.Any()).
+					Return(nil)
 				secrets.EXPECT().
 					List(TokenNamespace, gomock.Any()).
 					Return(&corev1.SecretList{
@@ -1829,20 +1826,14 @@ func TestSystemStoreListExported(t *testing.T) {
 			},
 		},
 		{
-			name: "ok, ignore broken secrets",
+			name: "ok, delete broken secrets as well",
 			opts: &metav1.ListOptions{},
 			err:  nil,
-			toks: &ext.TokenList{
-				ListMeta: metav1.ListMeta{
-					ResourceVersion:    "",
-					Continue:           "",
-					RemainingItemCount: nil,
-				},
-				Items: []ext.Token{
-					properToken,
-				},
-			},
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().Delete(TokenNamespace, properSecret.Name, gomock.Any()).
+					Return(nil)
+				secrets.EXPECT().Delete(TokenNamespace, badSecret.Name, gomock.Any()).
+					Return(nil)
 				secrets.EXPECT().
 					List(TokenNamespace, gomock.Any()).
 					Return(&corev1.SecretList{
@@ -1870,13 +1861,11 @@ func TestSystemStoreListExported(t *testing.T) {
 			test.storeSetup(secrets)
 
 			// perform test and validate results
-			toks, err := store.List(test.opts)
+			err := store.DeleteCollection(test.opts)
 			if test.err != nil {
 				assert.Equal(t, test.err, err)
-				assert.Nil(t, toks)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, test.toks, toks)
 			}
 		})
 	}

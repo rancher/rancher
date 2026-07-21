@@ -220,21 +220,14 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
 		}
 	}
 
-	// list all ext tokens that were created for the dashboard.
-	allExtTokens, err := extTokenStore.List(&metav1.ListOptions{
+	// bulk delete all ext tokens that were created for the dashboard,
+	// forcing their users to be redirected to the login page
+	err = extTokenStore.DeleteCollection(&metav1.ListOptions{
 		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.IsLogin}.AsSelector().String(),
 	})
 	if err != nil {
-		logrus.WithError(err).Error("Failed to list ext tokens for upgrade forced logout")
+		logrus.WithError(err).Error("Failed to delete ext session tokens for upgrade forced logout")
 		return err
-	}
-
-	// log out all the dashboard users forcing them to be redirected to the login page
-	for _, extToken := range allExtTokens.Items {
-		err = extTokenStore.Delete(extToken.ObjectMeta.Name, &metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			logrus.WithError(err).Errorf("Failed to delete ext token [%s] for upgrade forced logout", extToken.Name)
-		}
 	}
 
 	cm.Data[rancherVersionKey] = rancherversion.Version

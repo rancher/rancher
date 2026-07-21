@@ -785,6 +785,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
+// Delete is the core deletion method to remove a single named token
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	err := t.secretClient.Delete(TokenNamespace, name, options)
 	if err == nil {
@@ -797,6 +798,32 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	}
 
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
+}
+
+// DeleteCollection is an internal bulk deletion method for use by other parts of Rancher.
+func (t *SystemStore) DeleteCollection(options *metav1.ListOptions) error {
+	localOptions, err := ListOptionMerge(true, "", options)
+	if err != nil {
+		return apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
+	}
+
+	// Deliberately using client instead of the cache as the latter may not be yet synced/populated.
+	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // namespace absent - no tokens exist.
+		}
+		return apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
+	}
+
+	for _, s := range secrets.Items {
+		err = t.secretClient.Delete(TokenNamespace, s.Name, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", s.Name, err))
+		}
+	}
+
+	return nil
 }
 
 // Get retrieves the named ext token, without permission checking
@@ -912,23 +939,6 @@ func (t *SystemStore) ListForProvider(provider string) (*ext.TokenList, error) {
 	}
 
 	return &ext.TokenList{Items: tokens}, nil
-}
-
-// List returns all ext tokens as per the provided options. This is an internal
-// call invoked by other parts of Rancher. It runs with full access. None of the
-// returned tokens are marked as current.
-func (t *SystemStore) List(options *metav1.ListOptions) (*ext.TokenList, error) {
-	// As a visible method possibly called during Rancher start (migrations)
-	// ensure that the backing namespace exists when the store is fully
-	// wired; the namespace may not exist yet on clusters that have never
-	// created ext tokens.
-	if t.namespaceClient != nil && t.namespaceCache != nil {
-		if err := t.ensureNamespace(); err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %w",
-				TokenNamespace, err))
-		}
-	}
-	return t.list(true, "", "", options)
 }
 
 func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, options *metav1.ListOptions) (*ext.TokenList, error) {
