@@ -149,7 +149,11 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 	resourceFields := map[string]v32.Field{}
 	pubCredFields, privateCredFields, passwordFields, defaults, optionals := getCredFields(obj.Annotations)
 	for _, flag := range flags {
-		name, field, err := FlagToField(flag)
+		name, err := fieldNameFromFlag(flag)
+		if err != nil {
+			return nil, err
+		}
+		field, err := fieldFromFlag(flag)
 		if err != nil {
 			return nil, err
 		}

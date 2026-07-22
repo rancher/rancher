@@ -23,16 +23,15 @@ const (
 	FileToFieldAliasesAnno = "nodedriver.cattle.io/file-to-field-aliases"
 )
 
-func FlagToField(flag cli.Flag) (string, v32.Field, error) {
+func fieldNameFromFlag(flag cli.Flag) (string, error) {
+	return toLowerCamelCase(flag.String())
+}
+
+func fieldFromFlag(flag cli.Flag) (v32.Field, error) {
 	field := v32.Field{
 		Create: true,
 		Update: true,
 		Type:   "string",
-	}
-
-	name, err := ToLowerCamelCase(flag.String())
-	if err != nil {
-		return name, field, err
 	}
 
 	switch v := flag.(type) {
@@ -54,13 +53,13 @@ func FlagToField(flag cli.Flag) (string, v32.Field, error) {
 		field.Nullable = true
 		field.Default.StringSliceValue = v.Value
 	default:
-		return name, field, fmt.Errorf("unknown type of flag %v: %v", flag, reflect.TypeOf(flag))
+		return field, fmt.Errorf("unknown type of flag %v: %v", flag, reflect.TypeOf(flag))
 	}
 
-	return name, field, nil
+	return field, nil
 }
 
-func ToLowerCamelCase(nodeFlagName string) (string, error) {
+func toLowerCamelCase(nodeFlagName string) (string, error) {
 	parts := strings.SplitN(nodeFlagName, "-", 2)
 	if len(parts) != 2 {
 		return "", fmt.Errorf("parameter %s does not follow expected naming convention [DRIVER]-[FLAG-NAME]", nodeFlagName)
