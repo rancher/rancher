@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	errs "github.com/pkg/errors"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -83,12 +82,6 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		return obj, nil
 	}
 
-	forceUpdate := m.checkDriverVersion(obj)
-	if v32.NodeDriverConditionDownloaded.GetStatus(obj) == "" || v32.NodeDriverConditionInstalled.GetStatus(obj) == "" {
-		forceUpdate = true
-	}
-
-	err := errs.New("not found")
 	// if node driver was created, we also activate the driver by default
 	driver, err := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
 	if err != nil {
@@ -96,21 +89,35 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 		v32.NodeDriverConditionDownloaded.False(obj)
 		v32.NodeDriverConditionDownloaded.Reason(obj, err.Error())
 		return obj, controller.ErrIgnore
-	}
-	schemaName := obj.Spec.DisplayName + "config"
-	var existingSchema *v32.DynamicSchema
-	if obj.Spec.DisplayName != "" {
-		existingSchema, err = m.schemaLister.Get("", schemaName)
+	} else if !driver.Valid() {
+		v32.NodeDriverConditionDownloaded.Unknown(obj)
+		v32.NodeDriverConditionInstalled.Unknown(obj)
+		return obj, fmt.Errorf("node driver binary is not ready")
 	}
 
-	if driver.Exists() && err == nil && !forceUpdate {
+	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
+	obj.Spec.DisplayName = driverName
+	v32.NodeDriverConditionDownloaded.True(obj)
+	v32.NodeDriverConditionInstalled.True(obj)
+
+	needsUpdate := m.checkDriverVersion(obj)
+
+	schemaName := driverName + "config"
+	existingSchema, err := m.schemaLister.Get("", schemaName)
+	if err != nil {
+		logrus.Errorf("failed to get schema %q: %v", schemaName, err)
+		needsUpdate = true
+	}
+
+	// If dynamic schema exists already, and this specific version of the driver was already evaluated, only update the schema
+	if !needsUpdate {
 		// add credential schema
 		credFields := map[string]v32.Field{}
 		pubCredFields, privateCredFields, passwordFields, defaults, optionals := getCredFields(obj.Annotations)
 		for name, field := range existingSchema.Spec.ResourceFields {
 			if SSHKeyFields[name] || passwordFields[name] || privateCredFields[name] {
 				if field.Type != "password" {
-					forceUpdate = true
+					needsUpdate = true
 					break
 				}
 			}
@@ -124,55 +131,14 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 				credFields[name] = credField
 			}
 		}
-		if !forceUpdate {
+		if !needsUpdate {
 			return m.createCredSchema(obj, credFields)
 		}
 	}
 
-	if !driver.Exists() || forceUpdate {
-		v32.NodeDriverConditionDownloaded.Unknown(obj)
-		v32.NodeDriverConditionInstalled.Unknown(obj)
-	}
-
-	newObj, err := v32.NodeDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
-		// update status
-		obj, err = m.nodeDriverClient.Update(obj)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := driver.Stage(forceUpdate); err != nil {
-			return nil, err
-		}
-		return obj, nil
-	})
-	if err != nil {
-		return obj, err
-	}
-
-	obj = newObj.(*v32.NodeDriver)
-	newObj, err = v32.NodeDriverConditionInstalled.Once(obj, func() (runtime.Object, error) {
-		if err := driver.Install(); err != nil {
-			return nil, err
-		}
-		if err = driver.Executable(); err != nil {
-			return nil, err
-		}
-		obj.Spec.DisplayName = strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
-		return obj, nil
-	})
-	if err != nil {
-		return newObj.(*v32.NodeDriver), err
-	}
-
-	obj = newObj.(*v32.NodeDriver)
-	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
-
-	obj = m.addVersionInfo(obj)
-
-	obj, err = m.addUIHintsAnno(obj)
-	if err != nil {
-		return obj, errs.Wrap(err, "failed JSON in addUIHintsAnno")
+	m.addVersionInfo(obj)
+	if err := m.addUIHintsAnno(obj); err != nil {
+		return nil, fmt.Errorf("failed JSON in addUIHintsAnno: %w", err)
 	}
 
 	flags, err := getCreateFlagsForDriver(driverName)
@@ -295,7 +261,7 @@ func (m *Lifecycle) createCredSchema(obj *v32.NodeDriver, credFields map[string]
 }
 
 func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
-	if v32.NodeDriverConditionDownloaded.IsUnknown(obj) || v32.NodeDriverConditionInstalled.IsUnknown(obj) {
+	if !v32.NodeDriverConditionDownloaded.IsTrue(obj) || !v32.NodeDriverConditionInstalled.IsTrue(obj) {
 		return true
 	}
 
@@ -317,17 +283,16 @@ func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 	return false
 }
 
-func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) *v32.NodeDriver {
+func (m *Lifecycle) addVersionInfo(obj *v32.NodeDriver) {
 	if obj.Spec.Builtin {
 		obj.Status.AppliedDockerMachineVersion = m.dockerMachineVersion
 	} else {
 		obj.Status.AppliedURL = obj.Spec.URL
 		obj.Status.AppliedChecksum = obj.Spec.Checksum
 	}
-	return obj
 }
 
-func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
+func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) error {
 	if aliasedField, ok := obj.Annotations[FileToFieldAliasesAnno]; ok {
 		anno := make(map[string]map[string]string)
 		aliases := ParseKeyValueString(aliasedField)
@@ -339,7 +304,7 @@ func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) (*v32.NodeDriver, error)
 
 		jsonAnno, err := json.Marshal(anno)
 		if err != nil {
-			return obj, err
+			return err
 		}
 
 		if obj.Annotations == nil {
@@ -348,7 +313,7 @@ func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) (*v32.NodeDriver, error)
 
 		obj.Annotations[uiFieldHintsAnno] = string(jsonAnno)
 	}
-	return obj, nil
+	return nil
 }
 
 func (m *Lifecycle) Updated(obj *v32.NodeDriver) (runtime.Object, error) {
