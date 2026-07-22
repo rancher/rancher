@@ -74,6 +74,12 @@ var (
 	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
 )
 
+// tokenCollectionDeleter abstracts the interface to bulk deletion for tokens,
+// enabling simpler setup for testing
+type tokenCollectionDeleter interface {
+	DeleteCollection(options *metav1.ListOptions) error
+}
+
 func runMigrations(wranglerContext *wrangler.Context) error {
 	if err := migrateLocalUserPasswords(wranglerContext); err != nil {
 		return err
@@ -182,7 +188,7 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 // configuration map and only run if the last migrated version is lower than the given `migrationVersion`.
 func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
 	tokenController v3.TokenController,
-	extTokenStore *exttokenstore.SystemStore,
+	extTokenDeleter tokenCollectionDeleter,
 	migrationVersion string) error {
 	cm, err := getConfigMap(configMapController, forceUpgradeLogoutConfig)
 	if err != nil || cm == nil {
@@ -222,7 +228,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
 
 	// bulk delete all ext tokens that were created for the dashboard,
 	// forcing their users to be redirected to the login page
-	err = extTokenStore.DeleteCollection(&metav1.ListOptions{
+	err = extTokenDeleter.DeleteCollection(&metav1.ListOptions{
 		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.IsLogin}.AsSelector().String(),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {

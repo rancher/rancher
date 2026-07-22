@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
-	// v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -31,9 +30,9 @@ func TestForceUpgradeLogout(t *testing.T) {
 		ctrl *gomock.Controller,
 		configmaps *fake.MockCacheInterface[*corev1.ConfigMap],
 		v3tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-		secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+		extDeleter *extDeletionStub,
 	) {
-		// migrate legacy tokens
+		// legacy tokens
 		tCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
 		v3tokens.EXPECT().Cache().
 			Return(tCache)
@@ -43,16 +42,6 @@ func TestForceUpgradeLogout(t *testing.T) {
 			}, nil)
 		v3tokens.EXPECT().Delete("v3session", gomock.Any()).
 			Return(nil)
-
-		// migrate ext tokens
-		secrets.EXPECT().
-			DeleteCollection(exttokenstore.TokenNamespace,
-				metav1.DeleteOptions{},
-				metav1.ListOptions{
-					LabelSelector: labels.Set{
-						exttokenstore.KindLabel: exttokenstore.IsLogin,
-					}.AsSelector().String(),
-				}).Return(nil)
 	}
 
 	tests := map[string]struct {
@@ -62,8 +51,9 @@ func TestForceUpgradeLogout(t *testing.T) {
 			configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
 			cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
 			tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+			extDeleter *extDeletionStub,
 		)
+		extCount int
 	}{
 		"config map retrieval error": {
 			err: fmt.Errorf("some transient issue"),
@@ -72,7 +62,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 				configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
 				cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
 				tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				extDeleter *extDeletionStub,
 			) {
 				cmCache.EXPECT().Get("cattle-system", "forceupgradelogout").
 					Return(nil, fmt.Errorf("some transient issue"))
@@ -84,7 +74,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 				configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
 				cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
 				tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				extDeleter *extDeletionStub,
 			) {
 				cmCache.EXPECT().Get(cattleNamespace, forceUpgradeLogoutConfig).
 					Return(&corev1.ConfigMap{
@@ -100,7 +90,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 				configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
 				cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
 				tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				extDeleter *extDeletionStub,
 			) {
 				cmCache.EXPECT().Get(cattleNamespace, forceUpgradeLogoutConfig).
 					Return(&corev1.ConfigMap{
@@ -111,12 +101,13 @@ func TestForceUpgradeLogout(t *testing.T) {
 			},
 		},
 		"migration triggered for last migration <= target version": {
+			extCount: 1,
 			setup: func(
 				ctrl *gomock.Controller,
 				configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
 				cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
 				tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				extDeleter *extDeletionStub,
 			) {
 				cmCache.EXPECT().Get(cattleNamespace, forceUpgradeLogoutConfig).
 					Return(&corev1.ConfigMap{
@@ -125,7 +116,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 						},
 					}, nil)
 
-				commonMigrationSetup(ctrl, cmCache, tokens, secrets)
+				commonMigrationSetup(ctrl, cmCache, tokens, extDeleter)
 
 				configmaps.EXPECT().Create(&corev1.ConfigMap{
 					Data: map[string]string{
@@ -135,16 +126,17 @@ func TestForceUpgradeLogout(t *testing.T) {
 			},
 		},
 		"migration triggered when config map not present": {
+			extCount: 1,
 			setup: func(
 				ctrl *gomock.Controller,
 				configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
 				cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
 				tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				extDeleter *extDeletionStub,
 			) {
 				cmCache.EXPECT().Get(cattleNamespace, forceUpgradeLogoutConfig).Return(nil, nil)
 
-				commonMigrationSetup(ctrl, cmCache, tokens, secrets)
+				commonMigrationSetup(ctrl, cmCache, tokens, extDeleter)
 
 				configmaps.EXPECT().Create(&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -158,17 +150,18 @@ func TestForceUpgradeLogout(t *testing.T) {
 			},
 		},
 		"migration triggered when no last migration available": {
+			extCount: 1,
 			setup: func(
 				ctrl *gomock.Controller,
 				configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
 				cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
 				tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				extDeleter *extDeletionStub,
 			) {
 				cmCache.EXPECT().Get(cattleNamespace, forceUpgradeLogoutConfig).
 					Return(&corev1.ConfigMap{Data: map[string]string{}}, nil)
 
-				commonMigrationSetup(ctrl, cmCache, tokens, secrets)
+				commonMigrationSetup(ctrl, cmCache, tokens, extDeleter)
 
 				configmaps.EXPECT().Create(&corev1.ConfigMap{
 					Data: map[string]string{
@@ -189,32 +182,15 @@ func TestForceUpgradeLogout(t *testing.T) {
 
 			tokens := fake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 
-			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
-			nsCache.EXPECT().Get(exttokenstore.TokenNamespace).AnyTimes()
-
-			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-			secrets.EXPECT().Cache().Return(scache)
-
-			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
-			ucache := fake.NewMockNonNamespacedCacheInterface[*apiv3.User](ctrl)
-			users.EXPECT().Cache().Return(ucache)
-
-			tcache := fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
-			ccache := fake.NewMockNonNamespacedCacheInterface[*apiv3.Cluster](ctrl)
-
-			timer := exttokenstore.NewMocktimeHandler(ctrl)
-			hasher := exttokenstore.NewMockhashHandler(ctrl)
-			auth := exttokenstore.NewMockauthHandler(ctrl)
-
-			estore := exttokenstore.NewSystem(nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth, nil)
+			eDeleter := &extDeletionStub{t: t}
 
 			if spec.setup != nil {
-				spec.setup(ctrl, configmaps, cmCache, tokens, secrets)
+				spec.setup(ctrl, configmaps, cmCache, tokens, eDeleter)
 			}
 
-			err := forceUpgradeLogout(configmaps, tokens, estore, migrationTarget)
+			err := forceUpgradeLogout(configmaps, tokens, eDeleter, migrationTarget)
 
+			require.Equal(t, eDeleter.count, spec.extCount)
 			if spec.err != nil {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), spec.err.Error())
@@ -223,4 +199,20 @@ func TestForceUpgradeLogout(t *testing.T) {
 			}
 		})
 	}
+}
+
+// extDeletionStub implements [tokenCollectionDeleter]
+type extDeletionStub struct {
+	count int
+	t     *testing.T
+}
+
+func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {
+	require.Equal(e.t, options, &metav1.ListOptions{
+		LabelSelector: labels.Set{
+			exttokenstore.KindLabel: exttokenstore.IsLogin,
+		}.AsSelector().String(),
+	})
+	e.count = e.count + 1
+	return nil
 }
