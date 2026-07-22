@@ -121,6 +121,9 @@ func (d *BaseDriver) stage(forceUpdate bool) error {
 	defer tempFile.Close()
 
 	hasher := d.getHasher()
+	if len(d.DriverHash) > 0 && hasher == nil {
+		return fmt.Errorf("invalid hash format: %s", d.DriverHash)
+	}
 	downloadDest := io.Writer(tempFile)
 	if hasher != nil {
 		downloadDest = io.MultiWriter(tempFile, hasher)
