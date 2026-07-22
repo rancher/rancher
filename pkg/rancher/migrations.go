@@ -216,7 +216,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
 	for _, token := range allTokens {
 		err = tokenController.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			logrus.WithError(err).Errorf("Failed to delete token [%s] for upgrade forced logout", token.Name)
+			logrus.WithError(err).Errorf("Failed to delete legacy session token [%s] for upgrade forced logout", token.Name)
 		}
 	}
 
@@ -225,9 +225,8 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
 	err = extTokenStore.DeleteCollection(&metav1.ListOptions{
 		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.IsLogin}.AsSelector().String(),
 	})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.WithError(err).Error("Failed to delete ext session tokens for upgrade forced logout")
-		return err
 	}
 
 	cm.Data[rancherVersionKey] = rancherversion.Version

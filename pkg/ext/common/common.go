@@ -30,9 +30,9 @@ func EnsureNamespace(nsCache v1.NamespaceCache, nsClient v1.NamespaceClient, nam
 		}
 
 		if !apierrors.IsNotFound(err) {
-			// was: return false, fmt.Errorf(...)  <-- exits immediately
+			// retry after transient error, instead of exiting
 			logrus.Debugf("ensure namespace failure, retry: %s", err)
-			return false, nil // retry instead
+			return false, nil
 		}
 
 		_, err = nsClient.Create(&corev1.Namespace{
