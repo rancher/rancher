@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	errs "github.com/pkg/errors"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -89,7 +90,13 @@ func (m *Lifecycle) download(obj *v32.NodeDriver) (*v32.NodeDriver, error) {
 
 	err := errs.New("not found")
 	// if node driver was created, we also activate the driver by default
-	driver := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	driver, err := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	if err != nil {
+		// Configuration is incorrect, no point on retrying until it's changed
+		v32.NodeDriverConditionDownloaded.False(obj)
+		v32.NodeDriverConditionDownloaded.Reason(obj, err.Error())
+		return obj, controller.ErrIgnore
+	}
 	schemaName := obj.Spec.DisplayName + "config"
 	var existingSchema *v32.DynamicSchema
 	if obj.Spec.DisplayName != "" {
