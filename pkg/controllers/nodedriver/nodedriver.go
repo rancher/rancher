@@ -7,6 +7,9 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/rancher/pkg/wrangler"
+
+	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/sirupsen/logrus"
 )
 
 var leader = atomic.Bool{}
@@ -22,25 +25,17 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 }
 
 func onChange(_ string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	// if leader, no need to sync
-	if leader.Load() {
-		return obj, nil
-	}
-
-	if !obj.Spec.Active {
-		return obj, nil
-	}
-
 	// only cache drivers which are not built-in to rancher image
-	if obj.Spec.Builtin {
+	if obj == nil || obj.Spec.Builtin || !obj.Spec.Active {
 		return obj, nil
 	}
 
-	driver := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	driver, err := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	if err != nil {
+		logrus.Errorf("failed initializing NodeDriver %q: %v", obj.Name, err)
+		return obj, generic.ErrSkip
+	}
+
 	if driver.Exists() {
 		return obj, nil
 	}
