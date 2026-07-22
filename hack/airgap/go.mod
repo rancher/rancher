@@ -8,7 +8,7 @@ replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.33 // CVE-2026-46680, CVE-2026-53488
 	github.com/docker/docker => github.com/docker/docker v28.5.2+incompatible // CVE-2025-54388
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.4 // CVE-2026-34986
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.2.8 // CVE-2024-45310
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.3.6 // CVE-2024-45310
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.15 // CVE-2025-58058
 	golang.org/x/crypto => golang.org/x/crypto v0.53.0 // CVE-2025-47914, CVE-2025-58181, CVE-2026-39827
 	golang.org/x/net => golang.org/x/net v0.56.0 // CVE-2025-22870, CVE-2025-22872, CVE-2026-25680
@@ -40,7 +40,7 @@ require (
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.2.1 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
-	github.com/cyphar/filepath-securejoin v0.5.1 // indirect
+	github.com/cyphar/filepath-securejoin v0.5.2 // indirect
 	github.com/disiqueira/gotree/v3 v3.0.2 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
