@@ -32,6 +32,7 @@ const (
 var (
 	defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 	adminCreateLock   sync.Mutex
+	crudVerbs         = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 )
 
 func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
@@ -249,14 +250,15 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
-		addRule().apiGroups("security.istio.io").resources("requestauthentications").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
-		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
-		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection").
+		addRule().apiGroups("security.istio.io").resources("requestauthentications").verbs(crudVerbs...).
+		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs(crudVerbs...).
+		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs(crudVerbs...).
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
+		addRule().apiGroups("traefik.io").resources("ingressroutes", "ingressroutetcps", "ingressrouteudps", "middlewares", "middlewaretcps", "tlsoptions", "tlsstores", "serverstransports", "serverstransporttcps").verbs(crudVerbs...).
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", false, false, false).
