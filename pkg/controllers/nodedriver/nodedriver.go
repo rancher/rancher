@@ -2,7 +2,6 @@ package nodedriver
 
 import (
 	"context"
-	"sync/atomic"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
@@ -12,16 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var leader = atomic.Bool{}
-
 func Register(ctx context.Context, wrangler *wrangler.Context) {
+	// This handler ensures all Rancher pods have an up-to-date version of the driver binaries inside the UIPath/assets directory.
+	// This acts as a cache for rancher/machine (runs in a separate Job/Pod), which downloads the drivers from Rancher instead of the Internet.
+	// Given those requests could be load-balanced to any of the Pods, all replicas must have the same data.
 	wrangler.Mgmt.NodeDriver().OnChange(ctx, "custom-node-driver-handler", onChange)
-
-	// when this pod becomes the leader, do not run the onChange code
-	wrangler.OnLeaderOrDie("nodedriver-register", func(ctx context.Context) error {
-		leader.Store(true)
-		return nil
-	})
 }
 
 func onChange(_ string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
