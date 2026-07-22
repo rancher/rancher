@@ -6,7 +6,7 @@
 Rancher is an open source container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
 
 <a href="https://aws.amazon.com/marketplace/pp/prodview-yrzugbpzuukww">
-  <img src="./available-in-marketplace_white_bg.webp" alt="SUSE Rancher for EKS available in AWS marketplace" width="15%" />
+  <img src="https://raw.githubusercontent.com/rancher/rancher/ed99cea9aa73c67d61b79a2a9877b58366037402/available-in-marketplace_white_bg.webp" alt="SUSE Rancher for EKS available in AWS marketplace" width="15%" />
 </a>
 
 ## Stable Release
