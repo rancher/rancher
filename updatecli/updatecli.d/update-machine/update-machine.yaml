@@ -43,10 +43,21 @@ sources:
       - find: 'v\S+'
 
   machine-release:
-    name: 'Get latest upstream Rancher Machine version'
+    name: 'Get requested or latest upstream Rancher Machine version'
     kind: shell
     spec:
-      command: 'git ls-remote --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git | cut -f2 | sed -E "s#refs/tags/##; s/\\^\\{\\}$//" | sort -u | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+-rancher[0-9]+(\\.[0-9]+)?$" | sort -V | tail -n1'
+      command: |
+        if [ -n "${MACHINE_RELEASE_TAG}" ]; then
+          if ! git check-ref-format --allow-onelevel "refs/tags/${MACHINE_RELEASE_TAG}"; then
+            echo "Invalid Rancher Machine tag: ${MACHINE_RELEASE_TAG}" >&2
+            exit 1
+          fi
+          git ls-remote --exit-code --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git "refs/tags/${MACHINE_RELEASE_TAG}" > /dev/null ||
+            { echo "Rancher Machine tag does not exist: ${MACHINE_RELEASE_TAG}" >&2; exit 1; }
+          printf '%s\n' "${MACHINE_RELEASE_TAG}"
+        else
+          git ls-remote --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git | cut -f2 | sed -E "s#refs/tags/##; s/\\^\\{\\}$//" | sort -u | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+-rancher[0-9]+(\\.[0-9]+)?$" | sort -V | tail -n1
+        fi
 
   machine-checksum-amd64:
     name: 'Get sha256 for rancher-machine-amd64.tar.gz from {{ source "machine-release" }}'
