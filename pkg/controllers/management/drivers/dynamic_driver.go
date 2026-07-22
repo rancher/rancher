@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -56,7 +57,11 @@ func (d *DynamicDriver) Install() error {
 		return nil
 	}
 
-	return d.copyTo(fmt.Sprintf("%s/assets/%s", settings.UIDashboardPath.Get(), d.DriverName))
+	return d.copyTo(d.assetPath())
+}
+
+func (d *DynamicDriver) assetPath() string {
+	return filepath.Join(settings.UIDashboardPath.Get(), "assets", d.DriverName)
 }
 
 func (d *BaseDriver) copyTo(dest string) error {
