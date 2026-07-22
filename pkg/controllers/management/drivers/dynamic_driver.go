@@ -24,7 +24,7 @@ var DockerMachineDriverPrefix = "docker-machine-driver-"
 
 const ExecutionTimeout = time.Second * 5
 
-func NewDynamicDriver(builtin bool, name, url, hash string) *DynamicDriver {
+func NewDynamicDriver(builtin bool, name, url, hash string) (*DynamicDriver, error) {
 	d := &DynamicDriver{
 		BaseDriver{
 			Builtin:      builtin,
@@ -37,7 +37,10 @@ func NewDynamicDriver(builtin bool, name, url, hash string) *DynamicDriver {
 	if !strings.HasPrefix(d.DriverName, DockerMachineDriverPrefix) {
 		d.DriverName = DockerMachineDriverPrefix + d.DriverName
 	}
-	return d
+	if len(hash) > 0 && d.getHasher() == nil {
+		return nil, fmt.Errorf("invalid hash format: %s", hash)
+	}
+	return d, nil
 }
 
 func (d *DynamicDriver) Install() error {

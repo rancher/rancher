@@ -120,11 +120,7 @@ func (d *BaseDriver) stage(forceUpdate bool) error {
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	hasher, err := d.getHasher()
-	if err != nil {
-		return err
-	}
-
+	hasher := d.getHasher()
 	downloadDest := io.Writer(tempFile)
 	if hasher != nil {
 		downloadDest = io.MultiWriter(tempFile, hasher)
@@ -307,22 +303,19 @@ func compare(hash hash.Hash, value string) (string, bool) {
 	return got, got == expected
 }
 
-func (d *BaseDriver) getHasher() (hash.Hash, error) {
+func (d *BaseDriver) getHasher() hash.Hash {
 	switch len(d.DriverHash) {
-	case 0:
-		return nil, nil
 	case 32:
 		logrus.Warnf("[%s] md5 is unsupported and will be removed in a future version of Rancher", d.Name())
-		return md5.New(), nil
+		return md5.New()
 	case 40:
-		return sha1.New(), nil
+		return sha1.New()
 	case 64:
-		return sha256.New(), nil
+		return sha256.New()
 	case 128:
-		return sha512.New(), nil
+		return sha512.New()
 	}
-
-	return nil, fmt.Errorf("invalid hash format: %s", d.DriverHash)
+	return nil
 }
 
 func (d *BaseDriver) download(dest io.Writer) error {
