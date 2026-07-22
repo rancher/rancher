@@ -82,10 +82,9 @@ type handler struct {
 }
 
 func handlerWithoutCAPI(clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) *handler {
-	return &handler{
+	h := &handler{
 		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
 		mgmtClusters:          clients.Mgmt.Cluster(),
-		mgmtNodesCache:        clients.Mgmt.Node().Cache(),
 		clusterTokenCache:     clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:         clients.Mgmt.ClusterRegistrationToken(),
 		featureCache:          clients.Mgmt.Feature().Cache(),
@@ -97,6 +96,12 @@ func handlerWithoutCAPI(clients *wrangler.Context, kubeconfigManager *kubeconfig
 		secretCache:           clients.Core.Secret().Cache(),
 		kubeconfigManager:     kubeconfigManager,
 	}
+
+	if features.MCM.Enabled() {
+		h.mgmtNodesCache = clients.Mgmt.Node().Cache()
+	}
+
+	return h
 }
 
 func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {

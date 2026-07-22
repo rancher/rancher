@@ -230,6 +230,13 @@ func (h *handler) getNodeCount(cluster *v3.Cluster, provCluster *v1.Cluster) (in
 }
 
 func (h *handler) getArch(cluster *v3.Cluster) (string, error) {
+	if h.mgmtNodesCache == nil {
+		if cluster.Status.Info != nil {
+			return cluster.Status.Info.Arch, nil
+		}
+		return "", nil
+	}
+
 	machines, err := h.mgmtNodesCache.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return "", err
