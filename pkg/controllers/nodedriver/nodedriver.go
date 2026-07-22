@@ -36,7 +36,8 @@ func onChange(_ string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		return obj, generic.ErrSkip
 	}
 
-	if driver.Exists() {
+	if driver.Valid() {
+		// driver binary already downloaded and matches the expected hash
 		return obj, nil
 	}
 
