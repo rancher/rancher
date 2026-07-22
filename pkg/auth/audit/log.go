@@ -12,6 +12,7 @@ import (
 
 	"github.com/pborman/uuid"
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -103,7 +104,18 @@ func copyReqBody(req *http.Request, keepBody bool) ([]byte, string) {
 		return nil, ""
 	}
 
-	body, err := io.ReadAll(req.Body)
+	var body []byte
+	var err error
+	if isLoginEndpoint {
+		limit, settingErr := settings.APIBodyLimit.GetQuantityAsInt64(1024 * 1024)
+		if settingErr != nil {
+			limit = 1024 * 1024
+		}
+		body, err = io.ReadAll(io.LimitReader(req.Body, limit))
+	} else {
+		body, err = io.ReadAll(req.Body)
+	}
+
 	if err != nil {
 		body, err = json.Marshal(map[string]any{
 			"responseReadError": err.Error(),
