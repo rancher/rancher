@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -86,6 +87,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		if err != nil {
 			return fmt.Errorf("registering clusterauthtoken factory: %w", err)
 		}
+		logrus.Infof("[clusterauthtoken-sync] cluster=%s registered downstream secrets factory", cluster.ClusterName)
 		clusterauthtoken.Register(ctx, cluster, secretsCache)
 	}
 

@@ -3,6 +3,8 @@ package clusterauthtoken
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	lassocache "github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/client"
@@ -151,7 +153,11 @@ func Register(ctx context.Context, cluster *config.UserContext, secretsCache cor
 		clusterUserAttribute,
 	}).Sync)
 
+	scheduleStartupCensus(ctx, tokenInformer)
+	logrus.Infof("[clusterauthtoken-sync] cluster=%s v3 Token handlers registered", clusterName)
+
 	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
+		logrus.Infof("[clusterauthtoken-sync] cluster=%s ext API ready, registering ext Token handlers", clusterName)
 		extToken := w.Client.Token()
 		handler.extTokenIndexer.Store(extToken.Informer().GetIndexer())
 		extTokenLifecycle(ctx, extToken, extTokenController, clusterName, handler)
@@ -163,7 +169,116 @@ func Register(ctx context.Context, cluster *config.UserContext, secretsCache cor
 			extTokenStore: extstore.NewSystemFromWrangler(cluster.Management.Wrangler),
 		}
 		cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, catHandler.sync)
+		logrus.Infof("[clusterauthtoken-sync] cluster=%s ext Token handlers registered", clusterName)
+		scheduleExtStartupCensus(ctx, extToken.Informer())
 	})
+}
+
+var (
+	censusOnce    sync.Once
+	extCensusOnce sync.Once
+)
+
+// scheduleStartupCensus launches a goroutine that, once the management v3.Token
+// informer cache has synced, walks the cache exactly once and reports
+// per-cluster counts at Info level: total v3.Tokens scoped to each cluster and
+// the subset missing the cat-token-controller lifecycle annotation. The latter
+// equals the per-cluster backlog of tokens that have never been processed by
+// the downstream sync handler — i.e. the tokens that got stuck. The number
+// should drop to zero within seconds of handler registration as the
+// re-enqueue-all from AddClusterScopedLifecycle drains the backlog. A non-zero
+// residual after a few minutes points to a remaining sync path failure.
+//
+// The walk is process-wide, not per UserContext: the management Token informer
+// cache is shared across all clusters, so a single walk is sufficient. The
+// sync.Once guard is consumed only after WaitForCacheSync succeeds, so a
+// timeout on one caller leaves the gate open for the next cluster's Register
+// to retry.
+func scheduleStartupCensus(ctx context.Context, mgmtTokenInformer cache.SharedIndexInformer) {
+	go func() {
+		waitCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
+		if !cache.WaitForCacheSync(waitCtx.Done(), mgmtTokenInformer.HasSynced) {
+			if err := ctx.Err(); err != nil {
+				logrus.Warnf("[clusterauthtoken-sync] startup census skipped: %v before management v3.Token cache synced", err)
+			} else {
+				logrus.Warnf("[clusterauthtoken-sync] startup census skipped: management v3.Token cache did not sync within timeout")
+			}
+			return
+		}
+
+		censusOnce.Do(func() { walkV3StartupCensus(mgmtTokenInformer) })
+	}()
+}
+
+func walkV3StartupCensus(mgmtTokenInformer cache.SharedIndexInformer) {
+	type counts struct{ total, missing int }
+	byCluster := map[string]*counts{}
+	for _, obj := range mgmtTokenInformer.GetStore().List() {
+		t, ok := obj.(*managementv3.Token)
+		if !ok || t.ClusterName == "" {
+			continue
+		}
+
+		c, ok := byCluster[t.ClusterName]
+		if !ok {
+			c = &counts{}
+			byCluster[t.ClusterName] = c
+		}
+
+		c.total++
+
+		annotation := "lifecycle.cattle.io/create." + tokenController + "_" + t.ClusterName
+		if t.Annotations[annotation] != "true" {
+			c.missing++
+		}
+	}
+	for clusterName, c := range byCluster {
+		logrus.Infof("[clusterauthtoken-sync] cluster=%s startup census: v3_tokens=%d missing_lifecycle_annotation=%d",
+			clusterName, c.total, c.missing)
+	}
+}
+
+// scheduleExtStartupCensus mirrors scheduleStartupCensus for ext.Tokens.
+// ext.Tokens are managed by wrangler OnChange/OnRemove rather than Norman
+// lifecycle, so they carry no stuck-state annotation. The census reports
+// inventory only — total ext.Tokens per cluster. Drain of stuck tokens
+// (no existing ClusterAuthToken) is observable per-token via the success
+// Info events emitted by createClusterAuthToken; ongoing updates to
+// already-present ClusterAuthTokens are not logged at Info. The sync.Once
+// guard is consumed only after WaitForCacheSync succeeds, so a timeout on
+// one caller leaves the gate open for the next cluster's DeferFunc to retry.
+func scheduleExtStartupCensus(ctx context.Context, extTokenInformer cache.SharedIndexInformer) {
+	go func() {
+		waitCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
+		if !cache.WaitForCacheSync(waitCtx.Done(), extTokenInformer.HasSynced) {
+			if err := ctx.Err(); err != nil {
+				logrus.Warnf("[clusterauthtoken-sync] ext startup census skipped: %v before ext.Token cache synced", err)
+			} else {
+				logrus.Warnf("[clusterauthtoken-sync] ext startup census skipped: ext.Token cache did not sync within timeout")
+			}
+			return
+		}
+
+		extCensusOnce.Do(func() { walkExtStartupCensus(extTokenInformer) })
+	}()
+}
+
+func walkExtStartupCensus(extTokenInformer cache.SharedIndexInformer) {
+	byCluster := map[string]int{}
+	for _, obj := range extTokenInformer.GetStore().List() {
+		t, ok := obj.(*extv1.Token)
+		if !ok || t.Spec.ClusterName == "" {
+			continue
+		}
+		byCluster[t.Spec.ClusterName]++
+	}
+	for clusterName, total := range byCluster {
+		logrus.Infof("[clusterauthtoken-sync] cluster=%s startup census: ext_tokens=%d", clusterName, total)
+	}
 }
 
 func newDedicatedSecretsCache(clientFactory client.SharedClientFactory, namespace string) (corecontrollers.SecretCache, controller.SharedControllerFactory) {

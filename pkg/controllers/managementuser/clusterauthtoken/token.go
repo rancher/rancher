@@ -63,8 +63,6 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	if err := validateToken(token.GetName(), token.Spec.UserID); err != nil {
 		return token, err
 	}
-	logrus.Debugf("[%s] ext CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.Spec.ClusterName)
-
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.ExtUpdated(token)
@@ -212,8 +210,6 @@ func (h *tokenHandler) Create(token *mgmtapiv3.Token) (runtime.Object, error) {
 	if err := validateToken(token.Name, token.UserID); err != nil {
 		return token, err
 	}
-	logrus.Debugf("[%s] v3 CREATE FOR %q INTO %q", clusterAuthTokenController, token.Name, token.ClusterName)
-
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.Updated(token)
@@ -252,7 +248,17 @@ func (h *tokenHandler) Create(token *mgmtapiv3.Token) (runtime.Object, error) {
 }
 
 // createClusterAuthToken handles actions commonly taken to create a clusterAuthToken from a token.
-func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hashedValue string) error {
+func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hashedValue string) (retErr error) {
+	clusterName, tokenName := token.ObjClusterName(), token.GetName()
+	defer func() {
+		if retErr != nil {
+			logrus.Errorf("[clusterauthtoken-sync] cluster=%s token=%s createClusterAuthToken failed: %v",
+				clusterName, tokenName, retErr)
+			return
+		}
+		logrus.Infof("[clusterauthtoken-sync] cluster=%s token=%s ClusterAuthToken synced", clusterName, tokenName)
+	}()
+
 	err := h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
 		return err
@@ -274,7 +280,6 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 		// Overwrite an existing secret.
 		existing, err := h.clusterSecret.Get(clusterAuthTokenSecret.Namespace, clusterAuthTokenSecret.Name, metav1.GetOptions{})
 		if err != nil {
-			logrus.Errorf("error migrating clusterAuthToken's secret %s: %s", clusterAuthTokenSecret.Name, err)
 			return err
 		}
 		existing = existing.DeepCopy()

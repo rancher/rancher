@@ -483,8 +483,9 @@ func (w *UserContext) Start(pctx context.Context) error {
 
 	for name, factory := range w.extraControllerFactories {
 		ctx := metrics.WithContextID(pctx, fmt.Sprintf("usercontext_%s_%s", name, w.ClusterName))
+		logrus.Infof("Starting extra controller factory %q for cluster %s", name, w.ClusterName)
 		if err := factory.Start(ctx, 1); err != nil {
-			return err
+			return fmt.Errorf("starting extra controller factory %q for cluster %s: %w", name, w.ClusterName, err)
 		}
 	}
 
