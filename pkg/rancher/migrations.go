@@ -231,7 +231,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
 	err = extTokenDeleter.DeleteCollection(&metav1.ListOptions{
 		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.IsLogin}.AsSelector().String(),
 	})
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
 		logrus.WithError(err).Error("Failed to delete ext session tokens for upgrade forced logout")
 	}
 

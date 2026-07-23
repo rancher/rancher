@@ -170,6 +170,28 @@ func TestForceUpgradeLogout(t *testing.T) {
 				})
 			},
 		},
+		"migration ignores ext bulk deletion errors": {
+			extCount: 1,
+			setup: func(
+				ctrl *gomock.Controller,
+				configmaps *fake.MockControllerInterface[*corev1.ConfigMap, *corev1.ConfigMapList],
+				cmCache *fake.MockCacheInterface[*corev1.ConfigMap],
+				tokens *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList],
+				extDeleter *extDeletionStub,
+			) {
+				cmCache.EXPECT().Get(cattleNamespace, forceUpgradeLogoutConfig).
+					Return(&corev1.ConfigMap{Data: map[string]string{}}, nil)
+
+				commonMigrationSetup(ctrl, cmCache, tokens, extDeleter)
+				extDeleter.err = fmt.Errorf("some error")
+
+				configmaps.EXPECT().Create(&corev1.ConfigMap{
+					Data: map[string]string{
+						rancherVersionKey: migrationTarget,
+					},
+				})
+			},
+		},
 	}
 
 	for name, spec := range tests {
@@ -205,6 +227,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 type extDeletionStub struct {
 	count int
 	t     *testing.T
+	err error
 }
 
 func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {
@@ -214,5 +237,5 @@ func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {
 		}.AsSelector().String(),
 	})
 	e.count = e.count + 1
-	return nil
+	return e.err
 }
