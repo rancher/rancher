@@ -5,9 +5,9 @@ import (
 
 	extrbac "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
 	extunstructured "github.com/rancher/shepherd/extensions/unstructured"
-	"github.com/rancher/shepherd/extensions/users"
 	"github.com/rancher/shepherd/pkg/api/scheme"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -52,14 +52,19 @@ func (p *RTBTestSuite) TestImpersonationByClusterRole() {
 	// Create user2 with standard "user" role.
 	user2 := p.createUser(client, "imp-user2", "user")
 
-	localCluster, err := client.Management.Cluster.ByID(p.downstreamClusterID)
-	p.Require().NoError(err)
-
 	// Give user1 cluster-member and user2 cluster-owner.
-	err = users.AddClusterRoleToUser(client, localCluster, user1, "cluster-member", nil)
+	_, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		ClusterID:       p.downstreamClusterID,
+		UserPrincipalID: user1.PrincipalIDs[0],
+		RoleTemplateID:  "cluster-member",
+	})
 	p.Require().NoError(err)
 
-	err = users.AddClusterRoleToUser(client, localCluster, user2, "cluster-owner", nil)
+	_, err = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		ClusterID:       p.downstreamClusterID,
+		UserPrincipalID: user2.PrincipalIDs[0],
+		RoleTemplateID:  "cluster-owner",
+	})
 	p.Require().NoError(err)
 
 	user1Client, err := client.AsUser(user1)

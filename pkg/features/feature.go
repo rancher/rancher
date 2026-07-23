@@ -136,8 +136,8 @@ var (
 		true)
 	AggregatedRoleTemplates = newFeature(
 		"aggregated-roletemplates",
-		"[Experimental] Make RoleTemplates use aggregation for generated RBAC roles",
-		false,
+		"Make RoleTemplates use aggregation for generated RBAC roles",
+		true,
 		true,
 		true)
 	ClusterAgentSchedulingCustomization = newFeature(
