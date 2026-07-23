@@ -373,6 +373,12 @@ func TestStoreCreate(t *testing.T) {
 							Addresses: []corev1.NodeAddress{
 								{Type: corev1.NodeExternalIP, Address: "172.20.0.3"},
 							},
+							Conditions: []corev1.NodeCondition{
+								{
+									Type:   corev1.NodeReady,
+									Status: corev1.ConditionTrue,
+								},
+							},
 						},
 					},
 				},
@@ -1365,6 +1371,117 @@ func TestStoreCreate(t *testing.T) {
 		require.Len(t, tokenManager.clusterTokenKeys, 1)
 
 		assert.Equal(t, "downstream2-cp", config.CurrentContext)
+	})
+	t.Run("select first ready control plane node as current context", func(t *testing.T) {
+		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+			return authorizer.DecisionAllow, "", nil
+		})
+
+		var configMap *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap = obj.DeepCopy()
+			return configMap, nil
+		}).Times(1)
+
+		tokenManager := &fakeTokenManager{}
+
+		nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
+		nodeCache.EXPECT().List(downstream2, labels.Everything()).Return([]*v3.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "cp1"},
+				Spec: v3.NodeSpec{
+					RequestedHostname: "cp1",
+					ControlPlane:      true,
+				},
+				Status: v3.NodeStatus{
+					InternalNodeStatus: corev1.NodeStatus{
+						Addresses: []corev1.NodeAddress{
+							{
+								Type:    corev1.NodeExternalIP,
+								Address: "172.20.0.3",
+							},
+						},
+						Conditions: []corev1.NodeCondition{
+							{
+								Type:   corev1.NodeReady,
+								Status: corev1.ConditionUnknown,
+							},
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "cp2"},
+				Spec: v3.NodeSpec{
+					RequestedHostname: "cp2",
+					ControlPlane:      true,
+				},
+				Status: v3.NodeStatus{
+					InternalNodeStatus: corev1.NodeStatus{
+						Addresses: []corev1.NodeAddress{
+							{
+								Type:    corev1.NodeExternalIP,
+								Address: "172.20.0.4",
+							},
+						},
+						Conditions: []corev1.NodeCondition{
+							{
+								Type:   corev1.NodeReady,
+								Status: corev1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+		}, nil).Times(1)
+
+		store := &Store{
+			mcmEnabled:          true,
+			authorizer:          allowAuthorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenStore:          tokenStore,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			tokenMgr:            tokenManager,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:            []string{downstream2},
+				IncludeDefaultEntry: ptr.To(false),
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		assert.Equal(t, "downstream2-cp2", config.CurrentContext)
 	})
 	t.Run("exclude default entry with mixed clusters", func(t *testing.T) {
 		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
