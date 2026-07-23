@@ -180,6 +180,10 @@ func Register(
 		kubeconfigManager: kubeconfigManager,
 	}
 
+	if features.MCM.Enabled() {
+		h.mgmtNodesCache = clients.Mgmt.Node().Cache()
+	}
+
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
 	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
 }
