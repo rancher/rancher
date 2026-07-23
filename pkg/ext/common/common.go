@@ -6,6 +6,7 @@ import (
 	"time"
 
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,9 @@ func EnsureNamespace(nsCache v1.NamespaceCache, nsClient v1.NamespaceClient, nam
 		}
 
 		if !apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("error getting namespace %s: %w", name, err)
+			// retry after transient error, instead of exiting
+			logrus.Debugf("ensure namespace failure, retry: %s", err)
+			return false, nil
 		}
 
 		_, err = nsClient.Create(&corev1.Namespace{

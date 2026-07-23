@@ -785,6 +785,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
+// Delete is the core deletion method to remove a single named token
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	err := t.secretClient.Delete(TokenNamespace, name, options)
 	if err == nil {
@@ -797,6 +798,24 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	}
 
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
+}
+
+// DeleteCollection is an internal bulk deletion method for use by other parts of Rancher.
+func (t *SystemStore) DeleteCollection(options *metav1.ListOptions) error {
+	localOptions, err := ListOptionMerge(true, "", options)
+	if err != nil {
+		return apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
+	}
+
+	// Deliberately using client instead of the cache as the latter may not be yet synced/populated.
+	if err := t.secretClient.DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, localOptions); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return apierrors.NewInternalError(fmt.Errorf("failed to delete tokens: %w", err))
+	}
+
+	return nil
 }
 
 // Get retrieves the named ext token, without permission checking
@@ -1502,9 +1521,13 @@ func SessionID(ctx context.Context) (string, error) {
 // requests a filter for a different user than itself.
 func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
+	empty := metav1.ListOptions{}
 
 	// for admins we do not impose any additional restrictions over the requested
 	if fullAccess {
+		if options == nil {
+			return empty, nil
+		}
 		return *options, nil
 	}
 
@@ -1512,7 +1535,6 @@ func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptio
 	userIDSelector := labels.Set(map[string]string{
 		UserIDLabel: userName,
 	})
-	empty := metav1.ListOptions{}
 	if options == nil || *options == empty {
 		// No external filter to contend with, just set the internal filter.
 		localOptions = metav1.ListOptions{
