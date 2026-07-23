@@ -42,12 +42,6 @@ type signingKeyGetter interface {
 	GetPublicKey(kid string) (*rsa.PublicKey, error)
 }
 
-type jsonPatch struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
-	Value any    `json:"value"`
-}
-
 type tokenHandler struct {
 	extTokenStore       *exttokenstore.SystemStore
 	tokenCache          wrangmgmtv3.TokenCache
@@ -474,13 +468,13 @@ func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient
 	var patch []byte
 	var err error
 	if oidcClient.Annotations != nil {
-		patch, err = json.Marshal([]jsonPatch{{
+		patch, err = json.Marshal([]exttokenstore.JsonPatch{{
 			Op:    "add",
 			Path:  "/metadata/annotations/cattle.io.oidc-client-secret-used-" + clientSecretID,
 			Value: fmt.Sprintf("%d", h.now().Unix()),
 		}})
 	} else {
-		patch, err = json.Marshal([]jsonPatch{{
+		patch, err = json.Marshal([]exttokenstore.JsonPatch{{
 			Op:   "add",
 			Path: "/metadata/annotations",
 			Value: map[string]string{
@@ -506,13 +500,13 @@ func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, ranc
 
 		var patch []byte
 		if rancherToken.GetLabels() != nil {
-			patch, err = json.Marshal([]jsonPatch{{
+			patch, err = json.Marshal([]exttokenstore.JsonPatch{{
 				Op:    "add",
 				Path:  "/metadata/labels/cattle.io.oidc-client-" + escapedName,
 				Value: "true",
 			}})
 		} else {
-			patch, err = json.Marshal([]jsonPatch{{
+			patch, err = json.Marshal([]exttokenstore.JsonPatch{{
 				Op:   "add",
 				Path: "/metadata/labels",
 				Value: map[string]string{

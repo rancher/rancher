@@ -240,21 +240,21 @@ func TestTokenEndpoint(t *testing.T) {
 			fakeClientSecretID: []byte(fakeClientSecret),
 		},
 	}
-	clientSecretIDPatch, _ := json.Marshal([]jsonPatch{{
+	clientSecretIDPatch, _ := json.Marshal([]exttokenstore.JsonPatch{{
 		Op:   "add",
 		Path: "/metadata/annotations",
 		Value: map[string]string{
 			"cattle.io.oidc-client-secret-used-" + fakeClientSecretID: fmt.Sprintf("%d", fakeTime().Unix()),
 		},
 	}})
-	tokenPatch, _ := json.Marshal([]jsonPatch{{
+	tokenPatch, _ := json.Marshal([]exttokenstore.JsonPatch{{
 		Op:   "add",
 		Path: "/metadata/labels",
 		Value: map[string]string{
 			"cattle.io.oidc-client-" + fakeClientName: "true",
 		},
 	}})
-	tokenPatchExt, _ := json.Marshal([]jsonPatch{{
+	tokenPatchExt, _ := json.Marshal([]exttokenstore.JsonPatch{{
 		Op:    "add",
 		Path:  "/metadata/labels/cattle.io.oidc-client-" + fakeClientName,
 		Value: "true",

@@ -126,7 +126,7 @@ type SystemStore struct {
 	tableConverter  rest.TableConvertor // custom column formatting
 }
 
-type jsonPatch struct {
+type JsonPatch struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
 	Value any    `json:"value"`
@@ -1068,7 +1068,7 @@ func (t *SystemStore) AddLabel(name, key, value string) error {
 	// sure that the secret has labels, simplifying patch construction.
 
 	escapedKey := strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
-	patch, err := json.Marshal([]jsonPatch{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "add",
 		Path:  "/metadata/labels/" + escapedKey,
 		Value: value,
@@ -1085,7 +1085,7 @@ func (t *SystemStore) AddLabel(name, key, value string) error {
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]jsonPatch{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastUsedAt,
 		Value: nowEncoded,
@@ -1103,7 +1103,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.Token, error) {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]jsonPatch{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastActivitySeen,
 		Value: nowEncoded,
@@ -1129,7 +1129,7 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.T
 // Called by refreshAttributes.
 func (t *SystemStore) Disable(name string) error {
 	// Operate directly on the backend secret holding the token
-	patch, err := json.Marshal([]jsonPatch{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldEnabled,
 		Value: base64.StdEncoding.EncodeToString([]byte("false")),

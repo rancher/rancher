@@ -1951,7 +1951,7 @@ func TestSystemStoreAddLabel(t *testing.T) {
 
 		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 
-		patch, err := json.Marshal([]jsonPatch{{
+		patch, err := json.Marshal([]JsonPatch{{
 			Op:    "add",
 			Path:  "/metadata/labels/cattle.io.oidc-client-placeholder",
 			Value: "true",
@@ -1979,7 +1979,7 @@ func TestSystemStoreAddLabel(t *testing.T) {
 
 		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 
-		patch, err := json.Marshal([]jsonPatch{{
+		patch, err := json.Marshal([]JsonPatch{{
 			Op:    "add",
 			Path:  "/metadata/labels/cattle.io~1test",
 			Value: "true",
