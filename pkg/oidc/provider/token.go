@@ -192,7 +192,7 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 		if apierrors.IsNotFound(err) {
 			return TokenResponse{}, oidcerror.New(oidcerror.InvalidRequest, "Rancher token is not valid anymore")
 		}
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "failed to get Rancher token: "+err.Error())
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to get Rancher token: %v", err)
 	}
 	resp, oidcErr := h.createTokenResponse(rancherToken, oidcClient, session.Nonce, session.Scope)
 
@@ -244,7 +244,7 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 		return pubKey, nil
 	})
 	if err != nil {
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to parse refresh token: %v", err))
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to parse refresh token: %v", err)
 	}
 	claims, ok := token.Claims.(*RefreshTokenClaims)
 	if !ok || !token.Valid {
@@ -257,8 +257,8 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 		tokens.UserIDLabel: claims.Subject,
 	}))
 	if err != nil {
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError,
-			fmt.Sprintf("[OIDC provider] failed to retrieve legacy tokens for user %q: %v", claims.Subject, err))
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError,
+			"[OIDC provider] failed to retrieve legacy tokens for user %q: %v", claims.Subject, err)
 	}
 	var rancherToken accessor.TokenAccessor
 	for _, token := range tokenList {
@@ -273,8 +273,8 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 		// no matching legacy token found, now search ext tokens for a match
 		tokenList, err := h.extTokenStore.ListForUser(claims.Subject)
 		if err != nil {
-			return TokenResponse{}, oidcerror.New(oidcerror.ServerError,
-				fmt.Sprintf("[OIDC provider] failed to retrieve ext tokens for user %q: %v", claims.Subject, err))
+			return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError,
+				"[OIDC provider] failed to retrieve ext tokens for user %q: %v", claims.Subject, err)
 		}
 		for _, token := range tokenList.Items {
 			hash := sha256.Sum256([]byte(token.Name))
@@ -296,7 +296,7 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 	}
 	oidcClient, err := h.getOIDCClientByClientID(claims.Audience[0])
 	if err != nil {
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to get oidc client: %v", err))
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to get oidc client: %v", err)
 	}
 
 	_, clientSecret, ok := r.BasicAuth()
@@ -323,8 +323,8 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 	if authProvider != "" {
 		disabled, err := providers.IsDisabledProvider(authProvider)
 		if err != nil {
-			return TokenResponse{}, oidcerror.New(oidcerror.ServerError,
-				fmt.Sprintf("can't check if auth provider is disabled: %v", err))
+			return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError,
+				"can't check if auth provider is disabled: %v", err)
 		}
 		if disabled {
 			return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "auth provider is disabled")
@@ -333,14 +333,14 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 	userID := rancherToken.GetUserID()
 	user, err := h.userLister.Get(userID)
 	if err != nil {
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("can't get user: %v", err))
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "can't get user: %v", err)
 	}
 	if user.Enabled != nil && !*user.Enabled {
 		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "user is disabled")
 	}
 	attribs, err := h.userAttributeLister.Get(userID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("can't get user attributes: %v", err))
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "can't get user attributes: %v", err)
 	}
 	var groups []string
 	if attribs != nil {
@@ -354,14 +354,14 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 
 	key, kid, err := h.jwks.GetSigningKey()
 	if err != nil {
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to get signing key: %v", err))
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to get signing key: %v", err)
 	}
 
 	accessToken := CreateAccessToken(oidcClient, rancherToken, scopes, kid, h.now())
 	accessTokenString, err := accessToken.SignedString(key)
 	if err != nil {
 		logrus.Errorf("[OIDC provider] failed to sign access token %v", err)
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to sign access token: %v", err))
+		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to sign access token: %v", err)
 	}
 
 	resp := TokenResponse{
@@ -374,7 +374,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 		idTokenString, err := idToken.SignedString(key)
 		if err != nil {
 			logrus.Errorf("[OIDC provider] failed to sign id token %v", err)
-			return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to sign id token: %v", err))
+			return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to sign id token: %v", err)
 		}
 		resp.IDToken = idTokenString
 	}
@@ -399,12 +399,12 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 		refreshTokenString, err := refreshToken.SignedString(key)
 		if err != nil {
 			logrus.Errorf("[OIDC provider] failed to sign refresh token %v", err)
-			return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to sign refresh token: %v", err))
+			return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to sign refresh token: %v", err)
 		}
 		resp.RefreshToken = refreshTokenString
 
 		if err := h.addOIDCClientIDToRancherToken(oidcClient.Name, rancherToken); err != nil {
-			return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to add OIDC Client ID to Rancher token: %v", err))
+			return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to add OIDC Client ID to Rancher token: %v", err)
 		}
 	}
 
