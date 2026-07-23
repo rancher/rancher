@@ -6,14 +6,19 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -33,6 +38,7 @@ type ActionHandler struct {
 	TokenMgr       tokenManager
 	ClusterManager *clustermanager.Manager
 	AuthToken      requests.AuthTokenGetter
+	ExtTokenStore  *exttokenstore.SystemStore
 }
 
 // ClusterActionHandler runs the handler for the provided cluster action in the given context.
@@ -103,11 +109,87 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 	}, nil
 }
 
+// generateKubeConfigBearer is the core of generateKubeConfig providing the
+// bearer token to place into the final clientcmdapi.Config
+func (a ActionHandler) generateKubeConfigBearer(apiContext *types.APIContext) (string, error) {
+	if a.ExtTokenStore == nil {
+		return "", fmt.Errorf("ext token store is not configured")
+	}
+
+	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return "", fmt.Errorf("failed to get session token: %w", err)
+	}
+
+	defaultTokenTTL, err := tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds()
+	if err != nil {
+		return "", fmt.Errorf("failed to get default token TTL: %w", err)
+	}
+
+	userID := authToken.GetUserID()
+	tokenName := authToken.GetName() // todo full name later, force fast path
+
+	// Create a proper ext token, commit it to kubernetes, and pass the
+	// resulting bearer token on.
+	//
+	// The ability to set a custom generateName prefix (kubeconfig-<user>-...)
+	// is lost for ext tokens. The ext token store internally forces the
+	// prefix `token-`.
+
+	kcToken := &ext.Token{
+		Spec: ext.TokenSpec{
+			UserID:      userID,
+			Kind:        "kubeconfig",
+			Description: "Kubeconfig token",
+			TTL:         *defaultTokenTTL,
+		},
+	}
+
+	// Note that `userinfo == nil` is ok. The argument is only used when the
+	// token refers to a cluster by name, requiring a permission check. This
+	// is not the case here, we are asking for an unscoped token.
+	kcNewToken, err := a.ExtTokenStore.Create(
+		// Make the auth token available to `Create`, via reference by
+		// name, through a local [user.Info] interface implementation.
+		// This enables `Create` to retrieve it and the principal
+		// information it needs.
+		request.WithUser(apiContext.Request.Context(), &actionUserInfo{
+			authTokenName: tokenName,
+		}),
+		exttokenstore.GVR.GroupResource(),
+		kcToken,
+		&metav1.CreateOptions{},
+		nil)
+	if err != nil {
+		return "", err
+	}
+
+	return kcNewToken.Status.BearerToken, nil
+}
+
+// generateKubeConfig is only used by ImportYamlHandler, to provide a cluster kube config
 func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
-	token, err := a.ensureToken(apiContext)
+	bearer, err := a.generateKubeConfigBearer(apiContext)
 	if err != nil {
 		return nil, err
 	}
+	return a.ClusterManager.KubeConfig(cluster.ID, bearer), nil
+}
 
-	return a.ClusterManager.KubeConfig(cluster.ID, token), nil
+// actionUserInfo implements [k8s.io/apiserver/pkg/authentication/user.Info] to
+// pass the session token by name into the ext token system store.
+type actionUserInfo struct {
+	authTokenName string
+}
+
+// implements [k8s.io/apiserver/pkg/authentication/user.Info]
+func (a *actionUserInfo) GetName() string     { return "" }
+func (a *actionUserInfo) GetUID() string      { return "" }
+func (a *actionUserInfo) GetGroups() []string { return []string{} }
+func (a *actionUserInfo) GetExtra() map[string][]string {
+	return map[string][]string{
+		common.ExtraRequestTokenID: []string{
+			a.authTokenName,
+		},
+	}
 }
