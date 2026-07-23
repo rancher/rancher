@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/configserver"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -48,8 +49,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 		unmanagedMachine:  clients.RKE.CustomMachine(),
 		rkeClusterCache:   clients.RKE.RKECluster().Cache(),
 		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
-		mgmtNodeClient:    clients.Mgmt.Node(),
-		mgmtNodeCache:     clients.Mgmt.Node().Cache(),
 		clusterCache:      clients.Provisioning.Cluster().Cache(),
 		capiClusterCache:  clients.CAPI.Cluster().Cache(),
 		machineCache:      clients.CAPI.Machine().Cache(),
@@ -68,6 +67,11 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 				clients.Core.Secret(),
 			),
 	}
+	if features.MCM.Enabled() {
+		h.mgmtNodeClient = clients.Mgmt.Node()
+		h.mgmtNodeCache = clients.Mgmt.Node().Cache()
+	}
+
 	clients.RKE.CustomMachine().OnRemove(ctx, "unmanaged-machine", h.onUnmanagedMachineOnRemove)
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-health", h.onUnmanagedMachineChange)
 	clients.Core.Secret().OnChange(ctx, "unmanaged-machine-secret", h.onSecretChange)
@@ -206,6 +210,10 @@ func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secre
 }
 
 func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.Object) (*corev1.Secret, error) {
+	if h.mgmtNodeCache == nil || h.mgmtNodeClient == nil {
+		return secret, nil
+	}
+
 	labels := map[string]string{}
 	annotations := map[string]string{}
 
