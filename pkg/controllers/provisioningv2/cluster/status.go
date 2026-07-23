@@ -66,7 +66,7 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 	if cluster.Status.Info != nil {
 		arch = cluster.Status.Info.Arch
 	}
-	if h.getClusterInfoWaitTime(key) == 0 {
+	if h.mgmtNodesCache != nil && h.getClusterInfoWaitTime(key) == 0 {
 		arch, err = h.getArch(cluster)
 		if err != nil {
 			return nil, err
@@ -230,13 +230,6 @@ func (h *handler) getNodeCount(cluster *v3.Cluster, provCluster *v1.Cluster) (in
 }
 
 func (h *handler) getArch(cluster *v3.Cluster) (string, error) {
-	if h.mgmtNodesCache == nil {
-		if cluster.Status.Info != nil {
-			return cluster.Status.Info.Arch, nil
-		}
-		return "", nil
-	}
-
 	machines, err := h.mgmtNodesCache.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return "", err
