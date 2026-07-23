@@ -656,7 +656,7 @@ func (s *Store) Create(
 					})
 
 					if !isCurrentContextSet && currentContext == cluster.Name && v3node.IsMachineReady(node) {
-						data.CurrentContext = nodeName // Set the current context to the first control plane node.
+						data.CurrentContext = nodeName // Set the current context to the first Ready control plane node.
 						isCurrentContextSet = true
 					}
 				}
