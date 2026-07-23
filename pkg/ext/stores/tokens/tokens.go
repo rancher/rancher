@@ -666,7 +666,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		// wrapped api error
 		return nil, err
 	}
 
@@ -1365,7 +1364,6 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		if err == nil {
 			return ext, nil
 		}
-		// %w wraps the error, still testable for various API errors
 		return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
 	}
 
@@ -1388,7 +1386,6 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	if errExt == nil {
 		return ext, nil
 	}
-	// %w wraps the error, still testable for various API errors
 	return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, errExt)
 }
 
