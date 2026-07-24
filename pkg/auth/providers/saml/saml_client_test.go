@@ -475,6 +475,80 @@ func TestExtractIDPURLs(t *testing.T) {
 			wantSSO: "https://idp.example.com/sso",
 			wantSLO: "https://idp.example.com/slo",
 		},
+		"SSO falls back to first entry when no HTTP-Redirect binding": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleSignOnServices: []types.SingleSignOnService{
+						{
+							Location: "https://idp.example.com/sso/post",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+						},
+						{
+							Location: "https://idp.example.com/sso/artifact",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact",
+						},
+					},
+				},
+			},
+			wantSSO: "https://idp.example.com/sso/post",
+			wantSLO: "",
+		},
+		"SLO falls back to first entry when no HTTP-Redirect binding": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleLogoutServices: []types.SingleLogoutService{
+						{
+							Location: "https://idp.example.com/slo/post",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+						},
+						{
+							Location: "https://idp.example.com/slo/artifact",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact",
+						},
+					},
+				},
+			},
+			wantSSO: "",
+			wantSLO: "https://idp.example.com/slo/post",
+		},
+		"SSO prefers HTTP-Redirect over earlier non-redirect entry": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleSignOnServices: []types.SingleSignOnService{
+						{
+							Location: "https://idp.example.com/sso/post",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+						},
+						{
+							Location: "https://idp.example.com/sso/redirect",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+						},
+					},
+				},
+			},
+			wantSSO: "https://idp.example.com/sso/redirect",
+			wantSLO: "",
+		},
+		"SSO redirect present, SLO falls back to first entry": {
+			metadata: &types.EntityDescriptor{
+				IDPSSODescriptor: &types.IDPSSODescriptor{
+					SingleSignOnServices: []types.SingleSignOnService{
+						{
+							Location: "https://idp.example.com/sso/redirect",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+						},
+					},
+					SingleLogoutServices: []types.SingleLogoutService{
+						{
+							Location: "https://idp.example.com/slo/post",
+							Binding:  "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+						},
+					},
+				},
+			},
+			wantSSO: "https://idp.example.com/sso/redirect",
+			wantSLO: "https://idp.example.com/slo/post",
+		},
 	}
 
 	for name, tt := range tests {

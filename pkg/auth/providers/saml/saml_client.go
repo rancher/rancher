@@ -264,6 +264,9 @@ func extractIDPURLs(idpMetadata *types.EntityDescriptor) (string, string) {
 
 	if idpMetadata.IDPSSODescriptor != nil {
 		for _, sso := range idpMetadata.IDPSSODescriptor.SingleSignOnServices {
+			if idpSSOURL == "" {
+				idpSSOURL = sso.Location
+			}
 			if sso.Binding == saml2.BindingHttpRedirect {
 				idpSSOURL = sso.Location
 				break
@@ -271,6 +274,9 @@ func extractIDPURLs(idpMetadata *types.EntityDescriptor) (string, string) {
 		}
 
 		for _, slo := range idpMetadata.IDPSSODescriptor.SingleLogoutServices {
+			if idpSLOURL == "" {
+				idpSLOURL = slo.Location
+			}
 			if slo.Binding == saml2.BindingHttpRedirect {
 				idpSLOURL = slo.Location
 				break
@@ -453,7 +459,6 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		s.clientState.DeleteState(w, r, relayState)
 	}
 
-	// TODO: Validate that there is only one assertion.
 	assertion := assertionInfo.Assertions[0]
 
 	// Validate the assertion's time conditions.
