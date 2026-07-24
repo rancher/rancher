@@ -2,6 +2,7 @@ package ext
 
 import (
 	"bytes"
+	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -14,15 +15,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/lasso/pkg/cache"
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	wranglercore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/util/keyutil"
 	netutils "k8s.io/utils/net"
@@ -149,11 +154,11 @@ type rotatingSNIProvider struct {
 	cert      []byte
 	key       []byte
 
-	secrets wranglercorev1.SecretController
+	secrets wranglercorev1.SecretClient
 }
 
-func NewSNIProviderForCname(name string, cnames []string, secrets wranglercorev1.SecretController) (*rotatingSNIProvider, error) {
-	content := &rotatingSNIProvider{
+func NewSNIProviderForCname(name string, cnames []string, secrets wranglercorev1.SecretClient) (*rotatingSNIProvider, error) {
+	p := &rotatingSNIProvider{
 		name:       name,
 		secretName: fmt.Sprintf("%s-cert-ca", name),
 
@@ -164,7 +169,7 @@ func NewSNIProviderForCname(name string, cnames []string, secrets wranglercorev1
 		secrets: secrets,
 	}
 
-	return content, nil
+	return p, nil
 }
 
 func (p *rotatingSNIProvider) AddListener(listener dynamiccertificates.Listener) {
@@ -198,62 +203,33 @@ func (p *rotatingSNIProvider) CurrentCertKeyContent() ([]byte, []byte) {
 	return bytes.Clone(p.cert), bytes.Clone(p.key)
 }
 
-func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
-	logrus.Info("starting imperative api cert rotator")
-
-	req, err := labels.NewRequirement(SecretLabelProvider, selection.Equals, []string{p.name})
-	if err != nil {
-		return fmt.Errorf("failed to create label requirement: %w", err)
-	}
-
-	watcher, err := p.secrets.Watch(Namespace, metav1.ListOptions{
-		LabelSelector: labels.NewSelector().Add(*req).String(),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create secret watcher: %w", err)
-	}
-	defer watcher.Stop()
-
-	if err := p.handleCert(); err != nil {
-		logrus.Error(err)
-	}
-
-	ticker := time.NewTicker(certCheckInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-stopChan:
-			logrus.Info("stopping imperative api cert rotator")
-
-			if err := p.secrets.Delete(Namespace, p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
-				logrus.Error(err)
-			}
-
-			return nil
-		case <-ticker.C:
-			if err := p.handleCert(); err != nil {
-				logrus.Error(err)
-			}
-		case event, ok := <-watcher.ResultChan():
-			if !ok {
-				logrus.Errorf("watcher channel closed")
-				return nil
-			} else if event.Type == watch.Error {
-				switch obj := event.Object.(type) {
-				case *metav1.Status:
-					logrus.Errorf("watcher channel closed: %s", obj.Message)
-				default:
-					logrus.Errorf("watcher channel closed: %v", obj)
-				}
-
-				return nil
-			} else {
-				if err := p.handleCertEvent(event); err != nil {
-					logrus.Error(err)
-				}
-			}
+func (p *rotatingSNIProvider) onChange(k string, secret *corev1.Secret) (*corev1.Secret, error) {
+	if secret == nil {
+		if err := p.createOrUpdateCerts(nil); err != nil {
+			return nil, fmt.Errorf("failed to recreate deleted secret: %w", err)
 		}
+
+		return secret, nil
 	}
+
+	certData, ok := secret.Data[corev1.TLSCertKey]
+	if !ok {
+		return nil, fmt.Errorf("secret does not contain field '%s'", corev1.TLSCertKey)
+	}
+
+	keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
+	if !ok {
+		return nil, fmt.Errorf("secret does not contain field '%s'", corev1.TLSPrivateKeyKey)
+	}
+
+	p.contentMu.Lock()
+	p.cert = certData
+	p.key = keyData
+	p.contentMu.Unlock()
+
+	p.notify()
+
+	return secret, nil
 }
 
 func (p *rotatingSNIProvider) createOrUpdateCerts(secret *corev1.Secret) error {
@@ -354,30 +330,62 @@ func (p *rotatingSNIProvider) handleCert() error {
 	return nil
 }
 
-func (p *rotatingSNIProvider) handleCertEvent(event watch.Event) error {
-	switch event.Type {
-	case watch.Added, watch.Modified:
-		secret := event.Object.(*corev1.Secret)
-		certData, ok := secret.Data[corev1.TLSCertKey]
-		if !ok {
-			return fmt.Errorf("secret does not contain field '%s'", corev1.TLSCertKey)
-		}
+func (p *rotatingSNIProvider) Start(ctx context.Context, wctx *wrangler.Context) error {
+	opts := &controller.SharedControllerFactoryOptions{
+		CacheOptions: &cache.SharedCacheFactoryOptions{
+			KindTweakList: map[schema.GroupVersionKind]cache.TweakListOptionsFunc{
+				corev1.SchemeGroupVersion.WithKind("Secret"): func(opts *metav1.ListOptions) {
+					opts.LabelSelector = fmt.Sprintf("%s=%s", SecretLabelProvider, p.Name())
+				},
+			},
+		},
+	}
 
-		keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
-		if !ok {
-			return fmt.Errorf("secret does not contain field '%s'", corev1.TLSPrivateKeyKey)
-		}
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
 
-		p.contentMu.Lock()
-		p.cert = certData
-		p.key = keyData
-		p.contentMu.Unlock()
+	factory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(wctx.RESTConfig, scheme, opts)
+	if err != nil {
+		return err
+	}
 
-		p.notify()
-	case watch.Deleted:
-		if err := p.createOrUpdateCerts(nil); err != nil {
-			return err
+	genOpts := &generic.FactoryOptions{
+		SharedControllerFactory: factory,
+	}
+
+	coreCtrl, err := wranglercore.NewFactoryFromConfigWithOptions(wctx.RESTConfig, genOpts)
+	if err != nil {
+		return err
+	}
+
+	coreCtrl.Core().V1().Secret().AddGenericHandler(ctx, "sni-provider-secret-rotator", generic.FromObjectHandlerToHandler(p.onChange))
+
+	if err := coreCtrl.Start(ctx, 1); err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(certCheckInterval)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logrus.Info("stopping imperative api cert rotator")
+				ticker.Stop()
+
+				if err := p.secrets.Delete(Namespace, p.secretName, &metav1.DeleteOptions{}); client.IgnoreNotFound(err) != nil {
+					logrus.Error(err)
+				}
+			case <-ticker.C:
+				if err := p.handleCert(); err != nil {
+					logrus.Error(err)
+				}
+			}
 		}
+	}()
+
+	if err := p.handleCert(); err != nil {
+		return err
 	}
 
 	return nil

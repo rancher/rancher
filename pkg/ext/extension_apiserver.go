@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
@@ -170,18 +169,9 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	sniProvider.AddListener(ApiServiceCertListener(sniProvider, wranglerContext.API.APIService()))
 
-	go func() {
-		// sniProvider.Run uses a Watch that could be aborted due to external reasons, make sure we retry unless the context was already canceled
-		for {
-			if err := sniProvider.Run(ctx.Done()); err != nil {
-				logrus.Errorf("sni provider failed: %s", err)
-				if ctx.Err() != nil {
-					return
-				}
-			}
-			time.Sleep(10 * time.Second)
-		}
-	}()
+	if err := sniProvider.Start(ctx, wranglerContext); err != nil {
+		return nil, fmt.Errorf("failed to start sni provider: %w", err)
+	}
 
 	// Only need to listen on localhost because that port will be reached
 	// from a remotedialer tunnel on localhost
