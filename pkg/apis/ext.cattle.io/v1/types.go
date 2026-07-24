@@ -2,7 +2,16 @@
 package v1
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor/util"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -149,8 +158,16 @@ type TokenStatus struct {
 
 // Implement the TokenAccessor interface
 
+func (t *Token) GetLabels() map[string]string {
+	return t.ObjectMeta.Labels
+}
+
 func (t *Token) GetName() string {
 	return t.Name
+}
+
+func (t *Token) GetFullName() string {
+	return "ext/" + t.Name
 }
 
 func (t *Token) GetIsEnabled() bool {
@@ -217,6 +234,42 @@ func (t *Token) GetExpiresAt() string {
 
 func (t *Token) GetIsExpired() bool {
 	return t.Status.Expired
+}
+
+func (t *Token) Verify(tokenName, tokenKey string) (int, error) {
+	invalidAuthTokenErr := errors.New("invalid token")
+
+	if t == nil {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		tokenName = extTokenID
+	}
+	if t.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	// Ext token always has a hash. Only a hash.
+	hasher, err := hashers.GetHasherForHash(t.Status.Hash)
+	if err != nil {
+		logrus.Errorf("unable to get a hasher for token with error %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+	}
+
+	if err := hasher.VerifyHash(t.Status.Hash, tokenKey); err != nil {
+		logrus.Errorf("VerifyHash failed with error: %v", err)
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	if t.GetIsExpired() {
+		return http.StatusGone, errors.New("must authenticate, expired")
+	}
+
+	if util.IsIdleExpired(t, time.Now()) {
+		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+	}
+
+	return http.StatusOK, nil
 }
 
 // +genclient

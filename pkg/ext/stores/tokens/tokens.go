@@ -660,7 +660,8 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		// already some kind of api error
+		return nil, err
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
@@ -1054,6 +1055,14 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	return newToken, nil
 }
 
+// Patch applies the given JSONPatchType to the named token. It operates
+// directly on the internal secret. Use this only for operations on labels
+// and/or annotations.
+func (t *SystemStore) Patch(name string, patch []byte) error {
+	_, err := t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
+}
+
 // UpdateLastUsedAt patches the last-used-at information of the token.
 // Called during authentication.
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
@@ -1351,7 +1360,7 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		if err == nil {
 			return ext, nil
 		}
-		return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
+		return nil, err
 	}
 
 	// checking for a v3 Token first, as it is the currently more common
@@ -1363,11 +1372,11 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	}
 
 	// not a v3 Token, now check for ext token
-	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+	ext, err := t.Get(tokenID, "", &metav1.GetOptions{})
+	if err == nil {
 		return ext, nil
 	}
-
-	return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	return nil, err
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from

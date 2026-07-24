@@ -1150,7 +1150,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "provider/principal retrieval error",
-			err:  apierrors.NewInternalError(fmt.Errorf("unable to fetch unknown token \"session-token\"")),
+			err:  apierrors.NewInternalError(fmt.Errorf("failed to retrieve token session-token: %w", errSomeError)),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1899,6 +1899,42 @@ func TestSystemStoreDelete(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSystemStorePatch(t *testing.T) {
+	t.Run("patch anything", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// assemble and configure store from mock clients ...
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(nil)
+
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+
+		type jsonPatch struct {
+			Op    string `json:"op"`
+			Path  string `json:"path"`
+			Value any    `json:"value"`
+		}
+
+		patch, err := json.Marshal([]jsonPatch{{
+			Op:    "add",
+			Path:  "/metadata/labels/cattle.io.oidc-client-placeholder",
+			Value: "true",
+		}})
+		assert.NoError(t, err)
+		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, patch).
+			Return(nil, nil).Times(1)
+
+		err = store.Patch("atoken", patch)
+		assert.NoError(t, err)
+		// note: the main check, that the patch data is passed from
+		// system store to secret client, is done by the test framework
+		// itself, as it matches the call, or misses the match
+	})
 }
 
 func TestSystemStoreUpdateLastUsedAt(t *testing.T) {

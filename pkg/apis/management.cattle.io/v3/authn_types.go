@@ -1,11 +1,17 @@
 package v3
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/accessor/util"
+	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -50,7 +56,15 @@ type Token struct {
 
 // Implement the TokenAccessor interface
 
+func (t *Token) GetLabels() map[string]string {
+	return t.ObjectMeta.Labels
+}
+
 func (t *Token) GetName() string {
+	return t.ObjectMeta.Name
+}
+
+func (t *Token) GetFullName() string {
 	return t.ObjectMeta.Name
 }
 
@@ -112,6 +126,38 @@ func (t *Token) GetIsExpired() bool {
 
 	ttlDuration := time.Duration(t.TTLMillis) * time.Millisecond
 	return durationElapsed.Seconds() >= ttlDuration.Seconds()
+}
+
+func (t *Token) Verify(tokenName, tokenKey string) (int, error) {
+	if t == nil || t.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
+
+	if t.Annotations != nil && t.Annotations[TokenHashed] == "true" {
+		hasher, err := hashers.GetHasherForHash(t.Token)
+		if err != nil {
+			logrus.Errorf("unable to get a hasher for token with error %v", err)
+			return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+		}
+		if err := hasher.VerifyHash(t.Token, tokenKey); err != nil {
+			logrus.Errorf("VerifyHash failed with error: %v", err)
+			return http.StatusUnprocessableEntity, errInvalidAuthToken
+		}
+	} else {
+		if t.Token != tokenKey {
+			return http.StatusUnprocessableEntity, errInvalidAuthToken
+		}
+	}
+
+	if t.GetIsExpired() {
+		return http.StatusGone, errors.New("must authenticate, expired")
+	}
+
+	if util.IsIdleExpired(t, time.Now()) {
+		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+	}
+
+	return http.StatusOK, nil
 }
 
 // +genclient

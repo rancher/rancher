@@ -9,9 +9,12 @@ import (
 	"strings"
 	"time"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
@@ -47,7 +50,7 @@ type sessionAdder interface {
 }
 
 type authorizeHandler struct {
-	tokenCache      wrangmgmtv3.TokenCache
+	extTokenStore   *exttokenstore.SystemStore
 	userLister      wrangmgmtv3.UserCache
 	oidcClientCache wrangmgmtv3.OIDCClientCache
 	sessionAdder    sessionAdder
@@ -55,9 +58,9 @@ type authorizeHandler struct {
 	now             func() time.Time
 }
 
-func newAuthorizeHandler(tokenCache wrangmgmtv3.TokenCache, userLister wrangmgmtv3.UserCache, sessionAdder sessionAdder, codeCreator codeCreator, oidcClientCache wrangmgmtv3.OIDCClientCache) *authorizeHandler {
+func newAuthorizeHandler(extTokenStore *exttokenstore.SystemStore, userLister wrangmgmtv3.UserCache, sessionAdder sessionAdder, codeCreator codeCreator, oidcClientCache wrangmgmtv3.OIDCClientCache) *authorizeHandler {
 	return &authorizeHandler{
-		tokenCache:      tokenCache,
+		extTokenStore:   extTokenStore,
 		userLister:      userLister,
 		sessionAdder:    sessionAdder,
 		codeCreator:     codeCreator,
@@ -160,9 +163,10 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// store code and request info in a session. Session will be retrieved in the token endpoint using the code.
+	// store ext tokens in canonical form, i.e. with an `ext/` prefix.
 	err = h.sessionAdder.Add(code, session.Session{
 		ClientID:      params.clientID,
-		TokenName:     token.Name,
+		TokenName:     token.GetFullName(),
 		Scope:         params.scopes,
 		CodeChallenge: params.codeChallenge,
 		Nonce:         params.nonce,
@@ -189,7 +193,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
-func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) (*v3.Token, error) {
+func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) (accessor.TokenAccessor, error) {
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(r)
 	if tokenAuthValue == "" {
 		return nil, fmt.Errorf("rancher token not present")
@@ -199,7 +203,7 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 		return nil, fmt.Errorf("can't split rancher token")
 
 	}
-	token, err := h.tokenCache.Get(tokenName)
+	token, err := h.extTokenStore.Fetch(tokenName)
 	if err != nil {
 		// do not return early to avoid timing attacks
 		fakeToken, _ := randomtoken.Generate()
@@ -207,8 +211,9 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 		return nil, fmt.Errorf("invalid token")
 	}
 	// If the auth provider is specified make sure it exists and enabled.
-	if token.AuthProvider != "" {
-		disabled, err := providers.IsDisabledProvider(token.AuthProvider)
+	authProvider := token.GetAuthProvider()
+	if authProvider != "" {
+		disabled, err := providers.IsDisabledProvider(authProvider)
 		if err != nil {
 			return nil, fmt.Errorf("can't check if auth provider is disabled: %w", err)
 		}
@@ -216,11 +221,11 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 			return nil, fmt.Errorf("auth provider is disabled")
 		}
 	}
-	if _, err := tokens.VerifyToken(token, tokenName, tokenKey); err != nil {
+	if _, err := verifyToken(token, tokenName, tokenKey); err != nil {
 		return nil, fmt.Errorf("failed to verify token: %w", err)
 	}
 
-	authUser, err := h.userLister.Get(token.UserID)
+	authUser, err := h.userLister.Get(token.GetUserID())
 	if err != nil {
 		return nil, fmt.Errorf("can't get user: %w", err)
 	}
@@ -230,6 +235,21 @@ func (h *authorizeHandler) getAndVerifyRancherTokenFromRequest(r *http.Request) 
 	}
 
 	return token, nil
+}
+
+func verifyToken(token accessor.TokenAccessor, tokenName, tokenKey string) (int, error) {
+	switch t := token.(type) {
+	case *v3.Token:
+		return tokens.VerifyToken(t, tokenName, tokenKey)
+	case *ext.Token:
+		// tokenNames may or may not have the `ext/` prefix, depending on origin
+		if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+			tokenName = extTokenID
+		}
+		return tokens.ExtVerifyToken(t, tokenName, tokenKey)
+	default:
+		return 0, fmt.Errorf("unsupported token type %T", token)
+	}
 }
 
 // getAuthParamsFromRequest returns the params for the request. OIDC spec says that params can be either in a GET or POST request, so we should check both.
