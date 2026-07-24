@@ -650,6 +650,25 @@ type SamlConfig struct {
 	UIDField           string `json:"uidField"           norman:"required"`
 	RancherAPIHost     string `json:"rancherApiHost"     norman:"required"`
 	EntityID           string `json:"entityID"`
+
+	// NameIDFormat is the SAML NameID format the SP requests in the AuthnRequest.
+	// Consumed by the generic SAML provider only. Empty defaults to "unspecified".
+	// +optional
+	NameIDFormat string `json:"nameIDFormat,omitempty" norman:"type=enum,options=unspecified|emailAddress|transient|persistent"`
+
+	// SignatureMethod is the XML signature algorithm the SP uses to sign requests.
+	// Consumed by the generic SAML provider only. Empty defaults to "RSA-SHA256".
+	// +optional
+	SignatureMethod string `json:"signatureMethod,omitempty" norman:"type=enum,options=RSA-SHA256|RSA-SHA1|RSA-SHA512"`
+
+	// AllowIdpInitiated enables IdP-initiated SSO. Consumed by the generic SAML provider only.
+	// +optional
+	AllowIdpInitiated bool `json:"allowIdpInitiated,omitempty"`
+
+	// ForceAuthn, when set true, requests that the IdP force re-authentication.
+	// Consumed by the generic SAML provider only.
+	// +optional
+	ForceAuthn *bool `json:"forceAuthn,omitempty"`
 }
 
 type SamlConfigTestInput struct {
@@ -688,6 +707,11 @@ type OKTAConfig struct {
 type ShibbolethConfig struct {
 	SamlConfig     `json:",inline" mapstructure:",squash"`
 	OpenLdapConfig LdapFields `json:"openLdapConfig"`
+}
+
+// GenericSAMLConfig is the config for the generic, configurable SAML 2.0 auth provider.
+type GenericSAMLConfig struct {
+	SamlConfig `json:",inline" mapstructure:",squash"`
 }
 
 type AuthSystemImages struct {

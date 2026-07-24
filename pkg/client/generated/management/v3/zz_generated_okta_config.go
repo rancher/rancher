@@ -3,6 +3,7 @@ package client
 const (
 	OKTAConfigType                     = "oktaConfig"
 	OKTAConfigFieldAccessMode          = "accessMode"
+	OKTAConfigFieldAllowIdpInitiated   = "allowIdpInitiated"
 	OKTAConfigFieldAllowedPrincipalIDs = "allowedPrincipalIds"
 	OKTAConfigFieldAnnotations         = "annotations"
 	OKTAConfigFieldCreated             = "created"
@@ -10,6 +11,7 @@ const (
 	OKTAConfigFieldDisplayNameField    = "displayNameField"
 	OKTAConfigFieldEnabled             = "enabled"
 	OKTAConfigFieldEntityID            = "entityID"
+	OKTAConfigFieldForceAuthn          = "forceAuthn"
 	OKTAConfigFieldGroupsField         = "groupsField"
 	OKTAConfigFieldIDPMetadataContent  = "idpMetadataContent"
 	OKTAConfigFieldLabels              = "labels"
@@ -17,10 +19,12 @@ const (
 	OKTAConfigFieldLogoutAllForced     = "logoutAllForced"
 	OKTAConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	OKTAConfigFieldName                = "name"
+	OKTAConfigFieldNameIDFormat        = "nameIDFormat"
 	OKTAConfigFieldOpenLdapConfig      = "openLdapConfig"
 	OKTAConfigFieldOwnerReferences     = "ownerReferences"
 	OKTAConfigFieldRancherAPIHost      = "rancherApiHost"
 	OKTAConfigFieldRemoved             = "removed"
+	OKTAConfigFieldSignatureMethod     = "signatureMethod"
 	OKTAConfigFieldSpCert              = "spCert"
 	OKTAConfigFieldSpKey               = "spKey"
 	OKTAConfigFieldStatus              = "status"
@@ -32,6 +36,7 @@ const (
 
 type OKTAConfig struct {
 	AccessMode          string            `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
+	AllowIdpInitiated   bool              `json:"allowIdpInitiated,omitempty" yaml:"allowIdpInitiated,omitempty"`
 	AllowedPrincipalIDs []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
@@ -39,6 +44,7 @@ type OKTAConfig struct {
 	DisplayNameField    string            `json:"displayNameField,omitempty" yaml:"displayNameField,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EntityID            string            `json:"entityID,omitempty" yaml:"entityID,omitempty"`
+	ForceAuthn          *bool             `json:"forceAuthn,omitempty" yaml:"forceAuthn,omitempty"`
 	GroupsField         string            `json:"groupsField,omitempty" yaml:"groupsField,omitempty"`
 	IDPMetadataContent  string            `json:"idpMetadataContent,omitempty" yaml:"idpMetadataContent,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -46,10 +52,12 @@ type OKTAConfig struct {
 	LogoutAllForced     bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NameIDFormat        string            `json:"nameIDFormat,omitempty" yaml:"nameIDFormat,omitempty"`
 	OpenLdapConfig      *LdapFields       `json:"openLdapConfig,omitempty" yaml:"openLdapConfig,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SignatureMethod     string            `json:"signatureMethod,omitempty" yaml:"signatureMethod,omitempty"`
 	SpCert              string            `json:"spCert,omitempty" yaml:"spCert,omitempty"`
 	SpKey               string            `json:"spKey,omitempty" yaml:"spKey,omitempty"`
 	Status              *AuthConfigStatus `json:"status,omitempty" yaml:"status,omitempty"`

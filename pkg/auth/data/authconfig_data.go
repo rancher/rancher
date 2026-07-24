@@ -69,6 +69,10 @@ func AuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
+	if err := addAuthConfigWithSLO(saml.GenericSAMLName, client.GenericSAMLConfigType, false, management); err != nil {
+		return err
+	}
+
 	if err := addAuthConfig(googleoauth.Name, client.GoogleOauthConfigType, false, management); err != nil {
 		return err
 	}

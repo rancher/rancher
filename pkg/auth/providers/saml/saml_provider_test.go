@@ -20,6 +20,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -48,6 +50,26 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 
 	assert.True(t, provider.hasLdapGroupSearch(), "Missing LDAP group search capability for okta provider")
 	assert.NotNil(t, provider.ldapProvider, "Configured okta provider did not receive child LDAP provider")
+}
+
+func TestConfiguredGenericSAMLProviderHasNoLdap(t *testing.T) {
+	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
+	// just enough scaffolding to run the Configure function.
+	ctx := t.Context()
+	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
+	require.NoError(t, err, "Failed to create NewScaledContext")
+
+	// Create the dummy wrangler context
+	wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{})
+	require.NoError(t, err, "Failed to create wranglerContext")
+	mgmtCtx.Wrangler = wranglerContext
+
+	tokenMGR := tokens.NewManager(wranglerContext)
+	provider, ok := Configure(mgmtCtx, mgmtCtx.UserManager, tokenMGR, GenericSAMLName).(*Provider)
+	require.True(t, ok, "Failed to Configure a valid Provider")
+
+	assert.False(t, provider.hasLdapGroupSearch(), "Generic SAML provider must not have LDAP group search")
+	assert.Nil(t, provider.ldapProvider, "Generic SAML provider must not receive a child LDAP provider")
 }
 
 func TestSearchPrincipals(t *testing.T) {
@@ -483,4 +505,22 @@ func (p *mockLdapProvider) GetUserExtraAttributesFromToken(token accessor.TokenA
 
 func (p *mockLdapProvider) IsDisabledProvider() (bool, error) {
 	panic("IsDisabledProvider Unimplemented!")
+}
+
+func TestFormSamlRedirectURLGenericSAML(t *testing.T) {
+	cfg := map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	}
+	got := formSamlRedirectURLFromMap(cfg, GenericSAMLName)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login", got)
+}
+
+func TestTransformToAuthProviderGenericSAML(t *testing.T) {
+	p := &Provider{name: GenericSAMLName}
+	out, err := p.TransformToAuthProvider(map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login",
+		out[publicclient.GenericSAMLProviderFieldRedirectURL])
 }
