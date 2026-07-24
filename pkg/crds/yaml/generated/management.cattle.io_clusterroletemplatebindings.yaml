@@ -223,6 +223,8 @@ spec:
         - clusterName
         - roleTemplateName
         type: object
+    selectableFields:
+    - jsonPath: .userName
     served: true
     storage: true
     subresources:
