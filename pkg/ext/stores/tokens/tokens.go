@@ -1765,31 +1765,54 @@ func clampMaxTTL(ttl int64) (int64, error) {
 	}
 
 	// decision table
-	// max | ttl         | note                                        | result
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
-	// < 1 | = 0         | max = +inf = default, ttl default requested | -1 = +inf
-	// < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// > 0 | < 0         | ttl = +inf, clamp to max                    | max
-	// > 0 | = 0         | ttl default requested, this is max          | max
-	// > 0 | > 0, <= max | less than max                               | ttl
-	// > 0 | > max       | clamp to max                                | max
+	//   | max | ttl         | note                                         | result
+	// - + --- + ----------- + ------------------------------------------- + ----------------
+	// a | < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
+	// b | < 1 | = 0         | max = +inf, ttl default requested, no clamp | default
+	// c | < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
+	// - + --- + ----------- + ------------------------------------------- + ----------------
+	// d | > 0 | < 0         | ttl = +inf, clamp to max                    | max
+	// e | > 0 | = 0         | ttl default requested, clamp it to max      | clamp (default)
+	// f | > 0 | > 0, <= max | less than max                               | ttl
+	// g | > 0 | > max       | clamp to max                                | max
 
 	if max < 1 {
+		// a,b,c
 		if ttl == 0 {
-			return -1, nil
+			// b
+			defaultvalue, err := defaultTTL()
+			if err != nil {
+				return 0, err
+			}
+			return defaultvalue, nil
 		}
+		// a,c
 		return ttl, nil
 	}
-	if ttl > max || ttl <= 0 {
+	// d,e,f,g
+	if ttl > max || ttl < 0 {
+		// d,g
 		return max, nil
 	}
+	if ttl == 0 {
+		// e
+		defaultvalue, err := defaultTTL()
+		if err != nil {
+			return 0, err
+		}
+		// inlined clampMaxTTL(default), simplified, a,b,c irrelevant
+		if defaultvalue > max || defaultvalue < 0 {
+			// d,g
+			return max, nil
+		}
+		// e,f
+		return defaultvalue, nil
+	}
+	// f
 	return ttl, nil
 }
 
-// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
-// See also pkg/auth/tokens/manager.go
+// ParseTokenTTL parses an integer representing minutes as a string and returns it as a duration.
 func ParseTokenTTL(ttl string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vm", ttl)
 	dur, err := time.ParseDuration(durString)
@@ -1807,6 +1830,16 @@ func maxTTL() (int64, error) {
 	}
 
 	return maxTTL.Milliseconds(), nil
+}
+
+func defaultTTL() (int64, error) {
+	defaultTTL, err := ParseTokenTTL(settings.AuthTokenDefaultTTLMinutes.Get())
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenDefaultTTLMinutes.Name, err)
+	}
+
+	return defaultTTL.Milliseconds(), nil
 }
 
 // ttlGreater compares the two TTL a and b. It returns true if a is greater than b.

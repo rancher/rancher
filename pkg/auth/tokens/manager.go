@@ -101,7 +101,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return apiv3.Token{}, "", http.StatusUnauthorized, err
 	}
 
-	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	tokenTTL, err := ClampToMaxAuthTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
 		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating max-ttl %v", err)
 	}
@@ -775,47 +775,68 @@ func (m *Manager) GetKubeconfigToken(clusterName, tokenName, description, kind, 
 	return token, createdTokenValue, nil
 }
 
-// ClampToMaxTTL will return the duration of the provided TTL or the duration of settings.AuthTokenMaxTTLMinutes whichever is smaller.
-func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
-	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+// ClampToMaxAuthTTL will return the duration of the provided TTL or the
+// duration of settings.AuthTokenMaxTTLMinutes, whichever is smaller.
+func ClampToMaxAuthTTL(ttl time.Duration) (time.Duration, error) {
+	maxTTL, err := maxAuthTTL()
+	if err != nil {
+		return 0, err
+	}
+	return ClampToMaxTTL(ttl, maxTTL), nil
+}
+
+// ClampToMaxTTL will return the duration of the provided TTL or the max TTL, whichever is smaller.
+func ClampToMaxTTL(ttl, max time.Duration) time.Duration {
+	// handle infinities
+	if max == 0 {
+		return ttl
+	}
+	if ttl == 0 {
+		return max
+	}
+	// return minimum
+	if ttl <= max {
+		return ttl
+	}
+	return max
+}
+
+// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for
+// kubeconfig tokens, in milliseconds, and clamped to the associated max.
+func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
+	defaultTTL, err := defaultKubeconfigTTL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate kubeconfig ttl: %w", err)
+	}
+	maxTTL, err := maxKubeconfigTTL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate kubeconfig ttl: %w", err)
+	}
+
+	ttlMillis := ClampToMaxTTL(defaultTTL, maxTTL).Milliseconds()
+	return &ttlMillis, nil
+}
+
+func maxKubeconfigTTL() (time.Duration, error) {
+	maxKubeconfigTTL, err := exttokenstore.ParseTokenTTL(settings.KubeconfigMaxTokenTTLMinutes.Get())
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigMaxTokenTTLMinutes.Name, err)
+	}
+	return maxKubeconfigTTL, nil
+}
+
+func defaultKubeconfigTTL() (time.Duration, error) {
+	defaultKubeconfigTTL, err := exttokenstore.ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
+	}
+	return defaultKubeconfigTTL, nil
+}
+
+func maxAuthTTL() (time.Duration, error) {
+	maxAuthTTL, err := exttokenstore.ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
 	}
-	if maxTTL == 0 {
-		return ttl, nil
-	}
-	if ttl == 0 {
-		return maxTTL, nil
-	}
-	// return min(ttl, maxTTL)
-	if ttl <= maxTTL {
-		return ttl, nil
-	}
-	return maxTTL, nil
-}
-
-// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
-// See also pkg/ext/stores/tokens/tokens.go
-func ParseTokenTTL(ttl string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vm", ttl)
-	dur, err := time.ParseDuration(durString)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing token ttl: %v", err)
-	}
-	return dur, nil
-}
-
-// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for kubeconfig tokens
-func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
-	defaultTokenTTL, err := exttokenstore.ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
-	}
-
-	tokenTTL, err := ClampToMaxTTL(defaultTokenTTL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate token ttl: %w", err)
-	}
-	ttlMilli := tokenTTL.Milliseconds()
-	return &ttlMilli, nil
+	return maxAuthTTL, nil
 }
