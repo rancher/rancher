@@ -207,7 +207,7 @@ func TestOnChange(t *testing.T) {
 						Status:             metav1.ConditionFalse,
 						LastTransitionTime: mockTimeFactory(),
 						Reason:             reasonPolicyIsInvalid,
-						Message:            "failed to create redactor: failed to parse paths: failed to parse jsonpath: paths must begin with the root object identifier: '$'",
+						Message:            "failed to create redactor: failed to parse paths: failed to parse jsonpath \".missing.root\": paths must begin with the root object identifier: '$'",
 					},
 				},
 			},
