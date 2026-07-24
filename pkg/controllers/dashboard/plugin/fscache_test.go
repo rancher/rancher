@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"sync"
 	"testing"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -140,6 +141,79 @@ func TestSyncWithIndex(t *testing.T) {
 					assert.Equal(t, tc.ExpectedPluginDeleted, actualPluginDeleted)
 				}
 			}
+		})
+	}
+}
+
+func TestSyncWithIndexConcurrentAccess(t *testing.T) {
+	testCases := []struct {
+		Name       string
+		NumPlugins int
+		Iterations int
+	}{
+		{
+			Name:       "SyncWithIndex is safe during concurrent index generation",
+			NumPlugins: 20,
+			Iterations: 300,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			originalRemoveAll := osRemoveAll
+			osRemoveAll = func(path string) error {
+				return nil
+			}
+			defer func() {
+				osRemoveAll = originalRemoveAll
+			}()
+
+			plugins := make([]*v1.UIPlugin, tc.NumPlugins)
+			fsCacheFiles := make([]string, tc.NumPlugins)
+
+			for i := 0; i < tc.NumPlugins; i++ {
+				name := fmt.Sprintf("test-plugin-%d", i)
+				plugins[i] = &v1.UIPlugin{
+					Spec: v1.UIPluginSpec{
+						Plugin: v1.UIPluginEntry{
+							Name:    name,
+							Version: "0.1.0",
+						},
+					},
+				}
+
+				fsCacheFiles[i] = fmt.Sprintf("%s/%s/0.1.0/plugin.js", FSCacheRootDir, name)
+			}
+
+			index := &SafeIndex{}
+			fsCache := FSCache{}
+
+			assert.NoError(t, index.Generate(plugins))
+			ready := make(chan struct{})
+
+			var wg sync.WaitGroup
+			wg.Add(2)
+
+			go func() {
+				defer wg.Done()
+				<-ready
+
+				for i := 0; i < tc.Iterations; i++ {
+					_ = fsCache.SyncWithIndex(index, fsCacheFiles)
+				}
+			}()
+
+			go func() {
+				defer wg.Done()
+				<-ready
+
+				for i := 0; i < tc.Iterations; i++ {
+					_ = index.Generate(plugins)
+				}
+			}()
+
+			close(ready)
+			wg.Wait()
 		})
 	}
 }
