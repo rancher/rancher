@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type extTokenStore interface {
@@ -139,7 +140,7 @@ func (s *Service) deleteClusterRoleTemplateBindings(provider string) error {
 	}
 
 	for _, b := range list {
-		if getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName) == provider {
+		if getProvidersFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName).Has(provider) {
 			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -157,7 +158,7 @@ func (s *Service) deleteGlobalRoleBindings(provider string) error {
 	}
 
 	for _, b := range list {
-		if getProviderNameFromPrincipalNames(b.GroupPrincipalName) == provider {
+		if getProvidersFromPrincipalNames(b.GroupPrincipalName).Has(provider) {
 			err := s.globalRoleBindingsClient.Delete(b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -175,7 +176,7 @@ func (s *Service) deleteProjectRoleTemplateBindings(provider string) error {
 	}
 
 	for _, b := range prtbs {
-		if getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName) == provider {
+		if getProvidersFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName).Has(provider) {
 			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -200,7 +201,8 @@ func (s *Service) deleteUsers(provider string) error {
 	}
 
 	for _, u := range users.Items {
-		if getProviderNameFromPrincipalNames(u.PrincipalIDs...) != provider {
+		providers := getProvidersFromPrincipalNames(u.PrincipalIDs...)
+		if !providers.Has(provider) || providers.Len() > 1 {
 			continue
 		}
 		// A fully external user (who was never local) has no password.
@@ -287,14 +289,16 @@ func (s *Service) resetLocalUser(user *v3.User) error {
 	return nil
 }
 
-// getProviderNameFromPrincipalNames tries to extract the provider name from any one string that represents
-// a user principal or group principal.
-func getProviderNameFromPrincipalNames(names ...string) string {
+// getProvidersFromPrincipalNames returns the set of non-local provider names extracted from
+// the given principal ID strings. Each principal has the form "<provider>_<type>://<id>",
+// where <type> is "user" or "group". Local principals are excluded from the result.
+func getProvidersFromPrincipalNames(names ...string) sets.Set[string] {
+	providers := sets.New[string]()
 	for _, name := range names {
 		parts := strings.Split(name, "_")
 		if len(parts) > 0 && parts[0] != "" && !strings.HasPrefix(parts[0], "local") {
-			return parts[0]
+			providers.Insert(parts[0])
 		}
 	}
-	return ""
+	return providers
 }
