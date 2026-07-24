@@ -242,10 +242,6 @@ func verifyToken(token accessor.TokenAccessor, tokenName, tokenKey string) (int,
 	case *v3.Token:
 		return tokens.VerifyToken(t, tokenName, tokenKey)
 	case *ext.Token:
-		// tokenNames may or may not have the `ext/` prefix, depending on origin
-		if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
-			tokenName = extTokenID
-		}
 		return tokens.ExtVerifyToken(t, tokenName, tokenKey)
 	default:
 		return 0, fmt.Errorf("unsupported token type %T", token)

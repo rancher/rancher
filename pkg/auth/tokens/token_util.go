@@ -191,10 +191,18 @@ func VerifyTokenWithoutKey(storedToken *apiv3.Token, tokenName string) (int, err
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.
 // This must match the logic of `VerifyToken` above.
 func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
+	if storedToken == nil {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
 	invalidAuthTokenErr := errors.New("invalid token")
 
-	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	// tokenNames may or may not have the `ext/` prefix, depending on origin
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		tokenName = extTokenID
+	}
+
+	if storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
 	// Ext token always has a hash. Only a hash.
@@ -227,10 +235,17 @@ func ExtVerifyTokenWithoutKey(storedToken *ext.Token, tokenName string) (int, er
 	// authenticating a JWT token representing an OIDC session. See
 	// `TokenFromRequest` in `pkg/auth/requests/authenticate.go`.
 
+	if storedToken == nil {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
 	invalidAuthTokenErr := errors.New("invalid token")
 
-	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	// tokenNames may or may not have the `ext/` prefix, depending on origin
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		tokenName = extTokenID
+	}
+	if storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
 	if IsExpired(storedToken) {
