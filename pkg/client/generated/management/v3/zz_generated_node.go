@@ -21,9 +21,13 @@ const (
 	NodeFieldDockerInfo           = "dockerInfo"
 	NodeFieldEtcd                 = "etcd"
 	NodeFieldExternalIPAddress    = "externalIpAddress"
+	NodeFieldExternalIPv4Address  = "externalIpv4Address"
+	NodeFieldExternalIPv6Address  = "externalIpv6Address"
 	NodeFieldFeatures             = "features"
 	NodeFieldHostname             = "hostname"
 	NodeFieldIPAddress            = "ipAddress"
+	NodeFieldIPv4Address          = "ipv4Address"
+	NodeFieldIPv6Address          = "ipv6Address"
 	NodeFieldImported             = "imported"
 	NodeFieldInfo                 = "info"
 	NodeFieldLabels               = "labels"
@@ -70,9 +74,13 @@ type Node struct {
 	DockerInfo           *DockerInfo               `json:"dockerInfo,omitempty" yaml:"dockerInfo,omitempty"`
 	Etcd                 bool                      `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	ExternalIPAddress    string                    `json:"externalIpAddress,omitempty" yaml:"externalIpAddress,omitempty"`
+	ExternalIPv4Address  string                    `json:"externalIpv4Address,omitempty" yaml:"externalIpv4Address,omitempty"`
+	ExternalIPv6Address  string                    `json:"externalIpv6Address,omitempty" yaml:"externalIpv6Address,omitempty"`
 	Features             *NodeFeatures             `json:"features,omitempty" yaml:"features,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+	IPv4Address          string                    `json:"ipv4Address,omitempty" yaml:"ipv4Address,omitempty"`
+	IPv6Address          string                    `json:"ipv6Address,omitempty" yaml:"ipv6Address,omitempty"`
 	Imported             bool                      `json:"imported,omitempty" yaml:"imported,omitempty"`
 	Info                 *NodeInfo                 `json:"info,omitempty" yaml:"info,omitempty"`
 	Labels               map[string]string         `json:"labels,omitempty" yaml:"labels,omitempty"`

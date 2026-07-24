@@ -1,12 +1,19 @@
 package mapper
 
 import (
+	"net/netip"
+
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 )
 
 const (
-	extIPField = "externalIpAddress"
+	extIPField   = "externalIpAddress"
+	ipv4Field    = "ipv4Address"
+	ipv6Field    = "ipv6Address"
+	extIPv4Field = "externalIpv4Address"
+	extIPv6Field = "externalIpv6Address"
 )
 
 type NodeAddressMapper struct {
@@ -15,14 +22,41 @@ type NodeAddressMapper struct {
 func (n NodeAddressMapper) FromInternal(data map[string]interface{}) {
 	addresses, _ := values.GetSlice(data, "addresses")
 	for _, address := range addresses {
-		t := address["type"]
-		a := address["address"]
-		if t == "InternalIP" {
+		t := convert.ToString(address["type"])
+		a := convert.ToString(address["address"])
+		if a == "" {
+			continue
+		}
+
+		switch t {
+		case "InternalIP":
 			data["ipAddress"] = a
-		} else if t == "ExternalIP" {
+			setFamilyAddress(data, a, ipv4Field, ipv6Field)
+		case "ExternalIP":
 			data[extIPField] = a
-		} else if t == "Hostname" {
+			setFamilyAddress(data, a, extIPv4Field, extIPv6Field)
+		case "Hostname":
 			data["hostname"] = a
+		}
+	}
+}
+
+// setFamilyAddress records the first IPv4 and IPv6 address seen for the given fields.
+// Existing ipAddress/externalIpAddress remain last-wins for backward compatibility.
+func setFamilyAddress(data map[string]interface{}, address, v4Field, v6Field string) {
+	addr, err := netip.ParseAddr(address)
+	if err != nil {
+		return
+	}
+	if addr.Is4() || addr.Is4In6() {
+		if _, exists := data[v4Field]; !exists {
+			data[v4Field] = addr.Unmap().String()
+		}
+		return
+	}
+	if addr.Is6() {
+		if _, exists := data[v6Field]; !exists {
+			data[v6Field] = addr.String()
 		}
 	}
 }

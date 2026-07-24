@@ -122,10 +122,14 @@ func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
 			schema.CodeName = "InternalNodeStatus"
 			schema.CodeNamePlural = "InternalNodeStatuses"
 		}, struct {
-			IPAddress         string
-			ExternalIPAddress string `json:"externalIpAddress,omitempty"`
-			Hostname          string
-			Info              NodeInfo
+			IPAddress           string
+			IPv4Address         string `json:"ipv4Address,omitempty"`
+			IPv6Address         string `json:"ipv6Address,omitempty"`
+			ExternalIPAddress   string `json:"externalIpAddress,omitempty"`
+			ExternalIPv4Address string `json:"externalIpv4Address,omitempty"`
+			ExternalIPv6Address string `json:"externalIpv6Address,omitempty"`
+			Hostname            string
+			Info                NodeInfo
 		}{})
 }
 
