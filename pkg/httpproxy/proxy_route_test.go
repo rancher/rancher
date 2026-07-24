@@ -1,9 +1,11 @@
 package httpproxy
 
 import (
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -258,7 +260,9 @@ func TestPerRouteTLSTransport_UsesDefaultTransportWhenInsecureNotSet(t *testing.
 	}))
 	defer ts.Close()
 
-	host := ts.Listener.Addr().String() // e.g. "127.0.0.1:PORT"
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+	host := tsURL.Hostname()
 
 	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
 	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
@@ -273,6 +277,56 @@ func TestPerRouteTLSTransport_UsesDefaultTransportWhenInsecureNotSet(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.False(t, insecure.called, "insecure transport must not be used when InsecureSkipTLSVerify is false")
+}
+
+func TestPerRouteTLSTransport_SelfSignedRoute_InsecureSkipTLSVerifyTrue_Succeeds(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute(tsURL.Hostname(), true, nil),
+	}, nil)
+
+	p := &proxy{
+		proxyEndpointCache: cache,
+		insecureTransport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+	}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestPerRouteTLSTransport_SelfSignedRoute_InsecureSkipTLSVerifyFalse_Fails(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute(tsURL.Hostname(), false, nil),
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache, insecureTransport: &recordingTransport{}}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	_, err = transport.RoundTrip(req)
+	require.Error(t, err)
 }
 
 func TestPerRouteTLSTransport_UsesDefaultTransportWhenNoRouteMatches(t *testing.T) {
