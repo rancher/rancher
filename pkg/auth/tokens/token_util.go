@@ -147,7 +147,7 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		hasher, err := hashers.GetHasherForHash(storedToken.Token)
 		if err != nil {
 			logrus.Errorf("unable to get a hasher for token with error %v", err)
-			return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+			return http.StatusInternalServerError, errInvalidAuthToken
 		}
 		if err := hasher.VerifyHash(storedToken.Token, tokenKey); err != nil {
 			logrus.Errorf("VerifyHash failed with error: %v", err)
@@ -155,16 +155,19 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		}
 	} else {
 		if storedToken.Token != tokenKey {
+			logrus.Errorf("token mismatch, stored %q != have %q", storedToken.Token, tokenKey)
 			return http.StatusUnprocessableEntity, errInvalidAuthToken
 		}
 	}
 
 	if IsExpired(storedToken) {
-		return http.StatusGone, errors.New("must authenticate, expired")
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	if IsIdleExpired(storedToken, time.Now()) {
-		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	return http.StatusOK, nil
@@ -178,11 +181,13 @@ func VerifyTokenWithoutKey(storedToken *apiv3.Token, tokenName string) (int, err
 	}
 
 	if IsExpired(storedToken) {
-		return http.StatusGone, errors.New("must authenticate, expired")
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	if IsIdleExpired(storedToken, time.Now()) {
-		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	return http.StatusOK, nil
@@ -194,7 +199,6 @@ func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, er
 	if storedToken == nil {
 		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
-	invalidAuthTokenErr := errors.New("invalid token")
 
 	// tokenNames may or may not have the `ext/` prefix, depending on origin
 	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
@@ -209,20 +213,22 @@ func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, er
 	hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
 	if err != nil {
 		logrus.Errorf("unable to get a hasher for token with error %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+		return http.StatusInternalServerError, errInvalidAuthToken
 	}
 
 	if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
 		logrus.Errorf("VerifyHash failed with error: %v", err)
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
 	if IsExpired(storedToken) {
-		return http.StatusGone, errors.New("must authenticate, expired")
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	if IsIdleExpired(storedToken, time.Now()) {
-		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	return http.StatusOK, nil
@@ -238,22 +244,24 @@ func ExtVerifyTokenWithoutKey(storedToken *ext.Token, tokenName string) (int, er
 	if storedToken == nil {
 		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
-	invalidAuthTokenErr := errors.New("invalid token")
 
 	// tokenNames may or may not have the `ext/` prefix, depending on origin
 	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
 		tokenName = extTokenID
 	}
+
 	if storedToken.ObjectMeta.Name != tokenName {
 		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
 	if IsExpired(storedToken) {
-		return http.StatusGone, errors.New("must authenticate, expired")
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	if IsIdleExpired(storedToken, time.Now()) {
-		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	return http.StatusOK, nil
