@@ -2,6 +2,7 @@ package providerrefresh
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,24 +20,32 @@ var (
 	c   = cron.New()
 )
 
+// startOnce guards StartRefreshDaemon so the daemon runs exactly once per
+// process. Rancher wires OnLeader under two distinct lock names (auth server
+// and multi-cluster manager); both fire on the same pod in single-instance
+// deployments and would otherwise race on the package-level `ref` and `c`
+// state, potentially leaking an orphan cron goroutine.
+var startOnce sync.Once
+
 func StartRefreshDaemon(scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
-	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
-	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
-	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
-	ref = &refresher{
-		tokenLister:               mgmtContext.Management.Tokens("").Controller().Lister(),
-		tokens:                    mgmtContext.Management.Tokens(""),
-		userLister:                mgmtContext.Management.Users("").Controller().Lister(),
-		tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
-		userAttributes:            mgmtContext.Management.UserAttributes(""),
-		userAttributeLister:       mgmtContext.Management.UserAttributes("").Controller().Lister(),
-		extTokenStore:             extTokenStore,
-		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
-	}
+	startOnce.Do(func() {
+		extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
+		refreshCronTime := settings.AuthUserInfoResyncCron.Get()
+		maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
+		ref = &refresher{
+			tokenLister:               mgmtContext.Management.Tokens("").Controller().Lister(),
+			tokens:                    mgmtContext.Management.Tokens(""),
+			userLister:                mgmtContext.Management.Users("").Controller().Lister(),
+			tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
+			userAttributes:            mgmtContext.Management.UserAttributes(""),
+			userAttributeLister:       mgmtContext.Management.UserAttributes("").Controller().Lister(),
+			extTokenStore:             extTokenStore,
+			ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
+		}
 
-	UpdateRefreshMaxAge(maxAge)
-	UpdateRefreshCronTime(refreshCronTime)
-
+		UpdateRefreshMaxAge(maxAge)
+		UpdateRefreshCronTime(refreshCronTime)
+	})
 }
 
 func UpdateRefreshCronTime(refreshCronTime string) {
