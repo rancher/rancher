@@ -24,12 +24,12 @@ import (
 )
 
 const (
-	/* Prior to 2.5, the label "memberhsip-binding-owner" was set on the CRB/RBs for a roleTemplateBinding with the key being the roleTemplateBinding's UID.
-	2.5 onwards, instead of the roleTemplateBinding's UID, a combination of its namespace and name will be used in this label.
-	CRB/RBs on clusters upgraded from 2.4.x to 2.5 will continue to carry the original label with UID. To ensure permissions are managed properly on upgrade,
-	we need to change the label value as well.
-	So the older label value, MembershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner" (notice the spelling mistake),
-	and the new label, MembershipBindingOwner will be "membership-binding-owner" (a different label value with the right spelling)*/
+	// Prior to 2.5, the label "memberhsip-binding-owner" was set on the CRB/RBs for a roleTemplateBinding with the key being the roleTemplateBinding's UID.
+	// 2.5 onwards, instead of the roleTemplateBinding's UID, a combination of its namespace and name will be used in this label.
+	// CRB/RBs on clusters upgraded from 2.4.x to 2.5 will continue to carry the original label with UID.
+	// To ensure permissions are managed properly on upgrade, we need to change the label value as well.
+	// So the older label value, MembershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner" (notice the spelling mistake),
+	// and the new label, MembershipBindingOwner will be "membership-binding-owner" (a different label value with the right spelling)
 	MembershipBindingOwnerLegacy = "memberhsip-binding-owner"
 	MembershipBindingOwner       = "membership-binding-owner"
 	clusterResource              = "clusters"
@@ -98,10 +98,19 @@ type crtbLifecycle struct {
 }
 
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	logrus.Debugf("ZZZZZZ auth/CRTB create %q", obj.Name)
+
 	if features.AggregatedRoleTemplates.Enabled() {
+		logrus.Debugf("ZZZZZZ auth/CRTB create %q - skip, using aggregated role templates", obj.Name)
 		return nil, nil
 	}
 	var localConditions []metav1.Condition
+
+	logrus.Debugf("ZZZZZZ auth/CRTB create %q - reconcile", obj.Name)
+	defer func() {
+		logrus.Debugf("ZZZZZZ auth/CRTB create %q - reconcile done", obj.Name)
+	}()
+
 	obj, err := c.reconcileSubject(obj, &localConditions)
 	return obj, errors.Join(err,
 		c.reconcileBindings(obj, &localConditions),
@@ -109,10 +118,19 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	logrus.Debugf("ZZZZZZ auth/CRTB updated %q", obj.Name)
+
 	if features.AggregatedRoleTemplates.Enabled() {
+		logrus.Debugf("ZZZZZZ auth/CRTB updated %q - skip, using aggregated role templates", obj.Name)
 		return nil, nil
 	}
 	var localConditions []metav1.Condition
+
+	logrus.Debugf("ZZZZZZ auth/CRTB updated %q - reconcile", obj.Name)
+	defer func() {
+		logrus.Debugf("ZZZZZZ auth/CRTB updated %q - reconcile done", obj.Name)
+	}()
+
 	obj, err := c.reconcileSubject(obj, &localConditions)
 	return obj, errors.Join(err,
 		c.reconcileLabels(obj, &localConditions),
@@ -121,10 +139,18 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	logrus.Debugf("ZZZZZZ auth/CRTB remove %q", obj.Name)
+
 	if features.AggregatedRoleTemplates.Enabled() {
+		logrus.Debugf("ZZZZZZ auth/CRTB remove %q - skip, using aggregated role templates", obj.Name)
 		return nil, nil
 	}
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
+
+	logrus.Debugf("ZZZZZZ auth/CRTB remove %q - reconcile", obj.Name)
+	defer func() {
+		logrus.Debugf("ZZZZZZ auth/CRTB remove %q - reconcile done", obj.Name)
+	}()
 
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
 		c.s.AddCondition(&obj.Status.LocalConditions, condition, failedToDeleteClusterMembershipBinding, err)
@@ -152,6 +178,7 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 		return nil, errors.Join(err, c.updateStatus(obj, obj.Status.LocalConditions))
 	}
 
+	logrus.Debugf("ZZZZZZ auth/CRTB remove %q - no errors", obj.Name)
 	return nil, nil
 }
 
@@ -547,21 +574,27 @@ var timeNow = func() time.Time {
 }
 
 func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, localConditions []metav1.Condition) error {
+	logrus.Debugf("ZZZZZZ auth/CRTB update status %q, cond=((%v))", crtb.Name, localConditions)
+
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		crtbFromCluster, err := c.crtbCache.Get(crtb.Namespace, crtb.Name)
 		if err != nil {
+			logrus.Debugf("ZZZZZZ auth/CRTB update status %q, get FAIL: %v", crtb.Name, err)
 			return err
 		}
 		if status.CompareConditions(crtbFromCluster.Status.LocalConditions, localConditions) {
+			logrus.Debugf("ZZZZZZ auth/CRTB update status %q, skip, conditions unchanged", crtb.Name)
 			return nil
 		}
 
 		crtbFromCluster.Status.SummaryLocal = status.SummaryCompleted
 		if crtbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
+			logrus.Debugf("ZZZZZZ auth/CRTB update status %q, summary complete (local & remote complete)", crtb.Name)
 			crtbFromCluster.Status.Summary = status.SummaryCompleted
 		}
 		for _, c := range localConditions {
 			if c.Status != metav1.ConditionTrue {
+				logrus.Debugf("ZZZZZZ auth/CRTB update status %q, summary error, local error", crtb.Name)
 				crtbFromCluster.Status.Summary = status.SummaryError
 				crtbFromCluster.Status.SummaryLocal = status.SummaryError
 				break
@@ -573,6 +606,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, localC
 		crtbFromCluster.Status.LocalConditions = localConditions
 		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
 
+		logrus.Debugf("ZZZZZZ auth/CRTB update status %q, result: %v", crtb.Name, err)
 		return err
 	})
 }

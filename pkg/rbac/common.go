@@ -229,6 +229,7 @@ func NameForClusterRoleBinding(role rbacv1.RoleRef, subject rbacv1.Subject) stri
 	name.WriteString("crb-")
 	name.WriteString(getBindingHash("", role, subject))
 	nm := name.String()
+	logrus.Debugf("ZZZZZZ CRB %q for (kind=%s role=%s subjkind=%s subject=%s", nm, role.Kind, role.Name, subject.Kind, subject.Name)
 	logrus.Debugf("ClusterRoleBinding with role.kind=%s role.name=%s subject.kind=%s subject.name=%s has name: %s", role.Kind, role.Name, subject.Kind, subject.Name, nm)
 	return nm
 }
