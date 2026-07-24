@@ -50,8 +50,20 @@ type Token struct {
 
 // Implement the TokenAccessor interface
 
+func (t *Token) GetLabels() map[string]string {
+	return t.ObjectMeta.Labels
+}
+
 func (t *Token) GetName() string {
 	return t.ObjectMeta.Name
+}
+
+func (t *Token) GetFullName() string {
+	return t.ObjectMeta.Name
+}
+
+func (t *Token) GetKind() string {
+	return "v3"
 }
 
 func (t *Token) GetIsEnabled() bool {

@@ -21,6 +21,7 @@ import (
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/controllers/management/oidcprovider"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	oprovider "github.com/rancher/rancher/pkg/oidc/provider"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -172,9 +173,11 @@ func (s *OIDCProviderSuite) SetupSuite() {
 	})
 	assert.NoError(s.T(), err)
 
+	ets := exttokenstore.NewSystemFromWrangler(s.wranglerContext)
+
 	// init OIDC provider
 	mux := http.NewServeMux()
-	p, err := oprovider.NewProvider(s.ctx, s.wranglerContext.Mgmt.Token().Cache(), s.wranglerContext.Mgmt.Token(), s.wranglerContext.Mgmt.User().Cache(), s.wranglerContext.Mgmt.UserAttribute().Cache(), s.wranglerContext.Core.Secret().Cache(), s.wranglerContext.Core.Secret(), s.wranglerContext.Mgmt.OIDCClient().Cache(), s.wranglerContext.Mgmt.OIDCClient(), s.wranglerContext.Core.Namespace())
+	p, err := oprovider.NewProvider(s.ctx, ets, s.wranglerContext.Mgmt.Token().Cache(), s.wranglerContext.Mgmt.Token(), s.wranglerContext.Mgmt.User().Cache(), s.wranglerContext.Mgmt.UserAttribute().Cache(), s.wranglerContext.Core.Secret().Cache(), s.wranglerContext.Core.Secret(), s.wranglerContext.Mgmt.OIDCClient().Cache(), s.wranglerContext.Mgmt.OIDCClient(), s.wranglerContext.Core.Namespace())
 	assert.NoError(s.T(), err)
 	p.RegisterOIDCProviderHandles(mux)
 	// register redirect endpoint. This endpoint will be called by the OIDC provider with a valid code.

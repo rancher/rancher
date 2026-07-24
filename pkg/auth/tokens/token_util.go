@@ -147,7 +147,7 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		hasher, err := hashers.GetHasherForHash(storedToken.Token)
 		if err != nil {
 			logrus.Errorf("unable to get a hasher for token with error %v", err)
-			return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+			return http.StatusInternalServerError, errInvalidAuthToken
 		}
 		if err := hasher.VerifyHash(storedToken.Token, tokenKey); err != nil {
 			logrus.Errorf("VerifyHash failed with error: %v", err)
@@ -155,16 +155,39 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		}
 	} else {
 		if storedToken.Token != tokenKey {
+			logrus.Errorf("token mismatch, stored %q != have %q", storedToken.Token, tokenKey)
 			return http.StatusUnprocessableEntity, errInvalidAuthToken
 		}
 	}
 
 	if IsExpired(storedToken) {
-		return http.StatusGone, errors.New("must authenticate, expired")
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	if IsIdleExpired(storedToken, time.Now()) {
-		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
+	}
+
+	return http.StatusOK, nil
+}
+
+// Given a stored token without proper key, check only if it is bad in general,
+// or expired in some way.
+func VerifyTokenWithoutKey(storedToken *apiv3.Token, tokenName string) (int, error) {
+	if storedToken == nil || storedToken.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
+
+	if IsExpired(storedToken) {
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
+	}
+
+	if IsIdleExpired(storedToken, time.Now()) {
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	return http.StatusOK, nil
@@ -173,30 +196,72 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.
 // This must match the logic of `VerifyToken` above.
 func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
-	invalidAuthTokenErr := errors.New("invalid token")
+	if storedToken == nil {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
 
-	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	// tokenNames may or may not have the `ext/` prefix, depending on origin
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		tokenName = extTokenID
+	}
+
+	if storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
 	// Ext token always has a hash. Only a hash.
 	hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
 	if err != nil {
 		logrus.Errorf("unable to get a hasher for token with error %v", err)
-		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+		return http.StatusInternalServerError, errInvalidAuthToken
 	}
 
 	if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
 		logrus.Errorf("VerifyHash failed with error: %v", err)
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
 	if IsExpired(storedToken) {
-		return http.StatusGone, errors.New("must authenticate, expired")
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	if IsIdleExpired(storedToken, time.Now()) {
-		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
+	}
+
+	return http.StatusOK, nil
+}
+
+// Given a stored token (without hashed key), check only if it is bad in
+// general, or expired in some way.
+func ExtVerifyTokenWithoutKey(storedToken *ext.Token, tokenName string) (int, error) {
+	// We have no proper secret value to verify. This happens when
+	// authenticating a JWT token representing an OIDC session. See
+	// `TokenFromRequest` in `pkg/auth/requests/authenticate.go`.
+
+	if storedToken == nil {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
+
+	// tokenNames may or may not have the `ext/` prefix, depending on origin
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		tokenName = extTokenID
+	}
+
+	if storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
+	}
+
+	if IsExpired(storedToken) {
+		logrus.Errorf("token expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
+	}
+
+	if IsIdleExpired(storedToken, time.Now()) {
+		logrus.Errorf("token idle expired: %q", storedToken.Name)
+		return http.StatusGone, errInvalidAuthToken
 	}
 
 	return http.StatusOK, nil
