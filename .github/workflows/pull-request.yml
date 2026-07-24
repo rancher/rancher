@@ -25,7 +25,7 @@ jobs:
     uses: ./.github/workflows/unit-test.yml
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
     permissions:
       contents: read
     steps:

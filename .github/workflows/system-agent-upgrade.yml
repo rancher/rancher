@@ -40,6 +40,7 @@ jobs:
           permission-pull-requests: write
 
       - name: Check out repository code
+        # zizmor: ignore[artipacked] -- this job must retain the App token for its authenticated branch push.
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           token: ${{ steps.app-token.outputs.token }}

@@ -28,9 +28,10 @@ jobs:
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.4.0
         with:
           go-version: ${{ env.SETUP_GO_VERSION }}
-          cache: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+          cache: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }} # zizmor: ignore[cache-poisoning] -- test-only dependency cache; release workflows are separate.
       - uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3.5.0
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        # zizmor: ignore[cache-poisoning] -- test-only dependency cache; release workflows are separate.
         with:
           path: |
             ~/.cache/go-build

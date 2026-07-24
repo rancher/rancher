@@ -30,6 +30,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
+        # zizmor: ignore[artipacked] -- this job must retain checkout credentials for authenticated branch cleanup pushes.
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Install updatecli

@@ -50,15 +50,17 @@ jobs:
           echo "APP_ID=" >> $GITHUB_ENV
 
       - name: Checkout repository
+        # zizmor: ignore[artipacked] -- this job must retain checkout credentials for authenticated branch fetch and push operations.
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup and create branch
         id: branch-setup
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH_INPUT: ${{ inputs.base_branch }}
         run: |
-          if [[ -n "${{ inputs.base_branch }}" ]]; then
-            BASE_BRANCH="${{ inputs.base_branch }}"
+          if [[ -n "$BASE_BRANCH_INPUT" ]]; then
+            BASE_BRANCH="$BASE_BRANCH_INPUT"
           else
             BASE_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
           fi
@@ -75,11 +77,13 @@ jobs:
           echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Create and push empty commit
+        env:
+          BRANCH: ${{ steps.branch-setup.outputs.branch }}
         run: |
           touch trigger_ci
           git add trigger_ci
           git commit -m "Add trigger_ci file for CI testing"
-          git push origin ${{ steps.branch-setup.outputs.branch }}
+          git push origin "$BRANCH"
 
       - name: Create draft PR
         env:
@@ -88,6 +92,8 @@ jobs:
           INCLUDE_PATTERNS: ${{ inputs.include_patterns }}
           EXCLUDE_PATTERNS: ${{ inputs.exclude_patterns }}
           MAX_ATTEMPTS: ${{ inputs.max_ci_attempts }}
+          BASE_BRANCH: ${{ steps.branch-setup.outputs.base_branch }}
+          BRANCH: ${{ steps.branch-setup.outputs.branch }}
         run: |
           echo "This PR is for CI testing purposes only and can be ignored." > pr_body.txt
           echo "" >> pr_body.txt
@@ -102,8 +108,8 @@ jobs:
           fi
 
           gh pr create \
-            --base "${{ steps.branch-setup.outputs.base_branch }}" \
-            --head "${{ steps.branch-setup.outputs.branch }}" \
+            --base "$BASE_BRANCH" \
+            --head "$BRANCH" \
             --title "CI Testing" \
             --body-file pr_body.txt \
             --draft
