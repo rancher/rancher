@@ -312,7 +312,7 @@ func TestPerRouteTLSTransport_SelfSignedRoute_InsecureSkipTLSVerifyTrue_Succeeds
 
 	p := &proxy{
 		proxyEndpointCache: cache,
-		insecureTransport:  &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		insecureTransport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 	}
 	transport := &perRouteTLSTransport{proxy: p}
 
