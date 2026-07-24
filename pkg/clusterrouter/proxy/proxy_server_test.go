@@ -17,6 +17,47 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
+func TestServeHTTP_HostHeader(t *testing.T) {
+	t.Parallel()
+
+	const targetHost = "api.downstream-cluster.example.com:6443"
+
+	r := RemoteService{
+		transport: func() (http.RoundTripper, error) {
+			return http.DefaultTransport, nil
+		},
+		url: func() (url.URL, error) {
+			return url.URL{
+				Scheme: "https",
+				Host:   targetHost,
+			}, nil
+		},
+		cluster: &v3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: v3.ClusterSpec{
+				Internal: true,
+			},
+		},
+	}
+
+	req := &http.Request{
+		Host: "rancher.example.com",
+		URL: &url.URL{
+			Path: "/k8s/clusters/test/api/v1/pods",
+		},
+		Header: http.Header{},
+	}
+	req = req.WithContext(context.TODO())
+	rw := httptest.NewRecorder()
+
+	r.ServeHTTP(rw, req)
+
+	assert.Equal(t, targetHost, req.Host, "req.Host should be set to downstream API server host")
+	assert.Equal(t, targetHost, req.URL.Host, "req.URL.Host should be set to downstream API server host")
+}
+
 func TestServeHTTP(t *testing.T) {
 	tests := map[string]struct {
 		tokenCreator                   tokenCreator
