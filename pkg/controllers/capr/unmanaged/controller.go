@@ -356,8 +356,8 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 	}
 	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      planSecretName,
-			Namespace: secret.Namespace,
+			Name:            planSecretName,
+			Namespace:       secret.Namespace,
 			OwnerReferences: []metav1.OwnerReference{machineOwnerRef},
 		},
 		Subjects: []rbacv1.Subject{

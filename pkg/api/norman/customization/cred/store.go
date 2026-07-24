@@ -57,6 +57,7 @@ func configExists(data map[string]interface{}) bool {
 	}
 	return false
 }
+
 // Note: the check above accepts any "*Config" suffix, including "genericConfig".
 // This means generic (non-cloud-provider) credentials are supported as long as
 // callers include a "genericConfig" field in their data, e.g.:
