@@ -10,6 +10,7 @@ import (
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -41,63 +42,192 @@ func setup(t *testing.T, opts WriterOptions) (*logWriter, *Writer) {
 	return lw, w
 }
 
-func TestAllowList(t *testing.T) {
+func TestDenyTakesPrecedenceAcrossPolicies(t *testing.T) {
 	logs, w := setup(t, WriterOptions{
 		DefaultPolicyLevel:     auditlogv1.LevelRequestResponse,
 		DisableDefaultPolicies: true,
 	})
 
 	err := w.UpdatePolicy(&auditlogv1.AuditPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "block-all",
-			Namespace: "default",
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: "deny-secrets"},
 		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
-				{
-					Action:     auditlogv1.FilterActionDeny,
-					RequestURI: ".*",
-				},
+				{Action: auditlogv1.FilterActionDeny, RequestURI: "/api/v1/secrets"},
 			},
 		},
 	})
-	assert.NoError(t, err)
-
-	expected := []logEntry{}
-
-	err = w.Write(&logEntry{
-		RequestURI: "/api/v1/secrets",
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, expected, logs.logs)
+	require.NoError(t, err)
 
 	err = w.UpdatePolicy(&auditlogv1.AuditPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "allow-secrets",
-			Namespace: "default",
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: "allow-secrets"},
 		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
-				{
-					Action:     auditlogv1.FilterActionAllow,
-					RequestURI: "/api/v1/secrets",
-				},
+				{Action: auditlogv1.FilterActionAllow, RequestURI: "/api/v1/secrets"},
 			},
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	expected = []logEntry{
+	err = w.Write(&logEntry{RequestURI: "/api/v1/secrets"})
+	require.NoError(t, err)
+	assert.Empty(t, logs.logs)
+
+	err = w.Write(&logEntry{RequestURI: "/api/v1/pods"})
+	require.NoError(t, err)
+	require.Len(t, logs.logs, 1)
+	assert.Equal(t, "/api/v1/pods", logs.logs[0].RequestURI)
+}
+
+func TestPolicyActionForURI(t *testing.T) {
+	tests := []struct {
+		name     string
+		filters  []auditlogv1.Filter
+		uri      string
+		expected auditlogv1.FilterAction
+	}{
 		{
-			RequestURI: "/api/v1/secrets",
+			name:     "no filters allow all",
+			uri:      "/api/v1/pods",
+			expected: auditlogv1.FilterActionAllow,
+		},
+		{
+			name: "allow filter matches",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionAllow, RequestURI: ".*secrets.*"},
+			},
+			uri:      "/api/v1/secrets",
+			expected: auditlogv1.FilterActionAllow,
+		},
+		{
+			name: "allow-only policy does not match",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionAllow, RequestURI: ".*secrets.*"},
+			},
+			uri:      "/api/v1/pods",
+			expected: auditlogv1.FilterActionUnknown,
+		},
+		{
+			name: "deny filter matches",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionDeny, RequestURI: "/healthz"},
+			},
+			uri:      "/healthz",
+			expected: auditlogv1.FilterActionDeny,
+		},
+		{
+			name: "deny-only policy does not match",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionDeny, RequestURI: "/healthz"},
+			},
+			uri:      "/api/v1/pods",
+			expected: auditlogv1.FilterActionUnknown,
+		},
+		{
+			name: "allow overrides deny in same policy - deny first",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionDeny, RequestURI: ".*"},
+				{Action: auditlogv1.FilterActionAllow, RequestURI: ".*login.*"},
+			},
+			uri:      "/v3-public/localProviders/local?action=login",
+			expected: auditlogv1.FilterActionAllow,
+		},
+		{
+			name: "allow overrides deny in same policy - allow first",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionAllow, RequestURI: ".*login.*"},
+				{Action: auditlogv1.FilterActionDeny, RequestURI: ".*"},
+			},
+			uri:      "/v3-public/localProviders/local?action=login",
+			expected: auditlogv1.FilterActionAllow,
 		},
 	}
 
-	err = w.Write(&logEntry{
-		RequestURI: "/api/v1/secrets",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy, err := PolicyFromAuditPolicy(&auditlogv1.AuditPolicy{
+				Spec: auditlogv1.AuditPolicySpec{Filters: tt.filters},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, policy.actionForUri(tt.uri))
+		})
+	}
+}
+
+func TestAllowTakesPrecedenceWithinPolicy(t *testing.T) {
+	filterOrders := []struct {
+		name    string
+		filters []auditlogv1.Filter
+	}{
+		{
+			name: "deny before allow",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionDeny, RequestURI: ".*"},
+				{Action: auditlogv1.FilterActionAllow, RequestURI: ".*login.*"},
+			},
+		},
+		{
+			name: "allow before deny",
+			filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionAllow, RequestURI: ".*login.*"},
+				{Action: auditlogv1.FilterActionDeny, RequestURI: ".*"},
+			},
+		},
+	}
+
+	for _, tt := range filterOrders {
+		t.Run(tt.name, func(t *testing.T) {
+			logs, w := setup(t, WriterOptions{
+				DefaultPolicyLevel:     auditlogv1.LevelRequestResponse,
+				DisableDefaultPolicies: true,
+			})
+
+			err := w.UpdatePolicy(&auditlogv1.AuditPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "login-only"},
+				Spec:       auditlogv1.AuditPolicySpec{Filters: tt.filters},
+			})
+			require.NoError(t, err)
+
+			err = w.Write(&logEntry{RequestURI: "/v3-public/localProviders/local?action=login"})
+			require.NoError(t, err)
+			require.Len(t, logs.logs, 1)
+
+			err = w.Write(&logEntry{RequestURI: "/api/v1/pods"})
+			require.NoError(t, err)
+			require.Len(t, logs.logs, 1)
+		})
+	}
+}
+
+func TestUserDenyOverridesDefaultPolicies(t *testing.T) {
+	logs, w := setup(t, WriterOptions{
+		DefaultPolicyLevel:     auditlogv1.LevelRequestResponse,
+		DisableDefaultPolicies: false,
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, expected, logs.logs)
+
+	err := w.UpdatePolicy(&auditlogv1.AuditPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "deny-healthz"},
+		Spec: auditlogv1.AuditPolicySpec{
+			Filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionDeny, RequestURI: "/healthz"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = w.Write(&logEntry{RequestURI: "/healthz"})
+	require.NoError(t, err)
+	assert.Empty(t, logs.logs)
+
+	err = w.Write(&logEntry{RequestURI: "/api/v1/pods"})
+	require.NoError(t, err)
+
+	// Also exercise Rancher's allow-only default secrets policy.
+	err = w.Write(&logEntry{RequestURI: "/api/v1/secrets"})
+	require.NoError(t, err)
+
+	require.Len(t, logs.logs, 2)
+	assert.Equal(t, "/api/v1/pods", logs.logs[0].RequestURI)
+	assert.Equal(t, "/api/v1/secrets", logs.logs[1].RequestURI)
 }
 
 func TestBlockList(t *testing.T) {
@@ -142,6 +272,53 @@ func TestBlockList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
+
+	expected = append(expected, logEntry{
+		RequestURI: "/api/v1/configmaps",
+		Method:     http.MethodGet,
+	})
+
+	err = w.Write(&logEntry{
+		RequestURI: "/api/v1/configmaps",
+		Method:     http.MethodGet,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, expected, logs.logs)
+}
+
+func TestUnmatchedDenyPolicyDoesNotApplyRedactions(t *testing.T) {
+	logs, w := setup(t, WriterOptions{
+		DefaultPolicyLevel:     auditlogv1.LevelRequestResponse,
+		DisableDefaultPolicies: true,
+	})
+
+	err := w.UpdatePolicy(&auditlogv1.AuditPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "deny-healthz-redact-cache"},
+		Spec: auditlogv1.AuditPolicySpec{
+			Filters: []auditlogv1.Filter{
+				{Action: auditlogv1.FilterActionDeny, RequestURI: "/healthz"},
+			},
+			AdditionalRedactions: []auditlogv1.Redaction{
+				{Headers: []string{"Cache.*"}},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = w.Write(&logEntry{
+		RequestURI: "/api/v1/pods",
+		ResponseHeader: http.Header{
+			"Cache-Control": []string{"no-cache"},
+			"Content-Type":  []string{contentTypeJSON},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, logs.logs, 1)
+	assert.Equal(t, []string{"no-cache"}, logs.logs[0].ResponseHeader["Cache-Control"])
+
+	err = w.Write(&logEntry{RequestURI: "/healthz"})
+	require.NoError(t, err)
+	require.Len(t, logs.logs, 1)
 }
 
 func TestNewWriterDropsImpersonateGroups(t *testing.T) {
