@@ -138,14 +138,30 @@ var (
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                          = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
-	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
-	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
-	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
-	APIUIVersion                        = NewSetting("api-ui-version", "1.1.11")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
-	RotateCertsIfExpiringInDays         = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
-	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
-	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
-	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
+	// TLSInternalCNAllowedServices lists additional Kubernetes Service names
+	// in the cattle-system namespace (the only namespace Rancher's own pods
+	// run in) whose ClusterIP, ExternalIPs, and LoadBalancer ingress IPs are
+	// always allowed as CNs on the tls-rancher-internal cert (the :444
+	// listener), independent of the app=rancher pod-IP filter.
+	// Comma-separated, e.g. "my-vip-service,other-vip-service".
+	// Use this when Rancher is reached by IP through a Service that isn't a
+	// live rancher pod IP -- for example a LoadBalancer/VIP Service (such
+	// as a kube-vip-backed VIP in front of an embedded Harvester Rancher)
+	// -- which the pod-IP filter added for stale-CN pruning would
+	// otherwise reject and continually prune from the cert. Rancher reads
+	// this setting once at startup when the tls-rancher-internal listener
+	// is configured; changing it requires a Rancher restart to take
+	// effect, though changes to the listed Services' IPs themselves are
+	// picked up live.
+	TLSInternalCNAllowedServices = NewSetting("tls-internal-cn-allowed-services", "")
+	WhitelistDomain              = NewSetting("whitelist-domain", "forums.rancher.com")
+	WhitelistEnvironmentVars     = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
+	AuthUserInfoResyncCron       = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
+	APIUIVersion                 = NewSetting("api-ui-version", "1.1.11")              // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
+	RotateCertsIfExpiringInDays  = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
+	ClusterTemplateEnforcement   = NewSetting("cluster-template-enforcement", "false")
+	InitialDockerRootDir         = NewSetting("initial-docker-root-dir", "/var/lib/docker")
+	SystemCatalog                = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	// ATTENTION: This file and the following line are used in the rancher/webhook CI to extract the default branch they need
 	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.15")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
