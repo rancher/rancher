@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -93,6 +94,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		mutatingWebhookConfigurations:  wContext.Admission.MutatingWebhookConfiguration(),
 		chartsConfig:                   chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
 		registryOverride:               registryOverride,
+		capiReady:                      atomic.Bool{},
 	}
 
 	wContext.Catalog.ClusterRepo().OnChange(ctx, "bootstrap-charts", h.onRepo)
@@ -113,6 +115,12 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 	// TODO: remove in 2.15 - cleanup embedded CAPI webhooks when the namespace is deleted
 	wContext.Core.Namespace().OnChange(ctx, "cleanup-embedded-capi-webhook-configs", h.removeCAPIWebhooks)
 
+	// Keep system-charts active so Turtles can make CAPI available; only SUC waits for this signal.
+	wContext.DeferredCAPIRegistration.DeferFunc(func(*wrangler.CAPIContext) {
+		h.capiReady.Store(true)
+		h.clusterRepo.Enqueue(repoName)
+	})
+
 	return nil
 }
 
@@ -132,6 +140,7 @@ type handler struct {
 	plan                           plancontrolers.PlanController
 	planCache                      plancontrolers.PlanCache
 	registryOverride               string
+	capiReady                      atomic.Bool
 }
 
 func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
@@ -393,6 +402,12 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				return data.MergeMaps(values, configMapValues)
 			},
 			Enabled: func() bool {
+				// Defer SUC until CAPI is ready. System-charts must stay active because
+				// it installs Turtles, which establishes CAPI; onCAPIReady re-enqueues it.
+				if !h.capiReady.Load() {
+					return false
+				}
+
 				toEnable := true
 				suc, err := h.deploymentCache.Get(namespace.System, sucDeploymentName)
 				if err != nil && !errors.IsNotFound(err) {

@@ -123,7 +123,7 @@ type testMocks struct {
 }
 
 func (t *testMocks) Handler() *handler {
-	return &handler{
+	h := &handler{
 		manager:         t.manager,
 		namespaces:      t.namespaceCtrl,
 		namespaceCache:  t.namespaceCache,
@@ -135,6 +135,57 @@ func (t *testMocks) Handler() *handler {
 		plan:            t.plan,
 		planCache:       t.planCache,
 	}
+	h.capiReady.Store(true)
+	return h
+}
+
+func TestSystemUpgradeControllerWaitsForCAPI(t *testing.T) {
+	originalMCM := features.MCM.Enabled()
+	originalMCMAgent := features.MCMAgent.Enabled()
+	originalManagedSystemUpgradeController := features.ManagedSystemUpgradeController.Enabled()
+	t.Cleanup(func() {
+		features.MCM.Set(originalMCM)
+		features.MCMAgent.Set(originalMCMAgent)
+		features.ManagedSystemUpgradeController.Set(originalManagedSystemUpgradeController)
+	})
+
+	features.MCM.Set(false)
+	features.MCMAgent.Set(true)
+	features.ManagedSystemUpgradeController.Set(true)
+
+	ctrl := gomock.NewController(t)
+	deploymentCache := fake.NewMockCacheInterface[*appsv1.Deployment](ctrl)
+	planCache := fake.NewMockCacheInterface[*upgradev1.Plan](ctrl)
+	planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil)
+	h := &handler{
+		deploymentCache: deploymentCache,
+		planCache:       planCache,
+	}
+
+	var suc *chart.Definition
+	for _, definition := range h.getChartsToInstall() {
+		if definition.ChartName == chart.SystemUpgradeControllerChartName {
+			suc = definition
+			break
+		}
+	}
+	require.NotNil(t, suc)
+	require.False(t, suc.Enabled())
+
+	h.capiReady.Store(true)
+	deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, nil)
+	require.True(t, suc.Enabled())
+}
+
+func TestCAPIReadyEnqueuesSystemCharts(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	clusterRepo := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+	h := &handler{clusterRepo: clusterRepo}
+
+	clusterRepo.EXPECT().Enqueue(repoName)
+	h.onCAPIReady()
+
+	require.True(t, h.capiReady.Load())
 }
 
 // Test_ChartInstallation test that all expected charts are installed or uninstalled with expected configuration.
