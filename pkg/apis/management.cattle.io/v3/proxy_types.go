@@ -74,6 +74,9 @@ type ProxyEndpointRoute struct {
 
 // CredentialInjectionSpec defines how a credential secret's values are injected into a proxied request.
 type CredentialInjectionSpec struct {
+	// +kubebuilder:validation:XValidation:rule="self.mode != 'bearer' || has(self.tokenField) && self.tokenField != ''",message="tokenField is required when mode is bearer"
+	// +kubebuilder:validation:XValidation:rule="self.mode != 'basic' || (has(self.usernameField) && self.usernameField != '' && has(self.passwordField) && self.passwordField != '')",message="usernameField and passwordField are required when mode is basic"
+	// +kubebuilder:validation:XValidation:rule="(self.mode != 'headerinject' && self.mode != 'bodyinject') || (has(self.fields) && size(self.fields) > 0)",message="fields is required when mode is headerinject or bodyinject"
 	// Mode controls how the credential is applied to the request.
 	// "bearer"      – sets Authorization: Bearer <token>
 	// "basic"       – sets Authorization: Basic base64(username:password)
