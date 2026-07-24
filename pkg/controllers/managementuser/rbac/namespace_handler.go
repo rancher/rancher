@@ -14,9 +14,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
+	"github.com/rancher/rancher/pkg/rbac"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -235,150 +236,188 @@ func IsFleetNamespace(ns *v1.Namespace) bool {
 	return ns.Name == fleetconst.ClustersLocalNamespace || ns.Name == fleetconst.ClustersDefaultNamespace || ns.Name == fleetconst.ReleaseClustersNamespace || ns.Labels["fleet.cattle.io/managed"] == "true"
 }
 
+// ensurePRTBAddToNamespace reconciles the per-namespace PRTB RoleBindings for the project the
+// namespace currently belongs to. Under the legacy RBAC model it creates the bindings that should
+// exist; in all cases it removes bindings that should not (e.g. left behind when the namespace was
+// moved between projects, or when it belongs to no project at all). It returns whether the
+// namespace's project has any PRTBs, which the caller uses to gate the initial-roles status.
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
-	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
-	if len(projectID) == 0 {
-		logrus.Debugf("Namespace %s does not belong to a project - deleting rolebindings", ns.Name)
-		// if namespace does not belong to a project, delete all rolebindings from that namespace that were created for a PRTB
-		// such rolebindings will have the label "authz.cluster.cattle.io/rtb-owner" prior to 2.5 and
-		// "authz.cluster.cattle.io/rtb-owner-updated" 2.5 onwards
-		rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
-		if err != nil {
-			return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
-		}
-		client := n.m.workload.RBACw.RoleBinding()
-		for _, rb := range rbs {
-			for _, ownerLabel := range []string{
-				rtbOwnerLabelLegacy,
-				rtbOwnerLabel,
-			} {
-				if uid := convert.ToString(rb.Labels[ownerLabel]); uid != "" {
-					logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-					if err := client.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-						return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
-					}
-				}
-			}
-		}
-		return false, nil
-	}
 
-	prtbs, err := n.m.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
-	if err != nil {
-		return false, errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
+	var prtbs []any
+	if projectID != "" {
+		var err error
+		prtbs, err = n.m.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
+		if err != nil {
+			return false, errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
+		}
 	}
 	hasPRTBs := len(prtbs) > 0
 
-	// When aggregation is enabled, the per-namespace RoleBindings for PRTBs are owned by the
-	// roletemplate-aggregation controllers, which create them with aggregation labels and remove
-	// them when the PRTB is deleted. Creating the legacy bindings here would leak RoleBindings that
-	// the aggregation removal handler does not clean up, leaving stale namespace access behind.
-	if !features.AggregatedRoleTemplates.Enabled() {
-		for _, obj := range prtbs {
-			prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
-			if !ok {
-				return false, errors.Wrapf(err, "object %v is not valid project role template binding", obj)
-			}
-
-			if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
-				continue
-			}
-
-			if prtb.RoleTemplateName == "" {
-				logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", prtb.Name)
-				continue
-			}
-
-			rt, err := n.m.rtLister.Get(prtb.RoleTemplateName)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", prtb.Name, prtb.RoleTemplateName)
-					continue
-				}
-				return false, err
-			}
-
-			roles := map[string]*v3.RoleTemplate{}
-			if err := n.m.gatherRoles(rt, roles, 0); err != nil {
-				return false, err
-			}
-
-			if err := n.m.ensureRoles(roles); err != nil {
-				return false, errors.Wrap(err, "couldn't ensure roles")
-			}
-
-			if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
-				return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
-			}
+	// Under the legacy RBAC model the per-namespace PRTB RoleBindings are created here. Under
+	// aggregation they are owned by the roletemplate-aggregation controllers, which create them with
+	// aggregation labels and remove them when the PRTB is deleted; creating the legacy bindings here
+	// would leak RoleBindings the aggregation removal handler does not clean up.
+	if projectID != "" && !features.AggregatedRoleTemplates.Enabled() {
+		if err := n.createLegacyProjectRoleBindings(ns.Name, prtbs); err != nil {
+			return false, err
 		}
 	}
 
-	var namespace string
-	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		project, err := n.rq.ProjectCache.Get(parts[0], parts[1])
+	// Remove any PRTB RoleBinding (legacy or aggregation) that doesn't belong to the namespace's
+	// current project - e.g. bindings left behind when the namespace was moved between projects, or
+	// when it belongs to no project at all.
+	if err := n.removePRTBRoleBindingsNotInProject(ns.Name, projectID, prtbs); err != nil {
+		return hasPRTBs, err
+	}
+
+	return hasPRTBs, nil
+}
+
+// createLegacyProjectRoleBindings ensures a RoleBinding exists in the namespace for each PRTB in the
+// namespace's project. Only used under the legacy RBAC model; under aggregation these bindings are
+// owned by the roletemplate-aggregation controllers.
+func (n *nsLifecycle) createLegacyProjectRoleBindings(nsName string, prtbs []any) error {
+	for _, obj := range prtbs {
+		prtb, ok := obj.(*apisV3.ProjectRoleTemplateBinding)
+		if !ok {
+			return fmt.Errorf("expected *v3.ProjectRoleTemplateBinding, got %T", obj)
+		}
+
+		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
+			continue
+		}
+
+		if prtb.RoleTemplateName == "" {
+			logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", prtb.Name)
+			continue
+		}
+
+		rt, err := n.m.rtLister.Get(prtb.RoleTemplateName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				logrus.Warnf("Namespace %s references project %s in namespace %s which does not exist", ns.Name, parts[1], parts[0])
-				return hasPRTBs, nil
+				logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", prtb.Name, prtb.RoleTemplateName)
+				continue
 			}
-			return hasPRTBs, err
+			return err
 		}
-		namespace = project.GetProjectBackingNamespace()
-	} else {
-		return hasPRTBs, nil
+
+		roles := map[string]*apisV3.RoleTemplate{}
+		if err := n.m.gatherRoles(rt, roles, 0); err != nil {
+			return err
+		}
+
+		if err := n.m.ensureRoles(roles); err != nil {
+			return errors.Wrap(err, "couldn't ensure roles")
+		}
+
+		if err := n.m.ensureProjectRoleBindings(nsName, roles, prtb); err != nil {
+			return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, nsName)
+		}
+	}
+	return nil
+}
+
+// legacyOwnerIndexes maps each legacy rtb-owner RoleBinding label to the PRTB indexer that resolves
+// its value to the owning PRTB: the pre-2.5 label carries the PRTB UID, the 2.5+ label carries the
+// PRTB's namespace_name key. Only the legacy cleanup branch consults these; the whole map and its
+// use in prtbOwnerInCurrentProject can be removed with the legacy RBAC model.
+var legacyOwnerIndexes = map[string]string{
+	rtbOwnerLabelLegacy: prtbByUIDIndex,
+	rtbOwnerLabel:       prtbByNsAndNameIndex,
+}
+
+// removePRTBRoleBindingsNotInProject removes every PRTB-owned RoleBinding in the namespace whose
+// owning PRTB does not belong to the namespace's current project, handling legacy (rtb-owner
+// labelled) and aggregation (prtb-owner labelled) bindings in a single pass. Bindings left behind
+// when a namespace moves between projects are the main target; when the namespace belongs to no
+// project, no owner is valid so every PRTB-owned binding is removed.
+//
+// This closes the gap where moving a namespace between projects leaves a user with access to it: the
+// aggregation handler reconciles bindings by iterating a project's current namespaces, so once a
+// namespace leaves the project the owning PRTB's reconcile can no longer reach it to clean up.
+func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectID string, prtbs []any) error {
+	var backingNamespace string
+	if projectID != "" {
+		clusterID, projectID, found := strings.Cut(projectID, ":")
+		if !found {
+			return nil
+		}
+		project, err := n.rq.ProjectCache.Get(clusterID, projectID)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logrus.Warnf("Namespace %s references project %s in namespace %s which does not exist", nsName, projectID, clusterID)
+				return nil
+			}
+			return err
+		}
+		backingNamespace = project.GetProjectBackingNamespace()
 	}
 
-	rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
+	// allowedOwnerLabels is the set of prtb-owner label keys valid for the current project, against
+	// which aggregation bindings are matched. Empty when the namespace belongs to no project.
+	allowedOwnerLabels := make(map[string]bool, len(prtbs))
+	for _, obj := range prtbs {
+		if prtb, ok := obj.(*apisV3.ProjectRoleTemplateBinding); ok {
+			allowedOwnerLabels[pkgrbac.GetPRTBOwnerLabel(prtb.Name)] = true
+		}
+	}
+
+	rbs, err := n.m.rbLister.List(nsName, labels.Everything())
 	if err != nil {
-		return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
+		return errors.Wrapf(err, "couldn't list role bindings in %s", nsName)
 	}
-	client := n.m.workload.RBACw.RoleBinding()
-
 	for _, rb := range rbs {
-		if uid := convert.ToString(rb.Labels[rtbOwnerLabelLegacy]); uid != "" {
-			prtbs, err := n.m.prtbIndexer.ByIndex(prtbByUIDIndex, uid)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-
-				return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
-			}
-			for _, prtb := range prtbs {
-				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
-					if prtb.Namespace != namespace {
-						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-						if err := client.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
-						}
-					}
-				}
-			}
+		owned, inProject, err := n.prtbOwnerInCurrentProject(rb, backingNamespace, allowedOwnerLabels)
+		if err != nil {
+			return err
 		}
-
-		if nsAndName := convert.ToString(rb.Labels[rtbOwnerLabel]); nsAndName != "" {
-			prtbs, err := n.m.prtbIndexer.ByIndex(prtbByNsAndNameIndex, nsAndName)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-
-				return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
-			}
-			for _, prtb := range prtbs {
-				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
-					if prtb.Namespace != namespace {
-						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-						if err := client.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
-						}
-					}
-				}
+		// Only touch PRTB-owned bindings; leave CRTB-owned (or unrelated) bindings alone.
+		if owned && !inProject {
+			if err := rbac.DeleteNamespacedResource(nsName, rb.Name, n.m.roleBindings); err != nil {
+				return err
 			}
 		}
 	}
-	return hasPRTBs, nil
+	return nil
+}
+
+// prtbOwnerInCurrentProject reports whether rb is owned by a PRTB and if so, whether that
+// PRTB belongs to the namespace's current project.
+//
+// Aggregation bindings encode their owning PRTB in a prtb-owner-<name> label key, matched against
+// allowedOwnerLabels (the owner labels of the current project's PRTBs). Legacy bindings reference
+// their owning PRTB by the rtb-owner label value, which is resolved through the PRTB indexer and
+// matched against the current project's backing namespace. The legacy branch can be dropped once the
+// legacy RBAC model is removed.
+func (n *nsLifecycle) prtbOwnerInCurrentProject(rb *rbacv1.RoleBinding, backingNamespace string, allowedOwnerLabels map[string]bool) (owned, inProject bool, err error) {
+	for key := range rb.Labels {
+		if strings.HasPrefix(key, pkgrbac.PrtbOwnerLabel+"-") {
+			owned = true
+			if allowedOwnerLabels[key] {
+				inProject = true
+			}
+		}
+	}
+
+	for label, index := range legacyOwnerIndexes {
+		value := convert.ToString(rb.Labels[label])
+		if value == "" {
+			continue
+		}
+		owned = true
+		prtbs, lookupErr := n.m.prtbIndexer.ByIndex(index, value)
+		if lookupErr != nil {
+			return owned, inProject, errors.Wrapf(lookupErr, "couldn't find prtb for %s", rb.Name)
+		}
+		for _, obj := range prtbs {
+			if prtb, ok := obj.(*apisV3.ProjectRoleTemplateBinding); ok && prtb.Namespace == backingNamespace {
+				inProject = true
+			}
+		}
+	}
+
+	return owned, inProject, nil
 }
 
 // To ensure that all users in a project can do a GET on the namespaces in that project, this

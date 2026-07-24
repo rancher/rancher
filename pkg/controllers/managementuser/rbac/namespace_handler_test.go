@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -741,6 +743,278 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 				},
 			})
 			assert.Equal(t, test.wantHasPRTBs, hasPRTBs)
+			if test.wantError != "" {
+				assert.ErrorContains(t, err, test.wantError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// aggregationRoleBinding builds a RoleBinding carrying the aggregation feature label plus the given
+// owner label, mirroring what the roletemplate-aggregation PRTB handler creates in each namespace.
+func aggregationRoleBinding(name, namespace, ownerLabel string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				pkgrbac.AggregationFeatureLabel: "true",
+				ownerLabel:                      "true",
+			},
+		},
+	}
+}
+
+// legacyRoleBinding builds a RoleBinding carrying a single legacy rtb-owner label (key/value),
+// mirroring what the legacy PRTB handler creates in each namespace.
+func legacyRoleBinding(name, namespace, label, value string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{label: value},
+		},
+	}
+}
+
+// prtb builds a minimal PRTB; only its Namespace matters for legacy owner resolution.
+func prtb(namespace, name string) *v3.ProjectRoleTemplateBinding {
+	return &v3.ProjectRoleTemplateBinding{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
+	}
+}
+
+// multiIndexPRTBIndexer is a cache.Indexer that resolves PRTBs by (indexName, indexKey), supporting
+// the multiple indexes the unified cleanup consults (prtbByUIDIndex, prtbByNsAndNameIndex). Only
+// ByIndex is implemented; the other cache.Indexer methods are never called by the code under test.
+type multiIndexPRTBIndexer struct {
+	cache.Indexer
+	byIndex map[string]map[string][]*v3.ProjectRoleTemplateBinding
+	err     error
+}
+
+func (m *multiIndexPRTBIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	var out []interface{}
+	for _, p := range m.byIndex[indexName][indexKey] {
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+func TestRemovePRTBRoleBindingsNotInProject(t *testing.T) {
+	const (
+		namespaceName    = "test-ns"
+		projectID        = "c-123xyz:p-current"
+		backingNamespace = "p-current"
+		otherNamespace   = "p-other"
+	)
+	currentPRTBLabel := pkgrbac.GetPRTBOwnerLabel("current-prtb")
+	otherPRTBLabel := pkgrbac.GetPRTBOwnerLabel("other-prtb")
+	crtbLabel := pkgrbac.GetCRTBOwnerLabel("some-crtb")
+
+	currentProject := &apisV3.Project{
+		Status: apisV3.ProjectStatus{BackingNamespace: backingNamespace},
+	}
+
+	tests := []struct {
+		name          string
+		projectID     string
+		project       *apisV3.Project
+		projectGetErr error
+		currentPRTBs  []*v3.ProjectRoleTemplateBinding
+		existingRBs   []*rbacv1.RoleBinding
+		prtbsByUID    map[string][]*v3.ProjectRoleTemplateBinding
+		prtbsByNsName map[string][]*v3.ProjectRoleTemplateBinding
+		indexerErr    error
+		listError     error
+		deleteError   error
+
+		wantDeleted []string
+		wantError   string
+	}{
+		{
+			name:         "aggregation: stale binding from another project deleted, current kept",
+			projectID:    projectID,
+			project:      currentProject,
+			currentPRTBs: []*v3.ProjectRoleTemplateBinding{prtb(backingNamespace, "current-prtb")},
+			existingRBs: []*rbacv1.RoleBinding{
+				aggregationRoleBinding("rb-keep", namespaceName, currentPRTBLabel),
+				aggregationRoleBinding("rb-stale", namespaceName, otherPRTBLabel),
+			},
+			wantDeleted: []string{"rb-stale"},
+		},
+		{
+			name:      "legacy: stale binding from another project deleted, current kept",
+			projectID: projectID,
+			project:   currentProject,
+			existingRBs: []*rbacv1.RoleBinding{
+				legacyRoleBinding("rb-legkeep", namespaceName, rtbOwnerLabelLegacy, "uid-current"),
+				legacyRoleBinding("rb-legstale", namespaceName, rtbOwnerLabelLegacy, "uid-other"),
+			},
+			prtbsByUID: map[string][]*v3.ProjectRoleTemplateBinding{
+				"uid-current": {prtb(backingNamespace, "cur")},
+				"uid-other":   {prtb(otherNamespace, "oth")},
+			},
+			wantDeleted: []string{"rb-legstale"},
+		},
+		{
+			name:      "legacy: rtb-owner-updated label resolved via ns-and-name index",
+			projectID: projectID,
+			project:   currentProject,
+			existingRBs: []*rbacv1.RoleBinding{
+				legacyRoleBinding("rb-updstale", namespaceName, rtbOwnerLabel, "p-other_oth"),
+			},
+			prtbsByNsName: map[string][]*v3.ProjectRoleTemplateBinding{
+				"p-other_oth": {prtb(otherNamespace, "oth")},
+			},
+			wantDeleted: []string{"rb-updstale"},
+		},
+		{
+			name:      "legacy: orphaned binding whose PRTB no longer exists is deleted",
+			projectID: projectID,
+			project:   currentProject,
+			existingRBs: []*rbacv1.RoleBinding{
+				legacyRoleBinding("rb-orphan", namespaceName, rtbOwnerLabelLegacy, "uid-gone"),
+			},
+			// uid-gone resolves to nothing: the owning PRTB is gone, so the binding is stale.
+			wantDeleted: []string{"rb-orphan"},
+		},
+		{
+			name:         "crtb-owned aggregation binding is left alone",
+			projectID:    projectID,
+			project:      currentProject,
+			currentPRTBs: []*v3.ProjectRoleTemplateBinding{prtb(backingNamespace, "current-prtb")},
+			existingRBs: []*rbacv1.RoleBinding{
+				aggregationRoleBinding("rb-crtb", namespaceName, crtbLabel),
+			},
+			wantDeleted: nil,
+		},
+		{
+			name:      "no project: every prtb-owned binding (legacy and aggregation) deleted",
+			projectID: "",
+			existingRBs: []*rbacv1.RoleBinding{
+				aggregationRoleBinding("rb-agg", namespaceName, otherPRTBLabel),
+				legacyRoleBinding("rb-leg", namespaceName, rtbOwnerLabelLegacy, "uid-any"),
+			},
+			prtbsByUID: map[string][]*v3.ProjectRoleTemplateBinding{
+				"uid-any": {prtb(otherNamespace, "any")},
+			},
+			wantDeleted: []string{"rb-agg", "rb-leg"},
+		},
+		{
+			name:          "project not found: cleanup skipped",
+			projectID:     projectID,
+			projectGetErr: apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "projects"}, "p-current"),
+			existingRBs: []*rbacv1.RoleBinding{
+				aggregationRoleBinding("rb-stale", namespaceName, otherPRTBLabel),
+			},
+			wantDeleted: nil,
+		},
+		{
+			name:      "malformed project id: cleanup skipped",
+			projectID: "no-colon",
+			existingRBs: []*rbacv1.RoleBinding{
+				aggregationRoleBinding("rb-stale", namespaceName, otherPRTBLabel),
+			},
+			wantDeleted: nil,
+		},
+		{
+			name:          "project get error is surfaced",
+			projectID:     projectID,
+			projectGetErr: fmt.Errorf("boom"),
+			wantError:     "boom",
+		},
+		{
+			name:         "list error is surfaced",
+			projectID:    projectID,
+			project:      currentProject,
+			currentPRTBs: []*v3.ProjectRoleTemplateBinding{prtb(backingNamespace, "current-prtb")},
+			listError:    fmt.Errorf("boom"),
+			wantError:    "couldn't list role bindings",
+		},
+		{
+			name:      "prtb lookup error is surfaced",
+			projectID: projectID,
+			project:   currentProject,
+			existingRBs: []*rbacv1.RoleBinding{
+				legacyRoleBinding("rb-leg", namespaceName, rtbOwnerLabelLegacy, "uid-any"),
+			},
+			indexerErr: fmt.Errorf("boom"),
+			wantError:  "couldn't find prtb",
+		},
+		{
+			name:         "delete error is surfaced",
+			projectID:    projectID,
+			project:      currentProject,
+			currentPRTBs: []*v3.ProjectRoleTemplateBinding{prtb(backingNamespace, "current-prtb")},
+			existingRBs: []*rbacv1.RoleBinding{
+				aggregationRoleBinding("rb-stale", namespaceName, otherPRTBLabel),
+			},
+			wantDeleted: []string{"rb-stale"},
+			deleteError: fmt.Errorf("boom"),
+			wantError:   "couldn't delete role binding",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			wellFormed := false
+			if test.projectID != "" {
+				parts := strings.SplitN(test.projectID, ":", 2)
+				wellFormed = len(parts) == 2 && parts[1] != ""
+			}
+			// The project is only resolved when a well-formed project id is set; cleanup only reaches
+			// the RoleBinding list when there's no project or the project resolved successfully.
+			reachedList := test.projectID == "" || (wellFormed && test.projectGetErr == nil)
+
+			pGetter := wfakes.NewMockCacheInterface[*apisV3.Project](ctrl)
+			if wellFormed {
+				pGetter.EXPECT().Get(gomock.Any(), gomock.Any()).Return(test.project, test.projectGetErr)
+			}
+
+			rbLister := wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+			if reachedList {
+				rbLister.EXPECT().List(namespaceName, gomock.Any()).Return(test.existingRBs, test.listError)
+			}
+
+			roleBindings := wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+			for _, name := range test.wantDeleted {
+				roleBindings.EXPECT().Delete(namespaceName, name, gomock.Any()).Return(test.deleteError)
+			}
+
+			prtbIndexer := &multiIndexPRTBIndexer{
+				byIndex: map[string]map[string][]*v3.ProjectRoleTemplateBinding{
+					prtbByUIDIndex:       test.prtbsByUID,
+					prtbByNsAndNameIndex: test.prtbsByNsName,
+				},
+				err: test.indexerErr,
+			}
+
+			var prtbs []interface{}
+			for _, p := range test.currentPRTBs {
+				prtbs = append(prtbs, p)
+			}
+
+			lifecycle := nsLifecycle{
+				m: &manager{
+					rbLister:     rbLister,
+					roleBindings: roleBindings,
+					prtbIndexer:  prtbIndexer,
+				},
+				rq: &resourcequota.SyncController{
+					ProjectCache: pGetter,
+				},
+			}
+
+			err := lifecycle.removePRTBRoleBindingsNotInProject(namespaceName, test.projectID, prtbs)
 			if test.wantError != "" {
 				assert.ErrorContains(t, err, test.wantError)
 			} else {
