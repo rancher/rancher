@@ -510,7 +510,7 @@ func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, ranc
 				Op:   "add",
 				Path: "/metadata/labels",
 				Value: map[string]string{
-					"cattle.io.oidc-client-" + escapedName: "true",
+					"cattle.io.oidc-client-" + oidcClientName: "true",
 				},
 			}})
 		}

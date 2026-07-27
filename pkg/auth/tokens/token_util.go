@@ -155,7 +155,7 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		}
 	} else {
 		if storedToken.Token != tokenKey {
-			logrus.Errorf("token mismatch, stored %q != have %q", storedToken.Token, tokenKey)
+			logrus.Errorf("token mismatch")
 			return http.StatusUnprocessableEntity, errInvalidAuthToken
 		}
 	}
