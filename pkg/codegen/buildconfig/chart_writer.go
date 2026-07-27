@@ -153,10 +153,10 @@ func (w *ChartValuesWriter) collectReplacements(root *yaml.Node, replacements ma
 		parts := strings.SplitN(chartAssetsImage, ":", 2)
 		if len(parts) == 2 {
 			if err := w.recordReplacement(chart, []string{"chartsImage", "repository"}, parts[0], replacements); err != nil {
-				return fmt.Errorf("failed to set auditLog.image.repository: %w", err)
+				return fmt.Errorf("failed to set chartsImage.repository: %w", err)
 			}
 			if err := w.recordReplacement(chart, []string{"chartsImage", "tag"}, parts[1], replacements); err != nil {
-				return fmt.Errorf("failed to set auditLog.image.tag: %w", err)
+				return fmt.Errorf("failed to set chartsImage.tag: %w", err)
 			}
 		}
 	}
