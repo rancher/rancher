@@ -129,9 +129,10 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 	if len(hostIPs) > 0 {
 		serverOptions.TLSListenerConfig = dynamiclistener.Config{
-			SANs:           hostIPs,
-			MaxSANs:        30,
-			FilterCN:       newRancherPodIPFilter(ctx, core.Core().V1().Pod()),
+			SANs:    hostIPs,
+			MaxSANs: 30,
+			FilterCN: newRancherInternalCNFilter(ctx, core.Core().V1().Pod(), core.Core().V1().Service(),
+				settings.TLSInternalCNAllowedServices.Get()),
 			FilterExisting: true,
 		}
 	}
