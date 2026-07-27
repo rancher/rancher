@@ -30,6 +30,7 @@ const (
 	ClusterFieldCapabilities                                         = "capabilities"
 	ClusterFieldCapacity                                             = "capacity"
 	ClusterFieldCertificatesExpiration                               = "certificatesExpiration"
+	ClusterFieldChartsImage                                          = "chartsImage"
 	ClusterFieldChartsImageOverride                                  = "chartsImageOverride"
 	ClusterFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterFieldClusterSecrets                                       = "clusterSecrets"
@@ -115,6 +116,7 @@ type Cluster struct {
 	Capabilities                                         *Capabilities                   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                                             map[string]string               `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration                               map[string]CertExpiration       `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ChartsImage                                          string                          `json:"chartsImage,omitempty" yaml:"chartsImage,omitempty"`
 	ChartsImageOverride                                  string                          `json:"chartsImageOverride,omitempty" yaml:"chartsImageOverride,omitempty"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization   `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets                 `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`

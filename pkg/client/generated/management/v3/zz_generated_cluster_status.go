@@ -21,6 +21,7 @@ const (
 	ClusterStatusFieldCapabilities                               = "capabilities"
 	ClusterStatusFieldCapacity                                   = "capacity"
 	ClusterStatusFieldCertificatesExpiration                     = "certificatesExpiration"
+	ClusterStatusFieldChartsImage                                = "chartsImage"
 	ClusterStatusFieldComponentStatuses                          = "componentStatuses"
 	ClusterStatusFieldConditions                                 = "conditions"
 	ClusterStatusFieldCurrentCisRunName                          = "currentCisRunName"
@@ -68,6 +69,7 @@ type ClusterStatus struct {
 	Capabilities                               *Capabilities                   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                                   map[string]string               `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration                     map[string]CertExpiration       `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ChartsImage                                string                          `json:"chartsImage,omitempty" yaml:"chartsImage,omitempty"`
 	ComponentStatuses                          []ClusterComponentStatus        `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
 	Conditions                                 []ClusterCondition              `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	CurrentCisRunName                          string                          `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`

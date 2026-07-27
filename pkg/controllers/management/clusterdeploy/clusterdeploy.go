@@ -133,6 +133,7 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 		toUpdate.Status.AgentImage = modified.Status.AgentImage
 		toUpdate.Status.AgentFeatures = modified.Status.AgentFeatures
 		toUpdate.Status.AuthImage = modified.Status.AuthImage
+		toUpdate.Status.ChartsImage = modified.Status.ChartsImage
 		toUpdate.Status.AppliedAgentEnvVars = modified.Status.AppliedAgentEnvVars
 		toUpdate.Status.AppliedClusterAgentDeploymentCustomization = modified.Status.AppliedClusterAgentDeploymentCustomization
 		toUpdate.Status.AppliedClusterAgentImagePullSecretsHash = modified.Status.AppliedClusterAgentImagePullSecretsHash
@@ -239,13 +240,13 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	return false
 }
 
-func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
+func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desiredCharts string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
 	if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
-	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
+	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth || cluster.Status.ChartsImage != desiredCharts
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
 
 	if forceDeploy || imageChange || agentFeaturesChanged {
@@ -254,6 +255,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 			agentFeaturesChanged)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s]", cluster.Status.AgentImage, desiredAgent)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s]", cluster.Status.AuthImage, desiredAuth)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.ChartsImage [%s], desiredCharts: [%s]", cluster.Status.ChartsImage, desiredCharts)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentFeatures [%v], desiredFeatures: [%v]", cluster.Status.AgentFeatures, desiredFeatures)
 		return true
 	}
@@ -517,6 +519,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
 	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
+	desiredCharts := systemtemplate.GetDesiredChartsImage(cluster)
 	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
@@ -542,7 +545,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
-	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
+	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredCharts, desiredFeatures, desiredTaints)
 	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated || hashChanged || tokenHashChanged
 
 	if !agentManifestChanged && !pcChanged {
@@ -642,6 +645,11 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.DesiredAuthImage == "fixed" {
 		cluster.Spec.DesiredAuthImage = desiredAuth
 	}
+	cluster.Status.ChartsImage = desiredCharts
+	if cluster.Spec.DesiredChartsImage == "fixed" {
+		cluster.Spec.DesiredChartsImage = desiredCharts
+	}
+
 	if cluster.Annotations[AgentForceDeployAnn] == "true" {
 		cluster.Annotations[AgentForceDeployAnn] = "false"
 	}
