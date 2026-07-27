@@ -13,6 +13,47 @@ env:
 permissions: {}
 jobs:
   test:
+    name: test (${{ matrix.shard }})
+    strategy:
+      # Run every shard to completion even if one fails, so a single flaky shard
+      # doesn't hide results from the others.
+      fail-fast: false
+      matrix:
+        # Each shard runs on its own runner against its own Rancher instance, so
+        # the packages that mutate GLOBAL setting singletons (catalogv2's chart
+        # suites and tokens' auth kill-switch) are naturally isolated from every
+        # other package -- something `-p >1` on a single shared Rancher could not
+        # do safely. Shards are balanced by measured runtime (catalogv2 ~15 min
+        # dominates, so it is split across two shards). `run` selects specific
+        # suites; empty means "all tests in the listed packages".
+        include:
+          - shard: catalog-charts
+            packages: ./tests/v2/integration/catalogv2/...
+            run: 'TestRancherManagedChartsSuite|TestSystemChartsVersionSuite'
+          - shard: catalog-repos
+            packages: ./tests/v2/integration/catalogv2/...
+            run: 'TestClusterRepoTestSuite|TestChartsTestSuite|TestUIPluginSuite'
+          - shard: rbac-and-clusters
+            packages: >-
+              ./tests/v2/integration/rbac/...
+              ./tests/v2/integration/clusters/...
+              ./tests/v2/integration/projects/...
+              ./tests/v2/integration/settings/...
+              ./tests/v2/integration/users/...
+              ./tests/v2/integration/authconfigs/...
+            run: ''
+          # tokens is listed LAST: it flips global auth settings
+          # (kubeconfig-generate-token=false, a ~600ms token TTL) and only
+          # restores them in cleanup, so running it after the other packages in
+          # this shard avoids any window where their token/kubeconfig operations
+          # could be affected.
+          - shard: workloads-and-steve
+            packages: >-
+              ./tests/v2/integration/workloads/...
+              ./tests/v2/integration/steveapi/...
+              ./tests/v2/integration/serviceaccount/...
+              ./tests/v2/integration/tokens/...
+            run: ''
     runs-on:
       - runs-on
       - spot=false
@@ -93,4 +134,7 @@ jobs:
           ./tests/v2/integration/scripts/build-integration-setup
       - name: Run Tests
         shell: bash
+        env:
+          INTEGRATION_TEST_PACKAGES: ${{ matrix.packages }}
+          INTEGRATION_TEST_RUN: ${{ matrix.run }}
         run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests

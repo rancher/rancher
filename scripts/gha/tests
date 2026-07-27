@@ -14,6 +14,16 @@ cleanup()
 
 cd $(dirname $0)/../..
 
+# Which integration packages this (possibly sharded) invocation should run.
+# Defaults to the whole suite, so a plain `./scripts/gha/tests` is unchanged.
+# The integration-tests.yml matrix overrides these per shard so each shard runs
+# against its own Rancher instance (see the shared-state analysis: catalogv2 and
+# tokens mutate GLOBAL setting singletons, so real parallelism requires isolated
+# Rancher instances rather than `-p >1` on one server).
+INTEGRATION_TEST_PACKAGES="${INTEGRATION_TEST_PACKAGES:-./tests/v2/integration/...}"
+# Optional -run regex, used by the catalogv2 shards to select specific suites.
+INTEGRATION_TEST_RUN="${INTEGRATION_TEST_RUN:-}"
+
 
 TB_ORG=rancher
 
@@ -111,7 +121,7 @@ trap cleanup exit
 echo "Pre-compiling integration test binaries in the background"
 (
   set -e
-  for pkg in $($GOBIN list ./tests/v2/integration/...); do
+  for pkg in $($GOBIN list $INTEGRATION_TEST_PACKAGES); do
     $GOBIN test -c -o /dev/null "$pkg"
   done
 ) >/tmp/precompile.log 2>&1 &
@@ -171,7 +181,11 @@ if [ -n "${PRECOMPILE_PID:-}" ]; then
   echo "Waiting for background test compilation to finish"
   wait "$PRECOMPILE_PID" || { echo "background test compilation reported an error:"; cat /tmp/precompile.log || true; }
 fi
-$GOBIN test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
+integration_test_args=(-v -failfast -timeout 30m -p 1)
+if [ -n "$INTEGRATION_TEST_RUN" ]; then
+  integration_test_args+=(-run "$INTEGRATION_TEST_RUN")
+fi
+$GOBIN test "${integration_test_args[@]}" $INTEGRATION_TEST_PACKAGES || {
   dump_rancher_logs
   exit 1
 }
