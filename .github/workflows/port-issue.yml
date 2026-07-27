@@ -126,11 +126,11 @@ jobs:
           query($owner: String!, $repo: String!, $number: Int!) {
             repository(owner: $owner, name: $repo) {
               issue(number: $number) {
-                projectItems(first: 20) {
+                projectItems(first: 100) {
                   nodes {
                     id
                     project { id }
-                    fieldValues(first: 50) {
+                    fieldValues(first: 100) {
                       nodes {
                         __typename
                         ... on ProjectV2ItemFieldSingleSelectValue { field { ... on ProjectV2SingleSelectField { id } } optionId }
@@ -191,7 +191,7 @@ jobs:
                               VALUE_ARG=(-f "value[singleSelectOptionId]=${OPTION_ID}")
                               ;;
                           ProjectV2ItemFieldNumberValue)
-                              NUMBER=$(echo "${FIELD_VALUE}" | jq -r '.number // empty')
+                              NUMBER=$(echo "${FIELD_VALUE}" | jq -r 'if has("number") and .number != null then .number else "" end')
                               [ -z "$NUMBER" ] && continue
                               VALUE_ARG=(-F "value[number]=${NUMBER}")
                               ;;
