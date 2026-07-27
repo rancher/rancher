@@ -5,7 +5,7 @@ var (
 		AuthSystemImages AuthSystemImages
 	}{
 		AuthSystemImages: AuthSystemImages{
-			KubeAPIAuth: "rancher/kube-api-auth:v0.15.0",
+			KubeAPIAuth: "rancher/kube-api-auth:v0.15.1",
 		},
 	}
 )
