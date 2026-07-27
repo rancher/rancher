@@ -12,10 +12,13 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
+        # Merged the k3s "Operation" and k3s "Imported_Operation_SetD" shards
+        # into a single job. This reduces the number of concurrent 16cpu-x64
+        # jobs (integration + provisioning) from 10 to 9 so they fit the runner
+        # pool; previously the 10th job was starved and queued for ~30 min,
+        # roughly doubling total CI wall-clock.
         - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$"
+          V2PROV_TEST_RUN_REGEX: "^Test_(Operation_.*|Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode))$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
         - V2PROV_TEST_DIST: "rke2"

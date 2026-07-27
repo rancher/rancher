@@ -44,7 +44,10 @@ runs:
         file: ./package/Dockerfile
         labels: "${{ steps.meta.outputs.labels }}"
         outputs: type=docker,dest=/tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar
-        no-cache: true
+        # Reuse unchanged BuildKit layers across runs (see server action for
+        # rationale). Agent shares the rancher-go-builder / charts / kdm stages.
+        cache-from: type=gha,scope=pr-build-agent-${{ env.ARCH }}
+        cache-to: type=gha,mode=max,scope=pr-build-agent-${{ env.ARCH }}
         target: "agent"
     - name: Upload image
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -35,15 +35,15 @@ jobs:
           persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/rancher-chart/build
-  build-server:
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+  # amd64 builds are on the critical path: the integration and provisioning
+  # test jobs only consume the linux/amd64 image tarballs, so they must gate
+  # tests. The arm64 builds are split into separate, non-gating jobs below so
+  # that tests no longer wait on the (slower) arm64 build to finish.
+  build-server-amd64:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     env:
-      ARCH: ${{ matrix.arch }}
-      OS: ${{ matrix.OS }}
+      ARCH: x64
+      OS: linux
     permissions:
       contents: read
     steps:
@@ -53,15 +53,41 @@ jobs:
           persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/build-images/server
-  build-agent:
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+  build-agent-amd64:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     env:
-      ARCH: ${{ matrix.arch }}
-      OS: ${{ matrix.OS }}
+      ARCH: x64
+      OS: linux
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: ./.github/actions/build-images/agent
+  # arm64 builds still validate that the images compile for arm64, but nothing
+  # downstream depends on them, so they run in parallel and off the critical path.
+  build-server-arm64:
+    runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
+    env:
+      ARCH: arm64
+      OS: linux
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: ./.github/actions/build-images/server
+  build-agent-arm64:
+    runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
+    env:
+      ARCH: arm64
+      OS: linux
     permissions:
       contents: read
     steps:
@@ -98,10 +124,10 @@ jobs:
   integration-tests:
     permissions:
       contents: read
-    needs: [build-server, build-agent]
+    needs: [build-server-amd64, build-agent-amd64]
     uses: ./.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
       contents: read
-    needs: [build-server, build-agent]
+    needs: [build-server-amd64, build-agent-amd64]
     uses: ./.github/workflows/provisioning-tests.yml
