@@ -17,7 +17,6 @@ import (
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/rbac"
-	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -359,7 +358,7 @@ func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectID strin
 	allowedOwnerLabels := make(map[string]bool, len(prtbs))
 	for _, obj := range prtbs {
 		if prtb, ok := obj.(*apisV3.ProjectRoleTemplateBinding); ok {
-			allowedOwnerLabels[pkgrbac.GetPRTBOwnerLabel(prtb.Name)] = true
+			allowedOwnerLabels[rbac.GetPRTBOwnerLabel(prtb.Name)] = true
 		}
 	}
 
@@ -392,7 +391,7 @@ func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectID strin
 // legacy RBAC model is removed.
 func (n *nsLifecycle) prtbOwnerInCurrentProject(rb *rbacv1.RoleBinding, backingNamespace string, allowedOwnerLabels map[string]bool) (owned, inProject bool, err error) {
 	for key := range rb.Labels {
-		if strings.HasPrefix(key, pkgrbac.PrtbOwnerLabel+"-") {
+		if strings.HasPrefix(key, rbac.PrtbOwnerLabel+"-") {
 			owned = true
 			if allowedOwnerLabels[key] {
 				inProject = true
