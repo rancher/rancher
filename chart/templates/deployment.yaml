@@ -185,7 +185,7 @@ spec:
           value: "{{ range $i, $v := .Values.imagePullSecrets }}{{- if $i }},{{ end }}{{ $v.name }}{{ end }}"
 {{- end }}
         - name: CATTLE_CHARTS_IMAGE_DEFAULT
-          value: "{{ template "rancherCharts.image" . }}:{{ default .Chart.appVersion .Values.chartsImage.tag }}"
+          value: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
