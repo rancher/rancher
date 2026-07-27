@@ -957,7 +957,7 @@ func TestRemovePRTBRoleBindingsNotInProject(t *testing.T) {
 			},
 			wantDeleted: []string{"rb-stale"},
 			deleteError: fmt.Errorf("boom"),
-			wantError:   "couldn't delete role binding",
+			wantError:   "failed to delete",
 		},
 	}
 
