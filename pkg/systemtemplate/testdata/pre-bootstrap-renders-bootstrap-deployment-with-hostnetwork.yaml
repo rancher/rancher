@@ -165,6 +165,20 @@ spec:
       - effect: NoSchedule
         key: node.cloudprovider.kubernetes.io/uninitialized
         operator: "Exists"
+      initContainers:
+      - name: rancher-charts-copy
+        image: rancher/rancher-assets:v2.15-20260727T1556Z-dev
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          echo "Copying charts to shared volume..."
+          cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
+          echo "Charts copied successfully"
+        volumeMounts:
+        - name: rancher-charts
+          mountPath: /charts
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
@@ -184,6 +198,8 @@ spec:
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
             value: "mcc-test-preboot-managed-system-upgrade-controller"
           # since we're on the host network, talk to the apiserver over localhost
+          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+            value: rancher/rancher-assets:v2.15-20260727T1556Z-dev
           - name: CATTLE_SERVER_VERSION
             value: dev
           - name: CATTLE_INSTALL_UUID
@@ -193,12 +209,16 @@ spec:
             value: "true"
           image: "rancher/rancher-agent:v2.8.0"
           volumeMounts:
+          - name: rancher-charts
+            mountPath: /var/lib/rancher-data/local-catalogs/v2
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
       # use hostNetwork since the CNI (and coreDNS) is not up yet
       hostNetwork: true
       volumes:
+      - name: rancher-charts
+        emptyDir: {}
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-a15c1b308a

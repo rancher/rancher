@@ -161,6 +161,20 @@ spec:
       - effect: NoSchedule
         key: "node-role.kubernetes.io/control-plane"
         operator: "Exists"
+      initContainers:
+      - name: rancher-charts-copy
+        image: rancher/rancher-assets:v2.15-20260727T1556Z-dev
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          echo "Copying charts to shared volume..."
+          cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
+          echo "Charts copied successfully"
+        volumeMounts:
+        - name: rancher-charts
+          mountPath: /charts
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
@@ -181,6 +195,8 @@ spec:
             value: "mcc-testing-namesapce-opotions-managed-system-94546d"
           - name: RANCHER_NAMESPACE_OPTIONS
             value: '{"enabled":true,"annotations":{"foo":"bar"},"labels":{}}'
+          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+            value: rancher/rancher-assets:v2.15-20260727T1556Z-dev
           - name: CATTLE_SERVER_VERSION
             value: dev
           - name: CATTLE_INSTALL_UUID
@@ -190,10 +206,14 @@ spec:
             value: "true"
           image: "my/agent:image"
           volumeMounts:
+          - name: rancher-charts
+            mountPath: /var/lib/rancher-data/local-catalogs/v2
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
       volumes:
+      - name: rancher-charts
+        emptyDir: {}
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-5ec1f7e700
