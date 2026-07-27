@@ -89,6 +89,18 @@ jobs:
           AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
           docker tag "$image_agent_id" "${REGISTRY}/${IMAGE_AGENT}:${TAG}"
           echo "the image created is ${REGISTRY}/${IMAGE_AGENT}:${TAG}"
+      - name: Load prebuilt runtime image
+        run: |
+          # The build-runtime-image job publishes the rancher-runtime image so we
+          # don't rebuild it in every shard. Loading it makes container-run's
+          # `docker image inspect` succeed and skip the build. Best-effort: if the
+          # artifact is missing, container-run builds the image as before.
+          if [ -f /tmp/rancher-runtime.tar.gz ]; then
+            echo "Loading prebuilt rancher-runtime image (skips per-shard build)"
+            gzip -dc /tmp/rancher-runtime.tar.gz | docker load
+          else
+            echo "No prebuilt rancher-runtime image found; container-run will build it"
+          fi
       - name: Run tests
         env:
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"

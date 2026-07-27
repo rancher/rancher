@@ -121,6 +121,48 @@ jobs:
           push: false
           cache-from: type=gha,scope=pr-build-installer
           cache-to: type=gha,mode=min,scope=pr-build-installer
+  # The provisioning test shards each run `./scripts/container-run`, which builds
+  # the rancher-runtime image (Go toolchain + docker + k3s/k3d binaries) the
+  # first time it is missing. On ephemeral runners that means all 9 shards
+  # rebuild the identical image from scratch. Build it exactly once here, publish
+  # it as an artifact, and let each shard `docker load` it: because container-run
+  # tags the image deterministically (rancher-runtime:<hash>-<arch>) and skips
+  # the build when `docker image inspect` finds it, the shards reuse this image
+  # instead of rebuilding. If this job or the artifact is ever unavailable, the
+  # shards transparently fall back to building the image themselves.
+  build-runtime-image:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Build the shared rancher-runtime image
+        run: |
+          set -eo pipefail
+          # Must match the tag scripts/container-run derives (12-char sha256 of
+          # Dockerfile.runtime + normalized arch) so each shard's
+          # `docker image inspect` finds the pre-loaded image and skips its build.
+          RUNTIME_HASH=$(sha256sum Dockerfile.runtime | awk '{print $1}' | cut -c1-12)
+          RUNTIME_IMAGE="rancher-runtime:${RUNTIME_HASH}-amd64"
+          echo "Building ${RUNTIME_IMAGE}"
+          docker buildx build \
+            --build-arg RUNTIME_HOST_ARCH=amd64 \
+            --file Dockerfile.runtime \
+            --load \
+            --platform linux/amd64 \
+            --tag "${RUNTIME_IMAGE}" \
+            .
+          mkdir -p /tmp/runtime-image
+          docker save "${RUNTIME_IMAGE}" | gzip > /tmp/runtime-image/rancher-runtime.tar.gz
+      - name: Upload runtime image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rancher-runtime-image
+          path: /tmp/runtime-image/rancher-runtime.tar.gz
+          retention-days: 1
   integration-tests:
     permissions:
       contents: read
@@ -129,5 +171,5 @@ jobs:
   provisioning-tests:
     permissions:
       contents: read
-    needs: [build-server-amd64, build-agent-amd64]
+    needs: [build-server-amd64, build-agent-amd64, build-runtime-image]
     uses: ./.github/workflows/provisioning-tests.yml
