@@ -11,8 +11,14 @@ import (
 // `pkg/apis/management.cattle.io/v3/authn_types.go`, and imperative in file
 // `pkg/apis/ext.cattle.io/v1/types.go`
 type TokenAccessor interface {
+	// GetLabels returns the resource labels
+	GetLabels() map[string]string
 	// GetName returns the resource name of the token.
 	GetName() string
+	// GetFullName returns the extended resource name of the token, i.e. any applicable prefixes
+	GetFullName() string
+	// GetKind returns the type of the token
+	GetKind() string
 	// GetIsEnabled returns a boolean flag indicating if the token is
 	// enabled or not.
 	GetIsEnabled() bool

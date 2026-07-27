@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/capr/configserver"
 	"github.com/rancher/rancher/pkg/capr/installer"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/oidc/provider"
 	"github.com/rancher/rancher/pkg/settings"
@@ -69,7 +70,12 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 	health.Register(mux)
 
 	if features.OIDCProvider.Enabled() {
-		p, err := provider.NewProvider(ctx, config.Mgmt.Token().Cache(), config.Mgmt.Token(), config.Mgmt.User().Cache(), config.Mgmt.UserAttribute().Cache(), config.Core.Secret().Cache(), config.Core.Secret(), config.Mgmt.OIDCClient().Cache(), config.Mgmt.OIDCClient(), config.Core.Namespace())
+		p, err := provider.NewProvider(ctx, exttokenstore.NewSystemFromWrangler(config),
+			config.Mgmt.Token().Cache(), config.Mgmt.Token(),
+			config.Mgmt.User().Cache(), config.Mgmt.UserAttribute().Cache(),
+			config.Core.Secret().Cache(), config.Core.Secret(),
+			config.Mgmt.OIDCClient().Cache(), config.Mgmt.OIDCClient(),
+			config.Core.Namespace())
 		if err != nil {
 			return nil, err
 		}
