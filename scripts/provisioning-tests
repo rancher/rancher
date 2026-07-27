@@ -250,11 +250,20 @@ echo "Waiting for Rancher to be healthy"
 # Rancher's deployments (api-extension/remotedialer-proxy, webhook, turtles,
 # capi) to roll out. The compilation only needs the source tree, not a running
 # Rancher, so overlapping it with the readiness waits below removes the cold
-# `go build`/module download from the critical path. Using an empty run filter
-# builds every package's test binary without executing any tests (there is no
-# TestMain in tests/v2prov, so nothing tries to reach Rancher).
+# `go build`/module download from the critical path.
+#
+# `go test -c` compiles each package's test binary (including its _test.go
+# files, which `go build` would skip) and writes it to /dev/null WITHOUT
+# running anything -- so nothing tries to reach Rancher. Shared dependencies
+# are compiled once and reused from the build cache across the loop, so the
+# subsequent real `go test` only has to link and run.
 echo "Pre-compiling provisioning test binaries in the background"
-go test -run='^$' -count=1 ./tests/v2prov/tests/... >/tmp/precompile.log 2>&1 &
+(
+  set -e
+  for pkg in $(go list ./tests/v2prov/tests/...); do
+    go test -c -o /dev/null "$pkg"
+  done
+) >/tmp/precompile.log 2>&1 &
 PRECOMPILE_PID=$!
 
 # The remotedialer-proxy is pulled in by the api-extension deployment
