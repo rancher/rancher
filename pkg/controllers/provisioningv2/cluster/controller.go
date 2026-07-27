@@ -529,6 +529,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
 	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	spec.DesiredAuthImage = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
+	spec.DesiredChartsImage = image.ResolveWithCluster(settings.ChartsImage.Get(), cluster)
 
 	spec.ClusterSecrets.PrivateRegistrySecret, _ = image.GetPrivateRepoSecretFromCluster(cluster)
 	spec.ClusterSecrets.PrivateRegistryURL, _ = image.GetPrivateRepoURLFromCluster(cluster)

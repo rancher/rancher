@@ -191,6 +191,7 @@ type ClusterStatus struct {
 	Driver                     string                    `json:"driver"`
 	Provider                   string                    `json:"provider"`
 	AgentImage                 string                    `json:"agentImage"`
+	ChartsImage                string                    `json:"chartsImage"`
 	AppliedAgentEnvVars        []v1.EnvVar               `json:"appliedAgentEnvVars,omitempty"`
 	AgentFeatures              map[string]bool           `json:"agentFeatures,omitempty"`
 	AuthImage                  string                    `json:"authImage"`
