@@ -541,6 +541,11 @@ func (c Command) renderArgs() ([]string, error) {
 		dataMap["force-replace"] = v
 	}
 
+	if v, ok := dataMap["serverSide"]; ok {
+		delete(dataMap, "serverSide")
+		dataMap["server-side"] = v
+	}
+
 	if v, ok := dataMap["takeOwnership"]; ok && convert.ToString(v) == "true" {
 		dataMap["force-conflicts"] = "true"
 		dataMap["server-side"] = "true"

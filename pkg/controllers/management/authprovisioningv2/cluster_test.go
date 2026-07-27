@@ -80,9 +80,14 @@ func TestOnCluster(t *testing.T) {
 		crtbMock           func(*gomock.Controller) mgmtcontrollers.ClusterRoleTemplateBindingController
 		prtbCacheMock      func(*gomock.Controller, string) mgmtcontrollers.ProjectRoleTemplateBindingCache
 		prtbMock           func(*gomock.Controller) mgmtcontrollers.ProjectRoleTemplateBindingController
+		setupHandler       func(*handler)
 		expectedErr        error
 		expectedFinalizers []string
 	}{
+		"nil cluster no-op": {
+			cluster:     nil,
+			expectedErr: nil,
+		},
 		"role exists, don't enqueue CRTBs nor PRTBs": {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -302,8 +307,64 @@ func TestOnCluster(t *testing.T) {
 				})
 				return mock
 			},
+			setupHandler: func(h *handler) {
+				// Ensure deletion flow executes the updated cluster-index scan logic.
+				// Using provisioningClusterGVK here exercises the self-skip branch and avoids dynamic calls.
+				h.provisioningClusterGVK = schema.GroupVersionKind{
+					Group:   v1.SchemeGroupVersion.Group,
+					Version: v1.SchemeGroupVersion.Version,
+					Kind:    "Cluster",
+				}
+				h.resourcesList = []resourceMatch{{GVK: h.provisioningClusterGVK, Resource: "clusters"}}
+			},
 			expectedErr:        nil,
 			expectedFinalizers: []string{},
+		},
+		"deleting cluster without finalizer still processes cleanup": {
+			cluster: &v1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: v1.SchemeGroupVersion.String(),
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster",
+					Namespace: "fleet-default",
+					Labels: map[string]string{
+						kubernetesprovider.ProviderKey: providers.K3s, // distro is irrelevant here
+					},
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+			},
+			roleBindingMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) wranglerrbacv1.RoleBindingController {
+				mock := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+				mock.EXPECT().List(cluster.Namespace, metav1.ListOptions{}).Return(&rbacv1.RoleBindingList{}, nil)
+				return mock
+			},
+			roleCacheMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) wranglerrbacv1.RoleCache {
+				mock := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
+				mock.EXPECT().Get(cluster.Namespace, clusterViewName(cluster)).Return(&rbacv1.Role{
+					Rules: []rbacv1.PolicyRule{{
+						APIGroups:     []string{cluster.GroupVersionKind().Group},
+						Resources:     []string{"clusters"},
+						ResourceNames: []string{cluster.Name},
+						Verbs:         []string{"get"},
+					}},
+				}, nil)
+				return mock
+			},
+			clusterMock: func(ctrl *gomock.Controller, _ *v1.Cluster) provisioningcontrollers.ClusterController {
+				return fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
+			},
+			setupHandler: func(h *handler) {
+				h.provisioningClusterGVK = schema.GroupVersionKind{
+					Group:   v1.SchemeGroupVersion.Group,
+					Version: v1.SchemeGroupVersion.Version,
+					Kind:    "Cluster",
+				}
+				h.resourcesList = []resourceMatch{{GVK: h.provisioningClusterGVK, Resource: "clusters"}}
+			},
+			expectedErr:        nil,
+			expectedFinalizers: nil,
 		},
 		"missing finalizer updates cluster before role handling": {
 			cluster: &v1.Cluster{
@@ -388,13 +449,18 @@ func TestOnCluster(t *testing.T) {
 				roleBindingController:                roleBindingController,
 				clusterController:                    clusterController,
 			}
+			if test.setupHandler != nil {
+				test.setupHandler(&h)
+			}
 
 			result, err := h.OnCluster("", test.cluster)
 
-			assert.Equal(t, err, test.expectedErr)
-			if test.cluster != nil {
-				assert.Equal(t, test.expectedFinalizers, result.Finalizers)
+			assert.Equal(t, test.expectedErr, err)
+			if test.cluster == nil {
+				assert.Nil(t, result)
+				return
 			}
+			assert.Equal(t, test.expectedFinalizers, result.Finalizers)
 		})
 	}
 }

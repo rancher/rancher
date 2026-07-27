@@ -90,6 +90,13 @@ const (
 	SecretTypeClusterState = "rke.cattle.io/cluster-state"
 	SecretTypeBootstrap    = "rke.cattle.io/bootstrap"
 
+	// CAPIClusterOwnerLabel and CAPIClusterOwnerNSLabel are stamped by rancher-turtles on the
+	// mgmtv3.Cluster shell that represents an imported CAPI cluster. Presence of both labels
+	// (with non-empty values) identifies a CAPI-native caller; the values point at the real
+	// CAPI Cluster.
+	CAPIClusterOwnerLabel   = "cluster-api.cattle.io/capi-cluster-owner"
+	CAPIClusterOwnerNSLabel = "cluster-api.cattle.io/capi-cluster-owner-ns"
+
 	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
 	MachineTemplateClonedFromNameAnn         = "rke.cattle.io/cloned-from-name"
@@ -374,6 +381,12 @@ func GetSystemAgentDataDir(spec *rkev1.ClusterConfiguration) string {
 
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
 	for _, owner := range sa.OwnerReferences {
+		// CAPI-native path (turtles-imported clusters): the plan SA is owned directly by the
+		// CAPI Machine — there is no RKEBootstrap in the chain.
+		if owner.Kind == "Machine" && owner.Name == machineName {
+			return true, nil
+		}
+		// v2prov path: planSA → RKEBootstrap → CAPI Machine.
 		if owner.Kind == RKEBootstrapKind {
 			bootstrap, err := bootstrapCache.Get(sa.Namespace, owner.Name)
 			if err != nil {

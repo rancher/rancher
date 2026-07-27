@@ -5,6 +5,7 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -81,8 +82,12 @@ func newImportedMachinePlanSecret(name, machineName string) *corev1.Secret {
 			Namespace: "c-mine",
 			UID:       types.UID(name + "-uid"),
 			Labels: map[string]string{
-				capr.ClusterNameLabel: "c-mine",
-				capr.MachineNameLabel: machineName,
+				planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.MachineLifecycleKindLabel: "Machine",
+				planv1alpha1.MachineLifecycleNameLabel: machineName,
 			},
 		},
 		Type: capr.SecretTypeMachinePlan,

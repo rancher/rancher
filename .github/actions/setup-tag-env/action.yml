@@ -6,7 +6,7 @@ runs:
     - shell: bash
       run: |
         ref_name="${GITHUB_REF_NAME}"
-        TAG="v2.15-${GITHUB_SHA}-head"
+        TAG="v2.16-${GITHUB_SHA}-head"
         prefix="release/"
         if [[ "$ref_name" == "main" ]]; then
           echo "HEAD_TAG=head" >> "$GITHUB_ENV"

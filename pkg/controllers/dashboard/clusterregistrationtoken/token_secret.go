@@ -2,6 +2,7 @@ package clusterregistrationtoken
 
 import (
 	"fmt"
+	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -18,10 +19,36 @@ const (
 	secretPrefix         = "crt-token-"
 	tokenDataKey         = "token"
 	previousTokenDataKey = "previousToken"
+	// expiresAt and gracePeriodExpiresAt keys store the rotation schedule next to the
+	// token it governs. Required to stay idempotent against duplicate rotation triggers.
+	expiresAtDataKey            = "expiresAt"
+	gracePeriodExpiresAtDataKey = "gracePeriodExpiresAt"
 )
 
 func SecretName(crtName string) string {
 	return secretPrefix + crtName
+}
+func IsTokenSecret(secret *corev1.Secret) bool {
+	return secret != nil && strings.HasPrefix(secret.Name, secretPrefix)
+}
+
+// SecretTokenIndexValues returns the plaintext token values stored in a CRT
+// token secret, for use as index keys. Returns the current token and, if
+// present, the previous token (valid during a rotation grace period).
+// Returns nil for non-CRT secrets or secrets with no current token.
+func SecretTokenIndexValues(secret *corev1.Secret) []string {
+	if !IsTokenSecret(secret) {
+		return nil
+	}
+	token, ok := secret.Data[tokenDataKey]
+	if !ok || len(token) == 0 {
+		return nil
+	}
+	values := []string{string(token)}
+	if prev, ok := secret.Data[previousTokenDataKey]; ok && len(prev) > 0 {
+		values = append(values, string(prev))
+	}
+	return values
 }
 
 func GetTokenFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken) (string, error) {
@@ -53,7 +80,7 @@ func NewTokenSecret(crt *v3.ClusterRegistrationToken, token string, expiresAt st
 	}
 
 	if expiresAt != "" {
-		data["expiresAt"] = []byte(expiresAt)
+		data[expiresAtDataKey] = []byte(expiresAt)
 	}
 
 	return &corev1.Secret{
@@ -72,24 +99,4 @@ func NewTokenSecret(crt *v3.ClusterRegistrationToken, token string, expiresAt st
 		Type: corev1.SecretTypeOpaque,
 		Data: data,
 	}
-}
-
-func GetTokensFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken) (current string, previous string, err error) {
-	if crt == nil || crt.Status.TokenSecretName == "" {
-		return "", "", nil
-	}
-
-	secret, err := secrets.Get(crt.Namespace, crt.Status.TokenSecretName)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get token secret %s/%s: %w", crt.Namespace, crt.Status.TokenSecretName, err)
-	}
-
-	if token, ok := secret.Data[tokenDataKey]; ok {
-		current = string(token)
-	}
-	if prev, ok := secret.Data[previousTokenDataKey]; ok {
-		previous = string(prev)
-	}
-
-	return current, previous, nil
 }

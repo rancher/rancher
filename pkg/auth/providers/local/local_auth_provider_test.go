@@ -72,6 +72,26 @@ func TestProviderSearchPrincipal(t *testing.T) {
 			DisplayName:  "testuser2@example.com",
 			PrincipalIDs: []string{"okta_user://abc-uuid-1"},
 		},
+		{
+			// SCIM-provisioned external user after the user lifecycle controller
+			// appended a self-referential local:// principal. The user also
+			// carries an external provider principal, so it must still not
+			// surface as a local principal. Issue rancher/rancher#54022.
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-scim2",
+			},
+			DisplayName:  "testuser3@example.com",
+			PrincipalIDs: []string{"okta_user://abc-uuid-2", "local://u-scim2"},
+		},
+		{
+			// Local user with only a self-referential local:// principal and no
+			// username still counts as local.
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-local1",
+			},
+			DisplayName:  "Local Only",
+			PrincipalIDs: []string{"local://u-local1"},
+		},
 	}
 
 	provider := Provider{
@@ -169,6 +189,23 @@ func TestProviderSearchPrincipal(t *testing.T) {
 		{
 			searchKey: "testuser2@example.com",
 			want:      nil,
+		},
+		{
+			// SCIM user carrying both an external and a self-referential
+			// local:// principal must not surface as local.
+			// Issue rancher/rancher#54022.
+			searchKey: "testuser3",
+			want:      nil,
+		},
+		{
+			searchKey: "testuser3@example.com",
+			want:      nil,
+		},
+		{
+			// Local-only user (single local:// principal, no username) still
+			// surfaces as a local principal.
+			searchKey: "Local Only",
+			want:      []string{"local://u-local1"},
 		},
 	}
 

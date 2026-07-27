@@ -2,7 +2,115 @@ package mcmauthorizer
 
 import (
 	"testing"
+
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
 )
+
+func newTestSecretIndexer(t *testing.T, secrets ...*corev1.Secret) cache.Indexer {
+	t.Helper()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		SecretTokenIndex: func(obj interface{}) ([]string, error) {
+			secret, ok := obj.(*corev1.Secret)
+			if !ok {
+				return nil, nil
+			}
+			return (&Authorizer{}).secretTokenIndex(secret)
+		},
+	})
+	for _, s := range secrets {
+		if err := indexer.Add(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return indexer
+}
+
+func tokenSecret(namespace, name string, data map[string][]byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
+		Data:       data,
+	}
+}
+
+func TestGetClusterByToken(t *testing.T) {
+	cluster := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-abc"}}
+	clusterLister := &fakes.ClusterListerMock{
+		GetFunc: func(namespace, name string) (*apimgmtv3.Cluster, error) {
+			if name == "c-abc" {
+				return cluster, nil
+			}
+			return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
+		},
+	}
+
+	tests := []struct {
+		name       string
+		secrets    []*corev1.Secret
+		token      string
+		wantResult *apimgmtv3.Cluster
+		wantErr    error
+	}{
+		{
+			name: "current token matches",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-abc", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+			},
+			token:      "tok",
+			wantResult: cluster,
+		},
+		{
+			name: "previous token matches during rotation",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-abc", "crt-token-system", map[string][]byte{
+					"token":         []byte("new-tok"),
+					"previousToken": []byte("old-tok"),
+				}),
+			},
+			token:      "old-tok",
+			wantResult: cluster,
+		},
+		{
+			name: "non-token secret with matching data is ignored",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-abc", "unrelated-secret", map[string][]byte{"token": []byte("tok")}),
+			},
+			token:   "tok",
+			wantErr: ErrClusterNotFound,
+		},
+		{
+			name: "secret namespace has no matching cluster",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-missing", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+			},
+			token:   "tok",
+			wantErr: ErrClusterNotFound,
+		},
+		{
+			name:    "no matching secret",
+			token:   "tok",
+			wantErr: ErrClusterNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auth := &Authorizer{
+				secretIndexer: newTestSecretIndexer(t, tt.secrets...),
+				clusterLister: clusterLister,
+			}
+			got, err := auth.getClusterByToken(tt.token)
+			assert.Equal(t, tt.wantErr, err)
+			assert.Equal(t, tt.wantResult, got)
+		})
+	}
+}
 
 func TestFormatAddress(t *testing.T) {
 	tests := []struct {

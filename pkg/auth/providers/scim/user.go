@@ -455,9 +455,9 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, _, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
-		logrus.Errorf("scim::GetUsers: failed to get user attributes for %s: %s", user.Name, err)
+		logrus.Errorf("scim::GetUser: failed to get user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
 		return
 	}
@@ -562,9 +562,9 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, attrNeedsCreate, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
-		logrus.Errorf("scim::UpdateUsers: failed to get user attributes for %s: %s", user.Name, err)
+		logrus.Errorf("scim::UpdateUser: failed to get user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
 		return
 	}
@@ -620,8 +620,13 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		shouldUpdateUser = true
 	}
 	if shouldUpdateAttr {
-		if attr, err = s.userAttributes.Update(attr); err != nil {
-			logrus.Errorf("scim::UpdateUser: failed to update user attributes for %s: %s", user.Name, err)
+		if attrNeedsCreate {
+			attr, err = s.userAttributes.Create(attr)
+		} else {
+			attr, err = s.userAttributes.Update(attr)
+		}
+		if err != nil {
+			logrus.Errorf("scim::UpdateUser: failed to save user attributes for %s: %s", user.Name, err)
 			writeError(w, NewInternalError())
 			return
 		}
@@ -745,7 +750,7 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, attrNeedsCreate, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
 		logrus.Errorf("scim::PatchUser: failed to get user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
@@ -800,8 +805,13 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if shouldUpdateAttr {
-		if attr, err = s.userAttributes.Update(attr); err != nil {
-			logrus.Errorf("scim::PatchUser: failed to update user attributes for %s: %s", user.Name, err)
+		if attrNeedsCreate {
+			attr, err = s.userAttributes.Create(attr)
+		} else {
+			attr, err = s.userAttributes.Update(attr)
+		}
+		if err != nil {
+			logrus.Errorf("scim::PatchUser: failed to save user attributes for %s: %s", user.Name, err)
 			writeError(w, NewInternalError())
 			return
 		}

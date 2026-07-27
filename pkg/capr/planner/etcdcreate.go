@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func (p *Planner) setEtcdSnapshotCreateState(status rkev1.RKEControlPlaneStatus, create *rkev1.ETCDSnapshotCreate, phase rkev1.ETCDSnapshotPhase) (rkev1.RKEControlPlaneStatus, error) {
@@ -39,7 +40,7 @@ func (p *Planner) startOrRestartEtcdSnapshotCreate(status rkev1.RKEControlPlaneS
 	return status, nil
 }
 
-func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, joinServer string) []error {
+func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, tokensSecret plan.Secret, clusterPlan *plan.Plan, joinServer string) []error {
 	servers := collect(clusterPlan, isEtcd)
 	if len(servers) == 0 {
 		return []error{errors.New("failed to find node to perform etcd snapshot")}
@@ -48,7 +49,7 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tok
 	var errs []error
 
 	for _, server := range servers {
-		createPlan, joinedServer, err := p.generateEtcdSnapshotCreatePlan(controlPlane, tokensSecret, server, joinServer)
+		createPlan, joinedServer, err := p.generateEtcdSnapshotCreatePlan(controlPlane, cluster, tokensSecret, server, joinServer)
 		if err != nil {
 			return []error{err}
 		}
@@ -65,9 +66,9 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tok
 
 // runEtcdSnapshotManagementServiceStart walks through the reconciliation process for the controlplane and etcd nodes.
 // Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
-func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
+func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
 	// Generate and deliver desired plan for the bootstrap/init node first.
-	if err := p.reconcile(controlPlane, tokensSecret, clusterPlan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting, "1", "", controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions, -1, 1); err != nil {
+	if err := p.reconcile(controlPlane, cluster, tokensSecret, clusterPlan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting, "1", "", controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions, -1, 1); err != nil {
 		return err
 	}
 
@@ -84,7 +85,7 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
-		plan, joinedServer, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		plan, joinedServer, err := p.desiredPlan(controlPlane, cluster, tokensSecret, entry, joinServer)
 		if err != nil {
 			return err
 		}
@@ -96,7 +97,7 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 }
 
 // generateEtcdSnapshotCreatePlan generates a plan that contains an instruction to create an etcd snapshot.
-func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
+func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
 	v, err := semver.NewVersion(controlPlane.Spec.KubernetesVersion)
 	if err != nil {
 		return plan.NodePlan{}, "", err
@@ -111,7 +112,7 @@ func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlP
 		args = append(args, "save")
 	}
 
-	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
+	createPlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, cluster, tokensSecret, entry, joinServer, true)
 	createPlan.Instructions = append(createPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, entry),
 		plan.OneTimeInstruction{
 			CommonInstruction: planapi.CommonInstruction{
@@ -123,7 +124,7 @@ func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlP
 	return createPlan, joinedServer, err
 }
 
-func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
+func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, cluster *capi.Cluster, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
 	var err error
 	if controlPlane.Spec.ETCDSnapshotCreate == nil {
 		status, err := p.resetEtcdSnapshotCreateState(status)
@@ -155,7 +156,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 			logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster does not have an init node", controlPlane.Namespace, controlPlane.Name)
 			return status, nil
 		}
-		if errs := p.runEtcdSnapshotCreate(controlPlane, tokensSecret, clusterPlan, joinServer); len(errs) > 0 {
+		if errs := p.runEtcdSnapshotCreate(controlPlane, cluster, tokensSecret, clusterPlan, joinServer); len(errs) > 0 {
 			for _, err := range errs {
 				if err == nil {
 					continue
@@ -180,7 +181,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 		}
 		return status, nil
 	case rkev1.ETCDSnapshotPhaseRestartCluster:
-		if err = p.runEtcdSnapshotManagementServiceStart(controlPlane, tokensSecret, clusterPlan, isEtcd, "etcd snapshot creation"); err != nil {
+		if err = p.runEtcdSnapshotManagementServiceStart(controlPlane, cluster, tokensSecret, clusterPlan, isEtcd, "etcd snapshot creation"); err != nil {
 			return status, err
 		}
 		if status, err = p.setEtcdSnapshotCreateState(status, snapshot, rkev1.ETCDSnapshotPhaseFinished); err != nil {

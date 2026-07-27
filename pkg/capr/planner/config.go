@@ -21,6 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/rancher/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -652,7 +653,7 @@ func updateConfigWithAdvertiseAddresses(config map[string]interface{}, info *mac
 	}
 }
 
-func addLabels(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) error {
+func addLabels(config map[string]interface{}, cluster *capi.Cluster, entry *planEntry) error {
 	var labels []string
 	if data := entry.Metadata.Annotations[capr.LabelsAnnotation]; data != "" {
 		labelMap := map[string]string{}
@@ -666,7 +667,7 @@ func addLabels(config map[string]interface{}, controlPlane *rkev1.RKEControlPlan
 
 	labels = append(labels, capr.MachineUIDLabel+"="+string(entry.Machine.UID))
 
-	lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(controlPlane)
+	lifecycleLabels, err := planv1alpha1.ObjToClusterLifecycleLabels(cluster)
 	if err != nil {
 		return err
 	}
@@ -856,7 +857,7 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 // are referenced in the distribution configuration file (for example, ACE and the cloud-provider). It returns the updated
 // NodePlan, the config that was rendered in a map, the joined server, and an error if one exists.
 // NOTE: the joined server can be "-" if the config file is being added for the init node.
-func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, tokensSecret plan.Secret,
+func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, entry *planEntry, tokensSecret plan.Secret,
 	joinServer string, reg registries, renderS3 bool) (plan.NodePlan, map[string]interface{}, string, error) {
 	config := map[string]interface{}{}
 
@@ -885,7 +886,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
-	if err := addLabels(config, controlPlane, entry); err != nil {
+	if err := addLabels(config, cluster, entry); err != nil {
 		return nodePlan, config, joinedServer, err
 	}
 	if err := addTaints(config, entry, controlPlane); err != nil {

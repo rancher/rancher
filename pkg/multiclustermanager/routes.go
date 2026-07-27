@@ -49,9 +49,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		clusterImport  = clusterregistrationtokens.ClusterImport{
 			Clusters:     scaledContext.Management.Clusters(""),
 			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),
-			// Reuse the CRT token indexer registered by mcmauthorizer.NewAuthorizer,
-			// which is called on the same scaledContext before routing is set up.
-			CRTIndexer: scaledContext.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+			// Reuses the SecretTokenIndex indexer registered by mcmauthorizer.NewAuthorizer.
+			SecretIndexer: scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
 		}
 	)
 
@@ -95,7 +94,10 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	logrus.Infof("Configuring public API body limit to %v bytes", publicLimit)
 	limitingHandler := utils.APIBodyLimitingHandler(publicLimit)
 
-	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))
+	handler := sar.NewSubjectAccessReview(
+		scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews())
+	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, handler)
+
 	saAuth := auth.ToMiddleware(requests.NewServiceAccountAuth(scaledContext, clustermanager.ToRESTConfig))
 	accessControlHandler := rbac.NewAccessControlHandler()
 

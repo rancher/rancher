@@ -310,7 +310,16 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	enableMSUC := false
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		// the case of imported RKE2/K3s cluster
-		enableMSUC = importedclusterversionmanagement.Enabled(cluster) && features.ManagedSystemUpgradeController.Enabled()
+		if features.ManagedSystemUpgradeController.Enabled() {
+			if importedclusterversionmanagement.Enabled(cluster) {
+				enableMSUC = true
+			} else if cluster.Labels != nil {
+				if _, ok := cluster.Labels["cluster-api.cattle.io/owned"]; ok {
+					// install for CAPRKE2
+					enableMSUC = true
+				}
+			}
+		}
 	}
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
 		(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {

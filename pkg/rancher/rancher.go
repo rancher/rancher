@@ -222,6 +222,14 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, fmt.Errorf("failed to create CRDs: %w", err)
 	}
 
+	// Disable the linode node driver (if unused) and remove its DynamicSchema
+	// objects and generated CRDs before any informers start.
+	if features.MCM.Enabled() && features.ProvisioningV2.Enabled() {
+		if err := disableUnusedLinodeNodeDriver(wranglerContext); err != nil {
+			return nil, fmt.Errorf("failed to reconcile linode node driver: %w", err)
+		}
+	}
+
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
 		logrus.Info("fleet can't be turned off when MCM is enabled. Turning on fleet feature")
 		if err := features.SetFeature(wranglerContext.Mgmt.Feature(), features.Fleet.Name(), true); err != nil {
@@ -296,7 +304,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Controllers:     steveControllers,
 		AccessSetLookup: wranglerContext.ASL,
 		AuthMiddleware:  steveauth.ExistingContext,
-		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache(), wranglerContext.Core.Secret().Cache()),
+		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Core.Secret().Cache()),
 		ClusterRegistry: opts.ClusterRegistry,
 		SQLCache:        features.UISQLCache.Enabled(),
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{

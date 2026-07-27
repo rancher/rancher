@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - "v*"
+      # intentionally skip hotfix builds
       - "!v*-hotfix*"
       - "!v*-rcs*"
 

@@ -529,8 +529,8 @@ func TestGetUser(t *testing.T) {
 			Enabled:    &enabled,
 		}, nil)
 
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
@@ -540,11 +540,11 @@ func TestGetUser(t *testing.T) {
 					"email":       {"john.doe@example.com"},
 				},
 			},
-		}, nil)
+		}, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
+			userCache: userCache,
+			userMGR:   userMGR,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
@@ -590,8 +590,8 @@ func TestGetUser(t *testing.T) {
 			Enabled:    &disabled,
 		}, nil)
 
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
@@ -600,11 +600,11 @@ func TestGetUser(t *testing.T) {
 					"principalid": {provider + "_user://inactive.user"},
 				},
 			},
-		}, nil)
+		}, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
+			userCache: userCache,
+			userMGR:   userMGR,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
@@ -686,7 +686,7 @@ func TestGetUser(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
-	t.Run("returns error when user attribute cache fails", func(t *testing.T) {
+	t.Run("returns error when the attribute lookup fails", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		userID := "u-error"
@@ -698,12 +698,12 @@ func TestGetUser(t *testing.T) {
 			Enabled:    &enabled,
 		}, nil)
 
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(nil, fmt.Errorf("cache error"))
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(nil, false, fmt.Errorf("cache error"))
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
+			userCache: userCache,
+			userMGR:   userMGR,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
@@ -719,6 +719,94 @@ func TestGetUser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, resp.Schemas, errorSchemaID)
 		assert.Equal(t, http.StatusInternalServerError, resp.Status)
+	})
+
+	t.Run("missing user attribute returns user with empty attribute fields", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-noattr"
+		enabled := true
+
+		user := &v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(user, nil).AnyTimes()
+
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: userID},
+			GroupPrincipals: map[string]v3.Principals{},
+			ExtraByProvider: map[string]map[string][]string{},
+		}, true, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+			userMGR:   userMGR,
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.GetUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, userID, resp["id"])
+		assert.Equal(t, true, resp["active"])
+		assert.Equal(t, "", resp["userName"])
+		assert.Equal(t, "", resp["externalId"])
+		assert.NotContains(t, resp, "emails")
+	})
+
+	t.Run("resolves attributes via the manager", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-lag"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil).AnyTimes()
+
+		attr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(attr, false, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+			userMGR:   userMGR,
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.GetUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "john.doe", resp["userName"])
+		assert.Equal(t, "ext-12345", resp["externalId"])
 	})
 }
 
@@ -1489,8 +1577,8 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -1499,9 +1587,9 @@ func TestUpdateUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},
@@ -1538,6 +1626,70 @@ func TestUpdateUser(t *testing.T) {
 		assert.Contains(t, w.Header().Get("Location"), wantLocation)
 	})
 
+	t.Run("updates via the attribute from the manager", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		existingUser := &v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(existingUser, nil)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":    {"old.name"},
+					"externalid":  {"ext-12345"},
+					"principalid": {provider + "_user://old.name"},
+				},
+			},
+		}
+
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:      userCache,
+			userAttributes: userAttrClient,
+			userMGR:        userMGR,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "new.name",
+			"externalId": "ext-12345",
+			"active": true
+		}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider)
+		r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "new.name", resp["userName"])
+	})
+
 	t.Run("rejects userName change with default config", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
@@ -1559,13 +1711,13 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1610,12 +1762,12 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
+			userCache: userCache,
+			userMGR:   userMGR,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},
@@ -1663,8 +1815,8 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -1673,10 +1825,10 @@ func TestUpdateUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1721,8 +1873,8 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -1731,10 +1883,10 @@ func TestUpdateUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1779,14 +1931,14 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		// No Update calls expected since nothing changed.
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1841,15 +1993,15 @@ func TestUpdateUser(t *testing.T) {
 			PrincipalIDs: []string{"system://local"},
 		}, nil)
 
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
 			ObjectMeta:      metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{},
-		}, nil)
+		}, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
+			userCache: userCache,
+			userMGR:   userMGR,
 		}
 
 		body := `{
@@ -1888,13 +2040,13 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1992,16 +2144,16 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},
@@ -2043,17 +2195,17 @@ func TestUpdateUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2092,7 +2244,8 @@ func TestUpdateUser(t *testing.T) {
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser, otherUser}, nil)
 
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
@@ -2100,7 +2253,7 @@ func TestUpdateUser(t *testing.T) {
 					"externalid": {"ext-111"},
 				},
 			},
-		}, nil)
+		}, false, nil)
 		userAttributeCache.EXPECT().Get(otherUserID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
 			ExtraByProvider: map[string]map[string][]string{
@@ -2114,6 +2267,7 @@ func TestUpdateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			getConfig:          testDefaultGetConfig,
 		}
 
@@ -2153,7 +2307,8 @@ func TestUpdateUser(t *testing.T) {
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser, otherUser}, nil)
 
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
@@ -2161,7 +2316,7 @@ func TestUpdateUser(t *testing.T) {
 					"externalid": {"ext-111"},
 				},
 			},
-		}, nil)
+		}, false, nil)
 		userAttributeCache.EXPECT().Get(otherUserID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
 			ExtraByProvider: map[string]map[string][]string{
@@ -2175,6 +2330,7 @@ func TestUpdateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},
@@ -2381,8 +2537,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -2391,10 +2547,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2444,8 +2600,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -2454,10 +2610,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		// We deliberately use a string "True" here to verify that we handle string booleans.
@@ -2503,8 +2659,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -2513,10 +2669,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2559,8 +2715,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -2569,10 +2725,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2622,8 +2778,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(existingAttr, nil)
@@ -2634,11 +2790,11 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			users:          userClient,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2675,8 +2831,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -2685,10 +2841,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2724,8 +2880,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -2734,10 +2890,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2773,8 +2929,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -2783,10 +2939,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2831,8 +2987,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -2841,9 +2997,9 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},
@@ -2887,13 +3043,13 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2934,13 +3090,13 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2977,12 +3133,12 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
+			userCache: userCache,
+			userMGR:   userMGR,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},
@@ -3028,12 +3184,12 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
+			userCache: userCache,
+			userMGR:   userMGR,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},
@@ -3078,14 +3234,14 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		// No Update calls expected since nothing changed.
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3175,13 +3331,13 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3217,13 +3373,13 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3259,13 +3415,13 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3327,13 +3483,13 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3373,17 +3529,17 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3419,17 +3575,17 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3466,8 +3622,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
@@ -3476,10 +3632,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			users:              userClient,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			users:     userClient,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3524,8 +3680,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -3534,10 +3690,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3579,13 +3735,13 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			getConfig:          testDefaultGetConfig,
+			userCache: userCache,
+			userMGR:   userMGR,
+			getConfig: testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3623,8 +3779,8 @@ func TestPatchUser(t *testing.T) {
 				},
 			},
 		}
-		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(existingAttr, false, nil)
 
 		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
 		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -3633,10 +3789,10 @@ func TestPatchUser(t *testing.T) {
 		})
 
 		srv := &SCIMServer{
-			userCache:          userCache,
-			userAttributeCache: userAttributeCache,
-			userAttributes:     userAttrClient,
-			getConfig:          testDefaultGetConfig,
+			userCache:      userCache,
+			userMGR:        userMGR,
+			userAttributes: userAttrClient,
+			getConfig:      testDefaultGetConfig,
 		}
 
 		body := `{
@@ -3682,7 +3838,8 @@ func TestPatchUser(t *testing.T) {
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser, otherUser}, nil)
 
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
@@ -3690,7 +3847,7 @@ func TestPatchUser(t *testing.T) {
 					"externalid": {"ext-111"},
 				},
 			},
-		}, nil)
+		}, false, nil)
 		userAttributeCache.EXPECT().Get(otherUserID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
 			ExtraByProvider: map[string]map[string][]string{
@@ -3704,6 +3861,7 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			getConfig:          testDefaultGetConfig,
 		}
 
@@ -3741,7 +3899,8 @@ func TestPatchUser(t *testing.T) {
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser, otherUser}, nil)
 
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureAndGetUserAttribute(userID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: userID},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
@@ -3749,7 +3908,7 @@ func TestPatchUser(t *testing.T) {
 					"externalid": {"ext-111"},
 				},
 			},
-		}, nil)
+		}, false, nil)
 		userAttributeCache.EXPECT().Get(otherUserID).Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: otherUserID},
 			ExtraByProvider: map[string]map[string][]string{
@@ -3763,6 +3922,7 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
 			getConfig: func(string) providerConfig {
 				return providerConfig{UserIDAttribute: UserIDExternalID}
 			},

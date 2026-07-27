@@ -126,6 +126,12 @@ type SystemStore struct {
 	tableConverter  rest.TableConvertor // custom column formatting
 }
 
+type JsonPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
 // NewFromWrangler is a convenience function for creating a token store.
 // It initializes the returned store from the provided wrangler context.
 func NewFromWrangler(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
@@ -660,7 +666,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
@@ -785,6 +791,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
+// Delete is the core deletion method to remove a single named token
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	err := t.secretClient.Delete(TokenNamespace, name, options)
 	if err == nil {
@@ -797,6 +804,24 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	}
 
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
+}
+
+// DeleteCollection is an internal bulk deletion method for use by other parts of Rancher.
+func (t *SystemStore) DeleteCollection(options *metav1.ListOptions) error {
+	localOptions, err := ListOptionMerge(true, "", options)
+	if err != nil {
+		return apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
+	}
+
+	// Deliberately using client instead of the cache as the latter may not be yet synced/populated.
+	if err := t.secretClient.DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, localOptions); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return apierrors.NewInternalError(fmt.Errorf("failed to delete tokens: %w", err))
+	}
+
+	return nil
 }
 
 // Get retrieves the named ext token, without permission checking
@@ -1035,16 +1060,31 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	return newToken, nil
 }
 
+// AddLabel adds a custom label to the named ext token. This is done directly on
+// the secret.
+func (t *SystemStore) AddLabel(name, key, value string) error {
+	// Due to the presence of `SecretKindLabel` in the labels we can be
+	// sure that the secret has labels, simplifying patch construction.
+
+	escapedKey := strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
+	patch, err := json.Marshal([]JsonPatch{{
+		Op:    "add",
+		Path:  "/metadata/labels/" + escapedKey,
+		Value: value,
+	}})
+	if err != nil {
+		return err
+	}
+	_, err = t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
+}
+
 // UpdateLastUsedAt patches the last-used-at information of the token.
 // Called during authentication.
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastUsedAt,
 		Value: nowEncoded,
@@ -1062,11 +1102,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.Token, error) {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastActivitySeen,
 		Value: nowEncoded,
@@ -1092,11 +1128,7 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.T
 // Called by refreshAttributes.
 func (t *SystemStore) Disable(name string) error {
 	// Operate directly on the backend secret holding the token
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldEnabled,
 		Value: base64.StdEncoding.EncodeToString([]byte("false")),
@@ -1339,16 +1371,22 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
 	// cache.
-	if v3token, err := t.v3TokenClient.Get(tokenID); err == nil {
+	v3token, errV3 := t.v3TokenClient.Get(tokenID)
+	if errV3 == nil {
 		return v3token, nil
+	}
+	if !apierrors.IsNotFound(errV3) {
+		// report transient/internal v3 errors
+		// as we cannot be sure about resource state
+		return nil, errV3
 	}
 
 	// not a v3 Token, now check for ext token
-	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+	ext, errExt := t.Get(tokenID, "", &metav1.GetOptions{})
+	if errExt == nil {
 		return ext, nil
 	}
-
-	return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, errExt)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from
@@ -1502,9 +1540,13 @@ func SessionID(ctx context.Context) (string, error) {
 // requests a filter for a different user than itself.
 func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
+	empty := metav1.ListOptions{}
 
 	// for admins we do not impose any additional restrictions over the requested
 	if fullAccess {
+		if options == nil {
+			return empty, nil
+		}
 		return *options, nil
 	}
 
@@ -1512,7 +1554,6 @@ func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptio
 	userIDSelector := labels.Set(map[string]string{
 		UserIDLabel: userName,
 	})
-	empty := metav1.ListOptions{}
 	if options == nil || *options == empty {
 		// No external filter to contend with, just set the internal filter.
 		localOptions = metav1.ListOptions{

@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/lasso/pkg/metrics"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/apps"
@@ -128,7 +129,10 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 	if len(hostIPs) > 0 {
 		serverOptions.TLSListenerConfig = dynamiclistener.Config{
-			SANs: hostIPs,
+			SANs:           hostIPs,
+			MaxSANs:        30,
+			FilterCN:       newRancherPodIPFilter(ctx, core.Core().V1().Pod()),
+			FilterExisting: true,
 		}
 	}
 
@@ -414,6 +418,12 @@ func collectNodeIPs(nodeController corev1controllers.NodeController) ([]string, 
 }
 
 func filterCN(cns ...string) []string {
+	// In the embedded agent Rancher, reject all dynamic CN additions.
+	// The static Config.SANs (short-circuited by allowDefaultSANs) cover all
+	// legitimate access; anything dynamic is attacker-supplied SNI noise.
+	if features.MCMAgent.Enabled() {
+		return nil
+	}
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
 		return cns

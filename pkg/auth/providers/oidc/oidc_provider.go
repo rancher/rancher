@@ -77,6 +77,126 @@ type ClaimInfo struct {
 	Roles []string `json:"roles"`
 }
 
+// UnmarshalJSON decodes a ClaimInfo while tolerating IdPs that emit the
+// "groups", "full_group_path", or "roles" claim as a single string instead of
+// an array of strings (some OIDC providers serialize a single-element
+// IEnumerable<string> as a scalar). Each of these fields is accepted as
+// either a string or a JSON array of strings. Fields missing from the input
+// JSON are left untouched, matching the partial-update semantics of the
+// default json.Unmarshal so that UserInfo-overrides-ID-token behavior is
+// preserved.
+func (c *ClaimInfo) UnmarshalJSON(data []byte) error {
+	type claimInfoAlias ClaimInfo
+	raw := struct {
+		*claimInfoAlias
+		Groups        json.RawMessage `json:"groups"`
+		FullGroupPath json.RawMessage `json:"full_group_path"`
+		Roles         json.RawMessage `json:"roles"`
+	}{claimInfoAlias: (*claimInfoAlias)(c)}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if raw.Groups != nil {
+		groups, err := decodeStringOrSlice(raw.Groups)
+		if err != nil {
+			return fmt.Errorf("groups claim: %w", err)
+		}
+		c.Groups = groups
+	}
+	if raw.FullGroupPath != nil {
+		fullGroupPath, err := decodeStringOrSlice(raw.FullGroupPath)
+		if err != nil {
+			return fmt.Errorf("full_group_path claim: %w", err)
+		}
+		c.FullGroupPath = fullGroupPath
+	}
+	if raw.Roles != nil {
+		roles, err := decodeStringOrSlice(raw.Roles)
+		if err != nil {
+			return fmt.Errorf("roles claim: %w", err)
+		}
+		c.Roles = roles
+	}
+
+	return nil
+}
+
+// decodeStringOrSlice decodes a JSON value that may be either a string or an
+// array of strings into a []string. A scalar string becomes a single-element
+// slice; an array becomes a slice with one element per array entry. Null,
+// empty, or absent values yield a nil slice. Empty strings inside an array are
+// dropped (a scalar empty string also yields nil).
+func decodeStringOrSlice(data json.RawMessage) ([]string, error) {
+	if len(data) == 0 || string(data) == "null" {
+		return nil, nil
+	}
+	var arr []string
+	if err := json.Unmarshal(data, &arr); err == nil {
+		out := arr[:0]
+		for _, s := range arr {
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+		return out, nil
+	}
+	var single string
+	if err := json.Unmarshal(data, &single); err == nil {
+		if single == "" {
+			return nil, nil
+		}
+		return []string{single}, nil
+	}
+	return nil, errors.New("value must be a string or array of strings")
+}
+
+// coerceToStringSlice converts a claim value obtained from a decoded claim map
+// into a []string. It accepts a string (returned as a single-element slice),
+// an []any (each element type-asserted to string), or a []string. Other
+// shapes return nil. Empty strings are dropped.
+func coerceToStringSlice(v any) []string {
+	switch value := v.(type) {
+	case nil:
+		return nil
+	case string:
+		if value == "" {
+			return nil
+		}
+		return []string{value}
+	case []string:
+		out := make([]string, 0, len(value))
+		for _, s := range value {
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	case []any:
+		out := make([]string, 0, len(value))
+		for _, item := range value {
+			s, ok := item.(string)
+			if !ok {
+				logrus.Warn("OpenIDCProvider: failed to convert group to string")
+				continue
+			}
+			if s == "" {
+				continue
+			}
+			out = append(out, s)
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, TokenMgr *tokens.Manager) common.AuthProvider {
 	p := &OpenIDCProvider{
 		Name:        Name,
@@ -641,31 +761,24 @@ func applyCustomClaims(idToken *oidc.IDToken, userInfo *oidc.UserInfo, config *a
 	}
 
 	if config.GroupsClaim != "" {
-		groupsClaim, err := getValueFromClaims[[]any](idToken, config.GroupsClaim)
+		// The custom groups claim may arrive as either an array of strings or
+		// a single string (some IdPs emit a scalar when a user has only one
+		// group). Read the raw claim value and coerce it to []string so both
+		// shapes work.
+		rawGroups, err := getRawClaim(idToken, config.GroupsClaim)
 		if err != nil {
 			return fmt.Errorf("failed to parse groups claims: %w", err)
 		}
-		// UserInfo overrides ID token.
-		if raw, ok := userInfoRawClaims[config.GroupsClaim]; ok {
-			if rawSlice, ok := raw.([]any); ok {
-				groupsClaim = rawSlice
-			}
+		// UserInfo overrides ID token. A nil value (for example "role": null
+		// in the UserInfo payload) is ignored so the ID-token value is
+		// preserved rather than silently cleared.
+		if v, ok := userInfoRawClaims[config.GroupsClaim]; ok && v != nil {
+			rawGroups = v
 		}
 
-		if len(groupsClaim) > 0 {
+		if groups := coerceToStringSlice(rawGroups); len(groups) > 0 {
 			logrus.Debugf("OpenIDCProvider: using custom groups claim")
-			groups := make([]string, 0, len(groupsClaim))
-			for _, g := range groupsClaim {
-				group, ok := g.(string)
-				if !ok || group == "" {
-					logrus.Warn("OpenIDCProvider: failed to convert group to string")
-					continue
-				}
-				groups = append(groups, group)
-			}
-			if len(groups) > 0 {
-				claimInfo.Groups = groups
-			}
+			claimInfo.Groups = groups
 		}
 	}
 
@@ -940,6 +1053,18 @@ func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
 	}
 
 	return claim, nil
+}
+
+// getRawClaim returns the raw value of the named claim from the ID token
+// without enforcing a specific Go type, allowing the caller to handle claims
+// that may arrive in more than one JSON shape (for example a string or an
+// array of strings). It returns nil if the claim is absent.
+func getRawClaim(idToken *oidc.IDToken, name string) (any, error) {
+	var mapClaims jwt.MapClaims
+	if err := idToken.Claims(&mapClaims); err != nil {
+		return nil, fmt.Errorf("failed to parse claims: %w", err)
+	}
+	return mapClaims[name], nil
 }
 
 func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {

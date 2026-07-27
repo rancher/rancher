@@ -10,15 +10,16 @@ type ETCDSnapshotRestoreArgs struct {
 	// Name specifies the name of the ETCD snapshot file.
 	// +optional
 	Name string `json:"name,omitempty"`
-
-	// RestoreConfig: todo
 }
 
 // ETCDSnapshotRestoreSpec defines the desired state of ETCDSnapshotRestore.
 type ETCDSnapshotRestoreSpec struct {
+	// OperationSpec is the shared spec common to all operations.
 	// +optional
 	OperationSpec `json:",inline"`
 
+	// Args contains parameters for restoring an ETCD snapshot.
+	// Mutually exclusive with SnapshotRef.
 	// +optional
 	Args ETCDSnapshotRestoreArgs `json:"args,omitempty"`
 }
@@ -27,6 +28,8 @@ type ETCDSnapshotRestoreSpec struct {
 type ETCDSnapshotRestoreStep string
 
 const (
+	// ETCDSnapshotRestoreStepPreflight indicates the step is performing preflight checks to determine if the operation will succeed.
+	ETCDSnapshotRestoreStepPreflight ETCDSnapshotRestoreStep = "Preflight"
 
 	// ETCDSnapshotRestoreStepShutdown indicates the step is shutting down the cluster.
 	ETCDSnapshotRestoreStepShutdown ETCDSnapshotRestoreStep = "Shutdown"
@@ -54,7 +57,7 @@ type ETCDSnapshotRestoreStatus struct {
 
 	// Step is the current step of the operation.
 	// Step is typically only valid during the InProgress phase.
-	// +kubebuilder:validation:Enum=Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster
+	// +kubebuilder:validation:Enum=Preflight;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster
 	// +optional
 	Step ETCDSnapshotRestoreStep `json:"step,omitempty"`
 }
