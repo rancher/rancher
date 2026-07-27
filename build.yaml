@@ -8,7 +8,7 @@ fleetVersion: 110.0.0+up0.16.0
 defaultSccOperatorImage: rancher/scc-operator:v0.5.0
 chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
 # Notes: ClusterRepo asset and branch versions
-defaultChartsImage: rancher/rancher-assets:v0.1.0-rc.1
+defaultChartsImage: rancher/rancher-assets:v2.15-20260727T1556Z-dev
 chartDefaultBranch: dev-v2.15
 partnerChartDefaultBranch: main
 rke2ChartDefaultBranch: main
