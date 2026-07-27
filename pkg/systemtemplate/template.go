@@ -191,13 +191,6 @@ spec:
       - name: rancher-charts-copy
         image: {{.ChartsImage}}
         imagePullPolicy: IfNotPresent
-        command:
-        - sh
-        - -c
-        - |
-          echo "Copying charts to shared volume..."
-          cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
-          echo "Charts copied successfully"
         volumeMounts:
         - name: rancher-charts
           mountPath: /charts
