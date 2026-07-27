@@ -55,8 +55,13 @@ jobs:
         run: |
           declare -a additional_cmd
           BODY=$(mktemp)
-          ORIGINAL_ISSUE=$(gh issue view -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --json title,body,assignees)
+          ORIGINAL_ISSUE=$(gh issue view -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --json title,body,assignees,issueType)
           ORIGINAL_TITLE=$(echo "${ORIGINAL_ISSUE}" | jq -r .title)
+          ORIGINAL_TYPE=$(echo "${ORIGINAL_ISSUE}" | jq -r '.issueType.name // empty')
+          if [ -n "$ORIGINAL_TYPE" ]; then
+              additional_cmd+=("--type")
+              additional_cmd+=("${ORIGINAL_TYPE}")
+          fi
           TYPE=$(echo "${COMMENT_BODY}" | awk '{ print $1 }' | sed -e 's_/__')
           MILESTONE=$(echo "${COMMENT_BODY}" | awk '{ print $2 }')
           NEW_TITLE="[${TYPE}] ${ORIGINAL_TITLE}"
@@ -108,4 +113,119 @@ jobs:
               echo "${ORIGINAL_ISSUE}" | jq -r '.body[0:65536]' >> $BODY
               NEW_ISSUE=$(gh issue create -R "${GITHUB_REPOSITORY}" --title "${NEW_TITLE}" --body-file "${BODY}" -m "${MILESTONE}" "${additional_cmd[@]}")
               echo "Port issue created: ${NEW_ISSUE}" >> $GITHUB_STEP_SUMMARY
+
+              # Copy Project v2 field values (e.g. Status, Priority) from the original
+              # issue's project items to the newly created issue's project items.
+              # The --project flag above adds the new issue to the same projects but
+              # with default field values, so we replay each field value here.
+              NEW_ISSUE_NUMBER=$(echo "${NEW_ISSUE}" | awk -F/ '{ print $NF }')
+              REPO_OWNER="${GITHUB_REPOSITORY%/*}"
+              REPO_NAME="${GITHUB_REPOSITORY#*/}"
+
+              read -r -d '' PROJECT_ITEMS_QUERY <<'EOF' || true
+          query($owner: String!, $repo: String!, $number: Int!) {
+            repository(owner: $owner, name: $repo) {
+              issue(number: $number) {
+                projectItems(first: 20) {
+                  nodes {
+                    id
+                    project { id }
+                    fieldValues(first: 50) {
+                      nodes {
+                        __typename
+                        ... on ProjectV2ItemFieldSingleSelectValue { field { ... on ProjectV2SingleSelectField { id } } optionId }
+                        ... on ProjectV2ItemFieldNumberValue { field { ... on ProjectV2FieldCommon { id } } number }
+                        ... on ProjectV2ItemFieldTextValue { field { ... on ProjectV2FieldCommon { id } } text }
+                        ... on ProjectV2ItemFieldDateValue { field { ... on ProjectV2FieldCommon { id } } date }
+                        ... on ProjectV2ItemFieldIterationValue { field { ... on ProjectV2FieldCommon { id } } iterationId }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          EOF
+
+              ORIGINAL_PROJECT_ITEMS=$(gh api graphql \
+                  -f query="${PROJECT_ITEMS_QUERY}" \
+                  -f owner="${REPO_OWNER}" \
+                  -f repo="${REPO_NAME}" \
+                  -F number="${ORIGINAL_ISSUE_NUMBER}" \
+                  --jq '.data.repository.issue.projectItems.nodes')
+
+              NEW_PROJECT_ITEMS=$(gh api graphql \
+                  -f query="${PROJECT_ITEMS_QUERY}" \
+                  -f owner="${REPO_OWNER}" \
+                  -f repo="${REPO_NAME}" \
+                  -F number="${NEW_ISSUE_NUMBER}" \
+                  --jq '.data.repository.issue.projectItems.nodes')
+
+              # Build a map from project id -> new project item id so we can find
+              # the matching target item for each source item.
+              declare -A NEW_ITEM_BY_PROJECT=()
+              while IFS=$'\t' read -r PROJECT_ID ITEM_ID; do
+                  [ -z "$PROJECT_ID" ] && continue
+                  NEW_ITEM_BY_PROJECT[$PROJECT_ID]=$ITEM_ID
+              done < <(echo "${NEW_PROJECT_ITEMS}" | jq -r '.[] | [.project.id, .id] | @tsv')
+
+              # For each source project item, replay every field value onto the
+              # matching new project item.
+              while IFS=$'\t' read -r PROJECT_ID FIELD_VALUES_JSON; do
+                  [ -z "$PROJECT_ID" ] && continue
+                  NEW_ITEM_ID="${NEW_ITEM_BY_PROJECT[$PROJECT_ID]:-}"
+                  if [ -z "$NEW_ITEM_ID" ]; then
+                      echo "No matching new project item for project ${PROJECT_ID}, skipping field copy"
+                      continue
+                  fi
+                  echo "${FIELD_VALUES_JSON}" | jq -c '.[]' | while read -r FIELD_VALUE; do
+                      TYPENAME=$(echo "${FIELD_VALUE}" | jq -r '.__typename')
+                      FIELD_ID=$(echo "${FIELD_VALUE}" | jq -r '.field.id // empty')
+                      if [ -z "$FIELD_ID" ]; then
+                          continue
+                      fi
+                      case "${TYPENAME}" in
+                          ProjectV2ItemFieldSingleSelectValue)
+                              OPTION_ID=$(echo "${FIELD_VALUE}" | jq -r '.optionId // empty')
+                              [ -z "$OPTION_ID" ] && continue
+                              VALUE_ARG=(-f "value[singleSelectOptionId]=${OPTION_ID}")
+                              ;;
+                          ProjectV2ItemFieldNumberValue)
+                              NUMBER=$(echo "${FIELD_VALUE}" | jq -r '.number // empty')
+                              [ -z "$NUMBER" ] && continue
+                              VALUE_ARG=(-F "value[number]=${NUMBER}")
+                              ;;
+                          ProjectV2ItemFieldTextValue)
+                              TEXT=$(echo "${FIELD_VALUE}" | jq -r '.text // empty')
+                              [ -z "$TEXT" ] && continue
+                              VALUE_ARG=(-f "value[text]=${TEXT}")
+                              ;;
+                          ProjectV2ItemFieldDateValue)
+                              DATE=$(echo "${FIELD_VALUE}" | jq -r '.date // empty')
+                              [ -z "$DATE" ] && continue
+                              VALUE_ARG=(-f "value[date]=${DATE}")
+                              ;;
+                          ProjectV2ItemFieldIterationValue)
+                              ITERATION_ID=$(echo "${FIELD_VALUE}" | jq -r '.iterationId // empty')
+                              [ -z "$ITERATION_ID" ] && continue
+                              VALUE_ARG=(-f "value[iterationId]=${ITERATION_ID}")
+                              ;;
+                          *)
+                              continue
+                              ;;
+                      esac
+                      gh api graphql \
+                          -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                            updateProjectV2ItemFieldValue(input: {projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: $value}) {
+                              projectV2Item { id }
+                            }
+                          }' \
+                          -f projectId="${PROJECT_ID}" \
+                          -f itemId="${NEW_ITEM_ID}" \
+                          -f fieldId="${FIELD_ID}" \
+                          "${VALUE_ARG[@]}" > /dev/null \
+                          && echo "Copied field ${FIELD_ID} (${TYPENAME}) to new project item ${NEW_ITEM_ID}" \
+                          || echo "Failed to copy field ${FIELD_ID} (${TYPENAME}) to new project item ${NEW_ITEM_ID}" >> $GITHUB_STEP_SUMMARY
+                  done
+              done < <(echo "${ORIGINAL_PROJECT_ITEMS}" | jq -r '.[] | [.project.id, (.fieldValues.nodes | tojson)] | @tsv')
           fi
