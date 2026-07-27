@@ -3,7 +3,7 @@ webhookVersion: 110.0.0+up0.11.0
 # NOTE: CAPI controller version has to be updated in scripts/package-env
 turtlesVersion: 110.0.0+up0.27.0
 cspAdapterMinVersion: 110.0.0+up10.0.0
-defaultShellVersion: rancher/shell:v0.8.1-rc.2
+defaultShellVersion: rancher/shell:v0.8.1
 fleetVersion: 110.0.0+up0.16.0
 defaultSccOperatorImage: rancher/scc-operator:v0.5.0
 chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
