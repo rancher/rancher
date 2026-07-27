@@ -186,7 +186,7 @@ jobs:
                       elif $v.__typename == "IssueFieldTextValue" and ($v.value // "") != "" then
                           {fieldId: $fid, textValue: $v.value}
                       elif $v.__typename == "IssueFieldNumberValue" and ($v.value != null) then
-                          {fieldId: $fid, numberValue: ($v.value | tonumber)}
+                          {fieldId: $fid, numberValue: $v.value}
                       else empty end
                   ]')
 
@@ -201,7 +201,7 @@ jobs:
                   if echo "$MUTATION_PAYLOAD" | gh api graphql \
                           -H "GraphQL-Features: issue_fields" \
                           --input - > /dev/null 2>&1; then
-                      echo "Copied issue field values: ${ISSUE_FIELDS_JSON}"
+                      echo "Copied issue field values: ${ISSUE_FIELDS_JSON}" >> $GITHUB_STEP_SUMMARY
                   else
                       echo "Failed to copy issue field values (${ISSUE_FIELDS_JSON}) to new issue" >> $GITHUB_STEP_SUMMARY
                   fi
