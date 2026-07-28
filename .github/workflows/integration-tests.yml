@@ -26,14 +26,25 @@ jobs:
         # do safely. Shards are balanced by measured runtime (catalogv2 ~15 min
         # dominates, so it is split across two shards). `run` selects specific
         # suites; empty means "all tests in the listed packages".
+        #
+        # `cpu` sizes the runner (runner=<cpu>cpu-linux-x64). Default 16. As an
+        # EXPERIMENT we run the catalog-repos shard on an 8cpu runner to measure
+        # whether these integration jobs are actually CPU-bound: the heavy pool
+        # limit is an AWS vCPU quota, so if 8cpu still passes at similar speed we
+        # can halve the vCPU footprint (and ease runner contention). Integration
+        # is off the CI critical path, so a slower/failed 8cpu shard here does
+        # not affect overall wall-clock. Revert by setting cpu back to 16.
         include:
           - shard: catalog-charts
+            cpu: 16
             packages: ./tests/v2/integration/catalogv2/...
             run: 'TestRancherManagedChartsSuite|TestSystemChartsVersionSuite'
           - shard: catalog-repos
+            cpu: 8
             packages: ./tests/v2/integration/catalogv2/...
             run: 'TestClusterRepoTestSuite|TestChartsTestSuite|TestUIPluginSuite'
           - shard: rbac-and-clusters
+            cpu: 16
             packages: >-
               ./tests/v2/integration/rbac/...
               ./tests/v2/integration/clusters/...
@@ -48,6 +59,7 @@ jobs:
           # this shard avoids any window where their token/kubeconfig operations
           # could be affected.
           - shard: workloads-and-steve
+            cpu: 16
             packages: >-
               ./tests/v2/integration/workloads/...
               ./tests/v2/integration/steveapi/...
@@ -57,7 +69,7 @@ jobs:
     runs-on:
       - runs-on
       - spot=false
-      - runner=16cpu-linux-x64
+      - runner=${{ matrix.cpu }}cpu-linux-x64
       - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
