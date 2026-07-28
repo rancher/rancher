@@ -17,12 +17,14 @@ import (
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -32,6 +34,10 @@ const (
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
 	projectNSEditVerb              = "*"
+
+	// initialRolesRequeueInterval is the backstop delay for re-checking whether a namespace's
+	// project RBAC has materialized, used when no watch wakes the reconcile sooner.
+	initialRolesRequeueInterval = 5 * time.Second
 
 	// compatibility with previous norman lifecycle implementation, now implemented inside OnChange's handler
 	normanLifecycleAnnotation = "lifecycle.cattle.io/create.namespace-auth"
@@ -76,12 +82,20 @@ func (n *nsLifecycle) onChange(_ string, obj *v1.Namespace) (*v1.Namespace, erro
 		return n.onRemove(obj)
 	}
 
+	var err error
 	if obj.Annotations[normanLifecycleAnnotation] != "true" {
-		return n.onCreate(obj)
+		obj, err = n.onCreate(obj)
+	} else {
+		err = n.syncNS(obj)
+	}
+	if err != nil {
+		return obj, err
 	}
 
-	_, err := n.syncNS(obj)
-	return obj, err
+	// Level-triggered: reconcile the InitialRolesPopulated condition every pass, based on the
+	// namespace's final project assignment. The RB/CR enqueuers re-trigger this handler when the
+	// awaited RBAC appears; until then reconcileInitialRolesCondition requeues via EnqueueAfter.
+	return n.reconcileInitialRolesCondition(obj)
 }
 
 func (n *nsLifecycle) removeFinalizer(obj *v1.Namespace) (*v1.Namespace, error) {
@@ -102,8 +116,7 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 		return nil, err
 	}
 
-	hasPRTBs, err := n.syncNS(obj)
-	if err != nil {
+	if err := n.syncNS(obj); err != nil {
 		return nil, err
 	}
 
@@ -122,8 +135,6 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 		return nil, err
 	}
 
-	go updateStatusAnnotation(hasPRTBs, obj.DeepCopy(), n.m)
-
 	return obj, nil
 }
 
@@ -141,7 +152,7 @@ func (n *nsLifecycle) onRemove(obj *v1.Namespace) (*v1.Namespace, error) {
 	return obj, nil
 }
 
-func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
+func (n *nsLifecycle) syncNS(obj *v1.Namespace) error {
 	// add fleet namespace to system project
 	if IsFleetNamespace(obj) &&
 		// If this is the local cluster, then only move the namespace to ths system project if the projectIDAnnotation is
@@ -153,7 +164,7 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 
 		systemProjectName, err := n.GetSystemProjectName()
 		if err != nil {
-			return false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
+			return errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
 		}
 
 		// When there is no system project, we should not set this annotation as a result because the project name
@@ -166,16 +177,15 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 		}
 	}
 
-	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
-	if err != nil {
-		return false, fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
+	if err := n.ensurePRTBAddToNamespace(obj); err != nil {
+		return fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
 	}
 
 	if err := n.reconcileNamespaceProjectClusterRole(obj); err != nil {
-		return false, fmt.Errorf("reconciling namespace %s project cluster roles: %w", obj.Name, err)
+		return fmt.Errorf("reconciling namespace %s project cluster roles: %w", obj.Name, err)
 	}
 
-	return hasPRTBs, nil
+	return nil
 }
 
 func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
@@ -238,9 +248,8 @@ func IsFleetNamespace(ns *v1.Namespace) bool {
 // ensurePRTBAddToNamespace reconciles the per-namespace PRTB RoleBindings for the project the
 // namespace currently belongs to. Under the legacy RBAC model it creates the bindings that should
 // exist; in all cases it removes bindings that should not (e.g. left behind when the namespace was
-// moved between projects, or when it belongs to no project at all). It returns whether the
-// namespace's project has any PRTBs, which the caller uses to gate the initial-roles status.
-func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
+// moved between projects, or when it belongs to no project at all).
+func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) error {
 	projectID := ns.Annotations[projectIDAnnotation]
 
 	var prtbs []any
@@ -248,18 +257,16 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		var err error
 		prtbs, err = n.m.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
 		if err != nil {
-			return false, errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
+			return errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
 		}
 	}
-	hasPRTBs := len(prtbs) > 0
 
 	// Under the legacy RBAC model the per-namespace PRTB RoleBindings are created here. Under
 	// aggregation they are owned by the roletemplate-aggregation controllers, which create them with
-	// aggregation labels and remove them when the PRTB is deleted; creating the legacy bindings here
-	// would leak RoleBindings the aggregation removal handler does not clean up.
+	// aggregation labels and remove them when the PRTB is deleted.
 	if projectID != "" && !features.AggregatedRoleTemplates.Enabled() {
 		if err := n.createLegacyProjectRoleBindings(ns.Name, prtbs); err != nil {
-			return false, err
+			return err
 		}
 	}
 
@@ -267,15 +274,14 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	// current project - e.g. bindings left behind when the namespace was moved between projects, or
 	// when it belongs to no project at all.
 	if err := n.removePRTBRoleBindingsNotInProject(ns.Name, projectID, prtbs); err != nil {
-		return hasPRTBs, err
+		return err
 	}
 
-	return hasPRTBs, nil
+	return nil
 }
 
 // createLegacyProjectRoleBindings ensures a RoleBinding exists in the namespace for each PRTB in the
-// namespace's project. Only used under the legacy RBAC model; under aggregation these bindings are
-// owned by the roletemplate-aggregation controllers.
+// namespace's project. Only used under the non-aggregation RBAC model.
 func (n *nsLifecycle) createLegacyProjectRoleBindings(nsName string, prtbs []any) error {
 	for _, obj := range prtbs {
 		prtb, ok := obj.(*apisV3.ProjectRoleTemplateBinding)
@@ -319,22 +325,16 @@ func (n *nsLifecycle) createLegacyProjectRoleBindings(nsName string, prtbs []any
 
 // legacyOwnerIndexes maps each legacy rtb-owner RoleBinding label to the PRTB indexer that resolves
 // its value to the owning PRTB: the pre-2.5 label carries the PRTB UID, the 2.5+ label carries the
-// PRTB's namespace_name key. Only the legacy cleanup branch consults these; the whole map and its
-// use in prtbOwnerInCurrentProject can be removed with the legacy RBAC model.
+// PRTB's namespace_name key.
 var legacyOwnerIndexes = map[string]string{
 	rtbOwnerLabelLegacy: prtbByUIDIndex,
 	rtbOwnerLabel:       prtbByNsAndNameIndex,
 }
 
 // removePRTBRoleBindingsNotInProject removes every PRTB-owned RoleBinding in the namespace whose
-// owning PRTB does not belong to the namespace's current project, handling legacy (rtb-owner
-// labelled) and aggregation (prtb-owner labelled) bindings in a single pass. Bindings left behind
+// owning PRTB does not belong to the namespace's current project. Bindings left behind
 // when a namespace moves between projects are the main target; when the namespace belongs to no
 // project, no owner is valid so every PRTB-owned binding is removed.
-//
-// This closes the gap where moving a namespace between projects leaves a user with access to it: the
-// aggregation handler reconciles bindings by iterating a project's current namespaces, so once a
-// namespace leaves the project the owning PRTB's reconcile can no longer reach it to clean up.
 func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectID string, prtbs []any) error {
 	var backingNamespace string
 	if projectID != "" {
@@ -383,12 +383,6 @@ func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectID strin
 
 // prtbOwnerInCurrentProject reports whether rb is owned by a PRTB and if so, whether that
 // PRTB belongs to the namespace's current project.
-//
-// Aggregation bindings encode their owning PRTB in a prtb-owner-<name> label key, matched against
-// allowedOwnerLabels (the owner labels of the current project's PRTBs). Legacy bindings reference
-// their owning PRTB by the rtb-owner label value, which is resolved through the PRTB indexer and
-// matched against the current project's backing namespace. The legacy branch can be dropped once the
-// legacy RBAC model is removed.
 func (n *nsLifecycle) prtbOwnerInCurrentProject(rb *rbacv1.RoleBinding, backingNamespace string, allowedOwnerLabels map[string]bool) (owned, inProject bool, err error) {
 	for key := range rb.Labels {
 		if strings.HasPrefix(key, rbac.PrtbOwnerLabel+"-") {
@@ -609,7 +603,7 @@ func addUpdatepsaClusterRole(projectName string) *rbacv1.ClusterRole {
 	return clusterRole
 }
 
-func crByNS(obj interface{}) ([]string, error) {
+func crByNS(obj any) ([]string, error) {
 	cr, ok := obj.(*rbacv1.ClusterRole)
 	if !ok {
 		return []string{}, nil
@@ -628,68 +622,135 @@ func crByNS(obj interface{}) ([]string, error) {
 	return result, nil
 }
 
-func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager) {
-	if _, ok := namespace.Annotations[projectIDAnnotation]; ok {
-		for i := 0; i < 10; i++ {
-			time.Sleep(time.Millisecond * 500)
-			clusterRoles, err := mgr.crIndexer.ByIndex(crByNSIndex, namespace.Name)
+// reconcileInitialRolesCondition sets the InitialRolesPopulated condition once the namespace's
+// project RBAC has been created. Until then, it requeues the namespace via EnqueueAfter.
+// The condition is write-once: after it is set, this returns early on every subsequent reconcile.
+func (n *nsLifecycle) reconcileInitialRolesCondition(ns *v1.Namespace) (*v1.Namespace, error) {
+	set, err := namespaceutil.IsNamespaceConditionSet(ns, initialRoleCondition, true)
+	if err != nil {
+		return ns, fmt.Errorf("checking %s condition on namespace %s: %w", initialRoleCondition, ns.Name, err)
+	}
+	if set {
+		return ns, nil
+	}
+
+	ready, err := n.initialRolesReady(ns)
+	if err != nil {
+		return ns, err
+	}
+	if !ready {
+		// The RB/CR enqueuers usually wake us sooner when the awaited objects appear; this is the
+		// backstop for transitions no watch covers (e.g. a just-assigned project, dropped events).
+		n.m.namespaces.EnqueueAfter(ns.Name, initialRolesRequeueInterval)
+		return ns, nil
+	}
+
+	ns = ns.DeepCopy()
+	if err := namespaceutil.SetNamespaceCondition(ns, time.Second, initialRoleCondition, true, ""); err != nil {
+		return ns, fmt.Errorf("setting %s condition on namespace %s: %w", initialRoleCondition, ns.Name, err)
+	}
+	return n.m.namespaces.Update(ns)
+}
+
+// initialRolesReady reports whether the RBAC that InitialRolesPopulated gates has materialized: the
+// project's namespace ClusterRoles exist, the namespace creator (if any) has a binding to one of
+// them, and - when the project has PRTBs - at least one project RoleBinding exists in the namespace.
+// A namespace that belongs to no project has no per-project roles to wait for and is always ready.
+func (n *nsLifecycle) initialRolesReady(ns *v1.Namespace) (bool, error) {
+	projectID := ns.Annotations[projectIDAnnotation]
+	if projectID == "" {
+		return true, nil
+	}
+
+	clusterRoles, err := n.m.crIndexer.ByIndex(crByNSIndex, ns.Name)
+	if err != nil {
+		return false, fmt.Errorf("getting cluster roles for namespace %s: %w", ns.Name, err)
+	}
+	if len(clusterRoles) < 2 {
+		return false, nil
+	}
+
+	if creator := ns.Annotations["field.cattle.io/creatorId"]; creator != "" {
+		found := false
+		for _, crx := range clusterRoles {
+			cr, ok := crx.(*rbacv1.ClusterRole)
+			if !ok {
+				continue
+			}
+			crbKey := rbRoleSubjectKey(cr.Name, rbacv1.Subject{Kind: "User", Name: creator})
+			crbs, err := n.m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
 			if err != nil {
-				logrus.Warnf("error getting cluster roles for ns %v for status update: %v", namespace.Name, err)
-				continue
+				return false, fmt.Errorf("getting cluster role bindings for namespace %s: %w", ns.Name, err)
 			}
-			if len(clusterRoles) < 2 {
-				continue
+			if len(crbs) > 0 {
+				found = true
+				break
 			}
-
-			creator := namespace.Annotations["field.cattle.io/creatorId"]
-			if creator != "" {
-				found := false
-				for _, crx := range clusterRoles {
-					cr, _ := crx.(*rbacv1.ClusterRole)
-					crbKey := rbRoleSubjectKey(cr.Name, rbacv1.Subject{Kind: "User", Name: creator})
-					crbs, _ := mgr.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
-					if len(crbs) > 0 {
-						found = true
-						break
-					}
-				}
-				if !found {
-					continue
-				}
-			}
-
-			if hasPRTBs {
-				bindings, err := mgr.rbLister.List(namespace.Name, labels.Everything())
-				if err != nil {
-					logrus.Warnf("error getting bindings for ns %v for status update: %v", namespace.Name, err)
-					continue
-				}
-				if len(bindings) > 0 {
-					break
-				}
-			}
+		}
+		if !found {
+			return false, nil
 		}
 	}
 
-	for i := 0; i < 10; i++ {
-		ns, err := mgr.namespaces.Get(namespace.Name, metav1.GetOptions{})
+	prtbs, err := n.m.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
+	if err != nil {
+		return false, fmt.Errorf("getting PRTBs for project %s: %w", projectID, err)
+	}
+	if len(prtbs) > 0 {
+		bindings, err := n.m.rbLister.List(ns.Name, labels.Everything())
 		if err != nil {
-			logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
-			return
+			return false, fmt.Errorf("getting role bindings for namespace %s: %w", ns.Name, err)
 		}
-		if err := namespaceutil.SetNamespaceCondition(ns, time.Second*1, initialRoleCondition, true, ""); err != nil {
-			logrus.Warnf("fail to set %v condition on ns %v: %v", initialRoleCondition, namespace.Name, err)
-			continue
-		}
-		_, err = mgr.namespaces.Update(ns)
-		if err == nil {
-			break
-		}
-		if !apierrors.IsConflict(err) {
-			logrus.Warnf("error updating ns %v status: %v", ns.Name, err)
+		if len(bindings) == 0 {
+			return false, nil
 		}
 	}
 
+	return true, nil
+}
+
+// roleBindingEnqueueNamespace enqueues the namespace a PRTB-owned RoleBinding lives in, so its
+// InitialRolesPopulated condition is re-evaluated as soon as project-member bindings appear.
+func roleBindingEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	rb, ok := obj.(*rbacv1.RoleBinding)
+	if !ok || rb == nil {
+		return nil, nil
+	}
+	if !isPRTBOwnedRoleBinding(rb) {
+		return nil, nil
+	}
+	return []relatedresource.Key{{Name: rb.Namespace}}, nil
+}
+
+// isPRTBOwnedRoleBinding reports whether rb is owned by a ProjectRoleTemplateBinding, under either
+// the aggregation model (prtb-owner-<name> label) or the legacy model (rtb-owner labels).
+func isPRTBOwnedRoleBinding(rb *rbacv1.RoleBinding) bool {
+	for key := range rb.Labels {
+		if strings.HasPrefix(key, rbac.PrtbOwnerLabel+"-") {
+			return true
+		}
+	}
+	for label := range legacyOwnerIndexes {
+		if _, ok := rb.Labels[label]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// clusterRoleEnqueueNamespace enqueues every namespace a project-namespaces ClusterRole authorizes,
+// so InitialRolesPopulated is re-evaluated when those ClusterRoles appear. crByNS already filters to
+// the relevant ClusterRoles and extracts the namespaces they reference.
+func clusterRoleEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	nsNames, err := crByNS(obj)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]relatedresource.Key, 0, len(nsNames))
+	for _, name := range nsNames {
+		keys = append(keys, relatedresource.Key{Name: name})
+	}
+	return keys, nil
 }
 
 // asyncCleanupRBAC will wait for a Terminating namespace to be fully deleted before removing the associated RBAC.

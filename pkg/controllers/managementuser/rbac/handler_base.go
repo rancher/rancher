@@ -166,6 +166,11 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	}
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
 
+	// Re-evaluate a namespace's InitialRolesPopulated condition when the project RBAC it waits for
+	// appears: PRTB-owned RoleBindings (project-member access) and project-namespace ClusterRoles.
+	relatedresource.WatchClusterScoped(ctx, "enqueue-namespace-by-rolebinding", roleBindingEnqueueNamespace, workload.Corew.Namespace(), workload.RBACw.RoleBinding())
+	relatedresource.WatchClusterScoped(ctx, "enqueue-namespace-by-clusterrole", clusterRoleEnqueueNamespace, workload.Corew.Namespace(), workload.RBACw.ClusterRole())
+
 	// Register GlobalRole and GlobalRoleBinding Enqueuers
 	grEnqueuer := globalRoleEnqueuer{
 		grbLister: management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
@@ -222,7 +227,7 @@ type manager struct {
 	rbLister            wrbacv1.RoleBindingCache
 	roleBindings        wrbacv1.RoleBindingClient
 	nsLister            corew.NamespaceCache
-	namespaces          corew.NamespaceClient
+	namespaces          corew.NamespaceController
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
 	userLister          v3.UserLister
