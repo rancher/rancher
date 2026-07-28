@@ -27,16 +27,17 @@ jobs:
         # dominates, so it is split across two shards). `run` selects specific
         # suites; empty means "all tests in the listed packages".
         #
-        # `cpu` sizes the runner (runner=<cpu>cpu-linux-x64). Default 16. As an
-        # EXPERIMENT we run the catalog-repos shard on an 8cpu runner to measure
-        # whether these integration jobs are actually CPU-bound: the heavy pool
-        # limit is an AWS vCPU quota, so if 8cpu still passes at similar speed we
-        # can halve the vCPU footprint (and ease runner contention). Integration
-        # is off the CI critical path, so a slower/failed 8cpu shard here does
-        # not affect overall wall-clock. Revert by setting cpu back to 16.
+        # `cpu` sizes the runner (runner=<cpu>cpu-linux-x64). These integration
+        # jobs are largely orchestration/wait-bound (Rancher + k3s startup, chart
+        # pulls) rather than CPU-bound, and the heavy-runner pool is limited by an
+        # AWS vCPU quota -- so running all shards on 8cpu (instead of 16) halves
+        # integration's vCPU footprint (4x8=32 vs 4x16=64), letting all shards run
+        # concurrently within the quota and easing pool contention. Integration is
+        # off the CI critical path, so if 8cpu proves too slow/OOMy we can bump
+        # individual shards back to 16 without affecting overall wall-clock.
         include:
           - shard: catalog-charts
-            cpu: 16
+            cpu: 8
             packages: ./tests/v2/integration/catalogv2/...
             run: 'TestRancherManagedChartsSuite|TestSystemChartsVersionSuite'
           - shard: catalog-repos
@@ -44,7 +45,7 @@ jobs:
             packages: ./tests/v2/integration/catalogv2/...
             run: 'TestClusterRepoTestSuite|TestChartsTestSuite|TestUIPluginSuite'
           - shard: rbac-and-clusters
-            cpu: 16
+            cpu: 8
             packages: >-
               ./tests/v2/integration/rbac/...
               ./tests/v2/integration/clusters/...
@@ -59,7 +60,7 @@ jobs:
           # this shard avoids any window where their token/kubeconfig operations
           # could be affected.
           - shard: workloads-and-steve
-            cpu: 16
+            cpu: 8
             packages: >-
               ./tests/v2/integration/workloads/...
               ./tests/v2/integration/steveapi/...
