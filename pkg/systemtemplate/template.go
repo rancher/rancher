@@ -235,8 +235,6 @@ spec:
           - name: CATTLE_AGENT_PULL_SECRETS
             value: "{{range $i, $s := .AgentDeploymentPullSecrets}}{{if $i}},{{end}}{{$s.Name}}{{end}}"
           {{- end }}
-          - name: CATTLE_CHARTS_IMAGE_DEFAULT
-            value: {{.ChartsImage}}
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}

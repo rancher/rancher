@@ -57,7 +57,7 @@ tests:
             value: "true"
           - name: IMPERATIVE_API_APP_SELECTOR
             value: RELEASE-NAME-rancher
-          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+          - name: CATTLE_CHARTS_IMAGE
             value: rancher/rancher-assets:stable-tag
 - it: should have systemDefaultRegistry env var set when value is not empty
   set:
@@ -77,7 +77,7 @@ tests:
             value: "true"
           - name: IMPERATIVE_API_APP_SELECTOR
             value: RELEASE-NAME-rancher
-          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+          - name: CATTLE_CHARTS_IMAGE
             value: suseregistry/rancher/rancher-assets:stable-tag
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
@@ -729,7 +729,7 @@ tests:
           value: RELEASE-NAME-rancher
         - name: CACHE_SYNC_TIMEOUT
           value: 10m
-        - name: CATTLE_CHARTS_IMAGE_DEFAULT
+        - name: CATTLE_CHARTS_IMAGE
           value: rancher/rancher-assets:stable-tag
 - it: should enable hostNetwork and set dnsPolicy when hostNetwork is true
   set:
@@ -770,7 +770,7 @@ tests:
             value: RELEASE-NAME-rancher
           - name: RANCHER_NAMESPACES_OPTIONS
             value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"}}"
-          - name: CATTLE_CHARTS_IMAGE_DEFAULT
+          - name: CATTLE_CHARTS_IMAGE
             value: rancher/rancher-assets:stable-tag
 - it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when imagePullSecrets is empty
   asserts:

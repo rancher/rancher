@@ -184,7 +184,7 @@ spec:
         - name: CATTLE_BASE_REGISTRY_PULL_SECRETS
           value: "{{ range $i, $v := .Values.imagePullSecrets }}{{- if $i }},{{ end }}{{ $v.name }}{{ end }}"
 {{- end }}
-        - name: CATTLE_CHARTS_IMAGE_DEFAULT
+        - name: CATTLE_CHARTS_IMAGE
           value: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
