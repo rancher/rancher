@@ -11,8 +11,10 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -636,8 +638,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 		deleteError         error
 		getError            error
 
-		wantError    string
-		wantHasPRTBs bool
+		wantError string
 	}{
 		{
 			name:                "update namespace with missing namespace",
@@ -657,7 +658,6 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 					RoleTemplateName: "test-rt",
 				},
 			},
-			wantHasPRTBs: true,
 		},
 		{
 			name:                "aggregation enabled skips legacy binding creation",
@@ -677,7 +677,6 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 					RoleTemplateName: "test-rt",
 				},
 			},
-			wantHasPRTBs: true,
 		},
 	}
 	for _, test := range tests {
@@ -734,7 +733,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 					ProjectCache: pGetter,
 				},
 			}
-			hasPRTBs, err := lifecycle.ensurePRTBAddToNamespace(&corev1.Namespace{
+			err := lifecycle.ensurePRTBAddToNamespace(&corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespaceName,
 					Annotations: map[string]string{
@@ -742,7 +741,6 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 					},
 				},
 			})
-			assert.Equal(t, test.wantHasPRTBs, hasPRTBs)
 			if test.wantError != "" {
 				assert.ErrorContains(t, err, test.wantError)
 			} else {
@@ -1022,4 +1020,273 @@ func TestRemovePRTBRoleBindingsNotInProject(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsPRTBOwnedRoleBinding(t *testing.T) {
+	const namespaceName = "test-ns"
+	prtbLabel := pkgrbac.GetPRTBOwnerLabel("some-prtb")
+	crtbLabel := pkgrbac.GetCRTBOwnerLabel("some-crtb")
+
+	tests := []struct {
+		name string
+		rb   *rbacv1.RoleBinding
+		want bool
+	}{
+		{
+			name: "aggregation prtb-owner labelled binding is owned",
+			rb:   aggregationRoleBinding("rb", namespaceName, prtbLabel),
+			want: true,
+		},
+		{
+			name: "legacy rtb-owner labelled binding is owned",
+			rb:   legacyRoleBinding("rb", namespaceName, rtbOwnerLabelLegacy, "uid-1"),
+			want: true,
+		},
+		{
+			name: "legacy rtb-owner-updated labelled binding is owned",
+			rb:   legacyRoleBinding("rb", namespaceName, rtbOwnerLabel, "p-proj_name"),
+			want: true,
+		},
+		{
+			name: "crtb-owner labelled binding is not owned",
+			rb:   aggregationRoleBinding("rb", namespaceName, crtbLabel),
+			want: false,
+		},
+		{
+			name: "unlabelled binding is not owned",
+			rb:   &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "rb", Namespace: namespaceName}},
+			want: false,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, isPRTBOwnedRoleBinding(test.rb))
+		})
+	}
+}
+
+func TestRoleBindingEnqueueNamespace(t *testing.T) {
+	const namespaceName = "test-ns"
+	prtbLabel := pkgrbac.GetPRTBOwnerLabel("some-prtb")
+
+	t.Run("prtb-owned binding enqueues its namespace", func(t *testing.T) {
+		keys, err := roleBindingEnqueueNamespace("", "", aggregationRoleBinding("rb", namespaceName, prtbLabel))
+		assert.NoError(t, err)
+		assert.Equal(t, []relatedresource.Key{{Name: namespaceName}}, keys)
+	})
+
+	t.Run("non-prtb binding enqueues nothing", func(t *testing.T) {
+		keys, err := roleBindingEnqueueNamespace("", "", &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "rb", Namespace: namespaceName},
+		})
+		assert.NoError(t, err)
+		assert.Empty(t, keys)
+	})
+
+	t.Run("non-rolebinding object enqueues nothing", func(t *testing.T) {
+		keys, err := roleBindingEnqueueNamespace("", "", &rbacv1.ClusterRole{})
+		assert.NoError(t, err)
+		assert.Empty(t, keys)
+	})
+}
+
+func TestClusterRoleEnqueueNamespace(t *testing.T) {
+	const (
+		namespaceName = "test-ns"
+		projectName   = "p-123xyz"
+	)
+
+	t.Run("project namespace cluster role enqueues its namespaces", func(t *testing.T) {
+		cr := createClusterRoleForProject(projectName, namespaceName, "get")
+		keys, err := clusterRoleEnqueueNamespace("", "", cr)
+		assert.NoError(t, err)
+		assert.Contains(t, keys, relatedresource.Key{Name: namespaceName})
+	})
+
+	t.Run("unrelated cluster role enqueues nothing", func(t *testing.T) {
+		keys, err := clusterRoleEnqueueNamespace("", "", &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "unrelated"},
+		})
+		assert.NoError(t, err)
+		assert.Empty(t, keys)
+	})
+}
+
+func TestInitialRolesReady(t *testing.T) {
+	const (
+		namespaceName = "test-ns"
+		projectID     = "c-123xyz:p-123xyz"
+		creator       = "creator-user"
+	)
+	twoRoles := []*rbacv1.ClusterRole{
+		{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-readonly"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "p-123xyz-namespaces-edit"}},
+	}
+
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		clusterRoles  []*rbacv1.ClusterRole
+		creatorCRBs   []*rbacv1.ClusterRoleBinding
+		prtbs         []*v3.ProjectRoleTemplateBinding
+		bindings      []*rbacv1.RoleBinding
+		expectListRBs bool
+		want          bool
+	}{
+		{
+			name:        "no project is always ready",
+			annotations: map[string]string{},
+			want:        true,
+		},
+		{
+			name:         "fewer than two cluster roles is not ready",
+			annotations:  map[string]string{projectIDAnnotation: projectID},
+			clusterRoles: twoRoles[:1],
+			want:         false,
+		},
+		{
+			name:         "two cluster roles, no creator, no prtbs is ready",
+			annotations:  map[string]string{projectIDAnnotation: projectID},
+			clusterRoles: twoRoles,
+			want:         true,
+		},
+		{
+			name:         "creator without a binding is not ready",
+			annotations:  map[string]string{projectIDAnnotation: projectID, "field.cattle.io/creatorId": creator},
+			clusterRoles: twoRoles,
+			creatorCRBs:  nil,
+			want:         false,
+		},
+		{
+			name:         "creator with a binding, no prtbs is ready",
+			annotations:  map[string]string{projectIDAnnotation: projectID, "field.cattle.io/creatorId": creator},
+			clusterRoles: twoRoles,
+			creatorCRBs:  []*rbacv1.ClusterRoleBinding{{ObjectMeta: metav1.ObjectMeta{Name: "crb"}}},
+			want:         true,
+		},
+		{
+			name:          "project has prtbs but no bindings yet is not ready",
+			annotations:   map[string]string{projectIDAnnotation: projectID},
+			clusterRoles:  twoRoles,
+			prtbs:         []*v3.ProjectRoleTemplateBinding{prtb("p-123xyz", "member-prtb")},
+			bindings:      nil,
+			expectListRBs: true,
+			want:          false,
+		},
+		{
+			name:          "project has prtbs and a binding is ready",
+			annotations:   map[string]string{projectIDAnnotation: projectID},
+			clusterRoles:  twoRoles,
+			prtbs:         []*v3.ProjectRoleTemplateBinding{prtb("p-123xyz", "member-prtb")},
+			bindings:      []*rbacv1.RoleBinding{{ObjectMeta: metav1.ObjectMeta{Name: "rb", Namespace: namespaceName}}},
+			expectListRBs: true,
+			want:          true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			crIndexer := &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				resources: map[string][]*rbacv1.ClusterRole{namespaceName: test.clusterRoles},
+				index:     crByNSIndex,
+			}
+			crbKey := rbRoleSubjectKey(twoRoles[0].Name, rbacv1.Subject{Kind: "User", Name: creator})
+			crbIndexer := &FakeResourceIndexer[*rbacv1.ClusterRoleBinding]{
+				resources: map[string][]*rbacv1.ClusterRoleBinding{crbKey: test.creatorCRBs},
+				index:     crbByRoleAndSubjectIndex,
+			}
+			prtbIndexer := &FakeResourceIndexer[*v3.ProjectRoleTemplateBinding]{
+				resources: map[string][]*v3.ProjectRoleTemplateBinding{projectID: test.prtbs},
+				index:     prtbByProjectIndex,
+			}
+			rbLister := wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+			if test.expectListRBs {
+				rbLister.EXPECT().List(namespaceName, gomock.Any()).Return(test.bindings, nil)
+			}
+
+			lifecycle := nsLifecycle{m: &manager{
+				crIndexer:   crIndexer,
+				crbIndexer:  crbIndexer,
+				prtbIndexer: prtbIndexer,
+				rbLister:    rbLister,
+			}}
+
+			ready, err := lifecycle.initialRolesReady(&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Annotations: test.annotations},
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, test.want, ready)
+		})
+	}
+}
+
+func TestReconcileInitialRolesCondition(t *testing.T) {
+	const (
+		namespaceName = "test-ns"
+		projectID     = "c-123xyz:p-123xyz"
+	)
+
+	newNS := func() *corev1.Namespace {
+		return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name:        namespaceName,
+			Annotations: map[string]string{projectIDAnnotation: projectID},
+		}}
+	}
+	twoRoles := []*rbacv1.ClusterRole{
+		{ObjectMeta: metav1.ObjectMeta{Name: "readonly"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "edit"}},
+	}
+
+	t.Run("already-set condition short-circuits without lookups or writes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		ns := newNS()
+		assert.NoError(t, namespaceutil.SetNamespaceCondition(ns, time.Second, initialRoleCondition, true, ""))
+		// nil indexers/namespaces client would panic if the readiness path or an update ran.
+		namespaces := wfakes.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+
+		lifecycle := nsLifecycle{m: &manager{namespaces: namespaces}}
+		got, err := lifecycle.reconcileInitialRolesCondition(ns)
+		assert.NoError(t, err)
+		assert.Same(t, ns, got)
+	})
+
+	t.Run("not ready requeues via EnqueueAfter and does not update", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		crIndexer := &FakeResourceIndexer[*rbacv1.ClusterRole]{
+			resources: map[string][]*rbacv1.ClusterRole{namespaceName: twoRoles[:1]}, // <2 => not ready
+			index:     crByNSIndex,
+		}
+		namespaces := wfakes.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+		namespaces.EXPECT().EnqueueAfter(namespaceName, initialRolesRequeueInterval)
+
+		lifecycle := nsLifecycle{m: &manager{crIndexer: crIndexer, namespaces: namespaces}}
+		_, err := lifecycle.reconcileInitialRolesCondition(newNS())
+		assert.NoError(t, err)
+	})
+
+	t.Run("ready sets the condition and updates the namespace", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		crIndexer := &FakeResourceIndexer[*rbacv1.ClusterRole]{
+			resources: map[string][]*rbacv1.ClusterRole{namespaceName: twoRoles},
+			index:     crByNSIndex,
+		}
+		prtbIndexer := &FakeResourceIndexer[*v3.ProjectRoleTemplateBinding]{
+			resources: map[string][]*v3.ProjectRoleTemplateBinding{projectID: nil}, // no prtbs => no binding wait
+			index:     prtbByProjectIndex,
+		}
+		namespaces := wfakes.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+		namespaces.EXPECT().Update(gomock.Any()).DoAndReturn(func(ns *corev1.Namespace) (*corev1.Namespace, error) {
+			set, err := namespaceutil.IsNamespaceConditionSet(ns, initialRoleCondition, true)
+			assert.NoError(t, err)
+			assert.True(t, set, "expected %s condition set to true on the updated namespace", initialRoleCondition)
+			return ns, nil
+		})
+
+		lifecycle := nsLifecycle{m: &manager{crIndexer: crIndexer, prtbIndexer: prtbIndexer, namespaces: namespaces}}
+		_, err := lifecycle.reconcileInitialRolesCondition(newNS())
+		assert.NoError(t, err)
+	})
 }
