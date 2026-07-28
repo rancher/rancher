@@ -40,7 +40,12 @@ jobs:
   # tests. The arm64 builds are split into separate, non-gating jobs below so
   # that tests no longer wait on the (slower) arm64 build to finish.
   build-server-amd64:
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    # amd64 builders are on the critical path (every test job gates on them) and
+    # the Go compile is CPU-bound, so run them on 8cpu to shorten the build head.
+    # The build phase is well under the runner-pool vCPU quota, so the larger
+    # size adds no contention there (unlike the wait-bound test jobs). arm64 is
+    # off the critical path and stays on 4cpu.
+    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     env:
       ARCH: x64
       OS: linux
@@ -54,7 +59,9 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/build-images/server
   build-agent-amd64:
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    # On 8cpu for the same reason as build-server-amd64: critical-path, CPU-bound
+    # Go compile; arm64 stays on 4cpu (off the critical path).
+    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     env:
       ARCH: x64
       OS: linux

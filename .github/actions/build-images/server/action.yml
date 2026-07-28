@@ -45,12 +45,7 @@ runs:
         file: ./package/Dockerfile
         labels: "${{ steps.meta.outputs.labels }}"
         outputs: type=docker,dest=/tmp/rancher-${{ env.OS }}-${{ env.ARCH }}.tar
-        # Reuse unchanged BuildKit layers across runs. The expensive early
-        # stages (go mod download, chart/kdm pulls, k3s airgap image export)
-        # only change when their inputs change; VERSION/COMMIT only invalidate
-        # the final compile+copy layers, so caching stays correct.
-        cache-from: type=gha,scope=pr-build-server-${{ env.ARCH }}
-        cache-to: type=gha,mode=max,scope=pr-build-server-${{ env.ARCH }}
+        no-cache: true
         target: "server"
     - name: Upload image
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
