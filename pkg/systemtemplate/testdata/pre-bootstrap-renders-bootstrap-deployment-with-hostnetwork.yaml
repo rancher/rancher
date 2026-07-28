@@ -169,13 +169,6 @@ spec:
       - name: rancher-charts-copy
         image: rancher/rancher-assets:v2.15-20260727T1556Z-dev
         imagePullPolicy: IfNotPresent
-        command:
-        - sh
-        - -c
-        - |
-          echo "Copying charts to shared volume..."
-          cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
-          echo "Charts copied successfully"
         volumeMounts:
         - name: rancher-charts
           mountPath: /charts
@@ -198,8 +191,6 @@ spec:
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
             value: "mcc-test-preboot-managed-system-upgrade-controller"
           # since we're on the host network, talk to the apiserver over localhost
-          - name: CATTLE_CHARTS_IMAGE_DEFAULT
-            value: rancher/rancher-assets:v2.15-20260727T1556Z-dev
           - name: CATTLE_SERVER_VERSION
             value: dev
           - name: CATTLE_INSTALL_UUID

@@ -165,13 +165,6 @@ spec:
       - name: rancher-charts-copy
         image: rancher/rancher-assets:v2.15-20260727T1556Z-dev
         imagePullPolicy: IfNotPresent
-        command:
-        - sh
-        - -c
-        - |
-          echo "Copying charts to shared volume..."
-          cp -r /var/lib/rancher-data/local-catalogs/v2/* /charts/
-          echo "Charts copied successfully"
         volumeMounts:
         - name: rancher-charts
           mountPath: /charts
@@ -195,8 +188,6 @@ spec:
             value: "mcc-testing-namesapce-opotions-managed-system-94546d"
           - name: RANCHER_NAMESPACE_OPTIONS
             value: '{"enabled":true,"annotations":{},"labels":{"baz":"quz"}}'
-          - name: CATTLE_CHARTS_IMAGE_DEFAULT
-            value: rancher/rancher-assets:v2.15-20260727T1556Z-dev
           - name: CATTLE_SERVER_VERSION
             value: dev
           - name: CATTLE_INSTALL_UUID
