@@ -141,10 +141,6 @@ jobs:
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
-      - name: Build Integration Setup
-        shell: bash
-        run: |
-          ./tests/v2/integration/scripts/build-integration-setup
       - name: Run Tests
         shell: bash
         env:

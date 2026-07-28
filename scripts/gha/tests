@@ -107,20 +107,31 @@ export -f dump_rancher_logs
 ./scripts/gha/run 2>&1
 trap cleanup exit
 
-# Compile the integration test binaries in the background while we wait for
-# Rancher's deployments (k3s, api-extension/remotedialer-proxy, webhook,
-# turtles) to roll out below. Compilation only needs the source tree, not a
+# Build integrationsetup AND compile the integration test binaries in the
+# background while we wait for Rancher's deployments (k3s,
+# api-extension/remotedialer-proxy, webhook, turtles) to roll out below. Rancher
+# was already started (detached) by ./scripts/gha/run above, so everything in
+# this block overlaps its boot. Compilation only needs the source tree, not a
 # running Rancher, so overlapping it with the readiness waits removes the cold
 # `go build`/module download from the critical path.
+#
+# The integrationsetup build used to be a separate, SERIAL CI step that ran
+# BEFORE Rancher was started (so its compile could not overlap the boot). It is
+# built here instead -- first, so it warms the build cache shared with the test
+# binaries below. It mirrors tests/v2/integration/scripts/build-integration-setup
+# but uses $GOBIN because under sudo `go` is not on secure_path.
 #
 # `go test -c` compiles each package's test binary (including its _test.go
 # files, which `go build` would skip) and writes it to /dev/null WITHOUT
 # running anything -- so nothing tries to reach Rancher. Shared dependencies
 # are compiled once and reused from the build cache across the loop, so the
 # real `go test` afterwards only has to link and run.
-echo "Pre-compiling integration test binaries in the background"
+echo "Building integrationsetup + pre-compiling integration test binaries in the background"
 (
   set -e
+  mkdir -p tests/v2/integration/bin
+  CGO_ENABLED=0 $GOBIN build -tags containers_image_openpgp,integrationsetup \
+    -o tests/v2/integration/bin/integrationsetup ./tests/v2/integration/setup
   for pkg in $($GOBIN list $INTEGRATION_TEST_PACKAGES); do
     $GOBIN test -c -o /dev/null "$pkg"
   done
@@ -166,21 +177,22 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
+# Make sure the background build/compilation started above has finished before we
+# use the integrationsetup binary it produced (and before `go test` links the
+# precompiled test binaries). In the common case it completed during the
+# deployment waits above, so this returns immediately. If the integrationsetup
+# build failed, the run below fails clearly; if only the test precompile failed,
+# `go test` further down will recompile and surface the real error.
+if [ -n "${PRECOMPILE_PID:-}" ]; then
+  echo "Waiting for background integrationsetup build + test compilation to finish"
+  wait "$PRECOMPILE_PID" || { echo "background build/compilation reported an error:"; cat /tmp/precompile.log || true; }
+fi
 ./tests/v2/integration/bin/integrationsetup || {
   dump_rancher_logs
   exit 1
 }
 
 echo Running go integration tests
-# Make sure the background compilation started above has finished. In the common
-# case it completed during the deployment waits, so this returns immediately and
-# the `go test` below only has to link and run (build cache is already warm). If
-# it failed for any reason we don't abort here: `go test` will recompile and
-# surface the real error.
-if [ -n "${PRECOMPILE_PID:-}" ]; then
-  echo "Waiting for background test compilation to finish"
-  wait "$PRECOMPILE_PID" || { echo "background test compilation reported an error:"; cat /tmp/precompile.log || true; }
-fi
 integration_test_args=(-v -failfast -timeout 30m -p 1)
 if [ -n "$INTEGRATION_TEST_RUN" ]; then
   integration_test_args+=(-run "$INTEGRATION_TEST_RUN")
