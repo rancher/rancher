@@ -58,6 +58,11 @@ func TestIsRelease(t *testing.T) {
 // TestSystemDefaultRegistryDefault tests that the default registry is either
 // the value set by the environment variable CATTLE_BASE_REGISTRY or the build
 // time value set through InjectDefaults.
+//
+// NOTE: This test checks global settings initialized at package init time, so it reads
+// the actual environment. To ensure reliability in CI, either:
+// 1. Unset CATTLE_BASE_REGISTRY before running tests, OR
+// 2. Set it to a known value and verify that value is used
 func TestSystemDefaultRegistryDefault(t *testing.T) {
 	expect := os.Getenv("CATTLE_BASE_REGISTRY")
 	if InjectDefaults != "" {
@@ -201,5 +206,88 @@ func TestGetRancherVersion(t *testing.T) {
 		assert.NoError(t, err)
 		result := GetRancherVersion()
 		assert.Equal(t, value, result)
+	}
+}
+
+// TestSettingCreatedWithEnvVar tests that settings created with os.Getenv() in the default
+// value properly capture environment variables. Uses t.Setenv for test isolation.
+func TestSettingCreatedWithEnvVar(t *testing.T) {
+	testCases := []struct {
+		name     string
+		envKey   string
+		envValue string
+		expected string
+	}{
+		{
+			name:     "env-set",
+			envKey:   "TEST_SETTING_ENV_SET",
+			envValue: "custom-value",
+			expected: "custom-value",
+		},
+		{
+			name:     "env-not-set",
+			envKey:   "TEST_SETTING_ENV_NOT_SET",
+			envValue: "",
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Use t.Setenv for automatic cleanup and test isolation
+			if tc.envValue != "" {
+				t.Setenv(tc.envKey, tc.envValue)
+			} else {
+				t.Setenv(tc.envKey, "")
+			}
+
+			// Create a new setting that reads from env (mimics: NewSetting("name", os.Getenv("KEY")))
+			setting := NewSetting(tc.name, os.Getenv(tc.envKey))
+
+			// Verify the default matches the env value
+			assert.Equal(t, tc.expected, setting.Default,
+				"Setting default should match env var value")
+
+			// Verify Get() returns the default when no provider is set
+			assert.Equal(t, tc.expected, setting.Get(),
+				"Setting Get() should return default when no provider")
+		})
+	}
+}
+
+// TestSettingRegistration verifies that NewSetting properly registers settings in the global map
+// and that the registered setting matches the returned instance.
+func TestSettingRegistration(t *testing.T) {
+	testCases := []struct {
+		name         string
+		settingName  string
+		defaultValue string
+	}{
+		{
+			name:         "empty-default",
+			settingName:  "test-registration-empty",
+			defaultValue: "",
+		},
+		{
+			name:         "non-empty-default",
+			settingName:  "test-registration-value",
+			defaultValue: "test-value",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new setting
+			setting := NewSetting(tc.settingName, tc.defaultValue)
+
+			// Verify it was registered in the global map
+			registeredSetting, ok := settings[tc.settingName]
+			require.True(t, ok, "Setting %s should be registered in settings map", tc.settingName)
+
+			// Verify the registered setting matches the returned setting
+			assert.Equal(t, setting.Name, registeredSetting.Name, "Names should match")
+			assert.Equal(t, setting.Default, registeredSetting.Default, "Defaults should match")
+			assert.Equal(t, tc.defaultValue, registeredSetting.Default, "Default should match input")
+		})
 	}
 }
