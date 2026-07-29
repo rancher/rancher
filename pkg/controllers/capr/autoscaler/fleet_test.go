@@ -697,43 +697,117 @@ func (s *autoscalerSuite) TestSubstituteRegistryHost_InvalidURL_ReturnsOriginal(
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_NoSystemRegistry_ReturnsOriginal() {
+	cluster := s.createTestCluster("test-cluster", "default")
 	s.withChartRepositorySettings("oci://registry.rancher.io/rancher/cluster-autoscaler", "", func() {
-		result := getChartRepository()
+		result := s.h.getChartRepository(cluster)
 		s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", result)
 	})
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_EmptyRepo_ReturnsOriginal() {
+	cluster := s.createTestCluster("test-cluster", "default")
 	s.withChartRepositorySettings("", "my-registry.company.com", func() {
-		result := getChartRepository()
+		result := s.h.getChartRepository(cluster)
 		s.Equal("", result)
 	})
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_BothSet_SubstitutesRegistry() {
+	cluster := s.createTestCluster("test-cluster", "default")
 	s.withChartRepositorySettings(
 		"oci://registry.rancher.io/rancher/cluster-autoscaler",
 		"my-registry.company.com",
 		func() {
-			result := getChartRepository()
+			result := s.h.getChartRepository(cluster)
 			s.Equal("oci://my-registry.company.com/rancher/cluster-autoscaler", result)
 		},
 	)
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_BothSet_HTTPChart_SubstitutesRegistry() {
+	cluster := s.createTestCluster("test-cluster", "default")
 	s.withChartRepositorySettings(
 		"https://charts.rancher.io/charts",
 		"my-registry.company.com",
 		func() {
-			result := getChartRepository()
+			result := s.h.getChartRepository(cluster)
 			s.Equal("https://my-registry.company.com/charts", result)
 		},
 	)
 }
 
-// withChartRepositorySettings sets the chart repository and system default registry settings
-// for the duration of fn, then restores the original values.
+func (s *autoscalerSuite) TestGetChartRepository_ClusterLevelRegistry_TakesPrecedence() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local"},
+					},
+				},
+			},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withChartRepositorySettings(
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+		"global-registry.local",
+		func() {
+			result := s.h.getChartRepository(cluster)
+			s.Equal("oci://cluster-registry.local/rancher/cluster-autoscaler", result)
+		},
+	)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ClusterLevelRegistry_EmptyDefaultsToGlobal() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withChartRepositorySettings(
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+		"fallback-registry.local",
+		func() {
+			result := s.h.getChartRepository(cluster)
+			s.Equal("oci://fallback-registry.local/rancher/cluster-autoscaler", result)
+		},
+	)
+}
+
 func (s *autoscalerSuite) withChartRepositorySettings(repoURL, systemRegistry string, fn func()) {
 	originalRepo := settings.ClusterAutoscalerChartRepository.Get()
 	originalRegistry := settings.SystemDefaultRegistry.Get()
