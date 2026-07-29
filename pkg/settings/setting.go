@@ -233,14 +233,14 @@ var (
 
 	// CSPAdapterMinVersion is used to determine if an existing installation of the CSP adapter should be upgraded to a new version
 	// has no effect if the csp adapter is not installed.
-	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", "")
+	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", buildconfig.CspAdapterMinVersion)
 
 	// FleetMinVersion is the minimum version of the Fleet chart that Rancher will install.
 	// Deprecated in favor of FleetVersion, kept for backward compatibility purposes.
 	FleetMinVersion = NewSetting("fleet-min-version", "")
 
 	// FleetVersion is the exact version of the Fleet chart that Rancher will install.
-	FleetVersion = NewSetting("fleet-version", "")
+	FleetVersion = NewSetting("fleet-version", buildconfig.FleetVersion)
 
 	// AksOperatorVersion is the exact version of the aks-operator and aks-operator-crd charts that Rancher will install.
 	AksOperatorVersion = NewSetting("aks-operator-version", "")
@@ -270,13 +270,13 @@ var (
 	PartnerChartDefaultURL = NewSetting("partner-chart-default-url", "https://git.rancher.io/")
 
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
-	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
+	RancherWebhookVersion = NewSetting("rancher-webhook-version", buildconfig.WebhookVersion)
 
 	// RemoteDialerProxyVersion is the exact version of the RDP that Rancher will install.
-	RemoteDialerProxyVersion = NewSetting("remotedialer-proxy-version", "")
+	RemoteDialerProxyVersion = NewSetting("remotedialer-proxy-version", buildconfig.RemoteDialerProxyVersion)
 
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
-	RancherTurtlesVersion = NewSetting("rancher-turtles-version", "")
+	RancherTurtlesVersion = NewSetting("rancher-turtles-version", buildconfig.TurtlesVersion)
 
 	// ClusterAutoscalerChartRepository represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
 	// can be an OCI image path or a regular helm repo.
