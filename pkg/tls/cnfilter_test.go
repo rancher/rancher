@@ -3,6 +3,7 @@ package tls
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -287,12 +288,13 @@ func TestPodIPTracker_FilterExistingCN_PreSync(t *testing.T) {
 
 	filter := newPodIPTracker(context.Background(), namespace.System, "app=rancher", pods, "test-podip-filter-presync")
 
-	// Pre-sync: keep everything, including IPs, since we don't yet know the
-	// live pod set and must not prematurely prune a legitimate CN.
-	input := []string{"10.42.0.1", "rancher.cattle-system", "192.168.10.131"}
-	got := filter(input...)
-	if !reflect.DeepEqual(got, input) {
-		t.Errorf("pre-sync filter(%v) = %v, want pass-through %v", input, got, input)
+	// Pre-sync: keep IP CNs since we don't yet know the live pod set and
+	// must not prematurely prune a legitimate one. Hostnames are always
+	// rejected, pre-sync or not.
+	got := filter("10.42.0.1", "rancher.cattle-system", "192.168.10.131")
+	expected := []string{"10.42.0.1", "192.168.10.131"}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("pre-sync filter(...) = %v, want %v", got, expected)
 	}
 }
 
@@ -357,14 +359,14 @@ func TestPodIPTracker_OnChange_AndFilter(t *testing.T) {
 			expected: []string{},
 		},
 		{
-			name:     "hostnames always pass through regardless of pod set",
+			name:     "hostnames always rejected regardless of pod set",
 			input:    []string{"rancher.cattle-system", "some.other.host"},
-			expected: []string{"rancher.cattle-system", "some.other.host"},
+			expected: []string{},
 		},
 		{
 			name:     "mixed live IP, stale IP, and hostname",
 			input:    []string{"10.42.0.1", "10.42.0.99", "rancher.cattle-system"},
-			expected: []string{"10.42.0.1", "rancher.cattle-system"},
+			expected: []string{"10.42.0.1"},
 		},
 	}
 
@@ -456,5 +458,62 @@ func TestPodIPTracker_OnChange_ListError(t *testing.T) {
 	got := tracker.filterExistingCN("10.42.0.1")
 	if !reflect.DeepEqual(got, []string{"10.42.0.1"}) {
 		t.Errorf("expected pass-through after failed List, got %v", got)
+	}
+}
+
+// TestPodIPTracker_RejectsArbitraryHostnameInjection is a regression test
+// for the CN-filtering behavior: a client that can reach the
+// tls-rancher-internal listener and control TLS SNI or the HTTP Host header
+// must never be able to get an arbitrary hostname added to the cert, no
+// matter how many distinct hostnames are attempted or what the live pod-IP
+// snapshot contains. Only the static default SANs (already applied upstream
+// by dynamiclistener's allowDefaultSANs, before this filter is ever
+// consulted) and live pod IPs may appear on the cert.
+func TestPodIPTracker_RejectsArbitraryHostnameInjection(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pods := fake.NewMockControllerInterface[*corev1.Pod, *corev1.PodList](ctrl)
+	list := &corev1.PodList{
+		Items: []corev1.Pod{
+			*makePod(namespace.System, "rancher-1", "10.42.0.13", false),
+		},
+	}
+	pods.EXPECT().
+		List(namespace.System, gomock.Any()).
+		Return(list, nil).
+		AnyTimes()
+	pods.EXPECT().
+		OnChange(gomock.Any(), gomock.Any(), gomock.Any()).
+		AnyTimes()
+
+	// Populate the snapshot the way the real onChange handler would.
+	tracker := &podIPTracker{namespace: namespace.System, labelSelector: "app=rancher", pods: pods}
+	if _, err := tracker.onChange("rancher-1", &list.Items[0]); err != nil {
+		t.Fatalf("onChange returned error: %v", err)
+	}
+	filter := tracker.filterExistingCN
+
+	// Simulate a client sending many distinct fake SNI hostnames, as would
+	// happen via repeated TLS ClientHello / HTTP Host header requests
+	// against the pod's live IP.
+	extraHostnames := make([]string, 0, 40)
+	for i := 0; i < 40; i++ {
+		extraHostnames = append(extraHostnames, fmt.Sprintf("san-test-extra-%d.example", i))
+	}
+
+	got := filter(extraHostnames...)
+	if len(got) != 0 {
+		t.Errorf("expected all %d extra hostnames to be rejected, but %d got through: %v", len(extraHostnames), len(got), got)
+	}
+
+	// A legitimate live pod IP must still be kept alongside the rejected
+	// hostnames in the same call.
+	mixed := append([]string{"10.42.0.13"}, extraHostnames...)
+	got = filter(mixed...)
+	if !reflect.DeepEqual(got, []string{"10.42.0.13"}) {
+		t.Errorf("filter(pod IP + extra hostnames) = %v, want only the live pod IP kept", got)
 	}
 }

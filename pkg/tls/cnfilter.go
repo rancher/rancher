@@ -14,8 +14,12 @@ import (
 
 // podIPTracker watches pods matching the given label selector in a single
 // namespace and maintains a snapshot of their current pod IPs. The snapshot
-// is consumed by filterExistingCN to prune stale IP CNs from the
-// dynamiclistener-managed cert without disturbing other (hostname) CNs.
+// is consumed by filterExistingCN to keep only live pod IPs on the
+// dynamiclistener-managed cert. Non-IP CNs (hostnames) are never permitted
+// here: the static default SANs (localhost, cluster IP, node IPs, etc.) are
+// already allowed upstream via dynamiclistener's allowDefaultSANs wrapper
+// before this filter ever runs, so anything reaching filterExistingCN is, by
+// definition, not one of the intended SANs.
 type podIPTracker struct {
 	// ips holds *map[string]struct{}. nil before the first list completes:
 	// in that pre-sync state filterExistingCN keeps everything (so we never
@@ -29,9 +33,9 @@ type podIPTracker struct {
 
 // newPodIPTracker registers an OnChange handler that updates the IP set on
 // every relevant pod event. The tracker function it returns is safe to use
-// as a dynamiclistener.Config.FilterExistingCN: non-IP CNs (hostnames) pass
-// through unchanged, IP CNs are kept only if they match a currently-running
-// pod IP.
+// as a dynamiclistener.Config.FilterExistingCN: only CNs that are live pod
+// IPs pass through. Non-IP CNs (hostnames) are always rejected — see
+// filterExistingCN and the podIPTracker doc comment for why.
 func newPodIPTracker(ctx context.Context, ns, labelSelector string, pods corev1controllers.PodController, handlerName string) func(...string) []string {
 	t := &podIPTracker{
 		namespace:     ns,
@@ -70,19 +74,29 @@ func (t *podIPTracker) onChange(_ string, pod *corev1.Pod) (*corev1.Pod, error) 
 
 func (t *podIPTracker) filterExistingCN(cns ...string) []string {
 	v := t.ips.Load()
-	// Pre-sync: keep everything to avoid pruning legitimate CNs before we
-	// know what the live pod set looks like.
+	// Pre-sync: keep IP CNs unconditionally to avoid pruning legitimate
+	// ones before we know what the live pod set looks like. Hostnames are
+	// still rejected even pre-sync — that decision never depends on the
+	// pod-IP snapshot, only on dynamiclistener's own allowDefaultSANs
+	// short-circuit having already accepted the legitimate ones upstream.
 	if v == nil {
-		return cns
+		out := make([]string, 0, len(cns))
+		for _, cn := range cns {
+			if net.ParseIP(cn) != nil {
+				out = append(out, cn)
+			}
+		}
+		return out
 	}
 	ips := *v.(*map[string]struct{})
 	out := make([]string, 0, len(cns))
 	for _, cn := range cns {
-		// Only prune IP CNs we can positively classify as stale.
-		// Hostnames and any other non-IP CNs pass through — we don't have
-		// enough information here to decide whether they're stale.
+		// Reject any non-IP CN outright. Hostnames beyond the static
+		// default SANs (already handled upstream, before this filter is
+		// ever consulted) have no legitimate path onto this cert — a
+		// client that can reach the listener and control TLS SNI or the
+		// HTTP Host header must never be able to add arbitrary hostnames.
 		if net.ParseIP(cn) == nil {
-			out = append(out, cn)
 			continue
 		}
 		if _, ok := ips[cn]; ok {
