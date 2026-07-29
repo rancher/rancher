@@ -464,6 +464,11 @@ func TestStoreCreate(t *testing.T) {
 		millis := defaultTTLSeconds * 1000
 		return &millis, nil
 	}
+	maxTTLSeconds := int64(41760)
+	getMaxTTL := func() (int64, error) {
+		millis := maxTTLSeconds * 1000
+		return millis, nil
+	}
 	shouldGenerateToken := func() bool { return true }
 	options := &metav1.CreateOptions{}
 	tokenManager := &fakeTokenManager{}
@@ -509,6 +514,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -650,6 +656,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -736,6 +743,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -856,6 +864,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: func() bool { return false },
 		}
@@ -941,6 +950,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -1050,6 +1060,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -1209,6 +1220,7 @@ func TestStoreCreate(t *testing.T) {
 			getDefaultTTL: func() (*int64, error) {
 				return nil, fmt.Errorf("setting unavailable")
 			},
+			getMaxTTL: getMaxTTL,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1232,6 +1244,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenStore:    tokenStore,
 			tokenMgr:      tokenManager,
 			getDefaultTTL: getDefaultTTL,
+			getMaxTTL:     getMaxTTL,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1261,6 +1274,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenStore:    tokenStore,
 			tokenMgr:      tokenManager,
 			getDefaultTTL: getDefaultTTL,
+			getMaxTTL:     getMaxTTL,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1290,6 +1304,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenStore:    tokenStore,
 			tokenMgr:      tokenManager,
 			getDefaultTTL: getDefaultTTL,
+			getMaxTTL:     getMaxTTL,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1342,6 +1357,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -1418,6 +1434,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -1485,6 +1502,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -1554,6 +1572,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -1611,6 +1630,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}
@@ -1663,6 +1683,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
+			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
 		}

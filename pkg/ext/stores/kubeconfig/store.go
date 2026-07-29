@@ -137,6 +137,7 @@ type Store struct {
 	tokenMgr            tokenCreator
 	getCACert           func() string
 	getDefaultTTL       func() (*int64, error)
+	getMaxTTL           func() (int64, error)
 	getServerURL        func() string
 	shouldGenerateToken func() bool
 	tableConverter      rest.TableConvertor
@@ -159,6 +160,7 @@ func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authoriz
 		authorizer:      authorizer,
 		getCACert:       settings.CACerts.Get,
 		getDefaultTTL:   tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds,
+		getMaxTTL:       tokens.GetKubeconfigMaxTokenTTLInMilliSeconds,
 		getServerURL:    settings.ServerURL.Get,
 		shouldGenerateToken: func() bool {
 			return strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
@@ -294,6 +296,10 @@ func (s *Store) Create(
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %v", err))
 	}
 	defaultTTLSeconds := *defaultTTL / 1000
+	maxTTL, err := s.getMaxTTL()
+	if err != nil {
+		return nil, fmt.Errorf("error getting max token TTL: %w", err)
+	}
 
 	ttlMilliseconds := kubeconfig.Spec.TTL * 1000
 	switch {
@@ -302,8 +308,8 @@ func (s *Store) Create(
 	case ttlMilliseconds == 0:
 		ttlMilliseconds = *defaultTTL
 		kubeconfig.Spec.TTL = defaultTTLSeconds
-	case ttlMilliseconds > *defaultTTL:
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max ttl %d", kubeconfig.Spec.TTL, defaultTTLSeconds))
+	case ttlMilliseconds > maxTTL:
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max ttl %d", kubeconfig.Spec.TTL, maxTTL/1000))
 	default: // Valid TTL.
 	}
 

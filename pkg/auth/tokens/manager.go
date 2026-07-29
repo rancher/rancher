@@ -793,3 +793,9 @@ func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
 	}
 	return &ttlMillis, nil
 }
+
+// GetKubeconfigMaxTokenTTLInMilliSeconds will return the maimum TTL for
+// kubeconfig tokens, in milliseconds
+func GetKubeconfigMaxTokenTTLInMilliSeconds() (int64, error) {
+	return exttokenstore.ParseTTLToMilliseconds(settings.KubeconfigMaxTokenTTLMinutes)
+}
