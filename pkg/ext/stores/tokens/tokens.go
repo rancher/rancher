@@ -1018,7 +1018,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		ttl, err := clampMaxTTL(token.Spec.TTL)
+		ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
 		}
@@ -1627,7 +1627,7 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	// spec values
 	// injects default on creation and update
-	ttl, err := clampMaxTTL(token.Spec.TTL)
+	ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -1778,88 +1778,68 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-func clampMaxTTL(ttl int64) (int64, error) {
-	max, err := maxTTL()
+// IngestTTL returns the input ttl (milliseconds) with requests for defaults
+// resolved, and further limited to the maximum allowed, as per the given
+// settings.
+func IngestTTL(ttl int64, maxSetting, defaultSetting settings.Setting) (int64, error) {
+	maxValue, err := ParseTTLToMilliseconds(maxSetting)
+	if err != nil {
+		return 0, err
+	}
+	defaultValue, err := ParseTTLToMilliseconds(defaultSetting)
 	if err != nil {
 		return 0, err
 	}
 
-	// decision table
-	//   | max | ttl         | note                                         | result
-	// - + --- + ----------- + ------------------------------------------- + ----------------
-	// a | < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
-	// b | < 1 | = 0         | max = +inf, ttl default requested, no clamp | default
-	// c | < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
-	// - + --- + ----------- + ------------------------------------------- + ----------------
-	// d | > 0 | < 0         | ttl = +inf, clamp to max                    | max
-	// e | > 0 | = 0         | ttl default requested, clamp it to max      | clamp (default)
-	// f | > 0 | > 0, <= max | less than max                               | ttl
-	// g | > 0 | > max       | clamp to max                                | max
+	// We fall back to the maximum when the default value requests a default itself
+	defaultValue = DefaultTTL(defaultValue, maxValue)
 
-	if max < 1 {
-		// a,b,c
-		if ttl == 0 {
-			// b
-			defaultvalue, err := defaultTTL()
-			if err != nil {
-				return 0, err
-			}
-			return defaultvalue, nil
-		}
-		// a,c
-		return ttl, nil
-	}
-	// d,e,f,g
-	if ttl > max || ttl < 0 {
-		// d,g
-		return max, nil
-	}
-	if ttl == 0 {
-		// e
-		defaultvalue, err := defaultTTL()
-		if err != nil {
-			return 0, err
-		}
-		// inlined clampMaxTTL(default), simplified, a,b,c irrelevant
-		if defaultvalue > max || defaultvalue < 0 {
-			// d,g
-			return max, nil
-		}
-		// e,f
-		return defaultvalue, nil
-	}
-	// f
-	return ttl, nil
+	// Then resolve a default request in the input and clamp
+	return ClampToMaxTTL(DefaultTTL(ttl, defaultValue), maxValue), nil
 }
 
-// ParseTokenTTL parses an integer representing minutes as a string and returns it as a duration.
-func ParseTokenTTL(ttl string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vm", ttl)
-	dur, err := time.ParseDuration(durString)
+// ParseTTLToMilliseconds retrieves a ttl setting (in minutes) and returns it as milliseconds
+func ParseTTLToMilliseconds(ttlSetting settings.Setting) (int64, error) {
+	ttl, err := ParseTTLToDuration(ttlSetting.Get())
 	if err != nil {
-		return 0, fmt.Errorf("error parsing token ttl: %v", err)
+		return 0, fmt.Errorf("failed to process setting '%s': %w", ttlSetting.Name, err)
+	}
+	return ttl.Milliseconds(), nil
+}
+
+// ParseTTLToDuration parses an integer representing minutes as a string and returns it as a duration.
+func ParseTTLToDuration(ttl string) (time.Duration, error) {
+	dur, err := time.ParseDuration(fmt.Sprintf("%vm", ttl))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing ttl minutes: %v", err)
 	}
 	return dur, nil
 }
 
-func maxTTL() (int64, error) {
-	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
-
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
+// DefaultTTL returns the default ttl, if such was requested by the input
+// (`value == 0`), or else the input as is.
+func DefaultTTL(ttl, defaultValue int64) int64 {
+	if ttl == 0 {
+		return defaultValue
 	}
-
-	return maxTTL.Milliseconds(), nil
+	return ttl
 }
 
-func defaultTTL() (int64, error) {
-	defaultTTL, err := ParseTokenTTL(settings.AuthTokenDefaultTTLMinutes.Get())
-
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenDefaultTTLMinutes.Name, err)
+// ClampToMaxTTL ensures that the returned ttl is smaller than the specified
+// maximum. In other words, it returns the minimum of the 2 inputs, taking into
+// account the special encoding of `infinity` (`value < 0`). The function
+// assumes that `ttl` is not `0`, i.e. that a request for the default has been
+// resolved already.
+func ClampToMaxTTL(ttl, max int64) int64 {
+	if max < 1 {
+		// maximum is infinity, ttl is always smaller or equal
+		return ttl
 	}
-
-	return defaultTTL.Milliseconds(), nil
+	// for a finite maximum we can do simple comparison
+	if ttl > max {
+		return max
+	}
+	return ttl
 }
 
 // ttlGreater compares the two TTL a and b. It returns true if a is greater than b.
