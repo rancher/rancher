@@ -291,3 +291,135 @@ func TestSettingRegistration(t *testing.T) {
 		})
 	}
 }
+
+// TestSettingWithEnvDefaultPattern tests that settings created with environment-based defaults
+// work correctly. This test uses the current pattern and verifies the behavior.
+func TestSettingWithEnvDefaultPattern(t *testing.T) {
+	testCases := []struct {
+		name        string
+		envKey      string
+		envValue    string
+		staticDef   string
+		expected    string
+		description string
+	}{
+		{
+			name:        "EnvSet_OverridesEmptyDefault",
+			envKey:      "TEST_ENV_OVERRIDE",
+			envValue:    "from-env",
+			staticDef:   "",
+			expected:    "from-env",
+			description: "Env value should override empty static default",
+		},
+		{
+			name:        "EnvSet_OverridesNonEmptyDefault",
+			envKey:      "TEST_ENV_OVERRIDE_2",
+			envValue:    "from-env",
+			staticDef:   "static-value",
+			expected:    "from-env",
+			description: "Env value should override non-empty static default",
+		},
+		{
+			name:        "EnvNotSet_KeepsEmptyDefault",
+			envKey:      "TEST_ENV_NOT_SET",
+			envValue:    "",
+			staticDef:   "",
+			expected:    "",
+			description: "Should keep empty default when env not set",
+		},
+		{
+			name:        "EnvNotSet_KeepsStaticDefault",
+			envKey:      "TEST_ENV_NOT_SET_2",
+			envValue:    "",
+			staticDef:   "static-value",
+			expected:    "static-value",
+			description: "Should keep static default when env not set",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Clean up any existing env var
+			originalEnv := os.Getenv(tc.envKey)
+			defer func() {
+				if originalEnv != "" {
+					os.Setenv(tc.envKey, originalEnv)
+				} else {
+					os.Unsetenv(tc.envKey)
+				}
+			}()
+
+			// Set up test environment
+			if tc.envValue != "" {
+				os.Setenv(tc.envKey, tc.envValue)
+			} else {
+				os.Unsetenv(tc.envKey)
+			}
+
+			// Create setting using the current pattern (WithEnvDefault)
+			// OLD PATTERN (before refactor): NewSetting(tc.name, os.Getenv(tc.envKey))
+			// NEW PATTERN (after refactor): NewSetting(tc.name, tc.staticDef).WithEnvDefault(tc.envKey)
+			setting := NewSetting(tc.name, tc.staticDef).WithEnvDefault(tc.envKey)
+
+			// Verify the default value
+			assert.Equal(t, tc.expected, setting.Default, tc.description)
+
+			// Verify Get() returns the expected value
+			assert.Equal(t, tc.expected, setting.Get(), "Get() should return env-based default")
+
+			// CRITICAL: Verify it's registered in the settings map with the correct value
+			// This catches the bug where WithEnvDefault wasn't updating the map
+			registeredSetting, ok := settings[tc.name]
+			require.True(t, ok, "Setting should be registered in settings map")
+			assert.Equal(t, tc.expected, registeredSetting.Default,
+				"Registered setting should have correct default (map must be updated)")
+		})
+	}
+}
+
+// TestSettingEnvPatternEquivalence verifies that old and new patterns produce identical results.
+// This test ensures the refactor from os.Getenv() to WithEnvDefault() is behavior-preserving.
+func TestSettingEnvPatternEquivalence(t *testing.T) {
+	testCases := []struct {
+		name     string
+		envKey   string
+		envValue string
+	}{
+		{name: "test-equiv-1", envKey: "TEST_EQUIV_1", envValue: "value-1"},
+		{name: "test-equiv-2", envKey: "TEST_EQUIV_2", envValue: "value-2"},
+		{name: "test-equiv-3", envKey: "TEST_EQUIV_3", envValue: ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set environment using t.Setenv for automatic cleanup
+			if tc.envValue != "" {
+				t.Setenv(tc.envKey, tc.envValue)
+			} else {
+				t.Setenv(tc.envKey, "")
+			}
+
+			// Old pattern: inline os.Getenv
+			settingOld := NewSetting(tc.name+"-old", os.Getenv(tc.envKey))
+
+			// New pattern: WithEnvDefault
+			settingNew := NewSetting(tc.name+"-new", "").WithEnvDefault(tc.envKey)
+
+			// Both should have identical Default values
+			assert.Equal(t, settingOld.Default, settingNew.Default,
+				"Old and new patterns should produce identical Default values")
+
+			// Both should return identical values from Get()
+			assert.Equal(t, settingOld.Get(), settingNew.Get(),
+				"Old and new patterns should produce identical Get() values")
+
+			// Both should be registered correctly in the map
+			registeredOld, okOld := settings[tc.name+"-old"]
+			registeredNew, okNew := settings[tc.name+"-new"]
+			require.True(t, okOld, "Old pattern setting should be in map")
+			require.True(t, okNew, "New pattern setting should be in map")
+			assert.Equal(t, registeredOld.Default, registeredNew.Default,
+				"Registered settings should have identical defaults")
+		})
+	}
+}
