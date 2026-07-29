@@ -1200,6 +1200,31 @@ func TestStoreCreate(t *testing.T) {
 		assert.True(t, apierrors.IsForbidden(err))
 		assert.Contains(t, err.Error(), "\"non-existent\" not found")
 	})
+	t.Run("default TTL fetch error returns structured error", func(t *testing.T) {
+		store := &Store{
+			authorizer: commonAuthorizer,
+			userCache:  userCache,
+			tokenStore: tokenStore,
+			tokenMgr:   tokenManager,
+			getDefaultTTL: func() (*int64, error) {
+				return nil, fmt.Errorf("setting unavailable")
+			},
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: userID,
+			Extra: map[string][]string{
+				common.ExtraRequestTokenID: {authTokenID},
+			},
+		})
+
+		obj, err := store.Create(ctx, &ext.Kubeconfig{}, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		var apiStatus apierrors.APIStatus
+		assert.True(t, errors.As(err, &apiStatus), "expected apierrors.APIStatus, got %T: %v", err, err)
+		assert.True(t, apierrors.IsInternalError(err))
+	})
 	t.Run("negative ttl", func(t *testing.T) {
 		store := &Store{
 			authorizer:    commonAuthorizer,
@@ -1560,7 +1585,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.Contains(t, config.Contexts, defaultClusterName)
 		assert.Contains(t, config.AuthInfos, defaultClusterName)
 	})
-	t.Run("one-shot status value", func(t *testing.T) {
+	t.Run("status value returned only in the create response", func(t *testing.T) {
 		tokenManager := &fakeTokenManager{}
 		var capturedCM *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -2358,6 +2383,40 @@ func TestStoreWatch(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "2", k.ResourceVersion)
 		assert.Empty(t, k.Annotations)
+
+		// Bookmark with internal annotation must not leak cattle.io/uid;
+		// only k8s.io/initial-events-end is allowed through.
+		configMapWatcher.add(watch.Event{
+			Type: watch.Bookmark,
+			Object: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "3",
+					Annotations: map[string]string{
+						"k8s.io/initial-events-end": "true",
+						UIDAnnotation:               "some-uid",
+					},
+				},
+			},
+		})
+		event = <-watcher.ResultChan()
+		require.Equal(t, watch.Bookmark, event.Type)
+		k, ok = event.Object.(*ext.Kubeconfig)
+		require.True(t, ok)
+		assert.Equal(t, "3", k.ResourceVersion)
+		assert.Equal(t, "true", k.Annotations["k8s.io/initial-events-end"])
+		assert.NotContains(t, k.Annotations, UIDAnnotation)
+
+		// Unknown future event type must pass through with a non-nil object.
+		futureConfigMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "future-cm"},
+		}
+		configMapWatcher.add(watch.Event{
+			Type:   watch.EventType("FUTURE"),
+			Object: futureConfigMap,
+		})
+		event = <-watcher.ResultChan()
+		require.Equal(t, watch.EventType("FUTURE"), event.Type)
+		require.NotNil(t, event.Object)
 	})
 
 	t.Run("user watches kubeconfigs", func(t *testing.T) {
@@ -2922,6 +2981,75 @@ func TestStoreUpdate(t *testing.T) {
 		assert.False(t, isCreated)
 		assert.True(t, apierrors.IsConflict(err), "stale UID precondition must yield 409 Conflict, got %v", err)
 		assert.False(t, apierrors.IsInternalError(err), "expected not InternalError, got %v", err)
+	})
+	t.Run("double update yields exactly one Updated condition", func(t *testing.T) {
+		current := oldConfigMap.DeepCopy()
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(
+			func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+				return current.DeepCopy(), nil
+			}).Times(2)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(
+			func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+				updated := configMap.DeepCopy()
+				current = updated
+				return updated, nil
+			}).Times(2)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
+			Name: adminID,
+		})
+
+		kc, err := store.fromConfigMap(oldConfigMap)
+		require.NoError(t, err)
+
+		up1 := kc.DeepCopy()
+		up1.Spec.Description = "first"
+		obj1, _, err := store.Update(ctx, kubeconfigID, &fakeUpdatedObjectInfo{obj: up1}, nil, nil, false, &metav1.UpdateOptions{})
+		require.NoError(t, err)
+
+		kc2, ok := obj1.(*ext.Kubeconfig)
+		require.True(t, ok)
+
+		var ts1 metav1.Time
+		for _, c := range kc2.Status.Conditions {
+			if c.Type == UpdatedCond {
+				ts1 = c.LastTransitionTime
+				break
+			}
+		}
+		require.False(t, ts1.IsZero(), "Updated condition must have a non-zero timestamp after first update")
+
+		// metav1.Time serializes at second precision through the ConfigMap JSON
+		// round-trip, so we must cross a second boundary to observe advancement.
+		time.Sleep(1100 * time.Millisecond)
+
+		up2 := kc2.DeepCopy()
+		up2.Spec.Description = "second"
+		obj2, _, err := store.Update(ctx, kubeconfigID, &fakeUpdatedObjectInfo{obj: up2}, nil, nil, false, &metav1.UpdateOptions{})
+		require.NoError(t, err)
+
+		final, ok := obj2.(*ext.Kubeconfig)
+		require.True(t, ok)
+
+		var updatedCount int
+		var ts2 metav1.Time
+		for _, c := range final.Status.Conditions {
+			if c.Type == UpdatedCond {
+				updatedCount++
+				ts2 = c.LastTransitionTime
+			}
+		}
+		assert.Equal(t, 1, updatedCount, "expected exactly one Updated condition, got %d", updatedCount)
+		assert.True(t, ts2.After(ts1.Time), "Updated condition LastTransitionTime must advance on each update (ts1=%v ts2=%v)", ts1, ts2)
 	})
 }
 

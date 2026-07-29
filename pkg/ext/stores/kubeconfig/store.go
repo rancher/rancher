@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -290,7 +291,7 @@ func (s *Store) Create(
 
 	defaultTTL, err := s.getDefaultTTL()
 	if err != nil {
-		return nil, fmt.Errorf("error getting default token TTL: %w", err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %w", err))
 	}
 	defaultTTLSeconds := *defaultTTL / 1000
 
@@ -1118,12 +1119,25 @@ func (s *Store) Watch(
 						continue
 					}
 
-					obj = &ext.Kubeconfig{
-						ObjectMeta: metav1.ObjectMeta{
-							ResourceVersion: configMap.ResourceVersion,
-							Annotations:     configMap.Annotations,
-						},
+					// Rebuild the bookmark's metadata as an allowlist instead of
+					// copying the backing ConfigMap's annotations: passing them
+					// through leaked internal bookkeeping (the cattle.io/uid
+					// annotation) that every other event type strips, and a
+					// copy-and-delete approach would silently leak any internal
+					// annotation added later. Only two things are justified on a
+					// bookmark: the resourceVersion resume point, and the
+					// k8s.io/initial-events-end marker that tells a WatchList
+					// (sendInitialEvents) client the initial-state replay is
+					// complete — dropping the marker would leave such a client
+					// waiting forever.
+					anns := map[string]string{}
+					if v, ok := configMap.Annotations["k8s.io/initial-events-end"]; ok {
+						anns["k8s.io/initial-events-end"] = v
 					}
+					obj = &ext.Kubeconfig{ObjectMeta: metav1.ObjectMeta{
+						ResourceVersion: configMap.ResourceVersion,
+						Annotations:     anns,
+					}}
 				case watch.Error:
 					// Pass through the errors e.g. 410 Expired.
 					obj = event.Object
@@ -1139,7 +1153,8 @@ func (s *Store) Watch(
 						logrus.Errorf("kubeconfig: watch: error converting configmap %s to kubeconfig: %s", configMap.Name, err)
 						continue
 					}
-				default: // watch.Error
+				default:
+					// watch.EventType is an open string type; unknown types pass through untranslated.
 					obj = event.Object
 				}
 
@@ -1578,12 +1593,18 @@ func (s *Store) Update(
 	newKubeconfig.Labels[UserIDLabel] = oldKubeconfig.Labels[UserIDLabel]
 	newKubeconfig.Status = oldKubeconfig.Status // Carry over the status.
 
-	newKubeconfig.Status.Conditions = append(newKubeconfig.Status.Conditions, metav1.Condition{
-		Type:               UpdatedCond,
-		Status:             metav1.ConditionTrue,
-		Reason:             UpdatedCond,
-		LastTransitionTime: metav1.NewTime(time.Now()),
+	meta.SetStatusCondition(&newKubeconfig.Status.Conditions, metav1.Condition{
+		Type:   UpdatedCond,
+		Status: metav1.ConditionTrue,
+		Reason: UpdatedCond,
 	})
+	// Updated records the time of the latest modification, not a status transition.
+	// Advance LastTransitionTime unconditionally so clients can use it as a
+	// last-modified timestamp — restoring the observable behavior from before the
+	// single-condition upsert was introduced.
+	if c := meta.FindStatusCondition(newKubeconfig.Status.Conditions, UpdatedCond); c != nil {
+		c.LastTransitionTime = metav1.NewTime(time.Now())
+	}
 
 	// Note: [Store.toConfigMap] takes care of enforcing [KindLabel] label and [UIDAnnotation] annotation.
 	newConfigMap, err := s.toConfigMap(newKubeconfig)
