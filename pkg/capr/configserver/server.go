@@ -97,15 +97,15 @@ func (r *RKE2ConfigServer) DeferCAPIResources(clients *wrangler.Context) {
 		r.machines = clients.CAPI.Machine()
 		r.capiClusterCache = clients.CAPI.Cluster().Cache()
 		r.capiAvailable = true
-		logrus.Debug("[rke2configserver] Initialized CAPI clients after deferred func execution")
+		logrus.Info("[rke2configserver] Initialized CAPI clients after deferred func execution")
 	})
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !r.capiAvailable {
-		logrus.Debug("[rke2configserver] CAPI not ready yet")
-		rw.WriteHeader(http.StatusServiceUnavailable)
+		logrus.Warn("[rke2configserver] CAPI not ready yet")
 		rw.Header().Set("Retry-After", "5")
+		http.Error(rw, "CAPI not ready yet", http.StatusServiceUnavailable)
 		return
 	}
 
