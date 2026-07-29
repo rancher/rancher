@@ -43,7 +43,7 @@ func (s *Store) Delete(
 	}
 
 	if !isAdmin && secret.Labels[CloudCredentialOwnerLabel] != sanitizeLabelValue(userInfo.GetName()) {
-		return nil, false, apierrors.NewForbidden(GVR.GroupResource(), name, fmt.Errorf("insufficient permissions to delete cloud credentials"))
+		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
 	// If an UID precondition exists and matches the credential UID, replace it with the secret's UID

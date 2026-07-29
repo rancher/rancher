@@ -36,7 +36,7 @@ func (s *Store) Update(
 	}
 
 	if !isAdmin && oldSecret.Labels[CloudCredentialOwnerLabel] != sanitizeLabelValue(userInfo.GetName()) {
-		return nil, false, apierrors.NewForbidden(GVR.GroupResource(), name, fmt.Errorf("insufficient permissions to update cloud credential"))
+		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
 	oldCredential, err := fromSecret(oldSecret, s.dynamicSchemaCache)
