@@ -98,11 +98,12 @@ jobs:
         id: current-attempt
         if: steps.find-pr.outputs.pr_number
         env:
+          REPOSITORY: ${{ github.repository }}
           WORKFLOW_NAME: ${{ steps.find-pr.outputs.workflow_name }}
           RUN_ID: ${{ steps.find-pr.outputs.run_id }}
           MAX_ATTEMPTS: ${{ steps.pr-settings.outputs.max_attempts }}
         run: |
-          CURRENT_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '.run_attempt')
+          CURRENT_ATTEMPT=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID" --jq '.run_attempt')
           echo "value=$CURRENT_ATTEMPT" >> $GITHUB_OUTPUT
 
           if (( CURRENT_ATTEMPT >= MAX_ATTEMPTS )); then
@@ -116,13 +117,14 @@ jobs:
       - name: Restart workflow if under limit
         if: steps.find-pr.outputs.pr_number && steps.current-attempt.outputs.reached_limit != 'true'
         env:
+          REPOSITORY: ${{ github.repository }}
           # Needs write permissions to Actions
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           WORKFLOW_NAME: ${{ steps.find-pr.outputs.workflow_name }}
           RUN_ID: ${{ steps.find-pr.outputs.run_id }}
         run: |
           echo "Restart workflow '$WORKFLOW_NAME'"
-          gh api --method POST "repos/${{ github.repository }}/actions/runs/$RUN_ID/rerun"
+          gh api --method POST "repos/$REPOSITORY/actions/runs/$RUN_ID/rerun"
 
       - name: Check if all workflows have reached limit
         if: steps.find-pr.outputs.pr_number && steps.current-attempt.outputs.reached_limit == 'true'
@@ -137,7 +139,7 @@ jobs:
         run: |
           INCOMPLETE_WORKFLOWS=0
 
-          BRANCH_WORKFLOW_RUNS=$(gh api "repos/${{ github.repository }}/actions/runs" \
+          BRANCH_WORKFLOW_RUNS=$(gh api "repos/$REPOSITORY/actions/runs" \
             -X GET \
             -f branch="$BRANCH" \
             --paginate \
