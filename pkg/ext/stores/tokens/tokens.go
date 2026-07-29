@@ -1835,11 +1835,8 @@ func ClampToMaxTTL(ttl, max int64) int64 {
 		// maximum is infinity, ttl is always smaller or equal
 		return ttl
 	}
-	// for a finite maximum we can do simple comparison
-	if ttl > max {
-		return max
-	}
-	return ttl
+	// for a finite maximum we can do a simple
+	return min(ttl, max)
 }
 
 // ttlGreater compares the two TTL a and b. It returns true if a is greater than b.
