@@ -48,7 +48,6 @@ COPY chart/ /src/chart/
 COPY scripts/ /src/scripts/
 COPY build.yaml .
 
-RUN /src/scripts/export-config
 RUN /src/scripts/chart/ci
 
 FROM scratch
