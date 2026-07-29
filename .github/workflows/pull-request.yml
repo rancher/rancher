@@ -95,6 +95,191 @@ jobs:
           push: false
           cache-from: type=gha,scope=pr-build-installer
           cache-to: type=gha,mode=min,scope=pr-build-installer
+
+  # ---------------------------------------------------------------------
+  # TEMPORARY: cache-benchmark-{cold,warm} -- proves out buildkit-cache-dance
+  # + Magic Cache (extras=s3-cache) cold-vs-warm restore time for the go
+  # build/mod cache mount, using this real PR's pull_request trigger (since
+  # workflow_dispatch isn't reachable from a non-default-branch workflow
+  # file). Not wired into any real build path (build-server/build-agent are
+  # untouched by these two jobs) -- safe to drop once the benchmark numbers
+  # are in hand. Remove this whole block before merging the caching change
+  # for real.
+  #
+  # cache-benchmark-cold builds server with an empty cache mount against a
+  # scratch key that is unique per workflow run (so every push to this PR
+  # branch re-runs a genuine cold start), times the build, and always
+  # extracts+saves the populated cache back to that scratch key.
+  #
+  # cache-benchmark-warm needs: cache-benchmark-cold (so the save has
+  # already committed by the time this job starts), restores the SAME
+  # scratch key -- this must hit -- injects it, builds again, and never
+  # writes back (skip-extraction: true). Fails loudly if the expected hit
+  # doesn't happen so a bad number can't sneak through silently.
+  # ---------------------------------------------------------------------
+  cache-benchmark-cold:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      # Unique per workflow run -- guaranteed to not exist yet, so this is a
+      # genuine cold start every time the PR branch is pushed.
+      - name: "Restore go build/mod cache (expected: miss)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark
+          key: rancher-gocache-benchmark-${{ github.run_id }}
+      - name: "Report cache hit status (should be false)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
+          fi
+      - name: Inject (empty) cache into BuildKit
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-map: |
+            {
+              "go-build-cache-benchmark": { "target": "/root/.cache", "id": "rancher" }
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+      - name: "Timed build (server, cold cache)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server \
+            --output type=docker,dest=/tmp/rancher-cache-benchmark-cold.tar \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Cold build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Cold build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+
+  cache-benchmark-warm:
+    needs: cache-benchmark-cold
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      # Same scratch key as cache-benchmark-cold. Must hit -- that job's
+      # save step already committed by the time this job starts
+      # (needs: cache-benchmark-cold).
+      - name: "Restore go build/mod cache (expected: hit)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark
+          key: rancher-gocache-benchmark-${{ github.run_id }}
+      - name: "Report cache hit status (should be true)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected a cache hit on the warm job but got a miss -- Magic Cache / actions/cache restore did not work as expected."
+            exit 1
+          fi
+      - name: Inject cache into BuildKit
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-map: |
+            {
+              "go-build-cache-benchmark": { "target": "/root/.cache", "id": "rancher" }
+            }
+          # Read-only leg of the benchmark -- never writes back.
+          skip-extraction: true
+      - name: "Timed build (server, warm cache)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server \
+            --output type=docker,dest=/tmp/rancher-cache-benchmark-warm.tar \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+
+  cache-benchmark-report:
+    needs: [cache-benchmark-cold, cache-benchmark-warm]
+    runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    steps:
+      - name: Summarize results
+        run: |
+          COLD="${{ needs.cache-benchmark-cold.outputs.build-seconds }}"
+          WARM="${{ needs.cache-benchmark-warm.outputs.build-seconds }}"
+          echo "# Cache Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (empty cache mount) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (restored via buildkit-cache-dance + actions/cache) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
+            SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Speedup: **${SPEEDUP}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+  # ---------------------------------------------------------------------
+  # END TEMPORARY cache-benchmark block
+  # ---------------------------------------------------------------------
+
   integration-tests:
     permissions:
       contents: read
