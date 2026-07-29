@@ -24,9 +24,38 @@ runs:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
     - name: Set up Docker Buildx
+      id: setup-buildx
       uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       with:
         driver-opts: network=host
+    # See build-images/server/action.yml for the rationale on branch-scoped
+    # (rather than go.mod/go.sum-hash-scoped) cache keys.
+    - name: Compute cache scope
+      id: cache-scope
+      shell: bash
+      run: |
+        BRANCH="${{ github.base_ref || github.ref_name }}"
+        SAFE_BRANCH=$(echo "$BRANCH" | tr '/' '-')
+        echo "branch=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
+    - name: Restore go build/mod cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: go-build-cache-agent-${{ env.ARCH }}
+        key: rancher-gocache-agent-${{ env.ARCH }}-${{ steps.cache-scope.outputs.branch }}-${{ hashFiles('go.mod', 'go.sum') }}
+        restore-keys: |
+          rancher-gocache-agent-${{ env.ARCH }}-${{ steps.cache-scope.outputs.branch }}-
+    - name: Inject go build/mod cache into BuildKit
+      uses: reproducible-containers/buildkit-cache-dance@v3
+      with:
+        builder: ${{ steps.setup-buildx.outputs.name }}
+        cache-map: |
+          {
+            "go-build-cache-agent-${{ env.ARCH }}": { "target": "/root/.cache", "id": "rancher" }
+          }
+        # Only write the cache back on a push to a real branch (post-merge),
+        # never from a PR build.
+        skip-extraction: ${{ github.event_name == 'pull_request' }}
     - name: Build agent
       id: build
       uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
@@ -44,7 +73,6 @@ runs:
         file: ./package/Dockerfile
         labels: "${{ steps.meta.outputs.labels }}"
         outputs: type=docker,dest=/tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar
-        no-cache: true
         target: "agent"
     - name: Upload image
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
