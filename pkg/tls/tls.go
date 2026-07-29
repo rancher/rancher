@@ -124,6 +124,15 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		return err
 	}
 
+	// Always include localhost and the in-cluster DNS name for the
+	// rancher-internal Service as default SANs, alongside the dynamic
+	// pod/cluster IPs below. These are admin-controlled Config.SANs
+	// (short-circuited by dynamiclistener's allowDefaultSANs before
+	// FilterCN ever runs), so they're always present regardless of what
+	// the pod-IP/Service-allowlist filter would otherwise decide -- and
+	// unlike those IPs, they don't change across restarts.
+	hostIPs = append(hostIPs, "localhost", apiservice.RancherInternalServiceName+"."+namespace.System+".svc")
+
 	if clusterIP != "" {
 		hostIPs = append(hostIPs, clusterIP)
 	}
