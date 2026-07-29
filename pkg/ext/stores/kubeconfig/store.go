@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -43,6 +44,7 @@ import (
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/features"
@@ -93,6 +95,10 @@ const (
 )
 
 var gvr = ext.SchemeGroupVersion.WithResource(ext.KubeconfigResourceName)
+
+// kindRequirement filters ConfigMaps to those that back Kubeconfig resources.
+// It is built once at init time rather than per request.
+var kindRequirement = mustRequirement(KindLabel, selection.Equals, KindLabelValue)
 
 // tokenFetcher abstracts the ext token store operations needed by the kubeconfig store.
 type tokenFetcher interface {
@@ -199,6 +205,12 @@ func (s *Store) userFrom(ctx context.Context, verb string) (k8suser.Info, bool, 
 		return nil, false, false, fmt.Errorf("missing user info")
 	}
 
+	// Resource: "*" is a deliberate superuser heuristic, matching the pattern
+	// used by the sibling token and useractivity stores. Scoping this check to
+	// ext.KubeconfigResourceName would make every default Rancher user an admin
+	// because the built-in User/User Base GlobalRoles grant all verbs on
+	// ext.cattle.io/kubeconfigs, which would bypass per-user scoping in
+	// Get/List/Watch/Delete/Update.
 	decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 		User:            userInfo,
 		Verb:            verb,
@@ -432,7 +444,7 @@ func (s *Store) Create(
 
 		configMap, err = s.configMapClient.Create(configMap)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error creating configmap for kubeconfig: %w", err))
+			return nil, mapBackingError(err, namePrefix)
 		}
 		kubeConfigID = configMap.Name
 	}
@@ -697,7 +709,7 @@ func (s *Store) Create(
 			configMap, updateErr = s.configMapClient.Update(configMap)
 			if updateErr != nil {
 				if err == nil {
-					err = apierrors.NewInternalError(fmt.Errorf("error updating configmap for kubeconfig %s: %w", kubeConfigID, updateErr))
+					err = mapBackingError(updateErr, kubeConfigID)
 				} // else preserve the original error.
 			}
 		}
@@ -974,27 +986,39 @@ func (s *Store) NewList() runtime.Object {
 	return &ext.KubeconfigList{}
 }
 
+func mustRequirement(key string, op selection.Operator, val string) labels.Requirement {
+	r, err := labels.NewRequirement(key, op, []string{val})
+	if err != nil {
+		panic(fmt.Sprintf("kubeconfig: invalid label requirement %s %s %s: %v", key, op, val, err))
+	}
+	return *r
+}
+
 func toListOptions(options *metainternalversion.ListOptions, userInfo k8suser.Info, isAdmin bool) (*metav1.ListOptions, error) {
 	listOptions, err := extapi.ConvertListOptions(options)
 	if err != nil {
 		return nil, fmt.Errorf("error converting list options: %w", err)
 	}
 
-	labelSet, err := labels.ConvertSelectorToLabelsMap(listOptions.LabelSelector)
-	if err != nil {
-		return nil, fmt.Errorf("error converting label selector: %w", err)
+	selector := labels.Everything()
+	if listOptions.LabelSelector != "" {
+		parsed, err := labels.Parse(listOptions.LabelSelector)
+		if err != nil {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid label selector: %s", err))
+		}
+		selector = parsed
 	}
 
-	configMapLabels := labels.Set{
-		KindLabel: KindLabelValue,
-	}
-
+	reqs := []labels.Requirement{kindRequirement}
 	if !isAdmin {
-		configMapLabels[UserIDLabel] = userInfo.GetName()
+		userReq, err := labels.NewRequirement(UserIDLabel, selection.Equals, []string{userInfo.GetName()})
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("user ID %q is not a valid label value: %w", userInfo.GetName(), err))
+		}
+		reqs = append(reqs, *userReq)
 	}
-
-	labelSet = labels.Merge(labelSet, configMapLabels)
-	listOptions.LabelSelector = labelSet.AsSelector().String()
+	selector = selector.Add(reqs...)
+	listOptions.LabelSelector = selector.String()
 
 	return listOptions, nil
 }
@@ -1011,7 +1035,7 @@ func (s *Store) List(
 
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, toListOptionsErr(err)
 	}
 
 	configMapList, err := s.configMapClient.List(namespace, *listOptions)
@@ -1054,7 +1078,7 @@ func (s *Store) Watch(
 
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, toListOptionsErr(err)
 	}
 
 	if !features.FeatureGates().Enabled(features.WatchListClient) {
@@ -1069,7 +1093,8 @@ func (s *Store) Watch(
 	}
 
 	kubeconfigWatch := &watcher{
-		ch: make(chan watch.Event, 100),
+		ch:   make(chan watch.Event, 100),
+		done: make(chan struct{}),
 	}
 
 	go func() {
@@ -1133,22 +1158,26 @@ func (s *Store) Watch(
 
 // watcher implements [watch.Interface].
 type watcher struct {
-	mu     sync.RWMutex
-	closed bool
-	ch     chan watch.Event
+	mu       sync.RWMutex
+	closed   bool
+	ch       chan watch.Event
+	done     chan struct{}
+	stopOnce sync.Once
 }
 
 // Stop tells the producer that the consumer is done watching, so the
 // producer should stop sending events and close the result channel.
 func (w *watcher) Stop() {
+	// Close done BEFORE taking the write lock: a blocked add holds RLock
+	// until done closes, so taking Lock first would deadlock — the exact
+	// bug this change fixes.
+	w.stopOnce.Do(func() { close(w.done) })
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
-	// no operation if called multiple times.
 	if w.closed {
 		return
 	}
-
 	close(w.ch)
 	w.closed = true
 }
@@ -1162,13 +1191,15 @@ func (w *watcher) ResultChan() <-chan watch.Event {
 func (w *watcher) add(event watch.Event) bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-
 	if w.closed {
 		return false
 	}
-
-	w.ch <- event
-	return true
+	select {
+	case w.ch <- event:
+		return true
+	case <-w.done:
+		return false
+	}
 }
 
 // translateTimestampSince returns the elapsed time since timestamp in
@@ -1263,7 +1294,7 @@ func (s *Store) DeleteCollection(
 
 	lOptions, err := toListOptions(listOptions, userInfo, isAdmin)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, toListOptionsErr(err)
 	}
 
 	configMapList, err := s.configMapClient.List(namespace, *lOptions)
@@ -1284,17 +1315,36 @@ func (s *Store) DeleteCollection(
 	}
 
 	for _, configMap := range configMapList.Items {
-		obj, _, err := s.delete(ctx, &configMap, deleteValidation, options)
+		// Convert to Kubeconfig first and run deleteValidation against it directly.
+		// Any error from deleteValidation (including a NotFound-classified one) is
+		// provably from the caller's validation logic, not from a concurrent delete,
+		// so it aborts the whole collection and is surfaced verbatim.
+		kubeconfig, err := s.fromConfigMap(&configMap)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting kubeconfig %s: %w", configMap.Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
 		}
-
-		kubeconfig, ok := obj.(*ext.Kubeconfig)
-		if !ok { // Sanity check.
+		if deleteValidation != nil {
+			if err := deleteValidation(ctx, kubeconfig); err != nil {
+				if _, ok := err.(apierrors.APIStatus); ok {
+					return nil, err
+				}
+				return nil, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
+			}
+		}
+		// Pass nil deleteValidation: validation already ran above, so an IsNotFound
+		// from s.delete is provably the backing concurrent-delete race.
+		obj, _, err := s.delete(ctx, kubeconfig, &configMap, nil, options)
+		if apierrors.IsNotFound(err) {
+			continue // backing ConfigMap was concurrently deleted — skip
+		}
+		if err != nil {
+			return nil, err // already Kubeconfig-scoped via mapBackingError
+		}
+		kc, ok := obj.(*ext.Kubeconfig)
+		if !ok {
 			return nil, apierrors.NewInternalError(fmt.Errorf("expected kubeconfig object, got %T", obj))
 		}
-
-		list.Items = append(list.Items, *kubeconfig)
+		list.Items = append(list.Items, *kc)
 	}
 
 	return list, nil
@@ -1324,21 +1374,64 @@ func (s *Store) Delete(
 		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
-	return s.delete(ctx, configMap, deleteValidation, options)
-}
-
-// delete a kubeconfig's configmap and associated tokens.
-func (s *Store) delete(
-	ctx context.Context,
-	configMap *corev1.ConfigMap,
-	deleteValidation rest.ValidateObjectFunc,
-	options *metav1.DeleteOptions,
-) (runtime.Object, bool, error) {
 	kubeconfig, err := s.fromConfigMap(configMap)
 	if err != nil {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
 	}
+	return s.delete(ctx, kubeconfig, configMap, deleteValidation, options)
+}
 
+// checkPreconditions verifies the caller's UID and ResourceVersion preconditions
+// against the stored values. It returns a Conflict if a check fails and nil when
+// all checks pass or preconditions is nil.
+//
+// The UID precondition passes if the submitted UID equals ANY of the accepted
+// UIDs: callers may pass both the Kubeconfig's virtual UID and the backing
+// ConfigMap's real UID so a client holding either identity can enforce uniqueness.
+//
+// Note: the default apiserver UpdatedObjectInfo only ever populates the UID
+// precondition; the ResourceVersion branch is defensive for non-default
+// rest.UpdatedObjectInfo implementations, but kept for the standard
+// Preconditions contract.
+func checkPreconditions(preconditions *metav1.Preconditions, name, rv string, uids ...types.UID) error {
+	if preconditions == nil {
+		return nil
+	}
+	if preconditions.UID != nil {
+		var matched bool
+		for _, uid := range uids {
+			if *preconditions.UID == uid {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			var recordUID types.UID
+			if len(uids) > 0 {
+				recordUID = uids[0]
+			}
+			return apierrors.NewConflict(gvr.GroupResource(), name,
+				fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s)",
+					*preconditions.UID, recordUID))
+		}
+	}
+	if preconditions.ResourceVersion != nil && *preconditions.ResourceVersion != rv {
+		return apierrors.NewConflict(gvr.GroupResource(), name,
+			fmt.Errorf("the ResourceVersion in the precondition (%s) does not match the ResourceVersion in record (%s)",
+				*preconditions.ResourceVersion, rv))
+	}
+	return nil
+}
+
+// delete a kubeconfig's configmap and associated tokens.
+// kubeconfig must be the already-converted form of configMap (callers convert once).
+func (s *Store) delete(
+	ctx context.Context,
+	kubeconfig *ext.Kubeconfig,
+	configMap *corev1.ConfigMap,
+	deleteValidation rest.ValidateObjectFunc,
+	options *metav1.DeleteOptions,
+) (runtime.Object, bool, error) {
 	if deleteValidation != nil {
 		err := deleteValidation(ctx, kubeconfig)
 		if err != nil {
@@ -1349,53 +1442,56 @@ func (s *Store) delete(
 		}
 	}
 
-	if options.Preconditions != nil {
-		// If the UID precondition matches the kubeconfig's UID, we need
-		// to replace it with the corresponding configmap's UID.
-		if options.Preconditions.UID != nil && *options.Preconditions.UID == kubeconfig.UID {
-			options.Preconditions.UID = &configMap.UID
-		}
+	// Enforce the client's preconditions before any destructive step, so a
+	// failing precondition leaves both the tokens and the ConfigMap untouched.
+	// The backing ConfigMap delete below re-enforces them authoritatively; the
+	// window between the token loop and that delete is the inherent
+	// non-transactional gap of this multi-object design. On this gap: if the
+	// backing delete returns a Conflict after tokens have been deleted, the
+	// caller receives a Conflict that explicitly names this state — signaling
+	// that the delete is safe to retry (the tokens are gone; only the ConfigMap
+	// record remains to be removed).
+	if err := checkPreconditions(options.Preconditions, configMap.Name, configMap.ResourceVersion, kubeconfig.UID, configMap.UID); err != nil {
+		return nil, false, err
+	}
+	if options.Preconditions != nil && options.Preconditions.UID != nil {
+		// Rewrite to the ConfigMap UID so the backing delete can enforce
+		// it — on a copy, so a caller retrying with the same DeleteOptions
+		// still submits its original precondition.
+		preconditions := *options.Preconditions
+		preconditions.UID = &configMap.UID
+		optionsCopy := *options
+		optionsCopy.Preconditions = &preconditions
+		options = &optionsCopy
 	}
 
-	err = s.configMapClient.Delete(namespace, configMap.Name, options)
-	switch {
-	case err == nil:
-	case apierrors.IsNotFound(err):
-		return nil, false, apierrors.NewNotFound(gvr.GroupResource(), configMap.Name)
-	case apierrors.IsConflict(err):
-		// Massage the err details to refer to Kubeconfigs instead of ConfigMaps.
-		var errMessage string
-		conflictErr, ok := err.(*apierrors.StatusError)
-		if ok {
-			_, errMessage, ok = strings.Cut(conflictErr.ErrStatus.Message, `ConfigMap "`+configMap.Name+`": `)
-			if !ok {
-				errMessage = ""
-			}
-		}
-		return nil, false, apierrors.NewConflict(gvr.GroupResource(), configMap.Name, errors.New(errMessage))
-	default:
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting configmap for kubeconfig %s: %w", configMap.Name, err))
-	}
-
-	// Token IDs are tracked in status.tokens. Delete each token, falling back
-	// to the v3 token client for pre-migration kubeconfigs that reference v3 tokens.
+	// Delete tokens first so the ConfigMap (which holds the token ID list)
+	// survives a partial failure and the whole delete stays retryable.
+	tokensDeleteAttempted := len(options.DryRun) == 0 && len(kubeconfig.Status.Tokens) > 0
 	for _, tokenName := range kubeconfig.Status.Tokens {
 		delOptions := &metav1.DeleteOptions{
 			GracePeriodSeconds: options.GracePeriodSeconds,
 			PropagationPolicy:  options.PropagationPolicy,
-			DryRun:             options.DryRun, // Pass through the dry run flag instead of handling it explicitly.
+			DryRun:             options.DryRun,
 		}
-
 		err := s.tokenStore.Delete(tokenName, delOptions)
 		if apierrors.IsNotFound(err) {
-			// Not an ext token — try v3 token for backward compatibility.
 			err = s.v3Tokens.Delete(tokenName, delOptions)
 		}
 		if err != nil && !apierrors.IsNotFound(err) {
-			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
+			return nil, false, mapBackingError(err, configMap.Name)
 		}
 	}
 
+	err := s.configMapClient.Delete(namespace, configMap.Name, options)
+	if err != nil {
+		mapped := mapBackingError(err, configMap.Name)
+		if apierrors.IsConflict(mapped) && tokensDeleteAttempted {
+			return nil, false, apierrors.NewConflict(gvr.GroupResource(), configMap.Name,
+				fmt.Errorf("%s; this attempt has already revoked the kubeconfig's tokens and the delete should be retried to remove the record", genericregistry.OptimisticLockErrorMsg))
+		}
+		return nil, false, mapped
+	}
 	return kubeconfig, true, nil
 }
 
@@ -1440,6 +1536,15 @@ func (s *Store) Update(
 	newKubeconfig, ok := newObj.(*ext.Kubeconfig)
 	if !ok {
 		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", newObj))
+	}
+
+	// Enforce a UID or ResourceVersion precondition supplied by the caller via
+	// objInfo.Preconditions(). This mirrors the Delete path and must run before
+	// any write so dry-run also predicts the conflict outcome.
+	if prec := objInfo.Preconditions(); prec != nil {
+		if err := checkPreconditions(prec, name, oldKubeconfig.ResourceVersion, oldKubeconfig.UID, oldConfigMap.UID); err != nil {
+			return nil, false, err
+		}
 	}
 
 	if updateValidation != nil {
@@ -1487,10 +1592,19 @@ func (s *Store) Update(
 	}
 
 	dryRun := options != nil && len(options.DryRun) > 0
+
+	// Enforce the client's resourceVersion precondition even on dry-run, so a
+	// preview predicts the real conflict outcome.
+	if newKubeconfig.ResourceVersion != "" &&
+		newKubeconfig.ResourceVersion != oldKubeconfig.ResourceVersion {
+		return nil, false, apierrors.NewConflict(gvr.GroupResource(), name,
+			errors.New(genericregistry.OptimisticLockErrorMsg))
+	}
+
 	if !dryRun {
 		newConfigMap, err = s.configMapClient.Update(newConfigMap)
 		if err != nil {
-			return nil, false, apierrors.NewInternalError(fmt.Errorf("error updating configmap for kubeconfig %s: %w", name, err))
+			return nil, false, mapBackingError(err, name)
 		}
 	}
 
