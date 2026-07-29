@@ -18,18 +18,53 @@ type Signer interface {
 	sign(*http.Request, SecretGetter, string) error
 }
 
+// X-API-CattleAuth-Header: arbitrary headers=X-Token=my-value,X-User=alice
+
+// Injects literal header values — no secret lookup.
+// Multi-header delimiter: comma (',')
+// Values are set verbatim; credID is accepted but ignored
 type arbitrary struct{}
 
+// X-API-CattleAuth-Header: awsv4 credID=cattle-global-data/my-aws-cred
+
+// Signs the request with AWS SigV4 using accessKey / secretKey from a cloud credential secret.
+// Service and region are auto-detected from the target URL hostname
+// Secret must have fields accessKey and secretKey
 type awsv4 struct{}
 
+// X-API-CattleAuth-Header: basic credID=cattle-global-data/my-cred usernameField=username passwordField=password
+
+// Sets Authorization: Basic base64(username:password).
+// usernameField and passwordField name the keys to read from the secret
 type basic struct{}
 
+// X-API-CattleAuth-Header: bearer credID=cattle-global-data/my-cred passwordField=token
+
+// Sets Authorization: Bearer <token>.
+// passwordField names the key to read from the secret (historical naming; it holds the token)
 type bearer struct{}
+
+// X-API-CattleAuth-Header: bodyinject credID=cattle-global-data/my-cred fields=password=passwordField;username=usernameField
+
+// Merges credential values into the top-level JSON request body.
+// Multi-field delimiter: semicolon (;)
+// Format: <jsonBodyKey>=<secretFieldName>
 
 type bodyinject struct{}
 
+// X-API-CattleAuth-Header: digest credID=cattle-global-data/my-cred usernameField=username passwordField=password
+
+// Performs HTTP Digest auth — makes a pre-flight request to the target to get the WWW-Authenticate challenge, then signs.
+
+// Same secret-field naming convention as basic
+// Target endpoint must return 401 with a WWW-Authenticate: Digest ... header on the pre-flight
 type digest struct{}
 
+// X-API-CattleAuth-Header: headerinject credID=cattle-global-data/my-cred headers=X-Token=tokenField;X-User=usernameField
+
+// Injects credential values as named HTTP headers by looking them up from a secret.
+// Multi-header delimiter: semicolon (;)
+// Format: <HeaderName>=<secretFieldName> — right-hand side is the secret key, not a literal value
 type headerinject struct{}
 
 func newSigner(auth string) Signer {
