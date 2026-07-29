@@ -178,7 +178,7 @@ var (
 	// server args (unless overridden by the per-cluster provisioning.cattle.io/rke2-prime-enabled annotation).
 	// Defaults to empty (treated as "false") in standard builds; Prime builds set
 	// CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=true to override.
-	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", os.Getenv("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT"))
+	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", "").WithEnvDefault("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT")
 
 	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
@@ -301,11 +301,11 @@ var (
 
 	// SystemDefaultRegistry is the default container registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
-	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
+	SystemDefaultRegistry = NewSetting("system-default-registry", "").WithEnvDefault("CATTLE_BASE_REGISTRY")
 
 	// SystemDefaultRegistryPullSecrets are the default pull secrets used for authenticating to the system default container registry.
 	// The environmental variable "CATTLE_BASE_REGISTRY_PULL_SECRETS" controls the default value of this setting.
-	SystemDefaultRegistryPullSecrets = NewSetting("system-default-registry-pull-secrets", os.Getenv("CATTLE_BASE_REGISTRY_PULL_SECRETS"))
+	SystemDefaultRegistryPullSecrets = NewSetting("system-default-registry-pull-secrets", "").WithEnvDefault("CATTLE_BASE_REGISTRY_PULL_SECRETS")
 
 	// K3sBasedUpgraderUninstallConcurrency defines the maximum number of clusters
 	// for which Rancher can simultaneously uninstall the legacy K3s-based upgrade app.
@@ -320,7 +320,7 @@ var (
 
 	// UIBrand High level 'brand' value, for example `suse`.
 	// Fallback env, not a user-facing setting, used to indicate if this is a Prime install
-	UIBrand = NewSetting("ui-brand", os.Getenv("CATTLE_BASE_UI_BRAND"))
+	UIBrand = NewSetting("ui-brand", "").WithEnvDefault("CATTLE_BASE_UI_BRAND")
 
 	// UICommunityLinks displays community links in the UI.
 	// Deprecated in favour of UICustomLinks.
