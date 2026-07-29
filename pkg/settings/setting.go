@@ -631,6 +631,14 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
+func (s Setting) WithEnvDefault(key string) Setting {
+	if def := os.Getenv(key); def != "" {
+		s.Default = def
+	}
+	settings[s.Name] = s
+	return s
+}
+
 // WithDefaultOnUpgrade takes a setting and returns a new setting with the default value on upgrade set.
 func (s Setting) WithDefaultOnUpgrade(defOnUpgrade string) Setting {
 	s.DefaultOnUpgrade = defOnUpgrade
