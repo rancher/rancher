@@ -222,8 +222,28 @@ jobs:
       - name: Extract populated go build/mod cache
         shell: bash
         run: |
+          # Sample disk/CPU load in the background for the duration of this
+          # step, to help attribute the ~150s gap consistently observed
+          # (across every run so far) between BuildKit resolving the final
+          # CACHED layer and it actually starting the COPY --from=
+          # server-build step -- that gap shows zero progress output, so
+          # something is happening that isn't visible in buildx's default
+          # progress format. Falls back to /proc/stat + /proc/diskstats if
+          # iostat/sysstat isn't installed on this runner image.
+          ( while true; do
+              echo "[monitor $(date -u +%H:%M:%S)]"
+              if command -v iostat >/dev/null 2>&1; then
+                iostat -x 1 1 | tail -n +4
+              else
+                echo "cpu: $(head -1 /proc/stat)"
+                echo "disk (nvme0n1p1): $(grep nvme0n1p1 /proc/diskstats || true)"
+              fi
+              sleep 5
+            done ) &
+          MONITOR_PID=$!
           time docker buildx build \
             --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --progress=plain \
             --build-arg "VERSION=${{ env.TAG }}" \
             --build-arg "COMMIT=${{ env.COMMIT }}" \
             --build-arg "ARCH=amd64" \
@@ -239,6 +259,7 @@ jobs:
             --target gocache-out \
             --output type=tar,dest=go-build-cache-benchmark.tar \
             .
+          kill "$MONITOR_PID" 2>/dev/null || true
           echo "tar size:"
           du -sh go-build-cache-benchmark.tar
           mkdir -p go-build-cache-benchmark-extracted
