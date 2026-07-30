@@ -78,9 +78,10 @@ func mapBackingError(err error, resource string) error {
 	}
 }
 
-// toListOptionsErr classifies a toListOptions error: APIStatus errors pass through;
-// all other errors become InternalError.
-func toListOptionsErr(err error) error {
+// apiStatusOrInternalError returns err unchanged when it already carries an
+// APIStatus (so a deliberate 4xx keeps its code) and wraps anything else as an
+// InternalError.
+func apiStatusOrInternalError(err error) error {
 	if _, ok := err.(apierrors.APIStatus); ok {
 		return err
 	}

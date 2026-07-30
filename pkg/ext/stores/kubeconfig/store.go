@@ -248,7 +248,7 @@ func (s *Store) Create(
 ) (runtime.Object, error) {
 	userInfo, _, isRancherUser, err := s.userFrom(ctx, "create")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	if !isRancherUser {
@@ -264,7 +264,7 @@ func (s *Store) Create(
 
 	authToken, err := s.tokenStore.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("error getting request token %s: %w", authTokenID, err))
+		return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("error getting request token %s: %v", authTokenID, err))
 	}
 
 	kubeconfig, ok := obj.(*ext.Kubeconfig)
@@ -291,7 +291,7 @@ func (s *Store) Create(
 
 	defaultTTL, err := s.getDefaultTTL()
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %v", err))
 	}
 	defaultTTLSeconds := *defaultTTL / 1000
 
@@ -330,7 +330,7 @@ func (s *Store) Create(
 
 	localCluster, err := s.clusterCache.Get("local")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting local cluster: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting local cluster: %v", err))
 	}
 
 	if len(kubeconfig.Spec.Clusters) > 0 {
@@ -338,7 +338,7 @@ func (s *Store) Create(
 			// The first id in the spec.clusters "*" means all clusters.
 			clusters, err = s.clusterCache.List(labels.Everything())
 			if err != nil {
-				return nil, apierrors.NewInternalError(fmt.Errorf("error listing clusters: %w", err))
+				return nil, apierrors.NewInternalError(fmt.Errorf("error listing clusters: %v", err))
 			}
 		} else {
 			// Individually listed clusters.
@@ -353,7 +353,7 @@ func (s *Store) Create(
 					if apierrors.IsNotFound(err) {
 						return nil, apierrors.NewBadRequest(fmt.Sprintf("cluster %s not found", clusterID))
 					}
-					return nil, apierrors.NewInternalError(fmt.Errorf("error getting cluster %s: %w", clusterID, err))
+					return nil, apierrors.NewInternalError(fmt.Errorf("error getting cluster %s: %v", clusterID, err))
 				}
 
 				clusters = append(clusters, cluster)
@@ -377,7 +377,7 @@ func (s *Store) Create(
 			Name:            clusters[i].Name,
 		})
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error checking if user %s has access to cluster %s: %w", userInfo.GetName(), clusters[i].Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error checking if user %s has access to cluster %s: %v", userInfo.GetName(), clusters[i].Name, err))
 		}
 
 		if decision != authorizer.DecisionAllow {
@@ -430,7 +430,7 @@ func (s *Store) Create(
 
 	configMap, err := s.toConfigMap(kubeconfigToStore)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig to configmap: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig to configmap: %v", err))
 	}
 	configMap.GenerateName = namePrefix
 
@@ -440,7 +440,7 @@ func (s *Store) Create(
 		configMap.Name = kubeConfigID
 	} else {
 		if err = s.ensureNamespace(); err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %w", namespace, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error ensuring namespace %s: %v", namespace, err))
 		}
 
 		configMap, err = s.configMapClient.Create(configMap)
@@ -452,7 +452,7 @@ func (s *Store) Create(
 
 	kubeconfigToStore, err = s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", kubeConfigID, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", kubeConfigID, err))
 	}
 
 	var (
@@ -490,13 +490,13 @@ func (s *Store) Create(
 					LastTransitionTime: metav1.NewTime(time.Now()),
 				})
 
-				return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %w", err))
+				return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token: %v", err))
 			}
 
 			sharedTokenKey = sharedToken.Status.BearerToken
 			ownerRef, err := s.secretOwnerRef(sharedToken.Name)
 			if err != nil {
-				return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for shared token: %w", err))
+				return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for shared token: %v", err))
 			}
 			ownerRefs = append(ownerRefs, ownerRef)
 			tokenIDs = append(tokenIDs, sharedToken.Name)
@@ -581,13 +581,13 @@ func (s *Store) Create(
 						LastTransitionTime: metav1.NewTime(time.Now()),
 					})
 
-					return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %w", cluster.Name, err))
+					return apierrors.NewInternalError(fmt.Errorf("error creating kubeconfig token for cluster %s: %v", cluster.Name, err))
 				}
 
 				tokenKey = clusterToken.Status.BearerToken
 				ownerRef, err := s.secretOwnerRef(clusterToken.Name)
 				if err != nil {
-					return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for token: %w", err))
+					return apierrors.NewInternalError(fmt.Errorf("error getting owner reference for token: %v", err))
 				}
 				ownerRefs = append(ownerRefs, ownerRef)
 				tokenIDs = append(tokenIDs, clusterToken.Name)
@@ -646,7 +646,7 @@ func (s *Store) Create(
 						LastTransitionTime: metav1.NewTime(time.Now()),
 					})
 
-					return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %w", cluster.Name, err))
+					return apierrors.NewInternalError(fmt.Errorf("error listing nodes for cluster %s: %v", cluster.Name, err))
 				}
 
 				clusterCerts := kconfig.FormatCertString(cluster.Status.CACert) // Already base64 encoded.
@@ -686,7 +686,7 @@ func (s *Store) Create(
 				LastTransitionTime: metav1.NewTime(time.Now()),
 			}}
 
-			return apierrors.NewInternalError(fmt.Errorf("error generating kubeconfig content: %w", err))
+			return apierrors.NewInternalError(fmt.Errorf("error generating kubeconfig content: %v", err))
 		}
 
 		return nil
@@ -716,7 +716,7 @@ func (s *Store) Create(
 		}
 	} else {
 		if err == nil {
-			err = apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %w", kubeConfigID, convertErr))
+			err = apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %v", kubeConfigID, convertErr))
 		} // else preserve the original error.
 	}
 
@@ -726,7 +726,7 @@ func (s *Store) Create(
 
 	kubeconfig, err = s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig after saving: %w", kubeConfigID, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig after saving: %v", kubeConfigID, err))
 	}
 
 	// Note: Status.Value contains tokens' secret keys and mustn't be persisted.
@@ -958,7 +958,7 @@ func (s *Store) Get(
 ) (runtime.Object, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "get")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	var emptyGetOptions metav1.GetOptions
@@ -976,7 +976,7 @@ func (s *Store) Get(
 
 	kubeconfig, err := s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", name, err))
 	}
 
 	return kubeconfig, nil
@@ -1014,7 +1014,7 @@ func toListOptions(options *metainternalversion.ListOptions, userInfo k8suser.In
 	if !isAdmin {
 		userReq, err := labels.NewRequirement(UserIDLabel, selection.Equals, []string{userInfo.GetName()})
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("user ID %q is not a valid label value: %w", userInfo.GetName(), err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("user ID %q is not a valid label value: %v", userInfo.GetName(), err))
 		}
 		reqs = append(reqs, *userReq)
 	}
@@ -1031,12 +1031,12 @@ func (s *Store) List(
 ) (runtime.Object, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "list")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, toListOptionsErr(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	configMapList, err := s.configMapClient.List(namespace, *listOptions)
@@ -1044,7 +1044,7 @@ func (s *Store) List(
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
 			return nil, apierrors.NewResourceExpired(err.Error())
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %v", err))
 	}
 
 	list := &ext.KubeconfigList{
@@ -1058,7 +1058,7 @@ func (s *Store) List(
 	for _, configMap := range configMapList.Items {
 		kubeconfig, err := s.fromConfigMap(&configMap)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", configMap.Name, err))
 		}
 
 		list.Items = append(list.Items, *kubeconfig)
@@ -1074,12 +1074,12 @@ func (s *Store) Watch(
 ) (watch.Interface, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "watch")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, toListOptionsErr(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	if !features.FeatureGates().Enabled(features.WatchListClient) {
@@ -1090,7 +1090,7 @@ func (s *Store) Watch(
 	configMapWatch, err := s.configMapClient.Watch(namespace, *listOptions)
 	if err != nil {
 		logrus.Errorf("kubeconfig: watch: error starting watch: %s", err)
-		return nil, apierrors.NewInternalError(fmt.Errorf("kubeconfig: watch: error starting watch: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("kubeconfig: watch: error starting watch: %v", err))
 	}
 
 	kubeconfigWatch := &watcher{
@@ -1304,12 +1304,12 @@ func (s *Store) DeleteCollection(
 ) (runtime.Object, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "delete")
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	lOptions, err := toListOptions(listOptions, userInfo, isAdmin)
 	if err != nil {
-		return nil, toListOptionsErr(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	configMapList, err := s.configMapClient.List(namespace, *lOptions)
@@ -1317,7 +1317,7 @@ func (s *Store) DeleteCollection(
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
 			return nil, apierrors.NewResourceExpired(err.Error())
 		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %w", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error listing configmaps for kubeconfigs: %v", err))
 	}
 
 	list := &ext.KubeconfigList{
@@ -1336,7 +1336,7 @@ func (s *Store) DeleteCollection(
 		// so it aborts the whole collection and is surfaced verbatim.
 		kubeconfig, err := s.fromConfigMap(&configMap)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", configMap.Name, err))
 		}
 		if deleteValidation != nil {
 			if err := deleteValidation(ctx, kubeconfig); err != nil {
@@ -1374,7 +1374,7 @@ func (s *Store) Delete(
 ) (runtime.Object, bool, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "delete")
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	useCache := false
@@ -1391,7 +1391,7 @@ func (s *Store) Delete(
 
 	kubeconfig, err := s.fromConfigMap(configMap)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", configMap.Name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", configMap.Name, err))
 	}
 	return s.delete(ctx, kubeconfig, configMap, deleteValidation, options)
 }
@@ -1523,7 +1523,7 @@ func (s *Store) Update(
 ) (runtime.Object, bool, error) {
 	userInfo, isAdmin, _, err := s.userFrom(ctx, "update")
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting user info: %v", err))
 	}
 
 	useCache := false
@@ -1540,12 +1540,12 @@ func (s *Store) Update(
 
 	oldKubeconfig, err := s.fromConfigMap(oldConfigMap)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", name, err))
 	}
 
 	newObj, err := objInfo.UpdatedObject(ctx, oldKubeconfig)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object for kubeconfig %s: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object for kubeconfig %s: %v", name, err))
 	}
 
 	newKubeconfig, ok := newObj.(*ext.Kubeconfig)
@@ -1609,7 +1609,7 @@ func (s *Store) Update(
 	// Note: [Store.toConfigMap] takes care of enforcing [KindLabel] label and [UIDAnnotation] annotation.
 	newConfigMap, err := s.toConfigMap(newKubeconfig)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting kubeconfig %s to configmap: %v", name, err))
 	}
 
 	dryRun := options != nil && len(options.DryRun) > 0
@@ -1631,7 +1631,7 @@ func (s *Store) Update(
 
 	newKubeconfig, err = s.fromConfigMap(newConfigMap)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %w", name, err))
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error converting configmap %s to kubeconfig: %v", name, err))
 	}
 
 	return newKubeconfig, false, nil
