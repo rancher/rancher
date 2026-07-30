@@ -498,6 +498,95 @@ COPY internal/ internal/
 COPY pkg/ pkg/
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
+# TEMPORARY (CI cache benchmark, RUN --mount=type=cache variant): parallel
+# stages using the ORIGINAL RUN --mount=type=cache mechanism this
+# Dockerfile used before any of the COPY-based/bind-mount-based benchmark
+# work in this PR (see the "images" stage below for the still-unmodified
+# original example) -- paired with a custom buildkitd GC policy set via
+# --buildkitd-config-inline on the "Set up Docker Buildx" step in
+# pull-request.yml's cache-benchmark-{cold,warm}-cachemount jobs, raising
+# the exec.cachemount maxUsedSpace ceiling from this runner fleet's
+# default ~488MiB (the root cause diagnosed earlier in this PR for why
+# --mount=type=cache alone couldn't be extracted/persisted) to
+# comfortably above the ~10GB this cache needs.
+#
+# If this works, RUN --mount=type=cache is likely the best of the three
+# approaches tried in this PR: no COPY/bind-mount ingestion cost into
+# /root/.cache at all, and no gocache-out extraction/tar-export tax
+# either -- buildkit-cache-dance just does a plain filesystem copy in/out
+# of the cache mount's on-disk location, so persisting it across builds
+# via actions/cache doesn't require materializing ~10GB as image layers
+# at any point.
+#
+# id=rancher-cache-mount-bench is deliberately NOT id=rancher (the id the
+# real "images" stage below still uses) -- keeps this benchmark's cache
+# mount fully isolated from the real k3s images build's cache mount, so
+# running this benchmark can't affect (or be affected by) the real build
+# path.
+FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder-mount
+ARG BUILD_WORKDIR
+WORKDIR ${BUILD_WORKDIR}
+ARG GODEP_APISERVER_PATH
+COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
+ARG GODEP_REMOTEDIALER_PATH
+COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
+ARG GODEP_SHEPHERD_PATH
+COPY --from=godep-shepherd / ${GODEP_SHEPHERD_PATH}
+ARG GODEP_STEVE_PATH
+COPY --from=godep-steve / ${GODEP_STEVE_PATH}
+ARG GODEP_WRANGLER_PATH
+COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
+# Only invalidate cache if go.mod/go.sum changes.
+COPY go.mod go.sum ./
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
+RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench cd pkg/client && go mod download
+
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder-mount AS server-build-mount
+ARG VERSION
+ARG COMMIT
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY main.go ./
+RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+
+# k3s images step, RUN --mount=type=cache variant -- see
+# rancher-go-builder-mount comment above for the full rationale. Mirrors
+# the real "images" stage below (same go.mod/go.sum, same go build
+# invocation) but uses a distinct cache id (rancher-cache-mount-bench-k3s)
+# so this benchmark stays fully isolated from the real k3s images build's
+# id=rancher cache mount.
+FROM --platform=$BUILDPLATFORM go-builder AS images-mount
+WORKDIR /src
+ENV CGO_ENABLED=1
+ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
+RUN zypper -n install libbtrfs-devel libgpgme-devel
+COPY hack/airgap/go.mod hack/airgap/go.sum /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench-k3s go mod download
+COPY hack/airgap/ /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench-k3s go build -tags k3s_export -o export-images ./...
+RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images-mount.tar
+
+# Output just k3s images (cache-mount variant) -- separate target so the
+# benchmark can time export-images running against a cache-mount-consumed
+# cache without disturbing the real k3s-images target below.
+FROM scratch AS k3s-images-mount
+COPY --from=images-mount /src/k3s-airgap-images-mount.tar /k3s-airgap-images-mount.tar
+
 # TEMPORARY (CI cache benchmark, bind-mount variant): parallel stages that
 # consume the externally-supplied go build/mod cache (gocache-in, see ARG
 # GOCACHE_IN above) via RUN --mount=type=bind instead of the plain COPY

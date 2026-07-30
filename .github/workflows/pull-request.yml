@@ -443,6 +443,261 @@ jobs:
           echo "### Warm (8cpu) build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------
+  # TEMPORARY: cache-benchmark-{cold,warm}-cachemount -- tests the
+  # ORIGINAL RUN --mount=type=cache mechanism (what this Dockerfile used
+  # before any of the COPY-based/bind-mount-based work in this PR),
+  # combined with a custom buildkitd GC policy (via
+  # --buildkitd-config-inline on "Set up Docker Buildx") that raises the
+  # exec.cachemount maxUsedSpace ceiling. Earlier in this PR, an
+  # unmodified RUN --mount=type=cache + buildkit-cache-dance run showed
+  # the extraction step save only ~200 bytes instead of the real ~10GB
+  # cache -- this runner fleet's default GC policy caps exec.cachemount
+  # (the storage class RUN --mount=type=cache lives in) at ~488MiB,
+  # evicting nearly everything before extraction could run. This job
+  # raises that ceiling for just this job's own builder instance (created
+  # fresh by "Set up Docker Buildx" in the docker-container driver, so
+  # the override is fully scoped to this job -- it does not touch the
+  # runner fleet's actual daemon or any other job's builder).
+  #
+  # Sequential per request: cache-benchmark-warm-cachemount needs:
+  # cache-benchmark-cold-cachemount, so the dance's cache save from cold
+  # has already completed by the time warm starts and restores it.
+  #
+  # If successful, this is likely the best of the three approaches tried
+  # in this PR: RUN --mount=type=cache content never becomes a committed
+  # image layer at all (unlike the COPY approach's gocache-in/out COPY
+  # materialization, and its ~7min extraction/tar-export tax), and
+  # buildkit-cache-dance's inject/extract is a plain filesystem copy
+  # in/out of the mount's on-disk cache directory -- no image layer COPY,
+  # no buildx --output export round-trip needed at all to persist it via
+  # actions/cache.
+  # ---------------------------------------------------------------------
+  cache-benchmark-cold-cachemount:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          # Raise exec.cachemount's maxUsedSpace from this fleet's
+          # default ~488MiB to 12GB (comfortably above the ~10GB cache
+          # this repo needs). filters/keepDuration copied verbatim from
+          # this fleet's own default gcpolicy (captured via `docker
+          # buildx inspect` earlier in this PR) so only maxUsedSpace
+          # actually changes. Second gcpolicy block (catch-all, "all =
+          # true") is BuildKit's own documented default fallback for
+          # everything not matched by the first policy -- included so we
+          # aren't accidentally disabling GC for regular image layers.
+          buildkitd-config-inline: |
+            [worker.oci]
+              [[worker.oci.gcpolicy]]
+                keepDuration = "48h"
+                filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+                maxUsedSpace = "12GB"
+              [[worker.oci.gcpolicy]]
+                all = true
+                reservedSpace = "1GB"
+      - name: "Restore go build/mod cache (expected: miss)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-mount
+          key: rancher-gocache-benchmark-mount-${{ github.run_id }}
+      - name: "Report cache hit status (should be false)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
+          fi
+      - name: "Inject (likely empty) cache into BuildKit"
+        uses: ./.github/actions/buildkit-cache-dance
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-map: |
+            {
+              "go-build-cache-benchmark-mount": { "target": "/root/.cache", "id": "rancher-cache-mount-bench" }
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+      - name: "Timed build (server-build-mount, cold cache mount)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-mount \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Cold (cache mount) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Cold (cache mount, server-build-mount): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+        # No --output: server-build-mount's point is to exercise the RUN
+        # --mount=type=cache steps, not to produce a usable image.
+      - name: "Extract populated cache mount content"
+        shell: bash
+        run: |
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" | grep -i "cachemount\|exec.cachemount" || true
+        # Quick sanity check surfaced in the log: confirms how much
+        # exec.cachemount storage BuildKit is actually holding onto after
+        # the timed build above, given the raised maxUsedSpace ceiling --
+        # useful to compare against the dance extraction step's reported
+        # cache size below.
+      - name: "Extract populated cache into actions/cache"
+        uses: ./.github/actions/buildkit-cache-dance
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-map: |
+            {
+              "go-build-cache-benchmark-mount": { "target": "/root/.cache", "id": "rancher-cache-mount-bench" }
+            }
+      - name: "Report extracted cache size"
+        shell: bash
+        run: |
+          echo "Extracted cache size:"
+          du -sh go-build-cache-benchmark-mount || true
+
+  cache-benchmark-warm-cachemount:
+    needs: cache-benchmark-cold-cachemount
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+      k3s-build-seconds: ${{ steps.timed-build-k3s.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          # Same GC policy override as cache-benchmark-cold-cachemount --
+          # must match, otherwise this job's builder would evict the
+          # injected cache back down to the default ~488MiB ceiling
+          # before the timed build even runs.
+          buildkitd-config-inline: |
+            [worker.oci]
+              [[worker.oci.gcpolicy]]
+                keepDuration = "48h"
+                filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+                maxUsedSpace = "12GB"
+              [[worker.oci.gcpolicy]]
+                all = true
+                reservedSpace = "1GB"
+      # Same key as cache-benchmark-cold-cachemount. Must hit -- that
+      # job's dance-based save already committed by the time this job
+      # starts (needs: cache-benchmark-cold-cachemount).
+      - name: "Restore go build/mod cache (expected: hit)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-mount
+          key: rancher-gocache-benchmark-mount-${{ github.run_id }}
+      - name: "Report cache hit status (should be true)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected a cache hit on the warm job but got a miss -- Magic Cache / actions/cache restore did not work as expected."
+            exit 1
+          fi
+          echo "Restored cache size:"
+          du -sh go-build-cache-benchmark-mount || true
+      - name: "Inject cache into BuildKit"
+        uses: ./.github/actions/buildkit-cache-dance
+        with:
+          builder: ${{ steps.setup-buildx.outputs.name }}
+          cache-map: |
+            {
+              "go-build-cache-benchmark-mount": { "target": "/root/.cache", "id": "rancher-cache-mount-bench" }
+            }
+          # Read-only leg of the benchmark -- never writes back.
+          skip-extraction: true
+      - name: "Timed build (server-build-mount, warm cache mount)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-mount \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm (cache mount) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (cache mount, server-build-mount): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+      - name: "Timed build (images-mount / k3s, warm cache mount)"
+        id: timed-build-k3s
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target k3s-images-mount \
+            --output type=local,dest=k3s-images-mount-out \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm (cache mount, k3s) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (cache mount, images-mount / k3s): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+          ls -la k3s-images-mount-out/ || true
+        # k3s-images-mount images-mount's cache mount (id=...-k3s) was
+        # never injected/populated by the dance steps above (only the
+        # server-build-mount id was) -- this run is therefore itself a
+        # COLD run for the k3s leg specifically. Kept in for completeness/
+        # symmetry with the bind-mount benchmark's k3s coverage, but its
+        # number should be read as "k3s cold under the raised GC policy",
+        # not "k3s warm".
+
+  # ---------------------------------------------------------------------
+  # END TEMPORARY cache-benchmark-*-cachemount block
+  # ---------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------
   # TEMPORARY: cache-benchmark-{cold,warm}-bind -- same comparison as
   # cache-benchmark-{cold,warm} above, but exercising the bind-mount-based
   # stages in package/Dockerfile (rancher-go-builder-bind,
@@ -661,7 +916,7 @@ jobs:
   # ---------------------------------------------------------------------
 
   cache-benchmark-report:
-    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind]
+    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind, cache-benchmark-cold-cachemount, cache-benchmark-warm-cachemount]
     runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     steps:
       - name: Summarize results
@@ -672,6 +927,9 @@ jobs:
           COLD_BIND="${{ needs.cache-benchmark-cold-bind.outputs.build-seconds }}"
           WARM_BIND="${{ needs.cache-benchmark-warm-bind.outputs.build-seconds }}"
           WARM_BIND_K3S="${{ needs.cache-benchmark-warm-bind.outputs.k3s-build-seconds }}"
+          COLD_MOUNT="${{ needs.cache-benchmark-cold-cachemount.outputs.build-seconds }}"
+          WARM_MOUNT="${{ needs.cache-benchmark-warm-cachemount.outputs.build-seconds }}"
+          WARM_MOUNT_K3S="${{ needs.cache-benchmark-warm-cachemount.outputs.k3s-build-seconds }}"
           echo "# Cache Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
@@ -682,6 +940,9 @@ jobs:
           echo "| Cold (empty gocache-in, bind mount, server-build-bind) | ${COLD_BIND}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Warm (gocache-in via bind mount, server-build-bind) | ${WARM_BIND}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Warm (gocache-in via bind mount, images-bind / k3s) | ${WARM_BIND_K3S}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (RUN --mount=type=cache, raised GC policy, server-build-mount) | ${COLD_MOUNT}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (RUN --mount=type=cache via dance + actions/cache, server-build-mount) | ${WARM_MOUNT}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cache mount, images-mount / k3s (k3s leg is itself cold, see job comment) | ${WARM_MOUNT_K3S}s |" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
             SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
             echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -703,9 +964,22 @@ jobs:
             SPEEDUP_COPY_VS_BIND=$(awk "BEGIN { printf \"%.1f\", $WARM / $WARM_BIND }")
             echo "Warm COPY vs. warm bind mount (server): **${SPEEDUP_COPY_VS_BIND}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [ -n "$COLD_MOUNT" ] && [ -n "$WARM_MOUNT" ] && [ "$WARM_MOUNT" -gt 0 ]; then
+            SPEEDUP_MOUNT=$(awk "BEGIN { printf \"%.1f\", $COLD_MOUNT / $WARM_MOUNT }")
+            echo "Speedup (cold vs. warm, cache mount + raised GC policy): **${SPEEDUP_MOUNT}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$WARM" ] && [ -n "$WARM_MOUNT" ] && [ "$WARM_MOUNT" -gt 0 ]; then
+            SPEEDUP_COPY_VS_MOUNT=$(awk "BEGIN { printf \"%.1f\", $WARM / $WARM_MOUNT }")
+            echo "Warm COPY vs. warm cache mount (server): **${SPEEDUP_COPY_VS_MOUNT}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$WARM_BIND" ] && [ -n "$WARM_MOUNT" ] && [ "$WARM_MOUNT" -gt 0 ]; then
+            SPEEDUP_BIND_VS_MOUNT=$(awk "BEGIN { printf \"%.1f\", $WARM_BIND / $WARM_MOUNT }")
+            echo "Warm bind mount vs. warm cache mount (server): **${SPEEDUP_BIND_VS_MOUNT}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark block
   # ---------------------------------------------------------------------
+
 
 
   integration-tests:
