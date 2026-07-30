@@ -442,8 +442,226 @@ jobs:
           echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
           echo "### Warm (8cpu) build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
 
+  # ---------------------------------------------------------------------
+  # TEMPORARY: cache-benchmark-{cold,warm}-bind -- same comparison as
+  # cache-benchmark-{cold,warm} above, but exercising the bind-mount-based
+  # stages in package/Dockerfile (rancher-go-builder-bind,
+  # server-build-bind, images-bind) instead of the COPY-based ones.
+  #
+  # Bind mount writes are discarded when the RUN instruction ends (see
+  # comment above rancher-go-builder-bind in package/Dockerfile), so
+  # there's no way to produce a populated cache FROM a bind-mount build --
+  # cache-benchmark-cold-bind still produces its cache via the existing
+  # COPY-based server-build + gocache-out mechanism (same as
+  # cache-benchmark-cold), it just ALSO times a bind-mount build against
+  # an empty gocache-in for the "cold, bind mount" comparison number.
+  # cache-benchmark-warm-bind then restores that same COPY-produced cache
+  # and feeds it into the bind-mount stages via --build-context, to see
+  # whether reading via bind mount (no upfront COPY-materialization into
+  # /root/.cache, and none of that ~10GB ends up in a committed image
+  # layer) beats the COPY-based warm build.
+  #
+  # Also covers the k3s "images" step (images-bind target), per request --
+  # the earlier cache-benchmark-{cold,warm} jobs only covered server-build.
+  # ---------------------------------------------------------------------
+  cache-benchmark-cold-bind:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      # Same scratch-key pattern as cache-benchmark-cold, but a distinct
+      # key (suffixed -bind) so the two variants' actions/cache entries
+      # never collide even though they run in the same workflow run.
+      - name: "Restore go build/mod cache (expected: miss)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-bind
+          key: rancher-gocache-benchmark-bind-${{ github.run_id }}
+      - name: "Report cache hit status (should be false)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
+          fi
+          mkdir -p go-build-cache-benchmark-bind
+      - name: "Timed build (server-build-bind, cold/empty gocache-in)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark-bind" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-bind \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Cold (bind mount) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Cold (bind mount, server-build-bind): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+        # No --output: server-build-bind isn't meant to produce a usable
+        # image (its cache content is discarded, per the nature of bind
+        # mounts) -- we only care about timing the RUN steps themselves.
+        # Without --output/--load/--push, buildx runs the build and just
+        # discards the result (prints a warning, exits 0) instead of
+        # paying for an unused docker/tar export.
+      - name: Populate cache for warm-bind job (COPY-based, reusing existing mechanism)
+        shell: bash
+        run: |
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target gocache-out \
+            --output type=tar,dest=go-build-cache-benchmark-bind.tar \
+            .
+          rm -rf go-build-cache-benchmark-bind
+          mkdir -p go-build-cache-benchmark-bind
+          tar -xf go-build-cache-benchmark-bind.tar -C go-build-cache-benchmark-bind
+          rm -f go-build-cache-benchmark-bind.tar
+        # This is the SAME COPY-based gocache-out mechanism used by
+        # cache-benchmark-cold's "Extract populated go build/mod cache"
+        # step -- bind mounts have no equivalent extraction path (see
+        # rancher-go-builder-bind comment in package/Dockerfile), so this
+        # is the only way to obtain a populated cache to feed into
+        # cache-benchmark-warm-bind. Note: this build shares no build-args
+        # with the GOCACHE_IN-driven "Timed build" step above (it builds
+        # plain server-build/gocache-out, not server-build-bind), so it is
+        # NOT the near-instant cache-hit extraction cache-benchmark-cold
+        # gets -- expect this to pay the full cold build + ~7min
+        # extraction cost again here. Timing intentionally not measured/
+        # reported for this step since it's not part of what we're trying
+        # to compare (it's just how we generate warm-bind's input).
+
+  cache-benchmark-warm-bind:
+    needs: cache-benchmark-cold-bind
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+      k3s-build-seconds: ${{ steps.timed-build-k3s.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: "Restore go build/mod cache (expected: hit)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-bind
+          key: rancher-gocache-benchmark-bind-${{ github.run_id }}
+      - name: "Report cache hit status (should be true)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected a cache hit on the warm job but got a miss -- Magic Cache / actions/cache restore did not work as expected."
+            exit 1
+          fi
+          echo "Restored cache size:"
+          du -sh go-build-cache-benchmark-bind || true
+      - name: "Timed build (server-build-bind, warm gocache-in via bind mount)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark-bind" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-bind \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm (bind mount) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (bind mount, server-build-bind): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+      - name: "Timed build (images-bind / k3s, warm gocache-in via bind mount)"
+        id: timed-build-k3s
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark-bind" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target k3s-images-bind \
+            --output type=local,dest=k3s-images-bind-out \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm (bind mount, k3s) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (bind mount, images-bind / k3s): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+          ls -la k3s-images-bind-out/ || true
+        # k3s-images-bind (not images-bind directly) since images-bind
+        # itself has no output-able artifact of its own -- k3s-images-bind
+        # is a tiny scratch stage that COPYs the resulting k3s airgap tar
+        # out, giving us both a real timing number AND a concrete,
+        # checkable artifact confirming the build actually produced
+        # something (rather than just running RUN steps with no output at
+        # all, as done for server-build-bind above).
+  # ---------------------------------------------------------------------
+  # END TEMPORARY cache-benchmark-*-bind block
+  # ---------------------------------------------------------------------
+
   cache-benchmark-report:
-    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu]
+    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind]
     runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     steps:
       - name: Summarize results
@@ -451,25 +669,39 @@ jobs:
           COLD="${{ needs.cache-benchmark-cold.outputs.build-seconds }}"
           WARM="${{ needs.cache-benchmark-warm.outputs.build-seconds }}"
           WARM8="${{ needs.cache-benchmark-warm-8cpu.outputs.build-seconds }}"
+          COLD_BIND="${{ needs.cache-benchmark-cold-bind.outputs.build-seconds }}"
+          WARM_BIND="${{ needs.cache-benchmark-warm-bind.outputs.build-seconds }}"
+          WARM_BIND_K3S="${{ needs.cache-benchmark-warm-bind.outputs.k3s-build-seconds }}"
           echo "# Cache Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Cold (empty gocache-in, 4cpu) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (empty gocache-in, COPY, 4cpu) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Warm (gocache-in restored via COPY + actions/cache, 4cpu) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Warm (gocache-in restored via COPY + actions/cache, 8cpu) | ${WARM8}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (empty gocache-in, bind mount, server-build-bind) | ${COLD_BIND}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (gocache-in via bind mount, server-build-bind) | ${WARM_BIND}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (gocache-in via bind mount, images-bind / k3s) | ${WARM_BIND_K3S}s |" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
             SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Speedup (4cpu cold vs. 4cpu warm): **${SPEEDUP}x**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Speedup (4cpu cold vs. 4cpu warm, COPY): **${SPEEDUP}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -n "$COLD" ] && [ -n "$WARM8" ] && [ "$WARM8" -gt 0 ]; then
             SPEEDUP8=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM8 }")
-            echo "Speedup (4cpu cold vs. 8cpu warm): **${SPEEDUP8}x**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Speedup (4cpu cold vs. 8cpu warm, COPY): **${SPEEDUP8}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -n "$WARM" ] && [ -n "$WARM8" ] && [ "$WARM8" -gt 0 ]; then
             SPEEDUP_CPU=$(awk "BEGIN { printf \"%.1f\", $WARM / $WARM8 }")
-            echo "Speedup (4cpu warm vs. 8cpu warm): **${SPEEDUP_CPU}x**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Speedup (4cpu warm vs. 8cpu warm, COPY): **${SPEEDUP_CPU}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$COLD_BIND" ] && [ -n "$WARM_BIND" ] && [ "$WARM_BIND" -gt 0 ]; then
+            SPEEDUP_BIND=$(awk "BEGIN { printf \"%.1f\", $COLD_BIND / $WARM_BIND }")
+            echo "Speedup (cold vs. warm, bind mount): **${SPEEDUP_BIND}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$WARM" ] && [ -n "$WARM_BIND" ] && [ "$WARM_BIND" -gt 0 ]; then
+            SPEEDUP_COPY_VS_BIND=$(awk "BEGIN { printf \"%.1f\", $WARM / $WARM_BIND }")
+            echo "Warm COPY vs. warm bind mount (server): **${SPEEDUP_COPY_VS_BIND}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark block

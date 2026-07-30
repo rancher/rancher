@@ -498,6 +498,105 @@ COPY internal/ internal/
 COPY pkg/ pkg/
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
+# TEMPORARY (CI cache benchmark, bind-mount variant): parallel stages that
+# consume the externally-supplied go build/mod cache (gocache-in, see ARG
+# GOCACHE_IN above) via RUN --mount=type=bind instead of the plain COPY
+# used by rancher-go-builder/server-build/agent-build above. A bind
+# mount's writes are NOT committed to the resulting image layer -- they
+# are discarded once the RUN instruction completes (see
+# https://docs.docker.com/reference/dockerfile/#run---mounttypebind) --
+# so these stages can never be used to produce a populated cache for
+# extraction the way the COPY-based stages above can, and there is no
+# workaround for that within a single RUN/stage. Cache production for
+# testing purposes still goes entirely through the existing COPY-based
+# server-build + gocache-out mechanism above (unchanged); the resulting
+# tar is then fed into THESE bind-mount stages' gocache-in build-context
+# to test whether reading an already-populated cache via bind mount (no
+# COPY materialization cost, and the cache content itself never becomes
+# part of a committed image layer -- smaller image, nothing to garbage
+# collect afterward) is faster than the COPY-based approach for a real,
+# "warm" build. See cache-benchmark-{cold,warm} jobs in pull-request.yml
+# for how cold (empty gocache-in) vs. warm (populated gocache-in, sourced
+# from the COPY-based extraction) are compared.
+FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder-bind
+ARG BUILD_WORKDIR
+WORKDIR ${BUILD_WORKDIR}
+ARG GODEP_APISERVER_PATH
+COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
+ARG GODEP_REMOTEDIALER_PATH
+COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
+ARG GODEP_SHEPHERD_PATH
+COPY --from=godep-shepherd / ${GODEP_SHEPHERD_PATH}
+ARG GODEP_STEVE_PATH
+COPY --from=godep-steve / ${GODEP_STEVE_PATH}
+ARG GODEP_WRANGLER_PATH
+COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
+# Only invalidate cache if go.mod/go.sum changes.
+COPY go.mod go.sum ./
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
+RUN --mount=type=bind,from=gocache-in,target=/root/.cache,rw go mod download
+RUN --mount=type=bind,from=gocache-in,target=/root/.cache,rw cd pkg/apis && go mod download
+RUN --mount=type=bind,from=gocache-in,target=/root/.cache,rw cd pkg/client && go mod download
+
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder-bind AS server-build-bind
+ARG VERSION
+ARG COMMIT
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY main.go ./
+RUN --mount=type=bind,from=gocache-in,target=/root/.cache,rw GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder-bind AS agent-build-bind
+ARG VERSION
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY pkg/ pkg/
+RUN --mount=type=bind,from=gocache-in,target=/root/.cache,rw GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
+
+# k3s images step, bind-mount variant -- see rancher-go-builder-bind
+# comment above for the full rationale. Mirrors the "images" stage above
+# (same go.mod/go.sum, same go build invocation) but reads its go
+# mod/build cache via bind mount from gocache-in instead of
+# RUN --mount=type=cache (the original mechanism, GC-limited to ~488MiB
+# exec.cachemount storage on this runner fleet -- see the "images" stage
+# above, unchanged, still using it) or a COPY.
+FROM --platform=$BUILDPLATFORM go-builder AS images-bind
+WORKDIR /src
+ENV CGO_ENABLED=1
+ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
+RUN zypper -n install libbtrfs-devel libgpgme-devel
+COPY hack/airgap/go.mod hack/airgap/go.sum /src/
+RUN --mount=type=bind,from=gocache-in,target=/root/.cache,rw go mod download
+COPY hack/airgap/ /src/
+RUN --mount=type=bind,from=gocache-in,target=/root/.cache,rw go build -tags k3s_export -o export-images ./...
+RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images-bind.tar
+
+# Output just k3s images (bind-mount variant) -- separate target so the
+# benchmark can time export-images running against a bind-mount-consumed
+# cache without disturbing the real k3s-images target above.
+FROM scratch AS k3s-images-bind
+COPY --from=images-bind /src/k3s-airgap-images-bind.tar /k3s-airgap-images-bind.tar
+
 
 FROM base AS server
 ARG VERSION
