@@ -2,7 +2,12 @@ name: Controller Integration Tests
 
 on:
   workflow_dispatch:
-  pull_request:
+  # TEMPORARY: pull_request trigger disabled on this CI-test-only branch to
+  # avoid burning runner resources on jobs unrelated to the cache
+  # benchmark this PR exists for. Restore before this branch is used for
+  # anything real -- see the same marker in validate.yml,
+  # verify-generated-code-changes.yml, and zizmor.yaml.
+  # pull_request:
   push:
     branches:
     - 'release/*'
