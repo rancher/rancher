@@ -196,7 +196,7 @@ jobs:
       - name: Extract populated go build/mod cache
         shell: bash
         run: |
-          docker buildx build \
+          time docker buildx build \
             --builder "${{ steps.setup-buildx.outputs.name }}" \
             --build-arg "VERSION=${{ env.TAG }}" \
             --build-arg "COMMIT=${{ env.COMMIT }}" \
@@ -211,8 +211,13 @@ jobs:
             --platform linux/amd64 \
             --file ./package/Dockerfile \
             --target gocache-out \
-            --output type=local,dest=go-build-cache-benchmark-extracted \
+            --output type=tar,dest=go-build-cache-benchmark.tar \
             .
+          echo "tar size:"
+          du -sh go-build-cache-benchmark.tar
+          mkdir -p go-build-cache-benchmark-extracted
+          time tar -xf go-build-cache-benchmark.tar -C go-build-cache-benchmark-extracted
+          rm -f go-build-cache-benchmark.tar
           rm -rf go-build-cache-benchmark
           mv go-build-cache-benchmark-extracted go-build-cache-benchmark
         # IMPORTANT: every --build-arg / --build-context here must exactly
@@ -228,9 +233,23 @@ jobs:
         # supposed to be. (This is exactly what happened in an earlier
         # run of this job: the extraction step ran for ~50+ minutes doing
         # an undetected second cold build before it was caught and killed.)
+        #
+        # type=tar instead of type=local: a prior run with type=local
+        # showed every upstream layer as CACHED (confirming the ARG/context
+        # fix above worked) but then hung for 20+ minutes on "exporting to
+        # client directory" / "copying files" -- BuildKit's local exporter
+        # writing ~10GB as a real directory tree onto the runner's disk is
+        # apparently very slow here (guess: per-file syscall overhead,
+        # possibly compounded by spot-instance disk I/O limits). type=tar
+        # streams a single tar archive instead, which should avoid that
+        # per-file overhead; we then extract it locally with plain `tar`.
+        # `time` wraps both the buildx export and the local tar extraction
+        # so the actual split can be inspected in the step's own log
+        # output if this still turns out to be slow.
+        #
         # Extract into a fresh directory first, then swap it in -- do NOT
-        # delete go-build-cache-benchmark before this build runs, since
-        # it's still needed as the gocache-in build-context input.
+        # delete go-build-cache-benchmark before the buildx build runs,
+        # since it's still needed as the gocache-in build-context input.
 
   cache-benchmark-warm:
     needs: cache-benchmark-cold
