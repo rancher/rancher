@@ -129,6 +129,9 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 		nscache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
 		nscache.EXPECT().Get(exttokenstore.TokenNamespace).AnyTimes()
 
+		fakeHash := exttokenstore.NewMockhashHandler(ctrl)
+		fakeHash.EXPECT().MakeAndHashSecret().Return("the-secret", "the-hash", nil)
+
 		handler := ActionHandler{
 			NodeLister: &fakes.NodeListerMock{
 				GetFunc: func(namespace string, name string) (*apimgmtv3.Node, error) {
@@ -143,7 +146,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 			AuthToken: &fakeAuth,
 			ExtTokenStore: exttokenstore.NewSystem(nil, nscache, secrets, users, v3tcache, nil,
 				exttokenstore.NewTimeHandler(),
-				&fakeHash{},
+				fakeHash,
 				exttokenstore.NewAuthHandler(), nil),
 		}
 		bearer, err := handler.generateKubeConfigBearer(apiContext)
@@ -174,7 +177,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "fake-legacy",
 				},
-				UserID: testUser,
+				UserID:       testUser,
 				AuthProvider: "local",
 				UserPrincipal: apimgmtv3.Principal{
 					Provider: "local",
@@ -215,6 +218,9 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 		nscache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
 		nscache.EXPECT().Get(exttokenstore.TokenNamespace).AnyTimes()
 
+		fakeHash := exttokenstore.NewMockhashHandler(ctrl)
+		fakeHash.EXPECT().MakeAndHashSecret().Return("the-secret", "the-hash", nil)
+
 		handler := ActionHandler{
 			NodeLister: &fakes.NodeListerMock{
 				GetFunc: func(namespace string, name string) (*apimgmtv3.Node, error) {
@@ -229,7 +235,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 			AuthToken: &fakeAuth,
 			ExtTokenStore: exttokenstore.NewSystem(nil, nscache, secrets, users, v3tcache, nil,
 				exttokenstore.NewTimeHandler(),
-				&fakeHash{},
+				fakeHash,
 				exttokenstore.NewAuthHandler(), nil),
 		}
 		bearer, err := handler.generateKubeConfigBearer(apiContext)
@@ -249,12 +255,4 @@ func (f *fakeExtAuthToken) TokenFromRequest(req *http.Request) (accessor.TokenAc
 		return nil, f.err
 	}
 	return &f.token, nil
-}
-
-// fakeHash implements the [hashHandler] interface
-type fakeHash struct {
-}
-
-func (h *fakeHash) MakeAndHashSecret() (string, string, error) {
-	return "the-secret", "the-hash", nil
 }
