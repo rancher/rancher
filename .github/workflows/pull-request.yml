@@ -348,28 +348,112 @@ jobs:
           echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
           echo "### Warm build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
 
+  cache-benchmark-warm-8cpu:
+    needs: cache-benchmark-cold
+    # Same as cache-benchmark-warm, but on an 8cpu runner instead of 4cpu,
+    # to see whether the warm build (which still does a real go build,
+    # just without needing to download/compile from scratch) is CPU-bound
+    # enough that doubling cores meaningfully cuts the time -- separate
+    # from the earlier disk=large experiment. Duplicated as its own job
+    # (rather than a matrix on cache-benchmark-warm) to keep the existing
+    # 4cpu number directly comparable/unchanged.
+    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      # Same scratch key as cache-benchmark-cold. Must hit -- that job's
+      # save step already committed by the time this job starts
+      # (needs: cache-benchmark-cold).
+      - name: "Restore go build/mod cache (expected: hit)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark
+          key: rancher-gocache-benchmark-${{ github.run_id }}
+      - name: "Report cache hit status (should be true)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected a cache hit on the warm job but got a miss -- Magic Cache / actions/cache restore did not work as expected."
+            exit 1
+          fi
+          echo "Restored cache size:"
+          du -sh go-build-cache-benchmark || true
+      - name: "Timed build (server, warm gocache-in, 8cpu)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server \
+            --output type=docker,dest=/tmp/rancher-cache-benchmark-warm-8cpu.tar \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm (8cpu) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (8cpu) build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+
   cache-benchmark-report:
-    needs: [cache-benchmark-cold, cache-benchmark-warm]
+    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu]
     runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     steps:
       - name: Summarize results
         run: |
           COLD="${{ needs.cache-benchmark-cold.outputs.build-seconds }}"
           WARM="${{ needs.cache-benchmark-warm.outputs.build-seconds }}"
+          WARM8="${{ needs.cache-benchmark-warm-8cpu.outputs.build-seconds }}"
           echo "# Cache Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Cold (empty gocache-in) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Warm (gocache-in restored via COPY + actions/cache) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (empty gocache-in, 4cpu) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (gocache-in restored via COPY + actions/cache, 4cpu) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (gocache-in restored via COPY + actions/cache, 8cpu) | ${WARM8}s |" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
             SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Speedup: **${SPEEDUP}x**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Speedup (4cpu cold vs. 4cpu warm): **${SPEEDUP}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$COLD" ] && [ -n "$WARM8" ] && [ "$WARM8" -gt 0 ]; then
+            SPEEDUP8=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM8 }")
+            echo "Speedup (4cpu cold vs. 8cpu warm): **${SPEEDUP8}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$WARM" ] && [ -n "$WARM8" ] && [ "$WARM8" -gt 0 ]; then
+            SPEEDUP_CPU=$(awk "BEGIN { printf \"%.1f\", $WARM / $WARM8 }")
+            echo "Speedup (4cpu warm vs. 8cpu warm): **${SPEEDUP_CPU}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark block
   # ---------------------------------------------------------------------
+
 
   integration-tests:
     if: false
