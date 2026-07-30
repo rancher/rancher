@@ -24,6 +24,19 @@ ARG RKE2_CHART_DEFAULT_BRANCH=main
 ARG CATTLE_KDM_BRANCH=dev-v2.15
 ARG VERSION=${VERSION}
 
+# TEMPORARY (CI cache benchmark): externally-provided go build/mod cache
+# content, supplied as an extra buildx build-context (same pattern as the
+# GODEP_* deps below). Defaults to "scratch" (empty) so normal builds that
+# don't pass --build-context gocache=... behave exactly as before. When a
+# real directory is passed via --build-arg GOCACHE_IN=gocache
+# --build-context gocache=<path>, its content is COPY'd into /root/.cache
+# as a plain layer -- NOT a RUN --mount=type=cache -- so it lives under
+# BuildKit's normal (large) layer GC budget instead of the much smaller
+# exec.cachemount budget that RUN --mount=type=cache is subject to on some
+# runner fleets. See the CI test in pull-request.yml (cache-benchmark-*
+# jobs) for how this is populated/extracted across builds.
+ARG GOCACHE_IN=scratch
+
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
 FROM --platform=$BUILDPLATFORM ${GODEP_LASSO} AS godep-lasso
 FROM --platform=$BUILDPLATFORM ${GODEP_NORMAN} AS godep-norman
@@ -31,6 +44,7 @@ FROM --platform=$BUILDPLATFORM ${GODEP_REMOTEDIALER} AS godep-remotedialer
 FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
+FROM --platform=$BUILDPLATFORM ${GOCACHE_IN} AS gocache-in
 
 FROM registry.suse.com/bci/bci-micro:15.7 AS final
 RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
@@ -425,14 +439,24 @@ ARG GODEP_STEVE_PATH
 COPY --from=godep-steve / ${GODEP_STEVE_PATH}
 ARG GODEP_WRANGLER_PATH
 COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
+# TEMPORARY (CI cache benchmark): pre-populate /root/.cache (GOMODCACHE +
+# GOCACHE, see the ENV in go-builder above) from an externally-supplied
+# build context BEFORE go mod download/go build run. This is a plain COPY
+# into a normal layer (not a RUN --mount=type=cache), specifically so its
+# storage falls under BuildKit's regular (large) layer GC budget rather
+# than the much smaller exec.cachemount budget some runner fleets
+# configure. Defaults to an empty "scratch" context (see GOCACHE_IN ARG
+# above), so this is a no-op unless a real cache dir is explicitly passed
+# in via --build-context gocache=<path>.
+COPY --from=gocache-in / /root/.cache
 # Only invalidate cache if go.mod/go.sum changes.
 COPY go.mod go.sum ./
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
 COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
+RUN go mod download
+RUN cd pkg/apis && go mod download
+RUN cd pkg/client && go mod download
 
 
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
@@ -447,12 +471,19 @@ ARG TARGETARCH
 COPY internal/ internal/
 COPY pkg/ pkg/
 COPY main.go ./
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
 
 # Output just the server binary
 FROM scratch AS server-binary
 COPY --from=server-build /app/rancher /bin/rancher
 
+# TEMPORARY (CI cache benchmark): output just the populated go build/mod
+# cache directory from server-build, so it can be extracted with a plain
+# `docker buildx build --target gocache-out --output type=local,dest=...`
+# and handed to actions/cache for cross-run persistence. Remove alongside
+# the other TEMPORARY markers in this file once the benchmark is done.
+FROM scratch AS gocache-out
+COPY --from=server-build /root/.cache /
 
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
 ARG VERSION
@@ -465,7 +496,7 @@ ARG TARGETARCH
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY pkg/ pkg/
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
 
 FROM base AS server

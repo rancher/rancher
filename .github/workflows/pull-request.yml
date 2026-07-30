@@ -97,25 +97,40 @@ jobs:
           cache-to: type=gha,mode=min,scope=pr-build-installer
 
   # ---------------------------------------------------------------------
-  # TEMPORARY: cache-benchmark-{cold,warm} -- proves out buildkit-cache-dance
-  # + Magic Cache (extras=s3-cache) cold-vs-warm restore time for the go
-  # build/mod cache mount, using this real PR's pull_request trigger (since
-  # workflow_dispatch isn't reachable from a non-default-branch workflow
-  # file). Not wired into any real build path (build-server/build-agent are
-  # untouched by these two jobs) -- safe to drop once the benchmark numbers
-  # are in hand. Remove this whole block before merging the caching change
-  # for real.
+  # TEMPORARY: cache-benchmark-{cold,warm} -- proves out a go build/mod
+  # cache persisted via a plain COPY from an extra buildx build-context
+  # (package/Dockerfile's GOCACHE_IN arg / gocache-in, gocache-out stages)
+  # instead of RUN --mount=type=cache, using this real PR's pull_request
+  # trigger (since workflow_dispatch isn't reachable from a non-default-
+  # branch workflow file). Not wired into any real build path
+  # (build-server/build-agent are untouched by these two jobs) -- safe to
+  # drop once the benchmark numbers are in hand. Remove this whole block,
+  # and the TEMPORARY-marked additions in package/Dockerfile, before
+  # merging the caching change for real.
   #
-  # cache-benchmark-cold builds server with an empty cache mount against a
-  # scratch key that is unique per workflow run (so every push to this PR
-  # branch re-runs a genuine cold start), times the build, and always
-  # extracts+saves the populated cache back to that scratch key.
+  # Why not RUN --mount=type=cache (see earlier attempt in this PR's
+  # history): this runner fleet's BuildKit daemon caps exec.cachemount
+  # (the storage class RUN --mount=type=cache lives in) GC budget at
+  # ~488MiB, far below the ~10GB go build/mod cache this repo needs --
+  # BuildKit silently evicted almost all of it before it could be
+  # extracted. A plain COPY into a normal image layer instead falls under
+  # BuildKit's much larger regular-layer GC budget (~90GB on this fleet),
+  # sidestepping that ceiling entirely.
+  #
+  # cache-benchmark-cold builds server with an empty (scratch) gocache-in
+  # context against a scratch actions/cache key that is unique per
+  # workflow run (so every push to this PR branch re-runs a genuine cold
+  # start), times the build, then does a second (near-instant, since the
+  # builder + layers are already warm) buildx invocation targeting
+  # gocache-out to extract the now-populated /root/.cache directory back
+  # onto the runner's disk, and always saves it via actions/cache.
   #
   # cache-benchmark-warm needs: cache-benchmark-cold (so the save has
   # already committed by the time this job starts), restores the SAME
-  # scratch key -- this must hit -- injects it, builds again, and never
-  # writes back (skip-extraction: true). Fails loudly if the expected hit
-  # doesn't happen so a bad number can't sneak through silently.
+  # scratch key -- this must hit -- passes the restored directory in as
+  # the gocache-in build-context, builds again, and never writes back.
+  # Fails loudly if the expected hit doesn't happen so a bad number can't
+  # sneak through silently.
   # ---------------------------------------------------------------------
   cache-benchmark-cold:
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,run-id=${{ github.run_id }}
@@ -150,16 +165,8 @@ jobs:
           if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
             echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
           fi
-      - name: Inject (empty) cache into BuildKit
-        uses: ./.github/actions/buildkit-cache-dance
-        with:
-          builder: ${{ steps.setup-buildx.outputs.name }}
-          cache-map: |
-            {
-              "go-build-cache-benchmark": { "target": "/root/.cache", "id": "rancher" }
-            }
-          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
-      - name: "Timed build (server, cold cache)"
+          mkdir -p go-build-cache-benchmark
+      - name: "Timed build (server, cold/empty gocache-in)"
         id: timed-build
         shell: bash
         run: |
@@ -174,6 +181,8 @@ jobs:
             --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
             --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
             --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark" \
             --platform linux/amd64 \
             --file ./package/Dockerfile \
             --target server \
@@ -184,6 +193,24 @@ jobs:
           echo "Cold build took ${SECONDS_TAKEN}s"
           echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
           echo "### Cold build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Extract populated go build/mod cache
+        shell: bash
+        run: |
+          rm -rf go-build-cache-benchmark
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target gocache-out \
+            --output type=local,dest=go-build-cache-benchmark \
+            .
+        # gocache-out (FROM scratch; COPY --from=server-build /root/.cache /)
+        # only depends on the server-build stage, not on gocache-in, so no
+        # GOCACHE_IN / --build-context is needed here -- BuildKit only
+        # evaluates stages that are actual dependencies of --target.
+        # server-build's layers are already warm from the previous step's
+        # build in this same job, so this invocation should be seconds,
+        # not minutes.
 
   cache-benchmark-warm:
     needs: cache-benchmark-cold
@@ -221,17 +248,9 @@ jobs:
             echo "::error::Expected a cache hit on the warm job but got a miss -- Magic Cache / actions/cache restore did not work as expected."
             exit 1
           fi
-      - name: Inject cache into BuildKit
-        uses: ./.github/actions/buildkit-cache-dance
-        with:
-          builder: ${{ steps.setup-buildx.outputs.name }}
-          cache-map: |
-            {
-              "go-build-cache-benchmark": { "target": "/root/.cache", "id": "rancher" }
-            }
-          # Read-only leg of the benchmark -- never writes back.
-          skip-extraction: true
-      - name: "Timed build (server, warm cache)"
+          echo "Restored cache size:"
+          du -sh go-build-cache-benchmark || true
+      - name: "Timed build (server, warm gocache-in)"
         id: timed-build
         shell: bash
         run: |
@@ -246,6 +265,8 @@ jobs:
             --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
             --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
             --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark" \
             --platform linux/amd64 \
             --file ./package/Dockerfile \
             --target server \
@@ -269,8 +290,8 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Cold (empty cache mount) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Warm (restored via buildkit-cache-dance + actions/cache) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (empty gocache-in) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (gocache-in restored via COPY + actions/cache) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
             SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
             echo "" >> "$GITHUB_STEP_SUMMARY"
