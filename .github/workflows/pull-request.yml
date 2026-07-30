@@ -145,7 +145,20 @@ jobs:
   # sneak through silently.
   # ---------------------------------------------------------------------
   cache-benchmark-cold:
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,run-id=${{ github.run_id }}
+    # volume=200gb:gp3:500mbs:4000iops -- bigger/faster EBS volume than the
+    # default (AWS gp3 baseline is 125 MiB/s @ 3000 IOPS regardless of
+    # size), specifically to speed up this job's disk-heavy steps: writing
+    # out the ~10GB go build/mod cache as a tar (the "Extract populated go
+    # build/mod cache" step took ~7m15s in an earlier run: ~2min on the
+    # COPY into the gocache-out layer, then ~2.7min on buildx's tarball
+    # export alone) and the actual image build's own layer I/O. Note the
+    # underlying instance's IOPS/throughput ceiling could still be a
+    # bottleneck even with a faster EBS volume requested -- worth
+    # comparing this run's timings against the unmodified-disk run to see
+    # whether it actually moves the needle before assuming disk was ever
+    # the limiting factor. See:
+    # https://runs-on.com/docs/runners/labels/#volume
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,volume=200gb:gp3:500mbs:4000iops,run-id=${{ github.run_id }}
     permissions:
       contents: read
     outputs:
@@ -265,7 +278,12 @@ jobs:
 
   cache-benchmark-warm:
     needs: cache-benchmark-cold
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,run-id=${{ github.run_id }}
+    # Same volume= rationale as cache-benchmark-cold -- this job also
+    # restores the ~10GB cache from actions/cache onto local disk before
+    # the build, so it's worth giving it the same faster EBS volume for a
+    # fair cold-vs-warm comparison (otherwise a disk speed difference
+    # between the two jobs would confound the timing comparison).
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,volume=200gb:gp3:500mbs:4000iops,run-id=${{ github.run_id }}
     permissions:
       contents: read
     outputs:
