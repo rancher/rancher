@@ -21,9 +21,18 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
+  # ---------------------------------------------------------------------
+  # TEMPORARY: every job below other than cache-benchmark-* is disabled
+  # (if: false) on this CI-test-only branch, to avoid burning EIO runner
+  # resources on real image builds/tests unrelated to the go build/mod
+  # cache benchmark this PR exists for. Restore (remove the if: false
+  # lines) before this branch is used for anything beyond the benchmark.
+  # ---------------------------------------------------------------------
   unit-tests:
+    if: false
     uses: ./.github/workflows/unit-test.yml
   build-chart:
+    if: false
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: ghcr.io/rancher/ci-image/go1.26
     permissions:
@@ -36,6 +45,7 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/rancher-chart/build
   build-server:
+    if: false
     strategy:
       matrix:
         os: [linux]
@@ -54,6 +64,7 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/build-images/server
   build-agent:
+    if: false
     strategy:
       matrix:
         os: [linux]
@@ -72,6 +83,7 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/build-images/agent
   build-installer:
+    if: false
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -341,11 +353,13 @@ jobs:
   # ---------------------------------------------------------------------
 
   integration-tests:
+    if: false
     permissions:
       contents: read
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
   provisioning-tests:
+    if: false
     permissions:
       contents: read
     needs: [build-server, build-agent]
