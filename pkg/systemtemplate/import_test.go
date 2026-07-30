@@ -425,7 +425,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 
 			// Snapshot-based assertions
 			actual := b.String()
-			snapshotFile := filepath.Join("..", "..", "tests", "testdata", "systemtemplate", "import", sanitizeName(tt.name)+".yaml")
+			snapshotFile := filepath.Join(".", "testdata", sanitizeName(tt.name)+".yaml")
 
 			if *update {
 				// Write snapshot file
