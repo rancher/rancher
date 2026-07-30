@@ -531,6 +531,22 @@ jobs:
               "go-build-cache-benchmark-mount": { "target": "/root/.cache", "id": "rancher-cache-mount-bench" }
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+        # IMPORTANT (bug fixed after an earlier run of this job): call the
+        # dance action ONCE per job, not twice. Its action.yml wires
+        # `main` (injection) and `post` (extraction) to the SAME script --
+        # the post hook runs automatically at job end regardless of where
+        # in the job this step sits, and does the actual extraction
+        # (`cp -p -R /root/.cache/. /var/dance-cache/`), which
+        # actions/cache's own post-hook then saves. An earlier version of
+        # this job called the dance a second time, later, with a step
+        # literally named "Extract populated cache into actions/cache" --
+        # that second call ran as its own separate main-phase (injection)
+        # invocation instead, and ended up interfering with the first
+        # call's post-hook bookkeeping: the actions/cache save that run
+        # sent only 290 bytes instead of the real ~10GB cache, even though
+        # the dance's own extraction cp commands (visible in the post-job
+        # logs) ran and appeared to succeed. Removed the redundant second
+        # step entirely -- a single dance step handles both directions.
       - name: "Timed build (server-build-mount, cold cache mount)"
         id: timed-build
         shell: bash
@@ -557,28 +573,16 @@ jobs:
           echo "### Cold (cache mount, server-build-mount): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
         # No --output: server-build-mount's point is to exercise the RUN
         # --mount=type=cache steps, not to produce a usable image.
-      - name: "Extract populated cache mount content"
+      - name: "Report exec.cachemount storage held by BuildKit"
         shell: bash
         run: |
-          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" | grep -i "cachemount\|exec.cachemount" || true
-        # Quick sanity check surfaced in the log: confirms how much
-        # exec.cachemount storage BuildKit is actually holding onto after
-        # the timed build above, given the raised maxUsedSpace ceiling --
-        # useful to compare against the dance extraction step's reported
-        # cache size below.
-      - name: "Extract populated cache into actions/cache"
-        uses: ./.github/actions/buildkit-cache-dance
-        with:
-          builder: ${{ steps.setup-buildx.outputs.name }}
-          cache-map: |
-            {
-              "go-build-cache-benchmark-mount": { "target": "/root/.cache", "id": "rancher-cache-mount-bench" }
-            }
-      - name: "Report extracted cache size"
-        shell: bash
-        run: |
-          echo "Extracted cache size:"
-          du -sh go-build-cache-benchmark-mount || true
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+        # Full (unfiltered) output this time -- the earlier grep-filtered
+        # version only matched "Type:" lines and never showed the actual
+        # "Size:" field, so it wasn't actually useful as a sanity check.
+        # The dance step above already extracted (post-hook) and
+        # actions/cache's own post-hook already saved it -- there is
+        # nothing left to do in this job after this sanity check.
 
   cache-benchmark-warm-cachemount:
     needs: cache-benchmark-cold-cachemount
