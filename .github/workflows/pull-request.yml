@@ -145,20 +145,21 @@ jobs:
   # sneak through silently.
   # ---------------------------------------------------------------------
   cache-benchmark-cold:
-    # volume=200gb:gp3:500mbs:4000iops -- bigger/faster EBS volume than the
-    # default (AWS gp3 baseline is 125 MiB/s @ 3000 IOPS regardless of
-    # size), specifically to speed up this job's disk-heavy steps: writing
-    # out the ~10GB go build/mod cache as a tar (the "Extract populated go
-    # build/mod cache" step took ~7m15s in an earlier run: ~2min on the
-    # COPY into the gocache-out layer, then ~2.7min on buildx's tarball
-    # export alone) and the actual image build's own layer I/O. Note the
-    # underlying instance's IOPS/throughput ceiling could still be a
-    # bottleneck even with a faster EBS volume requested -- worth
-    # comparing this run's timings against the unmodified-disk run to see
-    # whether it actually moves the needle before assuming disk was ever
-    # the limiting factor. See:
-    # https://runs-on.com/docs/runners/labels/#volume
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,volume=200gb:gp3:500mbs:4000iops,run-id=${{ github.run_id }}
+    # Tried volume=200gb:gp3:500mbs:4000iops first (finer-grained size/
+    # type/throughput/IOPS control, added in RunsOn v2.9) but it had no
+    # effect: the runner's own "Runner details" table still showed the
+    # default ~120GB disk (Free=105.39GiB) and the tarball export step's
+    # timing was unchanged run over run. This org's RunsOn deployment only
+    # supports the older disk=default / disk=large label, not volume=.
+    # disk=large gives 250GB (vs 125GB default) per the EIO runner docs --
+    # confirmed against this fleet's actual supported label set, not
+    # assumed from RunsOn's general docs. Bigger disk alone doesn't
+    # guarantee more IOPS/throughput (see disk=default vs disk=large
+    # semantics -- this is a capacity request, not the performance-tier
+    # volume= mechanism above), but it's the tool actually available here,
+    # so trying it to see whether the larger volume type still ships
+    # faster baseline performance than the smaller default in practice.
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
       contents: read
     outputs:
@@ -278,12 +279,12 @@ jobs:
 
   cache-benchmark-warm:
     needs: cache-benchmark-cold
-    # Same volume= rationale as cache-benchmark-cold -- this job also
+    # Same disk=large rationale as cache-benchmark-cold -- this job also
     # restores the ~10GB cache from actions/cache onto local disk before
-    # the build, so it's worth giving it the same faster EBS volume for a
-    # fair cold-vs-warm comparison (otherwise a disk speed difference
-    # between the two jobs would confound the timing comparison).
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,volume=200gb:gp3:500mbs:4000iops,run-id=${{ github.run_id }}
+    # the build. Kept in sync with cache-benchmark-cold's disk setting so
+    # the cold vs. warm comparison isn't confounded by one job having a
+    # different disk than the other.
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
       contents: read
     outputs:
