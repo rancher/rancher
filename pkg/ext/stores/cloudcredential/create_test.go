@@ -205,7 +205,7 @@ func TestSystemStoreCreateNamespaceAndSecretFailures(t *testing.T) {
 
 		_, err := h.store.SystemStore.Create(context.Background(), credential, nil, adminUser)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to store cloud credential")
+		assert.True(t, apierrors.IsInternalError(err))
 	})
 }
 

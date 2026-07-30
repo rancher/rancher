@@ -366,7 +366,7 @@ func schema_pkg_apis_extcattleio_v1_CloudCredential(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CloudCredential is the public API for managing cloud credentials in Rancher.",
+				Description: "CloudCredential is the public API for managing cloud credentials in Rancher.\n\nThe server stores CloudCredential state in a backing Secret. Credential values are accepted on Create and Update, but are write-only: they are never returned by the Create response or by subsequent Get, List, or Watch responses.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -554,6 +554,16 @@ func schema_pkg_apis_extcattleio_v1_CloudCredentialStatus(ref common.ReferenceCa
 						},
 					},
 					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Conditions represents the current state of the CloudCredential.",
 							Type:        []string{"array"},
@@ -568,7 +578,6 @@ func schema_pkg_apis_extcattleio_v1_CloudCredentialStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"conditions"},
 			},
 		},
 		Dependencies: []string{

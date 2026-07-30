@@ -64,7 +64,7 @@ func (s *SystemStore) GetSecret(name, namespace string) (*corev1.Secret, error) 
 
 	secrets, err := s.secretCache.List(CredentialNamespace, ls)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list cloud credential secrets: %w", err))
+		return nil, mapBackingError(err, name)
 	}
 
 	// Filter for valid cloud credential secrets (type must match our prefix)
@@ -92,7 +92,7 @@ func (s *Store) NewList() runtime.Object {
 func (s *Store) List(ctx context.Context, internaloptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	options, err := steveext.ConvertListOptions(internaloptions)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	// Extract namespace from request context and filter by it
@@ -118,21 +118,24 @@ func (s *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Clo
 	// Non-admin users are filtered by owner label at the API server level
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	return s.SystemStore.list(listOptions)
 }
 
 func (s *SystemStore) list(options *metav1.ListOptions) (*ext.CloudCredentialList, error) {
-	// Add label selector to only get cloud credential secrets
-	if options.LabelSelector == "" {
-		options.LabelSelector = fmt.Sprintf("%s=true", CloudCredentialLabel)
+	listOptions := metav1.ListOptions{}
+	if options != nil {
+		listOptions = *options
+	}
+	if listOptions.LabelSelector == "" {
+		listOptions.LabelSelector = fmt.Sprintf("%s=true", CloudCredentialLabel)
 	} else {
-		options.LabelSelector = fmt.Sprintf("%s,%s=true", options.LabelSelector, CloudCredentialLabel)
+		listOptions.LabelSelector = fmt.Sprintf("%s,%s=true", listOptions.LabelSelector, CloudCredentialLabel)
 	}
 
-	secrets, err := s.secretClient.List(CredentialNamespace, *options)
+	secrets, err := s.secretClient.List(CredentialNamespace, listOptions)
 	if err != nil {
 		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) {
 			return nil, apierrors.NewResourceExpired(err.Error())
@@ -168,7 +171,7 @@ func (s *SystemStore) list(options *metav1.ListOptions) (*ext.CloudCredentialLis
 func (s *Store) Watch(ctx context.Context, internaloptions *metainternalversion.ListOptions) (watch.Interface, error) {
 	options, err := steveext.ConvertListOptions(internaloptions)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	return s.watch(ctx, options)
@@ -182,7 +185,7 @@ func (s *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 
 	listOptions, err := toListOptions(options, userInfo, isAdmin)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert list options: %w", err)
+		return nil, apiStatusOrInternalError(err)
 	}
 
 	if !features.FeatureGates().Enabled(features.WatchListClient) {
@@ -197,7 +200,8 @@ func (s *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 	}
 
 	cloudCredentialWatch := &watcher{
-		ch: make(chan watch.Event, 100),
+		ch:   make(chan watch.Event, 100),
+		done: make(chan struct{}),
 	}
 
 	go func() {
@@ -206,6 +210,8 @@ func (s *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		for {
 			select {
 			case <-ctx.Done():
+				return
+			case <-cloudCredentialWatch.done:
 				return
 			case event, more := <-secretWatch.ResultChan():
 				if !more {
@@ -220,13 +226,14 @@ func (s *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 						logrus.Warnf("cloudcredential: watch: expected secret got %T", event.Object)
 						continue
 					}
-					obj = &ext.CloudCredential{
-						ObjectMeta: metav1.ObjectMeta{
-							ResourceVersion: secret.ResourceVersion,
-							Annotations:     secret.Annotations,
-							Labels:          secret.Labels,
-						},
+					annotations := map[string]string{}
+					if value, ok := secret.Annotations["k8s.io/initial-events-end"]; ok {
+						annotations["k8s.io/initial-events-end"] = value
 					}
+					obj = &ext.CloudCredential{ObjectMeta: metav1.ObjectMeta{
+						ResourceVersion: secret.ResourceVersion,
+						Annotations:     annotations,
+					}}
 				case watch.Added, watch.Modified, watch.Deleted:
 					secret, ok := event.Object.(*corev1.Secret)
 					if !ok {
@@ -257,12 +264,16 @@ func (s *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 
 // watcher implements [watch.Interface]
 type watcher struct {
-	mu     sync.RWMutex
-	closed bool
-	ch     chan watch.Event
+	mu       sync.RWMutex
+	closed   bool
+	ch       chan watch.Event
+	done     chan struct{}
+	stopOnce sync.Once
 }
 
 func (w *watcher) Stop() {
+	w.stopOnce.Do(func() { close(w.done) })
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -282,6 +293,10 @@ func (w *watcher) addEvent(event watch.Event) bool {
 		return false
 	}
 
-	w.ch <- event
-	return true
+	select {
+	case w.ch <- event:
+		return true
+	case <-w.done:
+		return false
+	}
 }

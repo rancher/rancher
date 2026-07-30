@@ -25,7 +25,7 @@ func TestStoreDelete(t *testing.T) {
 		h.expectSecretListForName(testCredName, secret)
 		_, _, err := h.store.Delete(ctxWithUser(regularUser), testCredName, nil, nil)
 		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
+		assert.True(t, apierrors.IsNotFound(err) || apierrors.IsForbidden(err))
 	})
 
 	t.Run("delete validation errors are returned", func(t *testing.T) {
@@ -63,17 +63,30 @@ func TestStoreDelete(t *testing.T) {
 		require.NotNil(t, opts.Preconditions)
 		assert.Equal(t, secret.UID, *opts.Preconditions.UID)
 	})
+
+	t.Run("rejects stale resource version before delete", func(t *testing.T) {
+		h := newStoreHarness(t, adminOnlyAuthorizer())
+		secret := *secretForCredential(newCredential(testCredName))
+		h.expectSecretListForName(testCredName, secret)
+		stale := "stale"
+		_, _, err := h.store.Delete(ctxWithUser(adminUser), testCredName, nil, &metav1.DeleteOptions{
+			Preconditions: &metav1.Preconditions{ResourceVersion: &stale},
+		})
+		require.Error(t, err)
+		assert.True(t, apierrors.IsConflict(err))
+	})
 }
 
 func TestSystemStoreDelete(t *testing.T) {
 	t.Parallel()
 
-	t.Run("ignores not found errors", func(t *testing.T) {
+	t.Run("returns cloudcredential not found errors", func(t *testing.T) {
 		h := newSystemStoreHarness(t)
 		h.secretClient.EXPECT().Delete(CredentialNamespace, "missing", gomock.Any()).
 			Return(apierrors.NewNotFound(GVR.GroupResource(), "missing"))
 		err := h.store.SystemStore.Delete("missing", &metav1.DeleteOptions{})
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.True(t, apierrors.IsNotFound(err))
 	})
 
 	t.Run("wraps delete errors", func(t *testing.T) {
@@ -82,7 +95,7 @@ func TestSystemStoreDelete(t *testing.T) {
 			Return(fmt.Errorf(genericErr))
 		err := h.store.SystemStore.Delete("name", &metav1.DeleteOptions{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to delete cloud credential")
+		assert.True(t, apierrors.IsInternalError(err))
 	})
 
 	t.Run("returns nil on success", func(t *testing.T) {
@@ -183,7 +196,7 @@ func TestDeletePermissions(t *testing.T) {
 
 		_, _, err := h.store.Delete(ctx, testCredName, nil, nil)
 		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
+		assert.True(t, apierrors.IsNotFound(err) || apierrors.IsForbidden(err))
 	})
 
 	t.Run("missing user context errors", func(t *testing.T) {

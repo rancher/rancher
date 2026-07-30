@@ -80,9 +80,9 @@ func (s *SystemStore) Create(ctx context.Context, credential *ext.CloudCredentia
 		CloudCredentialNamespaceLabel: credential.Namespace},
 	))
 	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
+		return nil, mapBackingError(err, credential.Name)
 	}
-	if existing != nil {
+	if len(existing) > 0 {
 		return nil, apierrors.NewAlreadyExists(GR, credential.Name)
 	}
 
@@ -98,7 +98,7 @@ func (s *SystemStore) Create(ctx context.Context, credential *ext.CloudCredentia
 
 	newSecret, err := s.secretClient.Create(secret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store cloud credential: %w", err))
+		return nil, mapBackingError(err, credential.Name)
 	}
 
 	// Read changes back (credentials will be stripped by fromSecret)

@@ -382,6 +382,10 @@ type PasswordChangeRequestStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CloudCredential is the public API for managing cloud credentials in Rancher.
+//
+// The server stores CloudCredential state in a backing Secret. Credential values
+// are accepted on Create and Update, but are write-only: they are never returned
+// by the Create response or by subsequent Get, List, or Watch responses.
 type CloudCredential struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -437,7 +441,12 @@ type CloudCredentialStatus struct {
 	PublicData map[string]string `json:"publicData,omitempty"`
 
 	// Conditions represents the current state of the CloudCredential.
-	Conditions []metav1.Condition `json:"conditions"`
+	// +listType=map
+	// +listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +genclient

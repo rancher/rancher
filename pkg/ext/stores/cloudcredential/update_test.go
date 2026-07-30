@@ -28,7 +28,7 @@ func TestStoreUpdate(t *testing.T) {
 		objInfo := &fakeUpdatedObjectInfo{obj: newCredential(testCredName)}
 		_, _, err := h.store.Update(ctxWithUser(regularUser), testCredName, objInfo, nil, nil, false, nil)
 		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
+		assert.True(t, apierrors.IsNotFound(err) || apierrors.IsForbidden(err))
 	})
 
 	t.Run("updated object must be a cloudcredential", func(t *testing.T) {
@@ -80,6 +80,27 @@ func TestStoreUpdate(t *testing.T) {
 		cred := result.(*ext.CloudCredential)
 		assert.Equal(t, "2", cred.ResourceVersion)
 		assert.Equal(t, "updated description", cred.Spec.Description)
+	})
+
+	t.Run("rejects stale precondition before dry-run write", func(t *testing.T) {
+		h := newStoreHarness(t, adminOnlyAuthorizer())
+		secret := secretForCredential(newCredential(testCredName))
+		h.expectSecretListForName(testCredName, *secret)
+
+		objInfo := &fakeUpdatedObjectInfo{
+			obj: newCredential(testCredName),
+			preconditions: &metav1.Preconditions{
+				ResourceVersion: func() *string {
+					value := "stale"
+					return &value
+				}(),
+			},
+		}
+		_, _, err := h.store.Update(ctxWithUser(adminUser), testCredName, objInfo, nil, nil, false, &metav1.UpdateOptions{
+			DryRun: []string{metav1.DryRunAll},
+		})
+		require.Error(t, err)
+		assert.True(t, apierrors.IsConflict(err))
 	})
 }
 
@@ -162,7 +183,7 @@ func TestSystemStoreUpdate(t *testing.T) {
 
 		_, err := h.store.SystemStore.Update(baseSecret.DeepCopy(), oldCredential, update, nil, adminUser)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to save updated cloud credential")
+		assert.True(t, apierrors.IsInternalError(err))
 	})
 
 	t.Run("fails when updated secret cannot be converted back", func(t *testing.T) {

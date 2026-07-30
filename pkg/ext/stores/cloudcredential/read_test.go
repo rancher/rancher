@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -756,13 +757,22 @@ func TestWatch(t *testing.T) {
 		require.NoError(t, err)
 
 		go fakeWatcher.Action(watch.Bookmark, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{ResourceVersion: "12345"},
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "12345",
+				Labels:          map[string]string{"internal": "value"},
+				Annotations: map[string]string{
+					"internal":                  "value",
+					"k8s.io/initial-events-end": "12344",
+				},
+			},
 		})
 
 		event := <-w.ResultChan()
 		assert.Equal(t, watch.Bookmark, event.Type)
 		cred := event.Object.(*ext.CloudCredential)
 		assert.Equal(t, "12345", cred.ResourceVersion)
+		assert.Equal(t, map[string]string{"k8s.io/initial-events-end": "12344"}, cred.Annotations)
+		assert.Empty(t, cred.Labels)
 
 		w.Stop()
 		fakeWatcher.Stop()
@@ -781,6 +791,35 @@ func TestWatch(t *testing.T) {
 		require.Error(t, err)
 		assert.True(t, apierrors.IsInternalError(err))
 	})
+}
+
+func TestWatcherStopUnblocksBackpressure(t *testing.T) {
+	t.Parallel()
+
+	w := &watcher{
+		ch:   make(chan watch.Event, 1),
+		done: make(chan struct{}),
+	}
+	w.ch <- watch.Event{Type: watch.Added}
+
+	finished := make(chan bool, 1)
+	go func() {
+		finished <- w.addEvent(watch.Event{Type: watch.Modified})
+	}()
+
+	select {
+	case <-finished:
+		t.Fatal("addEvent should block while the result channel is full")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	w.Stop()
+	select {
+	case added := <-finished:
+		assert.False(t, added)
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not unblock addEvent")
+	}
 }
 
 func TestSystemStoreListErrors(t *testing.T) {

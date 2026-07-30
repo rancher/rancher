@@ -54,9 +54,18 @@ func (s *Store) Update(
 		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("invalid object type %T", newObj))
 	}
 
+	if preconditions := objInfo.Preconditions(); preconditions != nil {
+		if err := checkPreconditions(preconditions, name, oldSecret.ResourceVersion, oldCredential.UID, oldSecret.UID); err != nil {
+			return nil, false, err
+		}
+	}
+
 	if updateValidation != nil {
 		err = updateValidation(ctx, newCredential, oldCredential)
 		if err != nil {
+			if isAPIStatus(err) {
+				return nil, false, err
+			}
 			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
 		}
 	}
@@ -86,6 +95,11 @@ func (s *SystemStore) Update(oldSecret *corev1.Secret, oldCredential, credential
 	// Name is immutable
 	if credential.Name != oldCredential.Name {
 		return nil, apierrors.NewBadRequest("metadata.name is immutable")
+	}
+
+	if credential.ResourceVersion != "" && credential.ResourceVersion != oldCredential.ResourceVersion {
+		return nil, apierrors.NewConflict(GR, credential.Name, fmt.Errorf("the ResourceVersion in the precondition (%s) does not match the ResourceVersion in record (%s)",
+			credential.ResourceVersion, oldCredential.ResourceVersion))
 	}
 
 	// Preserve status (set by controller)
@@ -121,7 +135,7 @@ func (s *SystemStore) Update(oldSecret *corev1.Secret, oldCredential, credential
 
 	newSecret, err := s.secretClient.Update(secret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to save updated cloud credential: %w", err))
+		return nil, mapBackingError(err, credential.Name)
 	}
 
 	newCredential, err := fromSecret(newSecret, s.dynamicSchemaCache)

@@ -12,8 +12,10 @@ import (
 	extcommon "github.com/rancher/rancher/pkg/ext/common"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -320,23 +322,41 @@ func translateTimestampSince(timestamp metav1.Time) string {
 }
 
 func toListOptions(listOptions *metav1.ListOptions, userInfo user.Info, isAdmin bool) (*metav1.ListOptions, error) {
-	labelSet, err := labels.ConvertSelectorToLabelsMap(listOptions.LabelSelector)
-	if err != nil {
-		return nil, fmt.Errorf("error converting label selector: %w", err)
+	options := metav1.ListOptions{}
+	if listOptions != nil {
+		options = *listOptions
 	}
 
-	secretLabels := labels.Set{
-		CloudCredentialLabel: "true",
+	selector := labels.Everything()
+	if options.LabelSelector != "" {
+		parsed, err := labels.Parse(options.LabelSelector)
+		if err != nil {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid label selector: %s", err))
+		}
+		selector = parsed
 	}
 
+	requirements := []labels.Requirement{mustRequirement(CloudCredentialLabel, selection.Equals, "true")}
 	if !isAdmin {
-		secretLabels[CloudCredentialOwnerLabel] = sanitizeLabelValue(userInfo.GetName())
+		ownerRequirement, err := labels.NewRequirement(
+			CloudCredentialOwnerLabel, selection.Equals, []string{sanitizeLabelValue(userInfo.GetName())})
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("user ID %q is not a valid label value: %w", userInfo.GetName(), err))
+		}
+		requirements = append(requirements, *ownerRequirement)
 	}
 
-	labelSet = labels.Merge(labelSet, secretLabels)
-	listOptions.LabelSelector = labelSet.AsSelector().String()
+	options.LabelSelector = selector.Add(requirements...).String()
 
-	return listOptions, nil
+	return &options, nil
+}
+
+func mustRequirement(key string, op selection.Operator, value string) labels.Requirement {
+	requirement, err := labels.NewRequirement(key, op, []string{value})
+	if err != nil {
+		panic(fmt.Sprintf("cloudcredential: invalid label requirement %s %s %s: %v", key, op, value, err))
+	}
+	return *requirement
 }
 
 // ListOptionMerge merges any external filter options with the internal filter

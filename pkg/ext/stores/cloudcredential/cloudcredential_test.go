@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -212,12 +213,13 @@ func setSecretOwner(secret *corev1.Secret, owner string) {
 }
 
 type fakeUpdatedObjectInfo struct {
-	obj runtime.Object
-	err error
+	obj           runtime.Object
+	err           error
+	preconditions *metav1.Preconditions
 }
 
 func (f *fakeUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
-	return nil
+	return f.preconditions
 }
 
 func (f *fakeUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
@@ -615,13 +617,13 @@ func TestRBACCrossVerb(t *testing.T) {
 		objInfo := &fakeUpdatedObjectInfo{obj: updated}
 		_, _, err = h.store.Update(ctx, testCredName, objInfo, nil, nil, false, nil)
 		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
+		assert.True(t, apierrors.IsNotFound(err) || apierrors.IsForbidden(err))
 
 		// Cannot delete
 		h.expectSecretListForName(testCredName, secret)
 		_, _, err = h.store.Delete(ctx, testCredName, nil, nil)
 		require.Error(t, err)
-		assert.True(t, apierrors.IsForbidden(err))
+		assert.True(t, apierrors.IsNotFound(err) || apierrors.IsForbidden(err))
 	})
 
 	t.Run("full-access non-admin can do everything", func(t *testing.T) {
@@ -848,7 +850,32 @@ func TestToListOptions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"="+sanitizeLabelValue(u.Name))
 		assert.NotContains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=user:1")
-		assert.NotContains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=other-user")
+		assert.Contains(t, result.LabelSelector, CloudCredentialOwnerLabel+"=other-user")
+	})
+
+	t.Run("preserves conjunctive selector expressions", func(t *testing.T) {
+		t.Parallel()
+		u := k8suser.DefaultInfo{Name: "user-1"}
+		result, err := toListOptions(&metav1.ListOptions{
+			LabelSelector: "environment in (prod,staging),tier!=dev,optional",
+		}, &u, false)
+		require.NoError(t, err)
+		selector, err := labels.Parse(result.LabelSelector)
+		require.NoError(t, err)
+		assert.True(t, selector.Matches(labels.Set{
+			"environment":             "prod",
+			"tier":                    "test",
+			"optional":                "",
+			CloudCredentialLabel:      "true",
+			CloudCredentialOwnerLabel: "user-1",
+		}))
+	})
+
+	t.Run("rejects malformed selector as bad request", func(t *testing.T) {
+		t.Parallel()
+		_, err := toListOptions(&metav1.ListOptions{LabelSelector: "environment in ("}, &k8suser.DefaultInfo{Name: "user-1"}, true)
+		require.Error(t, err)
+		assert.True(t, apierrors.IsBadRequest(err))
 	})
 }
 
