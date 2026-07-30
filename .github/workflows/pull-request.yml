@@ -196,21 +196,41 @@ jobs:
       - name: Extract populated go build/mod cache
         shell: bash
         run: |
-          rm -rf go-build-cache-benchmark
           docker buildx build \
             --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark" \
             --platform linux/amd64 \
             --file ./package/Dockerfile \
             --target gocache-out \
-            --output type=local,dest=go-build-cache-benchmark \
+            --output type=local,dest=go-build-cache-benchmark-extracted \
             .
-        # gocache-out (FROM scratch; COPY --from=server-build /root/.cache /)
-        # only depends on the server-build stage, not on gocache-in, so no
-        # GOCACHE_IN / --build-context is needed here -- BuildKit only
-        # evaluates stages that are actual dependencies of --target.
-        # server-build's layers are already warm from the previous step's
-        # build in this same job, so this invocation should be seconds,
-        # not minutes.
+          rm -rf go-build-cache-benchmark
+          mv go-build-cache-benchmark-extracted go-build-cache-benchmark
+        # IMPORTANT: every --build-arg / --build-context here must exactly
+        # match the "Timed build" step above. BuildKit's layer cache key
+        # covers the WHOLE dependency graph leading to --target, not just
+        # the target stage itself -- even though gocache-out only
+        # *declares* a dependency on server-build, a differing ARG/context
+        # anywhere upstream (e.g. dropping GOCACHE_IN/gocache-in here)
+        # makes BuildKit treat rancher-go-builder's COPY --from=gocache-in
+        # step, and everything after it, as a fresh cache miss, silently
+        # re-running the entire go mod download + go build from scratch a
+        # second time instead of the near-instant extraction this step is
+        # supposed to be. (This is exactly what happened in an earlier
+        # run of this job: the extraction step ran for ~50+ minutes doing
+        # an undetected second cold build before it was caught and killed.)
+        # Extract into a fresh directory first, then swap it in -- do NOT
+        # delete go-build-cache-benchmark before this build runs, since
+        # it's still needed as the gocache-in build-context input.
 
   cache-benchmark-warm:
     needs: cache-benchmark-cold
