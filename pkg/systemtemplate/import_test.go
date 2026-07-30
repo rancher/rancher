@@ -430,7 +430,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			if *update {
 				// Write snapshot file
 				err := os.MkdirAll(filepath.Dir(snapshotFile), 0755)
-				assert.NoError(t, err)
+				if !assert.NoError(t, err) {
+					return
+				}
 				err = os.WriteFile(snapshotFile, []byte(actual), 0644)
 				assert.NoError(t, err)
 				return
@@ -438,7 +440,9 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 
 			// Read expected output
 			expected, err := os.ReadFile(snapshotFile)
-			assert.NoError(t, err, "snapshot file not found: %s", snapshotFile)
+			if !assert.NoError(t, err, "snapshot file not found: %s", snapshotFile) {
+				return
+			}
 
 			// Compare
 			assert.Equal(t, string(expected), actual)
