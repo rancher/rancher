@@ -128,7 +128,7 @@ func (a ActionHandler) generateKubeConfigBearer(apiContext *types.APIContext) (s
 	}
 
 	userID := a.UserMgr.GetUser(apiContext.Request)
-	tokenName := authToken.GetName() // todo full name later, force fast path
+	tokenName := authToken.GetFullName()
 
 	// Create a proper ext token, commit it to kubernetes, and pass the
 	// resulting bearer token on.
