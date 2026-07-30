@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -145,21 +146,22 @@ func (a ActionHandler) generateKubeConfigBearer(apiContext *types.APIContext) (s
 		},
 	}
 
-	// Note that `userinfo == nil` is ok. The argument is only used when the
-	// token refers to a cluster by name, requiring a permission check. This
-	// is not the case here, we are asking for an unscoped token.
+	// Note that `userinfo == nil` would have been ok as the argument is
+	// only used when the token refers to a cluster by name, requiring a
+	// permission check. Which is not the case here, we are asking for an
+	// unscoped token. Still, providing an empty user, just in case.
 	kcNewToken, err := a.ExtTokenStore.Create(
 		// Make the auth token available to `Create`, via reference by
 		// name, through a local [user.Info] interface implementation.
 		// This enables `Create` to retrieve it and the principal
 		// information it needs.
-		request.WithUser(apiContext.Request.Context(), &actionUserInfo{
-			authTokenName: tokenName,
+		request.WithUser(apiContext.Request.Context(), &k8suser.DefaultInfo{
+			Extra: map[string][]string{common.ExtraRequestTokenID: {tokenName}},
 		}),
 		exttokenstore.GVR.GroupResource(),
 		kcToken,
 		&metav1.CreateOptions{},
-		nil)
+		&k8suser.DefaultInfo{})
 	if err != nil {
 		return "", err
 	}
@@ -174,22 +176,4 @@ func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster 
 		return nil, err
 	}
 	return a.ClusterManager.KubeConfig(cluster.ID, bearer), nil
-}
-
-// actionUserInfo implements [k8s.io/apiserver/pkg/authentication/user.Info] to
-// pass the session token by name into the ext token system store.
-type actionUserInfo struct {
-	authTokenName string
-}
-
-// implements [k8s.io/apiserver/pkg/authentication/user.Info]
-func (a *actionUserInfo) GetName() string     { return "" }
-func (a *actionUserInfo) GetUID() string      { return "" }
-func (a *actionUserInfo) GetGroups() []string { return []string{} }
-func (a *actionUserInfo) GetExtra() map[string][]string {
-	return map[string][]string{
-		common.ExtraRequestTokenID: []string{
-			a.authTokenName,
-		},
-	}
 }
