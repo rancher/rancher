@@ -46,7 +46,7 @@ runs:
         restore-keys: |
           rancher-gocache-agent-${{ env.ARCH }}-${{ steps.cache-scope.outputs.branch }}-
     - name: Inject go build/mod cache into BuildKit
-      uses: reproducible-containers/buildkit-cache-dance@v3
+      uses: ./.github/actions/buildkit-cache-dance
       with:
         builder: ${{ steps.setup-buildx.outputs.name }}
         cache-map: |

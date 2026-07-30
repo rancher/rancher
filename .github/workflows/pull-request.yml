@@ -151,7 +151,7 @@ jobs:
             echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
           fi
       - name: Inject (empty) cache into BuildKit
-        uses: reproducible-containers/buildkit-cache-dance@v3
+        uses: ./.github/actions/buildkit-cache-dance
         with:
           builder: ${{ steps.setup-buildx.outputs.name }}
           cache-map: |
@@ -222,7 +222,7 @@ jobs:
             exit 1
           fi
       - name: Inject cache into BuildKit
-        uses: reproducible-containers/buildkit-cache-dance@v3
+        uses: ./.github/actions/buildkit-cache-dance
         with:
           builder: ${{ steps.setup-buildx.outputs.name }}
           cache-map: |
