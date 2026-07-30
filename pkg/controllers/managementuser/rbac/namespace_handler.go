@@ -286,7 +286,7 @@ func (n *nsLifecycle) createLegacyProjectRoleBindings(nsName string, prtbs []any
 	for _, obj := range prtbs {
 		prtb, ok := obj.(*apisV3.ProjectRoleTemplateBinding)
 		if !ok {
-			return fmt.Errorf("expected *v3.ProjectRoleTemplateBinding, got %T", obj)
+			return fmt.Errorf("expected *apisv3.ProjectRoleTemplateBinding, got %T", obj)
 		}
 
 		if prtb.UserName == "" && prtb.GroupPrincipalName == "" && prtb.GroupName == "" {
@@ -394,7 +394,11 @@ func (n *nsLifecycle) prtbOwnerInCurrentProject(rb *rbacv1.RoleBinding, backingN
 	}
 
 	for label, index := range legacyOwnerIndexes {
-		value := convert.ToString(rb.Labels[label])
+		raw, ok := rb.Labels[label]
+		if !ok {
+			continue
+		}
+		value := convert.ToString(raw)
 		if value == "" {
 			continue
 		}
