@@ -868,6 +868,7 @@ func (s *Store) buildExtToken(userName string, authToken accessor.TokenAccessor,
 	return &ext.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
+				tokens.TokenKindLabel:         KindLabelValue,
 				tokens.TokenKubeconfigIDLabel: kubeConfigID,
 			},
 		},
