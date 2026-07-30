@@ -127,7 +127,7 @@ func (a ActionHandler) generateKubeConfigBearer(apiContext *types.APIContext) (s
 		return "", fmt.Errorf("failed to get default token TTL: %w", err)
 	}
 
-	userID := authToken.GetUserID()
+	userID := a.UserMgr.GetUser(apiContext.Request)
 	tokenName := authToken.GetName() // todo full name later, force fast path
 
 	// Create a proper ext token, commit it to kubernetes, and pass the
