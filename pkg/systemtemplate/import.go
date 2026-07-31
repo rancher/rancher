@@ -146,6 +146,7 @@ func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 type TemplateOps struct {
 	AgentImage     string
 	AuthImage      string
+	ChartsImage    string
 	Namespace      string
 	Token          string
 	URL            string
@@ -165,6 +166,10 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 	if ops.AuthImage == "fixed" {
 		ops.AuthImage = settings.AuthImage.Get()
+	}
+
+	if ops.ChartsImage == "fixed" {
+		ops.ChartsImage = settings.ChartsImage.Get()
 	}
 
 	var registryURL string
@@ -274,7 +279,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		AgentImage:                 ops.AgentImage,
 		AgentEnvVars:               agentEnvVars,
 		AuthImage:                  ops.AuthImage,
-		ChartsImage:                GetDesiredChartsImage(ops.Cluster),
+		ChartsImage:                ops.ChartsImage,
 		TokenKey:                   tokenKey,
 		Token:                      base64.StdEncoding.EncodeToString([]byte(ops.Token)),
 		URL:                        base64.StdEncoding.EncodeToString([]byte(ops.URL)),
@@ -350,6 +355,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 	err := SystemTemplate(buf, &TemplateOps{
 		AgentImage:     GetDesiredAgentImage(cluster),
 		AuthImage:      GetDesiredAuthImage(cluster),
+		ChartsImage:    GetDesiredChartsImage(cluster),
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            settings.ServerURL.Get(),
