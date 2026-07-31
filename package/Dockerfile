@@ -572,9 +572,18 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench GOOS=$TA
 # generates a bare `RUN --mount=type=cache,target=...` with NO explicit
 # `id=` -- BuildKit defaults the cache-mount id to the target path in that
 # case -- so these stages deliberately omit `id=` too, to match v2.1.4's own
-# generated Dockerfile shape exactly. Isolated via a distinct target
-# (/root/.cache-dance-v2) so this can't collide with the id=rancher (real)
-# or id=rancher-cache-mount-bench (v3.4.0 benchmark) cache mounts.
+# generated Dockerfile shape exactly. Mount target is /root/.cache (NOT a
+# separate path) to match GOMODCACHE=/root/.cache/go/modcache and
+# GOCACHE=/root/.cache/go/cache set in the shared go-builder base stage --
+# an earlier version of this benchmark mistakenly mounted at
+# /root/.cache-dance-v2 instead, which `go mod download`/`go build` would
+# never actually write into, silently making the whole benchmark measure
+# nothing (caught before that run's results were used, per Tom). This job
+# runs in its own isolated builder/runner, so reusing the /root/.cache
+# target (and therefore the same implicit id string) doesn't collide with
+# id=rancher-cache-mount-bench (the explicit-id v3.4.0 benchmark) or
+# id=rancher (the real build) -- those live on entirely separate BuildKit
+# builder instances.
 FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder-mount-dance-v2
 ARG BUILD_WORKDIR
 WORKDIR ${BUILD_WORKDIR}
@@ -596,9 +605,9 @@ COPY go.mod go.sum ./
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
 COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
-RUN --mount=type=cache,target=/root/.cache-dance-v2 go mod download
-RUN --mount=type=cache,target=/root/.cache-dance-v2 cd pkg/apis && go mod download
-RUN --mount=type=cache,target=/root/.cache-dance-v2 cd pkg/client && go mod download
+RUN --mount=type=cache,target=/root/.cache go mod download
+RUN --mount=type=cache,target=/root/.cache cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache cd pkg/client && go mod download
 
 FROM --platform=$BUILDPLATFORM rancher-go-builder-mount-dance-v2 AS server-build-mount-dance-v2
 ARG VERSION
@@ -612,7 +621,7 @@ ARG TARGETARCH
 COPY internal/ internal/
 COPY pkg/ pkg/
 COPY main.go ./
-RUN --mount=type=cache,target=/root/.cache-dance-v2 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+RUN --mount=type=cache,target=/root/.cache GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
 
 # k3s images step, RUN --mount=type=cache variant -- see
 # rancher-go-builder-mount comment above for the full rationale. Mirrors

@@ -1099,8 +1099,14 @@ jobs:
         uses: ./.github/actions/buildkit-cache-dance-v2
         with:
           cache-source: go-build-cache-benchmark-dance-v2
-          cache-target: /root/.cache-dance-v2
+          cache-target: /root/.cache
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+        # cache-target must match GOMODCACHE/GOCACHE (both under
+        # /root/.cache, set in go-builder) -- an earlier version of this
+        # job used /root/.cache-dance-v2, which go mod download/go build
+        # never actually write into, silently making the whole benchmark
+        # measure nothing. Fixed before the (already-running, since-killed)
+        # first attempt's results were used.
         # No `builder:` input -- v2.1.4's action.yml doesn't define one (it
         # always runs `docker buildx build` against the default builder,
         # unlike v3.4.0 which supports passing --builder explicitly).
