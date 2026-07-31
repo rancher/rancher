@@ -636,6 +636,16 @@ func rkeControlPlane(cluster *provv1.Cluster) (*rkev1.RKEControlPlane, error) {
 		return nil, err
 	}
 	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()
+
+	var chartValuesJSON string
+	if len(rkeConfig.ChartValues.Data) > 0 {
+		b, err := json.Marshal(rkeConfig.ChartValues.Data)
+		if err != nil {
+			return nil, fmt.Errorf("cluster %s/%s: error marshalling chart values: %w", cluster.Namespace, cluster.Name, err)
+		}
+		chartValuesJSON = string(b)
+	}
+
 	return &rkev1.RKEControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -650,6 +660,7 @@ func rkeControlPlane(cluster *provv1.Cluster) (*rkev1.RKEControlPlane, error) {
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
 			ClusterConfiguration:     rkeConfig.ClusterConfiguration,
+			ChartValuesJSON:          chartValuesJSON,
 			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
 			ETCDSnapshotRestore:      rkeConfig.ETCDSnapshotRestore,
 			ETCDSnapshotCreate:       rkeConfig.ETCDSnapshotCreate,
