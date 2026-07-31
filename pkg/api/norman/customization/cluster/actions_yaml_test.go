@@ -113,6 +113,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 		scache.EXPECT().Get(exttokenstore.TokenNamespace, fakeAuth.token.Name).Return(fakeAuthSecret, nil)
 		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
 			assert.Equal(t, "the-hash", s.StringData[exttokenstore.FieldHash])
+			assert.Equal(t, testUser, s.StringData[exttokenstore.FieldUserID])
 			n := s.DeepCopy()
 			n.Name = "token-xxx"
 			n.Data = map[string][]byte{}
@@ -202,6 +203,7 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 
 		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
 			assert.Equal(t, "the-hash", s.StringData[exttokenstore.FieldHash])
+			assert.Equal(t, testUser, s.StringData[exttokenstore.FieldUserID])
 			n := s.DeepCopy()
 			n.Name = "token-xxx"
 			n.Data = map[string][]byte{}
