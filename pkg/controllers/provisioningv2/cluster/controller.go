@@ -77,7 +77,7 @@ type handler struct {
 	kubeconfigManager     *kubeconfig.Manager
 
 	capiClustersCache capicontrollers.ClusterCache
-	capiClusters      capicontrollers.ClusterClient
+	capiClusters      capicontrollers.ClusterController
 	capiMachinesCache capicontrollers.MachineCache
 }
 
