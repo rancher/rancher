@@ -558,7 +558,6 @@ jobs:
             -f scratch/Dancefile.inject \
             --tag dance:inject \
             --progress=plain \
-            --no-cache \
             go-build-cache-benchmark-mount 2>&1 | tee /tmp/inject-build.log
           echo "=== full inject build log ==="
           cat /tmp/inject-build.log
@@ -575,6 +574,30 @@ jobs:
         # (using --progress=plain and explicit `tee`/`cat` of full build
         # output) so we can actually see what BuildKit is doing at each
         # step, instead of continuing to guess against a black box.
+        #
+        # ROOT CAUSE FOUND (confirmed via local repro against docker
+        # buildx + docker-container driver, outside this fleet entirely):
+        # this step must NOT pass --no-cache. BuildKit does not dedupe
+        # `RUN --mount=type=cache,id=X` instances purely by `id=` -- it
+        # keys the cache-mount instance to the cached LAYER LINEAGE that
+        # RUN belongs to. `--no-cache` cache-busts every layer including
+        # the cache-mount RUN itself, so BuildKit allocates a fresh, empty
+        # cache-mount instance for that id on every --no-cache invocation,
+        # regardless of what other (non---no-cache) builds already
+        # populated for the same id. Confirmed locally: two consecutive
+        # `docker buildx build --no-cache` calls with an IDENTICAL
+        # Dockerfile and identical `id=` produce two different internal
+        # cache-mount IDs in `docker buildx du` output (different `Created
+        # at` timestamps) -- content written by the first is invisible to
+        # the second. Removing --no-cache (letting the RUN --mount layer
+        # cache-HIT normally) makes the SAME cache-mount instance persist
+        # across separate `docker buildx build` invocations, including
+        # entirely different Dockerfiles using the same id=. This is likely
+        # also the real explanation for reproducible-containers/
+        # buildkit-cache-dance#33 upstream, though the real dance action
+        # doesn't pass --no-cache itself -- our own hand-rolled debug
+        # version added it to force a clean measurement each run, which is
+        # exactly what broke this.
 
       - name: "Timed build (server-build-mount, cold cache mount)"
         id: timed-build
@@ -648,7 +671,6 @@ jobs:
             -f scratch/Dancefile.extract \
             --target export \
             --progress=plain \
-            --no-cache \
             --output "type=local,dest=$(pwd)/go-build-cache-benchmark-mount" \
             scratch 2>&1 | tee /tmp/extract-build.log
           echo "=== full extract build log ==="
