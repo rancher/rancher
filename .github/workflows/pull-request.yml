@@ -522,31 +522,48 @@ jobs:
           if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
             echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
           fi
-      - name: "Inject (likely empty) cache into BuildKit"
-        uses: ./.github/actions/buildkit-cache-dance
-        with:
-          builder: ${{ steps.setup-buildx.outputs.name }}
-          cache-map: |
-            {
-              "go-build-cache-benchmark-mount": { "target": "/root/.cache", "id": "rancher-cache-mount-bench" }
-            }
-          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
-        # IMPORTANT (bug fixed after an earlier run of this job): call the
-        # dance action ONCE per job, not twice. Its action.yml wires
-        # `main` (injection) and `post` (extraction) to the SAME script --
-        # the post hook runs automatically at job end regardless of where
-        # in the job this step sits, and does the actual extraction
-        # (`cp -p -R /root/.cache/. /var/dance-cache/`), which
-        # actions/cache's own post-hook then saves. An earlier version of
-        # this job called the dance a second time, later, with a step
-        # literally named "Extract populated cache into actions/cache" --
-        # that second call ran as its own separate main-phase (injection)
-        # invocation instead, and ended up interfering with the first
-        # call's post-hook bookkeeping: the actions/cache save that run
-        # sent only 290 bytes instead of the real ~10GB cache, even though
-        # the dance's own extraction cp commands (visible in the post-job
-        # logs) ran and appeared to succeed. Removed the redundant second
-        # step entirely -- a single dance step handles both directions.
+      - name: "Inject (likely empty) cache into BuildKit (debug: hand-rolled, verbose)"
+        id: inject
+        shell: bash
+        run: |
+          set -x
+          mkdir -p go-build-cache-benchmark-mount scratch
+          date -u -Iseconds > scratch/buildstamp
+          {
+            echo 'FROM ghcr.io/containerd/busybox:latest'
+            echo 'COPY buildstamp buildstamp'
+            echo 'RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench \'
+            echo '    --mount=type=bind,source=.,target=/var/dance-cache \'
+            echo '    cp -p -R /var/dance-cache/. /root/.cache && echo INJECT_CP_OK || echo INJECT_CP_FAILED'
+          } > scratch/Dancefile.inject
+          echo "=== Dancefile.inject ==="
+          cat scratch/Dancefile.inject
+          echo "=== source dir being injected (should be empty on cold run) ==="
+          find go-build-cache-benchmark-mount -maxdepth 2 | head -20
+          du -sh go-build-cache-benchmark-mount || true
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            -f scratch/Dancefile.inject \
+            --tag dance:inject \
+            --progress=plain \
+            --no-cache \
+            go-build-cache-benchmark-mount 2>&1 | tee /tmp/inject-build.log
+          echo "=== full inject build log (was it a no-op / cache hit that skipped the cp?) ==="
+          cat /tmp/inject-build.log
+          echo "=== exec.cachemount storage right after inject ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" 2>&1 | grep -B8 "exec.cachemount" || true
+        # This step is a debug replacement for the vendored
+        # buildkit-cache-dance's inject phase, since that action's own
+        # commands run through a silent wrapper (spawn-please) that only
+        # ever surfaces output on non-zero exit -- successful `docker
+        # buildx build`, `docker create`, `docker cp` calls are invisible
+        # in the log by design, which made a real ~10GB save silently
+        # turning into an ~200 byte save impossible to diagnose from
+        # dance's own output. Rewriting inject/extract by hand here
+        # (using --progress=plain and explicit `tee`/`cat` of full build
+        # output) so we can actually see what BuildKit is doing at each
+        # step, instead of continuing to guess against a black box.
+
       - name: "Timed build (server-build-mount, cold cache mount)"
         id: timed-build
         shell: bash
@@ -580,9 +597,53 @@ jobs:
         # Full (unfiltered) output this time -- the earlier grep-filtered
         # version only matched "Type:" lines and never showed the actual
         # "Size:" field, so it wasn't actually useful as a sanity check.
-        # The dance step above already extracted (post-hook) and
-        # actions/cache's own post-hook already saved it -- there is
-        # nothing left to do in this job after this sanity check.
+      - name: "Extract populated cache (debug: hand-rolled, verbose)"
+        shell: bash
+        run: |
+          set -x
+          {
+            echo 'FROM ghcr.io/containerd/busybox:latest'
+            echo 'COPY buildstamp buildstamp'
+            echo 'RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench \'
+            echo '    mkdir -p /var/dance-cache/ \'
+            echo '    && cp -p -R /root/.cache/. /var/dance-cache/ && echo EXTRACT_CP_OK || echo EXTRACT_CP_FAILED'
+          } > scratch/Dancefile.extract
+          echo "=== Dancefile.extract ==="
+          cat scratch/Dancefile.extract
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            -f scratch/Dancefile.extract \
+            --tag dance:extract \
+            --progress=plain \
+            --no-cache \
+            --load \
+            scratch 2>&1 | tee /tmp/extract-build.log
+          echo "=== full extract build log ==="
+          cat /tmp/extract-build.log
+          echo "=== was the image actually loaded into the host docker daemon? ==="
+          docker images dance:extract
+          docker rm -f cache-container 2>/dev/null || true
+          docker create --name cache-container dance:extract
+          echo "=== contents of /var/dance-cache inside the created container (via docker export, avoids docker cp edge cases) ==="
+          docker export cache-container | tar -tv | head -20
+          docker export cache-container | tar -tv | wc -l
+          rm -rf go-build-cache-benchmark-mount
+          mkdir -p go-build-cache-benchmark-mount
+          docker cp -L cache-container:/var/dance-cache/. go-build-cache-benchmark-mount/
+          docker rm -f cache-container
+          echo "=== extracted cache dir size on host disk ==="
+          du -sh go-build-cache-benchmark-mount || true
+          find go-build-cache-benchmark-mount -maxdepth 2 | head -20
+        # Hand-rolled replacement for the vendored dance action's
+        # (invisible-on-success) extraction phase: build the
+        # Dancefile.extract image with --load (imports it into the HOST
+        # docker daemon, not just the buildx builder), then docker
+        # create + docker cp (not the piped tar approach the real dance
+        # uses, to sidestep any tar/pipe-specific edge case) to pull
+        # /var/dance-cache onto the runner's local disk. Every step logs
+        # its own output/counts so a truncation or empty-directory bug
+        # is visible directly in this job's log instead of only showing
+        # up as a mysteriously tiny actions/cache save afterward.
 
   cache-benchmark-warm-cachemount:
     needs: cache-benchmark-cold-cachemount
@@ -637,16 +698,36 @@ jobs:
           fi
           echo "Restored cache size:"
           du -sh go-build-cache-benchmark-mount || true
-      - name: "Inject cache into BuildKit"
-        uses: ./.github/actions/buildkit-cache-dance
-        with:
-          builder: ${{ steps.setup-buildx.outputs.name }}
-          cache-map: |
-            {
-              "go-build-cache-benchmark-mount": { "target": "/root/.cache", "id": "rancher-cache-mount-bench" }
-            }
-          # Read-only leg of the benchmark -- never writes back.
-          skip-extraction: true
+      - name: "Inject cache into BuildKit (debug: hand-rolled, verbose)"
+        shell: bash
+        run: |
+          set -x
+          mkdir -p scratch
+          date -u -Iseconds > scratch/buildstamp
+          {
+            echo 'FROM ghcr.io/containerd/busybox:latest'
+            echo 'COPY buildstamp buildstamp'
+            echo 'RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench \'
+            echo '    --mount=type=bind,source=.,target=/var/dance-cache \'
+            echo '    cp -p -R /var/dance-cache/. /root/.cache && echo INJECT_CP_OK || echo INJECT_CP_FAILED'
+          } > scratch/Dancefile.inject
+          echo "=== source dir being injected (should be the restored ~10GB cache) ==="
+          du -sh go-build-cache-benchmark-mount || true
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            -f scratch/Dancefile.inject \
+            --tag dance:inject \
+            --progress=plain \
+            --no-cache \
+            go-build-cache-benchmark-mount 2>&1 | tee /tmp/inject-build.log
+          echo "=== full inject build log ==="
+          cat /tmp/inject-build.log
+          echo "=== exec.cachemount storage right after inject ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" 2>&1 | grep -B8 "exec.cachemount" || true
+        # Read-only leg of the benchmark -- never writes back. Same
+        # hand-rolled replacement as cache-benchmark-cold-cachemount's
+        # inject step, for the same debugging reasons (silent vendored
+        # action, need actual visibility into what's happening).
       - name: "Timed build (server-build-mount, warm cache mount)"
         id: timed-build
         shell: bash
