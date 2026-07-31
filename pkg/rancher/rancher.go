@@ -794,12 +794,22 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 	return nil
 }
 
+// effectiveWebhookVersion will return the resolved webhook version similar to `settingsProvider`
+// This is a thin stop-gap for resolving the version before the providers are ready to use.
+func effectiveWebhookVersion() string {
+	v := os.Getenv(settings.GetEnvKey(settings.RancherWebhookVersion.Name))
+	if v == "" {
+		v = settings.RancherWebhookVersion.Get()
+	}
+	return v
+}
+
 // bumpRancherServiceVersion bumps the version of rancher-webhook if it is detected that the version is less than
 // v0.2.2-alpha1. This is because the version of rancher-webhook less than v0.2.2-alpha1 does not support Kubernetes v1.22+
 // This should only be called when Rancher is run in a Docker container because the Kubernetes version and Rancher version
 // are bumped at the same time. In a Kubernetes cluster, usually the Rancher version is bumped when the cluster is upgraded.
 func bumpRancherWebhookIfNecessary(ctx context.Context, restConfig *rest.Config) error {
-	v := os.Getenv("CATTLE_RANCHER_WEBHOOK_VERSION")
+	v := effectiveWebhookVersion()
 	webhookVersionParts := strings.Split(v, "+up")
 	if len(webhookVersionParts) != 2 {
 		return nil
