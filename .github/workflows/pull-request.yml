@@ -528,7 +528,19 @@ jobs:
         run: |
           set -x
           mkdir -p go-build-cache-benchmark-mount scratch
-          date -u -Iseconds > scratch/buildstamp
+          # IMPORTANT: buildstamp goes in the CACHE dir (the build
+          # context), not the scratch dir -- confirmed against the real
+          # dance action's decompiled source: it calls
+          # writeFile(join(cacheDir, "buildstamp"), ...) and then passes
+          # cacheDir (not scratchDir) as the build context to `docker
+          # buildx build`, while writing the actual Dockerfile itself
+          # into scratchDir. My first hand-rolled attempt got this
+          # backwards (wrote buildstamp to scratch/, built against the
+          # cache dir as context) and failed immediately with "/buildstamp":
+          # not found -- which, notably, is the FIRST real error message
+          # we've seen in this whole cache-mount investigation, since the
+          # vendored action's silent wrapper never surfaced it.
+          date -u -Iseconds > go-build-cache-benchmark-mount/buildstamp
           {
             echo 'FROM ghcr.io/containerd/busybox:latest'
             echo 'COPY buildstamp buildstamp'
@@ -538,7 +550,7 @@ jobs:
           } > scratch/Dancefile.inject
           echo "=== Dancefile.inject ==="
           cat scratch/Dancefile.inject
-          echo "=== source dir being injected (should be empty on cold run) ==="
+          echo "=== source dir being injected (should be empty except buildstamp, on cold run) ==="
           find go-build-cache-benchmark-mount -maxdepth 2 | head -20
           du -sh go-build-cache-benchmark-mount || true
           docker buildx build \
@@ -548,7 +560,7 @@ jobs:
             --progress=plain \
             --no-cache \
             go-build-cache-benchmark-mount 2>&1 | tee /tmp/inject-build.log
-          echo "=== full inject build log (was it a no-op / cache hit that skipped the cp?) ==="
+          echo "=== full inject build log ==="
           cat /tmp/inject-build.log
           echo "=== exec.cachemount storage right after inject ==="
           docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" 2>&1 | grep -B8 "exec.cachemount" || true
@@ -601,6 +613,8 @@ jobs:
         shell: bash
         run: |
           set -x
+          mkdir -p scratch
+          date -u -Iseconds > scratch/buildstamp
           {
             echo 'FROM ghcr.io/containerd/busybox:latest'
             echo 'COPY buildstamp buildstamp'
@@ -635,15 +649,27 @@ jobs:
           du -sh go-build-cache-benchmark-mount || true
           find go-build-cache-benchmark-mount -maxdepth 2 | head -20
         # Hand-rolled replacement for the vendored dance action's
-        # (invisible-on-success) extraction phase: build the
-        # Dancefile.extract image with --load (imports it into the HOST
-        # docker daemon, not just the buildx builder), then docker
-        # create + docker cp (not the piped tar approach the real dance
-        # uses, to sidestep any tar/pipe-specific edge case) to pull
+        # (invisible-on-success) extraction phase. Confirmed against the
+        # real dance's decompiled source: for extraction, BOTH
+        # buildstamp AND the Dockerfile go into the scratch dir, and the
+        # scratch dir itself is the build context (unlike inject, where
+        # buildstamp/context is the cache dir, Dockerfile is in scratch --
+        # the two phases are asymmetric). My first hand-rolled attempt of
+        # this step never wrote scratch/buildstamp at all -- it would
+        # have hit the exact same "/buildstamp": not found error the
+        # inject step (also fixed in this same commit) hit, except this
+        # step's failure never got the chance to run since the job failed
+        # earlier at inject first.
+        #
+        # Then: build the Dancefile.extract image with --load (imports it
+        # into the HOST docker daemon, not just the buildx builder), then
+        # docker create + docker cp (not the piped tar approach the real
+        # dance uses, to sidestep any tar/pipe-specific edge case) to pull
         # /var/dance-cache onto the runner's local disk. Every step logs
-        # its own output/counts so a truncation or empty-directory bug
-        # is visible directly in this job's log instead of only showing
-        # up as a mysteriously tiny actions/cache save afterward.
+        # its own output/counts so a truncation or empty-directory bug is
+        # visible directly in this job's log instead of only showing up
+        # as a mysteriously tiny actions/cache save afterward.
+
 
   cache-benchmark-warm-cachemount:
     needs: cache-benchmark-cold-cachemount
@@ -703,7 +729,11 @@ jobs:
         run: |
           set -x
           mkdir -p scratch
-          date -u -Iseconds > scratch/buildstamp
+          # buildstamp goes in the cache dir (build context), matching
+          # the real dance action's inject-phase behavior and the fix
+          # already applied to cache-benchmark-cold-cachemount's inject
+          # step -- see the comment there for the full explanation.
+          date -u -Iseconds > go-build-cache-benchmark-mount/buildstamp
           {
             echo 'FROM ghcr.io/containerd/busybox:latest'
             echo 'COPY buildstamp buildstamp'
@@ -728,6 +758,7 @@ jobs:
         # hand-rolled replacement as cache-benchmark-cold-cachemount's
         # inject step, for the same debugging reasons (silent vendored
         # action, need actual visibility into what's happening).
+
       - name: "Timed build (server-build-mount, warm cache mount)"
         id: timed-build
         shell: bash
