@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/crewjam/saml"
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
@@ -28,9 +27,7 @@ func TestTestAndEnableInvalidFinalRedirectURL(t *testing.T) {
 			RancherAPIHost: "https://rancher.example.com",
 		}, nil
 	}
-	provider.serviceProvider = &saml.ServiceProvider{
-		MetadataURL: testParseURL(t, "https://rancher.example.com/saml/metadata"),
-	}
+	provider.metadataURL = testParseURL(t, "https://rancher.example.com/saml/metadata")
 	originalProvider := SamlProviders[providerName]
 	SamlProviders[providerName] = provider
 	t.Cleanup(func() {

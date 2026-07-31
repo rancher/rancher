@@ -8,11 +8,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
-	"github.com/crewjam/saml"
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -23,6 +21,8 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
+	saml2 "github.com/russellhaering/gosaml2"
+	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -149,17 +149,8 @@ func TestLogoutAllInvalidFinalRedirectURL(t *testing.T) {
 	userName := "test-user"
 	invalidRedirect := "https://attacker.example.com/logout"
 
-	metadataURL, err := url.Parse("https://rancher.example.com/v1-saml/" + providerName + "/metadata")
-	require.NoError(t, err)
-
-	serviceProvider := &saml.ServiceProvider{
-		MetadataURL: *metadataURL,
-	}
-
-	SamlProvidersOriginal := SamlProviders[providerName]
 	provider := &Provider{
-		serviceProvider: serviceProvider,
-		name:            providerName,
+		metadataURL: testParseURL(t, "https://rancher.example.com/v1-saml/"+providerName+"/metadata"),
 		userMGR: &fakeUserManager{
 			userName: userName,
 			userAttribute: &apiv3.UserAttribute{
@@ -172,10 +163,12 @@ func TestLogoutAllInvalidFinalRedirectURL(t *testing.T) {
 		},
 		clientState: &fakeClientState{},
 		sloEnabled:  true,
+		name:        providerName,
 	}
+	originalProvider := SamlProviders[providerName]
 	SamlProviders[providerName] = provider
 	t.Cleanup(func() {
-		SamlProviders[providerName] = SamlProvidersOriginal
+		SamlProviders[providerName] = originalProvider
 	})
 
 	body := bytes.NewBufferString(`{"finalRedirectUrl":"` + invalidRedirect + `"}`)
@@ -183,7 +176,7 @@ func TestLogoutAllInvalidFinalRedirectURL(t *testing.T) {
 	res := httptest.NewRecorder()
 	token := &fakeToken{authProvider: providerName}
 
-	err = provider.LogoutAll(res, req, token)
+	err := provider.LogoutAll(res, req, token)
 	assert.ErrorContains(t, err, "Invalid redirect URL 400: failed to logout")
 }
 
@@ -200,23 +193,19 @@ func TestPerformSamlLoginSetsStateAndResponds(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	serviceProvider := &saml.ServiceProvider{
-		Key:         privateKey,
-		MetadataURL: metadataURL,
-		AcsURL:      acsURL,
-		IDPMetadata: &saml.EntityDescriptor{
-			IDPSSODescriptors: []saml.IDPSSODescriptor{{
-				SingleSignOnServices: []saml.Endpoint{{
-					Binding:  saml.HTTPRedirectBinding,
-					Location: "https://idp.example.com/sso",
-				}},
-			}},
-		},
+	serviceProvider := &saml2.SAMLServiceProvider{
+		IdentityProviderSSOURL:      "https://idp.example.com/sso",
+		AssertionConsumerServiceURL: acsURL.String(),
+		SignAuthnRequests:           false,
+		Clock:                       dsig.NewRealClock(),
 	}
 
 	clientState := newRecordingClientState()
 	provider := &Provider{
 		serviceProvider: serviceProvider,
+		spKey:           privateKey,
+		metadataURL:     metadataURL,
+		acsURL:          acsURL,
 		clientState:     clientState,
 	}
 
@@ -242,7 +231,7 @@ func TestPerformSamlLoginSetsStateAndResponds(t *testing.T) {
 	err = PerformSamlLogin(req, res, providerName, loginInput, provider)
 	require.NoError(t, err)
 
-	assert.Equal(t, serviceProvider.AcsURL.Path, clientState.path)
+	assert.Equal(t, acsURL.Path, clientState.path)
 	assert.Equal(t, finalRedirect, clientState.states["Rancher_FinalRedirectURL"])
 	assert.Equal(t, loginAction, clientState.states["Rancher_Action"])
 	assert.Equal(t, publicKey, clientState.states["Rancher_PublicKey"])
@@ -262,19 +251,16 @@ func TestPerformSamlLoginSetsStateAndResponds(t *testing.T) {
 func TestPerformSamlLoginRejectsInvalidRedirect(t *testing.T) {
 	providerName := "test-provider"
 
-	metadataURL, err := url.Parse("https://rancher.example.com/v1-saml/" + providerName + "/metadata")
-	require.NoError(t, err)
-
 	provider := &Provider{
-		serviceProvider: &saml.ServiceProvider{MetadataURL: *metadataURL},
-		clientState:     newRecordingClientState(),
+		metadataURL: testParseURL(t, "https://rancher.example.com/v1-saml/"+providerName+"/metadata"),
+		clientState: newRecordingClientState(),
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1-saml/"+providerName+"/login", nil)
 	res := httptest.NewRecorder()
 	loginInput := &apiv3.SamlLoginInput{FinalRedirectURL: "https://attacker.example.com/login"}
 
-	err = PerformSamlLogin(req, res, providerName, loginInput, provider)
+	err := PerformSamlLogin(req, res, providerName, loginInput, provider)
 	assert.ErrorContains(t, err, "Invalid redirect URL 400: failed to login")
 	assert.Empty(t, res.Body.String())
 	assert.Empty(t, res.Header().Get("Content-Type"))
