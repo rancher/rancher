@@ -812,7 +812,7 @@ ARG GODEP_STEVE_PATH
 COPY --from=godep-steve / ${GODEP_STEVE_PATH}
 ARG GODEP_WRANGLER_PATH
 COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
-COPY --from=gocacheprog-builder /root/go/bin/gobuildcache /usr/local/bin/gobuildcache
+COPY --from=gocacheprog-builder /go/bin/gobuildcache /usr/local/bin/gobuildcache
 # GOCACHEPROG bucket directory -- empty (scratch) on a cold run, populated
 # (via gocacheprog-out extraction below, fed back in as a build-context)
 # on a warm run. NOT a RUN --mount=type=cache -- deliberately a plain COPY
