@@ -651,8 +651,8 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
 			oneTime := []plan.OneTimeInstruction{}
 			// stop then rotate then cleanup manifests then restart. Do not clear prior rotate idempotency state.
-			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/stop", fmt.Sprintf("%s", s.op.UID), "systemctl", []string{"stop", serverUnit}, env))
-			rotateInst := ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rotate", fmt.Sprintf("%s", s.op.UID), runtime, args, env)
+			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/stop", string(s.op.UID), "systemctl", []string{"stop", serverUnit}, env))
+			rotateInst := ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rotate", string(s.op.UID), runtime, args, env)
 			oneTime = append(oneTime, rotateInst)
 
 			// CAPR requires explicit component cert-dir and absence of tls-cert-file to safely remove
@@ -660,12 +660,12 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 			if runtime == capr.RuntimeRKE2 {
 				rmCmd := fmt.Sprintf("rm -rf %s/%s-*.yaml", path.Join(dataDir, "server/manifests"), runtime)
-				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", fmt.Sprintf("%s", s.op.UID), "/bin/sh", []string{"-c", rmCmd}, []string{}))
+				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", string(s.op.UID), "/bin/sh", []string{"-c", rmCmd}, []string{}))
 			}
 
 			// restart server unit idempotently
-			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart-reset-failed", fmt.Sprintf("%s", s.op.UID), "/bin/sh", []string{"-c", fmt.Sprintf("if [ $(systemctl is-failed %s) = failed ]; then systemctl reset-failed %s; fi", serverUnit, serverUnit)}, []string{}))
-			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart", fmt.Sprintf("%s", s.op.UID), "systemctl", []string{"restart", serverUnit}, []string{}))
+			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart-reset-failed", string(s.op.UID), "/bin/sh", []string{"-c", fmt.Sprintf("if [ $(systemctl is-failed %s) = failed ]; then systemctl reset-failed %s; fi", serverUnit, serverUnit)}, []string{}))
+			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart", string(s.op.UID), "systemctl", []string{"restart", serverUnit}, []string{}))
 
 			nodePlan = plan.Plan{
 				Files:               files,
@@ -678,7 +678,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			if ops.IsWindows(secret) {
 				// Windows idempotent restart using local idempotency helper; do not use linux systemctl logic.
 				files := []plan.File{windowsIdempotentScriptFile()}
-				oneTime := windowsIdempotentRestartInstructions("certificate-rotation/restart", fmt.Sprintf("%s", s.op.UID), capr.RuntimeRKE2)
+				oneTime := windowsIdempotentRestartInstructions("certificate-rotation/restart", string(s.op.UID), capr.RuntimeRKE2)
 				nodePlan = plan.Plan{
 					Files:               files,
 					OneTimeInstructions: oneTime,
@@ -688,8 +688,8 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 				provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 				files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
 				oneTime := []plan.OneTimeInstruction{}
-				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart-reset-failed", fmt.Sprintf("%s", s.op.UID), "/bin/sh", []string{"-c", fmt.Sprintf("if [ $(systemctl is-failed %s) = failed ]; then systemctl reset-failed %s; fi", agentUnit, agentUnit)}, []string{}))
-				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart", fmt.Sprintf("%s", s.op.UID), "systemctl", []string{"restart", agentUnit}, []string{}))
+				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart-reset-failed", string(s.op.UID), "/bin/sh", []string{"-c", fmt.Sprintf("if [ $(systemctl is-failed %s) = failed ]; then systemctl reset-failed %s; fi", agentUnit, agentUnit)}, []string{}))
+				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart", string(s.op.UID), "systemctl", []string{"restart", agentUnit}, []string{}))
 				nodePlan = plan.Plan{
 					Files:               files,
 					OneTimeInstructions: oneTime,
