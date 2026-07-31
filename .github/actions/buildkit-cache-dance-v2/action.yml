@@ -1,0 +1,19 @@
+name: Inject/Extract Cache
+description: "Injects the cached data into the docker build(x|kit) process"
+inputs:
+  cache-source:
+    default: cache
+    description: "Where the cache is stored in the calling workspace. Default: `cache`"
+  cache-target:
+    default: /root/.cache/go-build
+    description: "Where the cache is stored in the docker container. Default: `/root/.cache/go-build`"
+  scratch-dir:
+    default: scratch
+    description: "Where the action is stores some temporary files for its processing. Default: `scratch`"
+  skip-extraction:
+    default: "false"
+    description: "Skip the extraction of the cache from the docker container"
+runs:
+  using: 'node20'
+  main: 'entrypoint.js'
+  post: 'entrypoint.js'

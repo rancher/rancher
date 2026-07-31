@@ -1039,6 +1039,117 @@ jobs:
   # END TEMPORARY cache-benchmark-*-bind block
   # ---------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------
+  # TEMPORARY: cache-mount benchmark using buildkit-cache-dance@v2.1.4
+  # (vendored in .github/actions/buildkit-cache-dance-v2/), testing the
+  # workaround suggested by multiple independent reports in the still-open
+  # upstream issue reproducible-containers/buildkit-cache-dance#33 ("Stored
+  # cache is empty") -- see .github/actions/buildkit-cache-dance-v2/VENDORED.md
+  # for full context. Uses the ACTUAL vendored action here (not a hand-rolled
+  # reimplementation like cache-benchmark-cold/warm-cachemount above) since
+  # the whole point is testing whether v2.1.4's own real implementation
+  # avoids the empty-extraction bug our v3.4.0-based hand-rolled attempts
+  # hit twice.
+  # ---------------------------------------------------------------------
+  cache-benchmark-cold-cachemount-dance-v2:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          # Same raised GC policy as the v3.4.0 cachemount benchmark --
+          # v2.1.4's cache mount (id defaults to the target path,
+          # /root/.cache-dance-v2) needs the same headroom.
+          buildkitd-config-inline: |
+            [worker.oci]
+              [[worker.oci.gcpolicy]]
+                keepDuration = "48h"
+                filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+                maxUsedSpace = "12GB"
+              [[worker.oci.gcpolicy]]
+                all = true
+                reservedSpace = "1GB"
+      - name: "Restore go build/mod cache (expected: miss)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-dance-v2
+          key: rancher-gocache-benchmark-dance-v2-${{ github.run_id }}
+      - name: "Report cache hit status (should be false)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
+          fi
+      - name: "Inject (likely empty) cache into BuildKit via buildkit-cache-dance@v2.1.4"
+        uses: ./.github/actions/buildkit-cache-dance-v2
+        with:
+          cache-source: go-build-cache-benchmark-dance-v2
+          cache-target: /root/.cache-dance-v2
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+        # No `builder:` input -- v2.1.4's action.yml doesn't define one (it
+        # always runs `docker buildx build` against the default builder,
+        # unlike v3.4.0 which supports passing --builder explicitly).
+        # docker/setup-buildx-action already makes the builder it creates
+        # the active/default one, so this doesn't need one.
+      - name: "Timed build (server-build-mount-dance-v2, cold cache mount)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-mount-dance-v2 \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Cold (cache mount, dance v2.1.4) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Cold (cache mount, dance v2.1.4, server-build-mount-dance-v2): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+      - name: "Report exec.cachemount storage held by BuildKit"
+        shell: bash
+        run: |
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+        # No manual "extraction" or "check extracted dir size" step here,
+        # unlike the v3.4.0 hand-rolled jobs above: v2.1.4's extraction
+        # (like v3.x) only runs via the inject step's automatic post-hook,
+        # which fires at job cleanup time -- AFTER all of this job's own
+        # steps have already run. Any step placed here would just be
+        # checking pre-extraction (still-cold) state. The real evidence for
+        # whether this worked is in the job's own log at cleanup time (the
+        # vendored action's `post` script runs with `set -eux`, so its own
+        # `cp -p -R ... || true` is visible directly, unlike the silent
+        # v3.4.0 action) and in the final `actions/cache` save size
+        # reported by the "Post Restore go build/mod cache" step.
+
+  # ---------------------------------------------------------------------
+  # END TEMPORARY cache-benchmark-cold-cachemount-dance-v2 block
+  # ---------------------------------------------------------------------
+
   cache-benchmark-report:
     needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind, cache-benchmark-cold-cachemount, cache-benchmark-warm-cachemount]
     runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}

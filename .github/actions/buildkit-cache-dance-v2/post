@@ -1,0 +1,33 @@
+#!/bin/bash
+set -eux -o pipefail
+: "Argv0: $0"
+dir="$(dirname "$0")"
+read_action_input() {
+	"${dir}/read-action-input" "$1"
+}
+
+if [ "$(read_action_input skip-extraction)" == "true" ]; then
+  echo "skip-extraction is set. Skipping extraction step..." >&2
+  exit 0
+fi
+
+: "Prepare Timestamp for Layer Cache Busting"
+date --iso=ns | tee "$(read_action_input scratch-dir)"/buildstamp
+: "Prepare Dancefile to Access Caches"
+cat >"$(read_action_input scratch-dir)"/Dancefile.extract <<EOF
+FROM busybox:1
+COPY buildstamp buildstamp
+RUN --mount=type=cache,target="$(read_action_input cache-target)" \
+    mkdir -p /var/dance-cache/ \
+    && cp -p -R "$(read_action_input cache-target)"/. /var/dance-cache/ || true
+EOF
+cat "$(read_action_input scratch-dir)"/Dancefile.extract
+: "Extract Data into Docker Image"
+docker buildx build -f "$(read_action_input scratch-dir)"/Dancefile.extract --tag dance:extract --load "$(read_action_input scratch-dir)"
+: "Create Extraction Image"
+docker rm -f cache-container && docker create -ti --name cache-container dance:extract
+: "Unpack Docker Image into Scratch"
+docker cp -L cache-container:/var/dance-cache - | tar -H posix -x -C "$(read_action_input scratch-dir)"
+: "Move Cache into Its Place"
+sudo rm -rf "$(read_action_input cache-source)"
+mv "$(read_action_input scratch-dir)"/dance-cache "$(read_action_input cache-source)"

@@ -564,6 +564,56 @@ COPY pkg/ pkg/
 COPY main.go ./
 RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
 
+# Cache-mount variant #2, testing buildkit-cache-dance@v2.1.4 (vendored in
+# .github/actions/buildkit-cache-dance-v2/) as a workaround suggested by
+# multiple independent reports in the still-open, unresolved upstream issue
+# reproducible-containers/buildkit-cache-dance#33 ("Stored cache is empty").
+# v2.1.4 predates the current cache-map/per-mount-id architecture and always
+# generates a bare `RUN --mount=type=cache,target=...` with NO explicit
+# `id=` -- BuildKit defaults the cache-mount id to the target path in that
+# case -- so these stages deliberately omit `id=` too, to match v2.1.4's own
+# generated Dockerfile shape exactly. Isolated via a distinct target
+# (/root/.cache-dance-v2) so this can't collide with the id=rancher (real)
+# or id=rancher-cache-mount-bench (v3.4.0 benchmark) cache mounts.
+FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder-mount-dance-v2
+ARG BUILD_WORKDIR
+WORKDIR ${BUILD_WORKDIR}
+ARG GODEP_APISERVER_PATH
+COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
+ARG GODEP_REMOTEDIALER_PATH
+COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
+ARG GODEP_SHEPHERD_PATH
+COPY --from=godep-shepherd / ${GODEP_SHEPHERD_PATH}
+ARG GODEP_STEVE_PATH
+COPY --from=godep-steve / ${GODEP_STEVE_PATH}
+ARG GODEP_WRANGLER_PATH
+COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
+COPY go.mod go.sum ./
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
+RUN --mount=type=cache,target=/root/.cache-dance-v2 go mod download
+RUN --mount=type=cache,target=/root/.cache-dance-v2 cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache-dance-v2 cd pkg/client && go mod download
+
+FROM --platform=$BUILDPLATFORM rancher-go-builder-mount-dance-v2 AS server-build-mount-dance-v2
+ARG VERSION
+ARG COMMIT
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY main.go ./
+RUN --mount=type=cache,target=/root/.cache-dance-v2 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+
 # k3s images step, RUN --mount=type=cache variant -- see
 # rancher-go-builder-mount comment above for the full rationale. Mirrors
 # the real "images" stage below (same go.mod/go.sum, same go build
