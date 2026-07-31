@@ -1178,8 +1178,253 @@ jobs:
   # END TEMPORARY cache-benchmark-cold-cachemount-dance-v2 block
   # ---------------------------------------------------------------------
 
+  # ---------------------------------------------------------------------
+  # TEMPORARY: cache-benchmark-{cold,warm}-gocacheprog -- evaluates Go
+  # 1.24+'s GOCACHEPROG protocol as an alternative to (or complement of)
+  # everything above, per Tom's ask and GOCACHEPROG_FINDINGS.md.
+  #
+  # Uses rancher-go-builder-gocacheprog / server-build-gocacheprog /
+  # gocacheprog-out in package/Dockerfile: GOMODCACHE stays on the
+  # already-proven bind-mount mechanism (GOCACHEPROG doesn't cover module
+  # downloads at all), only $GOCACHE is routed through GOCACHEPROG, backed
+  # by saracen/gobuildcache pointed at a `file://` bucket directory that
+  # is itself persisted the SAME way gocache-in/gocache-out already is
+  # (plain COPY into a normal layer + actions/cache) -- this deliberately
+  # avoids re-fighting the RUN --mount=type=cache cross-invocation bug
+  # that sank the cache-mount benchmark above, under a different name.
+  #
+  # cache-benchmark-cold-gocacheprog: empty bucket, GOMODCACHE also cold
+  # (empty gocache-in, produced fresh here since GOCACHEPROG doesn't
+  # produce it). cache-benchmark-warm-gocacheprog: restores BOTH the
+  # GOCACHEPROG bucket (from this job) and the existing GOMODCACHE
+  # gocache-in cache (from cache-benchmark-cold, reused directly --
+  # module deps haven't changed between these benchmark jobs in the same
+  # workflow run) via --build-context, and times a build with a
+  # populated GOCACHEPROG bucket but a FRESH/uninitialized local
+  # gobuildcache staging dir (/tmp/gocacheprog-bucket contents ARE the
+  # persisted state; there's no separate local disk cache to complicate
+  # the cold/warm distinction with this backend, unlike a
+  # server/socket-mode GOCACHEPROG deployment would have).
+  # ---------------------------------------------------------------------
+  cache-benchmark-cold-gocacheprog:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      # Empty GOMODCACHE input (produced fresh by this job, same as
+      # cache-benchmark-cold does for gocache-in) -- distinct key so it
+      # never collides with the COPY-based benchmark's own cache entry.
+      - name: "Restore go mod cache for GOCACHEPROG variant (expected: miss)"
+        id: cache-gomod
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gocacheprog-gomod
+          key: rancher-gocache-benchmark-gocacheprog-gomod-${{ github.run_id }}
+      - name: "Restore GOCACHEPROG bucket (expected: miss)"
+        id: cache-bucket
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gocacheprog-bucket
+          key: rancher-gocache-benchmark-gocacheprog-bucket-${{ github.run_id }}
+      - name: "Report cache hit status (both should be false)"
+        run: |
+          echo "gomod cache-hit=${{ steps.cache-gomod.outputs.cache-hit }}"
+          echo "bucket cache-hit=${{ steps.cache-bucket.outputs.cache-hit }}"
+          if [ "${{ steps.cache-gomod.outputs.cache-hit }}" = "true" ] || [ "${{ steps.cache-bucket.outputs.cache-hit }}" = "true" ]; then
+            echo "::warning::Expected cache misses on the cold job but got a hit -- scratch key collided, results are not trustworthy."
+          fi
+          mkdir -p go-build-cache-benchmark-gocacheprog-gomod go-build-cache-benchmark-gocacheprog-bucket
+      - name: "Timed build (server-build-gocacheprog, cold GOCACHE via GOCACHEPROG, cold GOMODCACHE)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark-gocacheprog-gomod" \
+            --build-arg "GOCACHEPROG_BUCKET_IN=gocacheprogbucket" \
+            --build-context "gocacheprogbucket=go-build-cache-benchmark-gocacheprog-bucket" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-gocacheprog \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Cold (GOCACHEPROG) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Cold (GOCACHEPROG, server-build-gocacheprog): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+        # No --output: same rationale as server-build-bind above -- we
+        # only care about timing the RUN steps, not producing an image.
+      - name: Extract populated GOMODCACHE (reusing existing gocache-out mechanism)
+        shell: bash
+        run: |
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target gocache-out \
+            --output type=tar,dest=go-build-cache-benchmark-gocacheprog-gomod.tar \
+            .
+          rm -rf go-build-cache-benchmark-gocacheprog-gomod
+          mkdir -p go-build-cache-benchmark-gocacheprog-gomod
+          tar -xf go-build-cache-benchmark-gocacheprog-gomod.tar -C go-build-cache-benchmark-gocacheprog-gomod
+          rm -f go-build-cache-benchmark-gocacheprog-gomod.tar
+          du -sh go-build-cache-benchmark-gocacheprog-gomod || true
+        # Same COPY-based gocache-out mechanism as cache-benchmark-cold/
+        # cache-benchmark-cold-bind use -- gocache-out only depends on
+        # server-build (the real, unmodified COPY-based stage), so this
+        # produces the GOMODCACHE content warm-gocacheprog needs
+        # independent of whichever GOCACHE mechanism is under test.
+      - name: Extract populated GOCACHEPROG bucket
+        shell: bash
+        run: |
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark-gocacheprog-gomod" \
+            --build-arg "GOCACHEPROG_BUCKET_IN=gocacheprogbucket" \
+            --build-context "gocacheprogbucket=go-build-cache-benchmark-gocacheprog-bucket" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target gocacheprog-out \
+            --output type=tar,dest=go-build-cache-benchmark-gocacheprog-bucket.tar \
+            .
+          rm -rf go-build-cache-benchmark-gocacheprog-bucket
+          mkdir -p go-build-cache-benchmark-gocacheprog-bucket
+          tar -xf go-build-cache-benchmark-gocacheprog-bucket.tar -C go-build-cache-benchmark-gocacheprog-bucket
+          rm -f go-build-cache-benchmark-gocacheprog-bucket.tar
+          du -sh go-build-cache-benchmark-gocacheprog-bucket || true
+        # IMPORTANT: every --build-arg/--build-context here matches the
+        # "Timed build" step above exactly (same lesson as gocache-out
+        # above) -- gocacheprog-out's dependency graph runs through
+        # rancher-go-builder-gocacheprog, which also consumes gocache-in,
+        # so BOTH build-contexts must be supplied identically or this
+        # silently redoes the whole cold build a second time.
+
+  cache-benchmark-warm-gocacheprog:
+    needs: cache-benchmark-cold-gocacheprog
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: "Restore go mod cache for GOCACHEPROG variant (expected: hit)"
+        id: cache-gomod
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gocacheprog-gomod
+          key: rancher-gocache-benchmark-gocacheprog-gomod-${{ github.run_id }}
+      - name: "Restore GOCACHEPROG bucket (expected: hit)"
+        id: cache-bucket
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gocacheprog-bucket
+          key: rancher-gocache-benchmark-gocacheprog-bucket-${{ github.run_id }}
+      - name: "Report cache hit status (both should be true)"
+        run: |
+          echo "gomod cache-hit=${{ steps.cache-gomod.outputs.cache-hit }}"
+          echo "bucket cache-hit=${{ steps.cache-bucket.outputs.cache-hit }}"
+          if [ "${{ steps.cache-gomod.outputs.cache-hit }}" != "true" ] || [ "${{ steps.cache-bucket.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected cache hits on the warm job but got a miss -- actions/cache restore did not work as expected."
+            exit 1
+          fi
+          echo "Restored GOMODCACHE size:"
+          du -sh go-build-cache-benchmark-gocacheprog-gomod || true
+          echo "Restored GOCACHEPROG bucket size:"
+          du -sh go-build-cache-benchmark-gocacheprog-bucket || true
+      - name: "Timed build (server-build-gocacheprog, warm GOCACHE via GOCACHEPROG, warm GOMODCACHE)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark-gocacheprog-gomod" \
+            --build-arg "GOCACHEPROG_BUCKET_IN=gocacheprogbucket" \
+            --build-context "gocacheprogbucket=go-build-cache-benchmark-gocacheprog-bucket" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-gocacheprog \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm (GOCACHEPROG) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (GOCACHEPROG, server-build-gocacheprog): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+        # No --output, same rationale as the cold job's timed-build step.
+        # This is the real number of interest: does a small-diff PR (here,
+        # source is IDENTICAL between cold and warm since this is a
+        # same-commit re-run, so it's an upper bound on GOCACHEPROG's
+        # fine-grained-fetch benefit) get a genuinely fast GOCACHE
+        # restore via GOCACHEPROG vs. the coarse-grained COPY/bind-mount
+        # designs above having to stage the WHOLE cache directory first.
+  # ---------------------------------------------------------------------
+  # END TEMPORARY cache-benchmark-*-gocacheprog block
+  # ---------------------------------------------------------------------
+
   cache-benchmark-report:
-    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind, cache-benchmark-cold-cachemount, cache-benchmark-warm-cachemount]
+    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind, cache-benchmark-cold-cachemount, cache-benchmark-warm-cachemount, cache-benchmark-cold-gocacheprog, cache-benchmark-warm-gocacheprog]
     runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     steps:
       - name: Summarize results
@@ -1193,6 +1438,8 @@ jobs:
           COLD_MOUNT="${{ needs.cache-benchmark-cold-cachemount.outputs.build-seconds }}"
           WARM_MOUNT="${{ needs.cache-benchmark-warm-cachemount.outputs.build-seconds }}"
           WARM_MOUNT_K3S="${{ needs.cache-benchmark-warm-cachemount.outputs.k3s-build-seconds }}"
+          COLD_GOCACHEPROG="${{ needs.cache-benchmark-cold-gocacheprog.outputs.build-seconds }}"
+          WARM_GOCACHEPROG="${{ needs.cache-benchmark-warm-gocacheprog.outputs.build-seconds }}"
           echo "# Cache Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
@@ -1206,6 +1453,8 @@ jobs:
           echo "| Cold (RUN --mount=type=cache, raised GC policy, server-build-mount) | ${COLD_MOUNT}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Warm (RUN --mount=type=cache via dance + actions/cache, server-build-mount) | ${WARM_MOUNT}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Cache mount, images-mount / k3s (k3s leg is itself cold, see job comment) | ${WARM_MOUNT_K3S}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (GOCACHEPROG via gobuildcache file:// bucket, server-build-gocacheprog) | ${COLD_GOCACHEPROG}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (GOCACHEPROG bucket restored via actions/cache, server-build-gocacheprog) | ${WARM_GOCACHEPROG}s |" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
             SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
             echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -1238,6 +1487,14 @@ jobs:
           if [ -n "$WARM_BIND" ] && [ -n "$WARM_MOUNT" ] && [ "$WARM_MOUNT" -gt 0 ]; then
             SPEEDUP_BIND_VS_MOUNT=$(awk "BEGIN { printf \"%.1f\", $WARM_BIND / $WARM_MOUNT }")
             echo "Warm bind mount vs. warm cache mount (server): **${SPEEDUP_BIND_VS_MOUNT}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$COLD_GOCACHEPROG" ] && [ -n "$WARM_GOCACHEPROG" ] && [ "$WARM_GOCACHEPROG" -gt 0 ]; then
+            SPEEDUP_GOCACHEPROG=$(awk "BEGIN { printf \"%.1f\", $COLD_GOCACHEPROG / $WARM_GOCACHEPROG }")
+            echo "Speedup (cold vs. warm, GOCACHEPROG): **${SPEEDUP_GOCACHEPROG}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$WARM_BIND" ] && [ -n "$WARM_GOCACHEPROG" ] && [ "$WARM_GOCACHEPROG" -gt 0 ]; then
+            SPEEDUP_BIND_VS_GOCACHEPROG=$(awk "BEGIN { printf \"%.1f\", $WARM_BIND / $WARM_GOCACHEPROG }")
+            echo "Warm bind mount vs. warm GOCACHEPROG (server): **${SPEEDUP_BIND_VS_GOCACHEPROG}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark block
