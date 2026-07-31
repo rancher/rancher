@@ -43,6 +43,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		pcExists       bool
 		agentImage     string
 		authImage      string
+		chartsImage    string
 		namespace      string
 		token          string
 		url            string
@@ -159,9 +160,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
-			url:        "some-dummy-url",
-			token:      "some-dummy-token",
-			agentImage: "my/agent:image",
+			url:         "some-dummy-url",
+			token:       "some-dummy-token",
+			agentImage:  "my/agent:image",
+			chartsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled",
@@ -187,7 +189,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					"baz": "quz",
 				},
 			},
-			agentImage: "my/agent:image",
+			agentImage:  "my/agent:image",
+			chartsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled-no-labels",
@@ -211,7 +214,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 				Labels: map[string]string{},
 			},
-			agentImage: "my/agent:image",
+			agentImage:  "my/agent:image",
+			chartsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled-no-annotations",
@@ -235,7 +239,8 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					"baz": "quz",
 				},
 			},
-			agentImage: "my/agent:image",
+			agentImage:  "my/agent:image",
+			chartsImage: "rancher/assets:charts",
 		},
 		{
 			name: "imported cluster with pull secrets renders imagePullSecrets and secret resources",
@@ -255,9 +260,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
-			agentImage: "rancher/rancher-agent:v2.8.0",
-			token:      "test-token",
-			url:        "https://rancher.example.com",
+			agentImage:  "rancher/rancher-agent:v2.8.0",
+			chartsImage: "rancher/assets:charts",
+			token:       "test-token",
+			url:         "https://rancher.example.com",
 			secrets: map[string]*corev1.Secret{
 				"fleet-default:my-pull-secret": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -286,9 +292,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					},
 				},
 			},
-			agentImage: "rancher-agent:v2.8.0",
-			token:      "test-token",
-			url:        "https://rancher.example.com",
+			agentImage:  "rancher-agent:v2.8.0",
+			chartsImage: "rancher/assets:charts",
+			token:       "test-token",
+			url:         "https://rancher.example.com",
 			secrets: map[string]*corev1.Secret{
 				"fleet-default:my-pull-secret-rancher-managed-pull-secret": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -321,9 +328,10 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
-			agentImage: "rancher-agent:v2.8.0",
-			token:      "test-token",
-			url:        "https://rancher.example.com",
+			agentImage:  "rancher-agent:v2.8.0",
+			chartsImage: "rancher/assets:charts",
+			token:       "test-token",
+			url:         "https://rancher.example.com",
 			secrets: map[string]*corev1.Secret{
 				"fleet-default:secret-one": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -368,6 +376,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:    "my-registry.example.com/rancher/rancher-agent:v2.8.0",
+			chartsImage:   "rancher/assets:charts",
 			token:         "test-token",
 			url:           "https://rancher.example.com",
 			expectedError: "\"fleet-default:nonexistent-secret\" not found",
@@ -386,6 +395,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:     "rancher/rancher-agent:v2.8.0",
+			chartsImage:    "rancher/assets:charts",
 			token:          "test-token",
 			url:            "https://rancher.example.com",
 			isPreBootstrap: true,
@@ -404,6 +414,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			err := SystemTemplate(&b, &TemplateOps{
 				AgentImage:     tt.agentImage,
 				AuthImage:      tt.authImage,
+				ChartsImage:    tt.chartsImage,
 				Namespace:      tt.namespace,
 				Token:          tt.token,
 				URL:            tt.url,
