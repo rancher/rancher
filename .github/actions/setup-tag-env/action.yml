@@ -4,7 +4,7 @@ runs:
   using: "composite"
   steps:
     - shell: bash
-      run: |
+      run: | # zizmor: ignore[github-env] -- this action intentionally exports validated tag values for later steps.
         ref_name="${GITHUB_REF_NAME}"
         TAG="v2.16-${GITHUB_SHA}-head"
         prefix="release/"
