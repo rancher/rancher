@@ -609,45 +609,50 @@ jobs:
         # Full (unfiltered) output this time -- the earlier grep-filtered
         # version only matched "Type:" lines and never showed the actual
         # "Size:" field, so it wasn't actually useful as a sanity check.
-      - name: "Extract populated cache (debug: hand-rolled, verbose)"
+      - name: "Extract populated cache (debug: hand-rolled, verbose, --output=local, no --load)"
         shell: bash
         run: |
           set -x
           mkdir -p scratch
           date -u -Iseconds > scratch/buildstamp
+          # Two-stage Dancefile: stage 1 does the same cache-mount RUN cp as
+          # before (exec.cachemount id must match exactly, same as inject
+          # and the timed build). Stage 2 is FROM scratch and COPYs only
+          # /var/dance-cache out of stage 1, so `--output type=local` can
+          # export just that content directly to the runner's disk --
+          # exactly how approach #1 (COPY-based)'s gocache-out extraction
+          # already works reliably. This entirely avoids the
+          # --load + docker create + docker export/cp round-trip through
+          # the host Docker daemon, which upstream
+          # (reproducible-containers/buildkit-cache-dance#33, open since
+          # Jun 2024, still unresolved) and our own hand-rolled attempt
+          # both point to as the likely place cache-mount content silently
+          # goes missing (EXTRACT_CP_OK prints, but the --load'd image
+          # ends up empty of it).
           {
-            echo 'FROM ghcr.io/containerd/busybox:latest'
+            echo 'FROM ghcr.io/containerd/busybox:latest AS extract-stage'
             echo 'COPY buildstamp buildstamp'
             echo 'RUN --mount=type=cache,target=/root/.cache,id=rancher-cache-mount-bench \'
             echo '    mkdir -p /var/dance-cache/ \'
             echo '    && cp -p -R /root/.cache/. /var/dance-cache/ && echo EXTRACT_CP_OK || echo EXTRACT_CP_FAILED'
+            echo ''
+            echo 'FROM scratch AS export'
+            echo 'COPY --from=extract-stage /var/dance-cache /'
           } > scratch/Dancefile.extract
           echo "=== Dancefile.extract ==="
           cat scratch/Dancefile.extract
+          rm -rf go-build-cache-benchmark-mount
+          mkdir -p go-build-cache-benchmark-mount
           docker buildx build \
             --builder "${{ steps.setup-buildx.outputs.name }}" \
             -f scratch/Dancefile.extract \
-            --tag dance:extract \
+            --target export \
             --progress=plain \
             --no-cache \
-            --load \
+            --output "type=local,dest=$(pwd)/go-build-cache-benchmark-mount" \
             scratch 2>&1 | tee /tmp/extract-build.log
           echo "=== full extract build log ==="
           cat /tmp/extract-build.log
-          echo "=== was the image actually loaded into the host docker daemon? ==="
-          docker images dance:extract
-          docker rm -f cache-container 2>/dev/null || true
-          docker create --name cache-container dance:extract
-          echo "=== contents of /var/dance-cache inside the created container (via docker export, avoids docker cp edge cases) ==="
-          docker export cache-container > /tmp/cache-container.tar
-          tar -tvf /tmp/cache-container.tar > /tmp/cache-container-filelist.txt
-          sed -n '1,20p' /tmp/cache-container-filelist.txt
-          wc -l < /tmp/cache-container-filelist.txt
-          rm -f /tmp/cache-container.tar /tmp/cache-container-filelist.txt
-          rm -rf go-build-cache-benchmark-mount
-          mkdir -p go-build-cache-benchmark-mount
-          docker cp -L cache-container:/var/dance-cache/. go-build-cache-benchmark-mount/
-          docker rm -f cache-container
           echo "=== extracted cache dir size on host disk ==="
           du -sh go-build-cache-benchmark-mount || true
           find go-build-cache-benchmark-mount -maxdepth 2 | head -20
