@@ -640,9 +640,10 @@ jobs:
           docker create --name cache-container dance:extract
           echo "=== contents of /var/dance-cache inside the created container (via docker export, avoids docker cp edge cases) ==="
           docker export cache-container > /tmp/cache-container.tar
-          tar -tvf /tmp/cache-container.tar | head -20
-          tar -tvf /tmp/cache-container.tar | wc -l
-          rm -f /tmp/cache-container.tar
+          tar -tvf /tmp/cache-container.tar > /tmp/cache-container-filelist.txt
+          sed -n '1,20p' /tmp/cache-container-filelist.txt
+          wc -l < /tmp/cache-container-filelist.txt
+          rm -f /tmp/cache-container.tar /tmp/cache-container-filelist.txt
           rm -rf go-build-cache-benchmark-mount
           mkdir -p go-build-cache-benchmark-mount
           docker cp -L cache-container:/var/dance-cache/. go-build-cache-benchmark-mount/
