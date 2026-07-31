@@ -265,8 +265,8 @@ targets:
     sourceid: 'wins-release'
     spec:
       file: 'pkg/settings/setting.go'
-      matchpattern: 'https://raw.githubusercontent.com/rancher/wins/v\S+/install.ps1'
-      replacepattern: 'https://raw.githubusercontent.com/rancher/wins/{{ source "wins-release" }}/install.ps1'
+      matchpattern: 'https://github.com/rancher/wins/releases/download/v\S+/install.ps1'
+      replacepattern: 'https://github.com/rancher/wins/releases/download/{{ source "wins-release" }}/install.ps1'
 
   update-pkg-settings-system-agent-release:
     name: 'Update System Agent to {{ source "system-agent-release" }} in pkg/settings/setting.go'
