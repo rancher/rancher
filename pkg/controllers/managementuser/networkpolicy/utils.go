@@ -3,7 +3,7 @@ package networkpolicy
 import (
 	"fmt"
 
-	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"

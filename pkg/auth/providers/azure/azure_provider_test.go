@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rancher/norman/api/writer"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/api/writer"
+	"github.com/rancher/rancher/pkg/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"

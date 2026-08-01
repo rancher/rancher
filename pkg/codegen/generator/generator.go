@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/rancher/norman/generator"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/generator"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 

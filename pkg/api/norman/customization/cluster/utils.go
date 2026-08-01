@@ -7,8 +7,8 @@ import (
 	"time"
 
 	yaml2 "github.com/ghodss/yaml"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/values"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"

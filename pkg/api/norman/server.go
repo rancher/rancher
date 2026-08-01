@@ -1,8 +1,8 @@
 package norman
 
 import (
-	normanapi "github.com/rancher/norman/api"
-	"github.com/rancher/norman/types"
+	normanapi "github.com/rancher/rancher/pkg/norman/api"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/settings"
 )
 

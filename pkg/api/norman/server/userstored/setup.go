@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rancher/norman/store/subtype"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/store/subtype"
+	"github.com/rancher/rancher/pkg/norman/types"
 	namespacecustom "github.com/rancher/rancher/pkg/api/norman/customization/namespace"
 	"github.com/rancher/rancher/pkg/api/norman/customization/persistentvolumeclaim"
 	sec "github.com/rancher/rancher/pkg/api/norman/customization/secret"

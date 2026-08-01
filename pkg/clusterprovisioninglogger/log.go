@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/norman/condition"
+	"github.com/rancher/rancher/pkg/norman/condition"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/logstream"

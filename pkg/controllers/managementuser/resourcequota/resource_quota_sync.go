@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"

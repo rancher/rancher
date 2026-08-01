@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/norman/condition"
+	"github.com/rancher/rancher/pkg/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"

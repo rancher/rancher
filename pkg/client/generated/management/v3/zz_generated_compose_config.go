@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 const (

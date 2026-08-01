@@ -3,7 +3,7 @@ package v3
 import (
 	"strings"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

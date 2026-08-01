@@ -7,8 +7,8 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/norman/objectclient"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"

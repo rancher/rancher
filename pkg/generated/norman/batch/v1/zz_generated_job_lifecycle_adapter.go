@@ -1,8 +1,8 @@
 package v1
 
 import (
-	"github.com/rancher/norman/lifecycle"
-	"github.com/rancher/norman/resource"
+	"github.com/rancher/rancher/pkg/norman/lifecycle"
+	"github.com/rancher/rancher/pkg/norman/resource"
 	"k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )

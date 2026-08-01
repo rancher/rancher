@@ -10,7 +10,7 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/pkg/errors"
-	cond "github.com/rancher/norman/condition"
+	cond "github.com/rancher/rancher/pkg/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"

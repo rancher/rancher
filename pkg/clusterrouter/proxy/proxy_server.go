@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	dialer2 "github.com/rancher/rancher/pkg/dialer"

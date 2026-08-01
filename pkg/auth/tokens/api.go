@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	normanapi "github.com/rancher/norman/api"
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
+	normanapi "github.com/rancher/rancher/pkg/norman/api"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"

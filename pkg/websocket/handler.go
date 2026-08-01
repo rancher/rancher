@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 	httprequest "github.com/rancher/rancher/internal/http/request"
 	"github.com/rancher/rancher/pkg/features"
 )

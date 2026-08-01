@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-	"github.com/rancher/norman/api/builtin"
-	"github.com/rancher/norman/pkg/subscribe"
+	"github.com/rancher/rancher/pkg/norman/api/builtin"
+	"github.com/rancher/rancher/pkg/norman/pkg/subscribe"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/server/managementstored"
 	"github.com/rancher/rancher/pkg/api/norman/server/userstored"

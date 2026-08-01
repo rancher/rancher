@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
+	"github.com/rancher/rancher/pkg/norman/controller"
+	"github.com/rancher/rancher/pkg/norman/objectclient"
+	"github.com/rancher/rancher/pkg/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

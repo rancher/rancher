@@ -17,7 +17,7 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/lasso/pkg/metrics"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
 	extv1api "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"

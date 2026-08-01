@@ -11,6 +11,8 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+
+	github.com/rancher/rancher/pkg/norman => /home/wrinkle/workspaces/joshmeranda/rancher-rancher/pkg/norman
 	github.com/rancher/rancher/pkg/plan => ./pkg/plan
 	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
@@ -130,9 +132,9 @@ require (
 	github.com/rancher/lasso v0.2.9
 	github.com/rancher/machine v0.15.0-rancher145
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.9.7
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
+	github.com/rancher/rancher/pkg/norman v0.0.0-00010101000000-000000000000
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.8.0-rc.5
@@ -271,6 +273,7 @@ require (
 	github.com/pjbgf/sha1cd v0.6.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/prometheus/common v0.67.5 // indirect
+	github.com/rancher/norman v0.9.7 // indirect
 	github.com/rancher/wrangler v1.1.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect

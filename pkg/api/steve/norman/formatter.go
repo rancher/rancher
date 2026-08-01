@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
-	types2 "github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/urlbuilder"
+	types2 "github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/urlbuilder"
 	v3 "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"

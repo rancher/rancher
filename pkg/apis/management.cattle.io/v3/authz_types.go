@@ -3,8 +3,8 @@ package v3
 import (
 	"strings"
 
-	"github.com/rancher/norman/condition"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/condition"
+	"github.com/rancher/rancher/pkg/norman/types"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

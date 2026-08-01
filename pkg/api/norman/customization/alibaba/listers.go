@@ -16,7 +16,7 @@ import (
 
 	"github.com/rancher/muchang/utils/tea"
 	"github.com/rancher/muchang/utils/tea/dara"
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 )
 
 const (

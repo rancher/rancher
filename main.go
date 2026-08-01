@@ -10,8 +10,8 @@ import (
 
 	"github.com/ehazlett/simplelog"
 	"github.com/moby/sys/reexec"
-	_ "github.com/rancher/norman/controller"
-	"github.com/rancher/norman/pkg/kwrapper/k8s"
+	_ "github.com/rancher/rancher/pkg/norman/controller"
+	"github.com/rancher/rancher/pkg/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rancher"

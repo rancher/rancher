@@ -1,8 +1,8 @@
 package mapper
 
 import (
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/values"
 )
 
 // These mappers copy data from the networking.k8s.io/v1-style Ingress fields

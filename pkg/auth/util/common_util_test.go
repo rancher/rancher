@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/rancher/apiserver/pkg/apierror"
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

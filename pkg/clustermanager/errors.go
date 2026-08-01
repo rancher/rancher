@@ -1,6 +1,6 @@
 package clustermanager
 
-import "github.com/rancher/norman/httperror"
+import "github.com/rancher/rancher/pkg/norman/httperror"
 
 // IsClusterUnavailableErr checks if a given error indicates that the requested cluster was not available
 func IsClusterUnavailableErr(err error) bool {

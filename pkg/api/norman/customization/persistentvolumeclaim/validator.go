@@ -3,8 +3,8 @@ package persistentvolumeclaim
 import (
 	"fmt"
 
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/api/norman/store/storageclass"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

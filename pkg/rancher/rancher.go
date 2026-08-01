@@ -13,7 +13,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-	normanStoreProxy "github.com/rancher/norman/store/proxy"
+	normanStoreProxy "github.com/rancher/rancher/pkg/norman/store/proxy"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"

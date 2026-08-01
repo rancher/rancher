@@ -3,8 +3,8 @@ package globalrolebinding
 import (
 	"net/http"
 
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {

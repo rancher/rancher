@@ -1,8 +1,8 @@
 package rbac
 
 import (
-	"github.com/rancher/norman/authorization"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/authorization"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 type contextKey struct{}

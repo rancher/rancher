@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/norman/condition"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/condition"
+	"github.com/rancher/rancher/pkg/norman/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

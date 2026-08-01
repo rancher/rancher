@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/rancher/pkg/norman/objectclient"
 	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"

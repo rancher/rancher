@@ -9,8 +9,8 @@ import (
 	"time"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/objectclient"
+	"github.com/rancher/rancher/pkg/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"

@@ -3,12 +3,12 @@ package namespace
 import (
 	"fmt"
 
-	"github.com/rancher/norman/api/access"
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/store/transform"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/norman/api/access"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/store/transform"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/values"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"

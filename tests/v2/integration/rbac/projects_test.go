@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
 	"github.com/rancher/shepherd/clients/rancher"
 

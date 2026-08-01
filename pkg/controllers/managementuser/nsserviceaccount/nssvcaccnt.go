@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nsserviceaccount"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"

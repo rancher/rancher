@@ -1,6 +1,6 @@
 package noopwatching
 
-import "github.com/rancher/norman/types"
+import "github.com/rancher/rancher/pkg/norman/types"
 
 func Wrap(store types.Store) types.Store {
 	return &Store{
