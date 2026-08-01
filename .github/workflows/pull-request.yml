@@ -1419,12 +1419,100 @@ jobs:
         # fine-grained-fetch benefit) get a genuinely fast GOCACHE
         # restore via GOCACHEPROG vs. the coarse-grained COPY/bind-mount
         # designs above having to stage the WHOLE cache directory first.
+
+  # ---------------------------------------------------------------------
+  # TEMPORARY: cache-benchmark-warm-gocacheprog-8cpu -- same as
+  # cache-benchmark-warm-gocacheprog above, but on an 8cpu runner instead
+  # of 4cpu, mirroring the existing COPY-based cache-benchmark-warm-8cpu
+  # job. Tom asked whether GOCACHEPROG's warm build (225s on 4cpu, slower
+  # than bind-mount's 129s on the same-commit comparison) is CPU-bound
+  # enough that doubling cores closes (or reverses) that gap. Duplicated
+  # as its own job (not a matrix on cache-benchmark-warm-gocacheprog) to
+  # keep the existing 4cpu number directly comparable/unchanged, same
+  # rationale as cache-benchmark-warm-8cpu.
+  # ---------------------------------------------------------------------
+  cache-benchmark-warm-gocacheprog-8cpu:
+    needs: cache-benchmark-cold-gocacheprog
+    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: "Restore go mod cache for GOCACHEPROG variant (expected: hit)"
+        id: cache-gomod
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gocacheprog-gomod
+          key: rancher-gocache-benchmark-gocacheprog-gomod-${{ github.run_id }}
+      - name: "Restore GOCACHEPROG bucket (expected: hit)"
+        id: cache-bucket
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gocacheprog-bucket
+          key: rancher-gocache-benchmark-gocacheprog-bucket-${{ github.run_id }}
+      - name: "Report cache hit status (both should be true)"
+        run: |
+          echo "gomod cache-hit=${{ steps.cache-gomod.outputs.cache-hit }}"
+          echo "bucket cache-hit=${{ steps.cache-bucket.outputs.cache-hit }}"
+          if [ "${{ steps.cache-gomod.outputs.cache-hit }}" != "true" ] || [ "${{ steps.cache-bucket.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected cache hits on the warm job but got a miss -- actions/cache restore did not work as expected."
+            exit 1
+          fi
+          echo "Restored GOMODCACHE size:"
+          du -sh go-build-cache-benchmark-gocacheprog-gomod || true
+          echo "Restored GOCACHEPROG bucket size:"
+          du -sh go-build-cache-benchmark-gocacheprog-bucket || true
+      - name: "Timed build (server-build-gocacheprog, warm GOCACHE via GOCACHEPROG, warm GOMODCACHE, 8cpu)"
+        id: timed-build
+        shell: bash
+        run: |
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --build-arg "GOCACHE_IN=gocache" \
+            --build-context "gocache=go-build-cache-benchmark-gocacheprog-gomod" \
+            --build-arg "GOCACHEPROG_BUCKET_IN=gocacheprogbucket" \
+            --build-context "gocacheprogbucket=go-build-cache-benchmark-gocacheprog-bucket" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-gocacheprog \
+            .
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "Warm (GOCACHEPROG, 8cpu) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (GOCACHEPROG, 8cpu, server-build-gocacheprog): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+  # ---------------------------------------------------------------------
+  # END TEMPORARY cache-benchmark-warm-gocacheprog-8cpu block
+  # ---------------------------------------------------------------------
+
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark-*-gocacheprog block
   # ---------------------------------------------------------------------
 
   cache-benchmark-report:
-    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind, cache-benchmark-cold-cachemount, cache-benchmark-warm-cachemount, cache-benchmark-cold-gocacheprog, cache-benchmark-warm-gocacheprog]
+    needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind, cache-benchmark-cold-cachemount, cache-benchmark-warm-cachemount, cache-benchmark-cold-gocacheprog, cache-benchmark-warm-gocacheprog, cache-benchmark-warm-gocacheprog-8cpu]
     runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     steps:
       - name: Summarize results
@@ -1440,6 +1528,7 @@ jobs:
           WARM_MOUNT_K3S="${{ needs.cache-benchmark-warm-cachemount.outputs.k3s-build-seconds }}"
           COLD_GOCACHEPROG="${{ needs.cache-benchmark-cold-gocacheprog.outputs.build-seconds }}"
           WARM_GOCACHEPROG="${{ needs.cache-benchmark-warm-gocacheprog.outputs.build-seconds }}"
+          WARM_GOCACHEPROG_8CPU="${{ needs.cache-benchmark-warm-gocacheprog-8cpu.outputs.build-seconds }}"
           echo "# Cache Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
@@ -1455,6 +1544,7 @@ jobs:
           echo "| Cache mount, images-mount / k3s (k3s leg is itself cold, see job comment) | ${WARM_MOUNT_K3S}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Cold (GOCACHEPROG via gobuildcache file:// bucket, server-build-gocacheprog) | ${COLD_GOCACHEPROG}s |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Warm (GOCACHEPROG bucket restored via actions/cache, server-build-gocacheprog) | ${WARM_GOCACHEPROG}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (GOCACHEPROG bucket restored via actions/cache, 8cpu) | ${WARM_GOCACHEPROG_8CPU}s |" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
             SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
             echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -1495,6 +1585,14 @@ jobs:
           if [ -n "$WARM_BIND" ] && [ -n "$WARM_GOCACHEPROG" ] && [ "$WARM_GOCACHEPROG" -gt 0 ]; then
             SPEEDUP_BIND_VS_GOCACHEPROG=$(awk "BEGIN { printf \"%.1f\", $WARM_BIND / $WARM_GOCACHEPROG }")
             echo "Warm bind mount vs. warm GOCACHEPROG (server): **${SPEEDUP_BIND_VS_GOCACHEPROG}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$WARM_GOCACHEPROG" ] && [ -n "$WARM_GOCACHEPROG_8CPU" ] && [ "$WARM_GOCACHEPROG_8CPU" -gt 0 ]; then
+            SPEEDUP_GOCACHEPROG_CPU=$(awk "BEGIN { printf \"%.1f\", $WARM_GOCACHEPROG / $WARM_GOCACHEPROG_8CPU }")
+            echo "Speedup (4cpu warm vs. 8cpu warm, GOCACHEPROG): **${SPEEDUP_GOCACHEPROG_CPU}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$WARM_BIND" ] && [ -n "$WARM_GOCACHEPROG_8CPU" ] && [ "$WARM_GOCACHEPROG_8CPU" -gt 0 ]; then
+            SPEEDUP_BIND_VS_GOCACHEPROG_8CPU=$(awk "BEGIN { printf \"%.1f\", $WARM_BIND / $WARM_GOCACHEPROG_8CPU }")
+            echo "Warm bind mount (4cpu) vs. warm GOCACHEPROG (8cpu): **${SPEEDUP_BIND_VS_GOCACHEPROG_8CPU}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark block
