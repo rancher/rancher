@@ -145,6 +145,7 @@ jobs:
   # sneak through silently.
   # ---------------------------------------------------------------------
   cache-benchmark-cold:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     # Tried volume=200gb:gp3:500mbs:4000iops first (finer-grained size/
     # type/throughput/IOPS control, added in RunsOn v2.9) but it had no
     # effect: the runner's own "Runner details" table still showed the
@@ -299,6 +300,7 @@ jobs:
         # since it's still needed as the gocache-in build-context input.
 
   cache-benchmark-warm:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     needs: cache-benchmark-cold
     # Same disk=large rationale as cache-benchmark-cold -- this job also
     # restores the ~10GB cache from actions/cache onto local disk before
@@ -370,6 +372,7 @@ jobs:
           echo "### Warm build: ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
 
   cache-benchmark-warm-8cpu:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     needs: cache-benchmark-cold
     # Same as cache-benchmark-warm, but on an 8cpu runner instead of 4cpu,
     # to see whether the warm build (which still does a real go build,
@@ -473,6 +476,7 @@ jobs:
   # actions/cache.
   # ---------------------------------------------------------------------
   cache-benchmark-cold-cachemount:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -702,6 +706,7 @@ jobs:
 
 
   cache-benchmark-warm-cachemount:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     needs: cache-benchmark-cold-cachemount
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
@@ -866,6 +871,7 @@ jobs:
   # the earlier cache-benchmark-{cold,warm} jobs only covered server-build.
   # ---------------------------------------------------------------------
   cache-benchmark-cold-bind:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -969,6 +975,7 @@ jobs:
         # to compare (it's just how we generate warm-bind's input).
 
   cache-benchmark-warm-bind:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     needs: cache-benchmark-cold-bind
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
@@ -1074,6 +1081,7 @@ jobs:
   # hit twice.
   # ---------------------------------------------------------------------
   cache-benchmark-cold-cachemount-dance-v2:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -1207,6 +1215,7 @@ jobs:
   # server/socket-mode GOCACHEPROG deployment would have).
   # ---------------------------------------------------------------------
   cache-benchmark-cold-gocacheprog:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -1341,6 +1350,7 @@ jobs:
         # silently redoes the whole cold build a second time.
 
   cache-benchmark-warm-gocacheprog:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     needs: cache-benchmark-cold-gocacheprog
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
@@ -1432,6 +1442,7 @@ jobs:
   # rationale as cache-benchmark-warm-8cpu.
   # ---------------------------------------------------------------------
   cache-benchmark-warm-gocacheprog-8cpu:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     needs: cache-benchmark-cold-gocacheprog
     runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
     permissions:
@@ -1512,6 +1523,7 @@ jobs:
   # ---------------------------------------------------------------------
 
   cache-benchmark-report:
+    if: false  # TEMPORARY: disabled while iterating on new k3s-focused cache-mount jobs below -- re-enable when resuming this comparison
     needs: [cache-benchmark-cold, cache-benchmark-warm, cache-benchmark-warm-8cpu, cache-benchmark-cold-bind, cache-benchmark-warm-bind, cache-benchmark-cold-cachemount, cache-benchmark-warm-cachemount, cache-benchmark-cold-gocacheprog, cache-benchmark-warm-gocacheprog, cache-benchmark-warm-gocacheprog-8cpu]
     runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     steps:
@@ -1594,6 +1606,504 @@ jobs:
             SPEEDUP_BIND_VS_GOCACHEPROG_8CPU=$(awk "BEGIN { printf \"%.1f\", $WARM_BIND / $WARM_GOCACHEPROG_8CPU }")
             echo "Warm bind mount (4cpu) vs. warm GOCACHEPROG (8cpu): **${SPEEDUP_BIND_VS_GOCACHEPROG_8CPU}x**" >> "$GITHUB_STEP_SUMMARY"
           fi
+  # ---------------------------------------------------------------------
+  # NEW: cache-benchmark-{cold,warm}-k3s-cachemount-v2 -- focused retry at
+  # getting RUN --mount=type=cache working, using the FASTEST stage in this
+  # Dockerfile (k3s images / images-mount, ~1-2min vs. ~9min+ for
+  # server-build) so we can iterate quickly, plus a hand-rolled dance
+  # re-implementation written directly from the REAL upstream TypeScript
+  # source (reproducible-containers/buildkit-cache-dance v3.4.0 `src/inject-cache.ts`
+  # / `src/extract-cache.ts`, fetched via the v3.4.0 release tarball -- not
+  # guessed from decompiled dist/index.js like earlier attempts in this PR)
+  # with maximum verbosity: every command's exit code, full stdout/stderr,
+  # and a `docker buildx du --verbose` snapshot before/after every phase.
+  #
+  # Why the earlier cache-mount attempts (cache-benchmark-{cold,warm}-cachemount
+  # above, now disabled) failed, and what's different this time:
+  #
+  # 1. GC eviction (fixed both times): exec.cachemount capped at ~488MiB by
+  #    this fleet's default BuildKit GC policy. Fix: buildkitd-config-inline
+  #    raising maxUsedSpace to 12GB, kept below on both cold/warm jobs.
+  # 2. Double-invocation bug (fixed both times): calling the dance action's
+  #    inject step twice in one job (once explicitly for "inject", once
+  #    explicitly for "extract") is wrong -- the action's post-hook already
+  #    does extraction automatically. Not applicable here since we're not
+  #    using the vendored action's uses: step at all, we're hand-rolling
+  #    both phases as explicit steps -- but keeping the SAME one-inject/
+  #    one-extract-per-job shape intentionally to avoid re-introducing this.
+  # 3. buildstamp placement asymmetry (fixed both times): inject writes
+  #    buildstamp into the CACHE dir (which is also the build context);
+  #    extract writes buildstamp into the SCRATCH dir (which is also the
+  #    build context there). Confirmed again against the real
+  #    inject-cache.ts/extract-cache.ts source this time, not decompiled
+  #    output -- see the exact fs.writeFile(path.join(...)) calls quoted
+  #    inline below.
+  # 4. THE CONFIRMED ROOT CAUSE from the earlier investigation (see
+  #    CACHE_BENCHMARK_SUMMARY.md and the comments on
+  #    cache-benchmark-cold/warm-cachemount above): `--no-cache` on the
+  #    inject/extract builds causes BuildKit to allocate a FRESH, EMPTY
+  #    cache-mount instance for that id, because BuildKit keys a cache
+  #    mount's instance to the cached LAYER LINEAGE of the RUN it belongs
+  #    to, not to the id= string alone -- --no-cache invalidates every
+  #    layer including the cache-mount RUN itself, so each --no-cache
+  #    build gets its own private, empty mount instance under the same id.
+  #    **This was fixed in the cold job below** (its inject step already
+  #    doesn't pass --no-cache, matching the real dance action's own
+  #    behavior -- the real action NEVER passes --no-cache anywhere) --
+  #    but the OLD cache-benchmark-warm-cachemount job's inject step
+  #    (search for "--no-cache \" under its "Inject cache into BuildKit"
+  #    step, now disabled) STILL had --no-cache on it, which would have
+  #    broken warm's inject even though cold's worked. This v2 attempt
+  #    fixes that by never passing --no-cache to ANY dance build (inject or
+  #    extract, cold or warm) -- only the real TIMED build steps (which
+  #    exist purely to exercise the cache, not to persist/read it) are
+  #    unaffected by this since they don't go through the dance mechanism
+  #    at all.
+  #
+  # Real dance source snippets this hand-roll is built from (verified
+  # against the actual v3.4.0 release tarball, not the minified dist/
+  # bundle):
+  #
+  #   inject-cache.ts:
+  #     await fs.writeFile(path.join(cacheSource, 'buildstamp'), date);
+  #     dancefileContent = `
+  #       FROM ${containerImage}
+  #       COPY buildstamp buildstamp
+  #       RUN --mount=${mountArgs} \
+  #           --mount=type=bind,source=.,target=/var/dance-cache \
+  #           cp -p -R /var/dance-cache/. ${targetPath} || true`
+  #     run('docker', ['buildx','build', ..., '-f', scratchDir/Dancefile.inject, '--tag','dance:inject', cacheSource])
+  #     (NOTE: build context is cacheSource, NOT scratchDir; NO --no-cache)
+  #
+  #   extract-cache.ts:
+  #     await fs.writeFile(path.join(scratchDir, 'buildstamp'), date);
+  #     dancefileContent = `
+  #       FROM ${containerImage}
+  #       COPY buildstamp buildstamp
+  #       RUN --mount=${mountArgs} \
+  #           mkdir -p /var/dance-cache/ \
+  #           && cp -p -R ${targetPath}/. /var/dance-cache/ || true`
+  #     run('docker', ['buildx','build', ..., '-f', scratchDir/Dancefile.extract, '--tag','dance:extract','--load', scratchDir])
+  #     (NOTE: build context is scratchDir, NOT cacheSource; NO --no-cache;
+  #      DOES use --load, unlike our earlier --output=local workaround
+  #      attempt -- reproducing the real action's actual mechanism this
+  #      time instead of a hypothesized fix, now that --no-cache is
+  #      understood to be the actual root cause and --load was a red
+  #      herring)
+  #     run('docker', ['create','-ti','--name','cache-container','dance:extract'])
+  #     runPiped(['docker',['cp','-L','cache-container:/var/dance-cache','-']], ['tar',['-H','posix','-x','-C',scratchDir]])
+  #     fs.rename(path.join(scratchDir,'dance-cache'), cacheSource)
+  #
+  # Target: k3s-images-mount / images-mount (id=rancher-cache-mount-bench-k3s),
+  # already defined in package/Dockerfile -- the fastest cache-mount-using
+  # stage in this file (~1-2min per build vs. ~9min+ for server-build-mount),
+  # chosen specifically so iteration on this dance re-implementation is fast.
+  # ---------------------------------------------------------------------
+  cache-benchmark-cold-k3s-cachemount-v2:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          # Same GC policy override as the earlier cache-mount attempts --
+          # raises exec.cachemount's maxUsedSpace from this fleet's default
+          # ~488MiB to 12GB. k3s's own cache is much smaller than the
+          # server build's ~10GB, but keep the same headroom for parity
+          # and so a future switch back to server-build-mount doesn't need
+          # a different config.
+          buildkitd-config-inline: |
+            [worker.oci]
+              [[worker.oci.gcpolicy]]
+                keepDuration = "48h"
+                filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+                maxUsedSpace = "12GB"
+              [[worker.oci.gcpolicy]]
+                all = true
+                reservedSpace = "1GB"
+      - name: "Report exec.cachemount GC policy actually in effect (sanity check)"
+        shell: bash
+        run: |
+          echo "=== docker buildx inspect --bootstrap (look for GC Policy rule covering exec.cachemount) ==="
+          docker buildx inspect --bootstrap --builder "${{ steps.setup-buildx.outputs.name }}" || true
+      - name: "Restore go build/mod cache (expected: miss)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-k3s-mount-v2
+          key: rancher-gocache-benchmark-k3s-mount-v2-${{ github.run_id }}
+      - name: "Report cache hit status (should be false)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
+          fi
+          mkdir -p go-build-cache-benchmark-k3s-mount-v2
+      - name: "Inject (likely empty) cache into BuildKit -- verbose hand-roll of dance's inject-cache.ts"
+        id: inject
+        shell: bash
+        run: |
+          set -x
+          BUILDER="${{ steps.setup-buildx.outputs.name }}"
+          CACHE_DIR="go-build-cache-benchmark-k3s-mount-v2"
+          SCRATCH_DIR="scratch-inject"
+          MOUNT_ARGS="type=cache,target=/root/.cache,id=rancher-cache-mount-bench-k3s"
+
+          echo "=== [1/6] clean scratch dir (mirrors inject-cache.ts: fs.rm scratchDir, fs.mkdir scratchDir) ==="
+          rm -rf "$SCRATCH_DIR"
+          mkdir -p "$SCRATCH_DIR"
+
+          echo "=== [2/6] prepare cache source dir (mirrors: fs.mkdir cacheSource) ==="
+          mkdir -p "$CACHE_DIR"
+
+          echo "=== [3/6] write buildstamp INTO THE CACHE DIR, not scratch (mirrors: fs.writeFile(join(cacheSource,'buildstamp'), date)) ==="
+          date -u -Iseconds > "$CACHE_DIR/buildstamp"
+          echo "buildstamp content: $(cat "$CACHE_DIR/buildstamp")"
+
+          echo "=== [4/6] write Dancefile.inject INTO SCRATCH (mirrors: fs.writeFile(join(scratchDir,'Dancefile.inject'), content)) ==="
+          {
+            echo "FROM ghcr.io/containerd/busybox:latest"
+            echo "COPY buildstamp buildstamp"
+            echo "RUN --mount=$MOUNT_ARGS \\"
+            echo "    --mount=type=bind,source=.,target=/var/dance-cache \\"
+            echo "    cp -p -R /var/dance-cache/. /root/.cache && echo INJECT_CP_EXIT=\$? || echo INJECT_CP_EXIT=\$?"
+          } > "$SCRATCH_DIR/Dancefile.inject"
+          echo "--- Dancefile.inject content ---"
+          cat "$SCRATCH_DIR/Dancefile.inject"
+
+          echo "=== [5/6] docker buildx du BEFORE inject (should show no exec.cachemount entry yet, or a pre-existing empty one) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          echo "=== [6/6] run the inject build -- build context is CACHE_DIR (mirrors real dance: run('docker',['buildx','build',...,cacheSource])). NO --no-cache (this is the confirmed fix from the earlier investigation -- --no-cache allocates a fresh empty cache-mount instance per invocation). ==="
+          set +e
+          docker buildx build \
+            --builder "$BUILDER" \
+            -f "$SCRATCH_DIR/Dancefile.inject" \
+            --tag dance:inject \
+            --progress=plain \
+            "$CACHE_DIR" 2>&1 | tee /tmp/inject-build.log
+          INJECT_BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "=== inject build exit code: $INJECT_BUILD_EXIT ==="
+          echo "=== full inject build log ==="
+          cat /tmp/inject-build.log
+          echo "=== does the log contain INJECT_CP_EXIT=0? (0 means the cp inside the RUN actually succeeded) ==="
+          grep -o "INJECT_CP_EXIT=[0-9]*" /tmp/inject-build.log || echo "INJECT_CP_EXIT marker NOT FOUND in log -- cp step may not have run at all"
+
+          echo "=== docker buildx du AFTER inject (exec.cachemount id=rancher-cache-mount-bench-k3s should now exist, even if tiny on a cold/empty run) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          if [ "$INJECT_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Inject build failed with exit code $INJECT_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+
+          echo "=== clean cache source dir post-inject (mirrors: fs.rm(cacheSource) in a try/catch -- ignore errors) ==="
+          rm -rf "$CACHE_DIR" || echo "cleanup of $CACHE_DIR failed, ignoring (matches real dance's notice()-and-continue behavior)"
+      - name: "Timed build (images-mount / k3s, cold cache mount)"
+        id: timed-build
+        shell: bash
+        run: |
+          set -x
+          echo "=== docker buildx du BEFORE timed build ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --progress=plain \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target k3s-images-mount \
+            --output type=local,dest=k3s-images-mount-cold-out \
+            . 2>&1 | tee /tmp/timed-build.log
+          TIMED_BUILD_EXIT=${PIPESTATUS[0]}
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "=== timed build exit code: $TIMED_BUILD_EXIT ==="
+          echo "Cold (cache mount, k3s) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Cold (cache mount v2, k3s images-mount): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+          echo "=== output artifact check ==="
+          ls -la k3s-images-mount-cold-out/ || true
+          echo "=== docker buildx du AFTER timed build (exec.cachemount id=rancher-cache-mount-bench-k3s should now be populated with real go mod/build cache content) ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+          if [ "$TIMED_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Timed build failed with exit code $TIMED_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+      - name: "Extract populated cache -- verbose hand-roll of dance's extract-cache.ts"
+        id: extract
+        shell: bash
+        run: |
+          set -x
+          BUILDER="${{ steps.setup-buildx.outputs.name }}"
+          CACHE_DIR="go-build-cache-benchmark-k3s-mount-v2"
+          SCRATCH_DIR="scratch-extract"
+          MOUNT_ARGS="type=cache,target=/root/.cache,id=rancher-cache-mount-bench-k3s"
+
+          echo "=== [1/8] prepare scratch dir (mirrors: fs.mkdir(scratchDir)) ==="
+          rm -rf "$SCRATCH_DIR"
+          mkdir -p "$SCRATCH_DIR"
+
+          echo "=== [2/8] write buildstamp INTO SCRATCH, not cache dir -- opposite of inject (mirrors: fs.writeFile(join(scratchDir,'buildstamp'), date)) ==="
+          date -u -Iseconds > "$SCRATCH_DIR/buildstamp"
+          echo "buildstamp content: $(cat "$SCRATCH_DIR/buildstamp")"
+
+          echo "=== [3/8] write Dancefile.extract INTO SCRATCH (mirrors: fs.writeFile(join(scratchDir,'Dancefile.extract'), content)) ==="
+          {
+            echo "FROM ghcr.io/containerd/busybox:latest"
+            echo "COPY buildstamp buildstamp"
+            echo "RUN --mount=$MOUNT_ARGS \\"
+            echo "    mkdir -p /var/dance-cache/ \\"
+            echo "    && cp -p -R /root/.cache/. /var/dance-cache/ && echo EXTRACT_CP_EXIT=\$? || echo EXTRACT_CP_EXIT=\$?"
+          } > "$SCRATCH_DIR/Dancefile.extract"
+          echo "--- Dancefile.extract content ---"
+          cat "$SCRATCH_DIR/Dancefile.extract"
+
+          echo "=== [4/8] docker buildx du BEFORE extract build (confirms the mount still holds content from the timed build) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          echo "=== [5/8] run the extract build WITH --load (mirrors real dance exactly this time -- build context is SCRATCH_DIR, NOT cache dir; NO --no-cache) ==="
+          set +e
+          docker buildx build \
+            --builder "$BUILDER" \
+            -f "$SCRATCH_DIR/Dancefile.extract" \
+            --tag dance:extract \
+            --progress=plain \
+            --load \
+            "$SCRATCH_DIR" 2>&1 | tee /tmp/extract-build.log
+          EXTRACT_BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "=== extract build exit code: $EXTRACT_BUILD_EXIT ==="
+          echo "=== full extract build log ==="
+          cat /tmp/extract-build.log
+          echo "=== does the log contain EXTRACT_CP_EXIT=0? ==="
+          grep -o "EXTRACT_CP_EXIT=[0-9]*" /tmp/extract-build.log || echo "EXTRACT_CP_EXIT marker NOT FOUND in log -- cp step may not have run at all"
+          if [ "$EXTRACT_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Extract build (docker buildx build --load) failed with exit code $EXTRACT_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+
+          echo "=== [6/8] docker images -- confirm dance:extract was actually loaded into the HOST docker daemon ==="
+          docker images dance:extract
+
+          echo "=== [7/8] docker create + docker cp -L + tar -x (mirrors real dance exactly: run('docker',['create','-ti','--name','cache-container','dance:extract']); runPiped(docker cp -L ... | tar -x)) ==="
+          docker rm -f cache-container 2>/dev/null || true
+          docker create -ti --name cache-container dance:extract
+          echo "docker create exit code: $?"
+          set +e
+          docker cp -L cache-container:/var/dance-cache - 2>/tmp/cp-stderr.log | tar -H posix -x -C "$SCRATCH_DIR"
+          CP_TAR_EXIT=${PIPESTATUS[1]}
+          DOCKER_CP_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "docker cp exit code: $DOCKER_CP_EXIT, tar exit code: $CP_TAR_EXIT"
+          echo "--- docker cp stderr (if any) ---"
+          cat /tmp/cp-stderr.log || true
+          docker rm -f cache-container 2>/dev/null || true
+
+          echo "=== [8/8] move extracted dir into place (mirrors: fs.rename(join(scratchDir,'dance-cache'), cacheSource)) ==="
+          echo "--- contents of $SCRATCH_DIR right before rename ---"
+          find "$SCRATCH_DIR" -maxdepth 2 || true
+          rm -rf "$CACHE_DIR"
+          if [ -d "$SCRATCH_DIR/dance-cache" ]; then
+            mv "$SCRATCH_DIR/dance-cache" "$CACHE_DIR"
+            echo "=== SUCCESS: extracted cache dir size on host disk ==="
+            du -sh "$CACHE_DIR" || true
+            find "$CACHE_DIR" -maxdepth 2 | head -20
+          else
+            echo "::error::$SCRATCH_DIR/dance-cache does not exist after docker cp + tar -x -- extraction produced nothing. Listing $SCRATCH_DIR for diagnosis:"
+            find "$SCRATCH_DIR" -maxdepth 3 || true
+            exit 1
+          fi
+        # If this step's own exit codes/log markers all show success (both
+        # INJECT_CP_EXIT / EXTRACT_CP_EXIT show 0, buildx du shows the
+        # mount populated after the timed build, dance:extract image
+        # exists, docker cp/tar both exit 0, and $CACHE_DIR ends up
+        # non-trivially sized), but the FOLLOWING actions/cache save step
+        # still reports a tiny byte count, that would newly implicate
+        # actions/cache's own save mechanism specifically -- ruling out
+        # every dance-internal step individually is the entire point of
+        # this level of verbosity.
+
+  cache-benchmark-warm-k3s-cachemount-v2:
+    needs: cache-benchmark-cold-k3s-cachemount-v2
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          # Must match cache-benchmark-cold-k3s-cachemount-v2's GC policy
+          # exactly, otherwise this job's OWN builder (a fresh one, since
+          # docker-container spins up a new BuildKit container per job)
+          # would evict the injected cache back to the ~488MiB default
+          # ceiling before the timed build runs.
+          buildkitd-config-inline: |
+            [worker.oci]
+              [[worker.oci.gcpolicy]]
+                keepDuration = "48h"
+                filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+                maxUsedSpace = "12GB"
+              [[worker.oci.gcpolicy]]
+                all = true
+                reservedSpace = "1GB"
+      - name: "Restore go build/mod cache (expected: hit)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-k3s-mount-v2
+          key: rancher-gocache-benchmark-k3s-mount-v2-${{ github.run_id }}
+      - name: "Report cache hit status (should be true)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected a cache hit on the warm job but got a miss -- actions/cache restore did not work as expected."
+            exit 1
+          fi
+          echo "Restored cache size:"
+          du -sh go-build-cache-benchmark-k3s-mount-v2 || true
+          find go-build-cache-benchmark-k3s-mount-v2 -maxdepth 2 | head -20
+      - name: "Inject cache into BuildKit -- verbose hand-roll of dance's inject-cache.ts (read-only leg, never writes back)"
+        id: inject
+        shell: bash
+        run: |
+          set -x
+          BUILDER="${{ steps.setup-buildx.outputs.name }}"
+          CACHE_DIR="go-build-cache-benchmark-k3s-mount-v2"
+          SCRATCH_DIR="scratch-inject"
+          MOUNT_ARGS="type=cache,target=/root/.cache,id=rancher-cache-mount-bench-k3s"
+
+          echo "=== [1/5] clean scratch dir ==="
+          rm -rf "$SCRATCH_DIR"
+          mkdir -p "$SCRATCH_DIR"
+
+          echo "=== [2/5] write buildstamp INTO THE CACHE DIR (the restored ~real content dir, NOT scratch) ==="
+          date -u -Iseconds > "$CACHE_DIR/buildstamp"
+
+          echo "=== [3/5] write Dancefile.inject INTO SCRATCH ==="
+          {
+            echo "FROM ghcr.io/containerd/busybox:latest"
+            echo "COPY buildstamp buildstamp"
+            echo "RUN --mount=$MOUNT_ARGS \\"
+            echo "    --mount=type=bind,source=.,target=/var/dance-cache \\"
+            echo "    cp -p -R /var/dance-cache/. /root/.cache && echo INJECT_CP_EXIT=\$? || echo INJECT_CP_EXIT=\$?"
+          } > "$SCRATCH_DIR/Dancefile.inject"
+          echo "--- Dancefile.inject content ---"
+          cat "$SCRATCH_DIR/Dancefile.inject"
+
+          echo "=== [4/5] docker buildx du BEFORE inject (this is a FRESH builder for this job -- should show NO exec.cachemount entry yet) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          echo "=== source dir being injected (should be the RESTORED, real-sized cache from cache-benchmark-cold-k3s-cachemount-v2) ==="
+          du -sh "$CACHE_DIR" || true
+
+          echo "=== [5/5] run the inject build -- build context is CACHE_DIR. NO --no-cache. ==="
+          set +e
+          docker buildx build \
+            --builder "$BUILDER" \
+            -f "$SCRATCH_DIR/Dancefile.inject" \
+            --tag dance:inject \
+            --progress=plain \
+            "$CACHE_DIR" 2>&1 | tee /tmp/inject-build.log
+          INJECT_BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "=== inject build exit code: $INJECT_BUILD_EXIT ==="
+          echo "=== full inject build log ==="
+          cat /tmp/inject-build.log
+          echo "=== does the log contain INJECT_CP_EXIT=0? ==="
+          grep -o "INJECT_CP_EXIT=[0-9]*" /tmp/inject-build.log || echo "INJECT_CP_EXIT marker NOT FOUND in log"
+
+          echo "=== docker buildx du AFTER inject (exec.cachemount id=rancher-cache-mount-bench-k3s should now be populated -- this is the critical check: did the RESTORED content actually make it into BuildKit's mount storage?) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          if [ "$INJECT_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Inject build failed with exit code $INJECT_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+        # Read-only leg -- never writes back, no post-inject cleanup of
+        # CACHE_DIR needed here (unlike the cold job) since this job
+        # doesn't extract/save anything.
+      - name: "Timed build (images-mount / k3s, warm cache mount)"
+        id: timed-build
+        shell: bash
+        run: |
+          set -x
+          echo "=== docker buildx du BEFORE timed build ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --progress=plain \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target k3s-images-mount \
+            --output type=local,dest=k3s-images-mount-warm-out \
+            . 2>&1 | tee /tmp/timed-build.log
+          TIMED_BUILD_EXIT=${PIPESTATUS[0]}
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "=== timed build exit code: $TIMED_BUILD_EXIT ==="
+          echo "Warm (cache mount, k3s) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (cache mount v2, k3s images-mount): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+          echo "=== how many layers/steps show CACHED vs. executed? (a genuinely warm cache-mount run should still show go mod download/go build EXECUTING -- unlike a layer cache hit, a cache MOUNT hit means the RUN still runs, it just finds pre-populated content under /root/.cache) ==="
+          grep -c "CACHED" /tmp/timed-build.log || true
+          echo "=== output artifact check ==="
+          ls -la k3s-images-mount-warm-out/ || true
+          if [ "$TIMED_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Timed build failed with exit code $TIMED_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+
+  cache-benchmark-k3s-cachemount-v2-report:
+    needs: [cache-benchmark-cold-k3s-cachemount-v2, cache-benchmark-warm-k3s-cachemount-v2]
+    runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    steps:
+      - name: Summarize results
+        run: |
+          COLD="${{ needs.cache-benchmark-cold-k3s-cachemount-v2.outputs.build-seconds }}"
+          WARM="${{ needs.cache-benchmark-warm-k3s-cachemount-v2.outputs.build-seconds }}"
+          echo "# k3s Cache-Mount v2 Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (empty cache mount, images-mount) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (cache mount restored via hand-rolled dance + actions/cache, images-mount) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
+            SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Speedup (cold vs. warm, k3s cache mount v2): **${SPEEDUP}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+  # ---------------------------------------------------------------------
+  # END NEW cache-benchmark-*-k3s-cachemount-v2 block
+  # ---------------------------------------------------------------------
+
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark block
   # ---------------------------------------------------------------------
