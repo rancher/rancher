@@ -3,7 +3,7 @@ package generator
 var clientTemplate = `package client
 
 import (
-	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/rancher/pkg/norman/clientbase"
 )
 
 type Client struct {

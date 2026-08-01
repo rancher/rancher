@@ -3,8 +3,8 @@ package types
 import (
 	"net/http"
 
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 )
 
 func (s *Schema) MustCustomizeField(name string, f func(f Field) Field) *Schema {

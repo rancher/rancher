@@ -3,10 +3,10 @@ package wrapper
 import (
 	"testing"
 
-	"github.com/rancher/norman/api/handler"
-	"github.com/rancher/norman/parse"
-	"github.com/rancher/norman/store/empty"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/api/handler"
+	"github.com/rancher/rancher/pkg/norman/parse"
+	"github.com/rancher/rancher/pkg/norman/store/empty"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/stretchr/testify/assert"
 )
 

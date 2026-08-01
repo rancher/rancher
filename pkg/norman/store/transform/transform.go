@@ -3,9 +3,9 @@ package transform
 import (
 	"fmt"
 
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 )
 
 type TransformerFunc func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error)

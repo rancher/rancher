@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/norman/store/proxy"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/store/proxy"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

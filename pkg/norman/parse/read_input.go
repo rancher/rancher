@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 

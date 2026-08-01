@@ -3,7 +3,7 @@ package mapper
 import (
 	"fmt"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 func ValidateField(field string, schema *types.Schema) error {

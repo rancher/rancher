@@ -1,6 +1,6 @@
 package values
 
-import "github.com/rancher/norman/types/convert"
+import "github.com/rancher/rancher/pkg/norman/types/convert"
 
 func RemoveValue(data map[string]interface{}, keys ...string) (interface{}, bool) {
 	for i, key := range keys {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/definition"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/definition"
 	"github.com/rancher/wrangler/v3/pkg/name"
 )
 

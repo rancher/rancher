@@ -3,9 +3,9 @@ package types
 import (
 	"fmt"
 
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/definition"
-	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/definition"
+	"github.com/rancher/rancher/pkg/norman/types/values"
 )
 
 type Mapper interface {

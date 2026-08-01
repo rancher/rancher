@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/rancher/norman/api/writer"
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/parse"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/norman/api/writer"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/parse"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )

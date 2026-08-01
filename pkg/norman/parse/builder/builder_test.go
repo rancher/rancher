@@ -3,7 +3,7 @@ package builder
 import (
 	"testing"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/stretchr/testify/assert"
 )
 

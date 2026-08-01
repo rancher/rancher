@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/wrangler/v3/pkg/name"
 )
 

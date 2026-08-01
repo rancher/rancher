@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rancher/norman/api"
-	"github.com/rancher/norman/store/crd"
-	"github.com/rancher/norman/store/proxy"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/factory"
+	"github.com/rancher/rancher/pkg/norman/api"
+	"github.com/rancher/rancher/pkg/norman/store/crd"
+	"github.com/rancher/rancher/pkg/norman/store/proxy"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/factory"
 	"k8s.io/client-go/tools/clientcmd"
 )
 

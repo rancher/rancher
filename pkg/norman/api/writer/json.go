@@ -5,10 +5,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/rancher/norman/parse"
-	"github.com/rancher/norman/parse/builder"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/definition"
+	"github.com/rancher/rancher/pkg/norman/parse"
+	"github.com/rancher/rancher/pkg/norman/parse/builder"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/definition"
 	"github.com/sirupsen/logrus"
 )
 

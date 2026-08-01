@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"github.com/rancher/norman/parse"
-	"github.com/rancher/norman/parse/builder"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/parse"
+	"github.com/rancher/rancher/pkg/norman/parse/builder"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 func ParseAndValidateBody(apiContext *types.APIContext, create bool) (map[string]interface{}, error) {

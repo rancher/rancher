@@ -3,7 +3,7 @@ package mapper
 import (
 	"path"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 type BatchMove struct {

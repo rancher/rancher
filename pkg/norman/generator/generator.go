@@ -17,8 +17,8 @@ import (
 
 	"github.com/matryer/moq/pkg/moq"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"golang.org/x/tools/imports"
 )
 

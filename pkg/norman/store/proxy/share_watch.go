@@ -1,8 +1,8 @@
 package proxy
 
 import (
-	"github.com/rancher/norman/pkg/broadcast"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/pkg/broadcast"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 func (s *Store) shareWatch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {

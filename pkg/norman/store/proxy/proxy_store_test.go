@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/norman/authorization"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/authorization"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"

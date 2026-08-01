@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 func CreateHandler(apiContext *types.APIContext, next types.RequestHandler) error {

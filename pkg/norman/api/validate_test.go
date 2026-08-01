@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rancher/norman/api"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/api"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

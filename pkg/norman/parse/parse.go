@@ -8,10 +8,10 @@ import (
 
 	"sort"
 
-	"github.com/rancher/norman/api/builtin"
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/urlbuilder"
+	"github.com/rancher/rancher/pkg/norman/api/builtin"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/urlbuilder"
 )
 
 const (

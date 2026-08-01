@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/norman/api/builtin"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/api/builtin"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 const (

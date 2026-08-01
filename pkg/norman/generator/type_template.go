@@ -11,7 +11,7 @@ var typeTemplate = `package client
 
 import (
 {{- if .schema | hasGet }}
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 {{- end}}
 	{{if $intstr  }}
 		"k8s.io/apimachinery/pkg/util/intstr"

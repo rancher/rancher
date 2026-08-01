@@ -3,7 +3,7 @@ package subscribe
 import (
 	"net/http"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 )
 
 func Register(version *types.APIVersion, schemas *types.Schemas) {
