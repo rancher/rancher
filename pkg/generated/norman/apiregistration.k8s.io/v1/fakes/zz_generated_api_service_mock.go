@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	v11 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/norman/controller"
 	"github.com/rancher/rancher/pkg/norman/objectclient"
-	v11 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"

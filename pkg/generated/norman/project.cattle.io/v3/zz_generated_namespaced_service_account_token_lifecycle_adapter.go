@@ -1,9 +1,9 @@
 package v3
 
 import (
+	"github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/norman/lifecycle"
 	"github.com/rancher/rancher/pkg/norman/resource"
-	"github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

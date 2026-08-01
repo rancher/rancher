@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/norman/controller"
-	"github.com/rancher/rancher/pkg/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	v31 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/controller"
+	"github.com/rancher/rancher/pkg/norman/objectclient"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
