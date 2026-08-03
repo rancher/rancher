@@ -98,6 +98,8 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) erro
 // Entries that aren't in the index, but present in the filesystem cache are deleted
 func (c FSCache) SyncWithIndex(index *SafeIndex, fsCacheFiles []string) error {
 	var errs error
+	index.mu.RLock()
+	defer index.mu.RUnlock()
 	for _, file := range fsCacheFiles {
 		logrus.Debugf("syncing index with filesystem cache")
 		chartName, chartVersion, err := getChartNameAndVersion(file)
