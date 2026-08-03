@@ -15,7 +15,7 @@ import (
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	ops "github.com/rancher/rancher/pkg/operations"
-	plan "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -1666,7 +1666,7 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnap
 	} else if status.Phase == opv1alpha1.OperationPhaseFailed {
 		opv1alpha1.PendingCondition.False(&status)
 		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation completed successfully")
+		opv1alpha1.PendingCondition.Message(&status, "Operation failed")
 		opv1alpha1.InProgressCondition.False(&status)
 		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
 		opv1alpha1.InProgressCondition.Message(&status, "Operation failed")
