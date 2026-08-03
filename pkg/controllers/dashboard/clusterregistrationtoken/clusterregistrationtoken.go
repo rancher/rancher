@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -152,7 +153,7 @@ func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.
 	if obj.Status.TokenSecretName == "" {
 		token := obj.Status.Token
 		if token != "" {
-			logrus.Warnf("CRT %s/%s has Status.Token set but no TokenSecretName - this should have been migrated. Migrating now as fallback.",
+			logrus.Warnf("CRT %s/%s has Status.Token set but no TokenSecretName - migrating to secret",
 				obj.Namespace, obj.Name)
 		} else {
 			token, err = randomtoken.Generate()
@@ -176,7 +177,7 @@ func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.
 		obj.Status.ExpiresAt = expiresAt
 		obj.Status.GracePeriodExpiresAt = ""
 	} else {
-		if err := h.ensureCRTTokenReaderRole(obj.Namespace); err != nil {
+		if err := h.ensureCRTTokenReaderRoleForSecret(obj.Namespace, obj.Status.TokenSecretName); err != nil {
 			return nil, err
 		}
 
@@ -480,6 +481,23 @@ func ComputeJitter(ttl time.Duration) time.Duration {
 		return 0
 	}
 	return time.Duration(rand.Int63n(int64(tenPercent)))
+}
+
+func (h *handler) ensureCRTTokenReaderRoleForSecret(namespace, secretName string) error {
+	existing, err := h.roleCache.Get(namespace, crtTokenReaderRole)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	if existing != nil {
+		for _, rule := range existing.Rules {
+			if slices.Contains(rule.ResourceNames, secretName) {
+				return nil
+			}
+		}
+	}
+
+	return h.ensureCRTTokenReaderRole(namespace)
 }
 
 // ensureCRTTokenReaderRole creates or updates the crt-token-reader Role in the given namespace.
