@@ -6,12 +6,25 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 )
 
 type RegistrationTokenStore struct {
 	types.Store
 	SecretCache corecontrollers.SecretCache
+}
+
+func (r *RegistrationTokenStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if data != nil {
+		token, err := randomtoken.Generate()
+		if err != nil {
+			return nil, err
+		}
+		data["token"] = token
+	}
+
+	return r.Store.Create(apiContext, schema, data)
 }
 
 func (r *RegistrationTokenStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
