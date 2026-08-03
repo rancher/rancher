@@ -491,6 +491,44 @@ COPY --from=server-build /app/rancher /bin/rancher
 FROM scratch AS gocache-out
 COPY --from=server-build /root/.cache /
 
+# TEMPORARY (CI cache benchmark, "GOCACHE-only cache-mount" variant): Tom
+# asked to test the REVERSE of rancher-go-builder-mount/server-build-mount
+# above -- instead of putting go mod download's GOMODCACHE writes into a
+# cache mount, put ONLY go build's GOCACHE (compiled objects) into a cache
+# mount, while GOMODCACHE is seeded via the already-proven COPY-based
+# gocache-in mechanism (same as rancher-go-builder above -- reuses real,
+# working infrastructure instead of reinventing it).
+#
+# Why: the size-bisection benchmark so far found cache-mount extraction
+# succeeds at ~3.2GB (GOMODCACHE alone, rancher-go-builder-mount) and
+# ~720MB (k3s), but FAILS at the full server build's ~10.71GB (GOMODCACHE
+# + GOCACHE together, written by TWO separate RUN --mount=type=cache
+# commands sharing one id). This variant isolates the OTHER half -- GOCACHE
+# alone (~7.5GB, written by a SINGLE go build RUN) -- to test whether the
+# failure is really about total size, or specifically about multiple RUNs
+# writing to the same mount id across a go mod download + go build
+# sequence.
+#
+# Mount target is deliberately narrowed to $GOCACHE
+# (/root/.cache/go/cache, set as ENV in the shared go-builder base stage)
+# rather than the whole /root/.cache -- this ensures the mount holds ONLY
+# compiled objects, not module cache, so this test is a clean isolation of
+# "go build's cache alone", not "everything after go mod download
+# happens to also be cache-mounted".
+FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build-gobuild-cachemount
+ARG VERSION
+ARG COMMIT
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY main.go ./
+RUN --mount=type=cache,target=/root/.cache/go/cache,id=rancher-cache-mount-bench-gobuild GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
 ARG VERSION
 ARG TAGS="k8s"

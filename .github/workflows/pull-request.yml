@@ -2926,6 +2926,423 @@ jobs:
   # END NEW cache-benchmark-*-gomod-cachemount-v2 block
   # ---------------------------------------------------------------------
 
+
+  # ---------------------------------------------------------------------
+  # NEW: cache-benchmark-{cold,warm}-gobuild-cachemount-v2 -- the REVERSE
+  # of cache-benchmark-{cold,warm}-gomod-cachemount-v2 above. Tom asked to
+  # test extracting the cache from the go BUILD step (GOCACHE, compiled
+  # objects, ~7.5GB) instead of the go mod download step (GOMODCACHE,
+  # ~3.2GB, already confirmed working), to isolate whether the earlier
+  # server-build-mount extraction failure (10.71GB combined
+  # GOMODCACHE+GOCACHE, written by TWO separate RUN --mount=type=cache
+  # commands sharing id=rancher-cache-mount-bench) is a pure size ceiling
+  # or specific to that multi-RUN-write pattern.
+  #
+  # Targets server-build-gobuild-cachemount (package/Dockerfile): GOMODCACHE
+  # is seeded via the already-proven COPY-based gocache-in mechanism (same
+  # as rancher-go-builder/server-build use -- NOT a cache mount at all for
+  # this half), and ONLY the go build step's GOCACHE
+  # (/root/.cache/go/cache specifically, not all of /root/.cache) is
+  # behind a cache mount, with its own isolated id
+  # (rancher-cache-mount-bench-gobuild) so it can never collide with the
+  # gomod-only or full-server cache-mount benchmarks' ids.
+  #
+  # Same verbose, --no-cache-free hand-rolled dance mechanism as every
+  # other *-cachemount-v2 job in this PR, and the same raised 30GB GC
+  # ceiling (already ruled out as the cause of the full-server failure,
+  # but kept for consistency/no new variables).
+  # ---------------------------------------------------------------------
+  cache-benchmark-cold-gobuild-cachemount-v2:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          buildkitd-config-inline: |
+            [worker.oci]
+              [[worker.oci.gcpolicy]]
+                keepDuration = "48h"
+                filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+                maxUsedSpace = "30GB"
+              [[worker.oci.gcpolicy]]
+                all = true
+                reservedSpace = "1GB"
+      - name: "Restore go build/mod cache (expected: miss)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gobuild-mount-v2
+          key: rancher-gocache-benchmark-gobuild-mount-v2-${{ github.run_id }}
+      - name: "Report cache hit status (should be false)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "::warning::Expected a cache miss on the cold job but got a hit -- scratch key collided, results are not trustworthy."
+          fi
+          mkdir -p go-build-cache-benchmark-gobuild-mount-v2
+      - name: "Inject (likely empty) cache into BuildKit -- verbose hand-roll of dance's inject-cache.ts"
+        id: inject
+        shell: bash
+        run: |
+          set -x
+          BUILDER="${{ steps.setup-buildx.outputs.name }}"
+          CACHE_DIR="go-build-cache-benchmark-gobuild-mount-v2"
+          SCRATCH_DIR="scratch-inject"
+          # NOTE: target is /root/.cache/go/cache (GOCACHE only), NOT
+          # /root/.cache -- matches server-build-gobuild-cachemount's own
+          # mount target exactly (see comment above that stage in
+          # package/Dockerfile for why the target must match precisely).
+          MOUNT_ARGS="type=cache,target=/root/.cache/go/cache,id=rancher-cache-mount-bench-gobuild"
+
+          echo "=== [1/6] clean scratch dir ==="
+          rm -rf "$SCRATCH_DIR"
+          mkdir -p "$SCRATCH_DIR"
+
+          echo "=== [2/6] prepare cache source dir ==="
+          mkdir -p "$CACHE_DIR"
+
+          echo "=== [3/6] write buildstamp INTO THE CACHE DIR, not scratch ==="
+          date -u -Iseconds > "$CACHE_DIR/buildstamp"
+
+          echo "=== [4/6] write Dancefile.inject INTO SCRATCH ==="
+          {
+            echo "FROM ghcr.io/containerd/busybox:latest"
+            echo "COPY buildstamp buildstamp"
+            echo "RUN --mount=$MOUNT_ARGS \\"
+            echo "    --mount=type=bind,source=.,target=/var/dance-cache \\"
+            echo "    cp -p -R /var/dance-cache/. /root/.cache/go/cache && echo INJECT_CP_EXIT=\$? || echo INJECT_CP_EXIT=\$?"
+          } > "$SCRATCH_DIR/Dancefile.inject"
+          echo "--- Dancefile.inject content ---"
+          cat "$SCRATCH_DIR/Dancefile.inject"
+
+          echo "=== [5/6] docker buildx du BEFORE inject ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          echo "=== [6/6] run the inject build -- build context is CACHE_DIR. NO --no-cache. ==="
+          set +e
+          docker buildx build \
+            --builder "$BUILDER" \
+            -f "$SCRATCH_DIR/Dancefile.inject" \
+            --tag dance:inject \
+            --progress=plain \
+            "$CACHE_DIR" 2>&1 | tee /tmp/inject-build.log
+          INJECT_BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "=== inject build exit code: $INJECT_BUILD_EXIT ==="
+          cat /tmp/inject-build.log
+          grep -o "INJECT_CP_EXIT=[0-9]*" /tmp/inject-build.log || echo "INJECT_CP_EXIT marker NOT FOUND in log"
+
+          echo "=== docker buildx du AFTER inject ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          if [ "$INJECT_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Inject build failed with exit code $INJECT_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+
+          echo "=== clean cache source dir post-inject ==="
+          rm -rf "$CACHE_DIR" || echo "cleanup of $CACHE_DIR failed, ignoring"
+      - name: "Timed build (server-build-gobuild-cachemount, cold cache mount, go build/GOCACHE only)"
+        id: timed-build
+        shell: bash
+        run: |
+          set -x
+          echo "=== docker buildx du BEFORE timed build ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --progress=plain \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-gobuild-cachemount \
+            . 2>&1 | tee /tmp/timed-build.log
+          TIMED_BUILD_EXIT=${PIPESTATUS[0]}
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "=== timed build exit code: $TIMED_BUILD_EXIT ==="
+          echo "Cold (cache mount, gobuild-only) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Cold (cache mount v2, server-build-gobuild-cachemount / gobuild-only): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+          echo "=== docker buildx du AFTER timed build (exec.cachemount id=rancher-cache-mount-bench-gobuild should now hold real GOCACHE content, expect roughly ~7-8GB) ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+          if [ "$TIMED_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Timed build failed with exit code $TIMED_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+        # No --output: server-build-gobuild-cachemount's point is to
+        # exercise the RUN --mount=type=cache go build step, not to
+        # produce a usable image.
+      - name: "Extract populated cache -- verbose hand-roll of dance's extract-cache.ts"
+        id: extract
+        shell: bash
+        run: |
+          set -x
+          BUILDER="${{ steps.setup-buildx.outputs.name }}"
+          CACHE_DIR="go-build-cache-benchmark-gobuild-mount-v2"
+          SCRATCH_DIR="scratch-extract"
+          MOUNT_ARGS="type=cache,target=/root/.cache/go/cache,id=rancher-cache-mount-bench-gobuild"
+
+          echo "=== [1/8] prepare scratch dir ==="
+          rm -rf "$SCRATCH_DIR"
+          mkdir -p "$SCRATCH_DIR"
+
+          echo "=== [2/8] write buildstamp INTO SCRATCH, not cache dir ==="
+          date -u -Iseconds > "$SCRATCH_DIR/buildstamp"
+
+          echo "=== [3/8] write Dancefile.extract INTO SCRATCH ==="
+          {
+            echo "FROM ghcr.io/containerd/busybox:latest"
+            echo "COPY buildstamp buildstamp"
+            echo "RUN --mount=$MOUNT_ARGS \\"
+            echo "    mkdir -p /var/dance-cache/ \\"
+            echo "    && cp -p -R /root/.cache/go/cache/. /var/dance-cache/ && echo EXTRACT_CP_EXIT=\$? || echo EXTRACT_CP_EXIT=\$?"
+          } > "$SCRATCH_DIR/Dancefile.extract"
+          echo "--- Dancefile.extract content ---"
+          cat "$SCRATCH_DIR/Dancefile.extract"
+
+          echo "=== [4/8] docker buildx du BEFORE extract build (should show real GOCACHE content -- this is the number to compare against the failed 10.71GB combined server case) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          echo "=== [5/8] run the extract build WITH --load (real dance mechanism). NO --no-cache. ==="
+          set +e
+          time docker buildx build \
+            --builder "$BUILDER" \
+            -f "$SCRATCH_DIR/Dancefile.extract" \
+            --tag dance:extract \
+            --progress=plain \
+            --load \
+            "$SCRATCH_DIR" 2>&1 | tee /tmp/extract-build.log
+          EXTRACT_BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "=== extract build exit code: $EXTRACT_BUILD_EXIT ==="
+          cat /tmp/extract-build.log
+          grep -o "EXTRACT_CP_EXIT=[0-9]*" /tmp/extract-build.log || echo "EXTRACT_CP_EXIT marker NOT FOUND in log"
+          if [ "$EXTRACT_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Extract build (docker buildx build --load) failed with exit code $EXTRACT_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+
+          echo "=== [6/8] docker images -- confirm dance:extract was loaded into the HOST docker daemon (compare its Size against the mount size from [4/8]) ==="
+          docker images dance:extract
+
+          echo "=== [7/8] docker create + docker cp -L + tar -x ==="
+          docker rm -f cache-container 2>/dev/null || true
+          docker create -ti --name cache-container dance:extract
+          echo "docker create exit code: $?"
+          set +e
+          time docker cp -L cache-container:/var/dance-cache - 2>/tmp/cp-stderr.log | tar -H posix -x -C "$SCRATCH_DIR"
+          CP_TAR_EXIT=${PIPESTATUS[1]}
+          DOCKER_CP_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "docker cp exit code: $DOCKER_CP_EXIT, tar exit code: $CP_TAR_EXIT"
+          cat /tmp/cp-stderr.log || true
+          docker rm -f cache-container 2>/dev/null || true
+
+          echo "=== [8/8] move extracted dir into place ==="
+          find "$SCRATCH_DIR" -maxdepth 2 || true
+          rm -rf "$CACHE_DIR"
+          if [ -d "$SCRATCH_DIR/dance-cache" ]; then
+            mv "$SCRATCH_DIR/dance-cache" "$CACHE_DIR"
+            echo "=== SUCCESS: extracted cache dir size on host disk ==="
+            du -sh "$CACHE_DIR" || true
+            find "$CACHE_DIR" -maxdepth 2 | head -20
+          else
+            echo "::error::$SCRATCH_DIR/dance-cache does not exist after docker cp + tar -x -- extraction produced nothing. Listing $SCRATCH_DIR for diagnosis:"
+            find "$SCRATCH_DIR" -maxdepth 3 || true
+            exit 1
+          fi
+        # Decisive comparison point: if THIS (GOCACHE alone, ~7-8GB,
+        # written by a SINGLE go build RUN) succeeds while the full
+        # server-build-mount (GOMODCACHE+GOCACHE together, ~10.71GB,
+        # written by go mod download THEN go build as separate RUNs
+        # sharing one id) failed, that implicates the multi-RUN-write
+        # pattern specifically, not raw size. If THIS also fails, that
+        # points back to a size ceiling somewhere between ~3.2GB (gomod-
+        # only, worked) and whatever GOCACHE-alone measures here.
+
+  cache-benchmark-warm-gobuild-cachemount-v2:
+    needs: cache-benchmark-cold-gobuild-cachemount-v2
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,extras=s3-cache,disk=large,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    outputs:
+      build-seconds: ${{ steps.timed-build.outputs.seconds }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Setup Dependencies Env Variables
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Docker Buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          buildkitd-config-inline: |
+            [worker.oci]
+              [[worker.oci.gcpolicy]]
+                keepDuration = "48h"
+                filters = ["type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+                maxUsedSpace = "30GB"
+              [[worker.oci.gcpolicy]]
+                all = true
+                reservedSpace = "1GB"
+      - name: "Restore go build/mod cache (expected: hit)"
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: go-build-cache-benchmark-gobuild-mount-v2
+          key: rancher-gocache-benchmark-gobuild-mount-v2-${{ github.run_id }}
+      - name: "Report cache hit status (should be true)"
+        run: |
+          echo "cache-hit=${{ steps.cache.outputs.cache-hit }}"
+          if [ "${{ steps.cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Expected a cache hit on the warm job but got a miss -- actions/cache restore did not work as expected."
+            exit 1
+          fi
+          echo "Restored cache size:"
+          du -sh go-build-cache-benchmark-gobuild-mount-v2 || true
+      - name: "Inject cache into BuildKit -- verbose hand-roll of dance's inject-cache.ts (read-only leg, never writes back)"
+        id: inject
+        shell: bash
+        run: |
+          set -x
+          BUILDER="${{ steps.setup-buildx.outputs.name }}"
+          CACHE_DIR="go-build-cache-benchmark-gobuild-mount-v2"
+          SCRATCH_DIR="scratch-inject"
+          MOUNT_ARGS="type=cache,target=/root/.cache/go/cache,id=rancher-cache-mount-bench-gobuild"
+
+          echo "=== [1/5] clean scratch dir ==="
+          rm -rf "$SCRATCH_DIR"
+          mkdir -p "$SCRATCH_DIR"
+
+          echo "=== [2/5] write buildstamp INTO THE CACHE DIR (the restored content dir) ==="
+          date -u -Iseconds > "$CACHE_DIR/buildstamp"
+
+          echo "=== [3/5] write Dancefile.inject INTO SCRATCH ==="
+          {
+            echo "FROM ghcr.io/containerd/busybox:latest"
+            echo "COPY buildstamp buildstamp"
+            echo "RUN --mount=$MOUNT_ARGS \\"
+            echo "    --mount=type=bind,source=.,target=/var/dance-cache \\"
+            echo "    cp -p -R /var/dance-cache/. /root/.cache/go/cache && echo INJECT_CP_EXIT=\$? || echo INJECT_CP_EXIT=\$?"
+          } > "$SCRATCH_DIR/Dancefile.inject"
+          echo "--- Dancefile.inject content ---"
+          cat "$SCRATCH_DIR/Dancefile.inject"
+
+          echo "=== [4/5] docker buildx du BEFORE inject (fresh builder for this job) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          echo "=== source dir being injected ==="
+          du -sh "$CACHE_DIR" || true
+
+          echo "=== [5/5] run the inject build -- build context is CACHE_DIR. NO --no-cache. ==="
+          set +e
+          time docker buildx build \
+            --builder "$BUILDER" \
+            -f "$SCRATCH_DIR/Dancefile.inject" \
+            --tag dance:inject \
+            --progress=plain \
+            "$CACHE_DIR" 2>&1 | tee /tmp/inject-build.log
+          INJECT_BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "=== inject build exit code: $INJECT_BUILD_EXIT ==="
+          cat /tmp/inject-build.log
+          grep -o "INJECT_CP_EXIT=[0-9]*" /tmp/inject-build.log || echo "INJECT_CP_EXIT marker NOT FOUND in log"
+
+          echo "=== docker buildx du AFTER inject (critical check: did the RESTORED content actually make it into BuildKit's mount storage?) ==="
+          docker buildx du --verbose --builder "$BUILDER" || true
+
+          if [ "$INJECT_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Inject build failed with exit code $INJECT_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+      - name: "Timed build (server-build-gobuild-cachemount, warm cache mount, go build/GOCACHE only)"
+        id: timed-build
+        shell: bash
+        run: |
+          set -x
+          echo "=== docker buildx du BEFORE timed build ==="
+          docker buildx du --verbose --builder "${{ steps.setup-buildx.outputs.name }}" || true
+          START=$(date +%s)
+          docker buildx build \
+            --builder "${{ steps.setup-buildx.outputs.name }}" \
+            --progress=plain \
+            --build-arg "VERSION=${{ env.TAG }}" \
+            --build-arg "COMMIT=${{ env.COMMIT }}" \
+            --build-arg "ARCH=amd64" \
+            --build-arg "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}" \
+            --build-arg "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}" \
+            --build-arg "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}" \
+            --build-arg "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}" \
+            --build-arg "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}" \
+            --platform linux/amd64 \
+            --file ./package/Dockerfile \
+            --target server-build-gobuild-cachemount \
+            . 2>&1 | tee /tmp/timed-build.log
+          TIMED_BUILD_EXIT=${PIPESTATUS[0]}
+          END=$(date +%s)
+          SECONDS_TAKEN=$((END - START))
+          echo "=== timed build exit code: $TIMED_BUILD_EXIT ==="
+          echo "Warm (cache mount, gobuild-only) build took ${SECONDS_TAKEN}s"
+          echo "seconds=${SECONDS_TAKEN}" >> "$GITHUB_OUTPUT"
+          echo "### Warm (cache mount v2, server-build-gobuild-cachemount / gobuild-only): ${SECONDS_TAKEN}s" >> "$GITHUB_STEP_SUMMARY"
+          echo "=== go build step timing (should be much faster than cold's real compile if the mount is genuinely warm) ==="
+          grep -E "go build -tags" /tmp/timed-build.log | head -10
+          if [ "$TIMED_BUILD_EXIT" -ne 0 ]; then
+            echo "::error::Timed build failed with exit code $TIMED_BUILD_EXIT -- see log above"
+            exit 1
+          fi
+
+  cache-benchmark-gobuild-cachemount-v2-report:
+    needs: [cache-benchmark-cold-gobuild-cachemount-v2, cache-benchmark-warm-gobuild-cachemount-v2]
+    runs-on: runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    steps:
+      - name: Summarize results
+        run: |
+          COLD="${{ needs.cache-benchmark-cold-gobuild-cachemount-v2.outputs.build-seconds }}"
+          WARM="${{ needs.cache-benchmark-warm-gobuild-cachemount-v2.outputs.build-seconds }}"
+          echo "# gobuild-only (GOCACHE) Cache-Mount v2 Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Run | Build time |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cold (empty cache mount, server-build-gobuild-cachemount / gobuild-only) | ${COLD}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warm (cache mount restored via hand-rolled dance + actions/cache, gobuild-only) | ${WARM}s |" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$COLD" ] && [ -n "$WARM" ] && [ "$WARM" -gt 0 ]; then
+            SPEEDUP=$(awk "BEGIN { printf \"%.1f\", $COLD / $WARM }")
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Speedup (cold vs. warm, gobuild-only cache mount v2): **${SPEEDUP}x**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+  # ---------------------------------------------------------------------
+  # END NEW cache-benchmark-*-gobuild-cachemount-v2 block
+  # ---------------------------------------------------------------------
+
   # ---------------------------------------------------------------------
   # END TEMPORARY cache-benchmark block
   # ---------------------------------------------------------------------
