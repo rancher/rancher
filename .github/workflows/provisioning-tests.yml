@@ -3,35 +3,59 @@ on:
   workflow_call:
 permissions: {}
 jobs:
+  # setup-matrix dynamically builds the test matrix from the change set using the
+  # precompiled scopes list (.github/scripts/provisioning-test-scopes.yaml).
+  # On pull_request only the scopes with changed paths run.
+  # Every other event runs the full matrix
+  setup-matrix:
+    name: Build Test Matrix
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.26
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      run: ${{ steps.build.outputs.run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build matrix
+        id: build
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eo pipefail
+
+          # Decide what the matrix script should look at:
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            CHANGED="$(git diff --name-only "$BASE_SHA...HEAD")"
+            export CHANGED
+          else
+            export ALL=1
+          fi
+
+          MATRIX="$(bash .github/scripts/resolve-provisioning-matrix.sh)"
+
+          # If the returned matrix is empty, the test job below is skipped outright.
+          COUNT="$(echo "$MATRIX" | jq '.include | length')"
+          if [ "$COUNT" -gt 0 ]; then RUN=true; else RUN=false; fi
+
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
+          echo "event=$EVENT_NAME, entries=$COUNT, run=$RUN"
+          echo "$MATRIX" | jq .
+
   provisioning_tests:
+    needs: [setup-matrix]
+    if: ${{ needs.setup-matrix.outputs.run == 'true' }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewCombinedNode$"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_MP_(EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode|EtcdSnapshotOperationsOnNewNode)$"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewCombinedNode$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_MP_(EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode|EtcdSnapshotOperationsOnNewNode)$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles|ImportedDisableSingleNode|ImportedDisableMultiNode)$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
-          CATTLE_FEATURES: "provisioningprebootstrap=true"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
-          CATTLE_FEATURES: "provisioningprebootstrap=true"
+      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
     name: Provisioning tests
     runs-on:
       - runs-on
@@ -116,6 +140,28 @@ jobs:
           log-file-path: provtest_output.txt
           artifact-retention-days: 7
           artifact-name: "Parsed Failure Log Dump (${{ matrix.V2PROV_TEST_DIST }}, ${{ steps.test_output.outputs.suite }})"
+
+  # provisioning_tests_summary prints a friendly summary of what tests ran. It's true purpose
+  # is to act as an anchor, giving us a single check that forwards the results of the dynamic matrix
+  # which we can use as a 'required check'
+  provisioning_tests_summary:
+    if: always()
+    name: Provisioning Tests Summary
+    needs: [setup-matrix, provisioning_tests]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.26
+    steps:
+      - name: Generate provisioning tests summary
+        run: |
+          echo "Provisioning Test Summary"
+          echo "--------------------------------"
+          echo "Test Combinations:"
+          echo "${{ needs.setup-matrix.outputs.matrix }}" 
+          echo "--------------------------------"
+          if [[ "${{ needs.provisioning_tests.result }}" != "success" && "${{ needs.provisioning_tests.result }}" != "skipped" ]]; then
+            echo "Some provisioning tests failed. Please check the logs for details."
+            exit 1
+          fi
 
   convert-to-xml:
     name: Convert test report to xml

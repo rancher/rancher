@@ -1,0 +1,123 @@
+# This file is consumed by .github/scripts/resolve-provisioning-matrix.sh,
+# which looks at a change set and emits the GitHub Actions matrix (the actual V2PROV_TEST_* rows) directly.
+#
+# STRUCTURE
+#   scopes.<name>.paths : anchored grep -E regexes over a changed file path.
+#   scopes.<name>.tests : the matrix rows to run when this scope is selected. Each row:
+#       dist      (required) -> V2PROV_TEST_DIST        (k3s | rke2)
+#       regex     (required) -> V2PROV_TEST_RUN_REGEX   (go test -run regex)
+#       features  (optional) -> CATTLE_FEATURES         (omit when unused)
+#
+#   Tests within a specific scope can be sharded by adding additional test entries,
+#   however care must be taken to ensure that the regexes are mutually exclusive.
+#   Otherwise, the same test will run multiple times in a single workflow run.
+#
+#   In addition to path specific scopes, there are two special scopes:
+#
+#   full : Any match runs EVERY provisioning test. This is reserved for
+#          core functionality like the planner, where changes could impact all of provisioning.
+#
+#   skip : Documents coverage gaps. This scope runs nothing, and is identical
+#          to leaving a path unlisted. It exists to prevent accidental
+#          inclusion of these paths in the future.
+
+scopes:
+  # general + custom + machine provisioning + fleet
+  basic:
+    paths:
+      - '^pkg/provisioningv2/systeminfo/'
+      - '^pkg/provisioningv2/kubeconfig/'
+      - '^pkg/provisioningv2/image/'
+      - '^pkg/controllers/provisioningv2/provisioninglog/'
+      - '^pkg/controllers/provisioningv2/fleetcluster/'
+      - '^pkg/controllers/provisioningv2/fleetworkspace/'
+      - '^pkg/controllers/provisioningv2/managedchart/'
+      - '^pkg/controllers/provisioningv2/machineconfigcleanup/'
+      - '^pkg/controllers/capr/bootstrap/'
+      - '^pkg/controllers/capr/bootstraptoken/'       # also imported
+      - '^pkg/controllers/capr/managesystemagent/'
+      - '^pkg/controllers/capr/machineprovision/'
+      - '^pkg/controllers/capr/machinedrain/'         # also operations
+      - '^pkg/controllers/capr/machinenodelookup/'
+      - '^pkg/controllers/capr/dynamicschema/'
+      - '^pkg/capr/configserver/'                     # also imported
+      - '^pkg/capr/installer/'
+      - '^pkg/controllers/management/clusterdeploy/'
+      - '^pkg/controllers/management/systemagent/'
+      - '^pkg/controllers/management/node/'
+      - '^pkg/controllers/management/authprovisioningv2/'
+      - '^pkg/controllers/managementagent/'
+      - '^pkg/controllers/dashboard/fleetcharts/'
+      - '^pkg/fleet/'
+      - '^pkg/node/'
+      - '^pkg/systemtemplate/'
+      - '^pkg/taints/'
+      - '^pkg/cluster/'
+      - '^pkg/settings/'                              # This should be scoped further in the future
+      - '^pkg/agent/'
+      - '^pkg/clusterprovisioninglogger/'
+      - '^tests/v2prov/tests/general/'
+      - '^tests/v2prov/tests/custom/'                 # also operations
+      - '^tests/v2prov/tests/machineprovisioning/'    # also operations
+      - '^tests/v2prov/tests/fleet/'
+    tests:
+      - { dist: k3s,  regex: '^Test_(General|Provisioning|Fleet)_.*$' }
+      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$' }
+
+  # day-2 ops (cert rotation, etcd snapshot, drain) on custom/ + machine provisioning
+  operations:
+    paths:
+      - '^pkg/controllers/capr/etcdmgmt/'             # also imported
+      - '^pkg/controllers/capr/machinedrain/'         # also basic
+      - '^pkg/rkecerts/'
+      - '^tests/v2prov/tests/custom/'                 # also basic
+      - '^tests/v2prov/tests/machineprovisioning/'    # also basic
+    tests:
+      - { dist: k3s,  regex: '^Test_Operation_.*$' }        # k3s runs all ops in one instance
+      - { dist: rke2, regex: '^Test_Operation_SetA_.*$' }
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*$' }
+
+  # Imported clusters
+  imported:
+    paths:
+      - '^pkg/controllers/capr/unmanaged/'
+      - '^pkg/controllers/capr/bootstraptoken/'       # also basic
+      - '^pkg/controllers/capr/etcdmgmt/'             # also operations
+      - '^pkg/capr/configserver/'                     # also basic
+      - '^tests/v2prov/tests/imported/'
+    tests:
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
+
+  prebootstrap:
+    paths:
+      - '^pkg/provisioningv2/prebootstrap/'
+      - '^tests/v2prov/tests/prebootstrap/'
+    tests:
+      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true' }
+      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true' }
+
+full:
+  - '^pkg/capr/planner/'
+  - '^pkg/plan/'
+  - '^pkg/controllers/capr/planner/'
+  - '^pkg/controllers/capr/rkecontrolplane/'
+  - '^pkg/controllers/capr/rkecluster/'
+  - '^pkg/controllers/capr/plansecret/'
+  - '^pkg/controllers/provisioningv2/cluster/'
+  - '^pkg/controllers/provisioningv2/provisioningcluster/'
+  - '^pkg/controllers/provisioningv2/rke2/'
+  - '^pkg/controllers/provisioningv2/secret/'
+  - # framework (everything under tests/v2prov except 'tests/'. Individual tests are included in more specific scopes above)
+  - '^tests/v2prov/(clients|cluster|defaults|namespace|nodeconfig|objectstore|operations|registry|systemdnode|utils|wait)/'
+  - '^scripts/provisioning-tests$'                    # the runner
+  - '^\.github/workflows/provisioning-tests\.ya?ml$'
+
+# Mainly here for documentation, these directories are provisioning related but don't
+# actually have any existing test coverage in the provv2 test suite. They're listed here
+# so that they don't accidentally get included in the above scopes in the future.
+skip:
+  - '^pkg/(kontainer-engine|kontainerdriver|kontainerdrivermetadata|channelserver|clustermanager|multiclustermanager)/'
+  - '^pkg/controllers/nodedriver/'
+  - '^pkg/controllers/provisioningv2/harvestercleanup/'
+  - '^pkg/controllers/management/(aks|eks|gke|alibaba|clusteroperator|imported|importedclusterversionmanagement|clusterprovisioner|drivers|cloudcredential|agentupgrade|k3sbasedupgrade|certsexpiration)/'
