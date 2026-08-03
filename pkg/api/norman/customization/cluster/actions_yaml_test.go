@@ -26,9 +26,10 @@ import (
 
 func TestGenerateKubeConfigBearer(t *testing.T) {
 	const (
-		testClusterName = "test-cluster"
-		fakeHost        = "fake-request-host.fake"
-		testUser        = "fake-user"
+		testClusterName      = "test-cluster"
+		fakeHost             = "fake-request-host.fake"
+		testUser             = "fake-user"
+		testImpersonatedUser = "impersonated-user" // Impersonate-User header target
 	)
 
 	testSchemas := types.NewSchemas().AddSchemas(managementSchema.Schemas)
@@ -204,6 +205,207 @@ func TestGenerateKubeConfigBearer(t *testing.T) {
 		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
 			assert.Equal(t, "the-hash", s.StringData[exttokenstore.FieldHash])
 			assert.Equal(t, testUser, s.StringData[exttokenstore.FieldUserID])
+			n := s.DeepCopy()
+			n.Name = "token-xxx"
+			n.Data = map[string][]byte{}
+			for k, v := range n.StringData {
+				n.Data[k] = []byte(v)
+			}
+			return n, nil
+		})
+
+		nscache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+		nscache.EXPECT().Get(exttokenstore.TokenNamespace).AnyTimes()
+
+		fakeHash := exttokenstore.NewMockhashHandler(ctrl)
+		fakeHash.EXPECT().MakeAndHashSecret().Return("the-secret", "the-hash", nil)
+
+		handler := ActionHandler{
+			NodeLister: &fakes.NodeListerMock{
+				GetFunc: func(namespace string, name string) (*apimgmtv3.Node, error) {
+					return nil, nil
+				},
+				ListFunc: func(namespace string, selector labels.Selector) ([]*apimgmtv3.Node, error) {
+					return nil, nil
+				},
+			},
+			UserMgr:   userManager,
+			TokenMgr:  &fakeTokenManager{},
+			AuthToken: &fakeAuth,
+			ExtTokenStore: exttokenstore.NewSystem(nil, nscache, secrets, users, v3tcache, nil,
+				exttokenstore.NewTimeHandler(),
+				fakeHash,
+				exttokenstore.NewAuthHandler(), nil),
+		}
+		bearer, err := handler.generateKubeConfigBearer(apiContext)
+		assert.NoError(t, err, "got an error when calling generate kubeconfig")
+		assert.Equal(t, "ext/token-xxx:the-secret", bearer)
+	})
+
+	t.Run("kubeconfig bearer token, impersonation, ext token auth", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		userManager := userMocks.NewMockManager(ctrl)
+		userManager.EXPECT().GetUser(gomock.Any()).Return(testImpersonatedUser).AnyTimes()
+
+		recorder := normanRecorder{}
+		apiContext := &types.APIContext{
+			ID:             testClusterName,
+			Version:        &managementSchema.Version,
+			Type:           v3.ClusterType,
+			ResponseWriter: &recorder,
+			Schemas:        testSchemas,
+			Request: &http.Request{
+				Host: fakeHost,
+				Body: io.NopCloser(strings.NewReader(`{}`)),
+			},
+		}
+
+		fakeAuth := fakeExtAuthToken{
+			token: ext.Token{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-ext",
+				},
+				Spec: ext.TokenSpec{
+					UserID: testUser, // session owner, distinct from impersonated target
+					UserPrincipal: ext.TokenPrincipal{
+						Provider: "local",
+						Name:     testUser,
+					},
+				},
+			},
+		}
+		fakePrincipalBytes, _ := json.Marshal(fakeAuth.token.Spec.UserPrincipal)
+		fakeAuthSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fakeAuth.token.Name,
+				Labels: map[string]string{
+					exttokenstore.UserIDLabel:     testUser,
+					exttokenstore.SecretKindLabel: exttokenstore.SecretKindLabelValue,
+				},
+				UID: "",
+			},
+			Data: map[string][]byte{
+				exttokenstore.FieldDescription:    []byte(""),
+				exttokenstore.FieldEnabled:        []byte("true"),
+				exttokenstore.FieldHash:           []byte("al;dgkl;dkfdsafdioj"),
+				exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+				exttokenstore.FieldLastUpdateTime: []byte("13:00:05"),
+				exttokenstore.FieldPrincipal:      fakePrincipalBytes,
+				exttokenstore.FieldTTL:            []byte("-1"),
+				exttokenstore.FieldUID:            []byte("kubid"),
+				exttokenstore.FieldUserID:         []byte(testUser),
+			},
+		}
+
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		secrets.EXPECT().Cache().Return(scache)
+
+		users := fake.NewMockNonNamespacedControllerInterface[*apimgmtv3.User, *apimgmtv3.UserList](ctrl)
+		ucache := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.User](ctrl)
+		users.EXPECT().Cache().Return(ucache)
+		ucache.EXPECT().Get(testImpersonatedUser).Return(&apimgmtv3.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testImpersonatedUser,
+			},
+		}, nil).AnyTimes()
+
+		v3tcache := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.Token](ctrl)
+
+		scache.EXPECT().Get(exttokenstore.TokenNamespace, fakeAuth.token.Name).Return(fakeAuthSecret, nil)
+		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+			assert.Equal(t, "the-hash", s.StringData[exttokenstore.FieldHash])
+			assert.Equal(t, testImpersonatedUser, s.StringData[exttokenstore.FieldUserID])
+			n := s.DeepCopy()
+			n.Name = "token-xxx"
+			n.Data = map[string][]byte{}
+			for k, v := range n.StringData {
+				n.Data[k] = []byte(v)
+			}
+			return n, nil
+		})
+
+		nscache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+		nscache.EXPECT().Get(exttokenstore.TokenNamespace).AnyTimes()
+
+		fakeHash := exttokenstore.NewMockhashHandler(ctrl)
+		fakeHash.EXPECT().MakeAndHashSecret().Return("the-secret", "the-hash", nil)
+
+		handler := ActionHandler{
+			NodeLister: &fakes.NodeListerMock{
+				GetFunc: func(namespace string, name string) (*apimgmtv3.Node, error) {
+					return nil, nil
+				},
+				ListFunc: func(namespace string, selector labels.Selector) ([]*apimgmtv3.Node, error) {
+					return nil, nil
+				},
+			},
+			UserMgr:   userManager,
+			TokenMgr:  &fakeTokenManager{},
+			AuthToken: &fakeAuth,
+			ExtTokenStore: exttokenstore.NewSystem(nil, nscache, secrets, users, v3tcache, nil,
+				exttokenstore.NewTimeHandler(),
+				fakeHash,
+				exttokenstore.NewAuthHandler(), nil),
+		}
+		bearer, err := handler.generateKubeConfigBearer(apiContext)
+		assert.NoError(t, err, "got an error when calling generate kubeconfig")
+		assert.Equal(t, "ext/token-xxx:the-secret", bearer)
+	})
+
+	t.Run("kubeconfig bearer token, impersonation, legacy token auth", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		userManager := userMocks.NewMockManager(ctrl)
+		userManager.EXPECT().GetUser(gomock.Any()).Return(testImpersonatedUser).AnyTimes()
+
+		recorder := normanRecorder{}
+		apiContext := &types.APIContext{
+			ID:             testClusterName,
+			Version:        &managementSchema.Version,
+			Type:           v3.ClusterType,
+			ResponseWriter: &recorder,
+			Schemas:        testSchemas,
+			Request: &http.Request{
+				Host: fakeHost,
+				Body: io.NopCloser(strings.NewReader(`{}`)),
+			},
+		}
+
+		fakeAuth := fakeAuthToken{
+			token: apimgmtv3.Token{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-legacy",
+				},
+				UserID:       testUser, // session owner, distinct from impersonated target
+				AuthProvider: "local",
+				UserPrincipal: apimgmtv3.Principal{
+					Provider: "local",
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testUser,
+					},
+				},
+			},
+		}
+
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		secrets.EXPECT().Cache().Return(scache)
+
+		users := fake.NewMockNonNamespacedControllerInterface[*apimgmtv3.User, *apimgmtv3.UserList](ctrl)
+		ucache := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.User](ctrl)
+		users.EXPECT().Cache().Return(ucache)
+		ucache.EXPECT().Get(testImpersonatedUser).Return(&apimgmtv3.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testImpersonatedUser,
+			},
+		}, nil).AnyTimes()
+
+		v3tcache := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.Token](ctrl)
+		v3tcache.EXPECT().Get(fakeAuth.token.Name).Return(&fakeAuth.token, nil)
+
+		secrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+			assert.Equal(t, "the-hash", s.StringData[exttokenstore.FieldHash])
+			assert.Equal(t, testImpersonatedUser, s.StringData[exttokenstore.FieldUserID])
 			n := s.DeepCopy()
 			n.Name = "token-xxx"
 			n.Data = map[string][]byte{}
