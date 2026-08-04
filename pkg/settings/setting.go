@@ -86,8 +86,8 @@ var (
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	AzureGroupCacheSize                 = NewSetting("azure-group-cache-size", "10000")
 	CACerts                             = NewSetting("cacerts", "")
-	CRTDefaultTTL                       = NewSetting("crt-default-ttl-minutes", "43200")        //30 days
-	CRTDefaultGracePeriod               = NewSetting("crt-default-grace-period-minutes", "180") //3 hours
+	CRTDefaultTTL                       = NewSetting("crt-default-ttl-minutes", "43200")        // 30 days
+	CRTDefaultGracePeriod               = NewSetting("crt-default-grace-period-minutes", "180") // 3 hours
 	CLIURLDarwin                        = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                         = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                       = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
@@ -147,7 +147,7 @@ var (
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	// ATTENTION: This file and the following line are used in the rancher/webhook CI to extract the default branch they need
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.15")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.16")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
