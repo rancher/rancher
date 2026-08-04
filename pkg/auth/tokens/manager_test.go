@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -362,7 +363,7 @@ func TestListTokens(t *testing.T) {
 	}
 
 	want := []map[string]any{
-		map[string]any{
+		{
 			".selfLink":    "",
 			"authProvider": "testing",
 			"current":      true,
@@ -377,7 +378,7 @@ func TestListTokens(t *testing.T) {
 				"metadata": map[string]any{},
 			},
 		},
-		map[string]any{
+		{
 			".selfLink":    "",
 			"authProvider": "testing",
 			"current":      false,
@@ -395,6 +396,75 @@ func TestListTokens(t *testing.T) {
 	}
 	assert.Len(t, w.Responses, 1)
 	assert.Equal(t, want, w.Responses[0].Data)
+}
+
+func TestDeriveTokenClusterName(t *testing.T) {
+	t.Parallel()
+
+	authTokenKey := mustGenerateRandomToken(t)
+	authTokenName := "auth-token"
+	authTokenValue := authTokenName + ":" + authTokenKey
+
+	tests := []struct {
+		name            string
+		body            string
+		wantClusterName string
+	}{
+		{
+			name:            "clusterId field is used",
+			body:            `{"description":"test","clusterId":"c-m-abc123"}`,
+			wantClusterName: "c-m-abc123",
+		},
+		{
+			name:            "clusterName field is used as fallback",
+			body:            `{"description":"test","clusterName":"c-m-xyz789"}`,
+			wantClusterName: "c-m-xyz789",
+		},
+		{
+			name:            "clusterId takes precedence over clusterName",
+			body:            `{"description":"test","clusterId":"c-m-abc123","clusterName":"c-m-xyz789"}`,
+			wantClusterName: "c-m-abc123",
+		},
+		{
+			name:            "no cluster field",
+			body:            `{"description":"test"}`,
+			wantClusterName: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fakeClient := &fakeTokenClient{}
+			mgr := Manager{
+				tokenIndexer: &dummyIndexer{
+					Store: &cache.FakeCustomStore{},
+					token: &apiv3.Token{
+						ObjectMeta:   metav1.ObjectMeta{Name: authTokenName},
+						Token:        authTokenKey,
+						UserID:       "u-test",
+						AuthProvider: "local",
+					},
+				},
+				tokens: fakeClient,
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/v3/tokens", strings.NewReader(tt.body))
+			req.Header.Set("Authorization", "Bearer "+authTokenValue)
+			w := &normanRecorder{}
+			apiCtx := &types.APIContext{
+				ResponseWriter: w,
+				Request:        req,
+				Schema:         &types.Schema{Mapper: mapper.NewObject()},
+			}
+
+			err := mgr.deriveToken(apiCtx)
+			assert.NoError(t, err)
+			assert.NotNil(t, fakeClient.created)
+			assert.Equal(t, tt.wantClusterName, fakeClient.created.ClusterName)
+		})
+	}
 }
 
 // TestTokenStreamTransformer validates that the function properly filters data in websocket
@@ -512,6 +582,7 @@ type dummyIndexer struct {
 
 	hashedEnabled bool
 	empty         bool
+	token         *apiv3.Token
 }
 
 func (d *dummyIndexer) Empty() {
@@ -541,8 +612,15 @@ func (d *dummyIndexer) ByIndex(indexName, indexKey string) ([]any, error) {
 	if d.empty {
 		return nil, nil
 	}
-
-	token := &apiv3.Token{
+	if d.token != nil {
+		tok := d.token.DeepCopy()
+		if d.hashedEnabled {
+			tok.Annotations = map[string]string{TokenHashed: strconv.FormatBool(d.hashedEnabled)}
+			tok.Token = tokenHashed
+		}
+		return []any{tok}, nil
+	}
+	tok := &apiv3.Token{
 		Token: token,
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testname",
@@ -550,12 +628,10 @@ func (d *dummyIndexer) ByIndex(indexName, indexKey string) ([]any, error) {
 		UserID: "testuser",
 	}
 	if d.hashedEnabled {
-		token.Annotations = map[string]string{TokenHashed: strconv.FormatBool(d.hashedEnabled)}
-		token.Token = tokenHashed
+		tok.Annotations = map[string]string{TokenHashed: strconv.FormatBool(d.hashedEnabled)}
+		tok.Token = tokenHashed
 	}
-	return []any{
-		token,
-	}, nil
+	return []any{tok}, nil
 }
 
 func (d *dummyIndexer) GetIndexers() cache.Indexers {
@@ -579,10 +655,11 @@ func mustGenerateRandomToken(t *testing.T) string {
 }
 
 type fakeTokenClient struct {
-	list   []apiv3.Token
-	get    *apiv3.Token
-	gmap   map[string]*apiv3.Token
-	delete int
+	list    []apiv3.Token
+	get     *apiv3.Token
+	gmap    map[string]*apiv3.Token
+	delete  int
+	created *apiv3.Token
 }
 
 func (f *fakeTokenClient) DeleteCount() int {
@@ -590,7 +667,8 @@ func (f *fakeTokenClient) DeleteCount() int {
 }
 
 func (f *fakeTokenClient) Create(o *apiv3.Token) (*apiv3.Token, error) {
-	return nil, nil
+	f.created = o.DeepCopy()
+	return f.created, nil
 }
 
 func (f *fakeTokenClient) Get(name string, options metav1.GetOptions) (*apiv3.Token, error) {
