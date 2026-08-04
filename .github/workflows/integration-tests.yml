@@ -15,26 +15,15 @@ jobs:
   test:
     name: test (${{ matrix.shard }})
     strategy:
-      # Run every shard to completion even if one fails, so a single flaky shard
-      # doesn't hide results from the others.
+      # Don't let one failing shard cancel the others.
       fail-fast: false
       matrix:
-        # Each shard runs on its own runner against its own Rancher instance, so
-        # the packages that mutate GLOBAL setting singletons (catalogv2's chart
-        # suites and tokens' auth kill-switch) are naturally isolated from every
-        # other package -- something `-p >1` on a single shared Rancher could not
-        # do safely. Shards are balanced by measured runtime (catalogv2 ~15 min
-        # dominates, so it is split across two shards). `run` selects specific
-        # suites; empty means "all tests in the listed packages".
-        #
-        # `cpu` sizes the runner (runner=<cpu>cpu-linux-x64). These integration
-        # jobs are largely orchestration/wait-bound (Rancher + k3s startup, chart
-        # pulls) rather than CPU-bound, and the heavy-runner pool is limited by an
-        # AWS vCPU quota -- so running all shards on 8cpu (instead of 16) halves
-        # integration's vCPU footprint (4x8=32 vs 4x16=64), letting all shards run
-        # concurrently within the quota and easing pool contention. Integration is
-        # off the CI critical path, so if 8cpu proves too slow/OOMy we can bump
-        # individual shards back to 16 without affecting overall wall-clock.
+        # Each shard gets its own runner and Rancher instance, which isolates the
+        # packages that mutate global settings (catalogv2, tokens) instead of
+        # relying on `-p >1` on a shared Rancher. Shards are balanced by runtime
+        # (catalogv2 is split across two). `run` selects suites; empty means all.
+        # `cpu` is 8 (not 16) because these jobs are wait-bound, not CPU-bound;
+        # bump a shard back to 16 if it proves too slow.
         include:
           - shard: catalog-charts
             cpu: 8
@@ -54,11 +43,8 @@ jobs:
               ./tests/v2/integration/users/...
               ./tests/v2/integration/authconfigs/...
             run: ''
-          # tokens is listed LAST: it flips global auth settings
-          # (kubeconfig-generate-token=false, a ~600ms token TTL) and only
-          # restores them in cleanup, so running it after the other packages in
-          # this shard avoids any window where their token/kubeconfig operations
-          # could be affected.
+          # tokens runs LAST in its shard: it disables global auth settings and
+          # only restores them in cleanup, so keep it after the other packages.
           - shard: workloads-and-steve
             cpu: 8
             packages: >-

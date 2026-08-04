@@ -14,12 +14,8 @@ cleanup()
 
 cd $(dirname $0)/../..
 
-# Which integration packages this (possibly sharded) invocation should run.
-# Defaults to the whole suite, so a plain `./scripts/gha/tests` is unchanged.
-# The integration-tests.yml matrix overrides these per shard so each shard runs
-# against its own Rancher instance (see the shared-state analysis: catalogv2 and
-# tokens mutate GLOBAL setting singletons, so real parallelism requires isolated
-# Rancher instances rather than `-p >1` on one server).
+# Integration packages to run. Defaults to the whole suite; the
+# integration-tests.yml matrix overrides this per shard.
 INTEGRATION_TEST_PACKAGES="${INTEGRATION_TEST_PACKAGES:-./tests/v2/integration/...}"
 # Optional -run regex, used by the catalogv2 shards to select specific suites.
 INTEGRATION_TEST_RUN="${INTEGRATION_TEST_RUN:-}"
@@ -107,25 +103,15 @@ export -f dump_rancher_logs
 ./scripts/gha/run 2>&1
 trap cleanup exit
 
-# Build integrationsetup AND compile the integration test binaries in the
-# background while we wait for Rancher's deployments (k3s,
-# api-extension/remotedialer-proxy, webhook, turtles) to roll out below. Rancher
-# was already started (detached) by ./scripts/gha/run above, so everything in
-# this block overlaps its boot. Compilation only needs the source tree, not a
-# running Rancher, so overlapping it with the readiness waits removes the cold
-# `go build`/module download from the critical path.
+# Build integrationsetup and compile the integration test binaries in the
+# background while we wait for Rancher's deployments to roll out below, keeping
+# the cold `go build`/module download off the critical path. integrationsetup is
+# built first so it warms the build cache the test binaries reuse; it mirrors
+# tests/v2/integration/scripts/build-integration-setup but uses $GOBIN since
+# under sudo `go` is not on secure_path.
 #
-# The integrationsetup build used to be a separate, SERIAL CI step that ran
-# BEFORE Rancher was started (so its compile could not overlap the boot). It is
-# built here instead -- first, so it warms the build cache shared with the test
-# binaries below. It mirrors tests/v2/integration/scripts/build-integration-setup
-# but uses $GOBIN because under sudo `go` is not on secure_path.
-#
-# `go test -c` compiles each package's test binary (including its _test.go
-# files, which `go build` would skip) and writes it to /dev/null WITHOUT
-# running anything -- so nothing tries to reach Rancher. Shared dependencies
-# are compiled once and reused from the build cache across the loop, so the
-# real `go test` afterwards only has to link and run.
+# `go test -c` compiles each package's test binary (including its _test.go files)
+# without running anything, so nothing reaches Rancher during the wait.
 echo "Building integrationsetup + pre-compiling integration test binaries in the background"
 (
   set -e
@@ -177,12 +163,10 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
-# Make sure the background build/compilation started above has finished before we
-# use the integrationsetup binary it produced (and before `go test` links the
-# precompiled test binaries). In the common case it completed during the
-# deployment waits above, so this returns immediately. If the integrationsetup
-# build failed, the run below fails clearly; if only the test precompile failed,
-# `go test` further down will recompile and surface the real error.
+# Wait for the background build to finish before using integrationsetup and the
+# precompiled test binaries. It usually completed during the waits above. On
+# failure we log but don't abort: `go test` below will recompile and surface the
+# real error.
 if [ -n "${PRECOMPILE_PID:-}" ]; then
   echo "Waiting for background integrationsetup build + test compilation to finish"
   wait "$PRECOMPILE_PID" || { echo "background build/compilation reported an error:"; cat /tmp/precompile.log || true; }
