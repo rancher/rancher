@@ -128,7 +128,7 @@ jobs:
         run: |
           for file in $(ls /tmp/test-results/report-*.txt); do
              echo "Processing $file..."
-             go run github.com/jstemmer/go-junit-report/v2@latest < $file > $(sed 's/txt/xml/g' <<<$file)
+             go run github.com/jstemmer/go-junit-report/v2@14d61e6e75e3f3c74551d757ad936e8e88014464 < $file > $(sed 's/txt/xml/g' <<<$file)
           done
       - name: Upload XML Test Results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
