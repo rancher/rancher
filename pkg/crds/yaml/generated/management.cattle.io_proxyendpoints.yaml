@@ -48,6 +48,15 @@ spec:
                   allowlist. These are expected to be domain names, and not URL paths.
                 items:
                   properties:
+                    caBundle:
+                      description: |-
+                        CABundle is a PEM-encoded bundle of CA certificates to trust when verifying the TLS
+                        certificate of the endpoint. This is useful for self-signed certificates or certificates
+                        from non-public Certificate Authorities.
+                        When specified, only these CA certificates (plus the system's root CAs) will be trusted
+                        for verifying the endpoint's certificate. Do not use this with InsecureSkipTLSVerify.
+                      maxLength: 100000
+                      type: string
                     credentialInjection:
                       description: |-
                         e.g.: credID=cattle-global-data/my-cred headers=X-Token=token;X-User=user
@@ -158,6 +167,9 @@ spec:
                   required:
                   - domain
                   type: object
+                  x-kubernetes-validations:
+                  - message: caBundle cannot be set when insecureSkipTLSVerify is true
+                    rule: '!(has(self.caBundle) && self.caBundle != '''' && self.insecureSkipTLSVerify)'
                 type: array
             required:
             - routes
