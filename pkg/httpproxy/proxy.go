@@ -612,3 +612,39 @@ func buildTransportForRoute(route *mgmt.ProxyEndpointRoute, requestHostname stri
 
 	return transport, nil
 }
+
+// buildTransportWithCABundle creates an HTTP transport that trusts the provided CA certificates.
+// The caBundle should be PEM-encoded certificates.
+func buildTransportWithCABundle(caBundle string) (*http.Transport, error) {
+	// Parse the CA certificates from PEM
+	caCertPool, err := parseCACertificates(caBundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CA certificates: %w", err)
+	}
+
+	// Clone the default transport and update its TLS config
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	return transport, nil
+}
+
+// parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool.
+// It combines the provided certificates with the system's root CAs.
+func parseCACertificates(caBundle string) (*x509.CertPool, error) {
+	// Start with the system's root CAs
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		logrus.Debugf("httpproxy: failed to get system cert pool, using empty pool instead: %v", err)
+		caCertPool = x509.NewCertPool()
+	}
+
+	// Add the provided CA certificates to the pool
+	if !caCertPool.AppendCertsFromPEM([]byte(caBundle)) {
+		return nil, fmt.Errorf("failed to append CA certificates from PEM data")
+	}
+
+	return caCertPool, nil
+}
