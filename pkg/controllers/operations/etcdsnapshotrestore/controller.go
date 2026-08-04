@@ -766,13 +766,6 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 						Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/tls")},
 					},
 				},
-				plan.OneTimeInstruction{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "remove-cred-directory",
-						Command: "rm",
-						Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/cred")},
-					},
-				},
 			)
 		}
 
