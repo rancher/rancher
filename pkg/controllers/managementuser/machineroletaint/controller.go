@@ -193,9 +193,14 @@ func (h *handler) taintsNeedUpdate(nodeTaints []corev1.Taint, expectedTaints []c
 		}
 	}
 
-	// Remaining taints in expectedMap need to be added
-	for _, taint := range expectedMap {
-		toAdd = append(toAdd, taint)
+	// Remaining taints in expectedMap need to be added. Range over the
+	// expectedTaints slice (not the map) to preserve a deterministic order
+	// consistent with capr.GetExpectedDefaultTaints.
+	for _, taint := range expectedTaints {
+		key := fmt.Sprintf("%s:%s", taint.Key, taint.Effect)
+		if _, ok := expectedMap[key]; ok {
+			toAdd = append(toAdd, taint)
+		}
 	}
 
 	needsUpdate := len(toAdd) > 0 || len(toRemoveIndices) > 0

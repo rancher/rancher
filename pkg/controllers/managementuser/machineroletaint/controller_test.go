@@ -169,7 +169,8 @@ func TestWorkerLabelLogic(t *testing.T) {
 	tests := []struct {
 		name               string
 		machineHasWorker   bool
-		nodeWorkerValue    string // empty means label not present
+		nodeHasWorkerLabel bool   // whether the node has the worker label at all
+		nodeWorkerValue    string // value of the label when present
 		shouldAddLabel     bool
 		shouldRemoveLabel  bool
 		shouldNormalize    bool
@@ -177,6 +178,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 		{
 			name:               "add worker label",
 			machineHasWorker:   true,
+			nodeHasWorkerLabel: false,
 			nodeWorkerValue:    "",
 			shouldAddLabel:     true,
 			shouldRemoveLabel:  false,
@@ -185,6 +187,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 		{
 			name:               "remove worker label",
 			machineHasWorker:   false,
+			nodeHasWorkerLabel: true,
 			nodeWorkerValue:    "true",
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  true,
@@ -193,6 +196,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 		{
 			name:               "no change - both have correct value",
 			machineHasWorker:   true,
+			nodeHasWorkerLabel: true,
 			nodeWorkerValue:    "true",
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  false,
@@ -201,6 +205,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 		{
 			name:               "no change - neither have",
 			machineHasWorker:   false,
+			nodeHasWorkerLabel: false,
 			nodeWorkerValue:    "",
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  false,
@@ -209,6 +214,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 		{
 			name:               "normalize empty value to true",
 			machineHasWorker:   true,
+			nodeHasWorkerLabel: true,
 			nodeWorkerValue:    "", // label exists but empty
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  false,
@@ -217,6 +223,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 		{
 			name:               "normalize wrong value to true",
 			machineHasWorker:   true,
+			nodeHasWorkerLabel: true,
 			nodeWorkerValue:    "yes", // wrong value
 			shouldAddLabel:     false,
 			shouldRemoveLabel:  false,
@@ -232,7 +239,7 @@ func TestWorkerLabelLogic(t *testing.T) {
 				node.Labels = make(map[string]string)
 			}
 
-			if tt.nodeWorkerValue != "" {
+			if tt.nodeHasWorkerLabel {
 				node.Labels[workerLabel] = tt.nodeWorkerValue
 			}
 
