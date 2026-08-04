@@ -2,6 +2,7 @@ package httpproxy
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -488,15 +489,66 @@ func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt
 }
 
 // perRouteTLSTransport selects the appropriate HTTP transport based on whether the destination
-// ProxyEndpointRoute has InsecureSkipTLSVerify enabled.
+// ProxyEndpointRoute has InsecureSkipTLSVerify enabled or provides a CABundle.
 type perRouteTLSTransport struct {
 	proxy *proxy
 }
 
 func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	route := t.proxy.findMatchingRoute(req.URL.Hostname())
+
+	// If the route explicitly disables TLS verification, use the insecure transport
 	if route != nil && route.InsecureSkipTLSVerify {
 		return t.proxy.insecureTransport.RoundTrip(req)
 	}
+
+	// If the route provides a custom CA bundle, create a transport with those CAs
+	if route != nil && route.CABundle != "" {
+		transport, err := buildTransportWithCABundle(route.CABundle)
+		if err != nil {
+			logrus.Warnf("httpproxy: failed to build transport with CABundle: %v", err)
+			// Fall through to default transport
+			return http.DefaultTransport.RoundTrip(req)
+		}
+		return transport.RoundTrip(req)
+	}
+
+	// Use the default transport for standard certificate verification
 	return http.DefaultTransport.RoundTrip(req)
+}
+
+// buildTransportWithCABundle creates an HTTP transport that trusts the provided CA certificates.
+// The caBundle should be PEM-encoded certificates.
+func buildTransportWithCABundle(caBundle string) (*http.Transport, error) {
+	// Parse the CA certificates from PEM
+	caCertPool, err := parseCACertificates(caBundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CA certificates: %w", err)
+	}
+
+	// Clone the default transport and update its TLS config
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	return transport, nil
+}
+
+// parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool.
+// It combines the provided certificates with the system's root CAs.
+func parseCACertificates(caBundle string) (*x509.CertPool, error) {
+	// Start with the system's root CAs
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		logrus.Debugf("httpproxy: failed to get system cert pool, using empty pool instead: %v", err)
+		caCertPool = x509.NewCertPool()
+	}
+
+	// Add the provided CA certificates to the pool
+	if !caCertPool.AppendCertsFromPEM([]byte(caBundle)) {
+		return nil, fmt.Errorf("failed to append CA certificates from PEM data")
+	}
+
+	return caCertPool, nil
 }
