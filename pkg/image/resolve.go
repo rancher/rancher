@@ -138,7 +138,7 @@ func IsValidSemver(version string) bool {
 
 func setRequiredImages(osType OSType, imagesSet map[string]map[string]struct{}) {
 	if osType == Linux {
-		addSourceToImage(imagesSet, buildconfig.DefaultChartsImage, imageSourceCore)
+		addSourceToImage(imagesSet, buildconfig.DefaultAssetsImage, imageSourceCore)
 		addSourceToImage(imagesSet, buildconfig.DefaultSccOperatorImage, imageSourceCore)
 		addSourceToImage(imagesSet, buildconfig.DefaultShellVersion, imageSourceCore)
 		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), imageSourceCore)

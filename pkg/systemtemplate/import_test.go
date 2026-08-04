@@ -43,7 +43,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		pcExists       bool
 		agentImage     string
 		authImage      string
-		chartsImage    string
+		assetsImage    string
 		namespace      string
 		token          string
 		url            string
@@ -163,7 +163,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			url:         "some-dummy-url",
 			token:       "some-dummy-token",
 			agentImage:  "my/agent:image",
-			chartsImage: "rancher/assets:charts",
+			assetsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled",
@@ -190,7 +190,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:  "my/agent:image",
-			chartsImage: "rancher/assets:charts",
+			assetsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled-no-labels",
@@ -215,7 +215,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				Labels: map[string]string{},
 			},
 			agentImage:  "my/agent:image",
-			chartsImage: "rancher/assets:charts",
+			assetsImage: "rancher/assets:charts",
 		},
 		{
 			name: "test-rancher-namespace-options-enabled-no-annotations",
@@ -240,7 +240,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:  "my/agent:image",
-			chartsImage: "rancher/assets:charts",
+			assetsImage: "rancher/assets:charts",
 		},
 		{
 			name: "imported cluster with pull secrets renders imagePullSecrets and secret resources",
@@ -261,7 +261,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:  "rancher/rancher-agent:v2.8.0",
-			chartsImage: "rancher/assets:charts",
+			assetsImage: "rancher/assets:charts",
 			token:       "test-token",
 			url:         "https://rancher.example.com",
 			secrets: map[string]*corev1.Secret{
@@ -293,7 +293,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:  "rancher-agent:v2.8.0",
-			chartsImage: "rancher/assets:charts",
+			assetsImage: "rancher/assets:charts",
 			token:       "test-token",
 			url:         "https://rancher.example.com",
 			secrets: map[string]*corev1.Secret{
@@ -329,7 +329,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:  "rancher-agent:v2.8.0",
-			chartsImage: "rancher/assets:charts",
+			assetsImage: "rancher/assets:charts",
 			token:       "test-token",
 			url:         "https://rancher.example.com",
 			secrets: map[string]*corev1.Secret{
@@ -376,7 +376,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:    "my-registry.example.com/rancher/rancher-agent:v2.8.0",
-			chartsImage:   "rancher/assets:charts",
+			assetsImage:   "rancher/assets:charts",
 			token:         "test-token",
 			url:           "https://rancher.example.com",
 			expectedError: "\"fleet-default:nonexistent-secret\" not found",
@@ -395,7 +395,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			agentImage:     "rancher/rancher-agent:v2.8.0",
-			chartsImage:    "rancher/assets:charts",
+			assetsImage:    "rancher/assets:charts",
 			token:          "test-token",
 			url:            "https://rancher.example.com",
 			isPreBootstrap: true,
@@ -414,7 +414,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			err := SystemTemplate(&b, &TemplateOps{
 				AgentImage:     tt.agentImage,
 				AuthImage:      tt.authImage,
-				ChartsImage:    tt.chartsImage,
+				AssetsImage:    tt.assetsImage,
 				Namespace:      tt.namespace,
 				Token:          tt.token,
 				URL:            tt.url,

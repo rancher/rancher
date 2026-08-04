@@ -76,7 +76,7 @@ spec:
 {{- end }}
       initContainers:
         - name: rancher-charts-copy
-          image: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
+          image: "{{ template "rancherCharts.image" . }}:{{ .Values.assetsImage.tag }}"
           imagePullPolicy: {{ include "rancherCharts.imagePullPolicy" . }}
           volumeMounts:
             - name: rancher-charts
@@ -185,7 +185,7 @@ spec:
           value: "{{ range $i, $v := .Values.imagePullSecrets }}{{- if $i }},{{ end }}{{ $v.name }}{{ end }}"
 {{- end }}
         - name: CATTLE_CHARTS_IMAGE
-          value: "{{ template "rancherCharts.image" . }}:{{ .Values.chartsImage.tag }}"
+          value: "{{ template "rancherCharts.image" . }}:{{ .Values.assetsImage.tag }}"
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}

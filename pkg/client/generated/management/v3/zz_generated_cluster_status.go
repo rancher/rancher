@@ -16,12 +16,12 @@ const (
 	ClusterStatusFieldAppliedEnableNetworkPolicy                 = "appliedEnableNetworkPolicy"
 	ClusterStatusFieldAppliedSpec                                = "appliedSpec"
 	ClusterStatusFieldAppliedWebhookDeploymentCustomization      = "appliedWebhookDeploymentCustomization"
+	ClusterStatusFieldAssetsImage                                = "assetsImage"
 	ClusterStatusFieldAuthImage                                  = "authImage"
 	ClusterStatusFieldCACert                                     = "caCert"
 	ClusterStatusFieldCapabilities                               = "capabilities"
 	ClusterStatusFieldCapacity                                   = "capacity"
 	ClusterStatusFieldCertificatesExpiration                     = "certificatesExpiration"
-	ClusterStatusFieldChartsImage                                = "chartsImage"
 	ClusterStatusFieldComponentStatuses                          = "componentStatuses"
 	ClusterStatusFieldConditions                                 = "conditions"
 	ClusterStatusFieldCurrentCisRunName                          = "currentCisRunName"
@@ -64,12 +64,12 @@ type ClusterStatus struct {
 	AppliedEnableNetworkPolicy                 bool                            `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedSpec                                *ClusterSpec                    `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AppliedWebhookDeploymentCustomization      *WebhookDeploymentCustomization `json:"appliedWebhookDeploymentCustomization,omitempty" yaml:"appliedWebhookDeploymentCustomization,omitempty"`
+	AssetsImage                                string                          `json:"assetsImage,omitempty" yaml:"assetsImage,omitempty"`
 	AuthImage                                  string                          `json:"authImage,omitempty" yaml:"authImage,omitempty"`
 	CACert                                     string                          `json:"caCert,omitempty" yaml:"caCert,omitempty"`
 	Capabilities                               *Capabilities                   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                                   map[string]string               `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration                     map[string]CertExpiration       `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
-	ChartsImage                                string                          `json:"chartsImage,omitempty" yaml:"chartsImage,omitempty"`
 	ComponentStatuses                          []ClusterComponentStatus        `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
 	Conditions                                 []ClusterCondition              `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	CurrentCisRunName                          string                          `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`

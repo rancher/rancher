@@ -4,7 +4,7 @@ defaultShellVersion: rancher/shell:v0.8.1
 defaultSccOperatorImage: rancher/scc-operator:v0.5.1-rc.2
 
 # Notes: ClusterRepo asset and branch versions
-defaultChartsImage: rancher/rancher-assets:v2.16-20260805T1815Z-dev
+defaultAssetsImage: rancher/rancher-assets:v2.16-20260805T1815Z-dev
 chartDefaultBranch: dev-v2.16
 partnerChartDefaultBranch: main
 rke2ChartDefaultBranch: main

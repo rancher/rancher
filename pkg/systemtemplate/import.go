@@ -40,7 +40,7 @@ type clusterAgentContext struct {
 	AgentImage           string
 	AgentEnvVars         string
 	AuthImage            string
-	ChartsImage          string
+	AssetsImage          string
 	TokenKey             string
 	Token                string
 	URL                  string
@@ -146,7 +146,7 @@ func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 type TemplateOps struct {
 	AgentImage     string
 	AuthImage      string
-	ChartsImage    string
+	AssetsImage    string
 	Namespace      string
 	Token          string
 	URL            string
@@ -168,8 +168,8 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		ops.AuthImage = settings.AuthImage.Get()
 	}
 
-	if ops.ChartsImage == "fixed" {
-		ops.ChartsImage = settings.ChartsImage.Get()
+	if ops.AssetsImage == "fixed" {
+		ops.AssetsImage = settings.AssetsImage.Get()
 	}
 
 	var registryURL string
@@ -279,7 +279,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		AgentImage:                 ops.AgentImage,
 		AgentEnvVars:               agentEnvVars,
 		AuthImage:                  ops.AuthImage,
-		ChartsImage:                ops.ChartsImage,
+		AssetsImage:                ops.AssetsImage,
 		TokenKey:                   tokenKey,
 		Token:                      base64.StdEncoding.EncodeToString([]byte(ops.Token)),
 		URL:                        base64.StdEncoding.EncodeToString([]byte(ops.URL)),
@@ -355,7 +355,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 	err := SystemTemplate(buf, &TemplateOps{
 		AgentImage:     GetDesiredAgentImage(cluster),
 		AuthImage:      GetDesiredAuthImage(cluster),
-		ChartsImage:    GetDesiredChartsImage(cluster),
+		AssetsImage:    GetDesiredAssetsImage(cluster),
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            settings.ServerURL.Get(),
@@ -419,14 +419,14 @@ func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	return desiredAuth
 }
 
-func GetDesiredChartsImage(cluster *apimgmtv3.Cluster) string {
+func GetDesiredAssetsImage(cluster *apimgmtv3.Cluster) string {
 	logrus.Tracef("clusterDeploy: getting desired charts image for [%s]", cluster.Name)
-	desiredCharts := cluster.Spec.DesiredChartsImage
-	if cluster.Spec.ChartsImageOverride != "" {
-		desiredCharts = cluster.Spec.ChartsImageOverride
+	desiredCharts := cluster.Spec.DesiredAssetsImage
+	if cluster.Spec.AssetsImageOverride != "" {
+		desiredCharts = cluster.Spec.AssetsImageOverride
 	}
 	if desiredCharts == "" || desiredCharts == "fixed" {
-		desiredCharts = image.ResolveWithCluster(settings.ChartsImage.Get(), cluster)
+		desiredCharts = image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
 	}
 	logrus.Tracef("clusterDeploy: desiredCharts is [%s] for cluster [%s]", desiredCharts, cluster.Name)
 	return desiredCharts

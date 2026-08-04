@@ -189,7 +189,7 @@ spec:
       {{- end }}
       initContainers:
       - name: rancher-charts-copy
-        image: {{.ChartsImage}}
+        image: {{.AssetsImage}}
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: rancher-charts

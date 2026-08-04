@@ -44,7 +44,7 @@ tests:
 - it: should Just have default env vars with default values.yaml
   set:
     systemDefaultRegistry: ""
-    chartsImage.tag: "stable-tag"
+    assetsImage.tag: "stable-tag"
   asserts:
     - equal:
         path: spec.template.spec.containers[0].env
@@ -62,7 +62,7 @@ tests:
 - it: should have systemDefaultRegistry env var set when value is not empty
   set:
     systemDefaultRegistry: "suseregistry"
-    chartsImage.tag: "stable-tag"
+    assetsImage.tag: "stable-tag"
   asserts:
     - equal:
         path: spec.template.spec.containers[0].env
@@ -714,7 +714,7 @@ tests:
   set:
     systemDefaultRegistry: ""
     cacheSyncTimeout: 10m
-    chartsImage.tag: stable-tag
+    assetsImage.tag: stable-tag
   asserts:
   - equal:
       path: spec.template.spec.containers[0].env
@@ -749,7 +749,7 @@ tests:
         path: spec.template.spec.dnsPolicy
 - it: should configure rancher deployments with namespace options
   set:
-    chartsImage.tag: stable-tag
+    assetsImage.tag: stable-tag
     rancherNamespaces:
       enabled: true
       labels:

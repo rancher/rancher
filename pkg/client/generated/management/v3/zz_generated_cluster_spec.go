@@ -7,16 +7,16 @@ const (
 	ClusterSpecFieldAgentImageOverride                                   = "agentImageOverride"
 	ClusterSpecFieldAliConfig                                            = "aliConfig"
 	ClusterSpecFieldAmazonElasticContainerServiceConfig                  = "amazonElasticContainerServiceConfig"
+	ClusterSpecFieldAssetsImageOverride                                  = "assetsImageOverride"
 	ClusterSpecFieldAzureKubernetesServiceConfig                         = "azureKubernetesServiceConfig"
-	ClusterSpecFieldChartsImageOverride                                  = "chartsImageOverride"
 	ClusterSpecFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterSpecFieldClusterSecrets                                       = "clusterSecrets"
 	ClusterSpecFieldDefaultClusterRoleForProjectMembers                  = "defaultClusterRoleForProjectMembers"
 	ClusterSpecFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
 	ClusterSpecFieldDescription                                          = "description"
 	ClusterSpecFieldDesiredAgentImage                                    = "desiredAgentImage"
+	ClusterSpecFieldDesiredAssetsImage                                   = "desiredAssetsImage"
 	ClusterSpecFieldDesiredAuthImage                                     = "desiredAuthImage"
-	ClusterSpecFieldDesiredChartsImage                                   = "desiredChartsImage"
 	ClusterSpecFieldDisplayName                                          = "displayName"
 	ClusterSpecFieldDockerRootDir                                        = "dockerRootDir"
 	ClusterSpecFieldEKSConfig                                            = "eksConfig"
@@ -41,16 +41,16 @@ type ClusterSpec struct {
 	AgentImageOverride                                   string                          `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	AliConfig                                            *AliClusterConfigSpec           `json:"aliConfig,omitempty" yaml:"aliConfig,omitempty"`
 	AmazonElasticContainerServiceConfig                  map[string]interface{}          `json:"amazonElasticContainerServiceConfig,omitempty" yaml:"amazonElasticContainerServiceConfig,omitempty"`
+	AssetsImageOverride                                  string                          `json:"assetsImageOverride,omitempty" yaml:"assetsImageOverride,omitempty"`
 	AzureKubernetesServiceConfig                         map[string]interface{}          `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
-	ChartsImageOverride                                  string                          `json:"chartsImageOverride,omitempty" yaml:"chartsImageOverride,omitempty"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization   `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets                 `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                          `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                          `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 	Description                                          string                          `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                                    string                          `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
+	DesiredAssetsImage                                   string                          `json:"desiredAssetsImage,omitempty" yaml:"desiredAssetsImage,omitempty"`
 	DesiredAuthImage                                     string                          `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
-	DesiredChartsImage                                   string                          `json:"desiredChartsImage,omitempty" yaml:"desiredChartsImage,omitempty"`
 	DisplayName                                          string                          `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	EKSConfig                                            *EKSClusterConfigSpec           `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`

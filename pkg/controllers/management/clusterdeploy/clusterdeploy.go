@@ -133,7 +133,7 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 		toUpdate.Status.AgentImage = modified.Status.AgentImage
 		toUpdate.Status.AgentFeatures = modified.Status.AgentFeatures
 		toUpdate.Status.AuthImage = modified.Status.AuthImage
-		toUpdate.Status.ChartsImage = modified.Status.ChartsImage
+		toUpdate.Status.AssetsImage = modified.Status.AssetsImage
 		toUpdate.Status.AppliedAgentEnvVars = modified.Status.AppliedAgentEnvVars
 		toUpdate.Status.AppliedClusterAgentDeploymentCustomization = modified.Status.AppliedClusterAgentDeploymentCustomization
 		toUpdate.Status.AppliedClusterAgentImagePullSecretsHash = modified.Status.AppliedClusterAgentImagePullSecretsHash
@@ -246,7 +246,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desire
 		return true
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
-	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth || cluster.Status.ChartsImage != desiredCharts
+	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth || cluster.Status.AssetsImage != desiredCharts
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
 
 	if forceDeploy || imageChange || agentFeaturesChanged {
@@ -255,7 +255,7 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth, desire
 			agentFeaturesChanged)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s]", cluster.Status.AgentImage, desiredAgent)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s]", cluster.Status.AuthImage, desiredAuth)
-		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.ChartsImage [%s], desiredCharts: [%s]", cluster.Status.ChartsImage, desiredCharts)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AssetsImage [%s], desiredCharts: [%s]", cluster.Status.AssetsImage, desiredCharts)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentFeatures [%v], desiredFeatures: [%v]", cluster.Status.AgentFeatures, desiredFeatures)
 		return true
 	}
@@ -519,7 +519,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
 	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
-	desiredCharts := systemtemplate.GetDesiredChartsImage(cluster)
+	desiredCharts := systemtemplate.GetDesiredAssetsImage(cluster)
 	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
@@ -645,9 +645,9 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.DesiredAuthImage == "fixed" {
 		cluster.Spec.DesiredAuthImage = desiredAuth
 	}
-	cluster.Status.ChartsImage = desiredCharts
-	if cluster.Spec.DesiredChartsImage == "fixed" {
-		cluster.Spec.DesiredChartsImage = desiredCharts
+	cluster.Status.AssetsImage = desiredCharts
+	if cluster.Spec.DesiredAssetsImage == "fixed" {
+		cluster.Spec.DesiredAssetsImage = desiredCharts
 	}
 
 	if cluster.Annotations[AgentForceDeployAnn] == "true" {
@@ -682,10 +682,10 @@ func (cd *clusterDeploy) getKubeConfig(cluster *apimgmtv3.Cluster) (*clientcmdap
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage, chartsImage string, features map[string]bool, taints []corev1.Taint, priorityClassExists bool) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage, assetsImage string, features map[string]bool, taints []corev1.Taint, priorityClassExists bool) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
-	logrus.Tracef("clusterDeploy: getYAML: Desired charts assets image is [%s] for cluster [%s]", chartsImage, cluster.Name)
+	logrus.Tracef("clusterDeploy: getYAML: Desired charts assets image is [%s] for cluster [%s]", assetsImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired taints are [%v] for cluster [%s]", taints, cluster.Name)
 
@@ -703,7 +703,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 	ops := &systemtemplate.TemplateOps{
 		AgentImage:     agentImage,
 		AuthImage:      authImage,
-		ChartsImage:    chartsImage,
+		AssetsImage:    assetsImage,
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            url,

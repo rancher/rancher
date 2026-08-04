@@ -6,7 +6,7 @@ const (
 	ChartAuditLogImage        = "rancher/mirrored-bci-micro:16.0-15.11"
 	ChartDefaultBranch        = "dev-v2.16"
 	CspAdapterMinVersion      = "110.0.0+up10.0.0"
-	DefaultChartsImage        = "rancher/rancher-assets:v2.16-20260805T1815Z-dev"
+	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20260805T1815Z-dev"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.1-rc.2"
 	DefaultShellVersion       = "rancher/shell:v0.8.1"
 	FleetVersion              = "110.0.0+up0.16.0-rc.5"

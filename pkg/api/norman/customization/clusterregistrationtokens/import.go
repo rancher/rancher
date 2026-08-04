@@ -80,11 +80,11 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 	}
 
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	chartsImage := image.ResolveWithCluster(settings.ChartsImage.Get(), cluster)
+	assetsImage := image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
 	ops := &systemtemplate.TemplateOps{
 		AgentImage:     agentImage,
 		AuthImage:      authImage,
-		ChartsImage:    chartsImage,
+		AssetsImage:    assetsImage,
 		Namespace:      "",
 		Token:          token,
 		URL:            url,

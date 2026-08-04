@@ -148,15 +148,15 @@ func (w *ChartValuesWriter) collectReplacements(root *yaml.Node, replacements ma
 		}
 	}
 
-	// Update Charts asset image from defaultChartsImage
-	if chartAssetsImage, ok := w.Config["defaultChartsImage"]; ok {
+	// Update Charts asset image from defaultAssetsImage
+	if chartAssetsImage, ok := w.Config["defaultAssetsImage"]; ok {
 		parts := strings.SplitN(chartAssetsImage, ":", 2)
 		if len(parts) == 2 {
-			if err := w.recordReplacement(chart, []string{"chartsImage", "repository"}, parts[0], replacements); err != nil {
-				return fmt.Errorf("failed to set chartsImage.repository: %w", err)
+			if err := w.recordReplacement(chart, []string{"assetsImage", "repository"}, parts[0], replacements); err != nil {
+				return fmt.Errorf("failed to set assetsImage.repository: %w", err)
 			}
-			if err := w.recordReplacement(chart, []string{"chartsImage", "tag"}, parts[1], replacements); err != nil {
-				return fmt.Errorf("failed to set chartsImage.tag: %w", err)
+			if err := w.recordReplacement(chart, []string{"assetsImage", "tag"}, parts[1], replacements); err != nil {
+				return fmt.Errorf("failed to set assetsImage.tag: %w", err)
 			}
 		}
 	}

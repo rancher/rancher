@@ -452,8 +452,8 @@ var (
 
 	ImportedClusterDay2OpsEnabledDefault = NewSetting("imported-cluster-day2-ops-enabled", "true")
 
-	// ChartsImage is the image used for Rancher's `ClusterRepo` assets on downstream clusters.
-	ChartsImage = NewSetting("charts-image", buildconfig.DefaultChartsImage)
+	// AssetsImage is the image used for Rancher's `ClusterRepo` assets on downstream clusters.
+	AssetsImage = NewSetting("charts-image", buildconfig.DefaultAssetsImage)
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
