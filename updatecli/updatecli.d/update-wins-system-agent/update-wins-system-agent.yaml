@@ -70,7 +70,7 @@ sources:
       token: '{{ requiredEnv .scm.token }}'
       versionfilter:
         kind: semver
-        pattern: '~{{ source "wins-current-version" }}'
+        pattern: '~{{ source "wins-current-version" }}-0'
 
   system-agent-release:
     name: 'Get latest upstream System Agent version'
@@ -88,7 +88,7 @@ sources:
       token: '{{ requiredEnv .scm.token }}'
       versionfilter:
         kind: semver
-        pattern: '~{{ source "system-agent-current-version" }}'
+        pattern: '~{{ source "system-agent-current-version" }}-0'
 
   wins-checksum:
     name: 'Get sha256 for wins.exe from {{ source "wins-release" }}'
