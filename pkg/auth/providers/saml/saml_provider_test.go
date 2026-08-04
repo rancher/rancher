@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,12 +21,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 )
@@ -489,4 +492,179 @@ func (p *mockLdapProvider) GetUserExtraAttributesFromToken(token accessor.TokenA
 
 func (p *mockLdapProvider) IsDisabledProvider() (bool, error) {
 	panic("IsDisabledProvider Unimplemented!")
+}
+
+func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
+	t.Parallel()
+
+	users := []*apiv3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-ping1"},
+			DisplayName:  "Test UserOne",
+			PrincipalIDs: []string{"ping_user://uid-0001", "local://u-ping1"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta1"},
+			DisplayName:  "Test UserFromOkta",
+			PrincipalIDs: []string{"okta_user://abc-uuid-1", "local://u-okta1"},
+		},
+	}
+
+	provider := &Provider{
+		name:      PingName,
+		userType:  PingName + "_user",
+		groupType: PingName + "_group",
+		userSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+				return users, nil
+			},
+		}),
+	}
+
+	tests := []struct {
+		name          string
+		searchKey     string
+		principalType string
+		want          []apiv3.Principal
+	}{
+		{
+			name:          "known user is returned before the principal built from the search key",
+			searchKey:     "testu",
+			principalType: common.UserPrincipalType,
+			want: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: common.UserPrincipalType,
+					Provider:      PingName,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: common.UserPrincipalType,
+					Provider:      PingName,
+				},
+			},
+		},
+		{
+			name:      "known user is returned alongside the group principal",
+			searchKey: "testu",
+			want: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: common.UserPrincipalType,
+					Provider:      PingName,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: common.UserPrincipalType,
+					Provider:      PingName,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_group://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: common.GroupPrincipalType,
+					Provider:      PingName,
+				},
+			},
+		},
+		{
+			name:          "users of another provider are not returned",
+			searchKey:     "UserFromOkta",
+			principalType: common.UserPrincipalType,
+			want: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://UserFromOkta"},
+					DisplayName:   "UserFromOkta",
+					LoginName:     "UserFromOkta",
+					PrincipalType: common.UserPrincipalType,
+					Provider:      PingName,
+				},
+			},
+		},
+		{
+			name:          "searching the external id returns a single principal",
+			searchKey:     "uid-0001",
+			principalType: common.UserPrincipalType,
+			want: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					DisplayName:   "uid-0001",
+					LoginName:     "uid-0001",
+					PrincipalType: common.UserPrincipalType,
+					Provider:      PingName,
+				},
+			},
+		},
+		{
+			name:          "group search does not resolve users",
+			searchKey:     "testu",
+			principalType: common.GroupPrincipalType,
+			want: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping_group://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: common.GroupPrincipalType,
+					Provider:      PingName,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := provider.SearchPrincipals(test.searchKey, test.principalType, &apiv3.Token{})
+			require.NoError(t, err)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
+	t.Parallel()
+
+	provider := &Provider{
+		name:      PingName,
+		userType:  PingName + "_user",
+		groupType: PingName + "_group",
+	}
+
+	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
+	require.NoError(t, err)
+	assert.Equal(t, []apiv3.Principal{
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+			DisplayName:   "testu",
+			LoginName:     "testu",
+			PrincipalType: common.UserPrincipalType,
+			Provider:      PingName,
+		},
+	}, got)
+}
+
+func TestSearchPrincipalsUserSearchError(t *testing.T) {
+	t.Parallel()
+
+	provider := &Provider{
+		name:      PingName,
+		userType:  PingName + "_user",
+		groupType: PingName + "_group",
+		userSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+				return nil, errors.New("cache is not synced")
+			},
+		}),
+	}
+
+	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
+	require.ErrorContains(t, err, "cache is not synced")
+	assert.Nil(t, got)
 }
