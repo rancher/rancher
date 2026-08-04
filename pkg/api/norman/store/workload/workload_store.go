@@ -169,7 +169,21 @@ func setSelector(schemaID string, data map[string]interface{}) {
 		setSelector = true
 	}
 	if setSelector {
-		workloadID := resolveWorkloadID(schemaID, data)
+		namespaceID := convert.ToString(data["namespaceId"])
+		name := convert.ToString(data["name"])
+
+		workloadID, fullWorkloadID := resolveWorkloadID(schemaID, namespaceID, name)
+
+		// If fullWorkloadID is set, the label was truncated - store full ID in annotation
+		if fullWorkloadID != "" {
+			annotations := convert.ToMapInterface(data["workloadAnnotations"])
+			if annotations == nil {
+				annotations = make(map[string]interface{})
+			}
+			annotations[WorkloadIDAnnotation] = fullWorkloadID
+			data["workloadAnnotations"] = annotations
+		}
+
 		// set selector
 		data["selector"] = map[string]interface{}{
 			"matchLabels": map[string]interface{}{
