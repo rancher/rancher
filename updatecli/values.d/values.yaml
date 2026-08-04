@@ -43,6 +43,13 @@ machine:
     type: 'deps'
     scope: 'machine'
 
+autoscaler:
+  manifest: 'Update cluster-autoscaler artifact versions'
+  pipelineid: 'update-autoscaler-artifact-versions'
+  commitmessage:
+    type: 'deps'
+    scope: 'cluster-autoscaler'
+
 wins_system_agent:
   manifest: 'Update wins and system-agent patch versions'
   pipelineid: 'update-wins-system-agent-version'

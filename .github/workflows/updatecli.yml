@@ -17,6 +17,7 @@ on:
         type: choice
         options:
           - 'all'
+          - 'autoscaler'
           - 'harvester-docker-machine'
           - 'machine'
           - 'wins-system-agent'
