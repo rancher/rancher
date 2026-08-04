@@ -17,49 +17,17 @@ jobs:
       checks: write
       pull-requests: write
       actions: read
+      contents: read
     steps:
-      - name: Install Python Deps
-        run: |
-          # install python
-          zypper --non-interactive install python311 python311-pip python311-virtualenv which
-
-          # set python as the default python (essentially just a symlink)
-          update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
-
-      - name: mkdir test-results
-        run: mkdir -p /tmp/test-results
-
-      - name: Download All XML Test Reports
-        id: xml_reports
-        # don't error the entire job if the artifact is not there
-        continue-on-error: true
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          run-id: ${{ github.event.workflow_run.id }}
-          # needed per https://github.com/orgs/community/discussions/106300#discussioncomment-8369881
-          github-token: ${{ github.token }}
-          merge-multiple: true
-          path: /tmp/test-results/
-          name: "XML Results"
-
-      - name: Download the Event File
-        id: event_file
-        continue-on-error: true
-        if: steps.xml_reports.outcome == 'success'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-          merge-multiple: true
-          path: /tmp/test-results/
-          name: "Event File"
+          persist-credentials: false
 
       - name: Publish Test Results
-        if: steps.xml_reports.outcome == 'success' && steps.event_file.outcome == 'success'
-        uses: rancher/publish-unit-test-result-action/linux@2c5c7685c1698e015459f9a9bfa49f0888800df5
+        uses: ./.github/actions/publish-provisioning-test-results
         with:
-          check_name: Provisioning Tests Results
           commit: ${{ github.event.workflow_run.head_sha }}
-          event_name: ${{ github.event.workflow_run.event }}
-          event_file: /tmp/test-results/event.json
-          files: "/tmp/test-results/*.xml"
+          event-name: ${{ github.event.workflow_run.event }}
+          # download the fork's artifacts from the run that triggered this handler
+          run-id: ${{ github.event.workflow_run.id }}

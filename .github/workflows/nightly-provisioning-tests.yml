@@ -1,10 +1,10 @@
-name: Build Pull Request
+name: Nightly Provisioning Tests
 on:
-  pull_request:
-    paths-ignore:
-      # omit tests from triggering CI except when CI tests are changed
-      - "tests/v2/codecoverage/**"
-      - "tests/validation/**"
+  schedule:
+    # Runs every weekday at 05:00 UTC
+    # (1 AM EST, 10PM PST, 7AM CEST)
+    - cron: '0 5 * * 1-5'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,20 +21,6 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
-  unit-tests:
-    uses: ./.github/workflows/unit-test.yml
-  build-chart:
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          persist-credentials: false
-      - name: setup and build
-        uses: ./.github/actions/rancher-chart/build
   build-server:
     strategy:
       matrix:
@@ -43,7 +29,7 @@ jobs:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     env:
       ARCH: ${{ matrix.arch }}
-      OS: ${{ matrix.OS }}
+      OS: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
@@ -61,7 +47,7 @@ jobs:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     env:
       ARCH: ${{ matrix.arch }}
-      OS: ${{ matrix.OS }}
+      OS: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
@@ -105,3 +91,32 @@ jobs:
       contents: read
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
+
+  # Publish provisioning results into this run's job summary (and a check run).
+  # The nightly is schedule/dispatch only, so it runs in this workflows context with the
+  # permissions granted here, no workflow_run indirection needed.
+  # use `if always()` so results publish even when tests fail. failed jobs
+  # which are retried regenerates the summary for that _attempt_.
+  publish-results:
+    if: always()
+    needs: [provisioning-tests]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    permissions:
+      contents: read
+      checks: write
+      actions: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Publish Test Results
+        uses: ./.github/actions/publish-provisioning-test-results
+        with:
+          commit: ${{ github.sha }}
+          event-name: ${{ github.event_name }}
+          create-comment: 'off'
+          run-id: ${{ github.run_id }}
+
