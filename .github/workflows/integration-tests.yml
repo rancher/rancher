@@ -12,7 +12,7 @@ env:
   REPO: ${{ github.repository_owner }}
 permissions: {}
 jobs:
-  test:
+  test-shard:
     name: test (${{ matrix.shard }})
     strategy:
       # Don't let one failing shard cancel the others.
@@ -133,3 +133,17 @@ jobs:
           INTEGRATION_TEST_PACKAGES: ${{ matrix.packages }}
           INTEGRATION_TEST_RUN: ${{ matrix.run }}
         run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
+  # Aggregates the shard matrix into the single stable check
+  # "integration-tests / test" that branch protection requires, so the shard
+  # matrix can change without editing repo-level required-check settings. Its
+  # result is success only if every shard succeeded.
+  test:
+    needs: test-shard
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all integration shards passed
+        run: |
+          result="${{ needs.test-shard.result }}"
+          echo "shard matrix result: $result"
+          [ "$result" = "success" ] || exit 1
