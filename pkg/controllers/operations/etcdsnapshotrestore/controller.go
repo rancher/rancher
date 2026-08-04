@@ -645,7 +645,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			},
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -781,7 +781,7 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 			OneTimeInstructions: instructions,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -957,7 +957,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		},
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1156,7 +1156,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			},
 		}
 
-		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1190,7 +1190,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		})
 	}
 
-	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1346,7 +1346,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 			}
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1517,7 +1517,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	planStatus, err := h.store.AssignPlan(initSecret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(initSecret, nodePlan, 1, 1)
 	if err != nil {
 		return status, err
 	}
