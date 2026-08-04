@@ -611,16 +611,6 @@ func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane
 				},
 			},
 		},
-		{
-			CommonInstruction: planapi.CommonInstruction{
-				Name:    "remove-cred-directory",
-				Command: "rm",
-				Args: []string{
-					"-rf",
-					path.Join(capr.GetDistroDataDir(controlPlane), "server/cred"),
-				},
-			},
-		},
 	}
 }
 
