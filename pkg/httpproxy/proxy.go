@@ -1,6 +1,7 @@
 package httpproxy
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -84,7 +85,9 @@ type proxy struct {
 	credentials        v1.SecretInterface
 	mgmtClustersCache  mgmtv3.ClusterCache
 	provClustersCache  provv1.ClusterCache
+	proxyEndpointCache mgmtv3.ProxyEndpointCache
 	authorizer         authorizer.Authorizer
+	insecureTransport  http.RoundTripper
 }
 
 func (p *proxy) isAllowed(host string) bool {
@@ -137,15 +140,20 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		credentials:        scaledContext.Core.Secrets(""),
 		mgmtClustersCache:  scaledContext.Wrangler.Mgmt.Cluster().Cache(),
 		provClustersCache:  scaledContext.Wrangler.Provisioning.Cluster().Cache(),
+		proxyEndpointCache: scaledContext.Wrangler.Mgmt.ProxyEndpoint().Cache(),
+		insecureTransport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // intentional, opt-in per route
+		},
 	}
 
 	return &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			if err := p.proxy(req); err != nil {
-				logrus.Infof("Failed to proxy: %v", err)
+				logrus.Infof("Failed to proxy request: %v", err)
 			}
 		},
 		ModifyResponse: setModifiedHeaders,
+		Transport:      &perRouteTLSTransport{proxy: &p},
 	}, nil
 }
 
@@ -216,11 +224,17 @@ func (p *proxy) proxy(req *http.Request) error {
 	if auth != "" { // non-empty AuthHeader is noop
 		req.Header.Set(AuthHeader, auth)
 	} else if cAuth != "" {
-		// setting CattleAuthHeader will replace credential id with secret data
-		// and generate signature
+		// If a known signer mode is specified by the client, use it directly.
 		signer := newSigner(cAuth)
 		if signer != nil {
 			return signer.sign(req, p.secretGetter(req, cAuth), cAuth)
+		}
+		// No client-specified mode: check whether the matching ProxyEndpoint route
+		// defines a server-side injection pattern. This allows extension authors to
+		// control how credentials are applied without requiring the client to know
+		// the injection details.
+		if route := p.findMatchingRoute(destURLHostname); route != nil && route.CredentialInjection != nil {
+			return p.applyRouteInjection(req, cAuth, route)
 		}
 		req.Header.Set(AuthHeader, cAuth)
 	}
@@ -395,4 +409,70 @@ func isOverlyBroad(pattern string) bool {
 
 	// check if that label is a plain wildcard.
 	return targetLabel == "*" || targetLabel == "%"
+}
+
+// findMatchingRoute returns the first ProxyEndpointRoute whose domain pattern matches host,
+// or nil if no match is found. It uses the same wildcard/regex logic as isAllowed.
+func (p *proxy) findMatchingRoute(host string) *mgmt.ProxyEndpointRoute {
+	endpoints, err := p.proxyEndpointCache.List(nil)
+	if err != nil {
+		logrus.Debugf("httpproxy: failed to list ProxyEndpoints for route lookup: %v", err)
+		return nil
+	}
+	for _, ep := range endpoints {
+		for i := range ep.Spec.Routes {
+			route := &ep.Spec.Routes[i]
+			if routeMatchesHost(route.Domain, host) {
+				return route
+			}
+		}
+	}
+	return nil
+}
+
+// routeMatchesHost reports whether the domain pattern from a ProxyEndpointRoute matches host,
+// using the same rules as proxy.isAllowed.
+func routeMatchesHost(pattern, host string) bool {
+	if pattern == host {
+		return true
+	}
+	if isOverlyBroad(pattern) {
+		return false
+	}
+	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(host, pattern[1:]) {
+		return true
+	}
+	if strings.Contains(pattern, ".%.") || strings.HasPrefix(pattern, "%.") {
+		return constructRegex(pattern).MatchString(host)
+	}
+	return false
+}
+
+// applyRouteInjection fetches the credential identified by credID in cAuth, then applies the
+// injection pattern defined on the matching ProxyEndpoint route to the outgoing request.
+func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt.ProxyEndpointRoute) error {
+	params := getRequestParams(cAuth)
+	credID := params["credID"]
+	if credID == "" {
+		return fmt.Errorf("server-defined injection requires credID in %s header", CattleAuth)
+	}
+	secretData, err := getCredential(credID, p.secretGetter(req, cAuth))
+	if err != nil {
+		return fmt.Errorf("failed to retrieve credential for route injection: %w", err)
+	}
+	return applyInjectionSpec(req, route.CredentialInjection, secretData)
+}
+
+// perRouteTLSTransport selects the appropriate HTTP transport based on whether the destination
+// ProxyEndpointRoute has InsecureSkipTLSVerify enabled.
+type perRouteTLSTransport struct {
+	proxy *proxy
+}
+
+func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	route := t.proxy.findMatchingRoute(req.URL.Hostname())
+	if route != nil && route.InsecureSkipTLSVerify {
+		return t.proxy.insecureTransport.RoundTrip(req)
+	}
+	return http.DefaultTransport.RoundTrip(req)
 }
