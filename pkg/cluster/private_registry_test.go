@@ -343,7 +343,7 @@ func TestGetPrivateRegistry(t *testing.T) {
 			name:              "nil cluster, no GSDR",
 			cluster:           nil,
 			expectedRegistry:  nil,
-			expectedIsDefault: true,
+			expectedIsDefault: false,
 		},
 		{
 			name:              "nil cluster, GSDR set",
@@ -479,7 +479,7 @@ func TestGetPrivateRegistry(t *testing.T) {
 				Spec: v3.ClusterSpec{},
 			},
 			expectedRegistry:  nil,
-			expectedIsDefault: true,
+			expectedIsDefault: false,
 		},
 	}
 
@@ -583,6 +583,60 @@ func TestPrivateRegistryPullSecretNamesAsSlice(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.expected, tt.registry.PullSecretNamesAsSlice())
+		})
+	}
+}
+
+// TestGlobalPullSecretRefs tests that GlobalPullSecretRefs correctly parses the
+// SystemDefaultRegistryPullSecrets setting without requiring SystemDefaultRegistry to be set.
+func TestGlobalPullSecretRefs(t *testing.T) {
+	tests := []struct {
+		name     string
+		setting  string
+		expected []corev1.SecretReference
+	}{
+		{
+			name:     "empty setting returns nil",
+			setting:  "",
+			expected: nil,
+		},
+		{
+			name:    "single secret name",
+			setting: "my-secret",
+			expected: []corev1.SecretReference{
+				{Namespace: namespaces.System, Name: "my-secret"},
+			},
+		},
+		{
+			name:    "multiple secret names",
+			setting: "secret-a,secret-b,secret-c",
+			expected: []corev1.SecretReference{
+				{Namespace: namespaces.System, Name: "secret-a"},
+				{Namespace: namespaces.System, Name: "secret-b"},
+				{Namespace: namespaces.System, Name: "secret-c"},
+			},
+		},
+		{
+			name:    "whitespace around names is trimmed",
+			setting: " secret-a , secret-b ",
+			expected: []corev1.SecretReference{
+				{Namespace: namespaces.System, Name: "secret-a"},
+				{Namespace: namespaces.System, Name: "secret-b"},
+			},
+		},
+		{
+			name:     "only whitespace and commas returns nil",
+			setting:  " , , ",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, settings.SystemDefaultRegistryPullSecrets.Set(tt.setting))
+			t.Cleanup(func() { settings.SystemDefaultRegistryPullSecrets.Set("") })
+
+			assert.Equal(t, tt.expected, GlobalPullSecretRefs())
 		})
 	}
 }

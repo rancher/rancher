@@ -455,9 +455,9 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, _, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
-		logrus.Errorf("scim::GetUsers: failed to get user attributes for %s: %s", user.Name, err)
+		logrus.Errorf("scim::GetUser: failed to get user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
 		return
 	}
@@ -562,9 +562,9 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, attrNeedsCreate, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
-		logrus.Errorf("scim::UpdateUsers: failed to get user attributes for %s: %s", user.Name, err)
+		logrus.Errorf("scim::UpdateUser: failed to get user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
 		return
 	}
@@ -594,6 +594,10 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		shouldUpdateAttr = true
 	}
 	if externalID := first(attr.ExtraByProvider[provider]["externalid"]); externalID != payload.ExternalID {
+		if cfg.UserIDAttribute == UserIDExternalID {
+			writeError(w, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the principal identifier", "mutability"))
+			return
+		}
 		changedExternalID = payload.ExternalID
 		attr.ExtraByProvider[provider]["externalid"] = []string{payload.ExternalID}
 		shouldUpdateAttr = true
@@ -616,8 +620,13 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		shouldUpdateUser = true
 	}
 	if shouldUpdateAttr {
-		if attr, err = s.userAttributes.Update(attr); err != nil {
-			logrus.Errorf("scim::UpdateUser: failed to update user attributes for %s: %s", user.Name, err)
+		if attrNeedsCreate {
+			attr, err = s.userAttributes.Create(attr)
+		} else {
+			attr, err = s.userAttributes.Update(attr)
+		}
+		if err != nil {
+			logrus.Errorf("scim::UpdateUser: failed to save user attributes for %s: %s", user.Name, err)
 			writeError(w, NewInternalError())
 			return
 		}
@@ -741,7 +750,7 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, attrNeedsCreate, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
 		logrus.Errorf("scim::PatchUser: failed to get user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
@@ -796,8 +805,13 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if shouldUpdateAttr {
-		if attr, err = s.userAttributes.Update(attr); err != nil {
-			logrus.Errorf("scim::PatchUser: failed to update user attributes for %s: %s", user.Name, err)
+		if attrNeedsCreate {
+			attr, err = s.userAttributes.Create(attr)
+		} else {
+			attr, err = s.userAttributes.Update(attr)
+		}
+		if err != nil {
+			logrus.Errorf("scim::PatchUser: failed to save user attributes for %s: %s", user.Name, err)
 			writeError(w, NewInternalError())
 			return
 		}
@@ -849,13 +863,16 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 
 		var shouldUpdateAttr, shouldUpdateUser bool
 		for name, value := range fields {
+			if name == "" {
+				return false, false, NewError(http.StatusBadRequest, "empty attribute name in bulk operation")
+			}
 			updateAttr, updateUser, err := applyPatchUser(provider, attr, user, patchOp{
 				Op:    "replace",
 				Path:  name,
 				Value: value,
 			}, cfg)
 			if err != nil {
-				return false, false, fmt.Errorf("failed to apply replace operation: %v", err)
+				return false, false, fmt.Errorf("failed to apply %s operation: %w", op.Op, err)
 			}
 			if updateAttr {
 				shouldUpdateAttr = true
@@ -899,16 +916,15 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 			updateUser = true
 		}
 	case "username":
-		if cfg.UserIDAttribute != UserIDExternalID {
-			return false, false, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier", "mutability")
-		}
-
 		username, ok := op.Value.(string)
 		if !ok {
 			return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for userName: %v", op.Value))
 		}
 
 		if first(attr.ExtraByProvider[provider]["username"]) != username {
+			if cfg.UserIDAttribute != UserIDExternalID {
+				return false, false, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier", "mutability")
+			}
 			attr.ExtraByProvider[provider]["username"] = []string{username}
 			updateAttr = true
 		}
@@ -919,6 +935,9 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 		}
 
 		if first(attr.ExtraByProvider[provider]["externalid"]) != externalID {
+			if cfg.UserIDAttribute == UserIDExternalID {
+				return false, false, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the principal identifier", "mutability")
+			}
 			attr.ExtraByProvider[provider]["externalid"] = []string{externalID}
 			updateAttr = true
 		}

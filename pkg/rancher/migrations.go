@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
@@ -13,8 +15,11 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -49,6 +54,7 @@ const (
 	managementNodeCleanupMigration                    = "managementnodecleanupmigration"
 	cleanupProvisioningClusterMgmtOnlyConditions      = "cleanupprovisioningclustermgmtonlyconditions"
 	migrateRKE2PrimeAnnotation                        = "migraterke2primeannotation"
+	migrateCRTTokensToSecrets                         = "migratecrtttokenstosecrets"
 	rancherVersionKey                                 = "rancherVersion"
 	projectsCreatedKey                                = "projectsCreated"
 	namespacesAssignedKey                             = "namespacesAssigned"
@@ -61,18 +67,28 @@ const (
 	managementCleanupCompletedKey                     = "managementcleanupcompleted"
 	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
 	rke2PrimeAnnotationMigratedKey                    = "rke2PrimeAnnotationMigrated"
+	crtTokensToSecretsMigratedKey                     = "crtTokensToSecretsMigrated"
 )
 
 var (
 	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
 )
 
+// tokenCollectionDeleter abstracts the interface to bulk deletion for tokens,
+// enabling simpler setup for testing
+type tokenCollectionDeleter interface {
+	DeleteCollection(options *metav1.ListOptions) error
+}
+
 func runMigrations(wranglerContext *wrangler.Context) error {
 	if err := migrateLocalUserPasswords(wranglerContext); err != nil {
 		return err
 	}
 
-	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
+	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(),
+		wranglerContext.Mgmt.Token(),
+		exttokenstore.NewSystemFromWrangler(wranglerContext),
+		"v2.6.0"); err != nil {
 		return err
 	}
 
@@ -90,6 +106,10 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	}
 
 	if err := migrateImportedClusterFields(wranglerContext); err != nil {
+		return err
+	}
+
+	if err := migrateCRTTokensToSecretsFunc(wranglerContext); err != nil {
 		return err
 	}
 
@@ -166,7 +186,10 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 // forceUpgradeLogout will delete all dashboard tokens forcing a logout.  This is useful when there is a major frontend
 // upgrade and we want all users to be sent to a central point.  This function will check for the `forceUpgradeLogoutConfig`
 // configuration map and only run if the last migrated version is lower than the given `migrationVersion`.
-func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, tokenController v3.TokenController, migrationVersion string) error {
+func forceUpgradeLogout(configMapController controllerv1.ConfigMapController,
+	tokenController v3.TokenController,
+	extTokenDeleter tokenCollectionDeleter,
+	migrationVersion string) error {
 	cm, err := getConfigMap(configMapController, forceUpgradeLogoutConfig)
 	if err != nil || cm == nil {
 		return err
@@ -191,7 +214,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	// list all tokens that were created for the dashboard
 	allTokens, err := tokenController.Cache().List(labels.SelectorFromSet(labels.Set{tokens.TokenKindLabel: "session"}))
 	if err != nil {
-		logrus.Error("Failed to list tokens for upgrade forced logout")
+		logrus.WithError(err).Error("Failed to list tokens for upgrade forced logout")
 		return err
 	}
 
@@ -199,8 +222,17 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	for _, token := range allTokens {
 		err = tokenController.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			logrus.Errorf("Failed to delete token [%s] for upgrade forced logout", token.Name)
+			logrus.WithError(err).Errorf("Failed to delete legacy session token [%s] for upgrade forced logout", token.Name)
 		}
+	}
+
+	// bulk delete all ext tokens that were created for the dashboard,
+	// forcing their users to be redirected to the login page
+	err = extTokenDeleter.DeleteCollection(&metav1.ListOptions{
+		LabelSelector: labels.Set{exttokenstore.KindLabel: exttokenstore.IsLogin}.AsSelector().String(),
+	})
+	if err != nil {
+		logrus.WithError(err).Error("Failed to delete ext session tokens for upgrade forced logout")
 	}
 
 	cm.Data[rancherVersionKey] = rancherversion.Version
@@ -810,6 +842,34 @@ func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) 
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
+// migrateCRTTokensToSecretsFunc migrates ClusterRegistrationToken plaintext tokens
+// from Status.Token into secrets.
+func migrateCRTTokensToSecretsFunc(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateCRTTokensToSecrets)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[crtTokensToSecretsMigratedKey] == "true" {
+		return nil
+	}
+
+	allCRTs, err := w.Mgmt.ClusterRegistrationToken().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for i := range allCRTs.Items {
+		if err := migrateSingleCRT(w, &allCRTs.Items[i]); err != nil {
+			logrus.Errorf("Failed to migrate CRT %s/%s: %v", allCRTs.Items[i].Namespace, allCRTs.Items[i].Name, err)
+			return err
+		}
+	}
+
+	cm.Data[crtTokensToSecretsMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
 // migrateExistingRKE2ClustersPrimeAnnotation sets the provisioning.cattle.io/rke2-prime-enabled=false
 // annotation on all existing RKE2 provisioning clusters that do not already have the annotation.
 // This ensures existing clusters are unaffected when the rke2-provisioning-prime-default setting
@@ -870,4 +930,124 @@ func migrateExistingRKE2ClustersPrimeAnnotation(w *wrangler.CAPIContext) error {
 
 	cm.Data[rke2PrimeAnnotationMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) error {
+	if crt.Status.TokenSecretName != "" {
+		return nil
+	}
+
+	if crt.Status.Token == "" {
+		logrus.Warnf("CRT %s/%s has no token in Status.Token and no TokenSecretName - skipping",
+			crt.Namespace, crt.Name)
+		return nil
+	}
+
+	plaintextToken := crt.Status.Token
+	secretName := fmt.Sprintf("crt-token-%s", crt.Name)
+
+	var expiresAt string
+	if features.CRTTokenTTLRotation.Enabled() {
+		var ttl int64
+		if crt.Spec.TTL == nil {
+			ttl = int64(settings.CRTDefaultTTL.GetInt())
+		} else {
+			ttl = *crt.Spec.TTL
+		}
+
+		// Clamp to minimum TTL using shared validation logic
+		ttl = clusterregistrationtoken.ClampTTL(ttl, crt.Namespace, crt.Name)
+
+		if ttl > 0 {
+			// give all existing tokens a fresh TTL from migration time
+			now := time.Now()
+			ttlDuration := time.Duration(ttl) * time.Minute
+			jitter := computeMigrationJitter(ttlDuration)
+			expiresAt = now.Add(ttlDuration).Add(jitter).UTC().Format(time.RFC3339)
+		}
+	}
+
+	secretData := map[string][]byte{
+		"token": []byte(plaintextToken),
+	}
+	if expiresAt != "" {
+		secretData["expiresAt"] = []byte(expiresAt)
+	}
+
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: crt.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "ClusterRegistrationToken",
+					Name:       crt.Name,
+					UID:        crt.UID,
+				},
+			},
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: secretData,
+	}
+
+	var createErr error
+	_, createErr = w.Core.Secret().Create(secret)
+	if createErr != nil && !apierrors.IsAlreadyExists(createErr) {
+		return fmt.Errorf("failed to create token secret: %w", createErr)
+	}
+
+	crtCopy := crt.DeepCopy()
+	crtCopy.Status.Token = ""
+	crtCopy.Status.TokenSecretName = secretName
+
+	if apierrors.IsAlreadyExists(createErr) {
+		existing, err := w.Core.Secret().Get(crt.Namespace, secretName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get existing secret: %w", err)
+		}
+		if v, ok := existing.Data["expiresAt"]; ok {
+			expiresAt = string(v)
+		}
+	}
+
+	cluster, err := w.Mgmt.Cluster().Get(crt.Spec.ClusterName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	if cluster != nil {
+		newStatus, err := clusterregistrationtoken.AssignCommands(&crtCopy.Status, crt.Spec.ClusterName, w.Mgmt.Cluster().Cache())
+		if err != nil {
+			logrus.Warnf("Failed to regenerate commands for CRT %s/%s: %v",
+				crt.Namespace, crt.Name, err)
+		} else {
+			crtCopy.Status = newStatus
+		}
+	}
+
+	if expiresAt != "" {
+		crtCopy.Status.ExpiresAt = expiresAt
+	}
+
+	_, err = w.Mgmt.ClusterRegistrationToken().UpdateStatus(crtCopy)
+	if err != nil {
+		return fmt.Errorf("failed to update CRT status: %w", err)
+	}
+
+	logrus.Infof("Successfully migrated CRT %s/%s token to secret %s",
+		crt.Namespace, crt.Name, secretName)
+	return nil
+}
+
+func computeMigrationJitter(ttl time.Duration) time.Duration {
+	tenPercent := ttl / 10
+	maxJitter := 24 * time.Hour
+	if tenPercent > maxJitter {
+		tenPercent = maxJitter
+	}
+	if tenPercent <= 0 {
+		return 0
+	}
+	return time.Duration(rand.Int63n(int64(tenPercent)))
 }

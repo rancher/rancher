@@ -110,6 +110,8 @@ func (h *userInfoHandler) userInfoEndpoint(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
 	if err := json.NewEncoder(w).Encode(&response); err != nil {
 		http.Error(w, "failed to encode user info response", http.StatusInternalServerError)
 	}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/invopop/jsonschema"
 )
 
 var semVerCoreRe = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)`)
@@ -19,30 +20,35 @@ const (
 
 // SccPayload represents the canonical golang implementation of `schemas/scc-RMSSubscription.json`
 type SccPayload struct {
-	Version         string          `json:"version"`
+	Version         string          `json:"version" jsonschema:"pattern=^\\d+\\.\\d+\\.\\d+$,description=Product Version normalized for SCC - must be semver. https://semver.org/"`
 	Subscription    SccSubscription `json:"subscription"`
-	FeatureFlags    []string        `json:"feature_flags"`
-	ManagedSystems  []SccSystem     `json:"managedSystems"`
+	FeatureFlags    []string        `json:"feature_flags,omitempty" jsonschema:"description=Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags"`
+	ManagedSystems  []SccSystem     `json:"managedSystems" jsonschema:"description=Active systems under management and their details; to be expanded"`
 	ManagedClusters []SccCluster    `json:"managedClusters"`
 	Timestamp       time.Time       `json:"timestamp"`
 }
 
 type SccSubscription struct {
-	InstallUUID string `json:"installuuid"`
-	ClusterUUID string `json:"clusteruuid"`
-	Product     string `json:"product"`
-	Version     string `json:"version"`
+	InstallUUID string `json:"installuuid" jsonschema:"format=uuid,description=The UID of the k8s kube-system namespace."`
+	ClusterUUID string `json:"clusteruuid" jsonschema:"format=uuid,description=Rancher's unique cluster identifier - based on InstallUUID setting."`
+	Product     string `json:"product" jsonschema:"description=cpe of the product"`
+	Version     string `json:"version" jsonschema:"description=Rancher's raw build version"`
 	Arch        string `json:"arch"`
-	Git         string `json:"git"`
+	Git         string `json:"git" jsonschema:"description=Rancher's build git SHA"`
 	ServerURL   string `json:"server_url"`
 }
 
 type SccSystem struct {
 	Arch     string `json:"arch"`
-	Cpu      int    `json:"cpu"`
-	Memory   int    `json:"memory"`
-	Count    int    `json:"count"`
-	Upstream bool   `json:"upstream,omitempty"`
+	Cpu      int    `json:"cpu" jsonschema:"minimum=0,description=https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units status.internalNodeStatus.capacity.cpu"`
+	Memory   int    `json:"memory" jsonschema:"minimum=0,description=Capacity of the node(s): status.internalNodeStatus.capacity.memory (converted to MiB)"`
+	Count    int    `json:"count" jsonschema:"minimum=1,default=1,description=Count of systems with these attributes (deduplication to shrink data size)"`
+	Upstream bool   `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself"`
+}
+
+// JSONSchemaExtend allows SccSystem to accept additional properties
+func (SccSystem) JSONSchemaExtend(schema *jsonschema.Schema) {
+	schema.AdditionalProperties = jsonschema.TrueSchema
 }
 
 type sccSystemKey struct {
@@ -53,9 +59,14 @@ type sccSystemKey struct {
 }
 
 type SccCluster struct {
-	Count    int  `json:"count"`
-	Nodes    int  `json:"nodes"`
-	Upstream bool `json:"upstream,omitempty"`
+	Count    int  `json:"count" jsonschema:"minimum=1,description=De-duplication of identical clusters"`
+	Nodes    int  `json:"nodes" jsonschema:"minimum=0"`
+	Upstream bool `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself,default=false"`
+}
+
+// JSONSchemaExtend allows SccCluster to accept additional properties
+func (SccCluster) JSONSchemaExtend(schema *jsonschema.Schema) {
+	schema.AdditionalProperties = jsonschema.TrueSchema
 }
 
 const (
@@ -170,4 +181,16 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		},
 		Timestamp: now,
 	}, nil
+}
+
+// GenerateSccSchema generates the JSON schema for SccPayload
+func GenerateSccSchema() (*jsonschema.Schema, error) {
+	reflector := jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	schema := reflector.Reflect(&SccPayload{})
+	schema.Title = "RMSSubscription"
+	schema.Definitions = nil
+	return schema, nil
 }

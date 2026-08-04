@@ -164,7 +164,7 @@ func (p *Planner) renderRegistries(controlPlane *rkev1.RKEControlPlane) (registr
 				break
 			}
 			if !foundCredentials {
-				logrus.Warnf("[planner] no global pull secret contained credentials for registry %q. registries.yaml will be unpopulated.", GSDR)
+				logrus.Debugf("[planner] [%s] no global pull secret contained credentials for registry %q. registries.yaml will be unpopulated.", controlPlane.Name, GSDR)
 			}
 		}
 	}

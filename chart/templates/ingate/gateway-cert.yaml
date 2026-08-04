@@ -2,14 +2,14 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-    name: {{ include "rancher.gateway" . }}-tls
-    labels:
+  name: {{ include "rancher.gateway" . }}-tls
+  labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
-    secretName: {{ .Values.gateway.gatewayClass.tls.secretName }}
-    issuerRef:
-        name: {{ template "rancher.fullname" . }}
-        kind: Issuer
-    dnsNames:
-        - {{ .Values.hostname }}
+  secretName: {{ .Values.gateway.gatewayClass.tls.secretName }}
+  issuerRef:
+    name: {{ template "rancher.fullname" . }}
+    kind: Issuer
+  dnsNames:
+    - {{ .Values.hostname }}
 {{- end }}

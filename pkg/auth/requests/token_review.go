@@ -55,6 +55,11 @@ func (t *TokenReviewAuth) Authenticate(req *http.Request) (user.Info, bool, erro
 		return info, false, nil
 	}
 
+	if tokenReview.Status.Error != "" {
+		logrus.Debugf("tokenReview returned an error: %s", tokenReview.Status.Error)
+		return info, false, nil
+	}
+
 	tokenReviewUserInfo := &user.DefaultInfo{
 		Name:   tokenReview.Status.User.Username,
 		UID:    tokenReview.Status.User.UID,

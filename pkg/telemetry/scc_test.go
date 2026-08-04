@@ -1,6 +1,9 @@
 package telemetry
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -347,4 +350,25 @@ func TestSccPayload(t *testing.T) {
 		assert.ElementsMatch(tc.expectedClusters, payload.ManagedClusters)
 		assert.ElementsMatch(tc.expectedSystems, payload.ManagedSystems)
 	}
+}
+
+func TestSccSchemaUpToDate(t *testing.T) {
+	schema, err := GenerateSccSchema()
+	if err != nil {
+		t.Fatalf("failed to generate in-memory schema: %v", err)
+	}
+
+	generatedBytes, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal in-memory schema: %v", err)
+	}
+	generatedBytes = append(generatedBytes, '\n')
+
+	schemaPath := filepath.Join("schemas", "scc-RMSSubscription.json")
+	onDiskBytes, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("failed to read on-disk schema from %s: %v", schemaPath, err)
+	}
+
+	assert.Equal(t, string(onDiskBytes), string(generatedBytes), "JSON schema is out of sync with pkg/telemetry/scc.go structs. Please run 'go generate ./pkg/telemetry/schemas' to update the schema file on disk.")
 }

@@ -36,8 +36,14 @@ func (e *Error) ToString() string {
 	return e.Error + ": " + e.ErrorDescription
 }
 
+// New creates a new Error with the provided string and description.
 func New(errStr string, errDescription string) *Error {
 	return &Error{Error: errStr, ErrorDescription: errDescription}
+}
+
+// Newf creates a new Error with a formatted description.
+func Newf(errStr string, errDescription string, values ...any) *Error {
+	return &Error{Error: errStr, ErrorDescription: fmt.Sprintf(errDescription, values...)}
 }
 
 // WriteError writes an error in the response writer.

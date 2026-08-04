@@ -14,16 +14,21 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	planapi "github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
 type handler struct {
+	restMapper           meta.RESTMapper
 	secrets              corecontrollers.SecretClient
+	clusterCache         capicontrollers.ClusterCache
 	machinesCache        capicontrollers.MachineCache
 	machinesClient       capicontrollers.MachineClient
 	etcdSnapshotsClient  rkev1controllers.ETCDSnapshotClient
@@ -33,7 +38,9 @@ type handler struct {
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := handler{
+		restMapper:           clients.RESTMapper,
 		secrets:              clients.Core.Secret(),
+		clusterCache:         clients.CAPI.Cluster().Cache(),
 		machinesCache:        clients.CAPI.Machine().Cache(),
 		machinesClient:       clients.CAPI.Machine(),
 		etcdSnapshotsClient:  clients.RKE.ETCDSnapshot(),
@@ -61,19 +68,19 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 	secretChanged := false
 	secret = secret.DeepCopy()
 
-	if appliedChecksum == planner.PlanHash(plan) && !bytes.Equal(plan, secret.Data["appliedPlan"]) {
+	if appliedChecksum == planapi.PlanHash(plan) && !bytes.Equal(plan, secret.Data["appliedPlan"]) {
 		secret.Data["appliedPlan"] = plan
 		secretChanged = true
 	}
 
 	if len(secret.Data["probe-statuses"]) > 0 {
-		_, healthy, err := planner.ParseProbeStatuses(secret.Data["probe-statuses"])
+		_, healthy, err := planapi.ParseProbeStatuses(secret.Data["probe-statuses"])
 		if err != nil {
 			return nil, err
 		}
-		if healthy && secret.Annotations[capr.PlanProbesPassedAnnotation] == "" {
+		if healthy && secret.Annotations[planapi.PlanProbesPassedAnnotation] == "" {
 			// a non-zero value for this annotation indicates the probes for this specific plan have passed at least once
-			secret.Annotations[capr.PlanProbesPassedAnnotation] = time.Now().UTC().Format(time.RFC3339)
+			secret.Annotations[planapi.PlanProbesPassedAnnotation] = time.Now().UTC().Format(time.RFC3339)
 			secretChanged = true
 		}
 	}
@@ -116,10 +123,37 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 		}
 	}
 
+	if secret.Labels == nil {
+		return secret, nil
+	}
+
+	if !planv1alpha1.HasClusterLifecycleLabels(secret) {
+		return secret, nil
+	}
+
+	ref, err := planv1alpha1.ClusterLifecycleLabelsToObjectReference(secret, secret.Namespace, h.restMapper)
+	if err != nil {
+		return secret, err
+	}
+
+	if ref.APIVersion != capi.GroupVersion.String() || ref.Kind != "Cluster" {
+		return secret, nil
+	}
+
+	cluster, err := h.clusterCache.Get(secret.Namespace, ref.Name)
+	if err != nil {
+		return secret, err
+	}
+
+	// only execute rest if the machine-plan is CAPR
+	if cluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup || cluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
+		return secret, nil
+	}
+
 	// plan-state:failed is written by the agent when failure is definitive (takes priority over checksum-based detection).
 	// Fall back to checksum comparison for backward compatibility with older agents.
 	currentPlanState := planapi.PlanState(secret.Data[planapi.PlanStateKey])
-	if currentPlanState == planapi.PlanStateFailed || failedChecksum == planner.PlanHash(plan) {
+	if currentPlanState == planapi.PlanStateFailed || failedChecksum == planapi.PlanHash(plan) {
 		logrus.Debugf("[plansecret] %s/%s: rv: %s: Detected failed plan application, reconciling machine PlanApplied condition to error", secret.Namespace, secret.Name, secret.ResourceVersion)
 		// plans which temporarily fail will continue to set the failedChecksum as expected, however this should not be considered a
 		// true failure unless we have required that the plan not fail at any point, or we have reached the maximum of attempts configured.

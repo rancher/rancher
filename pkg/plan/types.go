@@ -2,6 +2,14 @@ package plan
 
 import "hash"
 
+const (
+	// PlanLastUpdatedAnnotation is a constant representing the annotation storing the last updated time of a plan.
+	PlanLastUpdatedAnnotation = "rke.cattle.io/plan-last-updated"
+
+	// PlanProbesPassedAnnotation is a constant representing the annotation storing the last known time the probes passed for a plan.
+	PlanProbesPassedAnnotation = "rke.cattle.io/plan-probes-passed"
+)
+
 // Plan represents the basic unit of work performed by the system-agent.
 type Plan struct {
 	Files                []File                `json:"files,omitempty"`
@@ -33,6 +41,14 @@ type CommonInstruction struct {
 	Env     []string `json:"env,omitempty"`
 	Args    []string `json:"args,omitempty"`
 	Command string   `json:"command,omitempty"`
+
+	// If Script is set, the command is ignored.
+	// When script is set, it's contents are written to a file and the file is executed.
+	// If no shebang is provided, it is executed with /bin/sh.
+	// If a shebang is provided, it is executed with the provided shebang.
+	// The rendered script is stored in the system-agent's data directory, with the following format:
+	// /var/lib/rancher/agent/plans/<plan-name>/<instruction-name>-<sha256sum>.sh
+	Script string `json:"script,omitempty"`
 }
 
 // OneTimeInstruction is an instruction that is executed exactly once.

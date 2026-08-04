@@ -216,9 +216,11 @@ func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
 	}
 
 	bootstrap, err := external.GetObjectFromContractVersionedRef(h.ctx, h.client, machine.Spec.Bootstrap.ConfigRef, machine.Namespace)
-	if apierrors.IsNotFound(err) {
-		return "", nil
-	} else if err != nil {
+	if err != nil {
+		if apierrors.IsNotFound(err) || strings.Contains(err.Error(), "not found") {
+			logrus.Debugf("[machineprovision] Infrastructure reference for machine %s already pruned, skipping config secret lookup", machine.Name)
+			return "", nil
+		}
 		return "", err
 	}
 

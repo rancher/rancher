@@ -31,6 +31,22 @@ func main() {
 	os.Unsetenv("GOPATH")
 
 	controllergen.Run(args.Options{
+		OutputPackage: "github.com/rancher/rancher/pkg/plan/generated",
+		Boilerplate:   "scripts/boilerplate.go.txt",
+		Groups: map[string]args.Group{
+			"plan.cattle.io": {
+				PackageName: "plan.cattle.io",
+				Types: []interface{}{
+					// All structs with an embedded ObjectMeta field will be picked up
+					"./pkg/plan/api/plan.cattle.io/v1alpha1",
+				},
+				GenerateTypes:   true,
+				GenerateClients: true,
+			},
+		},
+	})
+
+	controllergen.Run(args.Options{
 		OutputPackage: "github.com/rancher/rancher/pkg/generated",
 		Boilerplate:   "scripts/boilerplate.go.txt",
 		Groups: map[string]args.Group{
@@ -96,9 +112,9 @@ func main() {
 					fleet.HelmOp{},
 				},
 			},
-			"plan.cattle.io": {
+			"operation.cattle.io": {
 				Types: []interface{}{
-					"./pkg/apis/plan.cattle.io/v1alpha1",
+					"./pkg/apis/operation.cattle.io/v1alpha1",
 				},
 				GenerateTypes:   true,
 				GenerateClients: true,

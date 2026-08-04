@@ -25,6 +25,7 @@ import (
 var (
 	agentImage        = os.Getenv("CATTLE_AGENT_IMAGE")
 	bootstrapPassword = os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
+	rancherHost       = os.Getenv("CATTLE_RANCHER_HOST")
 )
 
 const (
@@ -35,8 +36,12 @@ const (
 func main() {
 	rancherConfig := new(rancherClient.Config)
 
-	ipAddress := getOutboundIP()
-	hostURL := fmt.Sprintf("%s:443", ipAddress.String())
+	var hostURL string
+	if rancherHost != "" {
+		hostURL = rancherHost
+	} else {
+		hostURL = fmt.Sprintf("%s:443", getOutboundIP().String())
+	}
 
 	var userToken *management.Token
 	logrus.Infof("CATTLE AGENT IS %s", agentImage)

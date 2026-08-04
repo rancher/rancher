@@ -67,6 +67,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 			handler := handler{
 				serviceAccountCache: getServiceAccountCacheMock(ctrl, tt.args.namespaceName, tt.args.secretName),
 				secretCache:         getSecretCacheMock(ctrl, tt.args.namespaceName, tt.args.secretName),
+				secretClient:        getSecretClientMock(ctrl),
 				deploymentCache:     getDeploymentCacheMock(ctrl),
 				machineCache:        getMachineCacheMock(ctrl, tt.args.namespaceName, tt.args.os),
 				k8s:                 fake.NewSimpleClientset(),
@@ -248,6 +249,14 @@ func getServiceAccountCacheMock(ctrl *gomock.Controller, namespace, name string)
 		}, nil
 	}).AnyTimes()
 	return mockServiceAccountCache
+}
+
+func getSecretClientMock(ctrl *gomock.Controller) *ctrlfake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+	mock := ctrlfake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl)
+	mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(secret *v1.Secret) (*v1.Secret, error) {
+		return secret, nil
+	})
+	return mock
 }
 
 func TestShouldCreateBootstrapSecret(t *testing.T) {

@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -205,11 +203,11 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		result.PlanRevision = revision
 	}
 
-	if probesPassed, ok := secret.Annotations[capr.PlanProbesPassedAnnotation]; ok && probesPassed != "" {
+	if probesPassed, ok := secret.Annotations[planapi.PlanProbesPassedAnnotation]; ok && probesPassed != "" {
 		result.ProbesUsable = true
 	}
 
-	if len(failureCount) > 0 && PlanHash(planData) == failedChecksum {
+	if len(failureCount) > 0 && planapi.PlanHash(planData) == failedChecksum {
 		failureCount, err := strconv.Atoi(string(failureCount))
 		if err != nil {
 			return nil, err
@@ -233,7 +231,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	}
 
 	if len(probes) > 0 {
-		probeStatuses, healthy, err := ParseProbeStatuses(probes)
+		probeStatuses, healthy, err := planapi.ParseProbeStatuses(probes)
 		if err != nil {
 			return nil, err
 		}
@@ -309,28 +307,6 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		result.InSync = bytes.Equal(planData, appliedPlanData)
 	}
 	return result, nil
-}
-
-func ParseProbeStatuses(probeStatuses []byte) (*map[string]plan.ProbeStatus, bool, error) {
-	healthy := true
-	if len(probeStatuses) == 0 {
-		return nil, false, fmt.Errorf("probe status length was 0")
-	}
-	probeStatusMap := map[string]plan.ProbeStatus{}
-	if err := json.Unmarshal(probeStatuses, &probeStatusMap); err != nil {
-		return nil, false, err
-	}
-	for _, status := range probeStatusMap {
-		if !status.Healthy {
-			healthy = false
-		}
-	}
-	return &probeStatusMap, healthy, nil
-}
-
-func PlanHash(plan []byte) string {
-	result := sha256.Sum256(plan)
-	return hex.EncodeToString(result[:])
 }
 
 // getPlanSecrets retrieves the plan secrets for the given list of machines
@@ -420,8 +396,8 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, join
 		entry.Metadata.Annotations[capr.JoinedToAnnotation] = ""
 	}
 
-	entry.Metadata.Annotations[capr.PlanUpdatedTimeAnnotation] = time.Now().UTC().Format(time.RFC3339)
-	entry.Metadata.Annotations[capr.PlanProbesPassedAnnotation] = ""
+	entry.Metadata.Annotations[planapi.PlanLastUpdatedAnnotation] = time.Now().UTC().Format(time.RFC3339)
+	entry.Metadata.Annotations[planapi.PlanProbesPassedAnnotation] = ""
 
 	capr.CopyPlanMetadataToSecret(secret, entry.Metadata)
 

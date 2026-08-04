@@ -7,15 +7,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestOnChange(t *testing.T) {
+// TestOnChangeNamespace verifies that OnChange produces the correct Namespace
+// object for each workspace configuration.  Every case here omits a creatorId
+// annotation so the focus stays on namespace metadata; the RBAC path is covered
+// by TestOnChangeWithCreatorID.
+func TestOnChangeNamespace(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
 		workspace       *mgmt.FleetWorkspace
 		wantNoObjects   bool
+		wantObjectCount int
 		wantAnnotations map[string]string
 		wantLabels      map[string]string
 	}{
@@ -36,6 +42,7 @@ func TestOnChange(t *testing.T) {
 					Name: "fleet-default",
 				},
 			},
+			wantObjectCount: 1,
 			wantAnnotations: map[string]string{},
 			wantLabels:      map[string]string{},
 		},
@@ -50,6 +57,7 @@ func TestOnChange(t *testing.T) {
 					},
 				},
 			},
+			wantObjectCount: 1,
 			wantAnnotations: map[string]string{
 				"example.com/keep": "should-be-kept",
 			},
@@ -66,6 +74,7 @@ func TestOnChange(t *testing.T) {
 					},
 				},
 			},
+			wantObjectCount: 1,
 			wantAnnotations: map[string]string{},
 			wantLabels: map[string]string{
 				"example.com/keep": "should-be-kept",
@@ -81,6 +90,7 @@ func TestOnChange(t *testing.T) {
 					},
 				},
 			},
+			wantObjectCount: 1,
 			wantAnnotations: map[string]string{
 				"example.com/keep": "should-be-kept",
 			},
@@ -101,6 +111,7 @@ func TestOnChange(t *testing.T) {
 					},
 				},
 			},
+			wantObjectCount: 1,
 			wantAnnotations: map[string]string{
 				"owner":            "team-a",
 				"cost-center":      "12345",
@@ -125,6 +136,7 @@ func TestOnChange(t *testing.T) {
 					},
 				},
 			},
+			wantObjectCount: 4,
 			wantAnnotations: map[string]string{
 				"owner": "team-a",
 			},
@@ -138,6 +150,7 @@ func TestOnChange(t *testing.T) {
 					Name: "my-custom-workspace",
 				},
 			},
+			wantObjectCount: 1,
 			wantAnnotations: map[string]string{},
 			wantLabels:      map[string]string{},
 		},
@@ -157,7 +170,7 @@ func TestOnChange(t *testing.T) {
 				return
 			}
 
-			require.Len(t, objs, 1)
+			require.Len(t, objs, tc.wantObjectCount)
 			ns, ok := objs[0].(*corev1.Namespace)
 			require.True(t, ok, "expected returned object to be a *corev1.Namespace")
 
@@ -166,4 +179,84 @@ func TestOnChange(t *testing.T) {
 			assert.Equal(t, tc.wantLabels, ns.Labels)
 		})
 	}
+}
+
+// TestOnChangeWithCreatorID verifies that a workspace carrying the
+// field.cattle.io/creatorId annotation results in four objects: a Namespace
+// plus the three RBAC objects that grant the creator administrative access to
+// the workspace.  The creatorId value is set by the Rancher management API from
+// the authenticated caller's identity and is not propagated into the namespace
+// annotations.
+func TestOnChangeWithCreatorID(t *testing.T) {
+	t.Parallel()
+
+	h := &handle{}
+	workspace := &mgmt.FleetWorkspace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fleet-default",
+			Annotations: map[string]string{
+				"field.cattle.io/creatorId": "user-xyz",
+			},
+		},
+	}
+
+	objs, _, err := h.OnChange(workspace, mgmt.FleetWorkspaceStatus{})
+	require.NoError(t, err)
+	require.Len(t, objs, 4)
+
+	// [0] Namespace – creatorId must not appear in namespace annotations because
+	// field.cattle.io/* is stripped by yaml.CleanAnnotationsForExport.
+	ns, ok := objs[0].(*corev1.Namespace)
+	require.True(t, ok)
+	assert.Equal(t, "fleet-default", ns.Name)
+	assert.NotContains(t, ns.Annotations, "field.cattle.io/creatorId",
+		"creatorId annotation must not be propagated to the child namespace")
+
+	// [1] RoleBinding – binds the creator to the fleetworkspace-admin ClusterRole
+	// in the workspace namespace, granting full access to Fleet resources there.
+	adminBinding, ok := objs[1].(*rbacv1.RoleBinding)
+	require.True(t, ok)
+	assert.Equal(t, "fleetworkspace-admin-binding-fleet-default", adminBinding.Name)
+	assert.Equal(t, "fleet-default", adminBinding.Namespace)
+	require.Len(t, adminBinding.Subjects, 1)
+	assert.Equal(t, "user-xyz", adminBinding.Subjects[0].Name)
+	assert.Equal(t, "fleetworkspace-admin", adminBinding.RoleRef.Name)
+
+	// [2] ClusterRole – allows the creator to manage the FleetWorkspace object
+	// itself (scoped to this workspace's resource name).
+	ownRole, ok := objs[2].(*rbacv1.ClusterRole)
+	require.True(t, ok)
+	assert.Equal(t, "fleetworkspace-own-fleet-default", ownRole.Name)
+	require.Len(t, ownRole.Rules, 1)
+	assert.Equal(t, []string{"fleetworkspaces"}, ownRole.Rules[0].Resources)
+	assert.Equal(t, []string{"fleet-default"}, ownRole.Rules[0].ResourceNames)
+
+	// [3] ClusterRoleBinding – binds the creator to the ClusterRole above.
+	ownBinding, ok := objs[3].(*rbacv1.ClusterRoleBinding)
+	require.True(t, ok)
+	assert.Equal(t, "fleetworkspace-own-binding-fleet-default", ownBinding.Name)
+	require.Len(t, ownBinding.Subjects, 1)
+	assert.Equal(t, "user-xyz", ownBinding.Subjects[0].Name)
+	assert.Equal(t, "fleetworkspace-own-fleet-default", ownBinding.RoleRef.Name)
+}
+
+// TestOnChangeWithoutCreatorIDProducesOnlyNamespace verifies that workspaces
+// created without a creatorId (e.g. by the provisioning controller for system
+// workspaces) result in a namespace only, with no RBAC objects.
+func TestOnChangeWithoutCreatorIDProducesOnlyNamespace(t *testing.T) {
+	t.Parallel()
+
+	h := &handle{}
+	workspace := &mgmt.FleetWorkspace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fleet-default",
+		},
+	}
+
+	objs, _, err := h.OnChange(workspace, mgmt.FleetWorkspaceStatus{})
+	require.NoError(t, err)
+	require.Len(t, objs, 1)
+
+	_, ok := objs[0].(*corev1.Namespace)
+	require.True(t, ok, "sole object must be the Namespace")
 }

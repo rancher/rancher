@@ -103,7 +103,7 @@ func TestAdd(t *testing.T) {
 	}
 }
 
-func TestGet(t *testing.T) {
+func TestGetAndRemove(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	now := time.Now()
 	fakeSession := Session{
@@ -137,6 +137,7 @@ func TestGet(t *testing.T) {
 						secretKey: sessionBytes,
 					},
 				}, nil)
+				mock.EXPECT().Delete(namespace, fakeCode, &metav1.DeleteOptions{}).Return(nil)
 
 				return mock
 			},
@@ -184,7 +185,7 @@ func TestGet(t *testing.T) {
 				mu:           sync.Mutex{},
 			}
 
-			session, err := store.Get(test.inputCode)
+			session, err := store.GetAndRemove(test.inputCode)
 
 			if test.expectedErrMsg == "" {
 				assert.NoError(t, err)
@@ -294,51 +295,58 @@ func TestCleanUpExpiredSession(t *testing.T) {
 	}
 }
 
-func TestRemove(t *testing.T) {
+func TestCleanUpExpiredSessionsContinuesAfterListError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	fakeCode := "code123"
-	tests := map[string]struct {
-		secretClient   func() corev1.SecretClient
-		inputCode      string
-		expectedErrMsg string
-	}{
-		"success delete": {
-			inputCode: fakeCode,
-			secretClient: func() corev1.SecretClient {
-				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl)
-				mock.EXPECT().Delete(namespace, fakeCode, &metav1.DeleteOptions{}).Return(nil)
 
-				return mock
-			},
-		},
-		"delete failure": {
-			inputCode: fakeCode,
-			secretClient: func() corev1.SecretClient {
-				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl)
-				mock.EXPECT().Delete(namespace, fakeCode, &metav1.DeleteOptions{}).Return(fmt.Errorf("unexpected error"))
-
-				return mock
-			},
-			expectedErrMsg: "unexpected error",
+	sessionExpiredBytes, _ := json.Marshal(&Session{})
+	sessionExpiredSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "expired-code"},
+		Data: map[string][]byte{
+			secretKey: sessionExpiredBytes,
 		},
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			store := &SecretSessionStore{
-				secretClient: test.secretClient(),
-				expiryTime:   time.Hour,
-				mu:           sync.Mutex{},
-			}
+	secretCacheMock := fake.NewMockCacheInterface[*v1.Secret](ctrl)
+	gomock.InOrder(
+		// First tick: List returns a transient error.
+		secretCacheMock.EXPECT().List(namespace, labels.Set{secretLabel: "true"}.AsSelector()).
+			Return(nil, fmt.Errorf("transient list error")),
+		// Second tick: List returns an expired session that must be deleted.
+		secretCacheMock.EXPECT().List(namespace, labels.Set{secretLabel: "true"}.AsSelector()).
+			Return([]*v1.Secret{sessionExpiredSecret}, nil),
+	)
 
-			err := store.Remove(test.inputCode)
+	secretClientMock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctrl)
+	// Delete must be called exactly once — on the second tick.
+	secretClientMock.EXPECT().Delete(namespace, sessionExpiredSecret.Name, &metav1.DeleteOptions{}).Return(nil)
 
-			if test.expectedErrMsg == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.ErrorContains(t, err, test.expectedErrMsg)
-			}
-		})
+	storage := &SecretSessionStore{
+		secretClient: secretClientMock,
+		secretCache:  secretCacheMock,
+		expiryTime:   time.Hour,
 	}
+
+	c := make(chan time.Time) // unbuffered so sends synchronise with goroutine reads
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		storage.cleanUpExpiredSessions(ctx, c)
+	}()
+
+	// First tick: goroutine receives it and encounters the List error.
+	c <- time.Unix(0, 0)
+
+	select {
+	case c <- time.Unix(0, 0):
+		// Goroutine is still alive and accepted the second tick — correct.
+	case <-time.After(3 * time.Second):
+		t.Fatal("second tick was not processed - cleanup has terminated")
+	}
+
+	cancel()
+	wg.Wait()
 }

@@ -15,6 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -285,6 +288,64 @@ func TestGetPublicKey(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			assert.Equal(t, test.expectedKey, key)
+		})
+	}
+}
+
+func TestNewJWKSHandler(t *testing.T) {
+	ctlr := gomock.NewController(t)
+
+	tests := map[string]struct {
+		secretCache  func() corecontrollers.SecretCache
+		secretClient func() corecontrollers.SecretClient
+		expectedErr  string
+	}{
+		"key secret already exists on Get — no creation attempted": {
+			secretCache: func() corecontrollers.SecretCache {
+				return fake.NewMockCacheInterface[*v1.Secret](ctlr)
+			},
+			secretClient: func() corecontrollers.SecretClient {
+				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+				mock.EXPECT().Get(keySecretNamespace, keySecretName, metav1.GetOptions{}).Return(&v1.Secret{}, nil)
+				return mock
+			},
+		},
+		"key secret created by a concurrent replica between Get and Create — AlreadyExists tolerated": {
+			secretCache: func() corecontrollers.SecretCache {
+				return fake.NewMockCacheInterface[*v1.Secret](ctlr)
+			},
+			secretClient: func() corecontrollers.SecretClient {
+				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+				mock.EXPECT().Get(keySecretNamespace, keySecretName, metav1.GetOptions{}).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, keySecretName))
+				mock.EXPECT().Create(gomock.Any()).Return(nil, apierrors.NewAlreadyExists(schema.GroupResource{}, keySecretName))
+				return mock
+			},
+		},
+		"unexpected error on Create — propagated": {
+			secretCache: func() corecontrollers.SecretCache {
+				return fake.NewMockCacheInterface[*v1.Secret](ctlr)
+			},
+			secretClient: func() corecontrollers.SecretClient {
+				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+				mock.EXPECT().Get(keySecretNamespace, keySecretName, metav1.GetOptions{}).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, keySecretName))
+				mock.EXPECT().Create(gomock.Any()).Return(nil, errors.New("unexpected error"))
+				return mock
+			},
+			expectedErr: "unexpected error",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			h, err := newJWKSHandler(test.secretCache(), test.secretClient())
+			if test.expectedErr != "" {
+				assert.EqualError(t, err, test.expectedErr)
+				assert.Nil(t, h)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, h)
+			}
 		})
 	}
 }

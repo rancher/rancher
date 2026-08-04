@@ -18,7 +18,7 @@ var (
 			InitialDelaySeconds: 1,
 			TimeoutSeconds:      5,
 			SuccessThreshold:    1,
-			FailureThreshold:    2,
+			FailureThreshold:    5,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL: "http://%s:9099/liveness",
 			},
@@ -27,7 +27,7 @@ var (
 			InitialDelaySeconds: 1,
 			TimeoutSeconds:      5,
 			SuccessThreshold:    1,
-			FailureThreshold:    2,
+			FailureThreshold:    5,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL: "http://%s:2381/health",
 			},
@@ -36,7 +36,7 @@ var (
 			InitialDelaySeconds: 1,
 			TimeoutSeconds:      5,
 			SuccessThreshold:    1,
-			FailureThreshold:    2,
+			FailureThreshold:    5,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL:        "https://%s:6443/readyz",
 				CACert:     "%s/server/tls/server-ca.crt",
@@ -48,7 +48,7 @@ var (
 			InitialDelaySeconds: 1,
 			TimeoutSeconds:      5,
 			SuccessThreshold:    1,
-			FailureThreshold:    2,
+			FailureThreshold:    5,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL: "https://%s:%s/healthz",
 			},
@@ -57,7 +57,7 @@ var (
 			InitialDelaySeconds: 1,
 			TimeoutSeconds:      5,
 			SuccessThreshold:    1,
-			FailureThreshold:    2,
+			FailureThreshold:    5,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL: "https://%s:%s/healthz",
 			},
@@ -66,7 +66,7 @@ var (
 			InitialDelaySeconds: 1,
 			TimeoutSeconds:      5,
 			SuccessThreshold:    1,
-			FailureThreshold:    2,
+			FailureThreshold:    5,
 			HTTPGetAction: plan.HTTPGetAction{
 				URL: "http://%s:10248/healthz",
 			},

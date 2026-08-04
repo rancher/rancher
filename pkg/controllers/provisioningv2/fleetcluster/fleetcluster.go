@@ -10,7 +10,7 @@ import (
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
+	clusterutils "github.com/rancher/rancher/pkg/cluster"
 	fleetpkg "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -19,12 +19,12 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,14 +49,15 @@ func (g fleetHostGetter) GetClusterHost(cfg clientcmd.ClientConfig) (string, []b
 }
 
 type handler struct {
-	clientConfig      clientcmd.ClientConfig
-	clusters          v3.ClusterClient
-	clustersCache     v3.ClusterCache
-	hostGetter        ClusterHostGetter
-	secretsController corecontrollers.SecretController
-	nodesController   corecontrollers.NodeController
-	fleetClusters     fleetcontrollers.ClusterController
-	getPrivateRepoURL func(*provv1.Cluster, *apimgmtv3.Cluster) string
+	clientConfig              clientcmd.ClientConfig
+	clusters                  v3.ClusterClient
+	clustersCache             v3.ClusterCache
+	hostGetter                ClusterHostGetter
+	secretsController         corecontrollers.SecretController
+	nodesController           corecontrollers.NodeController
+	fleetClusters             fleetcontrollers.ClusterController
+	getPrivateRepoURL         func(*provv1.Cluster, *apimgmtv3.Cluster) string
+	getPrivateRepoPullSecrets func(*apimgmtv3.Cluster) *[]corev1.LocalObjectReference
 }
 
 // Register registers the fleetcluster controller, which is responsible for creating fleet cluster objects.
@@ -66,13 +67,14 @@ type handler struct {
 // corresponding clusters.management.cattle.io/v3 object, if one does not already exist, and vice-versa)
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
-		clientConfig:      clients.ClientConfig,
-		clusters:          clients.Mgmt.Cluster(),
-		clustersCache:     clients.Mgmt.Cluster().Cache(),
-		hostGetter:        fleetHostGetter{},
-		secretsController: clients.Core.Secret(),
-		nodesController:   clients.Core.Node(),
-		fleetClusters:     clients.Fleet.Cluster(),
+		clientConfig:              clients.ClientConfig,
+		clusters:                  clients.Mgmt.Cluster(),
+		clustersCache:             clients.Mgmt.Cluster().Cache(),
+		hostGetter:                fleetHostGetter{},
+		secretsController:         clients.Core.Secret(),
+		nodesController:           clients.Core.Node(),
+		fleetClusters:             clients.Fleet.Cluster(),
+		getPrivateRepoPullSecrets: getPrivateRepoSecrets,
 	}
 
 	h.getPrivateRepoURL = func(cluster *provv1.Cluster, mgmtCluster *apimgmtv3.Cluster) string {
@@ -80,7 +82,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			// If the RKEConfig is nil, we are likely dealing with
 			// a legacy (v3/mgmt) cluster, and need to check the v3
 			// cluster for the cluster level registry.
-			return mgmtcluster.GetPrivateRegistryURL(mgmtCluster)
+			return clusterutils.GetPrivateRegistryURL(mgmtCluster)
 		}
 		url, _ := image.GetPrivateRepoURLFromCluster(cluster)
 		return url
@@ -207,7 +209,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	agentNamespace := ""
 	clientSecret := status.ClientSecretName
 
-	tolerations := mgmtcluster.GetFleetAgentTolerations(mgmtCluster)
+	tolerations := clusterutils.GetFleetAgentTolerations(mgmtCluster)
 	objs := []runtime.Object{}
 	if mgmtCluster.Spec.Internal {
 		// When not running inside a cluster (which may happen in local dev setups), do not populate API server
@@ -239,7 +241,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		}
 	}
 
-	agentAffinity, err := mgmtcluster.GetFleetAgentAffinity(mgmtCluster)
+	agentAffinity, err := clusterutils.GetFleetAgentAffinity(mgmtCluster)
 	if err != nil {
 		return nil, status, err
 	}
@@ -281,8 +283,9 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			PrivateRepoURL:               h.getPrivateRepoURL(cluster, mgmtCluster),
 			AgentTolerations:             tolerations,
 			AgentAffinity:                agentAffinity,
-			AgentResources:               mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
+			AgentResources:               clusterutils.GetFleetAgentResourceRequirements(mgmtCluster),
 			AgentSchedulingCustomization: schedulingCustomization,
+			AgentPullSecrets:             h.getPrivateRepoPullSecrets(mgmtCluster),
 		},
 	}), status, nil
 }
@@ -308,6 +311,20 @@ func (h *handler) addAPIServer(clientSecret string) {
 	if _, err := h.secretsController.Update(secret); err != nil {
 		logrus.Warnf("local cluster provisioning: failed to update client secret: %v", err)
 	}
+}
+
+func getPrivateRepoSecrets(mgmtCluster *apimgmtv3.Cluster) *[]corev1.LocalObjectReference {
+	if !clusterutils.MgmtNameRegexp.MatchString(mgmtCluster.Name) {
+		return &[]corev1.LocalObjectReference{}
+	}
+	registry, _ := clusterutils.GetPrivateRegistry(mgmtCluster)
+	if registry == nil {
+		return &[]corev1.LocalObjectReference{}
+	}
+	if mgmtCluster.Name == "local" {
+		return new(registry.PullSecretsAsObjectReferences())
+	}
+	return new(registry.DownstreamPullSecretsAsObjectReferences())
 }
 
 func sortTolerations(tols []corev1.Toleration) {

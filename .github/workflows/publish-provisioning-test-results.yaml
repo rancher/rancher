@@ -1,6 +1,6 @@
 name: Publish Provisioning Tests Results
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] -- artifacts are published only for successful or failed runs from this repository.
     workflows: ["Build Pull Request"]
     types:
       - completed
@@ -9,49 +9,25 @@ permissions: {}
 jobs:
   publish-provisioning-test-results:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
-    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
+    container: registry.suse.com/bci/bci-base@sha256:d691028312b5d68e5b2d7cf494f8bbc2311f80fae556520e5f5e03b78ce7d5f9 # 15.7
+    if: >-
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     permissions:
       checks: write
       pull-requests: write
       actions: read
+      contents: read
     steps:
-      - name: Install Python Deps
-        run: |
-          # install python
-          zypper --non-interactive install python311 python311-pip python311-virtualenv which
-
-          # set python as the default python (essentially just a symlink)
-          update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
-
-      - name: mkdir test-results
-        run: mkdir -p /tmp/test-results
-
-      - name: Download All XML Test Reports
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          run-id: ${{ github.event.workflow_run.id }}
-          # needed per https://github.com/orgs/community/discussions/106300#discussioncomment-8369881
-          github-token: ${{ github.token }}
-          merge-multiple: true
-          path: /tmp/test-results/
-          name: "XML Results"
-
-      - name: Download the Event File
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-          merge-multiple: true
-          path: /tmp/test-results/
-          name: "Event File"
+          persist-credentials: false
 
       - name: Publish Test Results
-        uses: rancher/publish-unit-test-result-action/linux@29a85161a9d18bf8cbf186abc523927ce71221b0
-        if: (!cancelled())
+        uses: ./.github/actions/publish-provisioning-test-results
         with:
-          check_name: Provisioning Tests Results
           commit: ${{ github.event.workflow_run.head_sha }}
-          event_name: ${{ github.event.workflow_run.event }}
-          event_file: /tmp/test-results/event.json
-          files: "/tmp/test-results/*.xml"
+          event-name: ${{ github.event.workflow_run.event }}
+          # download the fork's artifacts from the run that triggered this handler
+          run-id: ${{ github.event.workflow_run.id }}

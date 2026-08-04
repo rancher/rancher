@@ -2,10 +2,7 @@ package external
 
 import (
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/coreos/go-semver/semver"
@@ -20,110 +17,108 @@ const (
 	rke2WebVersion = "v1.23.6+rke2r1"
 	rke2           = "rke2"
 	rke1           = "rke1"
-	devKDM         = "https://github.com/rancher/kontainer-driver-metadata/raw/dev-v2.6/data/data.json"
-	releaseKDM     = "https://releases.rancher.com/kontainer-driver-metadata/release-v2.6/data.json"
 )
 
+// makeRelease creates a KDM release map entry with the given k8s version and
+// rancher-compatibility bounds. The min/max values are wide enough that any
+// testRancherVersion caller is considered compatible.
+func makeRelease(version string) map[string]interface{} {
+	return map[string]interface{}{
+		"version":                 version,
+		"minChannelServerVersion": "v2.14.0",
+		"maxChannelServerVersion": "v2.16.0",
+	}
+}
+
+// makeExternalData wraps a list of release versions into the map[string]interface{}
+// shape expected by GetExternalImages (i.e. {"releases": [...]}).
+func makeExternalData(versions ...string) map[string]interface{} {
+	releases := make([]interface{}, len(versions))
+	for i, v := range versions {
+		releases[i] = makeRelease(v)
+	}
+	return map[string]interface{}{"releases": releases}
+}
+
 func TestGetExternalImages(t *testing.T) {
+	// testRancherVersion is within the [v2.14.0, v2.16.0] band used by makeRelease.
+	const testRancherVersion = "v2.15.0"
+
 	kubeSemVer := &semver.Version{
 		Major: 1,
-		Minor: 21,
+		Minor: 32,
 		Patch: 0,
 	}
 
-	type args struct {
-		rancherVersion           string
-		externalData             map[string]interface{}
-		source                   Source
-		minimumKubernetesVersion *semver.Version
-		kdmUrl                   string
-		image1                   string
-		image2                   string
-		image3                   string
-		version                  string
+	tests := []struct {
+		name           string
+		rancherVersion string
+		externalData   map[string]interface{}
+		source         Source
+		wantImages     []string
+		dontWantImages []string
+		wantErr        bool
+	}{
+		// Data set 1: two different patch versions for the same minor.
+		// Expectation: only the latest patch (v1.35.2) survives filtering.
+		{
+			name:           "k3s: keeps latest patch per minor",
+			rancherVersion: testRancherVersion,
+			externalData:   makeExternalData("v1.35.1+k3s1", "v1.35.2+k3s1"),
+			source:         K3S,
+			wantImages:     []string{"rancher/system-agent-installer-k3s:v1.35.2-k3s1", "rancher/k3s-upgrade:v1.35.2-k3s1"},
+			dontWantImages: []string{"rancher/system-agent-installer-k3s:v1.35.1-k3s1", "rancher/k3s-upgrade:v1.35.1-k3s1"},
+		},
+		{
+			name:           "rke2: keeps latest patch per minor",
+			rancherVersion: testRancherVersion,
+			externalData:   makeExternalData("v1.35.1+rke2r1", "v1.35.2+rke2r1"),
+			source:         RKE2,
+			wantImages:     []string{"rancher/system-agent-installer-rke2:v1.35.2-rke2r1", "rancher/rke2-upgrade:v1.35.2-rke2r1"},
+			dontWantImages: []string{"rancher/system-agent-installer-rke2:v1.35.1-rke2r1", "rancher/rke2-upgrade:v1.35.1-rke2r1"},
+		},
+		// Data set 2: same patch version, two different build numbers.
+		// Expectation: only the highest build number (k3s2 / rke2r2) survives filtering.
+		{
+			name:           "k3s: keeps highest build number for same patch",
+			rancherVersion: testRancherVersion,
+			externalData:   makeExternalData("v1.35.2+k3s1", "v1.35.2+k3s2"),
+			source:         K3S,
+			wantImages:     []string{"rancher/system-agent-installer-k3s:v1.35.2-k3s2", "rancher/k3s-upgrade:v1.35.2-k3s2"},
+			dontWantImages: []string{"rancher/system-agent-installer-k3s:v1.35.2-k3s1", "rancher/k3s-upgrade:v1.35.2-k3s1"},
+		},
+		{
+			name:           "rke2: keeps highest build number for same patch",
+			rancherVersion: testRancherVersion,
+			externalData:   makeExternalData("v1.35.2+rke2r1", "v1.35.2+rke2r2"),
+			source:         RKE2,
+			wantImages:     []string{"rancher/system-agent-installer-rke2:v1.35.2-rke2r2", "rancher/rke2-upgrade:v1.35.2-rke2r2"},
+			dontWantImages: []string{"rancher/system-agent-installer-rke2:v1.35.2-rke2r1", "rancher/rke2-upgrade:v1.35.2-rke2r1"},
+		},
+		{
+			name:           "invalid source returns error",
+			rancherVersion: testRancherVersion,
+			externalData:   map[string]interface{}{},
+			source:         rke1,
+			wantErr:        true,
+		},
 	}
 
-	tests := []struct {
-		name    string
-		args    args
-		want    []string
-		wantErr bool
-	}{
-		{
-			name: "k3s-test",
-			args: args{
-				rancherVersion:           rancherVersion,
-				externalData:             map[string]interface{}{},
-				source:                   k3s,
-				version:                  k3sWebVersion,
-				minimumKubernetesVersion: kubeSemVer,
-				kdmUrl:                   devKDM,
-				image1:                   "rancher/klipper-lb:v0.3.5",
-				image2:                   "rancher/mirrored-pause:3.6",
-				image3:                   "rancher/mirrored-metrics-server:v0.5.2",
-			},
-			wantErr: false,
-		},
-		{
-			name: "rke2-test",
-			args: args{
-				rancherVersion:           rancherVersion,
-				externalData:             map[string]interface{}{},
-				source:                   rke2,
-				version:                  rke2WebVersion,
-				minimumKubernetesVersion: kubeSemVer,
-				kdmUrl:                   releaseKDM,
-				image1:                   "rancher/pause:3.6",
-				image2:                   "rancher/rke2-runtime:v1.23.6-rke2r1",
-				image3:                   "rancher/rke2-cloud-provider:v0.0.3-build20211118",
-			},
-			wantErr: false,
-		},
-		{
-			name: "rke1-test-fail",
-			args: args{
-				rancherVersion:           rancherVersion,
-				externalData:             map[string]interface{}{},
-				source:                   rke1,
-				minimumKubernetesVersion: kubeSemVer,
-				kdmUrl:                   releaseKDM,
-			},
-			wantErr: true,
-		},
-	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := assert.New(t)
-			get, err := http.Get(tt.args.kdmUrl)
-			if err != nil {
-				t.Errorf("failed to get KDM data.json from url %v", tt.args.kdmUrl)
+			got, err := GetExternalImages(tt.rancherVersion, tt.externalData, tt.source, kubeSemVer, image.Linux)
+			if tt.wantErr {
+				a.Error(err)
+				return
 			}
-			resp, err := io.ReadAll(get.Body)
-			if err != nil {
-				t.Errorf("failed to read response from url %v", tt.args.kdmUrl)
+			a.NoError(err)
+			a.NotEmpty(got)
+			for _, img := range tt.wantImages {
+				a.Contains(got, img)
 			}
-			data, err := image.KDMFromData(resp)
-			if err != nil {
-				t.Error(err)
-			}
-			switch tt.args.source {
-			case rke2:
-				tt.args.externalData = data.RKE2
-			case k3s:
-				tt.args.externalData = data.K3S
-			}
-			systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", "rancher/system-agent-installer-", tt.args.source, strings.ReplaceAll(tt.args.version, "+", "-"))
-
-			got, err := GetExternalImages(tt.args.rancherVersion, tt.args.externalData, tt.args.source, tt.args.minimumKubernetesVersion, image.Linux)
-			if err != nil {
-				a.Equal(tt.wantErr, true, "GetExternalImages() errored as expected")
-			}
-			if !tt.wantErr {
-				a.NotEmpty(got)
-				a.Contains(got, systemAgentInstallerImage)
-				a.Contains(got, tt.args.image1)
-				a.Contains(got, tt.args.image2)
-				a.Contains(got, tt.args.image3)
+			for _, img := range tt.dontWantImages {
+				a.NotContains(got, img)
 			}
 		})
 	}
@@ -257,6 +252,94 @@ func Test_downloadExternalSupportingImages(t *testing.T) {
 			a.Contains(got, tt.args.image2)
 			a.Contains(got, tt.args.image3)
 			a.Contains(got, tt.args.image4)
+		})
+	}
+}
+
+func Test_filterLatestPatchReleases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{
+			name:  "keeps latest patch per minor",
+			input: []string{"v1.28.1+k3s1", "v1.28.2+k3s1", "v1.28.3+k3s1"},
+			want:  []string{"v1.28.3+k3s1"},
+		},
+		{
+			name:  "keeps one entry per minor",
+			input: []string{"v1.28.3+k3s1", "v1.29.2+k3s1", "v1.30.0+k3s1"},
+			want:  []string{"v1.28.3+k3s1", "v1.29.2+k3s1", "v1.30.0+k3s1"},
+		},
+		{
+			name:  "same patch prefers higher build number",
+			input: []string{"v1.28.3+k3s1", "v1.28.3+k3s2"},
+			want:  []string{"v1.28.3+k3s2"},
+		},
+		{
+			name:  "rke2 versions",
+			input: []string{"v1.29.1+rke2r1", "v1.29.2+rke2r1", "v1.30.1+rke2r1", "v1.30.1+rke2r2"},
+			want:  []string{"v1.29.2+rke2r1", "v1.30.1+rke2r2"},
+		},
+		{
+			name:  "mixed minor versions across k8s releases",
+			input: []string{"v1.27.10+k3s1", "v1.28.5+k3s1", "v1.28.4+k3s1", "v1.29.0+k3s1"},
+			want:  []string{"v1.27.10+k3s1", "v1.28.5+k3s1", "v1.29.0+k3s1"},
+		},
+		{
+			name:  "empty input",
+			input: []string{},
+			want:  []string{},
+		},
+		{
+			name:  "unparseable versions are skipped",
+			input: []string{"not-a-version", "v1.28.3+k3s1"},
+			want:  []string{"v1.28.3+k3s1"},
+		},
+		{
+			name:  "RC versions are skipped entirely",
+			input: []string{"v1.33.3-rc.1+rke2r1", "v1.33.3+rke2r1"},
+			want:  []string{"v1.33.3+rke2r1"},
+		},
+		{
+			name:  "all-RC input yields empty result",
+			input: []string{"v1.33.3-rc.1+rke2r1", "v1.33.3-rc.2+rke2r2"},
+			want:  []string{},
+		},
+		{
+			name:  "RC patch is skipped, lower non-RC patch is kept",
+			input: []string{"v1.33.3+rke2r1", "v1.33.4-rc.1+rke2r1"},
+			want:  []string{"v1.33.3+rke2r1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := assert.New(t)
+			got := filterLatestPatchReleases(tt.input)
+			a.ElementsMatch(tt.want, got)
+		})
+	}
+}
+
+func Test_extractBuildNumber(t *testing.T) {
+	tests := []struct {
+		metadata string
+		want     int
+	}{
+		{"k3s1", 1},
+		{"k3s2", 2},
+		{"k3s10", 10},
+		{"rke2r1", 1},
+		{"rke2r2", 2},
+		{"", 0},
+		{"nodigits", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.metadata, func(t *testing.T) {
+			assert.Equal(t, tt.want, extractBuildNumber(tt.metadata))
 		})
 	}
 }

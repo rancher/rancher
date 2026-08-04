@@ -228,6 +228,9 @@ func (l *userLifecycle) onUpdate(user *v3.User) (*v3.User, error) {
 					userController, token.GetName(), token.GetUserID())
 				err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
 				if err != nil {
+					if errors.IsNotFound(err) {
+						continue
+					}
 					return nil, fmt.Errorf("error deleting ext token: %v", err)
 				}
 			}
@@ -488,6 +491,9 @@ func (l *userLifecycle) deleteAllExtTokens(tokens []*ext.Token) error {
 			userController, token.GetName(), token.GetUserID())
 		err := l.extTokenStore.Delete(token.GetName(), &metav1.DeleteOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return fmt.Errorf("error deleting ext token: %v", err)
 		}
 	}

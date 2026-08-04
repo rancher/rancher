@@ -249,6 +249,9 @@ func (s *Service) deleteExtTokens(provider string) error {
 
 	for i := range tokens.Items {
 		if err := s.extTokenStore.Delete(tokens.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return fmt.Errorf("failed deleting ext token %s while disabling auth provider %s: %w",
 				tokens.Items[i].Name, provider, err)
 		}

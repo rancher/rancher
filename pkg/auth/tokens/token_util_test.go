@@ -245,6 +245,13 @@ func TestExtVerifyToken(t *testing.T) {
 			}
 			require.Equal(t, test.wantResponseCode, responseCode)
 		})
+		t.Run(test.name+", ext/ prefix", func(t *testing.T) {
+			responseCode, err := ExtVerifyToken(test.token, "ext/"+test.tokenName, test.tokenKey)
+			if test.wantErr {
+				require.Error(t, err)
+			}
+			require.Equal(t, test.wantResponseCode, responseCode)
+		})
 	}
 }
 

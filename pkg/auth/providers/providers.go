@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
@@ -25,7 +26,9 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -34,6 +37,12 @@ var (
 
 	// providers maps provider names to their AuthProvider implementations, populated by Configure.
 	providers = make(map[string]common.AuthProvider)
+
+	// lastKnownEnabled caches the name of the most recently confirmed active
+	// non-local provider. IsExternalProviderEnabled checks this provider first,
+	// avoiding a full scan when the same provider stays enabled across calls —
+	// the common production steady state.
+	lastKnownEnabled atomic.Value // stores string
 
 	// userExtraAttributesMap defines which token ExtraInfo keys are propagated to UserAttributes.
 	userExtraAttributesMap = map[string]bool{common.UserAttributePrincipalID: true, common.UserAttributeUserName: true}
@@ -254,8 +263,75 @@ func SetProviders(m map[string]common.AuthProvider) {
 	if m == nil {
 		m = make(map[string]common.AuthProvider)
 	}
-
 	providers = m
+	lastKnownEnabled.Store("")
+}
+
+// IsExternalProviderEnabled reports whether at least one non-local auth provider is currently enabled.
+// It consults each registered provider's IsDisabledProvider rather than querying auth config resources.
+func IsExternalProviderEnabled() bool {
+	// Fast path: check the last known active provider first. In the common
+	// production steady state a single provider stays enabled indefinitely, so
+	// one IsDisabledProvider call is enough to confirm and return early — no
+	// snapshot allocation, no calls to any other provider.
+	//
+	// alreadyChecked records which provider the fast path called IsDisabledProvider
+	// on so the full scan below can skip it and avoid a redundant call.
+	var alreadyChecked string
+	if hint, _ := lastKnownEnabled.Load().(string); hint != "" {
+		mu.RLock()
+		p := providers[hint]
+		mu.RUnlock()
+		if p != nil {
+			disabled, err := p.IsDisabledProvider()
+			if err == nil {
+				if !disabled {
+					return true // Hint still valid.
+				}
+				// Got a clean "disabled" answer — safe to skip in the full scan.
+				alreadyChecked = hint
+			}
+			// On error: alreadyChecked stays "" so the full scan retries this provider.
+		}
+		// Don't clear the hint here; the full scan overwrites it authoritatively.
+	}
+
+	// Full scan: snapshot the non-local provider list while holding the lock,
+	// then call IsDisabledProvider outside the lock — those implementations make
+	// live Kubernetes API calls that must not block the lock.
+	mu.RLock()
+	type entry struct {
+		name     string
+		provider common.AuthProvider
+	}
+	snapshot := make([]entry, 0, len(providers))
+	for name, p := range providers {
+		if name != local.Name && name != alreadyChecked {
+			snapshot = append(snapshot, entry{name, p})
+		}
+	}
+	mu.RUnlock()
+
+	for _, e := range snapshot {
+		disabled, err := e.provider.IsDisabledProvider()
+		if err != nil {
+			logrus.Warnf("checking if provider %s is disabled: %v", e.name, err)
+			continue
+		}
+		if !disabled {
+			lastKnownEnabled.Store(e.name)
+			return true
+		}
+	}
+	lastKnownEnabled.Store("")
+	return false
+}
+
+// IsLocalHidden reports whether the local auth provider should be hidden from public-facing endpoints.
+// It returns true when the HideLocalAuthProvider feature flag is enabled and at least one external
+// auth provider is currently active.
+func IsLocalHidden() bool {
+	return features.HideLocalAuthProvider.Enabled() && IsExternalProviderEnabled()
 }
 
 // ProviderUsesUserSecrets reports whether the named provider stores per-user secrets for token refresh.

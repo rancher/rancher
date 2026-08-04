@@ -12,8 +12,8 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/git"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/repo"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

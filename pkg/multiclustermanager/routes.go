@@ -46,7 +46,12 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	var (
 		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
-		clusterImport  = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters(""), SecretLister: scaledContext.Core.Secrets("").Controller().Lister()}
+		clusterImport  = clusterregistrationtokens.ClusterImport{
+			Clusters:     scaledContext.Management.Clusters(""),
+			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),
+			// Reuses the SecretTokenIndex indexer registered by mcmauthorizer.NewAuthorizer.
+			SecretIndexer: scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
+		}
 	)
 
 	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))
@@ -89,7 +94,10 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	logrus.Infof("Configuring public API body limit to %v bytes", publicLimit)
 	limitingHandler := utils.APIBodyLimitingHandler(publicLimit)
 
-	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))
+	handler := sar.NewSubjectAccessReview(
+		scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews())
+	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, handler)
+
 	saAuth := auth.ToMiddleware(requests.NewServiceAccountAuth(scaledContext, clustermanager.ToRESTConfig))
 	accessControlHandler := rbac.NewAccessControlHandler()
 

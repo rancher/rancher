@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/catalogv2/internal/legacytypes/helmv2api"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rspb "k8s.io/helm/pkg/proto/hapi/release"
 )
 
 var (
@@ -65,7 +66,7 @@ func toTime(t *timestamp.Timestamp) *metav1.Time {
 
 // fromHelm2ReleaseToRelease receives a k8s release proto struct representing a helm2 release.
 // Returns a pointer to a v1.ReleaseSpec struct for the helm2 release
-func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
+func fromHelm2ReleaseToRelease(release *helmv2api.Release, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	var (
 		err error
 	)
@@ -127,7 +128,7 @@ func fromHelm2ReleaseToRelease(release *rspb.Release, isNamespaced IsNamespaced)
 }
 
 // decodeHelm2 receives a helm2 release data and returns the corresponding helm2 release proto struct
-func decodeHelm2(data string) (*rspb.Release, error) {
+func decodeHelm2(data string) (*helmv2api.Release, error) {
 	b, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func decodeHelm2(data string) (*rspb.Release, error) {
 		b = b2
 	}
 
-	var rls rspb.Release
+	var rls helmv2api.Release
 	// unmarshal protobuf bytes
 	if err := proto.Unmarshal(b, &rls); err != nil {
 		return nil, err

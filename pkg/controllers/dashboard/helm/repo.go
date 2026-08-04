@@ -26,8 +26,8 @@ import (
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	name2 "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -293,6 +293,12 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 			newStatus.URL = repoSpec.GitRepo
 			newStatus.Branch = repoSpec.GitBranch
 			index, err = git.BuildOrGetIndex(metadata.Namespace, metadata.Name, repoSpec.GitRepo)
+
+			// Bootstrap succeeded via git.Head() and BuildOrGetIndex(), which initialises the repository from the current local checkout. Set ShouldNotSkip to force exactly one immediate follow-up reconcile
+			// so shouldSkip() bypasses the refresh-interval gate and the next reconcile runs git.Update(), synchronising the repository with the latest upstream commit instead of waiting for RefreshInterval.
+			if err == nil {
+				newStatus.ShouldNotSkip = true
+			}
 		}
 	} else if repoSpec.GitRepo != "" {
 		commit, err = git.Update(secret, metadata.Namespace, metadata.Name, repoSpec.GitRepo, repoSpec.GitBranch, repoSpec.InsecureSkipTLSverify, repoSpec.CABundle)

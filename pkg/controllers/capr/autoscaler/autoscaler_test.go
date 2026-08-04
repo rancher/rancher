@@ -10,6 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"github.com/stretchr/testify/suite"
@@ -114,6 +115,11 @@ func (s *autoscalerSuite) SetupTest() {
 	s.client = &mockControllerRuntimeClient{}
 	s.context = context.Background()
 
+	s.withSettings(map[settings.Setting]string{
+		settings.SystemDefaultRegistry:            "",
+		settings.SystemDefaultRegistryPullSecrets: "",
+	})
+
 	s.h = &autoscalerHandler{
 		capiClusterCache:           s.capiClusterCache,
 		capiMachineCache:           s.capiMachineCache,
@@ -136,6 +142,22 @@ func (s *autoscalerSuite) SetupTest() {
 		client:                     s.client,
 		context:                    s.context,
 	}
+}
+
+func (s *autoscalerSuite) withSettings(values map[settings.Setting]string) {
+	s.T().Helper()
+
+	oldValues := make(map[settings.Setting]string)
+	for setting, v := range values {
+		oldValues[setting] = setting.Get()
+		s.NoError(setting.Set(v))
+	}
+
+	s.T().Cleanup(func() {
+		for setting, value := range oldValues {
+			s.NoError(setting.Set(value))
+		}
+	})
 }
 
 func (s *autoscalerSuite) TearDownTest() {

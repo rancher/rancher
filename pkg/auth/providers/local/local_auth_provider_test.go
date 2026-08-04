@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,13 +63,40 @@ func TestProviderSearchPrincipal(t *testing.T) {
 			Username:    "jalice",
 			DisplayName: "Alice Johnson",
 		},
+		{
+			// SCIM-provisioned external user: no Username, only an external
+			// provider principal ID. Must not surface as a local principal.
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-scim1",
+			},
+			DisplayName:  "testuser2@example.com",
+			PrincipalIDs: []string{"okta_user://abc-uuid-1"},
+		},
+		{
+			// SCIM-provisioned external user after the user lifecycle controller
+			// appended a self-referential local:// principal. The user also
+			// carries an external provider principal, so it must still not
+			// surface as a local principal. Issue rancher/rancher#54022.
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-scim2",
+			},
+			DisplayName:  "testuser3@example.com",
+			PrincipalIDs: []string{"okta_user://abc-uuid-2", "local://u-scim2"},
+		},
+		{
+			// Local user with only a self-referential local:// principal and no
+			// username still counts as local.
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "u-local1",
+			},
+			DisplayName:  "Local Only",
+			PrincipalIDs: []string{"local://u-local1"},
+		},
 	}
 
 	provider := Provider{
-		userLister:   fakeUserLister{users: testUsers},
-		userIndexer:  newTestUserIndexer(testUsers...),
-		groupIndexer: newTestGroupIndexer(),
-		groupLister:  fakeGroupLister{},
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
 	}
 
 	principalSearchTests := []struct {
@@ -153,6 +180,33 @@ func TestProviderSearchPrincipal(t *testing.T) {
 			searchKey: "Emile Dubois",
 			want:      []string{"local://u-56789"},
 		},
+		{
+			// SCIM-provisioned user must not appear in local search results
+			// even though they exist as a v3.User. Issue rancher/rancher#54022.
+			searchKey: "testuser2",
+			want:      nil,
+		},
+		{
+			searchKey: "testuser2@example.com",
+			want:      nil,
+		},
+		{
+			// SCIM user carrying both an external and a self-referential
+			// local:// principal must not surface as local.
+			// Issue rancher/rancher#54022.
+			searchKey: "testuser3",
+			want:      nil,
+		},
+		{
+			searchKey: "testuser3@example.com",
+			want:      nil,
+		},
+		{
+			// Local-only user (single local:// principal, no username) still
+			// surfaces as a local principal.
+			searchKey: "Local Only",
+			want:      []string{"local://u-local1"},
+		},
 	}
 
 	for _, tt := range principalSearchTests {
@@ -185,6 +239,18 @@ func TestProviderSearchPrincipal(t *testing.T) {
 			sort.Strings(tt.want)
 
 			require.Equal(t, tt.want, names)
+		})
+	}
+
+	// The local provider does not own any groups; v3.Group resources are
+	// SCIM-provisioned and belong to their external provider. A group-typed
+	// search must never return a local principal.
+	groupSearchKeys := []string{"", "test", "Engineering", "Test User", "scim"}
+	for _, key := range groupSearchKeys {
+		t.Run("group search "+key, func(t *testing.T) {
+			principals, err := provider.SearchPrincipals(key, "group", &v3.Token{})
+			require.NoError(t, err)
+			require.Empty(t, principals)
 		})
 	}
 }
@@ -273,12 +339,6 @@ func newTestUserIndexer(indexed ...*v3.User) cache.Indexer {
 	return indexer
 }
 
-func newTestGroupIndexer(_ ...v3.Group) cache.Indexer {
-	return cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
-		groupSearchIndex: groupSearchIndexer,
-	})
-}
-
 type fakeUserLister struct {
 	users []*v3.User
 }
@@ -287,15 +347,5 @@ func (f fakeUserLister) List(namespace string, selector labels.Selector) ([]*v3.
 	return f.users, nil
 }
 func (f fakeUserLister) Get(namespace, name string) (*v3.User, error) {
-	return nil, nil
-}
-
-type fakeGroupLister struct {
-}
-
-func (f fakeGroupLister) List(namespace string, selector labels.Selector) ([]*v3.Group, error) {
-	return nil, nil
-}
-func (f fakeGroupLister) Get(namespace, name string) (*v3.Group, error) {
 	return nil, nil
 }

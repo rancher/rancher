@@ -1,8 +1,12 @@
-webhookVersion: 110.0.0+up0.11.0-rc.13
-remoteDialerProxyVersion: 110.0.0+up0.8.0-rc.8
+# Container tags
+chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
+defaultShellVersion: rancher/shell:v0.8.1-rc.2
+defaultSccOperatorImage: rancher/scc-operator:v0.5.0
+
+# Charts Versions
+cspAdapterMinVersion: 110.0.0+up10.0.0
+fleetVersion: 110.0.0+up0.16.0-rc.5
+remoteDialerProxyVersion: 110.0.0+up0.8.0-rc.10
 # NOTE: CAPI controller version has to be updated in scripts/package-env
-turtlesVersion: 110.0.0+up0.27.0-rc.3
-cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
-defaultShellVersion: rancher/shell:v0.8.0-rc.2
-fleetVersion: 110.0.0+up0.16.0-alpha.9
-defaultSccOperatorImage: rancher/scc-operator:v0.4.1
+turtlesVersion: 110.0.0+up0.27.0
+webhookVersion: 110.0.0+up0.11.0

@@ -995,6 +995,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
+				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				f.EXPECT().Get("cattle-system", "global-pull-secret").Return(&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "global-pull-secret",
@@ -1048,6 +1049,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
+				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				// getGlobalPullSecrets should NOT be called
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
@@ -1075,13 +1077,18 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
 				// migrateExistingProjectScopedSecrets
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
+				// ensureProjectScopeSecretClusterLabel
+				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				// getProjectScopedSecretsFromNamespace
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pss-secret",
 							Namespace: testBackingNS,
-							Labels:    map[string]string{ProjectScopedSecretLabel: testProjectName},
+							Labels: map[string]string{
+								ProjectScopedSecretLabel:        testProjectName,
+								ProjectScopedSecretClusterLabel: testClusterName,
+							},
 						},
 						Data: map[string][]byte{"key": []byte("value")},
 					},
@@ -1145,6 +1152,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
+				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
 				f.EXPECT().List(testNamespace, metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
@@ -1174,6 +1182,7 @@ func Test_namespaceHandler_OnChange(t *testing.T) {
 				}, nil)
 			},
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
+				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				f.EXPECT().List(testBackingNS, gomock.Any()).Return([]*corev1.Secret{}, nil)
 				// getGlobalPullSecrets should NOT be called — project is not a system project

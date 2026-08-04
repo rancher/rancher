@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
@@ -48,7 +49,7 @@ func OIDCClientIDIndexFunc(obj interface{}) ([]string, error) {
 	return []string{o.Status.ClientID}, nil
 }
 
-func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenClient wrangmgmtv3.TokenClient, userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, secretCache corecontrollers.SecretCache, secretClient corecontrollers.SecretClient, oidcClientCache wrangmgmtv3.OIDCClientCache, oidcClientController wrangmgmtv3.OIDCClientController, namespaceClient corecontrollers.NamespaceClient) (Provider, error) {
+func NewProvider(ctx context.Context, extTokenStore *exttokenstore.SystemStore, tokenCache wrangmgmtv3.TokenCache, tokenClient wrangmgmtv3.TokenClient, userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, secretCache corecontrollers.SecretCache, secretClient corecontrollers.SecretClient, oidcClientCache wrangmgmtv3.OIDCClientCache, oidcClientController wrangmgmtv3.OIDCClientController, namespaceClient corecontrollers.NamespaceClient) (Provider, error) {
 	sessionStorage := session.NewSecretSessionStore(ctx, secretCache, secretClient, maxTime)
 	jwks, err := newJWKSHandler(secretCache, secretClient)
 	if err != nil {
@@ -74,8 +75,8 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 
 	return Provider{
 		jwksHandler:     jwks,
-		authHandler:     newAuthorizeHandler(tokenCache, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
-		tokenHandler:    newTokenHandler(tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
+		authHandler:     newAuthorizeHandler(extTokenStore, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
+		tokenHandler:    newTokenHandler(extTokenStore, tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
 		userInfoHandler: newUserInfoHandler(userLister, userAttributeLister, jwks),
 	}, nil
 }

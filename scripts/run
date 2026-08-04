@@ -20,7 +20,11 @@ export KUBECONFIG=
 export CATTLE_DEV_MODE=yes
 export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}'):8443"
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
-export CATTLE_FEATURES="harvester=false"
+if [ -n "$CATTLE_FEATURES" ]; then
+  export CATTLE_FEATURES="$CATTLE_FEATURES,harvester=false"
+else
+  export CATTLE_FEATURES="harvester=false"
+fi
 
 # Ensure $HOME/.kube/k3s.yaml symlink exists on the bind-mounted filesystem.
 # The Dockerfile.runtime creates this symlink inside the image layer, but the

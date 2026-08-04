@@ -25,29 +25,43 @@ import (
 )
 
 const (
-	NamespaceID                         = "namespaceId"
-	ProjectID                           = "projectId"
-	ClusterID                           = "clusterId"
-	GlobalAdmin                         = "admin"
-	GlobalAdminCRBPrefix                = "globaladmin-"
-	GlobalRestrictedAdmin               = "restricted-admin"
-	ClusterCRDsClusterRole              = "cluster-crd-clusterRole"
-	RestrictedAdminClusterRoleBinding   = "restricted-admin-rb-cluster"
-	ProjectCRDsClusterRole              = "project-crd-clusterRole"
-	RestrictedAdminProjectRoleBinding   = "restricted-admin-rb-project"
-	RestrictedAdminCRForClusters        = "restricted-admin-cr-clusters"
-	RestrictedAdminCRBForClusters       = "restricted-admin-crb-clusters"
-	CrtbOwnerLabel                      = "authz.cluster.cattle.io/crtb-owner"
-	PrtbOwnerLabel                      = "authz.cluster.cattle.io/prtb-owner"
-	AggregationLabel                    = "management.cattle.io/aggregates"
-	ClusterRoleOwnerLabel               = "authz.cluster.cattle.io/clusterrole-owner"
-	aggregatorSuffix                    = "aggregator"
-	promotedSuffix                      = "promoted"
-	namespaceSuffix                     = "namespaces"
-	clusterManagementPlaneSuffix        = "cluster-mgmt"
-	projectManagementPlaneSuffix        = "project-mgmt"
-	ClusterAdminRoleName                = "cluster-admin"
-	HelmProvisioningReaderRole          = "cattle-helm-provisioning-reader"
+	NamespaceID                       = "namespaceId"
+	ProjectID                         = "projectId"
+	ClusterID                         = "clusterId"
+	GlobalAdmin                       = "admin"
+	GlobalAdminCRBPrefix              = "globaladmin-"
+	GlobalRestrictedAdmin             = "restricted-admin"
+	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
+	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
+	ProjectCRDsClusterRole            = "project-crd-clusterRole"
+	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
+	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
+	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
+	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
+	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
+	AggregationLabel                  = "management.cattle.io/aggregates"
+	ClusterRoleOwnerLabel             = "authz.cluster.cattle.io/clusterrole-owner"
+	aggregatorSuffix                  = "aggregator"
+	promotedSuffix                    = "promoted"
+	namespaceSuffix                   = "namespaces"
+	clusterManagementPlaneSuffix      = "cluster-mgmt"
+	projectManagementPlaneSuffix      = "project-mgmt"
+	ClusterAdminRoleName              = "cluster-admin"
+	HelmProvisioningReaderRole        = "cattle-helm-provisioning-reader"
+
+	// Index names for PRTB/CRTB caches, registered by pkg/controllers/management/auth/roletemplates.
+	PRTBByRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-roletemplate-name"
+	CRTBByRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-roletemplate-name"
+	// Cluster-scoped variants of the indexes above, keyed by <cluster-name>/<roletemplate-name> (see
+	// RoleTemplateClusterIndexKey). Used by the per-cluster owner-plane enqueuers so that a RoleTemplate
+	// change only fetches the bindings belonging to that cluster, instead of every binding referencing
+	// the RoleTemplate across all clusters.
+	PRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-cluster-and-roletemplate-name"
+	CRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-cluster-and-roletemplate-name"
+	// PRTBByProjectNameIndex keys PRTBs by their ProjectName (<cluster-id>:<project-id>), which
+	// matches the field.cattle.io/projectId annotation on namespaces. Used by the aggregation
+	// namespace enqueuer to reconcile the PRTBs of a project when one of its namespaces changes.
+	PRTBByProjectNameIndex              = "auth.management.cattle.io/prtb-by-project-name"
 	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
 	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
 	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
@@ -216,6 +230,17 @@ func NameForClusterRoleBinding(role rbacv1.RoleRef, subject rbacv1.Subject) stri
 	name.WriteString(getBindingHash("", role, subject))
 	nm := name.String()
 	logrus.Debugf("ClusterRoleBinding with role.kind=%s role.name=%s subject.kind=%s subject.name=%s has name: %s", role.Kind, role.Name, subject.Kind, subject.Name, nm)
+	return nm
+}
+
+// NameForClusterRoleBindingWithOwner returns a deterministic name for a ClusterRoleBinding with the provided roleName, subject, and owner.
+// The owner name is included in the hash so that different owners can have distinct ClusterRoleBindings for the same role and subject.
+func NameForClusterRoleBindingWithOwner(role rbacv1.RoleRef, subject rbacv1.Subject, owner string) string {
+	var name strings.Builder
+	name.WriteString("crb-")
+	name.WriteString(getBindingHash(owner, role, subject))
+	nm := name.String()
+	logrus.Debugf("ClusterRoleBinding with role.kind=%s role.name=%s subject.kind=%s subject.name=%s owner=%s has name: %s", role.Kind, role.Name, subject.Kind, subject.Name, owner, nm)
 	return nm
 }
 
@@ -698,4 +723,11 @@ func GetClusterRoleOwnerLabel(s string) string {
 func GetClusterAndProjectNameFromPRTB(prtb *v3.ProjectRoleTemplateBinding) (string, string) {
 	cluster, project, _ := strings.Cut(prtb.ProjectName, ":")
 	return cluster, project
+}
+
+// RoleTemplateClusterIndexKey builds the cache index key used by the cluster-scoped
+// PRTBByClusterAndRoleTemplateNameIndex / CRTBByClusterAndRoleTemplateNameIndex indexes. Producers
+// (indexer funcs) and consumers (per-cluster enqueuers) must use this helper so their keys match.
+func RoleTemplateClusterIndexKey(clusterName, roleTemplateName string) string {
+	return clusterName + "/" + roleTemplateName
 }

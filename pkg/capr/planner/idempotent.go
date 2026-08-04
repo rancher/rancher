@@ -69,8 +69,8 @@ func generateIdempotencyCleanupInstruction(controlPlane *rkev1.RKEControlPlane, 
 // It works by running a script that writes the given "value" to a file at /var/lib/rancher/capr/idempotence/<identifier>/<hashedCommand>,
 // and checks this file to determine if it needs to run the instruction again. Notably, `identifier` must be a valid relative path.
 func idempotentInstruction(controlPlane *rkev1.RKEControlPlane, identifier, value, command string, args []string, env []string) plan.OneTimeInstruction {
-	hashedCommand := PlanHash([]byte(command))
-	hashedValue := PlanHash([]byte(value))
+	hashedCommand := planapi.PlanHash([]byte(command))
+	hashedValue := planapi.PlanHash([]byte(value))
 	return plan.OneTimeInstruction{
 		CommonInstruction: planapi.CommonInstruction{
 			Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),

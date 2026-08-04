@@ -3,6 +3,8 @@ package endpoints
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
@@ -12,8 +14,18 @@ import (
 	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+var ignoreOverfillError bool
+
+func init() {
+	ignoreOverfillErrorStr := os.Getenv("CATTLE_IGNORE_ENDPOINT_ANNOTATION_OVERFLOW")
+	if ignoreOverfillErrorStr != "" {
+		ignoreOverfillError, _ = strconv.ParseBool(ignoreOverfillErrorStr)
+	}
+}
 
 // This controller is responsible for monitoring workloads
 // and setting public endpoints on them based on HostPort pods
@@ -93,6 +105,8 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		}
 	}
 
+	numOverfilledAnnotations := 0
+	var firstOverfillError error
 	for _, w := range workloads {
 		// 1. Get endpoints from services
 		var newPublicEps []v32.PublicEndpoint
@@ -174,9 +188,22 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		annotations := map[string]string{
 			endpointsAnnotation: epsToUpdate,
 		}
-		if err = c.WorkloadController.UpdateWorkload(w, annotations); err != nil {
+
+		if err = validation.ValidateAnnotationsSize(annotations); err != nil {
+			numOverfilledAnnotations++
+			if firstOverfillError == nil {
+				firstOverfillError = err
+			}
+		} else if err = c.WorkloadController.UpdateWorkload(w, annotations); err != nil {
 			return err
 		}
 	}
-	return nil
+	if numOverfilledAnnotations == 0 || ignoreOverfillError {
+		return nil
+	}
+	pluralSuffix := ""
+	if numOverfilledAnnotations > 1 {
+		pluralSuffix = "s"
+	}
+	return fmt.Errorf("failed to update %d endpoint annotation%s: first error: %w", numOverfilledAnnotations, pluralSuffix, firstOverfillError)
 }

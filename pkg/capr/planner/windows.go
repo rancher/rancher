@@ -248,8 +248,8 @@ func windowsIdempotentRestartInstructions(identifier, value, service string) []p
 // care must be taken to ensure that certain escape characters (such as ') do not interfere with how arguments are built and passed to InvokeExpression.
 // Reference windowsIdempotentActionScript for more information as to how command arguments are crafted and passed to InvokeExpression.
 func windowsIdempotentInstruction(identifier, value, command string, args []string, env []string) plan.OneTimeInstruction {
-	hashedCommand := PlanHash([]byte(command))
-	hashedValue := PlanHash([]byte(value))
+	hashedCommand := planapi.PlanHash([]byte(command))
+	hashedValue := planapi.PlanHash([]byte(value))
 
 	return plan.OneTimeInstruction{
 		CommonInstruction: planapi.CommonInstruction{

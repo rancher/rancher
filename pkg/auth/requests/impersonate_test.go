@@ -19,7 +19,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -209,7 +211,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().
 					Get("kubeconfig-u-user5zfww").
-					Return(nil, errors.New("unexpected error"))
+					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "kubeconfig-u-user5zfww"))
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
@@ -417,7 +419,7 @@ func TestAuthenticateImpersonation(t *testing.T) {
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
 				cache.EXPECT().
 					Get("kubeconfig-u-user5zfww").
-					Return(nil, errors.New("unexpected error"))
+					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "kubeconfig-u-user5zfww"))
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 				scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 				secrets.EXPECT().Cache().Return(scache)
@@ -609,7 +611,8 @@ func TestAuthenticateImpersonation(t *testing.T) {
 			extTokenStore: func() *exttokenstore.SystemStore {
 				// Note: Have to fail both norman and ext sides of the token fetch
 				cache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
-				cache.EXPECT().Get("kubeconfig-u-user5zfww").Return(nil, errors.New("unexpected error"))
+				cache.EXPECT().Get("kubeconfig-u-user5zfww").
+					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "kubeconfig-u-user5zfww"))
 				users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 				users.EXPECT().Cache().Return(nil)
 				secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)

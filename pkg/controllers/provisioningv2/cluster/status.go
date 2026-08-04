@@ -66,7 +66,7 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 	if cluster.Status.Info != nil {
 		arch = cluster.Status.Info.Arch
 	}
-	if h.getClusterInfoWaitTime(key) == 0 {
+	if h.mgmtNodesCache != nil && h.getClusterInfoWaitTime(key) == 0 {
 		arch, err = h.getArch(cluster)
 		if err != nil {
 			return nil, err

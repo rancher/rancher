@@ -28,9 +28,10 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/action"
+	releasecommon "helm.sh/helm/v4/pkg/release/common"
+	release "helm.sh/helm/v4/pkg/release/v1"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -463,7 +464,7 @@ func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string
 // or may not be installed, depending on the value of the min version.
 func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVersion string, isExact bool, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
 	for _, r := range releases {
-		if r.Info.Status != release.StatusDeployed {
+		if r.Info.Status != releasecommon.StatusDeployed {
 			continue
 		}
 		if desiredValues == nil {

@@ -98,11 +98,12 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
       - name: Create App Token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.10.1
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
           private-key: ${{ env.PRIVATE_KEY }}
+          permission-pull-requests: write
       - name: Create Pull Request
         if: ${{ steps.repository-changes.outputs.changes_exist == 'true' }}
         id: cpr

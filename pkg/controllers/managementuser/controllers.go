@@ -27,6 +27,8 @@ import (
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -54,7 +56,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	}
 
 	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
-		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		err := cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			// For non-local clusters, register nodesyncer with CAPI context
 			if cluster.ClusterName != "local" {
 				nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
@@ -62,6 +64,9 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 			registerProvV2(ctx, cluster, capi, clusterRec)
 			return nil
 		})()
+		if err != nil {
+			logrus.Errorf("failed to start cluster manager: %v", err)
+		}
 	})
 
 	registerCaches(cluster)
@@ -83,7 +88,11 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		if err != nil {
 			return err
 		}
-		clusterauthtoken.Register(ctx, cluster)
+		secretsCache, err := clusterauthtoken.RegisterFactory(cluster)
+		if err != nil {
+			return fmt.Errorf("registering clusterauthtoken factory: %w", err)
+		}
+		clusterauthtoken.Register(ctx, cluster, secretsCache)
 	}
 
 	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
@@ -98,15 +107,40 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 			cluster.K3s = k3s.New(cluster.ControllerFactory)
-			snapshotbackpopulate.Register(ctx, cluster, capi)
+			snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
 		}
 		cluster.Plan = upgrade.New(cluster.ControllerFactory)
 		rkecontrolplanecondition.Register(ctx,
 			cluster.ClusterName,
 			cluster.Catalog.V1().App(),
 			cluster.Management.Wrangler.RKE.RKEControlPlane())
+	} else {
+		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+			resources, err := cluster.K8sClient.Discovery().ServerResourcesForGroupVersion("k3s.cattle.io/v1")
+			if apierrors.IsNotFound(err) {
+				logrus.Tracef("refusing to start snapshotbackpopulate controller for non RKE2/K3s cluster")
+			} else if err != nil {
+				logrus.Errorf("failed to find k3s server resources: %v", err)
+			} else if resources == nil || len(resources.APIResources) == 0 {
+				logrus.Tracef("skipping snapshotbackpopulate controller because k3s.cattle.io/v1 returned no resources")
+			} else {
+				found := false
+				for _, resource := range resources.APIResources {
+					if resource.Kind == "ETCDSnapshotFile" {
+						cluster.K3s = k3s.New(cluster.ControllerFactory)
+						snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
+						found = true
+						break
+					}
+				}
+				if !found {
+					logrus.Tracef("skipping snapshotbackpopulate controller because ETCDSnapshotFile is not served downstream")
+				}
+			}
+		}
 	}
-	machinerole.Register(ctx, cluster)
+
+	machinerole.Register(ctx, cluster, capi)
 	machineroletaint.Register(ctx, cluster, capi)
 }
 

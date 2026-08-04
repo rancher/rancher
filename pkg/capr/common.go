@@ -43,8 +43,10 @@ import (
 )
 
 const (
-	AddressAnnotation = "rke.cattle.io/address"
-	ClusterNameLabel  = "rke.cattle.io/cluster-name"
+	AddressAnnotation                      = "rke.cattle.io/address"
+	BootstrapTokenLastAccessTimeAnnotation = "rke.cattle.io/last-access-timestamp"
+	BootstrapTokenAnnotation               = "rke.cattle.io/bootstrap-token"
+	ClusterNameLabel                       = "rke.cattle.io/cluster-name"
 	// ClusterSpecAnnotation is used to define the cluster spec used to generate the rkecontrolplane object as an annotation on the object
 	ClusterSpecAnnotation                      = "rke.cattle.io/cluster-spec"
 	ControlPlaneRoleLabel                      = "rke.cattle.io/control-plane-role"
@@ -57,6 +59,7 @@ const (
 	InitNodeLabel                              = "rke.cattle.io/init-node"
 	InitNodeMachineIDLabel                     = "rke.cattle.io/init-node-machine-id"
 	InternalAddressAnnotation                  = "rke.cattle.io/internal-address"
+	InvalidatedBootstrapTokenAnnotation        = "rke.cattle.io/bootstrap-token-invalidated"
 	JoinURLAutosetDisabled                     = "rke.cattle.io/join-url-autoset-disabled"
 	JoinURLAnnotation                          = "rke.cattle.io/join-url"
 	JoinedToAnnotation                         = "rke.cattle.io/joined-to"
@@ -77,8 +80,6 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
-	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
-	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
 
 	SnapshotNameAnnotation = "etcdsnapshot.rke.io/snapshot-name"
@@ -88,6 +89,13 @@ const (
 	SecretTypeMachinePlan  = "rke.cattle.io/machine-plan"
 	SecretTypeClusterState = "rke.cattle.io/cluster-state"
 	SecretTypeBootstrap    = "rke.cattle.io/bootstrap"
+
+	// CAPIClusterOwnerLabel and CAPIClusterOwnerNSLabel are stamped by rancher-turtles on the
+	// mgmtv3.Cluster shell that represents an imported CAPI cluster. Presence of both labels
+	// (with non-empty values) identifies a CAPI-native caller; the values point at the real
+	// CAPI Cluster.
+	CAPIClusterOwnerLabel   = "cluster-api.cattle.io/capi-cluster-owner"
+	CAPIClusterOwnerNSLabel = "cluster-api.cattle.io/capi-cluster-owner-ns"
 
 	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
@@ -373,6 +381,12 @@ func GetSystemAgentDataDir(spec *rkev1.ClusterConfiguration) string {
 
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
 	for _, owner := range sa.OwnerReferences {
+		// CAPI-native path (turtles-imported clusters): the plan SA is owned directly by the
+		// CAPI Machine — there is no RKEBootstrap in the chain.
+		if owner.Kind == "Machine" && owner.Name == machineName {
+			return true, nil
+		}
+		// v2prov path: planSA → RKEBootstrap → CAPI Machine.
 		if owner.Kind == RKEBootstrapKind {
 			bootstrap, err := bootstrapCache.Get(sa.Namespace, owner.Name)
 			if err != nil {

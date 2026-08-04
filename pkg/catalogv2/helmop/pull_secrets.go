@@ -43,6 +43,12 @@ func (s *Operations) createNamespaceAndPullSecrets(ctx context.Context, status c
 		return nil
 	}
 
+	repo, err := s.clusterReposCache.Get(clusterRepoName)
+	if err != nil {
+		log.Errorf("[helmop] createNamespaceAndPullSecrets: failed to get cluster repo %q from cache: %v", clusterRepoName, err)
+		return err
+	}
+
 	for i := range cmds {
 		if cmds[i].ReleaseName == "" {
 			continue
@@ -63,20 +69,31 @@ func (s *Operations) createNamespaceAndPullSecrets(ctx context.Context, status c
 			continue
 		}
 
-		sdr, sdrDefined := s.systemDefaultRegistryConfigured(values)
-		pullSecretsPreConfigured := s.chartHasConfiguredPullSecrets(values)
+		currentManagedSecrets := buildManagedSecretNames(cmds[i].ReleaseName, repo.Spec.DefaultImagePullSecrets)
+		existingManagedSecrets, err := s.listExistingManagedSecretNames(ns.Name, cmds[i].ReleaseName)
+		if err != nil {
+			return err
+		}
+		allManagedSecrets := append(currentManagedSecrets, existingManagedSecrets...)
 
-		pullSecrets, err := s.managePullSecrets(sdr, ns.Name, clusterRepoName, cmds[i].ReleaseName, pullSecretsPreConfigured)
+		if s.chartHasOnlyUserConfiguredPullSecrets(baseValues, values, allManagedSecrets) {
+			// if the user is manually specifying image pull secret names in all supported paths,
+			// clean any managed ones up.
+			if err := s.deleteStaleHelmOpSecrets([]string{}, existingManagedSecrets, ns.Name, cmds[i].ReleaseName); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Create, update, or delete managed secret names in the charts release namespace.
+		pullSecrets, err := s.managePullSecrets(repo, s.configuredSystemDefaultRegistry(values), ns.Name, cmds[i].ReleaseName, existingManagedSecrets)
 		if err != nil {
 			return err
 		}
 
-		if !sdrDefined {
-			continue
-		}
-
+		// Ensure that the chart has the image pull secret fields correctly configured.
 		log.Tracef("[helmop] injecting pull secrets into command %d (release=%q, namespace=%q, valuesLen=%d, chartBaseValuesLen=%d)", i, cmds[i].ReleaseName, cmds[i].ReleaseNamespace, len(cmds[i].Values), len(cmds[i].ChartBaseValues))
-		cmds[i].Values, err = s.injectPullSecrets(cmds[i].ReleaseName, baseValues, values, pullSecrets)
+		cmds[i].Values, err = s.injectPullSecrets(cmds[i].ReleaseName, baseValues, values, pullSecrets, allManagedSecrets)
 		if err != nil {
 			return err
 		}
@@ -85,10 +102,13 @@ func (s *Operations) createNamespaceAndPullSecrets(ctx context.Context, status c
 	return nil
 }
 
-func (s *Operations) systemDefaultRegistryConfigured(values map[string]any) (string, bool) {
+func (s *Operations) configuredSystemDefaultRegistry(values map[string]any) string {
 	v, defined := getValueAtPath(values, "global", "cattle", "systemDefaultRegistry")
-	sdr, ok := v.(string)
-	return sdr, defined && ok && v != ""
+	if !defined {
+		return ""
+	}
+	sdr, _ := v.(string)
+	return sdr
 }
 
 func (s *Operations) chartSupportsImagePullSecrets(baseValues map[string]any) bool {
@@ -103,39 +123,113 @@ func (s *Operations) chartSupportsImagePullSecrets(baseValues map[string]any) bo
 	return false
 }
 
-func (*Operations) chartHasConfiguredPullSecrets(values map[string]any) bool {
-	for _, path := range imagePullSecretPaths {
-		pathStr := strings.Join(path, ".")
-		v, declared := getValueAtPath(values, path...)
-		if !declared {
-			continue
-		}
-		pullSecret, ok := v.([]any)
-		log.Tracef("[helmop] injectPullSecrets: path %q is declared in chart base values", pathStr)
-		if ok && len(pullSecret) != 0 {
-			return true
-		}
+// buildManagedSecretNames returns the names that managePullSecrets would assign to the
+// given cluster repo secrets when scoped to releaseName.
+func buildManagedSecretNames(releaseName string, secretRefs []catalog.SecretReference) []string {
+	names := make([]string, 0, len(secretRefs))
+	for _, ref := range secretRefs {
+		names = append(names, name.SafeConcatName(releaseName, ref.Name))
 	}
-	return false
+	return names
 }
 
-func (s *Operations) injectPullSecrets(releaseName string, baseValues map[string]any, confValues map[string]any, secretNames []string) ([]byte, error) {
-	pullSecrets := make([]map[string]string, len(secretNames))
-	for i, e := range secretNames {
-		pullSecrets[i] = map[string]string{"name": e}
+// chartHasOnlyUserConfiguredPullSecrets returns true when every imagePullSecrets path
+// supported by the chart (present in 'baseValues') is already populated in 'values' with
+// secrets that are not Rancher-managed (i.e. none of the configured secret names appear
+// in managedSecretNames). In that case the user owns all pull secret configuration and
+// Rancher should not inject or manage pull secrets for this chart.
+func (*Operations) chartHasOnlyUserConfiguredPullSecrets(baseValues, values map[string]any, managedSecretNames []string) bool {
+	managed := make(map[string]struct{}, len(managedSecretNames))
+	for _, n := range managedSecretNames {
+		managed[n] = struct{}{}
+	}
+
+	chartSupportsPullSecrets := false
+	for _, path := range imagePullSecretPaths {
+		if _, declared := getValueAtPath(baseValues, path...); !declared {
+			continue
+		}
+		chartSupportsPullSecrets = true
+
+		// find the pull secrets configured at one of
+		// the known paths
+		secrets, _ := getValueAtPath(values, path...)
+		secretList, ok := secrets.([]any)
+		if !ok || len(secretList) == 0 {
+			return false
+		}
+
+		// determine if any of the configured secrets are managed by Rancher.
+		// If not, then the user fully owns the pull secret configuration for this path,
+		// and we should not inject or manage pull secrets for this chart.
+		for _, entry := range secretList {
+			switch v := entry.(type) {
+			case string:
+				if _, isManaged := managed[v]; isManaged {
+					return false
+				}
+			case map[string]any:
+				if n, ok := v["name"].(string); ok {
+					if _, isManaged := managed[n]; isManaged {
+						return false
+					}
+				}
+			}
+		}
+		log.Tracef("[helmop] chartHasOnlyUserConfiguredPullSecrets: path %q has user-configured secrets", strings.Join(path, "."))
+	}
+
+	return chartSupportsPullSecrets
+}
+
+// listExistingManagedSecretNames returns the names of secrets in the release namespace
+// that were previously created by managePullSecrets (identified by the managed labels).
+func (s *Operations) listExistingManagedSecretNames(namespace, releaseName string) ([]string, error) {
+	secrets, err := s.secretCache.List(namespace, labels.SelectorFromSet(labels.Set{
+		helmOpManagedPullSecretLabel: "true",
+		helmOpReleaseLabelKey:        releaseName,
+	}))
+	if err != nil {
+		log.Errorf("[helmop] listExistingManagedSecretNames: failed to list managed secrets in namespace %q for release %q: %v", namespace, releaseName, err)
+		return nil, err
+	}
+	names := make([]string, 0, len(secrets))
+	for _, sec := range secrets {
+		names = append(names, sec.Name)
+	}
+	return names, nil
+}
+
+func (s *Operations) injectPullSecrets(releaseName string, baseValues map[string]any, confValues map[string]any, secretNames []string, knownManagedNames []string) ([]byte, error) {
+	known := make(map[string]struct{}, len(knownManagedNames))
+	for _, n := range knownManagedNames {
+		known[n] = struct{}{}
+	}
+
+	pullSecrets := make([]any, len(secretNames))
+	for i, n := range secretNames {
+		pullSecrets[i] = map[string]string{"name": n}
 	}
 
 	for _, path := range imagePullSecretPaths {
 		if _, declared := getValueAtPath(baseValues, path...); !declared {
 			continue
 		}
-		if value, exists := getValueAtPath(confValues, path...); exists {
-			if secrets, ok := value.([]any); ok && len(secrets) > 0 {
-				continue
-			}
+
+		v, _ := getValueAtPath(confValues, path...)
+		configuredPullSecrets, _ := v.([]any)
+		userConfiguredSecrets, containsRancherManagedSecret := extractUserPullSecrets(configuredPullSecrets, known)
+
+		if !containsRancherManagedSecret && len(configuredPullSecrets) > 0 {
+			continue // user fully owns this path
 		}
-		log.Tracef("[helmop] injectPullSecrets: injecting %d pull secrets at path %q for release %q: %v", len(pullSecrets), strings.Join(path, "."), releaseName, pullSecrets)
-		setValueAtPath(confValues, pullSecrets, path...)
+		if !containsRancherManagedSecret && len(secretNames) == 0 {
+			continue // nothing existed, nothing to inject
+		}
+
+		newList := append(userConfiguredSecrets, pullSecrets...)
+		log.Tracef("[helmop] injectPullSecrets: writing %d pull secrets at path %q for release %q (preserving %d user entries)", len(pullSecrets), strings.Join(path, "."), releaseName, len(userConfiguredSecrets))
+		setValueAtPath(confValues, newList, path...)
 	}
 
 	result, err := json.Marshal(confValues)
@@ -147,15 +241,37 @@ func (s *Operations) injectPullSecrets(releaseName string, baseValues map[string
 	return result, nil
 }
 
-func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace string, repoName string, releaseName string, pullSecretsPreConfigured bool) ([]string, error) {
-	repo, err := s.clusterReposCache.Get(repoName)
-	if err != nil {
-		log.Errorf("[helmop] managePullSecrets: failed to get cluster repo %q from cache: %v", repoName, err)
-		return nil, err
+// extractUserPullSecrets partitions secretList into user-owned entries and reports whether any
+// entry matched a name in managedSecrets (indicating it is managed by Rancher).
+// String entries are normalized to LocalObjectReference format ({name: str}) on the way out.
+func extractUserPullSecrets(secretList []any, managedSecrets map[string]struct{}) ([]any, bool) {
+	var userEntries []any
+	hasManagedEntry := false
+	for _, entry := range secretList {
+		switch v := entry.(type) {
+		case string:
+			if _, isKnown := managedSecrets[v]; isKnown {
+				hasManagedEntry = true
+			} else {
+				userEntries = append(userEntries, map[string]string{"name": v})
+			}
+		case map[string]any:
+			n, _ := v["name"].(string)
+			if _, isKnown := managedSecrets[n]; isKnown {
+				hasManagedEntry = true
+			} else {
+				userEntries = append(userEntries, entry)
+			}
+		default:
+			userEntries = append(userEntries, entry)
+		}
 	}
+	return userEntries, hasManagedEntry
+}
 
-	if systemDefaultRegistry == "" || len(repo.Spec.DefaultImagePullSecrets) == 0 || pullSecretsPreConfigured {
-		if err := s.deleteStaleHelmOpSecrets([]string{}, namespace, releaseName); err != nil {
+func (s *Operations) managePullSecrets(repo *catalog.ClusterRepo, systemDefaultRegistry string, namespace string, releaseName string, existingManagedNames []string) ([]string, error) {
+	if systemDefaultRegistry == "" || len(repo.Spec.DefaultImagePullSecrets) == 0 {
+		if err := s.deleteStaleHelmOpSecrets([]string{}, existingManagedNames, namespace, releaseName); err != nil {
 			return nil, err
 		}
 		return []string{}, nil
@@ -260,7 +376,7 @@ func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace s
 		secretNames = append(secretNames, secretName)
 	}
 
-	if err := s.deleteStaleHelmOpSecrets(secretNames, namespace, releaseName); err != nil {
+	if err := s.deleteStaleHelmOpSecrets(secretNames, existingManagedNames, namespace, releaseName); err != nil {
 		return nil, err
 	}
 
@@ -268,33 +384,22 @@ func (s *Operations) managePullSecrets(systemDefaultRegistry string, namespace s
 	return secretNames, nil
 }
 
-// deleteStaleHelmOpSecrets deletes secrets in the release namespace that were previously created
-// by managePullSecrets (identified by helmOpManagedPullSecretLabel and helmOpReleaseLabelKey)
-// but are no longer needed. It lists all managed secrets for the given release via label selector
-// and deletes any not present in activeSecretNames.
-func (s *Operations) deleteStaleHelmOpSecrets(activeSecretNames []string, namespace string, releaseName string) error {
+// deleteStaleHelmOpSecrets deletes managed pull secrets for the given release that are no longer
+// active. Any name not in activeSecretNames is deleted.
+func (s *Operations) deleteStaleHelmOpSecrets(activeSecretNames []string, existingManagedNames []string, namespace string, releaseName string) error {
 	active := make(map[string]struct{}, len(activeSecretNames))
 	for _, name := range activeSecretNames {
 		active[name] = struct{}{}
 	}
 
-	managed, err := s.secretCache.List(namespace, labels.SelectorFromSet(labels.Set{
-		helmOpManagedPullSecretLabel: "true",
-		helmOpReleaseLabelKey:        releaseName,
-	}))
-	if err != nil {
-		log.Errorf("[helmop] deleteStaleHelmOpSecrets: failed to list managed secrets in namespace %q for release %q: %v", namespace, releaseName, err)
-		return err
-	}
-
-	for _, secret := range managed {
-		if _, isActive := active[secret.Name]; isActive {
+	for _, secretName := range existingManagedNames {
+		if _, isActive := active[secretName]; isActive {
 			continue
 		}
 
-		log.Debugf("[helmop] deleteStaleHelmOpSecrets: deleting stale managed secret %q from namespace %q (release %q)", secret.Name, namespace, releaseName)
-		if err := s.secrets.Delete(namespace, secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-			log.Errorf("[helmop] deleteStaleHelmOpSecrets: failed to delete stale secret %q in namespace %q: %v", secret.Name, namespace, err)
+		log.Debugf("[helmop] deleteStaleHelmOpSecrets: deleting stale managed secret %q from namespace %q (release %q)", secretName, namespace, releaseName)
+		if err := s.secrets.Delete(namespace, secretName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			log.Errorf("[helmop] deleteStaleHelmOpSecrets: failed to delete stale secret %q in namespace %q: %v", secretName, namespace, err)
 			return err
 		}
 	}
@@ -302,13 +407,14 @@ func (s *Operations) deleteStaleHelmOpSecrets(activeSecretNames []string, namesp
 	return nil
 }
 
-// deleteReleasePullSecrets removes all Rancher-managed pull secrets for each release in cmds
-// from the given namespace. This is called on uninstall to clean up secrets created during install/upgrade.
+// deleteReleasePullSecrets removes all Rancher-managed pull secrets for the given release from
+// the namespace. Called on uninstall to clean up secrets created during install/upgrade.
 func (s *Operations) deleteReleasePullSecrets(namespace string, release string) error {
-	if err := s.deleteStaleHelmOpSecrets([]string{}, namespace, release); err != nil {
+	existing, err := s.listExistingManagedSecretNames(namespace, release)
+	if err != nil {
 		return err
 	}
-	return nil
+	return s.deleteStaleHelmOpSecrets([]string{}, existing, namespace, release)
 }
 
 func getValueAtPath(data map[string]any, path ...string) (any, bool) {

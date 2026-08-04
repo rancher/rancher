@@ -33,6 +33,36 @@ tests:
           path: apiVersion
           value: gateway.networking.k8s.io/v1
 
+  - it: should not render Gateway annotations when gatewayClass annotations are not provided
+    template: templates/ingate/gateway.yaml
+    set:
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          annotations: {}
+    asserts:
+      - exists:
+          path: metadata.annotations
+        not: true
+
+  - it: should render Gateway annotations when gatewayClass annotations are provided
+    template: templates/ingate/gateway.yaml
+    set:
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          annotations:
+            traefik.ingress.kubernetes.io/router.entrypoints: web
+            traefik.ingress.kubernetes.io/router.observability.tracing: true
+    asserts:
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.entrypoints: web
+            traefik.ingress.kubernetes.io/router.observability.tracing: true
+
   - it: should configure HTTP listener with default Traefik port 8000
     template: templates/ingate/gateway.yaml
     set:

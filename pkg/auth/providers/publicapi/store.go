@@ -12,6 +12,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/util"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -39,15 +40,26 @@ type authProvidersStore struct {
 }
 
 func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]any, error) {
+	if id == local.Name && providers.IsLocalHidden() {
+		return nil, httperror.NewAPIError(httperror.NotFound, "")
+	}
+
 	o, err := s.authConfigsRaw.Get(id, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 	u, _ := o.(runtime.Unstructured)
 	config := u.UnstructuredContent()
+	if enabled, ok := config["enabled"].(bool); !ok || !enabled {
+		return nil, httperror.NewAPIError(httperror.NotFound, "")
+	}
 	if t, ok := config["type"].(string); ok && t != "" {
+		p := providers.GetProviderByType(t)
+		if p == nil {
+			return nil, httperror.NewAPIError(httperror.NotFound, "")
+		}
 		config[".host"] = util.GetHost(apiContext.Request)
-		provider, err := providers.GetProviderByType(t).TransformToAuthProvider(config)
+		provider, err := p.TransformToAuthProvider(config)
 		if err != nil {
 			return nil, err
 		}
@@ -58,14 +70,29 @@ func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Sc
 }
 
 func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]any, error) {
-	rrr, _ := s.authConfigsRaw.List(metav1.ListOptions{})
+	rrr, err := s.authConfigsRaw.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	var result []map[string]any
 	list, _ := rrr.(*unstructured.UnstructuredList)
+	if list == nil {
+		return nil, nil
+	}
+
 	for _, i := range list.Items {
 		if t, ok := i.Object["type"].(string); ok && t != "" {
 			if enabled, ok := i.Object["enabled"].(bool); ok && enabled {
+				p := providers.GetProviderByType(t)
+				if p == nil {
+					continue
+				}
+				if p.GetName() == local.Name && providers.IsLocalHidden() {
+					continue
+				}
 				i.Object[".host"] = util.GetHost(apiContext.Request)
-				provider, err := providers.GetProviderByType(t).TransformToAuthProvider(i.Object)
+				provider, err := p.TransformToAuthProvider(i.Object)
 				if err != nil {
 					return result, err
 				}
@@ -158,6 +185,9 @@ func (s *v1AuthProviderStore) List(w http.ResponseWriter, r *http.Request) {
 		if !authConfig.Enabled {
 			continue
 		}
+		if authConfig.Name == local.Name && providers.IsLocalHidden() {
+			continue
+		}
 
 		raw, err := s.authConfigsUnstructured.Get(r.Context(), authConfig.Name, metav1.GetOptions{})
 		if err != nil {
@@ -168,7 +198,12 @@ func (s *v1AuthProviderStore) List(w http.ResponseWriter, r *http.Request) {
 
 		raw.Object[".host"] = util.GetHost(r)
 
-		authProvider, err := s.getProviderByType(authConfig.Type).TransformToAuthProvider(raw.Object)
+		p := s.getProviderByType(authConfig.Type)
+		if p == nil {
+			logrus.Errorf("v1AuthProviderStore: No provider registered for type %s, skipping", authConfig.Type)
+			continue
+		}
+		authProvider, err := p.TransformToAuthProvider(raw.Object)
 		if err != nil {
 			logrus.Errorf("v1AuthProviderStore: Getting authprovider %s: %s", authConfig.Type, err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

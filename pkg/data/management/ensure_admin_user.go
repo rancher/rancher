@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/docker/pkg/reexec"
+	"github.com/moby/sys/reexec"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"

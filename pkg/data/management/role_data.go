@@ -32,6 +32,7 @@ const (
 var (
 	defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 	adminCreateLock   sync.Mutex
+	crudVerbs         = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 )
 
 func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
@@ -46,10 +47,12 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch")
-
-	clusterCreateRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create").
-		addNamespacedRule("fleet-default").addRule().apiGroups("").resources("secrets").verbs("create")
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch").
+		addRule().apiGroups("operation.cattle.io").resources("*").verbs("get", "list", "watch")
+	clusterCreateRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
+	clusterCreateFleetDefault := clusterCreateRole.addNamespacedRule("fleet-default")
+	clusterCreateFleetDefault.addRule().apiGroups("").resources("secrets").verbs("create")
+	clusterCreateFleetDefault.addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("*").verbs("create")
 
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
@@ -83,8 +86,11 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	userRole := addUserRules(rb.addRole("User", "user"))
-	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create").
-		addNamespacedRule("fleet-default").addRule().apiGroups("").resources("secrets").verbs("create")
+	userRole.addNamespacedRule("cattle-global-data").addRule().apiGroups("").resources("secrets").verbs("create")
+
+	userFleetDefault := userRole.addNamespacedRule("fleet-default")
+	userFleetDefault.addRule().apiGroups("").resources("secrets").verbs("create")
+	userFleetDefault.addRule().apiGroups("infrastructure.cluster.x-k8s.io").resources("*").verbs("create")
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "update", "patch").
@@ -126,6 +132,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("updatepsa").
 		addRule().apiGroups("management.cattle.io").resources("clusterproxyconfigs").verbs("*").
+		addRule().apiGroups("operation.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", false, false, false).
@@ -175,7 +182,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("get", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machinedeployments").verbs("get", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch").
-		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch")
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch").
+		addRule().apiGroups("metrics.k8s.io").resources("nodemetrics", "nodes").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Storage", "storage-manage", "cluster", false, false, false).
 		addRule().apiGroups("").resources("persistentvolumes").verbs("*").
@@ -242,11 +250,15 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
+		addRule().apiGroups("security.istio.io").resources("requestauthentications").verbs(crudVerbs...).
+		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs(crudVerbs...).
+		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs(crudVerbs...).
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
+		addRule().apiGroups("traefik.io").resources("ingressroutes", "ingressroutetcps", "ingressrouteudps", "middlewares", "middlewaretcps", "tlsoptions", "tlsstores", "serverstransports", "serverstransporttcps").verbs(crudVerbs...).
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", false, false, false).
@@ -372,7 +384,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in
-	//rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
+	// rb.addRoleTemplate("View Events", "events-view", "", true, false, false).
 	//	addRule().apiGroups("").resources("events").verbs("get", "list", "watch").
 	//	addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 

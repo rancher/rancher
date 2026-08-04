@@ -3,10 +3,12 @@ package clusterregistrationtoken
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr/installer"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -19,9 +21,24 @@ const (
 	provisioningV2WindowsNodeCommandFormat         = `%s curl.exe -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
 	provisioningV2InsecureNodeCommandFormat        = "%s curl --insecure -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
 	provisioningV2InsecureWindowsNodeCommandFormat = `%s curl.exe --insecure -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
+
+	tokenPlaceholder = "{token}"
 )
 
 func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRegistrationTokenStatus, error) {
+	if crt.Status.TokenSecretName == "" {
+		return crt.Status, nil
+	}
+
+	clusterID := convert.ToString(crt.Spec.ClusterName)
+	crtStatus := crt.Status.DeepCopy()
+
+	return AssignCommands(crtStatus, clusterID, h.clusters)
+}
+
+// AssignCommands populates the command fields in a CRT status using the "{token}" placeholder.
+// Substitution of the placeholder with the real token happens at the API layer.
+func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, clusterID string, clusters mgmtcontrollers.ClusterCache) (v32.ClusterRegistrationTokenStatus, error) {
 	checksum := systemtemplate.CAChecksum()
 	ca := ""
 	caWindows := ""
@@ -30,18 +47,9 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 		caWindows = " -CaChecksum " + checksum
 	}
 
-	token := crt.Status.Token
-	clusterID := convert.ToString(crt.Spec.ClusterName)
-	if token == "" {
-		return crt.Status, nil
-	}
-
-	crtStatus := crt.Status.DeepCopy()
-	crtStatus.Token = token
-
-	url, err := getURL(token, clusterID)
+	url, err := getURL(tokenPlaceholder, clusterID)
 	if err != nil {
-		return crt.Status, err
+		return *crtStatus, err
 	}
 
 	if url == "" {
@@ -54,12 +62,12 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 
 	rootURL, err := getRootURL()
 	if err != nil {
-		return crt.Status, err
+		return *crtStatus, err
 	}
 
-	cluster, err := h.clusters.Get(clusterID)
+	cluster, err := clusters.Get(clusterID)
 	if err != nil {
-		return crt.Status, err
+		return *crtStatus, err
 	}
 
 	// for linux
@@ -68,14 +76,14 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 		rootURL+installer.SystemAgentInstallPath,
 		AgentEnvVars(cluster, Linux),
 		rootURL,
-		token,
+		tokenPlaceholder,
 		ca)
 	crtStatus.InsecureNodeCommand = fmt.Sprintf(provisioningV2InsecureNodeCommandFormat,
 		AgentEnvVars(cluster, Linux),
 		rootURL+installer.SystemAgentInstallPath,
 		AgentEnvVars(cluster, Linux),
 		rootURL,
-		token,
+		tokenPlaceholder,
 		ca)
 
 	// for windows
@@ -83,13 +91,13 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 		AgentEnvVars(cluster, PowerShell),
 		rootURL+installer.WindowsRke2InstallPath,
 		rootURL,
-		token,
+		tokenPlaceholder,
 		caWindows)
 	crtStatus.InsecureWindowsNodeCommand = fmt.Sprintf(provisioningV2InsecureWindowsNodeCommandFormat,
 		AgentEnvVars(cluster, PowerShell),
 		rootURL+installer.WindowsRke2InstallPath,
 		rootURL,
-		token,
+		tokenPlaceholder,
 		caWindows)
 
 	return *crtStatus, nil
@@ -139,6 +147,9 @@ func getURL(token, clusterID string) (string, error) {
 	}
 
 	u.Path = path
-	serverURL = u.String()
-	return serverURL, nil
+	result := u.String()
+
+	// Unescape the {token} placeholder that was auto-encoded by url.String()
+	result = strings.ReplaceAll(result, "%7Btoken%7D", "{token}")
+	return result, nil
 }

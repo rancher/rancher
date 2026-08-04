@@ -18,11 +18,10 @@ import (
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/rancher/shepherd/pkg/wait"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	release "helm.sh/helm/v4/pkg/release/v1"
 	appv1 "k8s.io/api/apps/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -209,7 +208,7 @@ func (w *SystemChartsVersionSuite) TestInstallFleet() {
 
 func (w *SystemChartsVersionSuite) uninstallApp(namespace, chartName string) error {
 	var cfg action.Configuration
-	if err := cfg.Init(w.restClientGetter, namespace, "", logrus.Infof); err != nil {
+	if err := cfg.Init(w.restClientGetter, namespace, ""); err != nil {
 		return err
 	}
 	releases, err := w.getReleases(&cfg)
@@ -232,12 +231,23 @@ func (w *SystemChartsVersionSuite) uninstallApp(namespace, chartName string) err
 
 func (w *SystemChartsVersionSuite) getReleases(cfg *action.Configuration) ([]*release.Release, error) {
 	l := action.NewList(cfg)
-	return l.Run()
+	releasers, err := l.Run()
+	if err != nil {
+		return nil, err
+	}
+	var releases []*release.Release
+	for _, r := range releasers {
+		rel, ok := r.(*release.Release)
+		if ok {
+			releases = append(releases, rel)
+		}
+	}
+	return releases, nil
 }
 
 func (w *SystemChartsVersionSuite) fetchRelease(namespace, chartName string) (*release.Release, error) {
 	var cfg action.Configuration
-	if err := cfg.Init(w.restClientGetter, namespace, "", logrus.Infof); err != nil {
+	if err := cfg.Init(w.restClientGetter, namespace, ""); err != nil {
 		return nil, err
 	}
 	releases, err := w.getReleases(&cfg)

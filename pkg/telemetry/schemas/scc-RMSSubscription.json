@@ -1,114 +1,141 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "RMSSubscription",
-  "type": "object",
+  "$id": "https://github.com/rancher/rancher/pkg/telemetry/scc-payload",
   "properties": {
     "version": {
-      "$comment": "Product Version normalized for SCC - must be semver. https://semver.org/",
       "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Product Version normalized for SCC - must be semver. https://semver.org/"
     },
     "subscription": {
-      "type": "object",
-      "required": ["installuuid", "clusteruuid", "product", "version", "arch", "git", "server_url"],
       "properties": {
         "installuuid": {
-          "$comment": "The UID of the k8s kube-system namespace.",
           "type": "string",
-          "format": "uuid"
+          "format": "uuid",
+          "description": "The UID of the k8s kube-system namespace."
         },
         "clusteruuid": {
-          "$comment": "Rancher's unique cluster identifier - based on InstallUUID setting.",
           "type": "string",
-          "format": "uuid"
+          "format": "uuid",
+          "description": "Rancher's unique cluster identifier - based on InstallUUID setting."
         },
         "product": {
-          "$comment": "cpe of the product",
-          "type": "string"
+          "type": "string",
+          "description": "cpe of the product"
         },
         "version": {
-          "$comment": "Rancher's raw build version",
-          "type": "string"
-        },
-        "git": {
-          "$comment": "Rancher's build git SHA",
-          "type": "string"
+          "type": "string",
+          "description": "Rancher's raw build version"
         },
         "arch": {
           "type": "string"
+        },
+        "git": {
+          "type": "string",
+          "description": "Rancher's build git SHA"
         },
         "server_url": {
           "type": "string"
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "installuuid",
+        "clusteruuid",
+        "product",
+        "version",
+        "arch",
+        "git",
+        "server_url"
+      ]
     },
     "feature_flags": {
-      "$comment": "Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags",
-      "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "type": "array",
+      "description": "Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags"
     },
     "managedSystems": {
-      "$comment": "Active systems under management and their details; to be expanded",
-      "type": "array",
       "items": {
-        "type": "object",
-        "required": ["arch", "memory", "cpu", "count"],
         "properties": {
           "arch": {
             "type": "string"
           },
           "cpu": {
-            "$comment": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units status.internalNodeStatus.capacity.cpu",
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units status.internalNodeStatus.capacity.cpu"
           },
           "memory": {
-            "$comment": "Capacity of the node(s): status.internalNodeStatus.capacity.memory (converted to MiB)",
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Capacity of the node(s): status.internalNodeStatus.capacity.memory (converted to MiB)"
           },
           "count": {
-            "$comment": "Count of systems with these attributes (deduplication to shrink data size)",
             "type": "integer",
             "minimum": 1,
+            "description": "Count of systems with these attributes (deduplication to shrink data size)",
             "default": 1
+          },
+          "upstream": {
+            "type": "boolean",
+            "description": "Identifies the cluster hosting RMS itself"
           }
         },
-        "additionalProperties": true
-      }
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "arch",
+          "cpu",
+          "memory",
+          "count"
+        ]
+      },
+      "type": "array",
+      "description": "Active systems under management and their details; to be expanded"
     },
     "managedClusters": {
-      "type": "array",
       "items": {
-        "type": "object",
-        "required": ["nodes", "count"],
         "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "De-duplication of identical clusters"
+          },
           "nodes": {
             "type": "integer",
             "minimum": 0
           },
           "upstream": {
-            "$comment": "Identifies the cluster hosting RMS itself",
             "type": "boolean",
+            "description": "Identifies the cluster hosting RMS itself",
             "default": false
-          },
-          "count": {
-            "$comment": "De-duplication of identical clusters",
-            "type": "integer",
-            "minimum": 1
           }
-        }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "count",
+          "nodes"
+        ]
       },
-      "additionalProperties": true
+      "type": "array"
     },
     "timestamp": {
       "type": "string",
       "format": "date-time"
     }
   },
-  "required": ["version", "subscription", "managedSystems", "managedClusters", "timestamp"],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "subscription",
+    "managedSystems",
+    "managedClusters",
+    "timestamp"
+  ],
+  "title": "RMSSubscription"
 }

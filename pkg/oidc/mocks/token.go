@@ -41,33 +41,19 @@ func (m *MocksessionGetterRemover) EXPECT() *MocksessionGetterRemoverMockRecorde
 	return m.recorder
 }
 
-// Get mocks base method.
-func (m *MocksessionGetterRemover) Get(code string) (*session.Session, error) {
+// GetAndRemove mocks base method.
+func (m *MocksessionGetterRemover) GetAndRemove(code string) (*session.Session, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", code)
+	ret := m.ctrl.Call(m, "GetAndRemove", code)
 	ret0, _ := ret[0].(*session.Session)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get.
-func (mr *MocksessionGetterRemoverMockRecorder) Get(code any) *gomock.Call {
+// GetAndRemove indicates an expected call of GetAndRemove.
+func (mr *MocksessionGetterRemoverMockRecorder) GetAndRemove(code any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MocksessionGetterRemover)(nil).Get), code)
-}
-
-// Remove mocks base method.
-func (m *MocksessionGetterRemover) Remove(code string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Remove", code)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Remove indicates an expected call of Remove.
-func (mr *MocksessionGetterRemoverMockRecorder) Remove(code any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MocksessionGetterRemover)(nil).Remove), code)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAndRemove", reflect.TypeOf((*MocksessionGetterRemover)(nil).GetAndRemove), code)
 }
 
 // MocksigningKeyGetter is a mock of signingKeyGetter interface.

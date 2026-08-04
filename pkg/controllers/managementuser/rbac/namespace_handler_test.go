@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -626,6 +627,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 		currentRoles        []*rbacv1.ClusterRole
 		indexedPRTBs        []*v3.ProjectRoleTemplateBinding
 		projectNSAnnotation string
+		aggregationEnabled  bool
 		indexerError        error
 		updateError         error
 		createError         error
@@ -655,10 +657,34 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 			},
 			wantHasPRTBs: true,
 		},
+		{
+			name:                "aggregation enabled skips legacy binding creation",
+			projectNSAnnotation: "c-123xyz:p-123xyz",
+			aggregationEnabled:  true,
+			indexedRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+			},
+			indexedPRTBs: []*v3.ProjectRoleTemplateBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespaceName,
+						Name:      "test-prtb",
+					},
+					UserName:         "test-user",
+					ProjectName:      "test-cluster:test-project",
+					RoleTemplateName: "test-rt",
+				},
+			},
+			wantHasPRTBs: true,
+		},
 	}
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
+			prev := features.AggregatedRoleTemplates.Enabled()
+			features.AggregatedRoleTemplates.Set(test.aggregationEnabled)
+			t.Cleanup(func() { features.AggregatedRoleTemplates.Set(prev) })
+
 			crIndexer := &FakeResourceIndexer[*rbacv1.ClusterRole]{
 				resources: map[string][]*rbacv1.ClusterRole{
 					namespaceName: test.indexedRoles,
@@ -675,14 +701,18 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 			}
 
 			rtLister := wfakes.NewMockNonNamespacedCacheInterface[*v3.RoleTemplate](ctrl)
-			rtLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(name string) (*v3.RoleTemplate, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    "management.cattle.io",
-						Resource: "roletemplates",
-					}, name)
-				},
-			)
+			// When aggregation is enabled, the legacy binding creation loop is skipped,
+			// so the RoleTemplate lister is never consulted.
+			if !test.aggregationEnabled {
+				rtLister.EXPECT().Get(gomock.Any()).DoAndReturn(
+					func(name string) (*v3.RoleTemplate, error) {
+						return nil, apierrors.NewNotFound(schema.GroupResource{
+							Group:    "management.cattle.io",
+							Resource: "roletemplates",
+						}, name)
+					},
+				)
+			}
 			pGetter := wfakes.NewMockCacheInterface[*apisV3.Project](ctrl)
 			pGetter.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(namespace string, name string) (*v3.Project, error) {

@@ -20,7 +20,7 @@ package scheme
 
 import (
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	planv1alpha1 "github.com/rancher/rancher/pkg/apis/plan.cattle.io/v1alpha1"
+	operationv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	telemetryv1 "github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1"
@@ -37,7 +37,7 @@ var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	catalogv1.AddToScheme,
-	planv1alpha1.AddToScheme,
+	operationv1alpha1.AddToScheme,
 	provisioningv1.AddToScheme,
 	rkev1.AddToScheme,
 	telemetryv1.AddToScheme,

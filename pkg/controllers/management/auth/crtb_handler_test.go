@@ -69,9 +69,11 @@ var (
 )
 
 type crtbTestState struct {
-	clusterListerMock *fakes.ClusterListerMock
-	projectListerMock *fakes.ProjectListerMock
-	managerMock       *MockmanagerInterface
+	clusterListerMock    *fakes.ClusterListerMock
+	projectListerMock    *fakes.ProjectListerMock
+	managerMock          *MockmanagerInterface
+	roleBindingLister    *corefakes.RoleBindingListerMock
+	roleBindingInterface *corefakes.RoleBindingInterfaceMock
 }
 
 func TestReconcileBindings(t *testing.T) {
@@ -219,6 +221,10 @@ func TestReconcileBindings(t *testing.T) {
 				cts.managerMock.EXPECT().
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(errDefault)
+				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(false, nil).
+					AnyTimes()
 			},
 			wantError: true,
 			crtb:      defaultCRTB.DeepCopy(),
@@ -250,6 +256,9 @@ func TestReconcileBindings(t *testing.T) {
 				cts.managerMock.EXPECT().
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
+				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(false, nil)
 				cts.projectListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Project, error) {
 					return nil, errDefault
 				}
@@ -284,6 +293,9 @@ func TestReconcileBindings(t *testing.T) {
 				cts.managerMock.EXPECT().
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
+				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(false, nil)
 				cts.projectListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Project, error) {
 					p := defaultProject.DeepCopy()
 					return []*v3.Project{p}, nil
@@ -319,6 +331,9 @@ func TestReconcileBindings(t *testing.T) {
 				cts.managerMock.EXPECT().
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
+				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(false, nil)
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "test-project", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
@@ -356,6 +371,9 @@ func TestReconcileBindings(t *testing.T) {
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
 				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(false, nil)
+				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "test-project", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
 				cts.clusterListerMock.GetFunc = func(namespace, name string) (*v3.Cluster, error) {
@@ -392,6 +410,9 @@ func TestReconcileBindings(t *testing.T) {
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
 				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(false, nil)
+				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "c-ABC-p-XYZ", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
 				cts.clusterListerMock.GetFunc = func(namespace, name string) (*v3.Cluster, error) {
@@ -427,6 +448,9 @@ func TestReconcileBindings(t *testing.T) {
 				cts.managerMock.EXPECT().
 					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
+				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(false, nil)
 				// This should not be called
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "deleting-project", gomock.Any(), gomock.Any(), gomock.Any()).
@@ -465,6 +489,8 @@ func TestReconcileBindings(t *testing.T) {
 			crtbLifecycle.clusterLister = state.clusterListerMock
 			crtbLifecycle.projectLister = state.projectListerMock
 			crtbLifecycle.mgr = state.managerMock
+			crtbLifecycle.rbLister = state.roleBindingLister
+			crtbLifecycle.rbClient = state.roleBindingInterface
 			crtbLifecycle.s = mockStatus
 			conditions := []v1.Condition{}
 
@@ -695,11 +721,26 @@ func setupTest(t *testing.T) crtbTestState {
 	fakeManager := NewMockmanagerInterface(ctrl)
 	projectListerMock := fakes.ProjectListerMock{}
 	clusterListerMock := fakes.ClusterListerMock{}
+	roleBindingListerMock := corefakes.RoleBindingListerMock{}
+	roleBindingInterfaceMock := corefakes.RoleBindingInterfaceMock{}
+
+	// Default mock behavior for CRT token reader RoleBinding operations
+	// Tests can override if needed
+	roleBindingInterfaceMock.DeleteNamespacedFunc = func(namespace, name string, options *v1.DeleteOptions) error {
+		// Default: RoleBinding doesn't exist, no error on delete
+		return nil
+	}
+	roleBindingListerMock.GetFunc = func(namespace, name string) (*rbacv1.RoleBinding, error) {
+		// Default: RoleBinding doesn't exist
+		return nil, fmt.Errorf("rolebinding.rbac.authorization.k8s.io \"%s\" not found", name)
+	}
 
 	state := crtbTestState{
-		managerMock:       fakeManager,
-		clusterListerMock: &clusterListerMock,
-		projectListerMock: &projectListerMock,
+		managerMock:          fakeManager,
+		clusterListerMock:    &clusterListerMock,
+		projectListerMock:    &projectListerMock,
+		roleBindingLister:    &roleBindingListerMock,
+		roleBindingInterface: &roleBindingInterfaceMock,
 	}
 	return state
 }

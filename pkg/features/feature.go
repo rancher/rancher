@@ -98,15 +98,9 @@ var (
 		true,
 		true,
 		true)
-	RKE1CustomNodeCleanup = newFeature(
-		"rke1-custom-node-cleanup",
-		"Enable cleanup RKE1 custom cluster nodes when they are deleted",
-		true,
-		true,
-		true)
 	HarvesterBaremetalContainerWorkload = newFeature(
 		"harvester-baremetal-container-workload",
-		"[Experimental]: Deploy container workloads to underlying harvester cluster",
+		"Deploy container workloads to underlying harvester cluster",
 		false,
 		true,
 		true)
@@ -128,12 +122,6 @@ var (
 		true,
 		false,
 		true)
-	RKE1UI = newFeature(
-		"rke1-ui",
-		"Enable RKE1 provisioning in the Rancher UI",
-		true,
-		true,
-		true)
 	ProvisioningPreBootstrap = newFeature(
 		"provisioningprebootstrap",
 		"Support running pre-bootstrap workloads on downstream clusters",
@@ -148,8 +136,8 @@ var (
 		true)
 	AggregatedRoleTemplates = newFeature(
 		"aggregated-roletemplates",
-		"[Experimental] Make RoleTemplates use aggregation for generated RBAC roles",
-		false,
+		"Make RoleTemplates use aggregation for generated RBAC roles",
+		true,
 		true,
 		true)
 	ClusterAgentSchedulingCustomization = newFeature(
@@ -213,7 +201,7 @@ var (
 	ImportedDay2Ops = newFeature(
 		"imported-day-2-ops",
 		"Enable day 2 ops for imported clusters",
-		false,
+		true,
 		false,
 		true,
 	)
@@ -242,6 +230,13 @@ var (
 		"hide-local-auth-provider",
 		"Hide the local auth provider when one or more external auth providers are active",
 		false,
+		true,
+		true,
+	)
+	CRTTokenTTLRotation = newFeature(
+		"crt-token-ttl-rotation",
+		"Enable TTL-based automatic rotation of ClusterRegistrationToken credentials",
+		true,
 		true,
 		true,
 	)

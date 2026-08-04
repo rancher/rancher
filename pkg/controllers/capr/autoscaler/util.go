@@ -22,10 +22,7 @@ const (
 	autoscalerChartImagePullSecretName = "autoscaler-chart-image-pull-secret"
 )
 
-func helmOpSecretName(clusterName, clusterNamespace string) string {
-	if clusterNamespace == "fleet-default" {
-		return autoscalerHelmSecretResourceName
-	}
+func helmOpSecretName(clusterName string) string {
 	return name.SafeConcatName(autoscalerHelmSecretResourceName, clusterName)
 }
 

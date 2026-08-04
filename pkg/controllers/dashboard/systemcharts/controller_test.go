@@ -206,6 +206,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -323,6 +326,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"priorityClassName": priorityClassName,
 					"features": map[string]interface{}{
 						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+						"rancher-credential-translation": map[string]interface{}{
 							"enabled": true,
 						},
 					},
@@ -444,6 +450,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -533,6 +542,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"priorityClassName": priorityClassName,
 					"features": map[string]interface{}{
 						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+						"rancher-credential-translation": map[string]interface{}{
 							"enabled": true,
 						},
 					},
@@ -626,6 +638,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -716,6 +731,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -804,6 +822,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"priorityClassName": priorityClassName,
 					"features": map[string]interface{}{
 						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+						"rancher-credential-translation": map[string]interface{}{
 							"enabled": true,
 						},
 					},
@@ -947,6 +968,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -1060,6 +1084,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"priorityClassName": priorityClassName,
 					"features": map[string]interface{}{
 						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+						"rancher-credential-translation": map[string]interface{}{
 							"enabled": true,
 						},
 					},
@@ -1177,6 +1204,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -1262,6 +1292,9 @@ func Test_ChartInstallation(t *testing.T) {
 				expectedTurtlesValues := map[string]interface{}{
 					"features": map[string]interface{}{
 						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+						"rancher-credential-translation": map[string]interface{}{
 							"enabled": true,
 						},
 					},
@@ -1408,6 +1441,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -1548,6 +1584,9 @@ func Test_ChartInstallation(t *testing.T) {
 				expectedTurtlesValues := map[string]interface{}{
 					"features": map[string]interface{}{
 						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+						"rancher-credential-translation": map[string]interface{}{
 							"enabled": true,
 						},
 					},
@@ -1719,6 +1758,9 @@ func Test_ChartInstallation(t *testing.T) {
 						"no-cert-manager": map[string]interface{}{
 							"enabled": true,
 						},
+						"rancher-credential-translation": map[string]interface{}{
+							"enabled": true,
+						},
 					},
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
@@ -1843,6 +1885,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"priorityClassName": priorityClassName,
 					"features": map[string]interface{}{
 						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+						"rancher-credential-translation": map[string]interface{}{
 							"enabled": true,
 						},
 					},
@@ -2038,6 +2083,9 @@ func Test_TurtlesInstallation(t *testing.T) {
 			"no-cert-manager": map[string]interface{}{
 				"enabled": true,
 			},
+			"rancher-credential-translation": map[string]interface{}{
+				"enabled": true,
+			},
 		},
 		"global": map[string]interface{}{
 			"cattle": map[string]interface{}{
@@ -2106,6 +2154,9 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 		"priorityClassName": priorityClassName,
 		"features": map[string]interface{}{
 			"no-cert-manager": map[string]interface{}{
+				"enabled": true,
+			},
+			"rancher-credential-translation": map[string]interface{}{
 				"enabled": true,
 			},
 		},
