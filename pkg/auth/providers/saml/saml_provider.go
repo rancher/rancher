@@ -49,6 +49,7 @@ type Provider struct {
 	groupType       string
 	clientState     ClientState
 	ldapProvider    common.AuthProvider
+	userSearcher    *common.UserSearcher
 	sloEnabled      bool
 	sloForced       bool
 
@@ -68,6 +69,7 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 		name:           name,
 		userType:       name + "_user",
 		groupType:      name + "_group",
+		userSearcher:   common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 		assertionCache: newAssertionCache(),
 	}
 	provider.getSamlConfig = provider.getSamlConfigFromUnstructured
@@ -371,9 +373,13 @@ func (s *Provider) UsesUserSecrets() bool      { return false }
 func (s *Provider) CanRefreshPrincipals() bool { return s.name == ShibbolethName }
 
 // SearchPrincipals searches for a principal by name using LDAP if configured.
-// Otherwise it returns a "fake" principal of a requested type with the name as the searchKey.
+// Otherwise it returns the users Rancher already knows about whose display name
+// or username matches the searchKey, followed by a principal of the requested
+// type holding the searchKey itself.
 // If the principalType is empty, both user and group principals are returned.
-// This is done because SAML, in the absence of LDAP, doesn't have a user/group lookup mechanism.
+// This is done because SAML, in the absence of LDAP, doesn't have a user/group
+// lookup mechanism, so that last principal lets an admin enter an external ID by
+// hand for an identity Rancher has not seen yet.
 func (s *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	if s.hasLdapGroupSearch() {
 		principals, err := s.ldapProvider.SearchPrincipals(searchKey, principalType, token)
@@ -386,13 +392,19 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token acces
 	var principals []apiv3.Principal
 
 	if principalType != common.GroupPrincipalType {
-		principals = append(principals, apiv3.Principal{
+		fromSearchKey := apiv3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + searchKey},
 			DisplayName:   searchKey,
 			LoginName:     searchKey,
 			PrincipalType: common.UserPrincipalType,
 			Provider:      s.name,
-		})
+		}
+
+		users, err := common.PrincipalsWithFallback(s.userSearcher, s.name, searchKey, fromSearchKey)
+		if err != nil {
+			return nil, err
+		}
+		principals = append(principals, users...)
 	}
 
 	if principalType != common.UserPrincipalType {
