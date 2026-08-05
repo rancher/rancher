@@ -190,10 +190,17 @@ func (h *autoscalerHandler) ensureGlobalRoleBinding(cluster *capi.Cluster, usern
 }
 
 // ensureUserToken ensures a user token is available for the given cluster and username.
-// It first checks if a token already exists for the user. If found, it returns the existing token
-// in the format "username:token". If not found, it generates a new token with appropriate labels
-// and owner references, then creates it in the system.
-// Returns the token string in "username:token" format or an error if the operation fails.
+// It first checks if a token already exists for the user, considering both legacy
+// v3.Tokens and ext tokens (see https://github.com/rancher/rancher/issues/55242).
+// If a legacy token is found, it returns the existing token in the format
+// "username:token". If an ext token owned by the user already exists, creation of
+// a new legacy token is skipped and an empty string is returned - the caller
+// (setupRBAC) short-circuits kubeconfig regeneration in that case because
+// ensureKubeconfigSecretUsingTemplate already returns the persisted kubeconfig
+// secret if it exists. If neither exists, it generates a new legacy token with
+// appropriate labels and owner references, then creates it in the system.
+// Returns the token string in "username:token" format, an empty string when an
+// existing ext token was found, or an error if the operation fails.
 func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username string) (string, error) {
 	t, err := h.tokenCache.Get(username)
 	if err != nil && !errors.IsNotFound(err) {
@@ -203,6 +210,37 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 	// token already exists - so just return the token string.
 	if t != nil {
 		return fmt.Sprintf("%s:%s", username, t.Token), nil
+	}
+
+	// No legacy token was found. Before creating one, check whether an ext
+	// token already exists for the autoscaler user (for example, created by
+	// a future switch-over of the create path per #55244 / #55241). If so,
+	// leave it in place - but only when the persisted kubeconfig secret is
+	// already present, since that secret is the only place the ext token's
+	// bearer value is stored (ext tokens hash their secrets). Without an
+	// existing kubeconfig secret we cannot recover the bearer value, so we
+	// fall through to legacy token creation to keep the controller
+	// self-healing during the transitional period.
+	if h.extTokenStore != nil {
+		extList, err := h.extTokenStore.ListForUser(username)
+		if err != nil {
+			return "", fmt.Errorf("failed to list ext tokens for user %s: %w", username, err)
+		}
+		if extList != nil && len(extList.Items) > 0 {
+			_, secretErr := h.secretCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
+			if secretErr == nil {
+				// Ext token and its kubeconfig secret already exist;
+				// nothing to do. An empty tokenStr signals the caller
+				// that the persisted kubeconfig secret should be
+				// reused as-is.
+				return "", nil
+			}
+			if !errors.IsNotFound(secretErr) {
+				return "", fmt.Errorf("failed to check kubeconfig secret for cluster %s/%s: %w", cluster.Namespace, cluster.Name, secretErr)
+			}
+			// Kubeconfig secret is missing; fall through and create a
+			// legacy token so the caller can (re)build the kubeconfig.
+		}
 	}
 
 	token, err := generateToken(username, cluster.Name, ownerReference(cluster))
@@ -264,9 +302,10 @@ func (h *autoscalerHandler) ensureKubeconfigSecretUsingTemplate(cluster *capi.Cl
 }
 
 // cleanupRBAC removes all autoscaler-related RBAC resources for a given cluster.
-// It attempts to delete the user, global role, global role binding, token, and kubeconfig secret
-// associated with the cluster. The deletion is performed safely - it only deletes resources
-// that exist and collects any errors that occur during the process.
+// It attempts to delete the user, global role, global role binding, legacy and
+// ext tokens, and kubeconfig secret associated with the cluster. The deletion
+// is performed safely - it only deletes resources that exist and collects any
+// errors that occur during the process.
 // Returns a combined error if any deletions fail, or nil if all operations succeed.
 func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 	var errs []error
@@ -308,6 +347,23 @@ func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 		}
 	} else if !errors.IsNotFound(err) {
 		errs = append(errs, fmt.Errorf("failed to check existence of token for user %s: %w", userName, err))
+	}
+
+	// Delete any ext tokens owned by the autoscaler user. Ext tokens use
+	// generated names (unlike the legacy token whose name equals the user
+	// name), so we list-by-owner rather than look them up by name. See
+	// https://github.com/rancher/rancher/issues/55242.
+	if h.extTokenStore != nil {
+		extList, err := h.extTokenStore.ListForUser(userName)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to list ext tokens for user %s: %w", userName, err))
+		} else if extList != nil {
+			for _, extToken := range extList.Items {
+				if err := h.extTokenStore.Delete(extToken.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+					errs = append(errs, fmt.Errorf("failed to delete ext token %s for user %s: %w", extToken.Name, userName, err))
+				}
+			}
+		}
 	}
 
 	// Delete the kubeconfig secret if it exists

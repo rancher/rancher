@@ -12,8 +12,11 @@ import (
 	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/capr"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
@@ -40,6 +43,22 @@ type dynamicGetter interface {
 	Get(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error)
 }
 
+// extTokenStore defines the subset of the ext token system store used by the
+// autoscaler controller. It exists so that the store can be mocked in unit
+// tests without pulling in the full *exttokenstore.SystemStore. The real
+// implementation is *exttokenstore.SystemStore, constructed in Register via
+// exttokenstore.NewSystemFromWrangler.
+type extTokenStore interface {
+	// Fetch resolves a token by ID, checking both legacy and ext token
+	// stores. It returns an accessor.TokenAccessor so callers can treat
+	// legacy and ext tokens uniformly.
+	Fetch(tokenID string) (accessor.TokenAccessor, error)
+	// ListForUser returns all ext tokens owned by the given user.
+	ListForUser(userName string) (*ext.TokenList, error)
+	// Delete removes an ext token by name.
+	Delete(name string, options *metav1.DeleteOptions) error
+}
+
 type autoscalerHandler struct {
 	capiClusterCache           v1beta2.ClusterCache
 	capiMachineCache           v1beta2.MachineCache
@@ -59,6 +78,13 @@ type autoscalerHandler struct {
 
 	tokenClient mgmtcontrollers.TokenClient
 	tokenCache  mgmtcontrollers.TokenCache
+
+	// extTokenStore provides read/delete access to ext tokens
+	// (pkg/ext/stores/tokens). It is used alongside tokenClient/tokenCache
+	// so the controller recognizes and cleans up both legacy and ext
+	// tokens. Creation of ext tokens is deferred to sibling issues
+	// (#55244, #55241).
+	extTokenStore extTokenStore
 
 	secretClient wranglerv1.SecretClient
 	secretCache  wranglerv1.SecretCache
@@ -90,6 +116,8 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 		tokenClient: clients.Mgmt.Token(),
 		tokenCache:  clients.Mgmt.Token().Cache(),
+
+		extTokenStore: exttokenstore.NewSystemFromWrangler(clients.Context),
 
 		secretClient: clients.Core.Secret(),
 		secretCache:  clients.Core.Secret().Cache(),
@@ -285,6 +313,20 @@ func (h *autoscalerHandler) setupRBAC(capiCluster *capi.Cluster, mds []*capi.Mac
 	if err != nil {
 		logrus.Errorf("[autoscaler] Failed to create token for user %s: %v", user.Username, err)
 		return nil, err
+	}
+
+	// An empty tokenStr means ensureUserToken found an existing ext token
+	// for the autoscaler user and a persisted kubeconfig secret is already
+	// in place. In that case simply reuse the existing secret rather than
+	// (re)generating a kubeconfig with a value we cannot recover from the
+	// hashed ext token.
+	if tokenStr == "" {
+		kubeconfig, err := h.secretCache.Get(capiCluster.Namespace, kubeconfigSecretName(capiCluster))
+		if err != nil {
+			logrus.Errorf("[autoscaler] Failed to get existing kubeconfig secret for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
+			return nil, err
+		}
+		return kubeconfig, nil
 	}
 
 	kubeconfig, err := h.ensureKubeconfigSecretUsingTemplate(capiCluster, tokenStr)
