@@ -57,6 +57,43 @@ spec:
                         for verifying the endpoint's certificate. Do not use this with InsecureSkipTLSVerify.
                       maxLength: 100000
                       type: string
+                    clientCertificate:
+                      description: |-
+                        ClientCertificate references a Kubernetes Secret containing client certificate and key
+                        for mutual TLS (mTLS) authentication. The secret must be in the same namespace as the
+                        ProxyEndpoint. The secret must contain "tls.crt" and "tls.key" fields with PEM-encoded
+                        certificate and private key respectively.
+                      properties:
+                        name:
+                          description: Name is the name of the secret object.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    serverName:
+                      description: |-
+                        ServerName is the SNI (Server Name Indication) hostname to use during the TLS handshake.
+                        If not specified, the domain hostname is used. This is useful when the endpoint domain
+                        does not match the certificate's CN or SAN fields.
+                      maxLength: 253
+                      type: string
+                    tlsVerificationOptions:
+                      description: |-
+                        TLSVerificationOptions controls certificate verification behavior.
+                      properties:
+                        verifyExpiration:
+                          default: true
+                          description: |-
+                            VerifyExpiration controls whether the certificate's validity period is checked.
+                            Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
+                          type: boolean
+                        verifyHostname:
+                          default: true
+                          description: |-
+                            VerifyHostname controls whether the certificate's hostname matches the connection hostname.
+                            Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
+                          type: boolean
+                      type: object
                     credentialInjection:
                       description: |-
                         CredentialInjection defines how credentials are applied to proxied requests for this domain.
