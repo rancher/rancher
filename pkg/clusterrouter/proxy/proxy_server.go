@@ -250,7 +250,8 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		req.URL.Scheme = "https"
 	}
 
-	req.URL.Host = req.Host
+	req.URL.Host = u.Host
+	req.Host = u.Host
 	transport, err := r.getTransport()
 	if err != nil {
 		er.Error(rw, req, err)
