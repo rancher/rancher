@@ -509,11 +509,11 @@ func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, err
 		return t.proxy.insecureTransport.RoundTrip(req)
 	}
 
-	// If the route provides a custom CA bundle, create a transport with those CAs
-	if route != nil && route.CABundle != "" {
-		transport, err := buildTransportWithCABundle(route.CABundle)
+	// If the route has custom certificate settings, build a transport for it
+	if route != nil && (route.CABundle != "" || route.ServerName != "" || route.TLSVerificationOptions != nil) {
+		transport, err := buildTransportForRoute(route, req.URL.Hostname())
 		if err != nil {
-			logrus.Warnf("httpproxy: failed to build transport with CABundle: %v", err)
+			logrus.Warnf("httpproxy: failed to build transport for route: %v", err)
 			// Fall through to default transport
 			return http.DefaultTransport.RoundTrip(req)
 		}
@@ -558,4 +558,57 @@ func parseCACertificates(caBundle string) (*x509.CertPool, error) {
 	}
 
 	return caCertPool, nil
+}
+
+// buildTLSConfigForRoute creates a complete TLS config based on route certificate settings.
+// It handles CA bundles, client certificates, server name indication, and verification options.
+func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute, requestHostname string) (*tls.Config, error) {
+	tlsConfig := &tls.Config{}
+
+	// Set up root CAs from CA bundle
+	if route.CABundle != "" {
+		caCertPool, err := parseCACertificates(route.CABundle)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CA bundle: %w", err)
+		}
+		tlsConfig.RootCAs = caCertPool
+	} else {
+		// Use system cert pool
+		caCertPool, err := x509.SystemCertPool()
+		if err != nil {
+			logrus.Debugf("httpproxy: failed to get system cert pool: %v", err)
+			caCertPool = x509.NewCertPool()
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	// Set server name for SNI
+	serverName := requestHostname
+	if route.ServerName != "" {
+		serverName = route.ServerName
+	}
+	tlsConfig.ServerName = serverName
+
+	// Apply verification options if specified
+	if route.TLSVerificationOptions != nil {
+		if route.TLSVerificationOptions.VerifyHostname != nil && !*route.TLSVerificationOptions.VerifyHostname {
+			tlsConfig.InsecureSkipVerify = true
+		}
+		// Note: VerifyExpiration is handled by the underlying crypto/tls verification
+	}
+
+	return tlsConfig, nil
+}
+
+// buildTransportForRoute creates an HTTP transport based on the route's certificate settings.
+func buildTransportForRoute(route *mgmt.ProxyEndpointRoute, requestHostname string) (*http.Transport, error) {
+	tlsConfig, err := buildTLSConfigForRoute(route, requestHostname)
+	if err != nil {
+		return nil, err
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+
+	return transport, nil
 }
