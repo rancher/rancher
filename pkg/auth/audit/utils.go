@@ -86,14 +86,30 @@ func matchesAny(s string, regexes []*regexp.Regexp) bool {
 func parsePaths(paths []string) ([]*jsonpath.JSONPath, error) {
 	compiled := make([]*jsonpath.JSONPath, len(paths))
 	for i, v := range paths {
-		jp, err := jsonpath.Parse(v)
+		jp, err := safeParseJSONPath(v)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse jsonpath: %w", err)
+			return nil, fmt.Errorf("failed to parse jsonpath %q: %w", v, err)
 		}
 		compiled[i] = jp
 	}
 
 	return compiled, nil
+}
+
+// safeParseJSONPath parses a JSONPath expression, recovering from any panic
+// in the underlying parser and returning it as an error. The upstream parser
+// can panic on malformed input such as unterminated subscripts (for example,
+// "$['testing'][5:"); converting the panic to an error allows the audit
+// policy controller to mark the policy invalid instead of crashing.
+func safeParseJSONPath(expr string) (jp *jsonpath.JSONPath, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			jp = nil
+			err = fmt.Errorf("invalid jsonpath expression: %v", r)
+		}
+	}()
+
+	return jsonpath.Parse(expr)
 }
 
 func pairMatches(v any, f func(string, any) bool) bool {
