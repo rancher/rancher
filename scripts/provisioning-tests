@@ -123,7 +123,7 @@ fi
 
 # Fallback: use the latest release for this $DIST from KDM data.json
 if [ -z "${SOME_K8S_VERSION}" ]; then
-  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/release-v2.14/data/data.json | jq -r ".$DIST.releases[-1].version")
+  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.14/data/data.json | jq -r ".$DIST.releases[-1].version")
   echo "Resolved ${DIST} to latest version ${SOME_K8S_VERSION}"
 fi
 
