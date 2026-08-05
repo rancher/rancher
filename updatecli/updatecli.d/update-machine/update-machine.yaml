@@ -46,6 +46,9 @@ sources:
     name: 'Get requested or latest upstream Rancher Machine version'
     kind: shell
     spec:
+      environments:
+        # pass through the var we need in order to make it available in the shell snippet below
+        - name: 'MACHINE_RELEASE_TAG'
       command: |
         if [ -n "${MACHINE_RELEASE_TAG}" ]; then
           if ! git check-ref-format --allow-onelevel "refs/tags/${MACHINE_RELEASE_TAG}"; then
