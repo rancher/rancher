@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	bootstrapFleet = map[string]interface{}{
+	bootstrapFleet = map[string]any{
 		"bundles.fleet.cattle.io":       fleetv1alpha1api.Bundle{},
 		"clusters.fleet.cattle.io":      fleetv1alpha1api.Cluster{},
 		"clustergroups.fleet.cattle.io": fleetv1alpha1api.ClusterGroup{},
@@ -41,18 +41,6 @@ func FeatureCRD() crd.CRD {
 
 func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 	result := []crd.CRD{
-		// source: https://github.com/rancher/system-upgrade-controller/blob/v0.15.2/pkg/upgrade/plan/plan.go#L53-L70
-		newCRD(v1.Plan{}, func(c crd.CRD) crd.CRD {
-			c.GVK.Kind = "Plan"
-			c.GVK.Group = "upgrade.cattle.io"
-			c.GVK.Version = "v1"
-			return c.
-				WithStatus().
-				WithCategories("upgrade").
-				WithColumn("Image", ".spec.upgrade.image").
-				WithColumn("Channel", ".spec.channel").
-				WithColumn("Version", ".spec.version")
-		}),
 		newCRD(&uiv1.NavLink{}, func(c crd.CRD) crd.CRD {
 			c.Status = false
 			c.NonNamespace = true
@@ -120,6 +108,11 @@ func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 		}),
 	}
 
+	result, err = planBootstrap(result, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	if features.Fleet.Enabled() {
 		result = append(result, crd.CRD{
 			SchemaObject: v3.FleetWorkspace{},
@@ -183,6 +176,43 @@ func fleetBootstrap(crds []crd.CRD, cfg *rest.Config) ([]crd.CRD, error) {
 	return crds, nil
 }
 
+// planBootstrap creates plans.upgrade.cattle.io CRD only when it is absent so Rancher does not
+// overwrite an existing SUC-managed CRD schema.
+func planBootstrap(crds []crd.CRD, cfg *rest.Config) ([]crd.CRD, error) {
+	planCRD := newCRD(v1.Plan{}, func(c crd.CRD) crd.CRD {
+		c.GVK.Kind = "Plan"
+		c.GVK.Group = "upgrade.cattle.io"
+		c.GVK.Version = "v1"
+		return c.
+			WithStatus().
+			WithCategories("upgrade").
+			WithColumn("Image", ".spec.upgrade.image").
+			WithColumn("Channel", ".spec.channel").
+			WithColumn("Version", ".spec.version")
+	})
+
+	// Keep current test behavior when cfg is intentionally nil.
+	if cfg == nil {
+		return append(crds, planCRD), nil
+	}
+
+	f, err := apiextensions.NewFactoryFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = f.Apiextensions().V1().CustomResourceDefinition().Get("plans.upgrade.cattle.io", metav1.GetOptions{})
+	if err == nil {
+		// no need to create if the CRD exists
+		return crds, nil
+	}
+	if !apierror.IsNotFound(err) {
+		return nil, err
+	}
+
+	return append(crds, planCRD), nil
+}
+
 func Webhooks() []runtime.Object {
 	if features.ProvisioningV2.Enabled() {
 		return provisioningv2.Webhooks()
@@ -225,7 +255,7 @@ func Create(ctx context.Context, cfg *rest.Config) error {
 	return factory.BatchCreateCRDs(ctx, crds...).BatchWait()
 }
 
-func newCRD(obj interface{}, customize func(crd.CRD) crd.CRD) crd.CRD {
+func newCRD(obj any, customize func(crd.CRD) crd.CRD) crd.CRD {
 	crd := crd.CRD{
 		SchemaObject: obj,
 	}
