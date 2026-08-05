@@ -94,7 +94,7 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 	assert.Len(t, phase1Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase1Identity.PlanRoles, 1)
 	assert.Len(t, phase1Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentInstallPlan(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, importedIdentityWaitTimeout)
 	t.Logf("phase 1 identity: %s", summarizeImportedPlanIdentity(phase1Identity))
 
 	waitForSystemAgentActiveState(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, true, importedSystemAgentTransitionTimeout)
@@ -146,7 +146,7 @@ func Test_Imported_Operation_SetD_ImportedDisableSingleNode(t *testing.T) {
 	assert.Len(t, phase3Identity.PlanTokenSecrets, 1)
 	assert.Len(t, phase3Identity.PlanRoles, 1)
 	assert.Len(t, phase3Identity.PlanRoleBindings, 1)
-	waitForDownstreamSystemAgentPlanUninstallMode(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, "false", importedIdentityWaitTimeout)
+	waitForDownstreamSystemAgentInstallPlan(t, clients, fixture.ns.Name, fixture.pods[0].Name, kubectlEnv, importedIdentityWaitTimeout)
 	t.Logf("phase 3 identity: %s", summarizeImportedPlanIdentity(phase3Identity))
 
 	newMachinePlanSecretName := phase3Identity.MachinePlanSecrets[0].Name
@@ -206,10 +206,10 @@ func assertImportedDay2OpsFeatureEnabled(t *testing.T, clients *clients.Clients)
 	}
 }
 
-func waitForDownstreamSystemAgentPlanUninstallMode(
+func waitForDownstreamSystemAgentInstallPlan(
 	t *testing.T,
 	clients *clients.Clients,
-	namespace, podName, kubectlEnv, expectedUninstall string,
+	namespace, podName, kubectlEnv string,
 	timeout time.Duration,
 ) {
 	t.Helper()
@@ -248,14 +248,13 @@ func waitForDownstreamSystemAgentPlanUninstallMode(
 			lastUninstallValue = strings.TrimSpace(strings.TrimPrefix(line, "UNINSTALL="))
 		}
 
-		return lastUninstallCount == 1 && lastUninstallValue == expectedUninstall, nil
+		return lastUninstallCount == 1 && lastUninstallValue == "false", nil
 	})
 	if err != nil {
 		planState := dumpDownstreamSystemAgentPlanState(clients, namespace, podName, kubectlEnv)
 		t.Fatalf(
-			"timed out waiting for downstream plan %s UNINSTALL=%s exactly once on pod %s/%s: %v (lastUninstallCount=%d lastUninstallValue=%q lastErr=%v output=%q planState=%q)",
+			"timed out waiting for downstream install plan %s with UNINSTALL=false exactly once on pod %s/%s: %v (lastUninstallCount=%d lastUninstallValue=%q lastErr=%v output=%q planState=%q)",
 			systemAgentUpgraderPlanName,
-			expectedUninstall,
 			namespace,
 			podName,
 			err,
