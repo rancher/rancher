@@ -70,6 +70,17 @@ func (h *handler) OnMachineChange(key string, machine *capi.Machine) (*capi.Mach
 		return machine, nil
 	}
 
+	// Only reconcile machines whose cluster is backed by an RKE control plane.
+	capiCluster, err := h.capiClusterCache.Get(machine.Namespace, clusterName)
+	if err != nil {
+		return machine, fmt.Errorf("failed to get CAPI cluster %s/%s: %w", machine.Namespace, clusterName, err)
+	}
+
+	if !capiCluster.Spec.ControlPlaneRef.IsDefined() ||
+		capiCluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup {
+		return machine, nil
+	}
+
 	// Check infrastructure ready before checking NodeRef
 	if !capr.InfrastructureReady.IsTrue(machine) {
 		logrus.Tracef("[%s] machine %s/%s: infrastructure not ready, skipping",
