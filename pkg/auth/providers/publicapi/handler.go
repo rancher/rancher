@@ -66,6 +66,7 @@ var authProviderTypes = []string{
 	v3public.KeyCloakProviderType,
 	v3public.OKTAProviderType,
 	v3public.ShibbolethProviderType,
+	v3public.GenericSAMLProviderType,
 	v3public.GoogleOAuthProviderType,
 	v3public.OIDCProviderType,
 	v3public.KeyCloakOIDCProviderType,

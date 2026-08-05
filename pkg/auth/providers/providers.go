@@ -49,11 +49,12 @@ var (
 
 	// samlProviders lists all SAML provider names. Used to look up the provider based on the type.
 	samlProviders = map[string]bool{
-		saml.PingName:       true,
-		saml.ADFSName:       true,
-		saml.KeyCloakName:   true,
-		saml.OKTAName:       true,
-		saml.ShibbolethName: true,
+		saml.PingName:        true,
+		saml.ADFSName:        true,
+		saml.KeyCloakName:    true,
+		saml.OKTAName:        true,
+		saml.ShibbolethName:  true,
+		saml.GenericSAMLName: true,
 	}
 )
 
@@ -107,6 +108,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[saml.KeyCloakName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.KeyCloakName)
 	providers[saml.OKTAName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.OKTAName)
 	providers[saml.ShibbolethName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.ShibbolethName)
+	providers[saml.GenericSAMLName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.GenericSAMLName)
 	providers[googleoauth.Name] = googleoauth.Configure(mgmt, userMGR, tokenMGR)
 	providers[oidc.Name] = oidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	providers[keycloakoidc.Name] = keycloakoidc.Configure(ctx, mgmt, userMGR, tokenMGR)
