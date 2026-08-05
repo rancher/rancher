@@ -3,8 +3,13 @@ name: GitHub Actions Security Analysis with zizmor 🌈
 on:
   push:
     branches: ["main", "release/v*"]
-  pull_request:
-    branches: ["**"]
+  # TEMPORARY: pull_request trigger disabled on this CI-test-only branch to
+  # avoid burning runner resources on jobs unrelated to the cache
+  # benchmark this PR exists for. Restore before this branch is used for
+  # anything real -- see the same marker in controller-test.yml,
+  # validate.yml, and verify-generated-code-changes.yml.
+  # pull_request:
+  #   branches: ["**"]
 
 permissions: {}
 

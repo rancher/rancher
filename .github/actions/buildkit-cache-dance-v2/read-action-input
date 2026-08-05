@@ -1,0 +1,13 @@
+#!/usr/bin/env node
+// helper script for printing kebab-cased env vars.
+// e.g., "foo-bar" -> "INPUT_FOO-BAR".
+//
+// This does not need to be implemented in nodejs,
+// but reimplementing this in sh is hard.
+
+const arg = process.argv[2]; // Equates to "$1" in sh
+const k = "INPUT_" + arg.toUpperCase();
+const v = process.env[k];
+if ( v !== undefined ) {
+  console.log(v);
+}

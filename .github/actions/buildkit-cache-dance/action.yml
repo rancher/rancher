@@ -1,0 +1,37 @@
+name: Inject/Extract Cache
+description: "Injects the cached data into the docker build(x|kit) process"
+inputs:
+  cache-map:
+    description: "The map of actions source paths to container destination paths or mount arguments. If not provided, the Dockerfile will be used to determine the cache paths."
+  dockerfile:
+    description: "The Dockerfile to use for auto-discovery of the cache-map. Default: `Dockerfile`"
+    default: "Dockerfile"
+  cache-dir:
+    description: "The root directory where cache content is injected from/extracted to when using auto-discovery of the cache-map. If not provided, each cache mount `target` will be used as a source path."
+    default: ""
+  cache-source:
+    deprecationMessage: "Use `cache-map` instead"
+    description: "Where the cache is stored in the calling workspace. Default: `cache`"
+  cache-target:
+    deprecationMessage: "Use `cache-map` instead"
+    description: "Where the cache is stored in the docker container. Default: `/root/.cache/go-build`"
+  scratch-dir:
+    default: scratch
+    description: "Where the action is stores some temporary files for its processing. Default: `scratch`"
+  skip-extraction:
+    default: "false"
+    description: "Skip the extraction of the cache from the docker container"
+  save-always:
+    default: "false"
+    description: "Run the post step to save the cache even if another step before fails"
+  utility-image:
+    default: "ghcr.io/containerd/busybox:latest"
+    description: "The container image to use for injecting and extracting the cache"
+  builder:
+    default: ""
+    description: "The name of the buildx builder to use. If not specified, the currently active builder is used."
+runs:
+  using: 'node24'
+  main: 'dist/index.js'
+  post: 'dist/index.js'
+  post-if: 'success() || github.event.inputs.save-always'
