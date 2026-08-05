@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/stretchr/testify/require"
 )
 

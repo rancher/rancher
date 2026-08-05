@@ -9,14 +9,14 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/norman/types"
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/generated/compose"
 	provisioningcontrollerv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/user"
 )

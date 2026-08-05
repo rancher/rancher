@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/norman/httperror"
-	"github.com/rancher/rancher/pkg/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/sirupsen/logrus"
 )
 

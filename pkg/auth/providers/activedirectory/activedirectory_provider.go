@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
-	"github.com/rancher/rancher/pkg/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -16,6 +15,7 @@ import (
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"

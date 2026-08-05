@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	objectclient "github.com/rancher/rancher/pkg/norman/objectclient"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	objectclient "github.com/rancher/rancher/pkg/norman/objectclient"
 	gomock "go.uber.org/mock/gomock"
 	v10 "k8s.io/api/rbac/v1"
 	v11 "k8s.io/apimachinery/pkg/apis/meta/v1"

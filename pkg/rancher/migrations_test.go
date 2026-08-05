@@ -227,7 +227,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 type extDeletionStub struct {
 	count int
 	t     *testing.T
-	err error
+	err   error
 }
 
 func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {

@@ -1,10 +1,10 @@
 package schema
 
 import (
+	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/norman/types/convert"
 	m "github.com/rancher/rancher/pkg/norman/types/mapper"
-	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	v1 "k8s.io/api/core/v1"
 )
 

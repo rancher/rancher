@@ -1,10 +1,10 @@
 package pod
 
 import (
-	"github.com/rancher/rancher/pkg/norman/store/transform"
-	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/store/transform"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/client-go/tools/cache"

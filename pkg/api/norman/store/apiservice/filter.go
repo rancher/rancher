@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/norman/types"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

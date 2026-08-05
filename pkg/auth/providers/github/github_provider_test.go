@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher/pkg/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/norman/types"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

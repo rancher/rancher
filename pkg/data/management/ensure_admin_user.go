@@ -7,10 +7,10 @@ import (
 
 	"github.com/moby/sys/reexec"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/wrangler"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/urfave/cli"

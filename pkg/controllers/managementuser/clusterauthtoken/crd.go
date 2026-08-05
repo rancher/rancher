@@ -3,10 +3,10 @@ package clusterauthtoken
 import (
 	"context"
 
-	"github.com/rancher/rancher/pkg/norman/store/crd"
-	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	"github.com/rancher/rancher/pkg/norman/store/crd"
+	"github.com/rancher/rancher/pkg/norman/types"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/client-go/rest"

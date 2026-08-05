@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/norman/types"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

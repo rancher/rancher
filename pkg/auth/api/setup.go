@@ -4,10 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	normanapi "github.com/rancher/rancher/pkg/norman/api"
-	"github.com/rancher/rancher/pkg/norman/pkg/subscribe"
-	"github.com/rancher/rancher/pkg/norman/store/crd"
-	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/auth/api/user"
 	"github.com/rancher/rancher/pkg/auth/principals"
@@ -17,6 +13,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	normanapi "github.com/rancher/rancher/pkg/norman/api"
+	"github.com/rancher/rancher/pkg/norman/pkg/subscribe"
+	"github.com/rancher/rancher/pkg/norman/store/crd"
+	"github.com/rancher/rancher/pkg/norman/types"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )

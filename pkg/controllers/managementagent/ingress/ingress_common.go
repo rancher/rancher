@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	"github.com/rancher/rancher/pkg/ingresswrapper"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"

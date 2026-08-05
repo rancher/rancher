@@ -3,9 +3,9 @@ package schema
 import (
 	"net/http"
 
+	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/norman/types"
 	m "github.com/rancher/rancher/pkg/norman/types/mapper"
-	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/schemas/factory"
 	"github.com/rancher/rancher/pkg/schemas/mapper"
 	appsv1 "k8s.io/api/apps/v1"

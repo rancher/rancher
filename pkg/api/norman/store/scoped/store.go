@@ -3,11 +3,11 @@ package scoped
 import (
 	"strings"
 
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/norman/store/transform"
 	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/norman/types/convert"
-	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
 type Store struct {

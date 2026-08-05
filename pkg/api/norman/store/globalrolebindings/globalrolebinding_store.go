@@ -1,10 +1,10 @@
 package grbstore
 
 import (
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/norman/types/values"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

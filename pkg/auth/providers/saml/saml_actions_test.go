@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/crewjam/saml"
-	"github.com/rancher/rancher/pkg/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

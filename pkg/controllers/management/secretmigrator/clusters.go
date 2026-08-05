@@ -8,8 +8,8 @@ import (
 	"github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/namespace"
 
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"

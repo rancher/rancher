@@ -3,11 +3,6 @@ package managementstored
 import (
 	"context"
 
-	"github.com/rancher/rancher/pkg/norman/store/crd"
-	"github.com/rancher/rancher/pkg/norman/store/proxy"
-	"github.com/rancher/rancher/pkg/norman/store/subtype"
-	"github.com/rancher/rancher/pkg/norman/store/transform"
-	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/api/norman/customization/authn"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"
@@ -41,6 +36,11 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/norman/store/crd"
+	"github.com/rancher/rancher/pkg/norman/store/proxy"
+	"github.com/rancher/rancher/pkg/norman/store/subtype"
+	"github.com/rancher/rancher/pkg/norman/store/transform"
+	"github.com/rancher/rancher/pkg/norman/types"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"

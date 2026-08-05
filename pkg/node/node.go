@@ -3,9 +3,9 @@ package node
 import (
 	"fmt"
 
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"github.com/rancher/rancher/pkg/settings"
 	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"

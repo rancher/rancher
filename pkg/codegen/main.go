@@ -5,8 +5,8 @@ import (
 	"os"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/codegen/generator"
+	"github.com/rancher/rancher/pkg/norman/types"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/schemas/factory"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"

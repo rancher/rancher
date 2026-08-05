@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
@@ -15,6 +14,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"

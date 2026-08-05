@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	errorsutil "github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/norman/types"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/cache"

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	authzv1 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/rancher/rancher/pkg/types/config"
 	"gopkg.in/check.v1"
 	rbacv1 "k8s.io/api/rbac/v1"

@@ -13,7 +13,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-	normanStoreProxy "github.com/rancher/rancher/pkg/norman/store/proxy"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	steveapi "github.com/rancher/rancher/pkg/api/steve"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
@@ -47,6 +46,7 @@ import (
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/namespace"
+	normanStoreProxy "github.com/rancher/rancher/pkg/norman/store/proxy"
 	"github.com/rancher/rancher/pkg/scc"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"

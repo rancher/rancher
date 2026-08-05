@@ -3,9 +3,9 @@ package rbac
 import (
 	"fmt"
 
-	"github.com/rancher/rancher/pkg/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"

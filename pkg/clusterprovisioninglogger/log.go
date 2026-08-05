@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/norman/condition"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/logstream"
+	"github.com/rancher/rancher/pkg/norman/condition"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 	corev1 "k8s.io/api/core/v1"

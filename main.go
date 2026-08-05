@@ -10,10 +10,10 @@ import (
 
 	"github.com/ehazlett/simplelog"
 	"github.com/moby/sys/reexec"
-	_ "github.com/rancher/rancher/pkg/norman/controller"
-	"github.com/rancher/rancher/pkg/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/logserver"
+	_ "github.com/rancher/rancher/pkg/norman/controller"
+	"github.com/rancher/rancher/pkg/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/pkg/rancher"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/v3/pkg/signals"

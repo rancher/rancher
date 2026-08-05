@@ -8,11 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/rancher/rancher/pkg/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/condition"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"

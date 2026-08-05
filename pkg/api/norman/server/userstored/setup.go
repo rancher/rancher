@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rancher/rancher/pkg/norman/store/subtype"
-	"github.com/rancher/rancher/pkg/norman/types"
 	namespacecustom "github.com/rancher/rancher/pkg/api/norman/customization/namespace"
 	"github.com/rancher/rancher/pkg/api/norman/customization/persistentvolumeclaim"
 	sec "github.com/rancher/rancher/pkg/api/norman/customization/secret"
@@ -26,6 +24,8 @@ import (
 	clusterClient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/norman/store/subtype"
+	"github.com/rancher/rancher/pkg/norman/types"
 	clusterschema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"

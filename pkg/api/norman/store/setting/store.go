@@ -5,12 +5,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/api/norman/customization/setting"
 	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/norman/store/transform"
 	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"github.com/rancher/rancher/pkg/norman/types/slice"
-	"github.com/rancher/rancher/pkg/api/norman/customization/setting"
 	"github.com/rancher/rancher/pkg/settings"
 )
 

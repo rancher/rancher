@@ -3,12 +3,12 @@ package k8slookup
 import (
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/norman/api/access"
-	"github.com/rancher/rancher/pkg/norman/httperror"
-	"github.com/rancher/rancher/pkg/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/api/access"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )

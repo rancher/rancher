@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/norman/api/access"
 	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/norman/types"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 )
 
 func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {

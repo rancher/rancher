@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"github.com/rancher/rancher/pkg/types/config"
 	k8sappv1 "k8s.io/api/apps/v1"
 	corebatchv1 "k8s.io/api/batch/v1"

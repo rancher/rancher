@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	azuread "github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/norman/objectclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierror "k8s.io/apimachinery/pkg/api/errors"

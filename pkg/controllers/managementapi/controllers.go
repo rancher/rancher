@@ -3,11 +3,11 @@ package managementapi
 import (
 	"context"
 
-	normanapi "github.com/rancher/rancher/pkg/norman/api"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	v3cluster "github.com/rancher/rancher/pkg/controllers/management/cluster"
+	normanapi "github.com/rancher/rancher/pkg/norman/api"
 
 	"github.com/rancher/rancher/pkg/controllers/managementapi/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/samlconfig"

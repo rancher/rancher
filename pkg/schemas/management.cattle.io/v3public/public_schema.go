@@ -3,8 +3,8 @@ package schema
 import (
 	"net/http"
 
-	"github.com/rancher/rancher/pkg/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/schemas/factory"
 )
 

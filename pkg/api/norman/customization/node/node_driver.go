@@ -10,12 +10,12 @@ import (
 	"encoding/json"
 
 	"github.com/ghodss/yaml"
-	"github.com/rancher/rancher/pkg/norman/api/access"
-	"github.com/rancher/rancher/pkg/norman/types"
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/generated/compose"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/api/access"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

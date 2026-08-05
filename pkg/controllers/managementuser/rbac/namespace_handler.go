@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/norman/types/convert"
-	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
@@ -16,6 +14,8 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"

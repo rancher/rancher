@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/norman/store/proxy"
 	"github.com/rancher/rancher/pkg/norman/types"
-	"github.com/rancher/rancher/pkg/api/scheme"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"

@@ -5,11 +5,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/norman/api/access"
-	"github.com/rancher/rancher/pkg/norman/types"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubeconfig"
+	"github.com/rancher/rancher/pkg/norman/api/access"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/settings"
 	"k8s.io/apimachinery/pkg/labels"
 )

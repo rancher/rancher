@@ -3,9 +3,9 @@ package resourcequota
 import (
 	"encoding/json"
 
-	"github.com/rancher/rancher/pkg/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/norman/types/convert"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/resourcequota"
 	corev1 "k8s.io/api/core/v1"

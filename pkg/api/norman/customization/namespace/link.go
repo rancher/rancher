@@ -3,9 +3,9 @@ package namespace
 import (
 	"strings"
 
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/norman/httperror"
 	"github.com/rancher/rancher/pkg/norman/types"
-	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/resourcelink"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
