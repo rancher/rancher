@@ -36,6 +36,33 @@ const (
 	RotateStepHookLabelPrefix = "rotate.step.hook.operation.cattle.io/"
 )
 
+var supportedCertificateRotationServices = map[string]struct{}{
+	"admin":              {},
+	"api-server":         {},
+	"auth-proxy":         {},
+	"cloud-controller":   {},
+	"controller-manager": {},
+	"etcd":               {},
+	"k3s-controller":     {},
+	"k3s-server":         {},
+	"kubelet":            {},
+	"kube-proxy":         {},
+	"rke2-controller":    {},
+	"rke2-server":        {},
+	"scheduler":          {},
+}
+
+type certificateRotationComponentSettingsProvider interface {
+	// CertificateRotationComponentTLSSettings returns an explicitly configured
+	// controller-manager or scheduler serving certificate for this node. The
+	// rotation plan uses this to avoid deleting the default generated certificate
+	// when the component is configured to use a different certificate pair.
+	CertificateRotationComponentTLSSettings(
+		secret *corev1.Secret,
+		component string,
+	) ops.ComponentTLSSettings
+}
+
 // dynamicResolver is the subset of the dynamic controller used by operations handlers.
 type dynamicResolver interface {
 	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
@@ -120,6 +147,13 @@ func (h *handler) onChange(op *opv1alpha1.CertificateRotation, status opv1alpha1
 
 	if status.Phase == "" {
 		status.SetPhase(opv1alpha1.OperationPhasePending)
+	}
+
+	if status.Phase == opv1alpha1.OperationPhasePending {
+		if err := validateCertificateRotationServices(op.Spec.Args.Services); err != nil {
+			markFailed(&status, opv1alpha1.PlanFailedReason, err.Error())
+			return status, nil
+		}
 	}
 
 	gvk := schema.FromAPIVersionAndKind(op.Spec.ClusterRef.APIVersion, op.Spec.ClusterRef.Kind)
@@ -517,6 +551,15 @@ func markFailed(status *opv1alpha1.CertificateRotationStatus, reason, condMsg st
 	opv1alpha1.FailedCondition.Message(status, condMsg)
 }
 
+func validateCertificateRotationServices(services []string) error {
+	for _, service := range services {
+		if _, ok := supportedCertificateRotationServices[service]; !ok {
+			return fmt.Errorf("unsupported certificate rotation service %q", service)
+		}
+	}
+	return nil
+}
+
 // operationEnv returns env vars that tie plan content to the operation UID and
 // current step. This keeps rotate plans distinct so system-agent reruns them instead
 // of reusing stale applied output.
@@ -539,7 +582,8 @@ func servicesApply(requested []string, secret *corev1.Secret) bool {
 	}
 	relevant := map[string]struct{}{}
 	if ops.IsWorker(secret) {
-		// worker
+		// Workers restart their runtime agent when any of these shared runtime
+		// certificates are rotated, so they can reconnect to the server.
 		relevant["rke2-server"] = struct{}{}
 		relevant["k3s-server"] = struct{}{}
 		relevant["api-server"] = struct{}{}
@@ -575,14 +619,126 @@ func servicesApply(requested []string, secret *corev1.Secret) bool {
 	return false
 }
 
-// reconcileRotate implements the rotate step: mark the beacon active, pause the cluster, and
-// walk nodes in disruption-safe order assigning per-node certificate rotation plans and waiting
-// for each to finish before proceeding.
+func serviceRequested(requested []string, service string) bool {
+	if len(requested) == 0 {
+		return true
+	}
+	for _, requestedService := range requested {
+		if requestedService == service {
+			return true
+		}
+	}
+	return false
+}
+
+// componentCertificateCleanupInstructions removes the default generated certificate/key pairs
+// used by controller-manager and scheduler. Removing the pair before restarting the server lets
+// the component generate a rotated replacement. Components with an explicit certificate and key
+// are excluded because those paths are managed outside the runtime's default certificate directory.
+func componentCertificateCleanupInstructions(provisioningDir, operationID, runtime, dataDir string, services []string, controllerManagerSettings, schedulerSettings ops.ComponentTLSSettings) []plan.OneTimeInstruction {
+	components := []struct {
+		service        string
+		certificate    string
+		certificateDir string
+		manifest       string
+		settings       ops.ComponentTLSSettings
+	}{
+		{
+			service:        "controller-manager",
+			certificate:    ops.DefaultKubeControllerManagerCert,
+			certificateDir: ops.DefaultKubeControllerManagerCertDir,
+			manifest:       "kube-controller-manager.yaml",
+			settings:       controllerManagerSettings,
+		},
+		{
+			service:        "scheduler",
+			certificate:    ops.DefaultKubeSchedulerCert,
+			certificateDir: ops.DefaultKubeSchedulerCertDir,
+			manifest:       "kube-scheduler.yaml",
+			settings:       schedulerSettings,
+		},
+	}
+
+	instructions := []plan.OneTimeInstruction{}
+	for _, component := range components {
+		// A service-filtered operation must not restart or remove certificates for
+		// components that were not selected by the caller.
+		if !serviceRequested(services, component.service) {
+			continue
+		}
+		// An explicit TLS pair is the component's active serving certificate. The
+		// default generated paths are not used in that configuration.
+		if component.settings.HasCompleteTLSConfig() {
+			continue
+		}
+
+		// The default component certificate and key are recreated when the server
+		// starts after the runtime certificate rotation command completes.
+		certPath := path.Join(dataDir, component.certificateDir, component.certificate)
+		keyPath := strings.TrimSuffix(certPath, ".crt") + ".key"
+		instructions = append(instructions,
+			ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rm-"+component.service+"-cert", operationID, "rm", []string{"-f", certPath}, nil),
+			ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rm-"+component.service+"-key", operationID, "rm", []string{"-f", keyPath}, nil),
+		)
+
+		if runtime == capr.RuntimeRKE2 {
+			// RKE2 regenerates the static-pod manifest when it is absent. Removing it
+			// makes the restarted server use the newly generated component certificate.
+			instructions = append(instructions,
+				ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rm-"+component.service+"-spm", operationID, "rm", []string{"-f", path.Join(dataDir, "agent/pod-manifests", component.manifest)}, nil),
+			)
+		}
+	}
+
+	return instructions
+}
+
+// certificateRotationStopInstructions stops the runtime server before its certificates are
+// changed. Keeping this as a discrete idempotent action makes retries safe.
+func certificateRotationStopInstructions(provisioningDir, operationID, serverUnit string, env []string) []plan.OneTimeInstruction {
+	return []plan.OneTimeInstruction{
+		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/stop", operationID, "systemctl", []string{"stop", serverUnit}, env),
+	}
+}
+
+// certificateRotationRuntimeInstructions invokes the runtime's certificate rotation command.
+// An empty services slice deliberately rotates every service supported by the runtime.
+func certificateRotationRuntimeInstructions(provisioningDir, operationID, runtime string, services []string, env []string) []plan.OneTimeInstruction {
+	args := []string{"certificate", "rotate"}
+	for _, service := range services {
+		args = append(args, "-s", service)
+	}
+
+	return []plan.OneTimeInstruction{
+		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rotate", operationID, runtime, args, env),
+	}
+}
+
+// rke2ManifestRemovalInstructions removes generated RKE2 manifests so the server recreates
+// them using the rotated certificates when it starts again.
+func rke2ManifestRemovalInstructions(provisioningDir, operationID, dataDir string) []plan.OneTimeInstruction {
+	rmCmd := fmt.Sprintf("rm -rf %s/rke2-*.yaml", path.Join(dataDir, "server/manifests"))
+	return []plan.OneTimeInstruction{
+		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", operationID, "/bin/sh", []string{"-c", rmCmd}, nil),
+	}
+}
+
+// linuxIdempotentRestartInstructions resets a failed systemd unit when needed, then restarts it.
+// Keeping the systemctl commands together gives each restart the same retry-safe behavior.
+func linuxIdempotentRestartInstructions(provisioningDir, identifier, value, service string) []plan.OneTimeInstruction {
+	return []plan.OneTimeInstruction{
+		ops.IdempotentInstruction(provisioningDir, identifier+"-reset-failed", value, "/bin/sh", []string{"-c", fmt.Sprintf("if [ $(systemctl is-failed %s) = failed ]; then systemctl reset-failed %s; fi", service, service)}, nil),
+		ops.IdempotentInstruction(provisioningDir, identifier+"-restart", value, "systemctl", []string{"restart", service}, nil),
+	}
+}
+
+// reconcileRotate pauses normal cluster reconciliation, assigns a rotation plan to one target at
+// a time in disruption-safe order, and waits for that target to recover before advancing.
 func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling certificate rotation", s.op.Namespace, s.op.Name)
 
-	// Step hook before PauseCluster so a delegate can inspect or modify the cluster's pre-pause
-	// state. PauseCluster is idempotent so re-entering after the hook clears just no-ops.
+	// Run the step hook before pausing the cluster so a delegate sees the normal
+	// pre-rotation state. Reconciliation resumes here after the delegate clears.
 	delegated, err := h.handleHook(s, RotateStepHookLabelPrefix)
 	if err != nil {
 		return status, err
@@ -593,13 +749,19 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		return status, nil
 	}
 
-	// Pause cluster reconciliation to avoid races during certificate replacement
+	// Prevent the cluster provisioner from changing node plans while the operation
+	// replaces certificates and restarts runtimes.
 	if err := s.adapter.PauseCluster(true); err != nil {
 		return status, err
 	}
 
-	// Collect all targets once and deterministically sort them.
+	// Collect all registered machine-plan secrets in the collector's safe role order.
+	// The service filter removes nodes that cannot run any requested service; keeping
+	// it in the collector ensures sorting and empty-target handling use the same set.
 	targets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+		WithFilter(func(secret *corev1.Secret) bool {
+			return servicesApply(s.op.Spec.Args.Services, secret)
+		}).
 		WithSorter(plan.DefaultSorter()).
 		Collect()
 	if plan.IsTransient(err) {
@@ -610,23 +772,19 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		return status, nil
 	}
 
-	// Filter targets by whether the requested services apply to them.
-	targetsFiltered := []*corev1.Secret{}
-	for _, secret := range targets {
-		if !servicesApply(s.op.Spec.Args.Services, secret) {
-			continue
-		}
-		targetsFiltered = append(targetsFiltered, secret)
-	}
-	if len(targetsFiltered) == 0 {
+	if len(targets) == 0 {
 		logrus.Errorf("[certificaterotation] %s/%s: no eligible machine-plan secrets found", s.op.Namespace, s.op.Name)
 		markFailed(&status, opv1alpha1.PlanFailedReason, "no eligible machine-plan secrets found")
 		return status, nil
 	}
 
+	// Pass the operation identity to runtime instructions so their execution is
+	// associated with this rotation attempt and step.
 	env := operationEnv(s.op, status.Step)
 
-	for _, secret := range targetsFiltered {
+	for _, secret := range targets {
+		// Plans are processed serially. Returning while one plan is waiting ensures
+		// the next node is not disrupted until this node has applied and passed probes.
 		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
 			return status, err
@@ -638,34 +796,36 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		var nodePlan plan.Plan
 
 		if ops.IsControlPlane(secret) || ops.IsEtcd(secret) {
-			// server node: stop, rotate, restart
-			args := []string{"certificate", "rotate"}
-			if len(s.op.Spec.Args.Services) > 0 {
-				for _, svc := range s.op.Spec.Args.Services {
-					args = append(args, "-s", svc)
-				}
-			}
-
+			// Server nodes own control-plane or etcd certificates. Stop the server
+			// before rotating them, then restart it after all required cleanup.
 			provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 			dataDir := s.adapter.DistroDataDirectory(secret)
 			files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
-			oneTime := []plan.OneTimeInstruction{}
-			// stop then rotate then cleanup manifests then restart. Do not clear prior rotate idempotency state.
-			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/stop", string(s.op.UID), "systemctl", []string{"stop", serverUnit}, env))
-			rotateInst := ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rotate", string(s.op.UID), runtime, args, env)
-			oneTime = append(oneTime, rotateInst)
+			oneTime := certificateRotationStopInstructions(provisioningDir, string(s.op.UID), serverUnit, env)
+			// Keep stop and rotate as separate idempotent instructions. A retry can
+			// resume safely without rerunning an instruction already applied by the agent.
+			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, s.op.Spec.Args.Services, env)...)
 
-			// CAPR requires explicit component cert-dir and absence of tls-cert-file to safely remove
-			// component certs. CertificateRotation lacks parsed per-node component config, so defer.
-
-			if runtime == capr.RuntimeRKE2 {
-				rmCmd := fmt.Sprintf("rm -rf %s/%s-*.yaml", path.Join(dataDir, "server/manifests"), runtime)
-				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", string(s.op.UID), "/bin/sh", []string{"-c", rmCmd}, []string{}))
+			if ops.IsControlPlane(secret) {
+				var controllerManagerSettings, schedulerSettings ops.ComponentTLSSettings
+				if provider, ok := s.adapter.(certificateRotationComponentSettingsProvider); ok {
+					// Some adapters can identify an explicit component TLS pair. Pass those
+					// settings to cleanup so rotation never removes an externally managed pair.
+					controllerManagerSettings = provider.CertificateRotationComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
+					schedulerSettings = provider.CertificateRotationComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
+				}
+				oneTime = append(oneTime, componentCertificateCleanupInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, s.op.Spec.Args.Services, controllerManagerSettings, schedulerSettings)...)
 			}
 
-			// restart server unit idempotently
-			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart-reset-failed", string(s.op.UID), "/bin/sh", []string{"-c", fmt.Sprintf("if [ $(systemctl is-failed %s) = failed ]; then systemctl reset-failed %s; fi", serverUnit, serverUnit)}, []string{}))
-			oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart", string(s.op.UID), "systemctl", []string{"restart", serverUnit}, []string{}))
+			if runtime == capr.RuntimeRKE2 {
+				// RKE2 regenerates its generated manifests during server startup. Remove
+				// them only after rotation so replacement manifests refer to rotated files.
+				oneTime = append(oneTime, rke2ManifestRemovalInstructions(provisioningDir, string(s.op.UID), dataDir)...)
+			}
+
+			// Restarting the server activates the rotated certificates and lets the
+			// probes verify that its local control-plane components recovered.
+			oneTime = append(oneTime, linuxIdempotentRestartInstructions(provisioningDir, "certificate-rotation", string(s.op.UID), serverUnit)...)
 
 			nodePlan = plan.Plan{
 				Files:               files,
@@ -673,10 +833,11 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 				Probes:              probes,
 			}
 		} else {
-			// worker: restart the runtime agent
+			// Workers do not rotate server certificates, but their runtime agent must
+			// restart so it reconnects using the updated cluster certificates.
 			agentUnit := runtimeAgentUnit(runtime)
 			if ops.IsWindows(secret) {
-				// Windows idempotent restart using local idempotency helper; do not use linux systemctl logic.
+				// Windows uses a service restart instruction rather than Linux systemctl.
 				files := []plan.File{windowsIdempotentScriptFile()}
 				oneTime := windowsIdempotentRestartInstructions("certificate-rotation/restart", string(s.op.UID), capr.RuntimeRKE2)
 				nodePlan = plan.Plan{
@@ -687,9 +848,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			} else {
 				provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 				files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
-				oneTime := []plan.OneTimeInstruction{}
-				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart-reset-failed", string(s.op.UID), "/bin/sh", []string{"-c", fmt.Sprintf("if [ $(systemctl is-failed %s) = failed ]; then systemctl reset-failed %s; fi", agentUnit, agentUnit)}, []string{}))
-				oneTime = append(oneTime, ops.IdempotentInstruction(provisioningDir, "certificate-rotation/restart", string(s.op.UID), "systemctl", []string{"restart", agentUnit}, []string{}))
+				oneTime := linuxIdempotentRestartInstructions(provisioningDir, "certificate-rotation", string(s.op.UID), agentUnit)
 				nodePlan = plan.Plan{
 					Files:               files,
 					OneTimeInstructions: oneTime,
@@ -698,6 +857,8 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			}
 		}
 
+		// AssignPlan updates this machine-plan secret and returns the agent's latest
+		// applied status for the same plan. A later reconcile continues from that status.
 		planStatus, err := h.store.AssignPlan(secret, &nodePlan, 0, 0)
 		if err != nil {
 			return status, err
@@ -710,6 +871,8 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		}
 
 		if planStatus.Waiting() {
+			// Do not assign a plan to another target until the current target reports
+			// both instruction completion and successful probes.
 			logrus.Debugf("[certificaterotation] %s/%s: waiting for certificate rotation plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 			opv1alpha1.InProgressCondition.True(&status)
 			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)

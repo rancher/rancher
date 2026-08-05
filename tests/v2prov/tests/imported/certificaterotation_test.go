@@ -155,6 +155,8 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Multi_Node(t *test
 	controlPlaneCertPaths := []string{
 		fmt.Sprintf("/var/lib/rancher/%s/server/tls/client-admin.crt", runtimeName),
 		fmt.Sprintf("/var/lib/rancher/%s/server/tls/serving-kube-apiserver.crt", runtimeName),
+		fmt.Sprintf("/var/lib/rancher/%s/server/tls/kube-controller-manager/kube-controller-manager.crt", runtimeName),
+		fmt.Sprintf("/var/lib/rancher/%s/server/tls/kube-scheduler/kube-scheduler.crt", runtimeName),
 	}
 
 	etcdPodNames := []string{fx.pods[0].Name}
@@ -192,6 +194,8 @@ func requiredCertificatePaths(runtimeName string) []string {
 		fmt.Sprintf("/var/lib/rancher/%s/server/tls/serving-kube-apiserver.crt", runtimeName),
 		fmt.Sprintf("/var/lib/rancher/%s/server/tls/etcd/server-client.crt", runtimeName),
 		fmt.Sprintf("/var/lib/rancher/%s/server/tls/etcd/peer-server-client.crt", runtimeName),
+		fmt.Sprintf("/var/lib/rancher/%s/server/tls/kube-controller-manager/kube-controller-manager.crt", runtimeName),
+		fmt.Sprintf("/var/lib/rancher/%s/server/tls/kube-scheduler/kube-scheduler.crt", runtimeName),
 	}
 }
 
