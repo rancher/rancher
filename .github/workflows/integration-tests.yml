@@ -139,7 +139,7 @@ jobs:
   # result is success only if every shard succeeded.
   test:
     needs: test-shard
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: Verify all integration shards passed
