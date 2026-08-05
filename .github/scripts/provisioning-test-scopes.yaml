@@ -98,10 +98,11 @@ scopes:
           - 'chart-default-branch'
           - 'machine-provision-image'
     tests:
-      - { dist: k3s,  regex: '^Test_(General|Provisioning|Fleet)_.*$', cpus: 8 }
-      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
+      - { dist: rke2, regex: '^Test_(General|Provisioning)_.*$'}
+      - { dist: rke2, regex: '^Test_Fleet_.*$' }
 
-  # day-2 ops (cert rotation, etcd snapshot, drain) on custom/ + machine provisioning
+  # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
     package-paths:
       - '^pkg/controllers/capr/etcdmgmt/'             # also imported
@@ -114,7 +115,6 @@ scopes:
       - { dist: rke2, regex: '^Test_Operation_SetA_.*$'}
       - { dist: rke2, regex: '^Test_Operation_SetB_.*$', cpus: 8 }
 
-  # Imported clusters
   imported:
     package-paths:
       - '^pkg/controllers/capr/unmanaged/'
@@ -123,8 +123,10 @@ scopes:
       - '^pkg/capr/configserver/'                     # also basic
       - '^tests/v2prov/tests/imported/'
     tests:
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$' }
 
   prebootstrap:
     package-paths:
