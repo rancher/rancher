@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	versioninfo "k8s.io/apimachinery/pkg/version"
 )
 
 const (
@@ -29,7 +31,8 @@ const (
 	agentVersionUpgraded       = "agent.cluster.cattle.io/upgraded-v1.22"
 
 	// quietPeriod marks the minimum period between sync calls for the same Cluster
-	quietPeriod = time.Second * 10
+	quietPeriod       = time.Second * 10
+	versionRetryDelay = 5 * time.Second
 )
 
 var numericReg = regexp.MustCompile("[^0-9]")
@@ -127,7 +130,6 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 		machines = append(machines, m)
 	}
 
-	origStatus := cluster.Status.DeepCopy()
 	cluster = cluster.DeepCopy()
 
 	cluster.Status.NodeCount = len(allMachines)
@@ -206,7 +208,53 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 			return nil, err
 		}
 	}
-	versionChanged := s.updateVersion(cluster)
+	versionChanged, retryVersionSync := s.updateVersion(cluster)
+
+	latestCluster, err := s.Clusters.Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if latestCluster.Status.Version == nil && cluster.Status.Version != nil {
+		logrus.Debugf("[cluster-stats] cluster %s: persisting discovered downstream server version %s onto latest management cluster status", cluster.Name, cluster.Status.Version.String())
+	}
+	if latestCluster.Status.Version != nil && cluster.Status.Version == nil {
+		logrus.Debugf("[cluster-stats] cluster %s: cached management cluster status is stale; latest object already has downstream server version %s", cluster.Name, latestCluster.Status.Version.String())
+	}
+
+	mergedCluster := latestCluster.DeepCopy()
+	mergedCluster.Status.NodeCount = cluster.Status.NodeCount
+	mergedCluster.Status.WindowsWorkerCount = cluster.Status.WindowsWorkerCount
+	mergedCluster.Status.LinuxWorkerCount = cluster.Status.LinuxWorkerCount
+	mergedCluster.Status.Capacity = cluster.Status.Capacity
+	mergedCluster.Status.Allocatable = cluster.Status.Allocatable
+	mergedCluster.Status.Requested = cluster.Status.Requested
+	mergedCluster.Status.Limits = cluster.Status.Limits
+	mergedCluster.Status.Version = cluster.Status.Version
+
+	if v32.ClusterConditionNoDiskPressure.IsTrue(cluster) {
+		v32.ClusterConditionNoDiskPressure.True(mergedCluster)
+	} else {
+		v32.ClusterConditionNoDiskPressure.False(mergedCluster)
+	}
+	if v32.ClusterConditionNoMemoryPressure.IsTrue(cluster) {
+		v32.ClusterConditionNoMemoryPressure.True(mergedCluster)
+	} else {
+		v32.ClusterConditionNoMemoryPressure.False(mergedCluster)
+	}
+
+	if statusChanged(&latestCluster.Status, &mergedCluster.Status) || versionChanged {
+		// Use UpdateStatus to only update the status subresource - Update() ignores status changes.
+		// Return nil to avoid norman's redundant Update() write-back.
+		if _, err := s.Clusters.UpdateStatus(mergedCluster); err != nil {
+			logrus.Debugf("[cluster-stats] cluster %s: failed to update management cluster status after downstream version/stat refresh: %v", cluster.Name, err)
+			return nil, err
+		}
+	}
+
+	if retryVersionSync {
+		s.Clusters.Controller().EnqueueAfter(cluster.Namespace, cluster.Name, versionRetryDelay)
+	}
 
 	// If the cluster went through an upgrade from <=1.21 to >=1.22, restart
 	// the cluster agent in order to restart controllers that will no longer work
@@ -224,13 +272,6 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 		}
 	}
 
-	if statusChanged(origStatus, &cluster.Status) || versionChanged {
-		// Use UpdateStatus to only update the status subresource - Update() ignores status changes.
-		// Return nil to avoid norman's redundant Update() write-back.
-		if _, err := s.Clusters.UpdateStatus(cluster); err != nil {
-			return nil, err
-		}
-	}
 	return nil, nil
 }
 
@@ -239,31 +280,59 @@ func minorVersion(cluster *v3.Cluster) (int, error) {
 	return strconv.Atoi(minorVersion)
 }
 
-func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
+func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) (bool, bool) {
 	updated := false
+	retry := false
 	userContext, err := s.ClusterManager.UserContextNoControllersReconnecting(cluster.Name, false)
-	if err == nil {
-		callWithTimeout(func() {
-			// This has the tendency to timeout
-			version, err := userContext.K8sClient.Discovery().ServerVersion()
-			if err == nil {
-				if version != nil {
-					// These fields can vary depending on the node serving the request
-					// Since they are not consumed, we omit them from the status to avoid unnecessary flickering of the fields
-					version.BuildDate, version.Platform = "", ""
-				}
-
-				isClusterVersionOk := cluster.Status.Version != nil
-				isNewVersionOk := version != nil
-				if isClusterVersionOk != isNewVersionOk ||
-					(isClusterVersionOk && *cluster.Status.Version != *version) {
-					cluster.Status.Version = version
-					updated = true
-				}
-			}
-		})
+	if err != nil {
+		if shouldRetryVersionSync(cluster) {
+			logrus.Debugf("[cluster-stats] cluster %s: failed to build downstream user context for version sync: %v", cluster.Name, err)
+			retry = true
+		}
+		return updated, retry
 	}
-	return updated
+
+	var (
+		version    *versioninfo.Info
+		versionErr error
+	)
+	timedOut := callWithTimeout(func() {
+		// This has the tendency to timeout
+		version, versionErr = userContext.K8sClient.Discovery().ServerVersion()
+	})
+	if timedOut {
+		if shouldRetryVersionSync(cluster) {
+			logrus.Debugf("[cluster-stats] cluster %s: timed out discovering downstream server version", cluster.Name)
+			retry = true
+		}
+		return updated, retry
+	}
+	if versionErr != nil {
+		if shouldRetryVersionSync(cluster) {
+			logrus.Debugf("[cluster-stats] cluster %s: failed to discover downstream server version: %v", cluster.Name, versionErr)
+			retry = true
+		}
+		return updated, retry
+	}
+
+	if version != nil {
+		// These fields can vary depending on the node serving the request
+		// Since they are not consumed, we omit them from the status to avoid unnecessary flickering of the fields
+		version.BuildDate, version.Platform = "", ""
+	}
+
+	isClusterVersionOk := cluster.Status.Version != nil
+	isNewVersionOk := version != nil
+	if isClusterVersionOk != isNewVersionOk ||
+		(isClusterVersionOk && *cluster.Status.Version != *version) {
+		cluster.Status.Version = version
+		updated = true
+		if version != nil {
+			logrus.Debugf("[cluster-stats] cluster %s: discovered downstream server version %s", cluster.Name, version.String())
+		}
+	}
+
+	return updated, retry
 }
 
 // restartAgentDeployment sets an annotation on the cluster agent deployment template
@@ -325,6 +394,10 @@ func statusChanged(existingCluster, newCluster *v32.ClusterStatus) bool {
 		return true
 	}
 
+	if !reflect.DeepEqual(existingCluster.Version, newCluster.Version) {
+		return true
+	}
+
 	return false
 }
 
@@ -342,7 +415,7 @@ func resourceListChanged(oldList, newList v1.ResourceList) bool {
 	return false
 }
 
-func callWithTimeout(do func()) {
+func callWithTimeout(do func()) bool {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -351,8 +424,18 @@ func callWithTimeout(do func()) {
 
 	select {
 	case <-done:
+		return false
 	case <-time.After(15 * time.Second):
+		return true
 	}
+}
+
+func shouldRetryVersionSync(cluster *v3.Cluster) bool {
+	return cluster != nil &&
+		cluster.Status.Version == nil &&
+		cluster.Status.NodeCount > 0 &&
+		cluster.Status.APIEndpoint != "" &&
+		clusterconnected.Connected.IsTrue(cluster)
 }
 
 func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {

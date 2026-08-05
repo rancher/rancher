@@ -83,11 +83,11 @@ func newImportedMachinePlanSecret(name, machineName string) *corev1.Secret {
 			UID:       types.UID(name + "-uid"),
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
-				planv1alpha1.MachineLifecycleKindLabel: "Machine",
-				planv1alpha1.MachineLifecycleNameLabel: machineName,
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  machineName,
 			},
 		},
 		Type: capr.SecretTypeMachinePlan,
@@ -341,4 +341,110 @@ func TestImportedAdapter_WaitForRegister_SecretPointsToUnexpectedNode(t *testing
 	ok, err := adapter.WaitForRegister()
 	assert.NoError(t, err)
 	assert.False(t, ok, "secret pointing to unexpected node should return false")
+}
+
+func TestComponentTLSSettingsFromNodeArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		args      []string
+		component string
+		want      ComponentTLSSettings
+	}{
+		{
+			name: "no relevant arguments",
+			args: []string{
+				"server",
+				"--kube-apiserver-arg", "secure-port=6444",
+				"--kube-controller-manager-arg", "feature-gates=Example=true",
+			},
+			component: KubeControllerManagerProbeName,
+		},
+		{
+			name: "split outer form",
+			args: []string{
+				"--kube-controller-manager-arg", "secure-port=10261",
+				"--kube-controller-manager-arg", "tls-cert-file=/custom/kcm.crt",
+				"--kube-controller-manager-arg", "tls-private-key-file=/custom/kcm.key",
+			},
+			component: KubeControllerManagerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10261",
+				TLSCertFile:       "/custom/kcm.crt",
+				TLSPrivateKeyFile: "/custom/kcm.key",
+			},
+		},
+		{
+			name: "combined outer form",
+			args: []string{
+				"--kube-controller-manager-arg=secure-port=10261",
+				"--kube-controller-manager-arg=tls-cert-file=/custom/kcm.crt",
+				"--kube-controller-manager-arg=tls-private-key-file=/custom/kcm.key",
+			},
+			component: KubeControllerManagerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10261",
+				TLSCertFile:       "/custom/kcm.crt",
+				TLSPrivateKeyFile: "/custom/kcm.key",
+			},
+		},
+		{
+			name: "custom secure port",
+			args: []string{
+				"--kube-scheduler-arg", "secure-port=10262",
+			},
+			component: KubeSchedulerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10262"},
+		},
+		{
+			name: "complete custom TLS pair",
+			args: []string{
+				"--kube-scheduler-arg", "tls-cert-file=/custom/ks.crt",
+				"--kube-scheduler-arg", "tls-private-key-file=/custom/ks.key",
+			},
+			component: KubeSchedulerProbeName,
+			want: ComponentTLSSettings{
+				TLSCertFile:       "/custom/ks.crt",
+				TLSPrivateKeyFile: "/custom/ks.key",
+			},
+		},
+		{
+			name: "incomplete TLS pair",
+			args: []string{
+				"--kube-controller-manager-arg", "tls-cert-file=/custom/kcm.crt",
+			},
+			component: KubeControllerManagerProbeName,
+			want:      ComponentTLSSettings{TLSCertFile: "/custom/kcm.crt"},
+		},
+		{
+			name: "cert-dir is ignored",
+			args: []string{
+				"--kube-controller-manager-arg", "cert-dir=/custom",
+			},
+			component: KubeControllerManagerProbeName,
+		},
+		{
+			name: "controller and scheduler select their own outer arguments",
+			args: []string{
+				"--kube-controller-manager-arg", "secure-port=10261",
+				"--kube-scheduler-arg", "secure-port=10262",
+			},
+			component: KubeSchedulerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10262"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := componentTLSSettingsFromNodeArgs(tt.args, tt.component)
+			assert.Equal(t, tt.want, got)
+			if tt.name == "incomplete TLS pair" {
+				assert.False(t, got.HasCompleteTLSConfig())
+			}
+			if tt.name == "complete custom TLS pair" {
+				assert.True(t, got.HasCompleteTLSConfig())
+			}
+		})
+	}
 }

@@ -13,7 +13,7 @@ const (
 	windowsIdempotencyRoot      = `c:\var\lib\rancher\capr`
 )
 
-// Windows idempotent PowerShell action script (local copy of CAPR helper).
+// Windows idempotent PowerShell action script.
 const windowsIdempotentActionScript = `param (
     [Parameter(Position=0)]
     [String]

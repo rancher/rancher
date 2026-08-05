@@ -30,22 +30,69 @@ const (
 	defaultK3sDataDirectory  = "/var/lib/rancher/k3s"
 )
 
-// dataDirFromNodeArgs parses a JSON []string node-args slice and extracts --data-dir or -d values.
-// Accepts forms: --data-dir <path>, --data-dir=<path>, -d <path>, -d=<path>. Returns empty string
-// when none is found.
-func dataDirFromNodeArgs(args []string) string {
-	for i, a := range args {
-		if a == "--data-dir" || a == "-d" {
-			if i+1 < len(args) && args[i+1] != "" {
-				return args[i+1]
-			}
-		} else if strings.HasPrefix(a, "--data-dir=") {
-			return strings.TrimPrefix(a, "--data-dir=")
-		} else if strings.HasPrefix(a, "-d=") {
-			return strings.TrimPrefix(a, "-d=")
+// ComponentTLSSettings contains the effective TLS-related settings for a control-plane
+// component obtained from an imported node's runtime arguments.
+type ComponentTLSSettings struct {
+	SecurePort        string
+	TLSCertFile       string
+	TLSPrivateKeyFile string
+}
+
+// HasCompleteTLSConfig reports whether the component has an explicitly configured TLS pair.
+func (s ComponentTLSSettings) HasCompleteTLSConfig() bool {
+	return s.TLSCertFile != "" && s.TLSPrivateKeyFile != ""
+}
+
+func componentOuterArgument(component string) string {
+	switch component {
+	case KubeControllerManagerProbeName:
+		return "--" + KubeControllerManagerArg
+	case KubeSchedulerProbeName:
+		return "--" + KubeSchedulerArg
+	default:
+		return ""
+	}
+}
+
+// componentTLSSettingsFromNodeArgs extracts the controller-manager or scheduler TLS settings
+// declared as repeated RKE2 outer arguments, in either split or combined form. cert-dir is not
+// extracted: it does not select the serving certificate when explicit TLS file arguments exist.
+func componentTLSSettingsFromNodeArgs(args []string, component string) ComponentTLSSettings {
+	outerArgument := componentOuterArgument(component)
+	if outerArgument == "" {
+		return ComponentTLSSettings{}
+	}
+
+	var settings ComponentTLSSettings
+	for _, innerArgument := range plan.NewArguments(args).Values(outerArgument) {
+		key, value, ok := strings.Cut(innerArgument, "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case "tls-private-key-file":
+			settings.TLSPrivateKeyFile = value
 		}
 	}
-	return ""
+	return settings
+}
+
+// secureProbeArguments returns the non-sensitive settings needed to render a component probe.
+// A certificate path is useful only with a complete certificate/key pair; the private key is
+// intentionally never included in a probe.
+func secureProbeArguments(settings ComponentTLSSettings) []string {
+	args := make([]string, 0, 2)
+	if settings.SecurePort != "" {
+		args = append(args, SecurePortArgument+"="+settings.SecurePort)
+	}
+	if settings.HasCompleteTLSConfig() {
+		args = append(args, TLSCertFileArgument+"="+settings.TLSCertFile)
+	}
+	return args
 }
 
 func init() {
@@ -297,71 +344,85 @@ func (a *ImportedAdapter) ServerUnit() string {
 	return capr.RuntimeK3S
 }
 
-func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
-	// default based on cluster provider
-	defaultDir := defaultRKE2DataDirectory
-	if a.RuntimeCommand() == capr.RuntimeK3S {
-		defaultDir = defaultK3sDataDirectory
-	}
-
-	// Select exactly one annotation key based on the cluster runtime
-	annotationKey := rke2NodeArgsAnnotation
-	if a.RuntimeCommand() == capr.RuntimeK3S {
-		annotationKey = k3sNodeArgsAnnotation
-		defaultDir = defaultK3sDataDirectory
-	}
-
+// nodeArgs returns the selected runtime's node arguments for the machine-plan secret.
+// It follows the machine-plan Secret -> lifecycle labels -> management Node -> status
+// nodeAnnotations lookup chain and returns no arguments when any link is unavailable.
+func (a *ImportedAdapter) nodeArgs(secret *corev1.Secret) []string {
 	if secret == nil {
-		logrus.Debugf("[imported adapter] nil secret provided to DistroDataDirectory, returning default %s", defaultDir)
-		return defaultDir
+		return nil
+	}
+	if a == nil || a.clients == nil || a.clients.Context == nil || a.clients.Mgmt == nil || a.clients.RESTMapper == nil {
+		return nil
 	}
 	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
-		logrus.Debugf("[imported adapter] secret %s/%s missing machine lifecycle labels, returning default %s", secret.Namespace, secret.Name, defaultDir)
-		return defaultDir
+		return nil
 	}
 
 	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret, secret.Namespace, a.clients.RESTMapper)
 	if err != nil {
 		logrus.Debugf("[imported adapter] unable to resolve machine lifecycle labels for %s/%s: %v", secret.Namespace, secret.Name, err)
-		return defaultDir
+		return nil
 	}
 
 	node, err := a.clients.Mgmt.Node().Cache().Get(ref.Namespace, ref.Name)
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("[imported adapter] node %s/%s not found for secret %s/%s", ref.Namespace, ref.Name, secret.Namespace, secret.Name)
-		return defaultDir
+		return nil
 	}
 	if err != nil {
 		logrus.Debugf("[imported adapter] error fetching node %s/%s: %v", ref.Namespace, ref.Name, err)
-		return defaultDir
+		return nil
 	}
 	if node == nil {
-		logrus.Debugf("[imported adapter] node %s/%s is nil for secret %s/%s, returning default %s", ref.Namespace, ref.Name, secret.Namespace, secret.Name, defaultDir)
-		return defaultDir
+		return nil
 	}
 
-	// Only consider the selected annotation key
 	if node.Status.NodeAnnotations == nil {
-		logrus.Debugf("[imported adapter] no node annotations found for node %s/%s, returning default %s", ref.Namespace, ref.Name, defaultDir)
-		return defaultDir
+		return nil
 	}
 
+	annotationKey := rke2NodeArgsAnnotation
+	if a.RuntimeCommand() == capr.RuntimeK3S {
+		annotationKey = k3sNodeArgsAnnotation
+	}
 	v, ok := node.Status.NodeAnnotations[annotationKey]
 	if !ok || v == "" {
-		logrus.Debugf("[imported adapter] missing or empty %s for node %s/%s, returning default %s", annotationKey, ref.Namespace, ref.Name, defaultDir)
-		return defaultDir
+		return nil
 	}
 
 	var args []string
 	if err := json.Unmarshal([]byte(v), &args); err != nil {
 		logrus.Debugf("[imported adapter] unable to parse %s JSON for node %s/%s: %v", annotationKey, ref.Namespace, ref.Name, err)
-		return defaultDir
+		return nil
 	}
-	if dd := dataDirFromNodeArgs(args); dd != "" {
-		return dd
+	return args
+}
+
+func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
+	defaultDir := defaultRKE2DataDirectory
+	if a.RuntimeCommand() == capr.RuntimeK3S {
+		defaultDir = defaultK3sDataDirectory
 	}
-	logrus.Debugf("[imported adapter] %s did not contain a usable --data-dir/-d flag for node %s/%s, returning default %s", annotationKey, ref.Namespace, ref.Name, defaultDir)
+
+	args := a.nodeArgs(secret)
+
+	// A node-level data directory overrides the distribution default.
+	if dataDir := plan.NewArguments(args).First("--data-dir", "-d"); dataDir != "" {
+		return dataDir
+	}
+
 	return defaultDir
+}
+
+// CertificateRotationComponentTLSSettings returns explicitly configured RKE2 component TLS
+// settings from the node arguments associated with a machine-plan secret. The certificate
+// rotation controller uses a complete pair to preserve externally managed component certificates.
+// K3s component overrides are not enabled for this imported-cluster path.
+func (a *ImportedAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) ComponentTLSSettings {
+	if a.RuntimeCommand() != capr.RuntimeRKE2 {
+		return ComponentTLSSettings{}
+	}
+	return componentTLSSettingsFromNodeArgs(a.nodeArgs(secret), component)
 }
 
 func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -420,13 +481,15 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmProbe, err := renderSecureProbe("", probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmSettings := a.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+		kcmProbe, err := renderSecureProbe(secureProbeArguments(kcmSettings), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksProbe, err := renderSecureProbe("", probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksSettings := a.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
+		ksProbe, err := renderSecureProbe(secureProbeArguments(ksSettings), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
