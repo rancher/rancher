@@ -71,6 +71,18 @@ var (
 				URL: "http://%s:10248/healthz",
 			},
 		},
+		"supervisor": {
+			InitialDelaySeconds: 1,
+			TimeoutSeconds:      5,
+			SuccessThreshold:    1,
+			FailureThreshold:    2,
+			HTTPGetAction: plan.HTTPGetAction{
+				URL:        "http://%s:%d/v1-%s/readyz",
+				CACert:     "%s/agent/server-ca.crt",
+				ClientCert: "%s/agent/client-kubelet.crt",
+				ClientKey:  "%s/agent/client-kubelet.key",
+			},
+		},
 	}
 	errEmptyCACert  = errors.New("cacert cannot be empty")
 	errEmptyPort    = errors.New("port cannot be empty")
@@ -131,12 +143,12 @@ func (p *Planner) generateProbes(controlPlane *rkev1.RKEControlPlane, entry *pla
 		probeNames = append(probeNames, "kube-controller-manager")
 		probeNames = append(probeNames, "kube-scheduler")
 	}
-	if !(IsOnlyEtcd(entry) && runtime == capr.RuntimeK3S) {
-		// k3s doesn't run the kubelet on etcd only nodes
-		probeNames = append(probeNames, "kubelet")
-	}
+	probeNames = append(probeNames, "kubelet")
 	if !IsOnlyEtcd(entry) && isCalico(controlPlane, runtime) && roleNot(windows)(entry) {
 		probeNames = append(probeNames, "calico")
+	}
+	if isControlPlane(entry) || isEtcd(entry) {
+		probeNames = append(probeNames, "supervisor")
 	}
 
 	for _, probeName := range probeNames {
@@ -146,6 +158,11 @@ func (p *Planner) generateProbes(controlPlane *rkev1.RKEControlPlane, entry *pla
 	probes = insertDataDirForProbes(controlPlane, probes)
 
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
+
+	if isEtcd(entry) || isControlPlane(entry) {
+		supervisorProbe := probes["supervisor"]
+		supervisorProbe.HTTPGetAction.URL = fmt.Sprintf(supervisorProbe.HTTPGetAction.URL, loopbackAddress, capr.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion), runtime)
+	}
 
 	if isControlPlane(entry) {
 		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes["kube-controller-manager"], controlPlane, loopbackAddress, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
