@@ -316,19 +316,12 @@ func (h *autoscalerHandler) setupRBAC(capiCluster *capi.Cluster, mds []*capi.Mac
 	}
 
 	// An empty tokenStr means ensureUserToken found an existing ext token
-	// for the autoscaler user and a persisted kubeconfig secret is already
-	// in place. In that case simply reuse the existing secret rather than
+	// for the autoscaler user and confirmed the persisted kubeconfig
+	// secret is already in place. ensureKubeconfigSecretUsingTemplate
+	// short-circuits when the secret already exists, so passing the empty
+	// value through here simply returns the existing secret without
 	// (re)generating a kubeconfig with a value we cannot recover from the
 	// hashed ext token.
-	if tokenStr == "" {
-		kubeconfig, err := h.secretCache.Get(capiCluster.Namespace, kubeconfigSecretName(capiCluster))
-		if err != nil {
-			logrus.Errorf("[autoscaler] Failed to get existing kubeconfig secret for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
-			return nil, err
-		}
-		return kubeconfig, nil
-	}
-
 	kubeconfig, err := h.ensureKubeconfigSecretUsingTemplate(capiCluster, tokenStr)
 	if err != nil {
 		logrus.Errorf("[autoscaler] Failed to create kubeconfig secret for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)

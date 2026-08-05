@@ -226,7 +226,7 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 		if err != nil {
 			return "", fmt.Errorf("failed to list ext tokens for user %s: %w", username, err)
 		}
-		if extList != nil && len(extList.Items) > 0 {
+		if len(extList.Items) > 0 {
 			_, secretErr := h.secretCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
 			if secretErr == nil {
 				// Ext token and its kubeconfig secret already exist;
@@ -357,7 +357,7 @@ func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 		extList, err := h.extTokenStore.ListForUser(userName)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to list ext tokens for user %s: %w", userName, err))
-		} else if extList != nil {
+		} else {
 			for _, extToken := range extList.Items {
 				if err := h.extTokenStore.Delete(extToken.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 					errs = append(errs, fmt.Errorf("failed to delete ext token %s for user %s: %w", extToken.Name, userName, err))
