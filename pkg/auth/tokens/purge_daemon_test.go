@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/norman/clientbase"
+	"github.com/rancher/rancher/pkg/norman/clientbase"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"

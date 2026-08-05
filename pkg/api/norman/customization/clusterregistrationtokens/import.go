@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/docker/distribution/reference"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/urlbuilder"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/urlbuilder"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"

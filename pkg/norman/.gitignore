@@ -1,0 +1,6 @@
+/.idea
+/bin
+/dist
+*.swp
+/.trash-cache
+/trash.lock

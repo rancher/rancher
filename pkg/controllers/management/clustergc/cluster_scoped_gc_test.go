@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/rancher/pkg/norman/lifecycle"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

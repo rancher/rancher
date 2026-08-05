@@ -655,6 +655,8 @@ github.com/rancher/muchang v0.1.1 h1:2UJ7FPn+DZKspmqioWQpGb/DvotKFJZdFrV961ZPHdU
 github.com/rancher/muchang v0.1.1/go.mod h1:dd9VsmzezLmgriZdgoWYqRmFPhfQlDE9+wABNYvLB0Y=
 github.com/rancher/norman v0.9.7 h1:za9JjsWBUi+0rY3EJ3JdAZFQsadu7fpfC3MHi9a21uE=
 github.com/rancher/norman v0.9.7/go.mod h1:XPdQnSdaiDrQ130ueYppMKIquQz5Ob1tnI6+lcraqqo=
+github.com/rancher/rancher/pkg/norman v0.0.0-20260801020746-c53ebd4b35e9 h1:20AtJNMxMIcKHNeu3TOb0AzzvEC3Is3xm3TP8p7+5Wk=
+github.com/rancher/rancher/pkg/norman v0.0.0-20260801020746-c53ebd4b35e9/go.mod h1:XUVWIDT81RddRYJYtnaZP/PDe2VQIl8jRzV9i7pNn0U=
 github.com/rancher/remotedialer v0.6.1 h1:smq2sHKJn+NxxIeQ8To9CGGkz8l6Ir7EPzfAdjUTt2s=
 github.com/rancher/remotedialer v0.6.1/go.mod h1:0+dmsw9TPjcqNUPrgAVFZpvbxy1r/fRaGPpVa84OMjU=
 github.com/rancher/remotedialer-proxy v0.8.0-rc.5 h1:22cdanfJa8OeBhbiZVixgnQOWmUD1BA2QLN06MpKMKM=

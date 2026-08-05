@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	authzv1 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"

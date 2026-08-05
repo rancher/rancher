@@ -3,7 +3,7 @@ package rbac
 import (
 	"context"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 )

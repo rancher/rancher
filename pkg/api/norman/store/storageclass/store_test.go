@@ -3,7 +3,7 @@ package storageclass
 import (
 	"testing"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"

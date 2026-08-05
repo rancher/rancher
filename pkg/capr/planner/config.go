@@ -23,7 +23,7 @@ import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
-	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"

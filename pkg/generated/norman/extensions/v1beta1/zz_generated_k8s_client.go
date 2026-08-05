@@ -3,8 +3,8 @@ package v1beta1
 import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
-	"github.com/rancher/norman/generator"
-	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/rancher/pkg/norman/generator"
+	"github.com/rancher/rancher/pkg/norman/objectclient"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"

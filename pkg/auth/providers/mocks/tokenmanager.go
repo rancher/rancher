@@ -12,7 +12,7 @@ package mocks
 import (
 	reflect "reflect"
 
-	types "github.com/rancher/norman/types"
+	types "github.com/rancher/rancher/pkg/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	accessor "github.com/rancher/rancher/pkg/auth/accessor"
 	gomock "go.uber.org/mock/gomock"

@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types/set"
+	"github.com/rancher/rancher/pkg/norman/types/set"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"

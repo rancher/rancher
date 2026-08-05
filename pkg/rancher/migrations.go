@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/mcuadros/go-version"
-	"github.com/rancher/norman/condition"
+	"github.com/rancher/rancher/pkg/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"

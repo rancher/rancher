@@ -1,7 +1,7 @@
 package v3
 
 import (
-	"github.com/rancher/norman/condition"
+	"github.com/rancher/rancher/pkg/norman/condition"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

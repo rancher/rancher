@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	normanapi "github.com/rancher/norman/api"
-	"github.com/rancher/norman/store/subtype"
-	"github.com/rancher/norman/types"
+	normanapi "github.com/rancher/rancher/pkg/norman/api"
+	"github.com/rancher/rancher/pkg/norman/store/subtype"
+	"github.com/rancher/rancher/pkg/norman/types"
 	v3public "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	publicSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"

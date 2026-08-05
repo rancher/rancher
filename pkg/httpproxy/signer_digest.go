@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/httperror"
 )
 
 func (d digest) sign(req *http.Request, secrets SecretGetter, auth string) error {

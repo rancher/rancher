@@ -3,11 +3,11 @@ package managementstored
 import (
 	"context"
 
-	"github.com/rancher/norman/store/crd"
-	"github.com/rancher/norman/store/proxy"
-	"github.com/rancher/norman/store/subtype"
-	"github.com/rancher/norman/store/transform"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/store/crd"
+	"github.com/rancher/rancher/pkg/norman/store/proxy"
+	"github.com/rancher/rancher/pkg/norman/store/subtype"
+	"github.com/rancher/rancher/pkg/norman/store/transform"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/rancher/pkg/api/norman/customization/authn"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/cred"

@@ -1,9 +1,9 @@
 package factory
 
 import (
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/factory"
-	m "github.com/rancher/norman/types/mapper"
+	"github.com/rancher/rancher/pkg/norman/types"
+	"github.com/rancher/rancher/pkg/norman/types/factory"
+	m "github.com/rancher/rancher/pkg/norman/types/mapper"
 	"github.com/rancher/rancher/pkg/schemas/mapper"
 )
 

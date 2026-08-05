@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/rancher/norman/types"
-	m "github.com/rancher/norman/types/mapper"
+	"github.com/rancher/rancher/pkg/norman/types"
+	m "github.com/rancher/rancher/pkg/norman/types/mapper"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

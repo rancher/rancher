@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rancher/norman/authorization"
-	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/norman/authorization"
+	"github.com/rancher/rancher/pkg/norman/httperror"
+	"github.com/rancher/rancher/pkg/norman/types"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/auth"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
