@@ -10,7 +10,7 @@ jobs:
   setup-matrix:
     name: Build Test Matrix
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
     permissions:
       contents: read
     outputs:
@@ -40,8 +40,21 @@ jobs:
 
           MATRIX="$(bash .github/scripts/resolve-provisioning-matrix.sh)"
 
+          # Expect compact {"include":[...]} JSON on a single line; bail otherwise.
+          if ! echo "$MATRIX" | jq -e 'has("include") and (.include | type == "array")' >/dev/null; then
+            echo "error: unexpected matrix output: $MATRIX" >&2
+            exit 1
+          fi
+
           # If the returned matrix is empty, the test job below is skipped outright.
           COUNT="$(echo "$MATRIX" | jq '.include | length')"
+
+          # Sanity cap against accidental fan-out (all scopes currently = 9 rows).
+          if [ "$COUNT" -gt 16 ]; then
+            echo "error: too many matrix entries ($COUNT)" >&2
+            exit 1
+          fi
+
           if [ "$COUNT" -gt 0 ]; then RUN=true; else RUN=false; fi
 
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -60,7 +73,7 @@ jobs:
     runs-on:
       - runs-on
       - spot=false
-      - runner=16cpu-linux-x64
+      - runner=${{ matrix.V2PROV_TEST_CPUS }}cpu-linux-x64
       - run-id=${{ github.run_id }}
     env:
       # The registry-cache pod exposes a host port, so use the Docker bridge IP from the runner.
@@ -149,14 +162,11 @@ jobs:
     name: Provisioning Tests Summary
     needs: [setup-matrix, provisioning_tests]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
     steps:
       - name: Generate provisioning tests summary
         run: |
           echo "Provisioning Test Summary"
-          echo "--------------------------------"
-          echo "Test Combinations:"
-          echo "${{ needs.setup-matrix.outputs.matrix }}" 
           echo "--------------------------------"
           if [[ "${{ needs.provisioning_tests.result }}" != "success" && "${{ needs.provisioning_tests.result }}" != "skipped" ]]; then
             echo "Some provisioning tests failed. Please check the logs for details."

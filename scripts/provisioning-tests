@@ -40,6 +40,12 @@ cd $(dirname $0)/..
 
 TB_ORG=rancher
 
+# Only k3s/rke2 are valid distros.
+if [ -n "${V2PROV_TEST_DIST}" ] && [ "${V2PROV_TEST_DIST}" != "k3s" ] && [ "${V2PROV_TEST_DIST}" != "rke2" ]; then
+  echo "error: V2PROV_TEST_DIST must be k3s or rke2, got: ${V2PROV_TEST_DIST}" >&2
+  exit 1
+fi
+
 if [ -z "${V2PROV_TEST_DIST}" ] || [ "${V2PROV_TEST_DIST}" = "k3s" ]; then
   V2PROV_TEST_DIST=k3s
   AIRGAP=-airgap
@@ -50,6 +56,12 @@ fi
 
 if [ -z "${V2PROV_TEST_RUN_REGEX}" ]; then
   V2PROV_TEST_RUN_REGEX="^Test_(General|Provisioning|Fleet)_.*$"
+fi
+
+# Restrict to regex characters so the value can't smuggle extra `go test` flags.
+if ! printf '%s' "${V2PROV_TEST_RUN_REGEX}" | grep -qE '^[A-Za-z0-9_()|.^$*]+$'; then
+  echo "error: invalid characters in V2PROV_TEST_RUN_REGEX: ${V2PROV_TEST_RUN_REGEX}" >&2
+  exit 1
 fi
 
 RUNARG="-run ${V2PROV_TEST_RUN_REGEX}"
@@ -309,7 +321,7 @@ if [ -n "${PRECOMPILE_PID:-}" ]; then
 fi
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
+go test -run "${V2PROV_TEST_RUN_REGEX}" -v -failfast -timeout 60m ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
      dump_rancher_logs
      exit 1
 }

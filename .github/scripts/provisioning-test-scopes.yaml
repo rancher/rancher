@@ -61,8 +61,8 @@ scopes:
       - '^tests/v2prov/tests/machineprovisioning/'    # also operations
       - '^tests/v2prov/tests/fleet/'
     tests:
-      - { dist: k3s,  regex: '^Test_(General|Provisioning|Fleet)_.*$' }
-      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$' }
+      - { dist: k3s,  regex: '^Test_(General|Provisioning|Fleet)_.*$', cpus: 16 }
+      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$', cpus: 16 }
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom/ + machine provisioning
   operations:
@@ -73,9 +73,9 @@ scopes:
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     tests:
-      - { dist: k3s,  regex: '^Test_Operation_.*$' }        # k3s runs all ops in one instance
-      - { dist: rke2, regex: '^Test_Operation_SetA_.*$' }
-      - { dist: rke2, regex: '^Test_Operation_SetB_.*$' }
+      - { dist: k3s,  regex: '^Test_Operation_.*$', cpus: 16 }        # k3s runs all ops in one instance
+      - { dist: rke2, regex: '^Test_Operation_SetA_.*$', cpus: 16 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*$', cpus: 16 }
 
   # Imported clusters
   imported:
@@ -86,16 +86,16 @@ scopes:
       - '^pkg/capr/configserver/'                     # also basic
       - '^tests/v2prov/tests/imported/'
     tests:
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 16 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles|ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 16 }
 
   prebootstrap:
     paths:
       - '^pkg/provisioningv2/prebootstrap/'
       - '^tests/v2prov/tests/prebootstrap/'
     tests:
-      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true' }
-      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true' }
+      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
 
 full:
   - '^pkg/capr/planner/'
