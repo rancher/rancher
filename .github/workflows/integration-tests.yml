@@ -13,10 +13,50 @@ env:
 permissions: {}
 jobs:
   test:
+    name: test (${{ matrix.shard }})
+    strategy:
+      # Don't let one failing shard cancel the others.
+      fail-fast: false
+      matrix:
+        # Each shard gets its own runner and Rancher instance, which isolates the
+        # packages that mutate global settings (catalogv2, tokens) instead of
+        # relying on `-p >1` on a shared Rancher. Shards are balanced by runtime
+        # (catalogv2 is split across two). `run` selects suites; empty means all.
+        # `cpu` is 8 (not 16) because these jobs are wait-bound, not CPU-bound;
+        # bump a shard back to 16 if it proves too slow.
+        include:
+          - shard: catalog-charts
+            cpu: 8
+            packages: ./tests/v2/integration/catalogv2/...
+            run: 'TestRancherManagedChartsSuite|TestSystemChartsVersionSuite'
+          - shard: catalog-repos
+            cpu: 8
+            packages: ./tests/v2/integration/catalogv2/...
+            run: 'TestClusterRepoTestSuite|TestChartsTestSuite|TestUIPluginSuite'
+          - shard: rbac-and-clusters
+            cpu: 8
+            packages: >-
+              ./tests/v2/integration/rbac/...
+              ./tests/v2/integration/clusters/...
+              ./tests/v2/integration/projects/...
+              ./tests/v2/integration/settings/...
+              ./tests/v2/integration/users/...
+              ./tests/v2/integration/authconfigs/...
+            run: ''
+          # tokens runs LAST in its shard: it disables global auth settings and
+          # only restores them in cleanup, so keep it after the other packages.
+          - shard: workloads-and-steve
+            cpu: 8
+            packages: >-
+              ./tests/v2/integration/workloads/...
+              ./tests/v2/integration/steveapi/...
+              ./tests/v2/integration/serviceaccount/...
+              ./tests/v2/integration/tokens/...
+            run: ''
     runs-on:
       - runs-on
       - spot=false
-      - runner=16cpu-linux-x64
+      - runner=${{ matrix.cpu }}cpu-linux-x64
       - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
@@ -87,10 +127,9 @@ jobs:
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
-      - name: Build Integration Setup
-        shell: bash
-        run: |
-          ./tests/v2/integration/scripts/build-integration-setup
       - name: Run Tests
         shell: bash
+        env:
+          INTEGRATION_TEST_PACKAGES: ${{ matrix.packages }}
+          INTEGRATION_TEST_RUN: ${{ matrix.run }}
         run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
