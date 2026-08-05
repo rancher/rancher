@@ -756,6 +756,7 @@ tests:
         path: spec.template.spec.dnsPolicy
 - it: should configure rancher deployments with namespace options
   set:
+    systemDefaultRegistry: ""
     rancherNamespaces:
       enabled: true
       labels:
