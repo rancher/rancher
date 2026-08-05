@@ -2,6 +2,7 @@ package secretmigrator
 
 import (
 	"context"
+
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 
 	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"

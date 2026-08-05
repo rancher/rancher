@@ -319,7 +319,7 @@ func exitCertWriter(ctx context.Context) {
 	}()
 
 	logrus.Info("attempting to stop the share-mnt container so it can reboot on startup")
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
+	c, err := client.New(client.WithAPIVersionNegotiation(), client.FromEnv)
 	if err != nil {
 		logrus.Error(err)
 		os.Exit(0)

@@ -2,8 +2,7 @@ package kubeimport
 
 import (
 	"context"
-
-	"io/ioutil"
+	"os"
 
 	"encoding/base64"
 
@@ -71,7 +70,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, _ *types
 	if configPath == "" {
 		raw = []byte(opts.StringOptions["kubeConfig"])
 	} else {
-		raw, err = ioutil.ReadFile(configPath)
+		raw, err = os.ReadFile(configPath)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to open kubeconfig file: %v", err)

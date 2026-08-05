@@ -2,13 +2,12 @@ package hashers
 
 import (
 	"crypto/rand"
+	"crypto/sha3"
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
-
-	"golang.org/x/crypto/sha3"
 )
 
 const (

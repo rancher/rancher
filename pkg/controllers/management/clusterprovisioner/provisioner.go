@@ -528,6 +528,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		cluster = updatedCluster
 
 		apiEndpoint, serviceAccountToken, caCert, _, err = p.driverUpdate(cluster, *spec)
+		_ = err
 	}
 	// at this point we know the cluster has been modified in driverCreate/Update so reload
 	if newCluster, reloadErr := p.Clusters.Get(cluster.Name, metav1.GetOptions{}); reloadErr == nil {
