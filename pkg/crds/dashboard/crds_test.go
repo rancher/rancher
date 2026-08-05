@@ -52,7 +52,6 @@ func TestListWithFleetEnabledIncludesFleetBootstrapCRDs(t *testing.T) {
 		"bundles.fleet.cattle.io":       http.StatusNotFound,
 		"clusters.fleet.cattle.io":      http.StatusNotFound,
 		"clustergroups.fleet.cattle.io": http.StatusNotFound,
-		"helmops.fleet.cattle.io":       http.StatusNotFound,
 	}))
 	defer server.Close()
 
@@ -63,7 +62,6 @@ func TestListWithFleetEnabledIncludesFleetBootstrapCRDs(t *testing.T) {
 		"bundles.fleet.cattle.io",
 		"clusters.fleet.cattle.io",
 		"clustergroups.fleet.cattle.io",
-		"helmops.fleet.cattle.io",
 	)
 }
 
@@ -75,7 +73,6 @@ func TestListWithFleetAndProvisioningV2IncludesManagedChartCRD(t *testing.T) {
 		"bundles.fleet.cattle.io":       http.StatusOK,
 		"clusters.fleet.cattle.io":      http.StatusOK,
 		"clustergroups.fleet.cattle.io": http.StatusOK,
-		"helmops.fleet.cattle.io":       http.StatusOK,
 	}))
 	defer server.Close()
 
