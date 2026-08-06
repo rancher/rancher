@@ -1,8 +1,10 @@
 package httpproxy
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -545,6 +547,10 @@ func buildTransportWithCABundle(caBundle string) (*http.Transport, error) {
 // parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool.
 // It combines the provided certificates with the system's root CAs.
 func parseCACertificates(caBundle string) (*x509.CertPool, error) {
+	if err := validateCABundleSecurity(caBundle); err != nil {
+		return nil, err
+	}
+
 	// Start with the system's root CAs
 	caCertPool, err := x509.SystemCertPool()
 	if err != nil {
@@ -558,6 +564,44 @@ func parseCACertificates(caBundle string) (*x509.CertPool, error) {
 	}
 
 	return caCertPool, nil
+}
+
+// validateCABundleSecurity applies defensive checks for user-provided PEM data.
+// It rejects oversized bundles and accidental private key material.
+func validateCABundleSecurity(caBundle string) error {
+	if len(caBundle) > maxCABundleBytes {
+		return fmt.Errorf("CA bundle exceeds maximum size of %d bytes", maxCABundleBytes)
+	}
+
+	remaining := []byte(caBundle)
+	foundCertificate := false
+
+	for len(remaining) > 0 {
+		if len(bytes.TrimSpace(remaining)) == 0 {
+			break
+		}
+
+		block, rest := pem.Decode(remaining)
+		if block == nil {
+			return fmt.Errorf("failed to parse CA bundle PEM data")
+		}
+
+		if strings.Contains(strings.ToUpper(block.Type), "PRIVATE KEY") {
+			return fmt.Errorf("CA bundle must not contain private key material")
+		}
+
+		if strings.EqualFold(block.Type, "CERTIFICATE") {
+			foundCertificate = true
+		}
+
+		remaining = rest
+	}
+
+	if !foundCertificate {
+		return fmt.Errorf("CA bundle must contain at least one CERTIFICATE PEM block")
+	}
+
+	return nil
 }
 
 // buildTLSConfigForRoute creates a complete TLS config based on route certificate settings.
