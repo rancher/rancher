@@ -81,7 +81,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/coreos/go-semver v0.3.1
-	github.com/creasty/defaults v1.5.2
+	github.com/creasty/defaults v1.8.0
 	github.com/crewjam/saml v0.0.0-00010101000000-000000000000
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
