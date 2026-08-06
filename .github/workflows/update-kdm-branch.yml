@@ -6,8 +6,8 @@ on:
         type: choice
         description: "New KDM branch value"
         options:
-          - dev-v2.15
-          - release-v2.15
+          - dev-v2.16
+          - release-v2.16
 
 permissions: {}
 
