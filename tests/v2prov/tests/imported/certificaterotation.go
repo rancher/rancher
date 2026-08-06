@@ -81,6 +81,13 @@ func WithCertificateRotationLabels(labels map[string]string) CertificateRotation
 	}
 }
 
+// WithCertificateRotationServices sets the runtime services whose certificates should be rotated.
+func WithCertificateRotationServices(services ...string) CertificateRotationOption {
+	return func(op *opv1alpha1.CertificateRotation) {
+		op.Spec.Args.Services = append([]string(nil), services...)
+	}
+}
+
 func buildCertificateRotationOp(namespace string, clusterRef corev1.ObjectReference, opts ...CertificateRotationOption) *opv1alpha1.CertificateRotation {
 	op := &opv1alpha1.CertificateRotation{
 		ObjectMeta: metav1.ObjectMeta{
