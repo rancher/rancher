@@ -743,7 +743,7 @@ type OIDCConfig struct {
 	// GroupsClaim is used instead of groups
 	GroupsClaim string `json:"groupsClaim,omitempty"`
 
-	// NameClaim is used instead instead of the name claim.
+	// NameClaim is used instead of the name claim.
 	NameClaim string `json:"nameClaim,omitempty"`
 
 	// EmailClaim is used instead of email
@@ -761,6 +761,11 @@ type OIDCConfig struct {
 	// client/secret rather than the user credentials if the underlying provider
 	// supports this.
 	ClientAuthenticatedSearch bool `json:"clientAuthenticatedSearch"`
+
+	// AdminEndpoint is used as a base url for all administration endpoints requests
+	// instead of the Issuer if the underlying provider is configured to expose it's
+	// administration endpoints on a separate hostname.
+	AdminEndpoint string `json:"adminEndpoint,omitempty"`
 }
 
 type OIDCTestOutput struct {
