@@ -1179,9 +1179,18 @@ func TestInitialRolesReady(t *testing.T) {
 			annotations:   map[string]string{projectIDAnnotation: projectID},
 			clusterRoles:  twoRoles,
 			prtbs:         []*v3.ProjectRoleTemplateBinding{prtb("p-123xyz", "member-prtb")},
-			bindings:      []*rbacv1.RoleBinding{{ObjectMeta: metav1.ObjectMeta{Name: "rb", Namespace: namespaceName}}},
+			bindings:      []*rbacv1.RoleBinding{aggregationRoleBinding("rb", namespaceName, pkgrbac.GetPRTBOwnerLabel("member-prtb"))},
 			expectListRBs: true,
 			want:          true,
+		},
+		{
+			name:          "project has prtbs but only an unrelated binding is not ready",
+			annotations:   map[string]string{projectIDAnnotation: projectID},
+			clusterRoles:  twoRoles,
+			prtbs:         []*v3.ProjectRoleTemplateBinding{prtb("p-123xyz", "member-prtb")},
+			bindings:      []*rbacv1.RoleBinding{{ObjectMeta: metav1.ObjectMeta{Name: "rb", Namespace: namespaceName}}},
+			expectListRBs: true,
+			want:          false,
 		},
 	}
 	for _, test := range tests {
