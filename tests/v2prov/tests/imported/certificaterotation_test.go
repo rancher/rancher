@@ -1,7 +1,9 @@
 package imported
 
 import (
+	"context"
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 	"testing"
@@ -19,7 +21,9 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 type certificateMetadata struct {
@@ -65,6 +69,171 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 
 	assertDownstreamAPIUsableAfterRotation(t, fx)
+}
+
+func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t *testing.T) {
+	cs, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-service-argument", []cluster.ImportedNodePool{
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
+	})
+
+	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
+	tlsDir := fmt.Sprintf("/var/lib/rancher/%s/server/tls", runtimeName)
+	etcdPaths := []string{
+		path.Join(tlsDir, "etcd/server-client.crt"),
+		path.Join(tlsDir, "etcd/peer-server-client.crt"),
+	}
+	nonEtcdPaths := []string{
+		path.Join(tlsDir, "client-admin.crt"),
+		path.Join(tlsDir, "serving-kube-apiserver.crt"),
+		path.Join(tlsDir, "kube-controller-manager/kube-controller-manager.crt"),
+		path.Join(tlsDir, "kube-scheduler/kube-scheduler.crt"),
+	}
+	allPaths := append(append([]string(nil), etcdPaths...), nonEtcdPaths...)
+	before := collectRequiredCertificateMetadata(t, fx, allPaths)
+
+	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationServices("etcd"))
+	assert.Equal(t, []string{"etcd"}, op.Spec.Args.Services)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
+	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
+	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+
+	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
+	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
+	assertDownstreamAPIUsableAfterRotation(t, fx)
+
+	after := collectRequiredCertificateMetadata(t, fx, allPaths)
+	assertCertificateRotationMetadata(t, before, after, etcdPaths)
+	assertCertificateMetadataUnchanged(t, before, after, nonEtcdPaths)
+}
+
+func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *testing.T) {
+	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
+	if runtimeName != capr.RuntimeRKE2 {
+		t.Skip("RKE2-only: validates imported RKE2 component TLS node arguments")
+	}
+
+	cs, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	dataDir := "/var/lib/rancher/rke2"
+	kcmDefaultCert := dataDir + "/server/tls/kube-controller-manager/kube-controller-manager.crt"
+	kcmDefaultKey := dataDir + "/server/tls/kube-controller-manager/kube-controller-manager.key"
+	ksDefaultCert := dataDir + "/server/tls/kube-scheduler/kube-scheduler.crt"
+	ksDefaultKey := dataDir + "/server/tls/kube-scheduler/kube-scheduler.key"
+	kcmCustomDir := dataDir + "/server/tls/rotation-test/kube-controller-manager"
+	ksCustomDir := dataDir + "/server/tls/rotation-test/kube-scheduler"
+	kcmCustomCert := kcmCustomDir + "/kube-controller-manager.crt"
+	kcmCustomKey := kcmCustomDir + "/kube-controller-manager.key"
+	ksCustomCert := ksCustomDir + "/kube-scheduler.crt"
+	ksCustomKey := ksCustomDir + "/kube-scheduler.key"
+	configPath := "/etc/rancher/rke2/config.yaml.d/60-certificate-rotation-tls-test.yaml"
+
+	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-rke2-tls-args", []cluster.ImportedNodePool{
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
+	})
+
+	configureCommand := strings.Join([]string{
+		"set -e",
+		fmt.Sprintf("mkdir -p %s %s", shellQuote(kcmCustomDir), shellQuote(ksCustomDir)),
+		fmt.Sprintf("cp %s %s", shellQuote(kcmDefaultCert), shellQuote(kcmCustomCert)),
+		fmt.Sprintf("cp %s %s", shellQuote(kcmDefaultKey), shellQuote(kcmCustomKey)),
+		fmt.Sprintf("cp %s %s", shellQuote(ksDefaultCert), shellQuote(ksCustomCert)),
+		fmt.Sprintf("cp %s %s", shellQuote(ksDefaultKey), shellQuote(ksCustomKey)),
+		fmt.Sprintf("cat > %s <<'EOF'\nkube-controller-manager-arg:\n  - secure-port=10261\n  - tls-cert-file=%s\n  - tls-private-key-file=%s\nkube-scheduler-arg:\n  - secure-port=10262\n  - tls-cert-file=%s\n  - tls-private-key-file=%s\nEOF", shellQuote(configPath), kcmCustomCert, kcmCustomKey, ksCustomCert, ksCustomKey),
+		"systemctl restart rke2-server",
+	}, "\n")
+	if out, err := cluster.ExecOnPod(cs, fx.ns.Name, fx.pods[0].Name, "sh", "-c", configureCommand); err != nil {
+		t.Fatalf("failed to configure RKE2 TLS arguments on pod %s: %v\noutput: %s", fx.pods[0].Name, err, strings.TrimSpace(out))
+	}
+
+	binDir := "/var/lib/rancher/rke2/bin"
+	kubeconfig := "/etc/rancher/rke2/rke2.yaml"
+	kubectlEnv := fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
+	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, kubectlEnv, []string{"imported-init-0"})
+	if out, err := fx.execKubectl(t, "kubectl get --raw=/readyz"); err != nil {
+		t.Fatalf("downstream API did not become ready after RKE2 TLS reconfiguration: %v\noutput: %s", err, strings.TrimSpace(out))
+	}
+
+	expectedNodeArgs := []string{
+		"secure-port=10261",
+		"tls-cert-file=" + kcmCustomCert,
+		"tls-private-key-file=" + kcmCustomKey,
+		"secure-port=10262",
+		"tls-cert-file=" + ksCustomCert,
+		"tls-private-key-file=" + ksCustomKey,
+	}
+	missingNodeArgs := append([]string(nil), expectedNodeArgs...)
+	err = utilwait.PollUntilContextTimeout(cs.Ctx, 2*time.Second, 5*time.Minute, true, func(_ context.Context) (bool, error) {
+		nodes, err := cs.Mgmt.Node().List(fx.mgmtCluster.Name, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		missingNodeArgs = append(missingNodeArgs[:0], expectedNodeArgs...)
+		if len(nodes.Items) == 1 {
+			annotation := nodes.Items[0].Status.NodeAnnotations["rke2.io/node-args"]
+			for i := 0; i < len(missingNodeArgs); {
+				if strings.Contains(annotation, missingNodeArgs[i]) {
+					missingNodeArgs = append(missingNodeArgs[:i], missingNodeArgs[i+1:]...)
+					continue
+				}
+				i++
+			}
+		}
+		return len(missingNodeArgs) == 0, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for RKE2 node args to contain expected TLS values; missing values: %q: %v", missingNodeArgs, err)
+	}
+
+	mgmtCluster, err := cs.Mgmt.Cluster().Get(fx.mgmtCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("get imported management cluster %s after RKE2 TLS reconfiguration: %v", fx.mgmtCluster.Name, err)
+	}
+	err = wait.ClusterObject(cs.Ctx, cs.Mgmt.Cluster().Watch, mgmtCluster, func(obj runtime.Object) (bool, error) {
+		mgmtCluster = obj.(*v3.Cluster)
+		return v3.Ready.IsTrue(mgmtCluster), nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for imported management cluster %s to be Ready after RKE2 TLS reconfiguration: %v", fx.mgmtCluster.Name, err)
+	}
+
+	rotatingPaths := []string{
+		dataDir + "/server/tls/client-admin.crt",
+		dataDir + "/server/tls/serving-kube-apiserver.crt",
+		dataDir + "/server/tls/etcd/server-client.crt",
+		dataDir + "/server/tls/etcd/peer-server-client.crt",
+	}
+	unchangedPaths := []string{
+		kcmCustomCert,
+		ksCustomCert,
+	}
+	allPaths := append(append([]string(nil), rotatingPaths...), unchangedPaths...)
+	before := collectRequiredCertificateMetadata(t, fx, allPaths)
+
+	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
+	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
+	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
+
+	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
+	assertDownstreamAPIUsableAfterRotation(t, fx)
+	after := collectRequiredCertificateMetadata(t, fx, allPaths)
+	assertCertificateRotationMetadata(t, before, after, rotatingPaths)
+	assertCertificateMetadataUnchanged(t, before, after, unchangedPaths)
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *testing.T) {
@@ -319,6 +488,35 @@ func assertCertificateRotationMetadata(t *testing.T, before, after map[string]ce
 		}
 		if afterMeta.notBefore.Before(beforeMeta.notBefore) {
 			t.Fatalf("certificate notBefore moved backwards after rotation: %s", detail)
+		}
+	}
+}
+
+func assertCertificateMetadataUnchanged(t *testing.T, before, after map[string]certificateMetadata, paths []string) {
+	t.Helper()
+
+	for _, certPath := range paths {
+		beforeMeta, ok := before[certPath]
+		if !ok {
+			t.Fatalf("missing pre-rotation certificate metadata for unchanged path %s", certPath)
+		}
+		afterMeta, ok := after[certPath]
+		if !ok {
+			t.Fatalf("missing post-rotation certificate metadata for unchanged path %s", certPath)
+		}
+
+		detail := fmt.Sprintf("path=%s before=%+v after=%+v", certPath, beforeMeta, afterMeta)
+		if beforeMeta.serial != afterMeta.serial {
+			t.Fatalf("certificate serial changed unexpectedly: %s", detail)
+		}
+		if beforeMeta.fingerprintSHA256 != afterMeta.fingerprintSHA256 {
+			t.Fatalf("certificate SHA-256 fingerprint changed unexpectedly: %s", detail)
+		}
+		if !beforeMeta.notBefore.Equal(afterMeta.notBefore) {
+			t.Fatalf("certificate notBefore changed unexpectedly: %s", detail)
+		}
+		if !beforeMeta.notAfter.Equal(afterMeta.notAfter) {
+			t.Fatalf("certificate notAfter changed unexpectedly: %s", detail)
 		}
 	}
 }
