@@ -39,4 +39,7 @@ rules:
   - apiGroups: [ "apiregistration.k8s.io" ]
     resources: [ "apiservices" ]
     verbs: [ "delete" ]
+  - apiGroups: [ "turtles-capi.cattle.io" ]
+    resources: [ "capiproviders", "clusterctlconfigs" ]
+    verbs: [ "get", "list", "patch", "delete" ]
 {{- end }}
