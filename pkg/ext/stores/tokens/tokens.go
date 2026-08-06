@@ -1786,6 +1786,9 @@ func IngestTTL(ttl int64, maxSetting, defaultSetting settings.Setting) (int64, e
 	if err != nil {
 		return 0, err
 	}
+	if maxValue < 1 {
+		maxValue = -1 // "0" means no max — use the real "never expires" value.
+	}
 	defaultValue, err := ParseTTLToMilliseconds(defaultSetting)
 	if err != nil {
 		return 0, err
@@ -1827,13 +1830,17 @@ func DefaultTTL(ttl, defaultValue int64) int64 {
 
 // ClampToMaxTTL ensures that the returned ttl is smaller than the specified
 // maximum. In other words, it returns the minimum of the 2 inputs, taking into
-// account the special encoding of `infinity` (`value < 0`). The function
-// assumes that `ttl` is not `0`, i.e. that a request for the default has been
-// resolved already.
+// account the special encoding of `infinity` (`value < 0`) for both max and
+// ttl. The function assumes that `ttl` is not `0`, i.e. that a request for the
+// default has been resolved already.
 func ClampToMaxTTL(ttl, max int64) int64 {
 	if max < 1 {
 		// maximum is infinity, ttl is always smaller or equal
 		return ttl
+	}
+	if ttl < 0 {
+		// ttl asked for infinity, but max is finite — cap it at max.
+		return max
 	}
 	// for a finite maximum we can do a simple
 	return min(ttl, max)
