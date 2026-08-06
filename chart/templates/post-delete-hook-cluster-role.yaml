@@ -14,7 +14,7 @@ rules:
     verbs: [ "get", "list", "delete" ]
   - apiGroups: [ "batch" ]
     resources: [ "jobs", "cronjobs" ]
-    verbs: [ "get", "list", "watch", "delete", "create" ]
+    verbs: [ "get", "list", "watch", "delete", "create", "patch" ]
   - apiGroups: [ "rbac.authorization.k8s.io" ]
     resources: [ "clusterroles", "clusterrolebindings", "roles", "rolebindings" ]
     verbs: [ "get", "list", "delete", "create", "patch" ]
