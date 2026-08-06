@@ -293,7 +293,7 @@ func (s *Store) Create(
 
 	defaultTTLPtr, err := s.getDefaultTTL()
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %v", err))
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %w", err))
 	}
 	maxTTL, err := s.getMaxTTL()
 	if err != nil {
@@ -305,10 +305,10 @@ func (s *Store) Create(
 	ttlMilliseconds := kubeconfig.Spec.TTL * 1000
 	switch {
 	case ttlMilliseconds < 0:
-		return nil, apierrors.NewBadRequest("spec.ttl can't be negative")
+		return nil, apierrors.NewBadRequest("spec.ttl can't be negative (infinite)")
 	case ttlMilliseconds == 0:
 		if defaultTTL < 0 {
-			return nil, apierrors.NewBadRequest("spec.ttl can't be made negative")
+			return nil, apierrors.NewBadRequest("spec.ttl can't be negative (infinite), please fix the default")
 		}
 		ttlMilliseconds = defaultTTL
 		kubeconfig.Spec.TTL = defaultTTLSeconds
