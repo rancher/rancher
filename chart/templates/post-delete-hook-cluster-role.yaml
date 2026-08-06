@@ -19,7 +19,7 @@ rules:
     resources: [ "clusterroles", "clusterrolebindings", "roles", "rolebindings" ]
     verbs: [ "get", "list", "delete", "create", "patch", "watch" ]
   - apiGroups: [ "" ]
-    resources: [ "pods", "secrets", "services", "configmaps" ]
+    resources: [ "pods", "secrets", "services", "configmaps", "namespaces" ]
     verbs: [ "get", "list", "delete", "patch", "update" ]
   - apiGroups: [ "" ]
     resources: [ "serviceaccounts" ]
