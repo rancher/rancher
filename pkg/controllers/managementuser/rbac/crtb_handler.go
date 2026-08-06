@@ -65,28 +65,55 @@ type crtbLifecycle struct {
 }
 
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	logrus.Debugf("ZZZZZZ rbac/CRTB create %q", obj.Name)
+
 	if features.AggregatedRoleTemplates.Enabled() {
+		logrus.Debugf("ZZZZZZ rbac/CRTB create %q - skip, using aggregated role templates", obj.Name)
 		return nil, nil
 	}
 	remoteConditions := []metav1.Condition{}
+
+	logrus.Debugf("ZZZZZZ rbac/CRTB create %q - reconcile", obj.Name)
+	defer func() {
+		logrus.Debugf("ZZZZZZ rbac/CRTB create %q - reconcile done", obj.Name)
+	}()
+
 	return obj, errors.Join(c.syncCRTB(obj, &remoteConditions),
 		c.updateStatus(obj, remoteConditions))
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	logrus.Debugf("ZZZZZZ rbac/CRTB updated %q", obj.Name)
+
 	if features.AggregatedRoleTemplates.Enabled() {
+		logrus.Debugf("ZZZZZZ rbac/CRTB updated %q - skip, using aggregated role templates", obj.Name)
 		return nil, nil
 	}
 	remoteConditions := []metav1.Condition{}
+
+	logrus.Debugf("ZZZZZZ rbac/CRTB updated %q - reconcile", obj.Name)
+	defer func() {
+		logrus.Debugf("ZZZZZZ rbac/CRTB updated %q - reconcile done", obj.Name)
+	}()
+
 	return obj, errors.Join(c.reconcileCRTBUserClusterLabels(obj, &remoteConditions),
 		c.syncCRTB(obj, &remoteConditions),
 		c.updateStatus(obj, remoteConditions))
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	logrus.Debugf("ZZZZZZ rbac/CRTB remove %q", obj.Name)
+
 	if features.AggregatedRoleTemplates.Enabled() {
+		logrus.Debugf("ZZZZZZ rbac/CRTB remove %q - skip, using aggregated role templates", obj.Name)
 		return nil, nil
 	}
+
+	logrus.Debugf("ZZZZZZ rbac/CRTB remove %q - reconcile", obj.Name)
+	defer func() {
+		logrus.Debugf("ZZZZZZ rbac/CRTB remove %q - reconcile done", obj.Name)
+	}()
+
 	err := c.ensureCRTBDelete(obj, &obj.Status.RemoteConditions)
 	if err != nil {
 		return obj, errors.Join(err,
@@ -98,22 +125,31 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: clusterRolesExists}
 
+	logrus.Debugf("ZZZZZZ syncCRTB %q - role-template-name   %q", binding.Name, binding.RoleTemplateName)
+	logrus.Debugf("ZZZZZZ syncCRTB %q - user-name            %q", binding.Name, binding.UserName)
+	logrus.Debugf("ZZZZZZ syncCRTB %q - group-principal-name %q", binding.Name, binding.GroupPrincipalName)
+	logrus.Debugf("ZZZZZZ syncCRTB %q - group-name           %q", binding.Name, binding.GroupName)
+
 	if binding.RoleTemplateName == "" {
+		logrus.Debugf("ZZZZZZ syncCRTB %q - skip, no role template", binding.Name)
 		logrus.Warnf("ClusterRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
 		c.s.AddCondition(remoteConditions, condition, roleTemplateDoesNotExist, nil)
 		return nil
 	}
 
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
+		logrus.Debugf("ZZZZZZ syncCRTB %q - skip, no user, or no group", binding.Name)
 		c.s.AddCondition(remoteConditions, condition, userOrGroupDoesNotExist, nil)
 		return nil
 	}
 
 	rt, err := c.rtLister.Get("", binding.RoleTemplateName)
 	if err != nil {
+		logrus.Debugf("ZZZZZZ syncCRTB %q - skip, get FAIL: %v", binding.Name, err)
 		err = fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
 		c.s.AddCondition(remoteConditions, condition, failedToGetRoleTemplate, err)
 		if apierrors.IsNotFound(err) {
+			logrus.Debugf("ZZZZZZ syncCRTB %q - skip, not found", binding.Name)
 			logrus.Warnf(
 				"RoleTemplate %s not found for ClusterRoleTemplateBinding %s. Skipping.",
 				binding.RoleTemplateName,
@@ -126,11 +162,13 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding, remoteC
 
 	roles := map[string]*v3.RoleTemplate{}
 	if err := c.m.gatherRoles(rt, roles, 0); err != nil {
+		logrus.Debugf("ZZZZZZ syncCRTB %q - skip, gather roles FAIL: %v", binding.Name, err)
 		c.s.AddCondition(remoteConditions, condition, failedToGatherRoles, err)
 		return err
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
+		logrus.Debugf("ZZZZZZ syncCRTB %q - skip, ensure roles FAIL: %v", binding.Name, err)
 		err = fmt.Errorf("couldn't ensure roles: %w", err)
 		c.s.AddCondition(remoteConditions, condition, failedToCreateRoles, err)
 		return err
@@ -139,6 +177,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding, remoteC
 
 	condition = metav1.Condition{Type: clusterRoleBindingsExists}
 	if err := c.m.ensureClusterBindings(roles, binding); err != nil {
+		logrus.Debugf("ZZZZZZ syncCRTB %q - skip, ensure cluster bindings FAIL: %v", binding.Name, err)
 		err = fmt.Errorf("couldn't ensure cluster bindings %v: %w", binding.Name, err)
 		c.s.AddCondition(remoteConditions, condition, failedToCreateBindings, err)
 		return err
@@ -148,6 +187,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding, remoteC
 	condition = metav1.Condition{Type: serviceAccountImpersonatorExists}
 	if binding.UserName != "" {
 		if err := c.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
+			logrus.Debugf("ZZZZZZ syncCRTB %q - skip, ensure impersonator FAIL: %v", binding.Name, err)
 			err = fmt.Errorf("couldn't ensure service account impersonator: %w", err)
 			c.s.AddCondition(remoteConditions, condition, failedToCreateServiceAccountImpersonator, err)
 			return err
@@ -155,6 +195,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding, remoteC
 	}
 	c.s.AddCondition(remoteConditions, condition, serviceAccountImpersonatorExists, nil)
 
+	logrus.Debugf("ZZZZZZ syncCRTB %q - OK", binding.Name)
 	return nil
 }
 
@@ -186,10 +227,9 @@ func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding,
 }
 
 func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
-	/* Prior to 2.5, for every CRTB, following CRBs are created in the user clusters
-		1. CRTB.UID is the label value for a CRB, authz.cluster.cattle.io/rtb-owner=CRTB.UID
-	Using this labels, list the CRBs and update them to add a label with ns+name of CRTB
-	*/
+	// Prior to 2.5, for every CRTB, the following CRBs are created in the user clusters
+	//	1. CRTB.UID is the label value for a CRB, authz.cluster.cattle.io/rtb-owner=CRTB.UID
+	// Using this label, list the CRBs and update them to add a label with ns+name of CRTB
 	condition := metav1.Condition{Type: crtbLabelsUpdated}
 
 	if binding.Labels[rtbCrbRbLabelsUpdated] == "true" {
@@ -265,21 +305,27 @@ var timeNow = func() time.Time {
 }
 
 func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remoteConditions []metav1.Condition) error {
+	logrus.Debugf("ZZZZZZ rbac/CRTB update status %q, cond=((%v))", crtb.Name, remoteConditions)
+
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		crtbFromCluster, err := c.crtbCache.Get(crtb.Namespace, crtb.Name)
 		if err != nil {
+			logrus.Debugf("ZZZZZZ rbac/CRTB update status %q, get FAIL: %v", crtb.Name, err)
 			return err
 		}
 		if status.CompareConditions(crtbFromCluster.Status.RemoteConditions, remoteConditions) {
+			logrus.Debugf("ZZZZZZ rbac/CRTB update status %q, skip, conditions unchanged", crtb.Name)
 			return nil
 		}
 
 		crtbFromCluster.Status.SummaryRemote = status.SummaryCompleted
 		if crtbFromCluster.Status.SummaryLocal == status.SummaryCompleted {
+			logrus.Debugf("ZZZZZZ rbac/CRTB update status %q, summary complete (remote & local complete)", crtb.Name)
 			crtbFromCluster.Status.Summary = status.SummaryCompleted
 		}
 		for _, c := range remoteConditions {
 			if c.Status != metav1.ConditionTrue {
+				logrus.Debugf("ZZZZZZ rbac/CRTB update status %q, summary error, remote error", crtb.Name)
 				crtbFromCluster.Status.Summary = status.SummaryError
 				crtbFromCluster.Status.SummaryRemote = status.SummaryError
 				break
@@ -290,6 +336,8 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remote
 		crtbFromCluster.Status.ObservedGenerationRemote = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.RemoteConditions = remoteConditions
 		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
+
+		logrus.Debugf("ZZZZZZ rbac/CRTB update status %q, result: %v", crtb.Name, err)
 		return err
 	})
 }
