@@ -335,10 +335,10 @@ var legacyOwnerIndexes = map[string]string{
 // owning PRTB does not belong to the namespace's current project. Bindings left behind
 // when a namespace moves between projects are the main target; when the namespace belongs to no
 // project, no owner is valid so every PRTB-owned binding is removed.
-func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectID string, prtbs []any) error {
+func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectLabel string, prtbs []any) error {
 	var backingNamespace string
-	if projectID != "" {
-		clusterID, projectID, found := strings.Cut(projectID, ":")
+	if projectLabel != "" {
+		clusterID, projectID, found := strings.Cut(projectLabel, ":")
 		if !found {
 			return nil
 		}
@@ -384,12 +384,12 @@ func (n *nsLifecycle) removePRTBRoleBindingsNotInProject(nsName, projectID strin
 // prtbOwnerInCurrentProject reports whether rb is owned by a PRTB and if so, whether that
 // PRTB belongs to the namespace's current project.
 func (n *nsLifecycle) prtbOwnerInCurrentProject(rb *rbacv1.RoleBinding, backingNamespace string, allowedOwnerLabels map[string]bool) (owned, inProject bool, err error) {
+	owned = isPRTBOwnedRoleBinding(rb)
+
 	for key := range rb.Labels {
-		if strings.HasPrefix(key, rbac.PrtbOwnerLabel+"-") {
-			owned = true
-			if allowedOwnerLabels[key] {
-				inProject = true
-			}
+		if allowedOwnerLabels[key] {
+			inProject = true
+			break
 		}
 	}
 
@@ -402,7 +402,6 @@ func (n *nsLifecycle) prtbOwnerInCurrentProject(rb *rbacv1.RoleBinding, backingN
 		if value == "" {
 			continue
 		}
-		owned = true
 		prtbs, lookupErr := n.m.prtbIndexer.ByIndex(index, value)
 		if lookupErr != nil {
 			return owned, inProject, errors.Wrapf(lookupErr, "couldn't find prtb for %s", rb.Name)
@@ -426,9 +425,10 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 		var desiredRole string
 		var projectName string
 		if ns.DeletionTimestamp == nil {
-			if parts := strings.SplitN(ns.Annotations[projectIDAnnotation], ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-				projectName = parts[1]
-				desiredRole = fmt.Sprintf(projectNSGetClusterRoleNameFmt, parts[1], name)
+			var found bool
+			_, projectName, found = strings.Cut(ns.Annotations[projectIDAnnotation], ":")
+			if found {
+				desiredRole = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, name)
 			}
 		}
 
@@ -705,7 +705,11 @@ func (n *nsLifecycle) initialRolesReady(ns *v1.Namespace) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("getting role bindings for namespace %s: %w", ns.Name, err)
 		}
-		if len(bindings) == 0 {
+
+		found := slices.ContainsFunc(bindings, func(rb *rbacv1.RoleBinding) bool {
+			return isPRTBOwnedRoleBinding(rb)
+		})
+		if !found {
 			return false, nil
 		}
 	}
@@ -746,6 +750,9 @@ func isPRTBOwnedRoleBinding(rb *rbacv1.RoleBinding) bool {
 // so InitialRolesPopulated is re-evaluated when those ClusterRoles appear. crByNS already filters to
 // the relevant ClusterRoles and extracts the namespaces they reference.
 func clusterRoleEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
 	nsNames, err := crByNS(obj)
 	if err != nil {
 		return nil, err
