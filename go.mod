@@ -17,7 +17,7 @@ replace (
 	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0
-	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.43.0
+	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v1.43.0
 	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.43.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.43.0
