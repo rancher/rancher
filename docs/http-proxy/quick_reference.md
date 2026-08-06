@@ -1,7 +1,44 @@
 # Quick Reference: ProxyEndpoint Route Fields
 
-This document is a concise reference for the `ProxyEndpointRoute` spec in
+This document is a comprehensive reference for ProxyEndpoint
+configuration and the `ProxyEndpointRoute` spec in
 `pkg/apis/management.cattle.io/v3/proxy_types.go`.
+
+
+This is the primary reference for ProxyEndpoint configuration, including:
+- ProxyEndpointRoute field definitions
+- TLS and certificate options
+- Validation rules
+- Common configuration examples
+
+
+## Documentation Overview
+
+For detailed guides on specific topics, see:
+
+| Topic | File | Purpose |
+|-------|------|---------|
+| **TLS Configuration** | [tls-configuration.md](tls-configuration.md) | Setup guides for CA bundles, SNI, mTLS |
+| **Security Controls** | [security-controls.md](security-controls.md) | Runtime safeguards for certificate data |
+| **API Reference** | [api-reference.md](api_reference.md) | Complete field-level documentation |
+| **Implementation** | [implementation-summary.md](implementation_summary.md) | Technical implementation details |
+| **Developer Guide** | [cert-management-developer.md](cert_management_developer.md) | Architecture and testing strategy |
+
+## Common Tasks
+
+**Configuring TLS for a route?**
+→ See [tls-configuration.md](tls-configuration.md)
+
+**Worried about certificate security?**
+→ See [security-controls.md](security-controls.md)
+
+**Implementing mTLS?**
+→ See [tls-configuration.md#mutual-tls-mtls](tls-configuration.md#mutual-tls-mtls)
+
+**Handling self-signed certs?**
+→ See [tls-configuration.md#self-signed-endpoint-with-custom-ca](tls-configuration.md#self-signed-endpoint-with-custom-ca)
+
+## Field Reference
 
 ## Core route field
 

@@ -1,6 +1,7 @@
 package httpproxy
 
 import (
+	"strings"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -67,6 +68,45 @@ func TestBuildTLSConfigForRoute_WithInvalidCABundle_ReturnsError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, tlsConfig)
 	assert.Contains(t, err.Error(), "failed to parse CA bundle")
+}
+
+func TestBuildTLSConfigForRoute_WithPrivateKeyInCABundle_ReturnsError(t *testing.T) {
+	privateKeyPEM := "-----BEGIN PRIVATE KEY-----\nMIIB\n-----END PRIVATE KEY-----"
+	route := &mgmt.ProxyEndpointRoute{
+		Domain:   "api.example.com",
+		CABundle: privateKeyPEM,
+	}
+
+	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
+	require.Error(t, err)
+	assert.Nil(t, tlsConfig)
+	assert.Contains(t, err.Error(), "must not contain private key")
+}
+
+func TestBuildTLSConfigForRoute_WithOversizedCABundle_ReturnsError(t *testing.T) {
+	oversized := strings.Repeat("A", maxCABundleBytes+1)
+	route := &mgmt.ProxyEndpointRoute{
+		Domain:   "api.example.com",
+		CABundle: oversized,
+	}
+
+	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
+	require.Error(t, err)
+	assert.Nil(t, tlsConfig)
+	assert.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestBuildTLSConfigForRoute_WithNoCertificatePEMBlock_ReturnsError(t *testing.T) {
+	nonCertPEM := "-----BEGIN COMMENT-----\nmetadata\n-----END COMMENT-----"
+	route := &mgmt.ProxyEndpointRoute{
+		Domain:   "api.example.com",
+		CABundle: nonCertPEM,
+	}
+
+	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
+	require.Error(t, err)
+	assert.Nil(t, tlsConfig)
+	assert.Contains(t, err.Error(), "must contain at least one CERTIFICATE")
 }
 
 func TestBuildTLSConfigForRoute_WithVerifyHostnameFalse_DisablesVerification(t *testing.T) {
