@@ -314,6 +314,10 @@ webhook: ""
 # helm values set here will override all other global values used when installing the fleet chart.
 fleet: ""
 
+# helm values to use when installing the rancher-turtles chart.
+# helm values set here will override all other global values used when installing the turtles chart.
+turtles: ""
+
 # Create a dynamic manifests via values:
 # Beware: There will be no validation on these resource manifests in `extraObjects` - they must be valid k8s resources.
 # If you encounter issues installing/upgrading rancher while using these, please investigate these first.

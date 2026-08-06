@@ -16,3 +16,8 @@ data:
   {{- else if .Values.fleet }}
   fleet: {{ toYaml .Values.fleet | quote }}
   {{- end }}
+  {{- if and .Values.turtles (kindIs "string" .Values.turtles) }}
+  rancher-turtles: {{ .Values.turtles | quote }}
+  {{- else if .Values.turtles }}
+  rancher-turtles: {{ toYaml .Values.turtles | quote }}
+  {{- end }}
