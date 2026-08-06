@@ -20,7 +20,7 @@ rules:
     verbs: [ "get", "list", "delete", "create", "patch" ]
   - apiGroups: [ "" ]
     resources: [ "pods", "secrets", "services", "configmaps" ]
-    verbs: [ "get", "list", "delete", "patch" ]
+    verbs: [ "get", "list", "delete", "patch", "update" ]
   - apiGroups: [ "" ]
     resources: [ "serviceaccounts" ]
     verbs: [ "get", "list", "delete", "create", "patch" ]
