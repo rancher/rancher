@@ -8,9 +8,6 @@ on:
       - "Nightly Provisioning Tests"
     types: [completed]
 
-permissions:
-  actions: write
-
 jobs:
   retry:
     # Only retry once, only on failure.
@@ -23,6 +20,8 @@ jobs:
        (github.event.workflow_run.event == 'push' &&
         github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Rerun failed jobs
         env:
@@ -43,6 +42,8 @@ jobs:
       github.event.workflow_run.event == 'schedule' &&
       github.event.workflow_run.run_attempt < 3
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Rerun failed jobs
         env:
