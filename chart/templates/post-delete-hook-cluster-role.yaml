@@ -42,4 +42,7 @@ rules:
   - apiGroups: [ "turtles-capi.cattle.io" ]
     resources: [ "capiproviders", "clusterctlconfigs" ]
     verbs: [ "get", "list", "patch", "delete" ]
+  - apiGroups: [ "apiextensions.k8s.io" ]
+    resources: [ "customresourcedefinitions" ]
+    verbs: [ "delete" ]
 {{- end }}
