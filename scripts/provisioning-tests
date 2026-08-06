@@ -22,6 +22,17 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; the
   sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
 fi
 
+echo "Total system resources: $(nproc) CPUs, $(free -m | awk '/^Mem:/{print $2}')MB RAM"
+
+vmstat 5 > /tmp/c &
+CPU_PID=$!
+
+# Started after the cgroup migration above: the repeating free/awk forks below
+# would otherwise race with moving processes out of the root cgroup and cause
+# the subtree_control write to fail with EBUSY.
+( while true; do free -m | awk '/^Mem:/{print $3}'; sleep 5; done ) > /tmp/m &
+MEM_PID=$!
+
 cleanup()
 {
     EXIT=$?
@@ -33,6 +44,12 @@ cleanup()
       kill $PID
       wait $PID
     fi
+
+    kill $CPU_PID $MEM_PID 2>/dev/null
+    awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
+    awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
+    rm -f /tmp/c /tmp/m
+
     return $EXIT
 }
 
@@ -321,7 +338,7 @@ if [ -n "${PRECOMPILE_PID:-}" ]; then
 fi
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -run "${V2PROV_TEST_RUN_REGEX}" -v -failfast -timeout 60m ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
+go test -run "${V2PROV_TEST_RUN_REGEX}" -v -failfast -timeout 60m -p 5 ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
      dump_rancher_logs
      exit 1
 }

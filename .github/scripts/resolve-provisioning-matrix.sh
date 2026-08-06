@@ -26,7 +26,7 @@
 # =============================================================================
 set -uo pipefail
 
-# The rules file sits next to this script (SCOPES_CONFIG can override it for tests).
+# The rules file sits next to this script (SCOPES_CONFIG can override it for tests)
 DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG="${SCOPES_CONFIG:-$DIR/provisioning-test-scopes.yaml}"
 SCOPES="$(yq '.scopes | keys | join(" ")' "$CONFIG")"

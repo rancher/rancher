@@ -68,6 +68,7 @@ scopes:
       - '^pkg/controllers/management/node/'
       - '^pkg/controllers/management/authprovisioningv2/'
       - '^pkg/controllers/managementagent/'
+      - '^pkg/controllers/managementuser/'
       - '^pkg/controllers/dashboard/fleetcharts/'
       - '^pkg/fleet/'
       - '^pkg/node/'
@@ -75,6 +76,8 @@ scopes:
       - '^pkg/taints/'
       - '^pkg/cluster/'
       - '^pkg/agent/'
+      - '^pkg/wrangler/'
+      - '^pkg/multiclustermanager/'
       - '^pkg/clusterprovisioninglogger/'
       - '^tests/v2prov/tests/general/'
       - '^tests/v2prov/tests/custom/'                 # also operations
@@ -99,8 +102,7 @@ scopes:
           - 'machine-provision-image'
     tests:
       - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
-      - { dist: rke2, regex: '^Test_(General|Provisioning)_.*$'}
-      - { dist: rke2, regex: '^Test_Fleet_.*$' }
+      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$'}
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
@@ -155,7 +157,7 @@ full:
 # actually have any existing test coverage in the provv2 test suite. They're listed here
 # so that they don't accidentally get included in the above scopes in the future.
 skip:
-  - '^pkg/(kontainer-engine|kontainerdriver|kontainerdrivermetadata|channelserver|clustermanager|multiclustermanager)/'
+  - '^pkg/(kontainer-engine|kontainerdriver|kontainerdrivermetadata|channelserver|clustermanager)/'
   - '^pkg/controllers/nodedriver/'
   - '^pkg/controllers/provisioningv2/harvestercleanup/'
   - '^pkg/controllers/management/(aks|eks|gke|alibaba|clusteroperator|imported|importedclusterversionmanagement|clusterprovisioner|drivers|cloudcredential|agentupgrade|k3sbasedupgrade|certsexpiration)/'
