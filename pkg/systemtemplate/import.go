@@ -341,7 +341,6 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.RKE2.Name():                           false,
 		features.ProvisioningV2.Name():                 false,
 		features.Turtles.Name():                        false,
-		features.UISQLCache.Name():                     features.UISQLCache.Enabled(),
 		features.ProvisioningPreBootstrap.Name():       capr.PreBootstrap(cluster),
 		features.ManagedSystemUpgradeController.Name(): enableMSUC,
 	}
