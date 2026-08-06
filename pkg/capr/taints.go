@@ -7,14 +7,20 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
+// Keys for the DefaultTaints map.
+const (
+	DefaultTaintControlPlane = "control-plane"
+	DefaultTaintEtcd         = "etcd"
+)
+
 // DefaultTaints are the taints automatically managed by Rancher for RKE2/K3s clusters.
 // These taints are added/removed based on machine roles.
 var DefaultTaints = map[string]corev1.Taint{
-	"control-plane": {
+	DefaultTaintControlPlane: {
 		Key:    "node-role.kubernetes.io/control-plane",
 		Effect: corev1.TaintEffectNoSchedule,
 	},
-	"etcd": {
+	DefaultTaintEtcd: {
 		Key:    "node-role.kubernetes.io/etcd",
 		Effect: corev1.TaintEffectNoExecute,
 	},
@@ -51,12 +57,12 @@ func GetExpectedDefaultTaints(machine *capi.Machine, runtime string) []corev1.Ta
 	// don't add the etcd taint because K3s charts don't have correct
 	// tolerations for this scenario.
 	if hasEtcd && (!hasControlPlane || runtime != RuntimeK3S) {
-		result = append(result, DefaultTaints["etcd"])
+		result = append(result, DefaultTaints[DefaultTaintEtcd])
 	}
 
 	// Add control-plane taint if node has control plane role
 	if hasControlPlane {
-		result = append(result, DefaultTaints["control-plane"])
+		result = append(result, DefaultTaints[DefaultTaintControlPlane])
 	}
 
 	return result

@@ -81,6 +81,18 @@ func TestTaintsNeedUpdate(t *testing.T) {
 			expectedToAddCount:   1,
 			expectedToRemoveCount: 1,
 		},
+		{
+			name: "reconcile drifted value - remove stale, re-add expected",
+			nodeTaints: []corev1.Taint{
+				{Key: "node-role.kubernetes.io/control-plane", Value: "tampered", Effect: corev1.TaintEffectNoSchedule},
+			},
+			expectedTaints: []corev1.Taint{
+				{Key: "node-role.kubernetes.io/control-plane", Effect: corev1.TaintEffectNoSchedule},
+			},
+			expectUpdate:         true,
+			expectedToAddCount:   1,
+			expectedToRemoveCount: 1,
+		},
 	}
 
 	for _, tt := range tests {

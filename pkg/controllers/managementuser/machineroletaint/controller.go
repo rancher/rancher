@@ -35,12 +35,6 @@ type handler struct {
 // and reconciles node taints and worker labels in the downstream cluster
 // when machine roles change.
 func Register(ctx context.Context, userContext *config.UserContext, capi *wrangler.CAPIContext) {
-	if capi == nil {
-		// Skip if CAPI not available (e.g., local cluster before bootstrap)
-		logrus.Debugf("[%s] skipping registration: CAPI context not available", controllerName)
-		return
-	}
-
 	h := &handler{
 		clusterName:          userContext.ClusterName,
 		nodeClient:           userContext.Corew.Node(),
@@ -195,11 +189,17 @@ func (h *handler) taintsNeedUpdate(nodeTaints []corev1.Taint, expectedTaints []c
 		}
 
 		key := fmt.Sprintf("%s:%s", taint.Key, taint.Effect)
-		if _, shouldExist := expectedMap[key]; !shouldExist {
+		expected, shouldExist := expectedMap[key]
+		if !shouldExist {
 			// This default taint should be removed
 			toRemoveIndices = append(toRemoveIndices, i)
+		} else if taint.Value != expected.Value {
+			// Managed taint exists but its value has drifted from the expected
+			// value. Remove the stale taint; the expected taint stays in
+			// expectedMap and is re-added below with the correct value.
+			toRemoveIndices = append(toRemoveIndices, i)
 		} else {
-			// This taint exists and should exist, remove from expected map
+			// This taint exists and matches, remove from expected map
 			delete(expectedMap, key)
 		}
 	}
