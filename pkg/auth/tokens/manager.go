@@ -105,7 +105,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		settings.AuthTokenMaxTTLMinutes,
 		settings.AuthTokenDefaultTTLMinutes)
 	if err != nil {
-		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating max-ttl %v", err)
+		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating ttl against default and max: %w", err)
 	}
 
 	var unhashedTokenKey string
@@ -794,7 +794,7 @@ func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
 	return &ttlMillis, nil
 }
 
-// GetKubeconfigMaxTokenTTLInMilliSeconds will return the maimum TTL for
+// GetKubeconfigMaxTokenTTLInMilliSeconds will return the maximum TTL for
 // kubeconfig tokens, in milliseconds
 func GetKubeconfigMaxTokenTTLInMilliSeconds() (int64, error) {
 	return exttokenstore.ParseTTLToMilliseconds(settings.KubeconfigMaxTokenTTLMinutes)

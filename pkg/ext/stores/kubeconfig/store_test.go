@@ -547,7 +547,7 @@ func TestStoreCreate(t *testing.T) {
 		created := obj.(*ext.Kubeconfig)
 		assert.NotEmpty(t, created.Name)
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
-		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
+		assert.Equal(t, maxTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
 		assert.NotEmpty(t, created.Spec.CurrentContext)
 		assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
@@ -561,7 +561,7 @@ func TestStoreCreate(t *testing.T) {
 		require.NotNil(t, configMap.Annotations)
 		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
 		require.NotNil(t, configMap.Data)
-		assert.Equal(t, strconv.FormatInt(defaultTTLSeconds, 10), configMap.Data[TTLField])
+		assert.Equal(t, strconv.FormatInt(maxTTLSeconds, 10), configMap.Data[TTLField])
 		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
 		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
 		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
@@ -587,7 +587,7 @@ func TestStoreCreate(t *testing.T) {
 			case 2:
 				assert.Equal(t, "# createdTimestamp: "+configMap.CreationTimestamp.Time.Format(time.RFC3339), line)
 			case 3:
-				assert.Equal(t, "# ttl: "+strconv.FormatInt(defaultTTLSeconds, 10), line)
+				assert.Equal(t, "# ttl: "+strconv.FormatInt(maxTTLSeconds, 10), line)
 			default:
 			}
 			lines++
@@ -688,7 +688,7 @@ func TestStoreCreate(t *testing.T) {
 		created := obj.(*ext.Kubeconfig)
 		assert.NotEmpty(t, created.Name)
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
-		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
+		assert.Equal(t, maxTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
 		assert.Empty(t, kubeconfig.Spec.CurrentContext)
 		assert.Len(t, created.Spec.Clusters, 0)
@@ -702,7 +702,7 @@ func TestStoreCreate(t *testing.T) {
 		require.NotNil(t, configMap.Annotations)
 		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
 		require.NotNil(t, configMap.Data)
-		assert.Equal(t, strconv.FormatInt(defaultTTLSeconds, 10), configMap.Data[TTLField])
+		assert.Equal(t, strconv.FormatInt(maxTTLSeconds, 10), configMap.Data[TTLField])
 		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
 		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
 		assert.Empty(t, configMap.Data[ClustersField])
@@ -781,7 +781,7 @@ func TestStoreCreate(t *testing.T) {
 		created := obj.(*ext.Kubeconfig)
 		assert.NotEmpty(t, created.Name)
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
-		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
+		assert.Equal(t, maxTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
 		assert.Equal(t, downstream1, kubeconfig.Spec.CurrentContext)
 		require.Len(t, created.Spec.Clusters, 2)
@@ -983,7 +983,7 @@ func TestStoreCreate(t *testing.T) {
 		created := obj.(*ext.Kubeconfig)
 		assert.NotEmpty(t, created.Name)
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
-		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
+		assert.Equal(t, maxTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
 		assert.Empty(t, kubeconfig.Spec.CurrentContext)
 		require.Len(t, created.Spec.Clusters, 1)
@@ -998,7 +998,7 @@ func TestStoreCreate(t *testing.T) {
 		require.NotNil(t, configMap.Annotations)
 		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
 		require.NotNil(t, configMap.Data)
-		assert.Equal(t, strconv.FormatInt(defaultTTLSeconds, 10), configMap.Data[TTLField])
+		assert.Equal(t, strconv.FormatInt(maxTTLSeconds, 10), configMap.Data[TTLField])
 		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
 		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
 		assert.Equal(t, "[\"*\"]", configMap.Data[ClustersField])
@@ -1092,7 +1092,7 @@ func TestStoreCreate(t *testing.T) {
 		created := obj.(*ext.Kubeconfig)
 		assert.NotEmpty(t, created.Name)
 		assert.Empty(t, created.Namespace) // Kubeconfig is a cluster scoped resource.
-		assert.Equal(t, defaultTTLSeconds, created.Spec.TTL)
+		assert.Equal(t, maxTTLSeconds, created.Spec.TTL)
 		assert.Equal(t, kubeconfig.Spec.Description, created.Spec.Description)
 		assert.NotEmpty(t, created.Spec.CurrentContext)
 		assert.Equal(t, kubeconfig.Spec.Clusters, created.Spec.Clusters)
@@ -1106,7 +1106,7 @@ func TestStoreCreate(t *testing.T) {
 		require.NotNil(t, configMap.Annotations)
 		assert.NotEmpty(t, configMap.Annotations[UIDAnnotation])
 		require.NotNil(t, configMap.Data)
-		assert.Equal(t, strconv.FormatInt(defaultTTLSeconds, 10), configMap.Data[TTLField])
+		assert.Equal(t, strconv.FormatInt(maxTTLSeconds, 10), configMap.Data[TTLField])
 		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
 		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
 		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)

@@ -1020,7 +1020,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	if !fullPermission {
 		ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to ingest token time-to-live: %w", err))
 		}
 		token.Spec.TTL = ttl
 		if ttlGreater(ttl, oldToken.Spec.TTL) {
@@ -1814,7 +1814,7 @@ func ParseTTLToMilliseconds(ttlSetting settings.Setting) (int64, error) {
 func ParseTTLToDuration(ttl string) (time.Duration, error) {
 	dur, err := time.ParseDuration(fmt.Sprintf("%vm", ttl))
 	if err != nil {
-		return 0, fmt.Errorf("error parsing ttl minutes: %v", err)
+		return 0, fmt.Errorf("error parsing ttl minutes: %w", err)
 	}
 	return dur, nil
 }
@@ -1850,7 +1850,7 @@ func ClampToMaxTTL(ttl, max int64) int64 {
 // Important special cases for TTL:
 // Any value < 0 represents +infinity.
 // A value > 0 is that many milliseconds.
-// The default of `0` cannot arrive here. `clampMaxTTL` resolved that already.
+// The default of `0` cannot arrive here. `IngestTTL` resolved that already.
 func ttlGreater(a, b int64) bool {
 	// Decision table
 	//

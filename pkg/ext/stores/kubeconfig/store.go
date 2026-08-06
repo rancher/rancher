@@ -291,25 +291,30 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest("at least one cluster is required when includeDefaultEntry is false")
 	}
 
-	defaultTTL, err := s.getDefaultTTL()
+	defaultTTLPtr, err := s.getDefaultTTL()
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting default token TTL: %v", err))
 	}
-	defaultTTLSeconds := *defaultTTL / 1000
 	maxTTL, err := s.getMaxTTL()
 	if err != nil {
-		return nil, fmt.Errorf("error getting max token TTL: %w", err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting max token TTL: %w", err))
 	}
+	defaultTTL := exttokens.ClampToMaxTTL(exttokens.DefaultTTL(*defaultTTLPtr, maxTTL), maxTTL)
+	defaultTTLSeconds := defaultTTL / 1000
 
 	ttlMilliseconds := kubeconfig.Spec.TTL * 1000
 	switch {
 	case ttlMilliseconds < 0:
 		return nil, apierrors.NewBadRequest("spec.ttl can't be negative")
 	case ttlMilliseconds == 0:
-		ttlMilliseconds = *defaultTTL
+		if defaultTTL < 0 {
+			return nil, apierrors.NewBadRequest("spec.ttl can't be made negative")
+		}
+		ttlMilliseconds = defaultTTL
 		kubeconfig.Spec.TTL = defaultTTLSeconds
-	case ttlMilliseconds > maxTTL:
+	case maxTTL >= 1 && ttlMilliseconds > maxTTL:
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max ttl %d", kubeconfig.Spec.TTL, maxTTL/1000))
+	case maxTTL < 1: // max is infinity, valid ttl
 	default: // Valid TTL.
 	}
 
