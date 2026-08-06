@@ -31,16 +31,23 @@ const (
 	projectNSAnn                   = "authz.cluster.auth.io/project-namespaces"
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
-	projectNSEditVerb              = "*"
+	getVerb                        = "get"
+	// editVerb and deleteVerb are symbolic verbs, not literal RBAC verbs. They are expanded by
+	// verbsFor/verbMatches into the real verbs (editVerbs/deleteVerbs) applied to ClusterRole rules.
+	editVerb   = "edit"
+	deleteVerb = "delete-ns"
 
 	// compatibility with previous norman lifecycle implementation, now implemented inside OnChange's handler
 	normanLifecycleAnnotation = "lifecycle.cattle.io/create.namespace-auth"
 	normanLifecycleFinalizer  = "controller.cattle.io/namespace-auth"
 )
 
+var editVerbs = []string{"patch", "update"}
+var deleteVerbs = []string{"delete", "deletecollection"}
 var projectNSVerbToSuffix = map[string]string{
-	"get":             "readonly",
-	projectNSEditVerb: "edit",
+	getVerb:    "readonly",
+	editVerb:   "edit",
+	deleteVerb: "delete",
 }
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
@@ -419,7 +426,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 			modified := false
 			for i := range undesiredRole.Rules {
 				r := &undesiredRole.Rules[i]
-				if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
+				if verbMatches(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
 					modified = true
 					resNames := r.ResourceNames
 					for i := len(resNames) - 1; i >= 0; i-- {
@@ -466,14 +473,19 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 				return err
 			}
 
-			// Create new role
+			// Create new role. Note: this must not exit the enclosing function - each verb in
+			// projectNSVerbToSuffix governs its own independent ClusterRole, and returning here
+			// would skip reconciling the rest of them for this namespace.
 			if cr == nil {
-				return n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName)
+				if err := n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName); err != nil {
+					return err
+				}
+				continue
 			}
 
 			// Check to see if retrieved role has the namespace (small chance cache could have been updated)
 			for _, r := range cr.Rules {
-				if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
+				if verbMatches(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
 					// ns already in the role, nothing to do
 					mustUpdate = false
 				}
@@ -483,7 +495,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 				appendedToExisting := false
 				for i := range cr.Rules {
 					r := &cr.Rules[i]
-					if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
+					if verbMatches(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
 						r.ResourceNames = append(r.ResourceNames, ns.Name)
 						appendedToExisting = true
 						break
@@ -493,7 +505,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 				if !appendedToExisting {
 					cr.Rules = append(cr.Rules, rbacv1.PolicyRule{
 						APIGroups:     []string{""},
-						Verbs:         []string{verb},
+						Verbs:         verbsFor(verb),
 						Resources:     []string{"namespaces"},
 						ResourceNames: []string{ns.Name},
 					})
@@ -522,19 +534,44 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 		cr.Rules = []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{""},
-				Verbs:         []string{verb},
+				Verbs:         verbsFor(verb),
 				Resources:     []string{"namespaces"},
 				ResourceNames: []string{ns},
 			},
 		}
 	}
-	// the verbs passed into this function come from projectNSVerbToSuffix which only contains two verbs, one for read
-	// permissions and one for write. Only the write permission should get the manage-ns verb
-	if verb == projectNSEditVerb {
+	// manage-namespaces is bundled into the edit role so that anyone able to edit a project's
+	// namespaces can also move namespaces in and out of the project
+	if verb == editVerb {
 		cr = addManageNSPermission(cr, projectName)
 	}
 	_, err := roleCli.Create(cr)
 	return err
+}
+
+// verbsFor expands a namespace-verb symbol into the real RBAC verbs that should appear on a
+// ClusterRole rule. getVerb is a real verb and expands to itself; editVerb/deleteVerb are
+// symbolic aliases for a pair of real verbs that aren't themselves valid RBAC verbs.
+func verbsFor(verb string) []string {
+	switch verb {
+	case editVerb:
+		return editVerbs
+	case deleteVerb:
+		return deleteVerbs
+	default:
+		return []string{verb}
+	}
+}
+
+// verbMatches reports whether ruleVerbs already grants the given namespace-verb symbol, i.e.
+// every real verb it expands to (via verbsFor) is present in ruleVerbs.
+func verbMatches(ruleVerbs []string, verb string) bool {
+	for _, v := range verbsFor(verb) {
+		if !slice.ContainsString(ruleVerbs, v) {
+			return false
+		}
+	}
+	return true
 }
 
 func addManageNSPermission(clusterRole *rbacv1.ClusterRole, projectName string) *rbacv1.ClusterRole {
@@ -583,7 +620,10 @@ func crByNS(obj interface{}) ([]string, error) {
 
 	var result []string
 	for _, r := range cr.Rules {
-		if slice.ContainsString(r.Resources, "namespaces") && (slice.ContainsString(r.Verbs, "get") || slice.ContainsString(r.Verbs, "*")) {
+		// Any rule on namespaces with resourceNames belongs to one of our project-scoped
+		// readonly/edit/delete roles (the manage-namespaces rule targets the "projects"
+		// resource, not "namespaces", so it's naturally excluded here regardless of verb).
+		if slice.ContainsString(r.Resources, "namespaces") && len(r.ResourceNames) > 0 {
 			result = append(result, r.ResourceNames...)
 		}
 	}

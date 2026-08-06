@@ -44,7 +44,8 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			name:                "create read-only",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
 				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
@@ -55,7 +56,8 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			name:                "update old create new read-only",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
 				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
@@ -68,7 +70,8 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			name:                "delete old create new read-only",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
 				createClusterRoleForProject("p-123abc", namespaceName, "get"),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
@@ -81,7 +84,8 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			name:                "delete old update new read-only",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
 				createClusterRoleForProject("p-123abc", namespaceName, "get"),
 			},
 			currentRoles: []*rbacv1.ClusterRole{
@@ -98,9 +102,10 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
 				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
+				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, editVerb)),
 			},
 			wantError: false,
 		},
@@ -109,11 +114,12 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
 				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
-				addManagePermissionToClusterRole("p-123abc", addNamespaceToClusterRole("otherNamespace", "*", createClusterRoleForProject("p-123abc", namespaceName, "*"))),
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
+				addManagePermissionToClusterRole("p-123abc", addNamespaceToClusterRole("otherNamespace", editVerb, createClusterRoleForProject("p-123abc", namespaceName, editVerb))),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
-				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", "otherNamespace", "*")),
+				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, editVerb)),
+				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", "otherNamespace", editVerb)),
 			},
 			wantError: false,
 		},
@@ -122,16 +128,62 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
 				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
-				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", namespaceName, "*")),
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
+				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", namespaceName, editVerb)),
 			},
 			currentRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", "otherNamespace", "*")),
+				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", "otherNamespace", editVerb)),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", addNamespaceToClusterRole(namespaceName, "*", createClusterRoleForProject("p-123xyz", "otherNamespace", "*"))),
-				addManagePermissionToClusterRole("p-123abc", createBaseClusterRoleForProject("p-123abc", "*")),
+				addManagePermissionToClusterRole("p-123xyz", addNamespaceToClusterRole(namespaceName, editVerb, createClusterRoleForProject("p-123xyz", "otherNamespace", editVerb))),
+				addManagePermissionToClusterRole("p-123abc", createBaseClusterRoleForProject("p-123abc", editVerb)),
 			},
 			wantError: false,
+		},
+		{
+			name:                "create delete",
+			projectNSAnnotation: "c-123xyz:p-123xyz",
+			indexedRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
+			},
+			wantError: false,
+		},
+		{
+			name:                "update old create new delete",
+			projectNSAnnotation: "c-123xyz:p-123xyz",
+			indexedRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
+				addNamespaceToClusterRole("otherNamespace", deleteVerb, createClusterRoleForProject("p-123abc", namespaceName, deleteVerb)),
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, deleteVerb),
+				createClusterRoleForProject("p-123abc", "otherNamespace", deleteVerb),
+			},
+			wantError: false,
+		},
+		{
+			name:                "update old update new delete",
+			projectNSAnnotation: "c-123xyz:p-123xyz",
+			indexedRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
+				createClusterRoleForProject("p-123abc", namespaceName, deleteVerb),
+			},
+			currentRoles: []*rbacv1.ClusterRole{
+				createClusterRoleForProject("p-123xyz", "otherNamespace", deleteVerb),
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				addNamespaceToClusterRole(namespaceName, deleteVerb, createClusterRoleForProject("p-123xyz", "otherNamespace", deleteVerb)),
+			},
+			// unlike edit roles, delete roles never carry a bundled manage-namespaces rule to keep them
+			// alive, so removing the only namespace from a stale delete role deletes it outright.
+			wantDeleteRoleNames: []string{createRoleName("p-123abc", deleteVerb)},
+			wantError:           false,
 		},
 		{
 			name:                "indexer error",
@@ -143,7 +195,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			name:                "update error",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
 				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
 			},
 			updateError: fmt.Errorf("unable to update"),
@@ -159,7 +211,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			name:                "delete error",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
 				createClusterRoleForProject("p-123abc", namespaceName, "get"),
 			},
 			deleteError: fmt.Errorf("unable to delete"),
@@ -292,7 +344,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 		},
 		{
 			description: "create edit role",
-			verb:        "*",
+			verb:        editVerb,
 			projectName: "p-123xyz",
 			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -312,8 +364,21 @@ func TestCreateProjectNSRole(t *testing.T) {
 			},
 		},
 		{
+			description: "create delete role",
+			verb:        deleteVerb,
+			projectName: "p-123xyz",
+			expectedCR: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "p-123xyz-namespaces-delete",
+					Annotations: map[string]string{
+						projectNSAnn: "p-123xyz-namespaces-delete",
+					},
+				},
+			},
+		},
+		{
 			description: "do not change role if already exists and return AlreadyExists error",
-			verb:        "*",
+			verb:        editVerb,
 			projectName: "p-123xyz",
 			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
@@ -351,7 +416,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 		},
 		{
 			description: "test should return non-AlreadyExists error",
-			verb:        "*",
+			verb:        editVerb,
 			projectName: "p-123xyz",
 			createError: apierrors.NewInternalError(fmt.Errorf("some error")),
 			expectedErr: "Internal error occurred: some error",
@@ -443,7 +508,7 @@ func addNamespaceToClusterRole(namespace string, verb string, clusterRole *rbacv
 	}
 	rule := rbacv1.PolicyRule{
 		APIGroups:     []string{""},
-		Verbs:         []string{verb},
+		Verbs:         verbsFor(verb),
 		Resources:     []string{"namespaces"},
 		ResourceNames: []string{namespace},
 	}
@@ -561,7 +626,7 @@ func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
 			}).AnyTimes()
 
 			indexedRoles := []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
 			}
 			indexer := FakeResourceIndexer[*rbacv1.ClusterRole]{
 				index: crByNSIndex,
@@ -641,7 +706,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 			name:                "update namespace with missing namespace",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
 				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
 			},
 			indexedPRTBs: []*v3.ProjectRoleTemplateBinding{
@@ -662,7 +727,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 			projectNSAnnotation: "c-123xyz:p-123xyz",
 			aggregationEnabled:  true,
 			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+				createClusterRoleForProject("p-123xyz", namespaceName, editVerb),
 			},
 			indexedPRTBs: []*v3.ProjectRoleTemplateBinding{
 				{
