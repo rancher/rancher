@@ -28,6 +28,11 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+const (
+	alternateRKE2KubernetesVersion = "v1.36.0+rke2test1"
+	alternateK3sKubernetesVersion  = "v1.36.0+k3stest1"
+)
+
 func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
 	defer func() {
 		if t.Failed() {
@@ -222,7 +227,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 }
 
 func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
-	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, "none", false)
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, "none", false, "")
 }
 
 func RunSnapshotCreateTests(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string, count int) []*rkev1.ETCDSnapshot {
@@ -243,10 +248,15 @@ func RunSnapshotCreateTests(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 func RunSnapshotRestoreTestWithRKEConfig(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string) {
 	t.Helper()
-	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, restoreRKEConfig, true)
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, restoreRKEConfig, true, "")
 }
 
-func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string, incrementGeneration bool) {
+func RunSnapshotRestoreTestWithRKEConfigAndKubernetesVersion(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig, kubernetesVersion string) {
+	t.Helper()
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, restoreRKEConfig, true, kubernetesVersion)
+}
+
+func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string, incrementGeneration bool, kubernetesVersion string) {
 	t.Helper()
 
 	defer func() {
@@ -272,6 +282,9 @@ func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 			Name:             snapshotName,
 			Generation:       generation,
 			RestoreRKEConfig: restoreRKEConfig,
+		}
+		if kubernetesVersion != "" {
+			newC.Spec.KubernetesVersion = kubernetesVersion
 		}
 		newC, err = clients.Provisioning.Cluster().Update(newC)
 		if err != nil {
@@ -307,10 +320,7 @@ func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		t.Fatal(err)
 	}
 
-	ns := corev1.NamespaceDefault
-	if expectedConfigMap.Namespace != "" {
-		ns = expectedConfigMap.Namespace
-	}
+	ns := configMapNamespace(expectedConfigMap)
 
 	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), expectedConfigMap.Name, metav1.GetOptions{})
 	if err != nil {
@@ -332,6 +342,100 @@ func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		}
 	}
 	assert.Equal(t, expectedNodeCount, nonDeletingNodes, "Unexpected number of nodes after restore")
+}
+
+// PrepareConfigMapForRestore ensures the expected ConfigMap exists before deleting it and waiting
+// for NotFound. This keeps each restore assertion focused on etcd data recovery from the snapshot.
+func PrepareConfigMapForRestore(t *testing.T, clients *clients.Clients, c *v1.Cluster, expectedConfigMap corev1.ConfigMap) {
+	t.Helper()
+
+	clientset, err := GetAndVerifyDownstreamClientset(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := configMapNamespace(expectedConfigMap)
+
+	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), expectedConfigMap.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		toCreate := expectedConfigMap.DeepCopy()
+		toCreate.Namespace = ns
+		retrievedConfigMap, err = clientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), toCreate, metav1.CreateOptions{})
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, expectedConfigMap.Name, retrievedConfigMap.Name)
+	assert.Equal(t, expectedConfigMap.Data, retrievedConfigMap.Data)
+
+	err = clientset.CoreV1().ConfigMaps(ns).Delete(context.TODO(), expectedConfigMap.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		_, getErr := clientset.CoreV1().ConfigMaps(ns).Get(ctx, expectedConfigMap.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(getErr) {
+			return true, nil
+		}
+		if getErr != nil {
+			return false, getErr
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func SnapshotKubernetesVersion(t *testing.T, snapshot *rkev1.ETCDSnapshot) string {
+	t.Helper()
+
+	spec, err := snapshotutil.ParseSnapshotClusterSpecOrError(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.KubernetesVersion == "" {
+		t.Fatal("snapshot is missing KubernetesVersion metadata")
+	}
+	return spec.KubernetesVersion
+}
+
+func AlternateKubernetesVersionForSnapshot(t *testing.T, snapshotKubernetesVersion string) string {
+	t.Helper()
+
+	snapshotRuntime := capr.GetRuntime(snapshotKubernetesVersion)
+
+	var alternateVersion string
+	switch snapshotRuntime {
+	case capr.RuntimeRKE2:
+		alternateVersion = alternateRKE2KubernetesVersion
+	case capr.RuntimeK3S:
+		alternateVersion = alternateK3sKubernetesVersion
+	default:
+		t.Fatalf("unsupported runtime %q for snapshot version %q", snapshotRuntime, snapshotKubernetesVersion)
+		return ""
+	}
+
+	if alternateVersion == snapshotKubernetesVersion {
+		t.Fatalf("alternate Kubernetes version %q must differ from snapshot version %q", alternateVersion, snapshotKubernetesVersion)
+		return ""
+	}
+
+	if capr.GetRuntime(alternateVersion) != snapshotRuntime {
+		t.Fatalf("alternate Kubernetes version %q runtime does not match snapshot runtime %q", alternateVersion, snapshotRuntime)
+		return ""
+	}
+
+	return alternateVersion
+}
+
+func configMapNamespace(configMap corev1.ConfigMap) string {
+	if configMap.Namespace != "" {
+		return configMap.Namespace
+	}
+	return corev1.NamespaceDefault
 }
 
 // ModifyClusterAdditionalManifest updates the AdditionalManifest field on the cluster spec.
