@@ -668,3 +668,156 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
 }
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_ReplacesHost() {
+	result := substituteRegistryHost("oci://registry.rancher.io/rancher/cluster-autoscaler", "my-registry.company.com")
+	s.Equal("oci://my-registry.company.com/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_ReplacesHostWithPort() {
+	result := substituteRegistryHost("oci://registry.rancher.io/rancher/cluster-autoscaler", "my-registry.company.com:5000")
+	s.Equal("oci://my-registry.company.com:5000/rancher/cluster-autoscaler", result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_OCI_NoPath() {
+	original := "oci://registry.rancher.io"
+	result := substituteRegistryHost(original, "my-registry.company.com")
+	s.Equal(original, result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_HTTP_ReplacesHost() {
+	result := substituteRegistryHost("https://charts.rancher.io/charts", "my-registry.company.com")
+	s.Equal("https://my-registry.company.com/charts", result)
+}
+
+func (s *autoscalerSuite) TestSubstituteRegistryHost_InvalidURL_ReturnsOriginal() {
+	original := "not-a-valid-url://\x00host"
+	result := substituteRegistryHost(original, "my-registry.company.com")
+	s.Equal(original, result)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_NoSystemRegistry_ReturnsOriginal() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withChartRepositorySettings("oci://registry.rancher.io/rancher/cluster-autoscaler", "", func() {
+		result := s.h.getChartRepository(cluster)
+		s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", result)
+	})
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_EmptyRepo_ReturnsOriginal() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withChartRepositorySettings("", "my-registry.company.com", func() {
+		result := s.h.getChartRepository(cluster)
+		s.Equal("", result)
+	})
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_BothSet_SubstitutesRegistry() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withChartRepositorySettings(
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+		"my-registry.company.com",
+		func() {
+			result := s.h.getChartRepository(cluster)
+			s.Equal("oci://my-registry.company.com/rancher/cluster-autoscaler", result)
+		},
+	)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_BothSet_HTTPChart_SubstitutesRegistry() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withChartRepositorySettings(
+		"https://charts.rancher.io/charts",
+		"my-registry.company.com",
+		func() {
+			result := s.h.getChartRepository(cluster)
+			s.Equal("https://my-registry.company.com/charts", result)
+		},
+	)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ClusterLevelRegistry_TakesPrecedence() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local"},
+					},
+				},
+			},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withChartRepositorySettings(
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+		"global-registry.local",
+		func() {
+			result := s.h.getChartRepository(cluster)
+			s.Equal("oci://cluster-registry.local/rancher/cluster-autoscaler", result)
+		},
+	)
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ClusterLevelRegistry_EmptyDefaultsToGlobal() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withChartRepositorySettings(
+		"oci://registry.rancher.io/rancher/cluster-autoscaler",
+		"fallback-registry.local",
+		func() {
+			result := s.h.getChartRepository(cluster)
+			s.Equal("oci://fallback-registry.local/rancher/cluster-autoscaler", result)
+		},
+	)
+}
+
+func (s *autoscalerSuite) withChartRepositorySettings(repoURL, systemRegistry string, fn func()) {
+	originalRepo := settings.ClusterAutoscalerChartRepository.Get()
+	originalRegistry := settings.SystemDefaultRegistry.Get()
+
+	_ = settings.ClusterAutoscalerChartRepository.Set(repoURL)
+	_ = settings.SystemDefaultRegistry.Set(systemRegistry)
+	defer func() {
+		_ = settings.ClusterAutoscalerChartRepository.Set(originalRepo)
+		_ = settings.SystemDefaultRegistry.Set(originalRegistry)
+	}()
+
+	fn()
+}

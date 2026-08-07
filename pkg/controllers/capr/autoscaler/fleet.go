@@ -2,12 +2,15 @@ package autoscaler
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/docker/distribution/reference"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/capr"
+	provimage "github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -214,6 +217,60 @@ func getChartName() string {
 	}
 
 	return "cluster-autoscaler"
+}
+
+// substituteRegistryHost replaces the registry host in the given repository URL with the
+// provided registry. It handles both OCI (oci://) and standard HTTP(S) URLs.
+func substituteRegistryHost(repoURL, registry string) string {
+	if strings.HasPrefix(repoURL, "oci://") {
+		imageRef, err := reference.ParseNamed(strings.TrimPrefix(repoURL, "oci://"))
+		if err != nil {
+			logrus.Debugf("[autoscaler] failed to parse OCI chart repository URL '%s': %v", repoURL, err)
+			return repoURL
+		}
+		path := reference.Path(imageRef)
+		if path == "" {
+			return "oci://" + registry
+		}
+		return "oci://" + registry + "/" + path
+	}
+
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		logrus.Debugf("[autoscaler] failed to parse chart repository URL '%s': %v", repoURL, err)
+		return repoURL
+	}
+	u.Host = registry
+	return u.String()
+}
+
+// getChartRepository returns the chart repository URL to use for the fleet helm op.
+// If a cluster-level private registry is configured it will be used; otherwise the
+// system default registry is used. If both are empty, the original repo URL is returned.
+func (h *autoscalerHandler) getChartRepository(cluster *capi.Cluster) string {
+	repo := settings.ClusterAutoscalerChartRepository.Get()
+	if repo == "" {
+		return repo
+	}
+
+	registry := h.resolveRegistryForCluster(cluster)
+	if registry == "" {
+		return repo
+	}
+
+	return substituteRegistryHost(repo, registry)
+}
+
+// resolveRegistryForCluster resolves the private registry URL to use for the given cluster.
+// It first checks for a cluster-level system-default-registry (from the provisioning cluster's
+// RKE config), falling back to the global SystemDefaultRegistry if no cluster-level registry is configured.
+func (h *autoscalerHandler) resolveRegistryForCluster(cluster *capi.Cluster) string {
+	provCluster, err := capr.GetProvisioningClusterFromCAPICluster(cluster, h.clusterCache)
+	if err == nil && provCluster != nil {
+		privateURL, _ := provimage.GetPrivateRepoURLFromCluster(provCluster)
+		return privateURL
+	}
+	return settings.SystemDefaultRegistry.Get()
 }
 
 // getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object
