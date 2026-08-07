@@ -450,6 +450,14 @@ func (c *SyncController) getNamespacesLimits(ns *v1.Namespace, projectID string)
 		if other.Name == ns.Name {
 			continue
 		}
+		// Skip namespaces with invalid quotas
+		set, err := namespaceutil.IsNamespaceConditionSet(other, ResourceQuotaValidatedCondition, true)
+		if err != nil {
+			return nil, err
+		}
+		if !set {
+			continue
+		}
 		nsLimit, err := getNamespaceResourceQuotaLimit(other)
 		if err != nil {
 			return nil, err

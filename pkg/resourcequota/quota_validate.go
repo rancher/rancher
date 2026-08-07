@@ -47,6 +47,7 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 	if err != nil {
 		return false, nil, fmt.Errorf("checking quota fit: %w", err)
 	}
+	negativeResources := quota.IsNegative(nsResourceList)
 	nssResourceList = quota.Add(nssResourceList, nsResourceList)
 
 	for _, nsLimit := range nsLimits {
@@ -54,6 +55,7 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 		if err != nil {
 			return false, nil, fmt.Errorf("checking namespace limits: %w", err)
 		}
+		negativeResources = append(negativeResources, quota.IsNegative(nsResourceList)...)
 		nssResourceList = quota.Add(nssResourceList, nsResourceList)
 	}
 
@@ -64,12 +66,26 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 
 	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
 	// Include resources with negative values among exceeded resources.
-	exceeded = append(exceeded, quota.IsNegative(nsResourceList)...)
+	exceeded = append(exceeded, negativeResources...)
+	exceeded = uniqueResourceNames(exceeded)
 	if len(exceeded) == 0 {
 		return true, nil, nil
 	}
 	failedHard := quota.Mask(nssResourceList, exceeded)
 	return false, failedHard, nil
+}
+
+func uniqueResourceNames(resources []api.ResourceName) []api.ResourceName {
+	seen := map[api.ResourceName]struct{}{}
+	unique := make([]api.ResourceName, 0, len(resources))
+	for _, resource := range resources {
+		if _, ok := seen[resource]; ok {
+			continue
+		}
+		seen[resource] = struct{}{}
+		unique = append(unique, resource)
+	}
+	return unique
 }
 
 func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList, error) {
