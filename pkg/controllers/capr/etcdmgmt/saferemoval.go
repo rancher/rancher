@@ -44,6 +44,9 @@ func SafelyRemoved(restConfig *rest.Config, runtime, nodeName string) (bool, err
 			if err != nil {
 				return err
 			}
+			if node.Annotations == nil {
+				node.Annotations = map[string]string{}
+			}
 			node.Annotations[removeAnnotation] = "true"
 			_, err = clientset.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 			return err
