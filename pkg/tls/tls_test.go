@@ -152,14 +152,70 @@ func TestEnsureInternalCertSANs(t *testing.T) {
 	}
 }
 
-// TestFilterCN covers all branches of filterCN, which gates dynamic CN
-// additions to the serving-cert (:443) listener.
-//
-// filterCN is the func(...string)[]string passed to dynamiclistener as
-// FilterCN.  allowDefaultSANs (inside dynamiclistener) already short-circuits
-// CNs that are in Config.SANs, so filterCN only ever receives the *unknown*
-// (dynamically presented) ones.
-func TestFilterCN(t *testing.T) {
+// TestServerURLFilterCN covers the hostname-only half of the filter (the
+// MCMAgent short-circuit and pod-IP union live in TestNewServingCertFilterCN).
+func TestServerURLFilterCN(t *testing.T) {
+	tests := []struct {
+		name      string
+		serverURL string
+		input     []string
+		expected  []string
+	}{
+		{
+			name:      "empty serverURL — pass-through (pre-bootstrap)",
+			serverURL: "",
+			input:     []string{"anything.com", "10.0.0.5"},
+			expected:  []string{"anything.com", "10.0.0.5"},
+		},
+		{
+			name:      "serverURL set — only server hostname allowed",
+			serverURL: "https://rancher.example.com",
+			input:     []string{"other.example.com"},
+			expected:  []string{"rancher.example.com"},
+		},
+		{
+			name:      "serverURL with port — hostname without port returned",
+			serverURL: "https://rancher.example.com:8443",
+			input:     []string{"other.example.com"},
+			expected:  []string{"rancher.example.com"},
+		},
+		{
+			name:      "unparseable serverURL — pass-through",
+			serverURL: "://bad-url",
+			input:     []string{"other.example.com"},
+			expected:  []string{"other.example.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// serverURLFilterCN reads global state; do not run subtests in parallel.
+			_ = settings.ServerURL.Set(tt.serverURL)
+			t.Cleanup(func() { _ = settings.ServerURL.Set("") })
+
+			got := serverURLFilterCN(tt.input...)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("serverURLFilterCN(%v) = %v, want %v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestNewServingCertFilterCN covers the MCMAgent short-circuit and the
+// server-url/pod-IP union for the normal management-server case.
+func TestNewServingCertFilterCN(t *testing.T) {
+	// Stub pod-IP filter: only "10.42.0.1" is a "live" pod IP.
+	podIPFilter := func(cns ...string) []string {
+		var out []string
+		for _, cn := range cns {
+			if cn == "10.42.0.1" {
+				out = append(out, cn)
+			}
+		}
+		return out
+	}
+
 	tests := []struct {
 		name      string
 		mcmAgent  bool
@@ -168,45 +224,44 @@ func TestFilterCN(t *testing.T) {
 		expected  []string
 	}{
 		{
-			name:     "MCMAgent enabled — reject all dynamic CNs regardless of serverURL",
+			name:     "MCMAgent enabled — reject all dynamic CNs regardless of pod IPs",
 			mcmAgent: true,
-			input:    []string{"attacker.evil.com", "10.0.0.5"},
+			input:    []string{"other.example.com", "10.42.0.1"},
 			expected: nil,
 		},
 		{
 			name:     "MCMAgent enabled, empty serverURL — still returns nil",
 			mcmAgent: true,
-			serverURL: "",
-			input:    []string{"anything.com"},
+			input:    []string{"10.42.0.1"},
 			expected: nil,
 		},
 		{
-			name:     "MCMAgent disabled, empty serverURL — pass-through (pre-bootstrap)",
-			mcmAgent: false,
-			serverURL: "",
-			input:    []string{"anything.com", "10.0.0.5"},
-			expected: []string{"anything.com", "10.0.0.5"},
-		},
-		{
-			name:      "MCMAgent disabled, serverURL set — only server hostname allowed",
+			name:      "server mode: hostname CN kept via serverURLFilterCN",
 			mcmAgent:  false,
 			serverURL: "https://rancher.example.com",
-			input:     []string{"attacker.evil.com"},
+			input:     []string{"other.example.com"},
 			expected:  []string{"rancher.example.com"},
 		},
 		{
-			name:      "MCMAgent disabled, serverURL with port — hostname without port returned",
+			name:      "server mode: live pod IP kept via podIPFilter even though it's not the hostname",
 			mcmAgent:  false,
-			serverURL: "https://rancher.example.com:8443",
-			input:     []string{"attacker.evil.com"},
+			serverURL: "https://rancher.example.com",
+			input:     []string{"10.42.0.1"},
+			expected:  []string{"rancher.example.com", "10.42.0.1"},
+		},
+		{
+			name:      "server mode: stale/unknown pod IP rejected, hostname still present",
+			mcmAgent:  false,
+			serverURL: "https://rancher.example.com",
+			input:     []string{"10.42.0.99"},
 			expected:  []string{"rancher.example.com"},
 		},
 		{
-			name:      "MCMAgent disabled, unparseable serverURL — pass-through",
+			name:      "server mode: hostname and live pod IP both kept in the same call",
 			mcmAgent:  false,
-			serverURL: "://bad-url",
-			input:     []string{"attacker.evil.com"},
-			expected:  []string{"attacker.evil.com"},
+			serverURL: "https://rancher.example.com",
+			input:     []string{"other.example.com", "10.42.0.1"},
+			expected:  []string{"rancher.example.com", "10.42.0.1"},
 		},
 	}
 
@@ -220,9 +275,9 @@ func TestFilterCN(t *testing.T) {
 			_ = settings.ServerURL.Set(tt.serverURL)
 			t.Cleanup(func() { _ = settings.ServerURL.Set("") })
 
-			got := filterCN(tt.input...)
+			got := newServingCertFilterCN(podIPFilter)(tt.input...)
 			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("filterCN(%v) = %v, want %v", tt.input, got, tt.expected)
+				t.Errorf("newServingCertFilterCN(...)(%v) = %v, want %v", tt.input, got, tt.expected)
 			}
 		})
 	}

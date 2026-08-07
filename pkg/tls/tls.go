@@ -68,7 +68,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 
 	if httpsPort != 0 {
-		opts, err = SetupListener(core.Core().V1().Secret(), acmeDomains, noCACerts)
+		opts, err = SetupListener(ctx, core.Core().V1().Secret(), core.Core().V1().Pod(), acmeDomains, noCACerts)
 		if err != nil {
 			return errors.Wrap(err, "failed to setup TLS listener")
 		}
@@ -216,8 +216,8 @@ func migrateConfig(ctx context.Context, restConfig *rest.Config, opts *server.Li
 	}
 }
 
-func SetupListener(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
-	caForAgent, noCACerts, opts, err := readConfig(secrets, acmeDomains, noCACerts)
+func SetupListener(ctx context.Context, secrets corev1controllers.SecretController, pods corev1controllers.PodController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
+	caForAgent, noCACerts, opts, err := readConfig(ctx, secrets, pods, acmeDomains, noCACerts)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func SetupListener(secrets corev1controllers.SecretController, acmeDomains []str
 // - bool: The value of the noCACerts flag.
 // - *server.ListenOpts: The listener options for dynamiclistener.
 // - error: An error if the configuration is invalid.
-func readConfig(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (string, bool, *server.ListenOpts, error) {
+func readConfig(ctx context.Context, secrets corev1controllers.SecretController, pods corev1controllers.PodController, acmeDomains []string, noCACerts bool) (string, bool, *server.ListenOpts, error) {
 	var (
 		ca  string
 		err error
@@ -294,7 +294,8 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 			TLSConfig:             tlsConfig,
 			ExpirationDaysCheck:   expiration,
 			SANs:                  sans,
-			FilterCN:              filterCN,
+			FilterCN:              newServingCertFilterCN(newRancherPodIPFilter(ctx, pods, "rancher-podip-serving-cert-filter")),
+			FilterExisting:        true,
 			CloseConnOnCertChange: true,
 		},
 	}
@@ -429,13 +430,9 @@ func collectNodeIPs(nodeController corev1controllers.NodeController) ([]string, 
 	return nodeIPs, nil
 }
 
-func filterCN(cns ...string) []string {
-	// In the embedded agent Rancher, reject all dynamic CN additions.
-	// The static Config.SANs (short-circuited by allowDefaultSANs) cover all
-	// legitimate access; anything dynamic is attacker-supplied SNI noise.
-	if features.MCMAgent.Enabled() {
-		return nil
-	}
+// serverURLFilterCN restricts dynamic CNs to the settings.ServerURL hostname
+// (or passes everything through pre-bootstrap / on a parse error).
+func serverURLFilterCN(cns ...string) []string {
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
 		return cns
@@ -450,6 +447,18 @@ func filterCN(cns ...string) []string {
 		return []string{host}
 	}
 	return cns
+}
+
+// newServingCertFilterCN builds the FilterCN closure for the :443 serving
+// cert: MCMAgent rejects all dynamic CNs outright; otherwise a CN is kept if
+// it matches the server-url hostname or is a live rancher pod IP.
+func newServingCertFilterCN(podIPFilter func(...string) []string) func(...string) []string {
+	return func(cns ...string) []string {
+		if features.MCMAgent.Enabled() {
+			return nil
+		}
+		return unionFilterCN(serverURLFilterCN, podIPFilter)(cns...)
+	}
 }
 
 func fileExists(path string) bool {
