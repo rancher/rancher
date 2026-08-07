@@ -625,8 +625,8 @@ github.com/rancher/aks-operator v1.15.0 h1:YSR70a9NRyiGIfh+EOtazSukWc0L8QJY4mVnW
 github.com/rancher/aks-operator v1.15.0/go.mod h1:MhY/DNfRpaUgHjC/RFM7Lf2LAVzvgieRY1ZKNBVsGz0=
 github.com/rancher/ali-operator v1.15.0-rc.3 h1:FVIgpnCaLyZjsJ6IYLHZV3vs7GjUYA4OwmOlPA/QtnY=
 github.com/rancher/ali-operator v1.15.0-rc.3/go.mod h1:LAIvfUxjKovWDTdasdGfFYpO+qg49kXDj7lHMWVWa04=
-github.com/rancher/apiserver v0.9.7 h1:b29KuloAFVY3PemDSUdrLmwzX/vJWpWBgr20m7xSvuE=
-github.com/rancher/apiserver v0.9.7/go.mod h1:NLkaZ69HiT6/5OcXm2EZcydCv8PKRcIXaIphABvhX1I=
+github.com/rancher/apiserver v0.10.0 h1:6koiip9lw0g9roCAqtCIDgBaShH3aM0k41xNpgDzfSA=
+github.com/rancher/apiserver v0.10.0/go.mod h1:UAvpDyi36wzrbpBEaJVBSqXCRnDpt4WoMoqOMggDIqM=
 github.com/rancher/channelserver v0.11.0 h1:R1oRG2SkGkC0EKHsa+VgBuLKHzEGVE1NMJeP/6c5vPo=
 github.com/rancher/channelserver v0.11.0/go.mod h1:ZWuXGR708g5FoMdmf+fXE2XEOztdm3bcwjdMmriY1kg=
 github.com/rancher/cluster-api-provider-rke2 v0.25.0 h1:/BVUHgficJxfSRFLwBdgkzP7Guts8wdftpF/CfpH7Vo=
