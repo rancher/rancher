@@ -35,7 +35,10 @@ import (
 )
 
 var (
-	VERSION = "dev"
+	VERSION             = "dev"
+	hasEverConnected    = false
+	consecutiveFailures = 0
+	maxAttempts         = 30
 )
 
 const (
@@ -263,6 +266,8 @@ func run(ctx context.Context) error {
 	}
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
+		hasEverConnected = true
+		consecutiveFailures = 0
 		connected()
 
 		if writeCertsOnly {
@@ -302,6 +307,12 @@ func run(ctx context.Context) error {
 			}
 			return false
 		}, onConnect)
+		if hasEverConnected {
+			consecutiveFailures++
+			if consecutiveFailures >= maxAttempts {
+				logrus.Fatalf("Cannot reconnect to %s after %d consecutive attempts, exiting for pod restart", wsURL, consecutiveFailures)
+			}
+		}
 		time.Sleep(5 * time.Second)
 	}
 }
