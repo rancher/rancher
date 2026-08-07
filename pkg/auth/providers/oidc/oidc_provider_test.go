@@ -20,11 +20,15 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestValidateACR(t *testing.T) {
@@ -1426,4 +1430,128 @@ func TestCookieSecurityAttributes(t *testing.T) {
 			assert.Equal(t, http.SameSiteLaxMode, got.SameSite, "SameSite must be Lax")
 		})
 	}
+}
+
+func TestSearchPrincipals(t *testing.T) {
+	t.Parallel()
+
+	users := []*apiv3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+			DisplayName:  "Test UserOne",
+			PrincipalIDs: []string{"oidc_user://sub-0001", "local://u-oidc1"},
+		},
+	}
+
+	provider := &OpenIDCProvider{
+		Name: Name,
+		UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+				return users, nil
+			},
+		}),
+	}
+
+	tests := []struct {
+		name          string
+		searchValue   string
+		principalType string
+		expected      []apiv3.Principal
+	}{
+		{
+			name:          "known user is returned before the principal built from the search value",
+			searchValue:   "testu",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:        "an empty principal type searches for users",
+			searchValue: "testu",
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:          "searching the subject returns a single principal",
+			searchValue:   "sub-0001",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "sub-0001",
+					LoginName:     "sub-0001",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:          "group search does not resolve users",
+			searchValue:   "testu",
+			principalType: GroupType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_group://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := provider.SearchPrincipals(test.searchValue, test.principalType, &apiv3.Token{})
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
+	t.Parallel()
+
+	provider := &OpenIDCProvider{Name: Name}
+
+	result, err := provider.SearchPrincipals("testu", UserType, &apiv3.Token{})
+	require.NoError(t, err)
+	assert.Equal(t, []apiv3.Principal{
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+			DisplayName:   "testu",
+			LoginName:     "testu",
+			PrincipalType: UserType,
+			Provider:      Name,
+		},
+	}, result)
 }
