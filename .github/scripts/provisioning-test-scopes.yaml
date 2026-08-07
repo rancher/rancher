@@ -46,9 +46,13 @@ scopes:
   # general + custom + machine provisioning + fleet
   basic:
     package-paths:
-      - '^pkg/provisioningv2/systeminfo/'
-      - '^pkg/provisioningv2/kubeconfig/'
-      - '^pkg/provisioningv2/image/'
+      - '^cmd/agent/'
+      - '^pkg/agent/'
+      - '^pkg/apis/'
+      - '^pkg/capr/configserver/'                     # also imported
+      - '^pkg/capr/installer/'
+      - '^pkg/cluster/'
+      - '^pkg/clusterprovisioninglogger/'
       - '^pkg/controllers/provisioningv2/provisioninglog/'
       - '^pkg/controllers/provisioningv2/fleetcluster/'
       - '^pkg/controllers/provisioningv2/fleetworkspace/'
@@ -61,24 +65,30 @@ scopes:
       - '^pkg/controllers/capr/machinedrain/'         # also operations
       - '^pkg/controllers/capr/machinenodelookup/'
       - '^pkg/controllers/capr/dynamicschema/'
-      - '^pkg/capr/configserver/'                     # also imported
-      - '^pkg/capr/installer/'
+      - '^pkg/controllers/management/authprovisioningv2/'
+      - '^pkg/controllers/management/clusterconnected/'
       - '^pkg/controllers/management/clusterdeploy/'
       - '^pkg/controllers/management/systemagent/'
       - '^pkg/controllers/management/node/'
-      - '^pkg/controllers/management/authprovisioningv2/'
       - '^pkg/controllers/managementagent/'
       - '^pkg/controllers/managementuser/'
       - '^pkg/controllers/dashboard/fleetcharts/'
+      - '^pkg/controllers/dashboard/clusterregistrationtoken/'
+      - '^pkg/controllers/dashboard/systemcharts/'
+      - '^pkg/data/dashboard'
       - '^pkg/fleet/'
+      - '^pkg/image/'
+      - '^pkg/impersonation/'
       - '^pkg/node/'
-      - '^pkg/systemtemplate/'
-      - '^pkg/taints/'
-      - '^pkg/cluster/'
-      - '^pkg/agent/'
-      - '^pkg/wrangler/'
       - '^pkg/multiclustermanager/'
-      - '^pkg/clusterprovisioninglogger/'
+      - '^pkg/provisioningv2/systeminfo/'
+      - '^pkg/provisioningv2/kubeconfig/'
+      - '^pkg/provisioningv2/image/'
+      - '^pkg/systemtemplate/'
+      - '^pkg/serviceaccounttoken/'
+      - '^pkg/systemtokens/'
+      - '^pkg/taints/'
+      - '^pkg/wrangler/'
       - '^tests/v2prov/tests/general/'
       - '^tests/v2prov/tests/custom/'                 # also operations
       - '^tests/v2prov/tests/machineprovisioning/'    # also operations
@@ -97,9 +107,11 @@ scopes:
           - 'wins-agent-version'
           - 'system-agent-install-script'
           - 'wins-agent-install-script'
-          - 'system-upgrade-controller-chart-version'
           - 'chart-default-branch'
           - 'machine-provision-image'
+      - path: "^package/Dockerfile"
+        substrings:
+          - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
     tests:
       - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
       - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$'}
@@ -115,7 +127,7 @@ scopes:
     tests:
       - { dist: k3s,  regex: '^Test_Operation_.*$'}        # k3s runs all ops in one instance
       - { dist: rke2, regex: '^Test_Operation_SetA_.*$'}
-      - { dist: rke2, regex: '^Test_Operation_SetB_.*$', cpus: 8 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*$'}
 
   imported:
     package-paths:

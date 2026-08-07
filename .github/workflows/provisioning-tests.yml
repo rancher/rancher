@@ -49,7 +49,7 @@ jobs:
           # If the returned matrix is empty, the test job below is skipped outright.
           COUNT="$(echo "$MATRIX" | jq '.include | length')"
 
-          # Sanity cap against accidental fan-out (all scopes currently = 9 rows).
+          # Sanity cap against accidental fan-out
           if [ "$COUNT" -gt 16 ]; then
             echo "error: too many matrix entries ($COUNT)" >&2
             exit 1

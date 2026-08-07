@@ -131,6 +131,7 @@ file_has_substring() {
   while IFS= read -r s; do
     test -n "$s" || continue
     if printf '%s\n' "$changed_lines" | grep -qF -- "$s"; then
+      printf "%s has changed lines matching substring '%s'\n" "$file" "$s" >&2
       return 0
     fi
   done <<< "$substrings"

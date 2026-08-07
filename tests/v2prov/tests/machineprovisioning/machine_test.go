@@ -262,7 +262,6 @@ func Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
-	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -373,7 +372,6 @@ func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
-	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -431,7 +429,6 @@ func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer clients.Close()
-	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -626,7 +623,6 @@ func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
-	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
