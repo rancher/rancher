@@ -218,7 +218,8 @@ spec:
             value: '{{.NamespaceOptions | mustToJson}}'
           {{- end }}
           {{- if .IsPreBootstrap }}
-          # since we're on the host network, talk to the apiserver over localhost
+          - name: CATTLE_PREBOOTSTRAP
+            value: "true"
           {{- end }}
           {{- if .SystemDefaultPullSecrets}}
           - name: CATTLE_SYSTEM_DEFAULT_REGISTRY_PULL_SECRETS

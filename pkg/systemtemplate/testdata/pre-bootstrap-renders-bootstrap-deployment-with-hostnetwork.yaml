@@ -183,7 +183,8 @@ spec:
             value: cattle-credentials-a15c1b308a
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
             value: "mcc-test-preboot-managed-system-upgrade-controller"
-          # since we're on the host network, talk to the apiserver over localhost
+          - name: CATTLE_PREBOOTSTRAP
+            value: "true"
           - name: CATTLE_SERVER_VERSION
             value: dev
           - name: CATTLE_INSTALL_UUID
