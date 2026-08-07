@@ -101,7 +101,7 @@ require (
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/microsoft/kiota-abstractions-go v1.9.4
 	github.com/microsoftgraph/msgraph-sdk-go v1.51.0
-	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1
+	github.com/microsoftgraph/msgraph-sdk-go-core v1.4.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/locker v1.0.1
 	github.com/moby/moby/client v0.4.1
@@ -255,10 +255,10 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kubereboot/kured v1.13.1 // indirect
-	github.com/microsoft/kiota-authentication-azure-go v1.1.0 // indirect
-	github.com/microsoft/kiota-http-go v1.5.5 // indirect
+	github.com/microsoft/kiota-authentication-azure-go v1.3.1 // indirect
+	github.com/microsoft/kiota-http-go v1.5.6 // indirect
 	github.com/microsoft/kiota-serialization-form-go v1.0.0 // indirect
-	github.com/microsoft/kiota-serialization-json-go v1.0.8 // indirect
+	github.com/microsoft/kiota-serialization-json-go v1.1.2 // indirect
 	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
 	github.com/microsoft/kiota-serialization-text-go v1.0.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
