@@ -12,7 +12,7 @@ import (
 
 func TestIsQuotaFitRejectsNegativePeerLimit(t *testing.T) {
 	projectLimit := &v32.ResourceQuotaLimit{LimitsMemory: "4000Mi"}
-	currentLimit := &v32.ResourceQuotaLimit{LimitsMemory: "8000Mi"}
+	currentLimit := &v32.ResourceQuotaLimit{LimitsMemory: "2000Mi"}
 	peerNegativeLimit := &v32.ResourceQuotaLimit{LimitsMemory: "-8000Mi"}
 
 	fit, failedHard, err := IsQuotaFit(currentLimit, []*v32.ResourceQuotaLimit{

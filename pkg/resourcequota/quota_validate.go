@@ -64,14 +64,14 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 		return false, nil, fmt.Errorf("checking project limits: %w", err)
 	}
 
-	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
-	// Include resources with negative values among exceeded resources.
-	exceeded = append(exceeded, negativeResources...)
-	exceeded = uniqueResourceNames(exceeded)
-	if len(exceeded) == 0 {
+	_, badResources := quota.LessThanOrEqual(nssResourceList, projectResourceList)
+	// Include resources with negative values among the bad resources.
+	badResources = append(badResources, negativeResources...)
+	badResources = uniqueResourceNames(badResources)
+	if len(badResources) == 0 {
 		return true, nil, nil
 	}
-	failedHard := quota.Mask(nssResourceList, exceeded)
+	failedHard := quota.Mask(nssResourceList, badResources)
 	return false, failedHard, nil
 }
 
