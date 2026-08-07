@@ -166,13 +166,17 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 	var operationErr error
 	switch operation {
 	case "create":
-		isFit, updated, exceeded, err := c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
+		isFit, updated, exceeded, negatives, err := c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
 		if err != nil {
 			return updated, err
 		}
 		if !isFit {
-			// Create a quota with zeros only for overused resources.
+			// Create a quota with zeros only for bad resources (overused, negative inputs)
 			limit, err := zeroOutResourceQuotaLimit(requestedQuotaLimit, exceeded)
+			if err != nil {
+				return updated, err
+			}
+			limit, err = zeroOutResourceQuotaLimit(limit, negatives)
 			if err != nil {
 				return updated, err
 			}
@@ -184,7 +188,7 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 		}
 		operationErr = c.createResourceQuota(ns, newQuotaSpec)
 	case "update":
-		isFit, upd, _, err := c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
+		isFit, upd, _, _, err := c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
 		if err != nil {
 			return upd, err
 		}
@@ -379,19 +383,19 @@ func (c *SyncController) createDefaultLimitRange(ns *corev1.Namespace, spec *cor
 	return err
 }
 
-func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quotaToUpdate *v32.NamespaceResourceQuota) (bool, *corev1.Namespace, corev1.ResourceList, error) {
+func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quotaToUpdate *v32.NamespaceResourceQuota) (bool, *corev1.Namespace, corev1.ResourceList, corev1.ResourceList, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
-		return true, ns, nil, nil
+		return true, ns, nil, nil, nil
 	}
 
 	// get project limit
 	projectLimit, projectID, err := getProjectResourceQuotaLimit(ns, c.ProjectCache)
 	if err != nil {
-		return false, ns, nil, err
+		return false, ns, nil, nil, err
 	}
 
 	if projectLimit == nil {
-		return true, ns, nil, err
+		return true, ns, nil, nil, err
 	}
 
 	updatedNs := ns.DeepCopy()
@@ -401,14 +405,14 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 		}
 		b, err := json.Marshal(quotaToUpdate)
 		if err != nil {
-			return false, ns, nil, err
+			return false, ns, nil, nil, err
 		}
 		updatedNs.Annotations[resourceQuotaAnnotation] = string(b)
 		// avoid updates if nothing would change
 		if !reflect.DeepEqual(updatedNs, ns) {
 			updatedNs, err = c.Namespaces.Update(updatedNs)
 			if err != nil {
-				return false, updatedNs, nil, err
+				return false, updatedNs, nil, nil, err
 			}
 		}
 	}
@@ -421,21 +425,30 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 	// Get other namespaces' limits.
 	nsLimits, err := c.getNamespacesLimits(ns, projectID)
 	if err != nil {
-		return false, updatedNs, nil, err
+		return false, updatedNs, nil, nil, err
 	}
-	isFit, exceeded, err := validate.IsQuotaFit(&quotaToUpdate.Limit, nsLimits, projectLimit)
+	// Put everything together and check that things fit
+	isFit, exceeded, negatives, err := validate.IsQuotaFit(&quotaToUpdate.Limit, nsLimits, projectLimit)
 	if err != nil {
-		return false, updatedNs, nil, err
+		return false, updatedNs, nil, nil, err
 	}
 
 	var msg string
-	if !isFit && exceeded != nil {
-		msg = fmt.Sprintf("Resource quota [%v] exceeds project limit", utils.FormatResourceList(exceeded))
+	if !isFit && (exceeded != nil || negatives != nil) {
+		if exceeded != nil {
+			msg = fmt.Sprintf("Oversubscribed resource quota [%v]", utils.FormatResourceList(exceeded))
+		}
+		if negatives != nil {
+			if msg != "" {
+				msg = msg + "; "
+			}
+			msg = msg + fmt.Sprintf("Resource quota [%v] are based on negative inputs", utils.FormatResourceList(negatives))
+		}
 	}
 
 	validated, err := c.setValidated(updatedNs, isFit, msg)
 
-	return isFit, validated, exceeded, err
+	return isFit, validated, exceeded, negatives, err
 }
 
 func (c *SyncController) getNamespacesLimits(ns *v1.Namespace, projectID string) ([]*v32.ResourceQuotaLimit, error) {
@@ -450,6 +463,13 @@ func (c *SyncController) getNamespacesLimits(ns *v1.Namespace, projectID string)
 		if other.Name == ns.Name {
 			continue
 		}
+		// Beware: namespaces which are not validated are accepted here,
+		// contrary to `calculateProjectResourceQuota`.  Because while
+		// they may contain bogus resource quantities on some keys
+		// (oversubscribed, negative) other keys may be good. And
+		// excluding these good keys will cause the caller to generate
+		// an incorrect sum of used resources for these keys, opening
+		// the referenced resources up to oversubscription.
 		nsLimit, err := getNamespaceResourceQuotaLimit(other)
 		if err != nil {
 			return nil, err
@@ -571,16 +591,15 @@ func completeLimit(nsLimit *v32.ContainerResourceLimit, projectLimit *v32.Contai
 	return resultingLimit, err
 }
 
-// zeroOutResourceQuotaLimit takes a resource quota limit and a list of
-// resources exceeding the quota, and returns a new quota limit with exceeded
-// resources zeroed out.
-func zeroOutResourceQuotaLimit(limit *v32.ResourceQuotaLimit, exceeded corev1.ResourceList) (*v32.ResourceQuotaLimit, error) {
+// zeroOutResourceQuotaLimit takes a resource quota limit and a list of bad
+// resources, and returns a new quota limit with the bad resources zeroed out.
+func zeroOutResourceQuotaLimit(limit *v32.ResourceQuotaLimit, badResources corev1.ResourceList) (*v32.ResourceQuotaLimit, error) {
 	zeroed, err := convertProjectResourceLimitToResourceList(limit)
 	if err != nil {
 		return nil, err
 	}
 
-	for k := range exceeded {
+	for k := range badResources {
 		zeroed[k] = zeroQuantity
 	}
 

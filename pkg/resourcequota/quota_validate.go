@@ -41,35 +41,67 @@ func GetProjectLock(projectID string) *sync.Mutex {
 	return mu
 }
 
-func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, error) {
+// IsQuotaFit puts the various limits (of the namespace itself, and its
+// siblings) together and checks if they still fit into the project. It reports
+// the names of all found bad resources. A resource is flagged as bad either
+// because its sum goes beyond the project limit, or because it had bogus
+// (negative values) among the summed inputs.
+func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, api.ResourceList, error) {
 	nssResourceList := api.ResourceList{}
 	nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 	if err != nil {
-		return false, nil, fmt.Errorf("checking quota fit: %w", err)
+		return false, nil, nil, fmt.Errorf("checking quota fit: %w", err)
 	}
+	negativeResources := quota.IsNegative(nsResourceList)
 	nssResourceList = quota.Add(nssResourceList, nsResourceList)
 
 	for _, nsLimit := range nsLimits {
 		nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 		if err != nil {
-			return false, nil, fmt.Errorf("checking namespace limits: %w", err)
+			return false, nil, nil, fmt.Errorf("checking namespace limits: %w", err)
 		}
+		negativeResources = append(negativeResources, quota.IsNegative(nsResourceList)...)
 		nssResourceList = quota.Add(nssResourceList, nsResourceList)
 	}
 
 	projectResourceList, err := ConvertLimitToResourceList(projectLimit)
 	if err != nil {
-		return false, nil, fmt.Errorf("checking project limits: %w", err)
+		return false, nil, nil, fmt.Errorf("checking project limits: %w", err)
 	}
 
+	// Start the set of bad resources with the oversubscribed resources ...
 	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
-	// Include resources with negative values among exceeded resources.
-	exceeded = append(exceeded, quota.IsNegative(nsResourceList)...)
-	if len(exceeded) == 0 {
-		return true, nil, nil
+
+	// Include resources with negative inputs among the bad resources, their sums are bogus.
+	badResources := append(exceeded, negativeResources...)
+	badResources = uniqueResourceNames(badResources)
+	if len(badResources) == 0 {
+		return true, nil, nil, nil
 	}
-	failedHard := quota.Mask(nssResourceList, exceeded)
-	return false, failedHard, nil
+	failedExceeded := quota.Mask(nssResourceList, exceeded)
+	failedNegative := quota.Mask(nssResourceList, negativeResources)
+
+	if len(failedExceeded) == 0 {
+		failedExceeded = nil
+	}
+	if len(failedNegative) == 0 {
+		failedNegative = nil
+	}
+
+	return false, failedExceeded, failedNegative, nil
+}
+
+func uniqueResourceNames(resources []api.ResourceName) []api.ResourceName {
+	seen := map[api.ResourceName]struct{}{}
+	unique := make([]api.ResourceName, 0, len(resources))
+	for _, resource := range resources {
+		if _, ok := seen[resource]; ok {
+			continue
+		}
+		seen[resource] = struct{}{}
+		unique = append(unique, resource)
+	}
+	return unique
 }
 
 func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList, error) {

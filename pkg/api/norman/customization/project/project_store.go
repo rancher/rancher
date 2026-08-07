@@ -167,14 +167,18 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 
 func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v32.ResourceQuotaLimit,
 	projectQuotaLimit *v32.ResourceQuotaLimit, id string) error {
-	// check that namespace default quota is within project quota
-	isFit, exceeded, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
+	// check that namespace default quota is within project quota and no negative requests occurred
+	isFit, exceeded, negatives, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
-		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField, fmt.Sprintf("exceeds %s on fields: %s",
-			quotaField, utils.FormatResourceList(exceeded)))
+		if negatives != nil {
+			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, namespaceQuotaField,
+				fmt.Sprintf("has negative inputs on fields: %s", utils.FormatResourceList(negatives)))
+		}
+		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
+			fmt.Sprintf("exceeds limits on fields: %s", utils.FormatResourceList(exceeded)))
 	}
 
 	if id == "" {
@@ -230,13 +234,17 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if err != nil {
 		return err
 	}
-	isFit, exceeded, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
+	isFit, exceeded, negatives, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
-		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("is below the used limit on fields: %s",
-			utils.FormatResourceList(exceeded)))
+		if negatives != nil {
+			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, quotaField,
+				fmt.Sprintf("has negative inputs on fields: %s", utils.FormatResourceList(negatives)))
+		}
+		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField,
+			fmt.Sprintf("is below the used limit on fields: %s", utils.FormatResourceList(exceeded)))
 	}
 
 	if len(limitToAdd) == 0 && len(limitToRemove) == 0 {
@@ -265,17 +273,19 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 		nsLimits = append(nsLimits, converted)
 	}
 
-	isFit, exceeded, err = resourcequota.IsQuotaFit(&v32.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
-	if err != nil {
+	isFit, exceeded, negatives, err = resourcequota.IsQuotaFit(&v32.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
+	if err != nil || isFit {
 		return err
 	}
-	if !isFit {
-		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
-			fmt.Sprintf("exceeds project limit on fields %s when applied to all namespaces in a project",
-				utils.FormatResourceList(exceeded)))
-	}
 
-	return nil
+	if negatives != nil {
+		return httperror.NewFieldAPIError(httperror.MinLimitExceeded, namespaceQuotaField,
+			fmt.Sprintf("has negative inputs on fields %s when applied to all namespaces in a project",
+				utils.FormatResourceList(negatives)))
+	}
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
+		fmt.Sprintf("exceeds project limit on fields %s when applied to all namespaces in a project",
+			utils.FormatResourceList(exceeded)))
 }
 
 func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project mgmtclient.Project) (int, error) {
