@@ -76,18 +76,20 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 	snapshots := operations.RunSnapshotCreateTests(t, clients, c, cm, "etcd-test-node", 3)
 	require.Len(t, snapshots, 3, "expected 3 snapshots to be created")
 
-	// Record original K8s version for post-restore validation
-	originalK8sVersion := c.Spec.KubernetesVersion
+	snapshotK8sVersion := operations.SnapshotKubernetesVersion(t, snapshots[2])
+	alternateK8sVersion := operations.AlternateKubernetesVersionForSnapshot(t, snapshotK8sVersion)
 
 	// Modify a cluster spec field to validate that restore modes properly revert (or preserve) spec changes
 	operations.ModifyClusterAdditionalManifest(t, clients, c, "modified-for-restore-test")
 
 	// RestoreRKEConfigAll: should revert both KubernetesVersion and spec fields to snapshot values
-	operations.RunSnapshotRestoreTestWithRKEConfig(t, clients, c, snapshots[2].Name, cm, 2, rkev1.RestoreRKEConfigAll)
+	operations.PrepareConfigMapForRestore(t, clients, c, cm)
+	require.NotEqual(t, snapshotK8sVersion, alternateK8sVersion, "alternate Kubernetes version must differ from snapshot version for restore validation")
+	operations.RunSnapshotRestoreTestWithRKEConfigAndKubernetesVersion(t, clients, c, snapshots[2].Name, cm, 2, rkev1.RestoreRKEConfigAll, alternateK8sVersion)
 	latestC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "", latestC.Spec.RKEConfig.AdditionalManifest, "RestoreRKEConfigAll should revert AdditionalManifest")
-	assert.Equal(t, originalK8sVersion, latestC.Spec.KubernetesVersion, "RestoreRKEConfigAll should restore KubernetesVersion")
+	assert.Equal(t, snapshotK8sVersion, latestC.Spec.KubernetesVersion, "RestoreRKEConfigAll should restore KubernetesVersion from snapshot")
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
@@ -95,19 +97,23 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 	operations.ModifyClusterAdditionalManifest(t, clients, c, "modified-for-kv-restore-test")
 
 	// RestoreRKEConfigKubernetesVersion: should only restore KubernetesVersion, not other spec fields
-	operations.RunSnapshotRestoreTestWithRKEConfig(t, clients, c, snapshots[1].Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion)
+	operations.PrepareConfigMapForRestore(t, clients, c, cm)
+	require.NotEqual(t, snapshotK8sVersion, alternateK8sVersion, "alternate Kubernetes version must differ from snapshot version for restore validation")
+	operations.RunSnapshotRestoreTestWithRKEConfigAndKubernetesVersion(t, clients, c, snapshots[1].Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion, alternateK8sVersion)
 	latestC, err = clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "modified-for-kv-restore-test", latestC.Spec.RKEConfig.AdditionalManifest, "RestoreRKEConfigKubernetesVersion should not revert AdditionalManifest")
-	assert.Equal(t, originalK8sVersion, latestC.Spec.KubernetesVersion, "RestoreRKEConfigKubernetesVersion should restore KubernetesVersion")
+	assert.Equal(t, snapshotK8sVersion, latestC.Spec.KubernetesVersion, "RestoreRKEConfigKubernetesVersion should restore KubernetesVersion from snapshot")
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
 	// RestoreRKEConfigNone: should not revert any spec fields
+	operations.PrepareConfigMapForRestore(t, clients, c, cm)
 	operations.RunSnapshotRestoreTestWithRKEConfig(t, clients, c, snapshots[0].Name, cm, 2, rkev1.RestoreRKEConfigNone)
 	latestC, err = clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "modified-for-kv-restore-test", latestC.Spec.RKEConfig.AdditionalManifest, "RestoreRKEConfigNone should not revert AdditionalManifest")
+	assert.Equal(t, snapshotK8sVersion, latestC.Spec.KubernetesVersion, "RestoreRKEConfigNone should preserve KubernetesVersion")
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
