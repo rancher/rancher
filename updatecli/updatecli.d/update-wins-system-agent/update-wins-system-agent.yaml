@@ -34,31 +34,31 @@ actions:
       description: 'Bump patch versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
 
 sources:
-  wins-current-version:
-    name: 'Get current Wins version from package/Dockerfile'
+  wins-current-base-version:
+    name: 'Get base Wins version (without pre-release suffix) from package/Dockerfile'
     kind: file
     scmid: 'default'
     spec:
       file: 'package/Dockerfile'
       matchpattern: 'ENV[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
     transformers:
-      - find: 'v\S+'
+      - find: 'v\d+\.\d+\.\d+'
 
-  system-agent-current-version:
-    name: 'Get current System Agent version from package/Dockerfile'
+  system-agent-current-base-version:
+    name: 'Get base System Agent version (without pre-release suffix) from package/Dockerfile'
     kind: file
     scmid: 'default'
     spec:
       file: 'package/Dockerfile'
       matchpattern: 'ENV[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
     transformers:
-      - find: 'v\S+'
+      - find: 'v\d+\.\d+\.\d+'
 
   wins-release:
     name: 'Get latest upstream Wins version'
     kind: githubrelease
     dependson:
-      - 'wins-current-version'
+      - 'wins-current-base-version'
     spec:
       owner: '{{ .repos.wins.owner }}'
       repository: '{{ .repos.wins.repo }}'
@@ -70,13 +70,13 @@ sources:
       token: '{{ requiredEnv .scm.token }}'
       versionfilter:
         kind: semver
-        pattern: '~{{ source "wins-current-version" }}-0'
+        pattern: '~{{ source "wins-current-base-version" }}-0'
 
   system-agent-release:
     name: 'Get latest upstream System Agent version'
     kind: githubrelease
     dependson:
-      - 'system-agent-current-version'
+      - 'system-agent-current-base-version'
     spec:
       owner: '{{ .repos.system_agent.owner }}'
       repository: '{{ .repos.system_agent.repo }}'
@@ -88,7 +88,7 @@ sources:
       token: '{{ requiredEnv .scm.token }}'
       versionfilter:
         kind: semver
-        pattern: '~{{ source "system-agent-current-version" }}-0'
+        pattern: '~{{ source "system-agent-current-base-version" }}-0'
 
   wins-checksum:
     name: 'Get sha256 for wins.exe from {{ source "wins-release" }}'
