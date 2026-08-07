@@ -31,7 +31,7 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: setup and build
@@ -49,7 +49,7 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: setup and build
@@ -74,7 +74,7 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: Load Secrets from Vault
@@ -89,7 +89,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
     permissions:
       contents: read
       id-token: write
@@ -101,7 +101,7 @@ jobs:
       ARCH: amd64
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: Load Secrets from Vault
@@ -134,7 +134,7 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: Load Secrets from Vault
@@ -154,7 +154,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: Load Secrets from Vault
@@ -186,7 +186,7 @@ jobs:
         uses: ./.github/actions/merge-manifests
   create-images-files:
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
     permissions:
       contents: read
       id-token: write
@@ -196,7 +196,7 @@ jobs:
       ARTIFACTS_BASE_DIR: "bin"
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: generate
