@@ -4,14 +4,17 @@ import (
 	"go.uber.org/mock/gomock"
 	"reflect"
 	"testing"
+	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientcache "k8s.io/client-go/tools/cache"
 )
 
 func TestSetLimitRangeAnnotation(t *testing.T) {
@@ -570,4 +573,55 @@ func TestZeroOutResourceQuotaLimit(t *testing.T) {
 			},
 		}, out)
 	})
+}
+
+func TestGetNamespacesLimitsSkipsUnvalidatedNamespaces(t *testing.T) {
+	indexer := clientcache.NewIndexer(clientcache.MetaNamespaceKeyFunc, clientcache.Indexers{
+		nsByProjectIndex: nsByProjectID,
+	})
+
+	current := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "current",
+			Annotations: map[string]string{
+				projectIDAnnotation: "local:p-abcde",
+			},
+		},
+	}
+
+	assert.NoError(t, namespaceutil.SetNamespaceCondition(current, time.Second, ResourceQuotaValidatedCondition, true, ""))
+
+	validPeer := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "valid-peer",
+			Annotations: map[string]string{
+				projectIDAnnotation:     "local:p-abcde",
+				resourceQuotaAnnotation: `{"limit":{"limitsMemory":"1000Mi"}}`,
+			},
+		},
+	}
+
+	assert.NoError(t, namespaceutil.SetNamespaceCondition(validPeer, time.Second, ResourceQuotaValidatedCondition, true, ""))
+
+	invalidPeer := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "invalid-peer",
+			Annotations: map[string]string{
+				projectIDAnnotation:     "local:p-abcde",
+				resourceQuotaAnnotation: `{"limit":{"limitsMemory":"-8000Mi"}}`,
+			},
+		},
+	}
+
+	assert.NoError(t, namespaceutil.SetNamespaceCondition(invalidPeer, time.Second, ResourceQuotaValidatedCondition, false, "invalid"))
+	assert.NoError(t, indexer.Add(current))
+	assert.NoError(t, indexer.Add(validPeer))
+	assert.NoError(t, indexer.Add(invalidPeer))
+
+	controller := &SyncController{NsIndexer: indexer}
+	limits, err := controller.getNamespacesLimits(current, "local:p-abcde")
+
+	assert.NoError(t, err)
+	assert.Len(t, limits, 1)
+	assert.Equal(t, "1000Mi", limits[0].LimitsMemory)
 }
