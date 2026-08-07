@@ -28,6 +28,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CloudCredentialList is a list of CloudCredential resources
+type CloudCredentialList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []CloudCredential `json:"items"`
+}
+
+func NewCloudCredential(namespace, name string, obj CloudCredential) *CloudCredential {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CloudCredential").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // GroupMembershipRefreshRequestList is a list of GroupMembershipRefreshRequest resources
 type GroupMembershipRefreshRequestList struct {
 	metav1.TypeMeta `json:",inline"`
