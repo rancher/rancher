@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/operations/certificaterotation"
 	"github.com/rancher/rancher/pkg/controllers/operations/encryptionkeyrotation"
 	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotrestore"
 	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotsave"
@@ -10,6 +11,7 @@ import (
 )
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
+	certificaterotation.Register(ctx, clients)
 	encryptionkeyrotation.Register(ctx, clients)
 	etcdsnapshotsave.Register(ctx, clients)
 	etcdsnapshotrestore.Register(ctx, clients)
