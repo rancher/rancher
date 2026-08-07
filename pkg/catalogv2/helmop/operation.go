@@ -31,8 +31,8 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/taints"
+	steveclient "github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/podimpersonation"
-	"github.com/rancher/steve/pkg/stores/proxy"
 	data2 "github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -102,12 +102,12 @@ type Operations struct {
 	secretCache       corev1controllers.SecretCache
 	secrets           corev1controllers.SecretClient
 	roleBindings      rbacv1controllers.RoleBindingClient // client for rolebinding kubernetes resource
-	cg                proxy.ClientGetter                  // dynamic kubernetes client factory
+	cg                steveclient.ClientGetter            // dynamic kubernetes client factory
 }
 
 // NewOperations creates a new Operations struct with all fields initialized
 func NewOperations(
-	cg proxy.ClientGetter,
+	cg steveclient.ClientGetter,
 	catalog catalogcontrollers.Interface,
 	rbac rbacv1controllers.Interface,
 	contentManager *content.Manager,

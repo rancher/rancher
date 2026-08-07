@@ -116,7 +116,7 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.15.0
 	github.com/rancher/ali-operator v1.15.0-rc.3
-	github.com/rancher/apiserver v0.9.7
+	github.com/rancher/apiserver v0.10.0
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.0
 	github.com/rancher/dynamiclistener v0.9.0
@@ -128,7 +128,7 @@ require (
 	github.com/rancher/lasso v0.2.9
 	github.com/rancher/machine v0.15.0-rancher145
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.9.7
+	github.com/rancher/norman v0.10.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
@@ -301,10 +301,10 @@ require (
 	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
 	k8s.io/kms v0.36.2 // indirect
 	k8s.io/streaming v0.36.2 // indirect
-	modernc.org/libc v1.72.0 // indirect
+	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.50.0 // indirect
+	modernc.org/sqlite v1.55.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 )
@@ -347,7 +347,7 @@ require (
 	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-openapi/jsonpointer v0.22.4 // indirect
 	github.com/go-openapi/jsonreference v0.21.4 // indirect
 	github.com/go-openapi/swag v0.25.4 // indirect
@@ -435,3 +435,5 @@ require (
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 )
+
+replace github.com/rancher/steve => github.com/rohitsuse/steve v0.0.0-20260806174338-4cc24c2aae89
