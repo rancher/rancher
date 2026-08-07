@@ -36,7 +36,7 @@ jobs:
     steps:
       - name: Checkout
         # zizmor: ignore[artipacked] -- this job must retain checkout credentials for authenticated branch cleanup pushes.
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Install updatecli
         uses: updatecli/updatecli-action@4b17f4ea784de29f71f85f9bc4955402ba1ae53c # v2.100.0
