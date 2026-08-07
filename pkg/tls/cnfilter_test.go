@@ -129,6 +129,44 @@ func TestUnionFilterCN(t *testing.T) {
 	}
 }
 
+// TestUnionFilterCN_TransformingPrimary is a regression test: unionFilterCN
+// must compute primary's rejected set by membership against its actual
+// output, not by comparing lengths. A primary that transforms its input
+// (e.g. collapses many CNs down to a single hostname, as serverURLFilterCN
+// does) can coincidentally return a result the same length as its input
+// without having "accepted everything" -- a length-based shortcut would
+// wrongly skip consulting allowlist in that case.
+func TestUnionFilterCN_TransformingPrimary(t *testing.T) {
+	t.Parallel()
+
+	// transformingPrimary always collapses its input down to a single fixed
+	// CN, regardless of what it was given -- simulating serverURLFilterCN's
+	// behavior of always returning the configured hostname.
+	transformingPrimary := func(cns ...string) []string {
+		return []string{"rancher.example.com"}
+	}
+	allowlist := func(cns ...string) []string {
+		var out []string
+		for _, cn := range cns {
+			if cn == "10.42.0.1" {
+				out = append(out, cn)
+			}
+		}
+		return out
+	}
+
+	union := unionFilterCN(transformingPrimary, allowlist)
+
+	// Single-CN input: primary's output happens to be the same length (1)
+	// as the input, but the input CN itself was rejected (it's not
+	// "rancher.example.com") and must still be checked against allowlist.
+	got := union("10.42.0.1")
+	expected := []string{"rancher.example.com", "10.42.0.1"}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("union(10.42.0.1) = %v, want %v", got, expected)
+	}
+}
+
 // makeService builds a Service with the given ClusterIP, ExternalIPs, and
 // LoadBalancer ingress IPs for use in serviceIPTracker tests.
 func makeService(ns, name, clusterIP string, externalIPs []string, lbIPs ...string) *corev1.Service {
