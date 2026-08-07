@@ -172,6 +172,13 @@ spec:
       - effect: NoSchedule
         key: "node-role.kubernetes.io/control-plane"
         operator: "Exists"
+      initContainers:
+      - name: rancher-charts-copy
+        image: 
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: rancher-charts
+          mountPath: /charts
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
@@ -199,10 +206,14 @@ spec:
             value: "true"
           image: ""
           volumeMounts:
+          - name: rancher-charts
+            mountPath: /var/lib/rancher-data/local-catalogs/v2
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
       volumes:
+      - name: rancher-charts
+        emptyDir: {}
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-5ec1f7e700

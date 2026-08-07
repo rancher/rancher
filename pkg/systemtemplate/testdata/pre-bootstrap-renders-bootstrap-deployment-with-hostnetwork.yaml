@@ -165,6 +165,13 @@ spec:
       - effect: NoSchedule
         key: node.cloudprovider.kubernetes.io/uninitialized
         operator: "Exists"
+      initContainers:
+      - name: rancher-charts-copy
+        image: rancher/assets:charts
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: rancher-charts
+          mountPath: /charts
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
@@ -193,12 +200,16 @@ spec:
             value: "true"
           image: "rancher/rancher-agent:v2.8.0"
           volumeMounts:
+          - name: rancher-charts
+            mountPath: /var/lib/rancher-data/local-catalogs/v2
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
       # use hostNetwork since the CNI (and coreDNS) is not up yet
       hostNetwork: true
       volumes:
+      - name: rancher-charts
+        emptyDir: {}
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-a15c1b308a

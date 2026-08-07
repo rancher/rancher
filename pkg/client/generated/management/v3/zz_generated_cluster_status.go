@@ -16,6 +16,7 @@ const (
 	ClusterStatusFieldAppliedEnableNetworkPolicy                 = "appliedEnableNetworkPolicy"
 	ClusterStatusFieldAppliedSpec                                = "appliedSpec"
 	ClusterStatusFieldAppliedWebhookDeploymentCustomization      = "appliedWebhookDeploymentCustomization"
+	ClusterStatusFieldAssetsImage                                = "assetsImage"
 	ClusterStatusFieldAuthImage                                  = "authImage"
 	ClusterStatusFieldCACert                                     = "caCert"
 	ClusterStatusFieldCapabilities                               = "capabilities"
@@ -63,6 +64,7 @@ type ClusterStatus struct {
 	AppliedEnableNetworkPolicy                 bool                            `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedSpec                                *ClusterSpec                    `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AppliedWebhookDeploymentCustomization      *WebhookDeploymentCustomization `json:"appliedWebhookDeploymentCustomization,omitempty" yaml:"appliedWebhookDeploymentCustomization,omitempty"`
+	AssetsImage                                string                          `json:"assetsImage,omitempty" yaml:"assetsImage,omitempty"`
 	AuthImage                                  string                          `json:"authImage,omitempty" yaml:"authImage,omitempty"`
 	CACert                                     string                          `json:"caCert,omitempty" yaml:"caCert,omitempty"`
 	Capabilities                               *Capabilities                   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`

@@ -147,7 +147,7 @@ var (
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	// ATTENTION: This file and the following line are used in the rancher/webhook CI to extract the default branch they need
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.16")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", buildconfig.ChartDefaultBranch)
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
@@ -263,7 +263,7 @@ var (
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
-	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", "main")
+	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", buildconfig.PartnerChartDefaultBranch)
 
 	// PartnerChartDefaultURL represents the default URL for the partner charts repo. It should only be set for test
 	// or debug purposes.
@@ -286,7 +286,7 @@ var (
 	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
-	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
+	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", buildconfig.Rke2ChartDefaultBranch)
 
 	// RKE2ChartDefaultURL represents the default URL for the RKE2 charts repo. It should only be set for test or
 	// debug purposes.
@@ -451,6 +451,9 @@ var (
 	ExpireSCIMTokensAfter = NewSetting("expire-scim-tokens-after", "720h") // 30 days
 
 	ImportedClusterDay2OpsEnabledDefault = NewSetting("imported-cluster-day2-ops-enabled", "true")
+
+	// AssetsImage is the image used for Rancher's `ClusterRepo` assets on downstream clusters.
+	AssetsImage = NewSetting("charts-image", buildconfig.DefaultAssetsImage)
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
