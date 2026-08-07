@@ -171,7 +171,7 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Name
 			return updated, err
 		}
 		if !isFit {
-			// Create a quota with zeros only for overused resources.
+			// Create a quota with zeros only for bad resources (overused, negative inputs)
 			limit, err := zeroOutResourceQuotaLimit(requestedQuotaLimit, badResources)
 			if err != nil {
 				return updated, err
