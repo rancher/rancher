@@ -25,14 +25,38 @@ func getAuthData(auth string, secrets SecretGetter, fields []string) (map[string
 
 func getRequestParams(auth string) map[string]string {
 	params := map[string]string{}
-	if auth != "" {
-		splitAuth := strings.Split(auth, " ")
-		for _, term := range splitAuth[1:] {
-			splitTerm := strings.SplitN(term, "=", 2)
-			params[splitTerm[0]] = splitTerm[1]
+	if auth == "" {
+		return params
+	}
+
+	terms := strings.Fields(auth)
+	for _, term := range terms[1:] {
+		splitTerm := strings.SplitN(term, "=", 2)
+		if len(splitTerm) != 2 || splitTerm[0] == "" {
+			continue
 		}
+		params[splitTerm[0]] = splitTerm[1]
 	}
 	return params
+}
+
+// credentialIDFromCattleAuth extracts credID from X-API-CattleAuth-Header.
+// It supports both parameterized values ("<mode> credID=<ns>/<name>") and
+// bare credential IDs ("<ns>/<name>" or "provider:<name>").
+func credentialIDFromCattleAuth(cAuth string) string {
+	params := getRequestParams(cAuth)
+	if credID := params["credID"]; credID != "" {
+		return credID
+	}
+
+	bare := strings.TrimSpace(cAuth)
+	if bare == "" || strings.Contains(bare, " ") || strings.Contains(bare, "=") {
+		return ""
+	}
+	if strings.Contains(bare, "/") || strings.Contains(bare, ":") {
+		return bare
+	}
+	return ""
 }
 
 func requiredFieldsExist(data map[string]string, fields []string) bool {
