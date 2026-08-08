@@ -143,6 +143,15 @@ func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.
 		return obj, nil
 	}
 
+	if clusterName := obj.Spec.ClusterName; clusterName != "" {
+		if _, err := h.clusters.Get(clusterName); err != nil {
+			if apierrors.IsNotFound(err) {
+				return obj, nil
+			}
+			return obj, err
+		}
+	}
+
 	obj = obj.DeepCopy()
 	original := obj.DeepCopy()
 	var requeueAfter time.Duration
