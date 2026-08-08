@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
@@ -39,6 +40,14 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 // AssignCommands populates the command fields in a CRT status using the "{token}" placeholder.
 // Substitution of the placeholder with the real token happens at the API layer.
 func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, clusterID string, clusters mgmtcontrollers.ClusterCache) (v32.ClusterRegistrationTokenStatus, error) {
+	cluster, err := clusters.Get(clusterID)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return *crtStatus, nil
+		}
+		return *crtStatus, err
+	}
+
 	checksum := systemtemplate.CAChecksum()
 	ca := ""
 	caWindows := ""
@@ -61,11 +70,6 @@ func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, clusterID str
 	crtStatus.ManifestURL = url
 
 	rootURL, err := getRootURL()
-	if err != nil {
-		return *crtStatus, err
-	}
-
-	cluster, err := clusters.Get(clusterID)
 	if err != nil {
 		return *crtStatus, err
 	}
