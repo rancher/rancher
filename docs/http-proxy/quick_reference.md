@@ -24,7 +24,7 @@ This document is a concise reference for the `ProxyEndpointRoute` spec in
 - `clientCertificate` (`SecretReference`, optional)
   - References a Kubernetes Secret in the same namespace.
   - Secret must contain `tls.crt` and `tls.key`.
-  - Use for mutual TLS (mTLS).
+  - Type is defined, but runtime mTLS wiring is not implemented yet.
 
 - `serverName` (`string`, optional)
   - SNI hostname used during the TLS handshake.
@@ -50,6 +50,7 @@ This document is a concise reference for the `ProxyEndpointRoute` spec in
 - `domain` is required and validated as a hostname / wildcard domain.
 - `caBundle` and `insecureSkipTLSVerify: true` are mutually exclusive.
 - `clientCertificate.name` must refer to a Secret in the same namespace.
+- `clientCertificate` is currently not consumed by `pkg/httpproxy/proxy.go` transport logic.
 - `verifyHostname` and `verifyExpiration` default to `true` when omitted.
 
 ## Common examples
@@ -66,7 +67,7 @@ spec:
         -----END CERTIFICATE-----
 ```
 
-### mTLS endpoint with SNI
+### Planned mTLS endpoint with SNI (field defined)
 
 ```yaml
 spec:
