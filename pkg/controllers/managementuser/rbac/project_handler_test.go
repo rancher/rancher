@@ -53,6 +53,14 @@ func TestCreate(t *testing.T) {
 						},
 					},
 				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "p-123xyz-namespaces-delete",
+						Annotations: map[string]string{
+							projectNSAnn: "p-123xyz-namespaces-delete",
+						},
+					},
+				},
 			},
 		},
 		{
@@ -67,7 +75,7 @@ func TestCreate(t *testing.T) {
 		},
 		{
 			name:                     "roles already exist",
-			existingClusterRoleNames: []string{"p-123xyz-namespaces-readonly", "p-123xyz-namespaces-edit"},
+			existingClusterRoleNames: []string{"p-123xyz-namespaces-readonly", "p-123xyz-namespaces-edit", "p-123xyz-namespaces-delete"},
 			wantErr:                  false,
 		},
 	}
