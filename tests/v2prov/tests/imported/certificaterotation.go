@@ -123,12 +123,9 @@ func CreateCertificateRotationOp(t *testing.T, clients *clients.Clients, namespa
 func RunCertificateRotationOperationTest(t *testing.T, clients *clients.Clients, namespace string, clusterRef corev1.ObjectReference, opts ...CertificateRotationOption) *opv1alpha1.CertificateRotation {
 	t.Helper()
 
-	op, err := clients.Operation.CertificateRotation().Create(buildCertificateRotationOp(namespace, clusterRef, opts...))
-	if err != nil {
-		t.Fatal(err)
-	}
+	op := CreateCertificateRotationOp(t, clients, namespace, clusterRef, opts...)
 
-	err = wait.ObjectWithTimeout(clients.Ctx, 25*time.Minute, clients.Operation.CertificateRotation().Watch, op, func(obj runtime.Object) (bool, error) {
+	err := wait.ObjectWithTimeout(clients.Ctx, 25*time.Minute, clients.Operation.CertificateRotation().Watch, op, func(obj runtime.Object) (bool, error) {
 		op = obj.(*opv1alpha1.CertificateRotation)
 		if op.Status.Phase == opv1alpha1.OperationPhaseFailed {
 			return false, fmt.Errorf("certificate rotation operation failed at step %q", op.Status.Step)
@@ -210,14 +207,12 @@ func handleCertificateRotationError(t *testing.T, clients *clients.Clients, name
 		}
 	}
 
-	if op != nil {
-		latest, newErr := clients.Operation.CertificateRotation().Get(op.Namespace, op.Name, metav1.GetOptions{})
-		if newErr != nil {
-			logrus.Error(newErr)
-			objs["certificateRotation"] = summarizeCertificateRotation(op)
-		} else {
-			objs["certificateRotation"] = summarizeCertificateRotation(latest)
-		}
+	latest, newErr := clients.Operation.CertificateRotation().Get(op.Namespace, op.Name, metav1.GetOptions{})
+	if newErr != nil {
+		logrus.Error(newErr)
+		objs["certificateRotation"] = summarizeCertificateRotation(op)
+	} else {
+		objs["certificateRotation"] = summarizeCertificateRotation(latest)
 	}
 
 	data, newErr := snapshotutil.CompressInterface(objs)
@@ -278,9 +273,6 @@ func summarizeBeacon(beacon *planv1alpha1.Beacon) beaconSummary {
 }
 
 func summarizeCertificateRotation(op *opv1alpha1.CertificateRotation) certificateRotationSummary {
-	if op == nil {
-		return certificateRotationSummary{}
-	}
 	return certificateRotationSummary{
 		Name:             op.Name,
 		Namespace:        op.Namespace,

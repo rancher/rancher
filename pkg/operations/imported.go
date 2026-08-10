@@ -348,12 +348,6 @@ func (a *ImportedAdapter) ServerUnit() string {
 // It follows the machine-plan Secret -> lifecycle labels -> management Node -> status
 // nodeAnnotations lookup chain and returns no arguments when any link is unavailable.
 func (a *ImportedAdapter) nodeArgs(secret *corev1.Secret) []string {
-	if secret == nil {
-		return nil
-	}
-	if a == nil || a.clients == nil || a.clients.Context == nil || a.clients.Mgmt == nil || a.clients.RESTMapper == nil {
-		return nil
-	}
 	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
 		return nil
 	}
@@ -371,13 +365,6 @@ func (a *ImportedAdapter) nodeArgs(secret *corev1.Secret) []string {
 	}
 	if err != nil {
 		logrus.Debugf("[imported adapter] error fetching node %s/%s: %v", ref.Namespace, ref.Name, err)
-		return nil
-	}
-	if node == nil {
-		return nil
-	}
-
-	if node.Status.NodeAnnotations == nil {
 		return nil
 	}
 
