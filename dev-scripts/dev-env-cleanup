@@ -14,7 +14,7 @@ for bin in docker jq k3d; do
   fi
 done
 
-if k3d cluster list --output json 2>/dev/null | jq "(map(select(.name == \"${cluster}\")) | first) // error (\"Cluster ${cluster} does not exist\")"; then
+if k3d cluster list --output json 2>/dev/null | jq -e --arg cluster "$cluster" 'any(.[]; .name == $cluster)' >/dev/null; then
   echo "Deleting k3d cluster '${cluster}'"
   k3d cluster delete "${cluster}"
 else

@@ -36,7 +36,7 @@ if ! docker network inspect kind >/dev/null 2>&1; then
   docker network create kind >/dev/null
 fi
 
-if k3d cluster list --output json 2>/dev/null | jq "(map(select(.name == \"${cluster}\")) | first) // error (\"Cluster ${cluster} does not exist\")"; then
+if k3d cluster list --output json 2>/dev/null | jq -e --arg cluster "$cluster" 'any(.[]; .name == $cluster)' >/dev/null; then
   echo "k3d cluster '${cluster}' already exists — reusing"
 else
   echo "Creating k3d cluster '${cluster}' on the 'kind' network with docker socket mounted"
