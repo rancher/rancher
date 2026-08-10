@@ -52,17 +52,6 @@ var supportedCertificateRotationServices = map[string]struct{}{
 	"scheduler":          {},
 }
 
-type certificateRotationComponentSettingsProvider interface {
-	// CertificateRotationComponentTLSSettings returns an explicitly configured
-	// controller-manager or scheduler serving certificate for this node. The
-	// rotation plan uses this to avoid deleting the default generated certificate
-	// when the component is configured to use a different certificate pair.
-	CertificateRotationComponentTLSSettings(
-		secret *corev1.Secret,
-		component string,
-	) ops.ComponentTLSSettings
-}
-
 // dynamicResolver is the subset of the dynamic controller used by operations handlers.
 type dynamicResolver interface {
 	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
@@ -808,11 +797,11 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 			if ops.IsControlPlane(secret) {
 				var controllerManagerSettings, schedulerSettings ops.ComponentTLSSettings
-				if provider, ok := s.adapter.(certificateRotationComponentSettingsProvider); ok {
-					// Some adapters can identify an explicit component TLS pair. Pass those
-					// settings to cleanup so rotation never removes an externally managed pair.
-					controllerManagerSettings = provider.CertificateRotationComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
-					schedulerSettings = provider.CertificateRotationComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
+				if adapter, ok := s.adapter.(*ops.ImportedAdapter); ok {
+					// Imported RKE2 nodes expose their effective runtime arguments in the
+					// machine-plan secret. Preserve explicitly configured component TLS pairs.
+					controllerManagerSettings = adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
+					schedulerSettings = adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
 				}
 				oneTime = append(oneTime, componentCertificateCleanupInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, s.op.Spec.Args.Services, controllerManagerSettings, schedulerSettings)...)
 			}
