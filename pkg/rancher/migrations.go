@@ -866,6 +866,7 @@ func migrateCRTTokensToSecretsFunc(w *wrangler.Context) error {
 		}
 	}
 
+	logrus.Infof("Successfully migrated cluster registration tokens to secrets")
 	cm.Data[crtTokensToSecretsMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
@@ -1017,7 +1018,7 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 	}
 
 	if cluster != nil {
-		newStatus, err := clusterregistrationtoken.AssignCommands(&crtCopy.Status, crt.Spec.ClusterName, w.Mgmt.Cluster().Cache())
+		newStatus, err := clusterregistrationtoken.AssignCommands(&crtCopy.Status, cluster)
 		if err != nil {
 			logrus.Warnf("Failed to regenerate commands for CRT %s/%s: %v",
 				crt.Namespace, crt.Name, err)
@@ -1030,13 +1031,11 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 		crtCopy.Status.ExpiresAt = expiresAt
 	}
 
-	_, err = w.Mgmt.ClusterRegistrationToken().UpdateStatus(crtCopy)
+	_, err = w.Mgmt.ClusterRegistrationToken().Update(crtCopy)
 	if err != nil {
 		return fmt.Errorf("failed to update CRT status: %w", err)
 	}
 
-	logrus.Infof("Successfully migrated CRT %s/%s token to secret %s",
-		crt.Namespace, crt.Name, secretName)
 	return nil
 }
 
