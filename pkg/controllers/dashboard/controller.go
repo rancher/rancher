@@ -110,7 +110,7 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 }
 
 // RegisterPostMigration registers controllers that should only start after boot-time
-// migrations (see pkg/rancher/migrations.go) have completed. This avoids redundant and conflicting work on startup.
+// migrations (see pkg/rancher/migrations.go) have completed. This avoids redundant or conflicting work on startup.
 func RegisterPostMigration(ctx context.Context, clients *wrangler.Context) {
 	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
 		clusterregistrationtoken.Register(ctx, clients)

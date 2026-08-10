@@ -505,7 +505,12 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		dashboard.RegisterPostMigration(ctx, r.Wrangler)
+		if err := r.Wrangler.StartFactoryWithTransaction(ctx, func(ctx context.Context) error {
+			dashboard.RegisterPostMigration(ctx, r.Wrangler)
+			return nil
+		}); err != nil {
+			return errors.New("dashboard.RegisterPostMigration() failed: " + err.Error())
+		}
 		return nil
 	})
 
