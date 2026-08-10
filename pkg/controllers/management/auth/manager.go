@@ -123,7 +123,7 @@ type manager struct {
 }
 
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
-// that gives the subject access to the the cluster custom resource itself
+// that gives the subject access to the cluster custom resource itself
 // This is painfully similar to ensureProjectMemberBinding, but making one function that handles both is overly complex
 func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, cluster *v3.Cluster, makeOwner bool, subject v1.Subject) error {
 	key := rbRoleSubjectKey(roleName, subject)
@@ -205,7 +205,7 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 }
 
 // When a PRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
-// that gives the subject access to the the project/cluster custom resource itself
+// that gives the subject access to the project/cluster custom resource itself
 func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespace string, project *v3.Project, makeOwner bool, subject v1.Subject) error {
 	key := rbRoleSubjectKey(roleName, subject)
 	rbs, err := m.rbIndexer.ByIndex(membershipBindingOwnerIndex, namespace+"/"+rtbNsAndName)

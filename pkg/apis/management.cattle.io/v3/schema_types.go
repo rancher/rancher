@@ -35,7 +35,7 @@ type DynamicSchema struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Specification of the desired behavior of the the dynamic schema. More info:
+	// Specification of the desired behavior of the dynamic schema. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec DynamicSchemaSpec `json:"spec"`
 	// Most recent observed status of the dynamic schema. More info:

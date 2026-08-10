@@ -31,7 +31,7 @@ type Meta struct {
 	Location string `json:"location,omitempty"`
 	// ResourceType is the name of the resource type of the resource.
 	ResourceType string `json:"resourceType,omitempty"`
-	// Created is the the "DateTime" that the resource was added to the service
+	// Created is the "DateTime" that the resource was added to the service
 	// provider.  This attribute must be a DateTime.
 	Created *time.Time `json:"created,omitempty"`
 	// LastModified is the most recent DateTime that the details of this

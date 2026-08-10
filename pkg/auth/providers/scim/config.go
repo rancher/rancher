@@ -39,7 +39,7 @@ type authenticationScheme struct {
 type ServiceProviderConfig struct {
 	// AuthenticationSchemes is a multi-valued complex type that specifies supported authentication scheme properties.
 	AuthenticationSchemes []authenticationScheme
-	// MaxResults denotes the the integer value specifying the maximum number of resources returned in a response. It defaults to 100.
+	// MaxResults denotes the integer value specifying the maximum number of resources returned in a response. It defaults to 100.
 	MaxResults int
 	// SupportFiltering indicates whether or not the SCIM implementation supports filtering.
 	SupportFiltering bool
