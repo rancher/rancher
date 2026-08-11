@@ -1,4 +1,4 @@
-package plan
+package operations
 
 import (
 	"testing"
@@ -47,7 +47,7 @@ func TestArgumentsFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.value, NewArguments(tt.args).First(tt.names...))
+			assert.Equal(t, tt.value, newArguments(tt.args).First(tt.names...))
 		})
 	}
 }
@@ -55,7 +55,7 @@ func TestArgumentsFirst(t *testing.T) {
 func TestArgumentsValues(t *testing.T) {
 	t.Parallel()
 
-	args := NewArguments([]string{
+	args := newArguments([]string{
 		"--kube-scheduler-arg", "secure-port=10262",
 		"--kube-scheduler-arg=tls-cert-file=/custom/scheduler.crt",
 		"--kube-controller-manager-arg", "secure-port=10261",

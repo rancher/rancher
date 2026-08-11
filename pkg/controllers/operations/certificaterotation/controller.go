@@ -36,22 +36,6 @@ const (
 	RotateStepHookLabelPrefix = "rotate.step.hook.operation.cattle.io/"
 )
 
-var supportedCertificateRotationServices = map[string]struct{}{
-	"admin":              {},
-	"api-server":         {},
-	"auth-proxy":         {},
-	"cloud-controller":   {},
-	"controller-manager": {},
-	"etcd":               {},
-	"k3s-controller":     {},
-	"k3s-server":         {},
-	"kubelet":            {},
-	"kube-proxy":         {},
-	"rke2-controller":    {},
-	"rke2-server":        {},
-	"scheduler":          {},
-}
-
 // dynamicResolver is the subset of the dynamic controller used by operations handlers.
 type dynamicResolver interface {
 	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
@@ -83,6 +67,7 @@ type scope struct {
 	adapter    ops.Adapter
 }
 
+// Register wires the CertificateRotation status handler.
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		certificateRotations: clients.Operation.CertificateRotation(),
@@ -96,6 +81,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	operationcontrollers.RegisterCertificateRotationStatusHandler(ctx, clients.Operation.CertificateRotation(), "", "certificate-rotation-handler", h.OnChange)
 }
 
+// OnChange executes one reconcile pass and requeues while the operation is active.
 func (h *handler) OnChange(op *opv1alpha1.CertificateRotation, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	status, err := h.onChange(op, status)
 	if err != nil {
@@ -120,6 +106,7 @@ func (h *handler) OnChange(op *opv1alpha1.CertificateRotation, status opv1alpha1
 	return status, nil
 }
 
+// onChange resolves cluster context, then dispatches phase-specific handlers.
 func (h *handler) onChange(op *opv1alpha1.CertificateRotation, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	if op == nil {
 		return status, nil
@@ -136,13 +123,6 @@ func (h *handler) onChange(op *opv1alpha1.CertificateRotation, status opv1alpha1
 
 	if status.Phase == "" {
 		status.SetPhase(opv1alpha1.OperationPhasePending)
-	}
-
-	if status.Phase == opv1alpha1.OperationPhasePending {
-		if err := validateCertificateRotationServices(op.Spec.Args.Services); err != nil {
-			markFailed(&status, opv1alpha1.PlanFailedReason, err.Error())
-			return status, nil
-		}
 	}
 
 	gvk := schema.FromAPIVersionAndKind(op.Spec.ClusterRef.APIVersion, op.Spec.ClusterRef.Kind)
@@ -225,6 +205,7 @@ func (h *handler) onChange(op *opv1alpha1.CertificateRotation, status opv1alpha1
 	}
 }
 
+// handlePending acquires or follows beacon ownership and waits for agent registration.
 func (h *handler) handlePending(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Tracef("[certificaterotation] %s/%s: handling pending", s.op.Namespace, s.op.Name)
 
@@ -279,6 +260,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.CertificateRotationS
 	return status, nil
 }
 
+// handleInProgress enforces beacon authorization and executes the current step.
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	ownerKey := s.ownerKey
 	stepPrefix := RotateStepHookLabelPrefix
@@ -358,6 +340,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 	return status, nil
 }
 
+// handleCanceled clears pause state and releases beacon ownership.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
 
@@ -384,6 +367,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotation
 	return status, nil
 }
 
+// handleFailed runs failed hooks, unpauses the cluster, and releases the beacon.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
@@ -410,6 +394,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationSt
 	return status, nil
 }
 
+// handleSucceeded runs succeeded hooks, unpauses the cluster, and releases the beacon.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
@@ -441,6 +426,7 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.CertificateRotatio
 	return status, nil
 }
 
+// updateStatus keeps operation conditions aligned with the current phase.
 func updateStatus(op *opv1alpha1.CertificateRotation, status opv1alpha1.CertificateRotationStatus) opv1alpha1.CertificateRotationStatus {
 	logrus.Tracef("[certificaterotation] %s/%s: updating conditions", op.Namespace, op.Name)
 
@@ -489,9 +475,6 @@ func updateStatus(op *opv1alpha1.CertificateRotation, status opv1alpha1.Certific
 // lifecycleHookDelegate returns (suffix, delegate) for the first label on the operation whose key
 // starts with prefix. Returns ("", "") when no such label is set.
 func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string) {
-	if s.op.Labels == nil {
-		return "", ""
-	}
 	for k, v := range s.op.Labels {
 		if strings.HasPrefix(k, prefix) {
 			return strings.TrimPrefix(k, prefix), v
@@ -538,15 +521,6 @@ func markFailed(status *opv1alpha1.CertificateRotationStatus, reason, condMsg st
 	opv1alpha1.FailedCondition.True(status)
 	opv1alpha1.FailedCondition.Reason(status, reason)
 	opv1alpha1.FailedCondition.Message(status, condMsg)
-}
-
-func validateCertificateRotationServices(services []string) error {
-	for _, service := range services {
-		if _, ok := supportedCertificateRotationServices[service]; !ok {
-			return fmt.Errorf("unsupported certificate rotation service %q", service)
-		}
-	}
-	return nil
 }
 
 // operationEnv returns env vars that tie plan content to the operation UID and
@@ -608,6 +582,7 @@ func servicesApply(requested []string, secret *corev1.Secret) bool {
 	return false
 }
 
+// serviceRequested reports whether service filtering includes the named service.
 func serviceRequested(requested []string, service string) bool {
 	if len(requested) == 0 {
 		return true
@@ -620,11 +595,24 @@ func serviceRequested(requested []string, service string) bool {
 	return false
 }
 
-// componentCertificateCleanupInstructions removes the default generated certificate/key pairs
-// used by controller-manager and scheduler. Removing the pair before restarting the server lets
-// the component generate a rotated replacement. Components with an explicit certificate and key
-// are excluded because those paths are managed outside the runtime's default certificate directory.
-func componentCertificateCleanupInstructions(provisioningDir, operationID, runtime, dataDir string, services []string, controllerManagerSettings, schedulerSettings ops.ComponentTLSSettings) []plan.OneTimeInstruction {
+// componentCertificateCleanupInstructions builds default certificate/key cleanup
+// instructions for controller-manager and scheduler on one node.
+func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret) ([]plan.OneTimeInstruction, error) {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	operationID := string(s.op.UID)
+	runtime := s.adapter.RuntimeCommand()
+	dataDir := s.adapter.DistroDataDirectory(secret)
+	services := s.op.Spec.Args.Services
+
+	controllerManagerSettings, err := s.adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
+	if err != nil {
+		return nil, err
+	}
+	schedulerSettings, err := s.adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
+	if err != nil {
+		return nil, err
+	}
+
 	components := []struct {
 		service        string
 		certificate    string
@@ -679,7 +667,7 @@ func componentCertificateCleanupInstructions(provisioningDir, operationID, runti
 		}
 	}
 
-	return instructions
+	return instructions, nil
 }
 
 // certificateRotationStopInstructions stops the runtime server before its certificates are
@@ -796,14 +784,11 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, s.op.Spec.Args.Services, env)...)
 
 			if ops.IsControlPlane(secret) {
-				var controllerManagerSettings, schedulerSettings ops.ComponentTLSSettings
-				if adapter, ok := s.adapter.(*ops.ImportedAdapter); ok {
-					// Imported RKE2 nodes expose their effective runtime arguments in the
-					// machine-plan secret. Preserve explicitly configured component TLS pairs.
-					controllerManagerSettings = adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
-					schedulerSettings = adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
+				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret)
+				if err != nil {
+					return status, err
 				}
-				oneTime = append(oneTime, componentCertificateCleanupInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, s.op.Spec.Args.Services, controllerManagerSettings, schedulerSettings)...)
+				oneTime = append(oneTime, cleanupInstructions...)
 			}
 
 			if runtime == capr.RuntimeRKE2 {
@@ -828,7 +813,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			if ops.IsWindows(secret) {
 				// Windows uses a service restart instruction rather than Linux systemctl.
 				files := []plan.File{windowsIdempotentScriptFile()}
-				oneTime := windowsIdempotentRestartInstructions("certificate-rotation/restart", string(s.op.UID), capr.RuntimeRKE2)
+				oneTime := windowsIdempotentRestartInstructions("certificate-rotation/restart", string(s.op.UID), runtime)
 				nodePlan = plan.Plan{
 					Files:               files,
 					OneTimeInstructions: oneTime,

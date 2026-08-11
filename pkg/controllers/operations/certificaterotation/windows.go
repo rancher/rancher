@@ -66,10 +66,12 @@ if ($currentAttempt -ne $env:CATTLE_AGENT_ATTEMPT_NUMBER) {
 }
 `
 
+// windowsIdempotentActionScriptPath returns the on-node script path.
 func windowsIdempotentActionScriptPath() string {
 	return windowsIdempotentScriptPath
 }
 
+// windowsIdempotentScriptFile returns the embedded idempotent helper script.
 func windowsIdempotentScriptFile() plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(windowsIdempotentActionScript)),
@@ -101,6 +103,7 @@ func windowsIdempotentInstruction(identifier, value, command string, args []stri
 	}
 }
 
+// windowsIdempotentRestartInstructions builds idempotent restart instructions for a Windows service.
 func windowsIdempotentRestartInstructions(identifier, value, service string) []plan.OneTimeInstruction {
 	return []plan.OneTimeInstruction{
 		windowsIdempotentInstruction(identifier+"-restart", value, "restart-service", []string{service}, []string{}),
