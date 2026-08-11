@@ -107,7 +107,9 @@ func (t *podIPTracker) filterExistingCN(cns ...string) []string {
 
 // newRancherPodIPFilter wires a podIPTracker to the upstream Rancher
 // server's pods (app=rancher in cattle-system) and returns its
-// FilterExistingCN closure.
-func newRancherPodIPFilter(ctx context.Context, pods corev1controllers.PodController) func(...string) []string {
-	return newPodIPTracker(ctx, namespace.System, "app=rancher", pods, "rancher-podip-tls-internal-filter")
+// FilterExistingCN closure. handlerName distinguishes each listener's
+// tracker instance (e.g. for metrics/logging) since this is called once per
+// listener (:443 and :444).
+func newRancherPodIPFilter(ctx context.Context, pods corev1controllers.PodController, handlerName string) func(...string) []string {
+	return newPodIPTracker(ctx, namespace.System, "app=rancher", pods, handlerName)
 }
