@@ -625,19 +625,27 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 	concurrency := len(secrets)
 	results := make([]plan.PlanStatus, 0, concurrency)
 
+	snapshotName := s.op.Spec.Args.Name
+	snapshot, err := h.etcdsnapshots.Get(s.adapter.EtcdSnapshotNamespace(), snapshotName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: could not find associated etcdsnapshot.rke.cattle.io %s/%s, assuming snapshot file", s.op.Namespace, s.op.Name, s.adapter.EtcdSnapshotNamespace(), snapshotName)
+		snapshot = nil
+	} else if err != nil {
+		return status, err
+	}
+
 	for _, secret := range secrets {
 		nodePlan := &plan.Plan{
 			OneTimeInstructions: []plan.OneTimeInstruction{
 				{
+					SaveOutput: true,
 					CommonInstruction: plan.CommonInstruction{
 						Name:    "preflight",
 						Command: "/bin/sh",
 						Args: []string{
 							"-c",
-
-							fmt.Sprintf(`grep -rE -q '^[[:space:]]*[\x27\x22 ]?token[\x27\x22 ]?[[:space:]]*:[[:space:]]*[\x27\x22 ]*[^[:space:]\x27\x22]+' %s %s/ 2>/dev/null || (exit 1)`,
-								s.adapter.ConfigFile(secret),
-								s.adapter.ConfigDirectory(secret),
+							fmt.Sprintf(`tr -d '[:space:]' < %s/token | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`,
+								s.adapter.DistroDataDirectory(secret),
 							),
 						},
 					},
@@ -671,6 +679,38 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			concurrency--
 			if concurrency <= 0 {
 				break
+			}
+		}
+
+		if snapshot != nil {
+			output, err := plan.ReadAppliedOutput(secret)
+			if err != nil {
+				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: could not read preflight check output for %s/%s",
+					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+				opv1alpha1.FailedCondition.True(&status)
+				opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+				opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("could not read preflight check output for %s/%s", secret.Namespace, secret.Name))
+
+				return status, nil
+			}
+			if hash, ok := snapshot.Annotations[capr.SnapshotTokenHashAnnotation]; ok && hash != "" {
+				if b, ok := output["preflight"]; ok && string(b) != hash {
+					logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check output for %s/%s does not match snapshot token hash",
+						s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+					opv1alpha1.FailedCondition.True(&status)
+					opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+					opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
+
+					return status, nil
+				}
+
+				concurrency--
+				if concurrency <= 0 {
+					break
+				}
+			} else {
+				logrus.Warnf("[etcdsnapshotrestore] %s/%s: could not find snapshot token hash for %s/%s, preflight check output will not be validated",
+					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 			}
 		}
 	}
@@ -854,7 +894,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, err
 	} else if snapshot != nil && snapshot.SnapshotFile.S3 == nil {
 		// Prefer the snapshot's stamped MachineLifecycleNameLabel (used by CAPRKE2 where the
-		// owner ref is a mgmt v3 Node but plan secrets are labelled with the CAPI Machine's
+		// owner ref is a mgmt v3 Node but plan secrets are labeled with the CAPI Machine's
 		// name). Fall back to OwnerReferences[0].Name for v2prov/imported paths that predate the
 		// label.
 		machineName := snapshot.Labels[planv1alpha1.MachineLifecycleNameLabel]
