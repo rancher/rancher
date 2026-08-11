@@ -419,6 +419,18 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstru
 	return strings.Join(availableModes, ",")
 }
 
+func getSnapshotHash(downstream *k3s.ETCDSnapshotFile) string {
+	if downstream == nil || downstream.Annotations == nil {
+		return ""
+	}
+
+	if hash := downstream.Annotations["etcd.rke2.cattle.io/snapshot-token-hash"]; hash != "" {
+		return hash
+	}
+
+	return downstream.Annotations["etcd.k3s.cattle.io/snapshot-token-hash"]
+}
+
 // populateUpstreamSnapshotFromDownstream sets the labels, annotations, spec and status fields which are governed by the
 // downstream snapshot. Also sets the relevant owner references (machine for local, capi cluster for s3), and
 // namespace/name if the snapshot is being created.
@@ -460,6 +472,11 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
 	upstream.Annotations[SnapshotFileNameAnnotationKey] = downstream.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name
+
+	hash := getSnapshotHash(downstream)
+	if hash != "" {
+		upstream.Annotations[capr.SnapshotTokenHashAnnotation] = hash
+	}
 
 	upstream.Spec.ClusterName = clusterName
 	upstream.SnapshotFile = rkev1.ETCDSnapshotFile{
