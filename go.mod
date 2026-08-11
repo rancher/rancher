@@ -143,7 +143,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.17
-	github.com/vmware/govmomi v0.42.0
+	github.com/vmware/govmomi v0.55.1
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.54.0
 	golang.org/x/mod v0.38.0
