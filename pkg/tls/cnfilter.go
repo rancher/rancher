@@ -249,12 +249,15 @@ func (t *serviceIPTracker) allowCN(cns ...string) []string {
 // or allowlist accepts it. CNs rejected by primary are re-offered to
 // allowlist rather than dropped outright, so an admin-approved Service IP is
 // never pruned just because it isn't a live rancher pod IP.
+//
+// primary's rejected set is determined by set membership against its own
+// output, not by comparing lengths -- primary may transform its input
+// (e.g. collapse it down to a single hostname) rather than merely filtering
+// a subset of it, so an equal-length result does not imply nothing was
+// rejected.
 func unionFilterCN(primary, allowlist func(...string) []string) func(...string) []string {
 	return func(cns ...string) []string {
 		kept := primary(cns...)
-		if len(kept) == len(cns) {
-			return kept
-		}
 		keptSet := make(map[string]struct{}, len(kept))
 		for _, cn := range kept {
 			keptSet[cn] = struct{}{}
@@ -274,9 +277,11 @@ func unionFilterCN(primary, allowlist func(...string) []string) func(...string) 
 
 // newRancherPodIPFilter wires a podIPTracker to the upstream Rancher
 // server's pods (app=rancher in cattle-system) and returns its
-// FilterExistingCN closure.
-func newRancherPodIPFilter(ctx context.Context, pods corev1controllers.PodController) func(...string) []string {
-	return newPodIPTracker(ctx, namespace.System, "app=rancher", pods, "rancher-podip-tls-internal-filter")
+// FilterExistingCN closure. handlerName distinguishes each listener's
+// tracker instance (e.g. for metrics/logging) since this is called once per
+// listener (:443 and :444).
+func newRancherPodIPFilter(ctx context.Context, pods corev1controllers.PodController, handlerName string) func(...string) []string {
+	return newPodIPTracker(ctx, namespace.System, "app=rancher", pods, handlerName)
 }
 
 // newRancherInternalCNFilter builds the FilterCN used for the
@@ -286,7 +291,7 @@ func newRancherPodIPFilter(ctx context.Context, pods corev1controllers.PodContro
 // admin has explicitly named -- e.g. a LoadBalancer/VIP Service that isn't a
 // rancher pod IP -- are never rejected/pruned by the pod-IP filter.
 func newRancherInternalCNFilter(ctx context.Context, pods corev1controllers.PodController, services corev1controllers.ServiceController, allowedServices string) func(...string) []string {
-	podFilter := newRancherPodIPFilter(ctx, pods)
+	podFilter := newRancherPodIPFilter(ctx, pods, "rancher-podip-tls-internal-filter")
 	refs := parseAllowedServices(allowedServices)
 	svcFilter := newServiceIPTracker(ctx, refs, services, "rancher-service-allowlist-tls-internal-filter")
 	return unionFilterCN(podFilter, svcFilter)
