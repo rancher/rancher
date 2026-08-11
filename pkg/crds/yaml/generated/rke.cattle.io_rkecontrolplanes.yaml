@@ -103,6 +103,14 @@ spec:
                 nullable: true
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
+              chartValuesJSON:
+                description: |-
+                  This field is used to store the chart values for the RKE2 or K3s Helm chart
+                  that is used to deploy the control plane components.
+                  Carrying the values as an opaque string keeps them intact, because a string
+                  is replaced atomically by a merge patch.
+                nullable: true
+                type: string
               clusterName:
                 description: ClusterName is the name of the provisioning cluster object.
                 maxLength: 63
@@ -982,6 +990,14 @@ spec:
                     nullable: true
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
+                  chartValuesJSON:
+                    description: |-
+                      This field is used to store the chart values for the RKE2 or K3s Helm chart
+                      that is used to deploy the control plane components.
+                      Carrying the values as an opaque string keeps them intact, because a string
+                      is replaced atomically by a merge patch.
+                    nullable: true
+                    type: string
                   clusterName:
                     description: ClusterName is the name of the provisioning cluster
                       object.

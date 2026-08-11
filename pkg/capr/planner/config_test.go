@@ -5,14 +5,17 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/data/management"
+	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/stretchr/testify/assert"
 )
@@ -786,4 +789,143 @@ func buildExtractConfigGzipPayload(t *testing.T, payload []byte) string {
 	}
 
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func TestChartValues(t *testing.T) {
+	tests := []struct {
+		name         string
+		controlPlane *rkev1.RKEControlPlane
+		expected     map[string]interface{}
+		expectErr    bool
+	}{
+		{
+			name:         "no chart values at all",
+			controlPlane: &rkev1.RKEControlPlane{},
+			expected:     nil,
+		},
+		{
+			name: "prefers chartValuesJSON over the structured field",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					ChartValuesJSON: `{"rke2-coredns":{"replicas":2}}`,
+					ClusterConfiguration: rkev1.ClusterConfiguration{
+						ChartValues: rkev1.GenericMap{
+							Data: map[string]interface{}{
+								"rke2-coredns": map[string]interface{}{"replicas": 1},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]interface{}{
+				"rke2-coredns": map[string]interface{}{"replicas": float64(2)},
+			},
+		},
+		{
+			// null must survive the round trip through the serialized field.
+			name: "preserves a nested explicit null",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					ChartValuesJSON: `{"rke2-coredns":{"resources":{"limits":{"cpu":null,"memory":"130Mi"}}}}`,
+				},
+			},
+			expected: map[string]interface{}{
+				"rke2-coredns": map[string]interface{}{
+					"resources": map[string]interface{}{
+						"limits": map[string]interface{}{
+							"cpu":    nil,
+							"memory": "130Mi",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "falls back to the structured field when chartValuesJSON is empty",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
+						ChartValues: rkev1.GenericMap{
+							Data: map[string]interface{}{
+								"rke2-canal": map[string]interface{}{"mtu": 1450},
+							},
+						},
+					},
+				},
+			},
+			// float64 rather than int: GenericMap.DeepCopyInto round trips through
+			// convert.ToObj, which marshals and unmarshals as JSON. Both branches of
+			// chartValues therefore yield the same numeric type.
+			expected: map[string]interface{}{
+				"rke2-canal": map[string]interface{}{"mtu": float64(1450)},
+			},
+		},
+		{
+			name: "malformed chartValuesJSON returns an error",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					ChartValuesJSON: `{"rke2-coredns":`,
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			values, err := chartValues(tt.controlPlane)
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, values)
+		})
+	}
+}
+
+// TestChartValuesNullIsRenderedIntoValuesContent asserts that an explicit null
+// carried in chartValuesJSON reaches the generated HelmChartConfig
+func TestChartValuesNullIsRenderedIntoValuesContent(t *testing.T) {
+	controlPlane := &rkev1.RKEControlPlane{
+		Spec: rkev1.RKEControlPlaneSpec{
+			ChartValuesJSON:       `{"rke2-coredns":{"resources":{"limits":{"cpu":null,"memory":"130Mi"}}}}`,
+			ManagementClusterName: "c-m-abcde",
+		},
+	}
+
+	values, err := chartValues(controlPlane)
+	assert.NoError(t, err)
+
+	valuesMap := convert.ToMapInterface(values["rke2-coredns"])
+	data.PutValue(valuesMap, controlPlane.Spec.ManagementClusterName, "global", "cattle", "clusterId")
+
+	rendered, err := json.Marshal(valuesMap)
+	assert.NoError(t, err)
+	assert.JSONEq(t,
+		`{"global":{"cattle":{"clusterId":"c-m-abcde"}},"resources":{"limits":{"cpu":null,"memory":"130Mi"}}}`,
+		string(rendered))
+}
+
+// TestChartValuesDoesNotMutateControlPlane guards the fallback path: addVSphereCharts
+// writes into the returned map, which must not be the informer cache's copy.
+func TestChartValuesDoesNotMutateControlPlane(t *testing.T) {
+	controlPlane := &rkev1.RKEControlPlane{
+		Spec: rkev1.RKEControlPlaneSpec{
+			ClusterConfiguration: rkev1.ClusterConfiguration{
+				ChartValues: rkev1.GenericMap{
+					Data: map[string]interface{}{
+						"rke2-canal": map[string]interface{}{"mtu": 1450},
+					},
+				},
+			},
+		},
+	}
+
+	values, err := chartValues(controlPlane)
+	assert.NoError(t, err)
+
+	values["rancher-vsphere-csi"] = map[string]interface{}{}
+	assert.NotContains(t, controlPlane.Spec.ChartValues.Data, "rancher-vsphere-csi",
+		"chartValues must return a copy, not the control plane's live map")
 }
