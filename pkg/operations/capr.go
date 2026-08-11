@@ -192,6 +192,24 @@ func (a *CAPRAdapter) ServerUnit() string {
 	return "k3s"
 }
 
+// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
+// TLS settings from the rendered per-machine runtime config.
+func (a *CAPRAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	config, err := a.renderConfig(secret)
+	if err != nil {
+		return ComponentTLSSettings{}, err
+	}
+
+	switch component {
+	case KubeControllerManagerProbeName:
+		return componentTLSSettingsFromConfigArg(config[KubeControllerManagerArg]), nil
+	case KubeSchedulerProbeName:
+		return componentTLSSettingsFromConfigArg(config[KubeSchedulerArg]), nil
+	default:
+		return ComponentTLSSettings{}, nil
+	}
+}
+
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // If the cluster is using a custom data directory or secure probes, this information is extracted from the cluster object and rendered in.
 func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
@@ -225,11 +243,6 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 
 	loopbackAddress := capr.GetLoopbackAddress(a.controlPlane)
 
-	config, err := a.renderConfig(secret)
-	if err != nil {
-		return nil, err
-	}
-
 	// render this probe separately because it has a specific format
 	if supervisor && (IsEtcd(secret) || IsControlPlane(secret)) {
 		supervisorProbe := AllProbes[SupervisorProbeName]
@@ -244,13 +257,21 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+		if err != nil {
+			return probes, err
+		}
+		kcmProbe, err := renderSecureProbe(secureProbeArguments(kcmSettings), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
+		if err != nil {
+			return probes, err
+		}
+		ksProbe, err := renderSecureProbe(secureProbeArguments(ksSettings), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
@@ -521,16 +542,6 @@ func splitArgKeyVal(val string, delim string) (string, string) {
 		return splitSubArg[0], splitSubArg[1]
 	}
 	return "", ""
-}
-
-// convertInterfaceSliceToStringSlice converts an input interface slice to a string slice by iterating through the
-// interface slice and converting each entry to a string using Sprintf.
-func convertInterfaceSliceToStringSlice(input []any) []string {
-	var stringArr []string
-	for _, v := range input {
-		stringArr = append(stringArr, fmt.Sprintf("%v", v))
-	}
-	return stringArr
 }
 
 func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {

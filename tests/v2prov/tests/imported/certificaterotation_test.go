@@ -447,11 +447,11 @@ func parseCertificateMetadataOutput(certPath, out string) (certificateMetadata, 
 			record.serial, record.notBeforeRaw, record.notAfterRaw, record.fingerprintSHA256)
 	}
 
-	notBefore, err := time.Parse("Jan 2 15:04:05 2006 MST", record.notBeforeRaw)
+	notBefore, err := time.Parse("Jan _2 15:04:05 2006 MST", record.notBeforeRaw)
 	if err != nil {
 		return record, fmt.Errorf("parse notBefore %q: %w", record.notBeforeRaw, err)
 	}
-	notAfter, err := time.Parse("Jan 2 15:04:05 2006 MST", record.notAfterRaw)
+	notAfter, err := time.Parse("Jan _2 15:04:05 2006 MST", record.notAfterRaw)
 	if err != nil {
 		return record, fmt.Errorf("parse notAfter %q: %w", record.notAfterRaw, err)
 	}

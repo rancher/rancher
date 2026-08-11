@@ -1,66 +1,84 @@
 package certificaterotation
 
 import (
+	"errors"
 	"testing"
 
+	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	ops "github.com/rancher/rancher/pkg/operations"
+	"github.com/rancher/rancher/pkg/plan"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestValidateCertificateRotationServices(t *testing.T) {
-	t.Parallel()
+// stubAdapter is a minimal ops.Adapter implementation for testing component
+// certificate cleanup plan construction.
+type stubAdapter struct {
+	runtime           string
+	dataDir           string
+	provisioningDir   string
+	controllerManager ops.ComponentTLSSettings
+	scheduler         ops.ComponentTLSSettings
+	settingsErr       error
+}
 
-	tests := []struct {
-		name     string
-		services []string
-		valid    bool
-	}{
-		{
-			name:  "all services",
-			valid: true,
-		},
-		{
-			name:     "known services",
-			services: []string{"etcd", "controller-manager", "scheduler"},
-			valid:    true,
-		},
-		{
-			name:     "unknown service",
-			services: []string{"not-a-service"},
-			valid:    false,
-		},
-		{
-			name:     "known and unknown services",
-			services: []string{"etcd", "not-a-service"},
-			valid:    false,
-		},
+func (a *stubAdapter) RuntimeCommand() string                      { return a.runtime }
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string { return a.dataDir }
+func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
+	return a.provisioningDir
+}
+func (a *stubAdapter) CertificateRotationComponentTLSSettings(_ *corev1.Secret, component string) (ops.ComponentTLSSettings, error) {
+	if a.settingsErr != nil {
+		return ops.ComponentTLSSettings{}, a.settingsErr
 	}
+	switch component {
+	case ops.KubeControllerManagerProbeName:
+		return a.controllerManager, nil
+	case ops.KubeSchedulerProbeName:
+		return a.scheduler, nil
+	default:
+		return ops.ComponentTLSSettings{}, nil
+	}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateCertificateRotationServices(tt.services)
-			if tt.valid {
-				assert.NoError(t, err)
-				return
-			}
-			assert.EqualError(t, err, `unsupported certificate rotation service "not-a-service"`)
-		})
-	}
+// The remaining methods complete the ops.Adapter contract. Component cleanup
+// does not call them, so the stub returns static, runtime-appropriate values.
+func (a *stubAdapter) BeaconRef() (string, string)                        { return "", "" }
+func (a *stubAdapter) EtcdSnapshotNamespace() string                      { return "" }
+func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) { return nil, nil }
+func (a *stubAdapter) WaitForRegister() (bool, error)                     { return true, nil }
+func (a *stubAdapter) PauseCluster(bool) error                            { return nil }
+func (a *stubAdapter) ServerUnit() string                                 { return a.runtime }
+func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string                 { return "" }
+func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string            { return "" }
+func (a *stubAdapter) RenderProbes(*corev1.Secret, bool) (map[string]plan.Probe, error) {
+	return map[string]plan.Probe{}, nil
+}
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return "" }
+func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return "" }
+func (a *stubAdapter) FindOrElectLeader(string, ops.Filter) (*corev1.Secret, error) {
+	return nil, nil
+}
+func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
+func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "" }
+func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
+	return nil, nil, nil
 }
 
 func TestComponentCertificateCleanupInstructions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                      string
-		runtime                   string
-		services                  []string
-		controllerManagerSettings ops.ComponentTLSSettings
-		schedulerSettings         ops.ComponentTLSSettings
-		expected                  []string
+		name             string
+		runtime          string
+		services         []string
+		controllerConfig ops.ComponentTLSSettings
+		schedulerConfig  ops.ComponentTLSSettings
+		expected         []string
 	}{
 		{
 			name:    "RKE2 all services",
@@ -92,7 +110,7 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 			name:     "complete custom controller-manager TLS suppresses its cleanup",
 			runtime:  capr.RuntimeRKE2,
 			services: []string{"controller-manager"},
-			controllerManagerSettings: ops.ComponentTLSSettings{
+			controllerConfig: ops.ComponentTLSSettings{
 				TLSCertFile:       "/custom/kcm.crt",
 				TLSPrivateKeyFile: "/custom/kcm.key",
 			},
@@ -101,7 +119,7 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 			name:     "custom controller-manager TLS does not suppress scheduler cleanup",
 			runtime:  capr.RuntimeRKE2,
 			services: []string{"controller-manager", "scheduler"},
-			controllerManagerSettings: ops.ComponentTLSSettings{
+			controllerConfig: ops.ComponentTLSSettings{
 				TLSCertFile:       "/custom/kcm.crt",
 				TLSPrivateKeyFile: "/custom/kcm.key",
 			},
@@ -115,7 +133,29 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			instructions := componentCertificateCleanupInstructions("/var/lib/rancher/capr", "operation", tt.runtime, "/var/lib/rancher/"+tt.runtime, tt.services, tt.controllerManagerSettings, tt.schedulerSettings)
+			adapter := &stubAdapter{
+				runtime:           tt.runtime,
+				dataDir:           "/var/lib/rancher/" + tt.runtime,
+				provisioningDir:   "/var/lib/rancher/capr",
+				controllerManager: tt.controllerConfig,
+				scheduler:         tt.schedulerConfig,
+			}
+			s := &scope{
+				op: &opv1alpha1.CertificateRotation{
+					ObjectMeta: metav1.ObjectMeta{
+						UID: "operation",
+					},
+					Spec: opv1alpha1.CertificateRotationSpec{
+						Args: opv1alpha1.CertificateRotationArgs{
+							Services: tt.services,
+						},
+					},
+				},
+				adapter: adapter,
+			}
+
+			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{})
+			assert.NoError(t, err)
 			assert.Len(t, instructions, len(tt.expected))
 			for i, instruction := range instructions {
 				assert.GreaterOrEqual(t, len(instruction.Args), 4)
@@ -124,6 +164,34 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestComponentCertificateCleanupInstructions_AdapterError(t *testing.T) {
+	t.Parallel()
+
+	s := &scope{
+		op: &opv1alpha1.CertificateRotation{
+			ObjectMeta: metav1.ObjectMeta{UID: "operation"},
+		},
+		adapter: &stubAdapter{
+			runtime:         capr.RuntimeRKE2,
+			dataDir:         "/var/lib/rancher/rke2",
+			provisioningDir: "/var/lib/rancher/capr",
+			settingsErr:     errors.New("settings failed"),
+		},
+	}
+
+	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{})
+	assert.Nil(t, instructions)
+	assert.EqualError(t, err, "settings failed")
+}
+
+func TestWindowsIdempotentRestartInstructions_UsesPassedRuntime(t *testing.T) {
+	t.Parallel()
+
+	instructions := windowsIdempotentRestartInstructions("certificate-rotation/restart", "operation", capr.RuntimeK3S)
+	assert.Len(t, instructions, 1)
+	assert.Contains(t, instructions[0].Args, capr.RuntimeK3S)
 }
 
 func TestServicesApply(t *testing.T) {

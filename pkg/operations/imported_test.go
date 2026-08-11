@@ -343,7 +343,7 @@ func TestImportedAdapter_WaitForRegister_SecretPointsToUnexpectedNode(t *testing
 	assert.False(t, ok, "secret pointing to unexpected node should return false")
 }
 
-func TestComponentTLSSettingsFromNodeArgs(t *testing.T) {
+func TestComponentTLSSettingsFromOuterArgs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -437,7 +437,7 @@ func TestComponentTLSSettingsFromNodeArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := componentTLSSettingsFromNodeArgs(tt.args, tt.component)
+			got := componentTLSSettingsFromOuterArgs(tt.args, tt.component)
 			assert.Equal(t, tt.want, got)
 			if tt.name == "incomplete TLS pair" {
 				assert.False(t, got.HasCompleteTLSConfig())

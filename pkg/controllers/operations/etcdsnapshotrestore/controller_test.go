@@ -65,6 +65,9 @@ func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string {
 func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return "/etc/rancher/" + a.runtimeCommand + "/config.yaml.d"
 }
+func (a *stubAdapter) CertificateRotationComponentTLSSettings(_ *corev1.Secret, _ string) (ops.ComponentTLSSettings, error) {
+	return ops.ComponentTLSSettings{}, nil
+}
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
 func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }

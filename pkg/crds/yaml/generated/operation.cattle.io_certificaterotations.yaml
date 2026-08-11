@@ -72,6 +72,20 @@ spec:
                       Services is a list of services to rotate certificates for.
                       If empty, all supported services are rotated.
                     items:
+                      enum:
+                      - admin
+                      - api-server
+                      - auth-proxy
+                      - cloud-controller
+                      - controller-manager
+                      - etcd
+                      - k3s-controller
+                      - k3s-server
+                      - kubelet
+                      - kube-proxy
+                      - rke2-controller
+                      - rke2-server
+                      - scheduler
                       type: string
                     nullable: true
                     type: array

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
-	"strings"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
@@ -29,71 +28,6 @@ const (
 	defaultRKE2DataDirectory = "/var/lib/rancher/rke2"
 	defaultK3sDataDirectory  = "/var/lib/rancher/k3s"
 )
-
-// ComponentTLSSettings contains the effective TLS-related settings for a control-plane
-// component obtained from an imported node's runtime arguments.
-type ComponentTLSSettings struct {
-	SecurePort        string
-	TLSCertFile       string
-	TLSPrivateKeyFile string
-}
-
-// HasCompleteTLSConfig reports whether the component has an explicitly configured TLS pair.
-func (s ComponentTLSSettings) HasCompleteTLSConfig() bool {
-	return s.TLSCertFile != "" && s.TLSPrivateKeyFile != ""
-}
-
-func componentOuterArgument(component string) string {
-	switch component {
-	case KubeControllerManagerProbeName:
-		return "--" + KubeControllerManagerArg
-	case KubeSchedulerProbeName:
-		return "--" + KubeSchedulerArg
-	default:
-		return ""
-	}
-}
-
-// componentTLSSettingsFromNodeArgs extracts the controller-manager or scheduler TLS settings
-// declared as repeated RKE2 outer arguments, in either split or combined form. cert-dir is not
-// extracted: it does not select the serving certificate when explicit TLS file arguments exist.
-func componentTLSSettingsFromNodeArgs(args []string, component string) ComponentTLSSettings {
-	outerArgument := componentOuterArgument(component)
-	if outerArgument == "" {
-		return ComponentTLSSettings{}
-	}
-
-	var settings ComponentTLSSettings
-	for _, innerArgument := range plan.NewArguments(args).Values(outerArgument) {
-		key, value, ok := strings.Cut(innerArgument, "=")
-		if !ok {
-			continue
-		}
-		switch key {
-		case SecurePortArgument:
-			settings.SecurePort = value
-		case TLSCertFileArgument:
-			settings.TLSCertFile = value
-		case "tls-private-key-file":
-			settings.TLSPrivateKeyFile = value
-		}
-	}
-	return settings
-}
-
-// secureProbeArguments returns the non-sensitive settings needed to render a component probe.
-// A certificate path is useful only with a complete certificate/key pair; the private key is
-// intentionally never included in a probe.
-func secureProbeArguments(settings ComponentTLSSettings) []string {
-	args := make([]string, 0, 2)
-	if settings.SecurePort != "" {
-		args = append(args, SecurePortArgument+"="+settings.SecurePort)
-	}
-	if settings.HasCompleteTLSConfig() {
-		args = append(args, TLSCertFileArgument+"="+settings.TLSCertFile)
-	}
-	return args
-}
 
 func init() {
 	// The Rancher UI creates day-2 operations with ClusterRef pointing at the mgmtv3.Cluster
@@ -394,22 +328,17 @@ func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
 	args := a.nodeArgs(secret)
 
 	// A node-level data directory overrides the distribution default.
-	if dataDir := plan.NewArguments(args).First("--data-dir", "-d"); dataDir != "" {
+	if dataDir := newArguments(args).First("--data-dir", "-d"); dataDir != "" {
 		return dataDir
 	}
 
 	return defaultDir
 }
 
-// CertificateRotationComponentTLSSettings returns explicitly configured RKE2 component TLS
-// settings from the node arguments associated with a machine-plan secret. The certificate
-// rotation controller uses a complete pair to preserve externally managed component certificates.
-// K3s component overrides are not enabled for this imported-cluster path.
-func (a *ImportedAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) ComponentTLSSettings {
-	if a.RuntimeCommand() != capr.RuntimeRKE2 {
-		return ComponentTLSSettings{}
-	}
-	return componentTLSSettingsFromNodeArgs(a.nodeArgs(secret), component)
+// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
+// TLS settings parsed from the imported node's effective runtime arguments.
+func (a *ImportedAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	return componentTLSSettingsFromOuterArgs(a.nodeArgs(secret), component), nil
 }
 
 func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -418,8 +347,7 @@ func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 }
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
-// Currently custom data directories, probes, and using ipv4 as the primary ip family are supported
-// per-node via DistroDataDirectory.
+// Imported clusters currently support per-node custom data-directory paths via DistroDataDirectory.
 func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
 	var (
 		runtime    = a.RuntimeCommand()
@@ -468,14 +396,20 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmSettings := a.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+		kcmSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+		if err != nil {
+			return probes, err
+		}
 		kcmProbe, err := renderSecureProbe(secureProbeArguments(kcmSettings), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksSettings := a.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
+		ksSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
+		if err != nil {
+			return probes, err
+		}
 		ksProbe, err := renderSecureProbe(secureProbeArguments(ksSettings), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err

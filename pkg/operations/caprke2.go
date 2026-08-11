@@ -226,6 +226,12 @@ func (a *CAPRKE2Adapter) extraArgsFor(component string) []string {
 	return nil
 }
 
+// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
+// TLS settings from CAPRKE2 control-plane extra args.
+func (a *CAPRKE2Adapter) CertificateRotationComponentTLSSettings(_ *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	return componentTLSSettingsFromConfigArg(a.extraArgsFor(component)), nil
+}
+
 // RenderProbes renders the per-role probe set for a machine-plan secret. Mirrors the structure of
 // CAPRAdapter.RenderProbes (pkg/operations/capr.go:193-261) but skips the renderConfig
 // indirection — CAPRKE2 has no MachineGlobalConfig/MachineSelectorConfig.
@@ -273,13 +279,21 @@ func (a *CAPRKE2Adapter) RenderProbes(secret *corev1.Secret, supervisor bool) (m
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmProbe, err := renderSecureProbe(a.extraArgsFor(KubeControllerManagerProbeName), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+		if err != nil {
+			return probes, err
+		}
+		kcmProbe, err := renderSecureProbe(secureProbeArguments(kcmSettings), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksProbe, err := renderSecureProbe(a.extraArgsFor(KubeSchedulerProbeName), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
+		if err != nil {
+			return probes, err
+		}
+		ksProbe, err := renderSecureProbe(secureProbeArguments(ksSettings), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
