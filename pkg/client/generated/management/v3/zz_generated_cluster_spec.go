@@ -7,6 +7,7 @@ const (
 	ClusterSpecFieldAgentImageOverride                                   = "agentImageOverride"
 	ClusterSpecFieldAliConfig                                            = "aliConfig"
 	ClusterSpecFieldAmazonElasticContainerServiceConfig                  = "amazonElasticContainerServiceConfig"
+	ClusterSpecFieldAssetsImageOverride                                  = "assetsImageOverride"
 	ClusterSpecFieldAzureKubernetesServiceConfig                         = "azureKubernetesServiceConfig"
 	ClusterSpecFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterSpecFieldClusterSecrets                                       = "clusterSecrets"
@@ -14,6 +15,7 @@ const (
 	ClusterSpecFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
 	ClusterSpecFieldDescription                                          = "description"
 	ClusterSpecFieldDesiredAgentImage                                    = "desiredAgentImage"
+	ClusterSpecFieldDesiredAssetsImage                                   = "desiredAssetsImage"
 	ClusterSpecFieldDesiredAuthImage                                     = "desiredAuthImage"
 	ClusterSpecFieldDisplayName                                          = "displayName"
 	ClusterSpecFieldDockerRootDir                                        = "dockerRootDir"
@@ -39,6 +41,7 @@ type ClusterSpec struct {
 	AgentImageOverride                                   string                          `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	AliConfig                                            *AliClusterConfigSpec           `json:"aliConfig,omitempty" yaml:"aliConfig,omitempty"`
 	AmazonElasticContainerServiceConfig                  map[string]interface{}          `json:"amazonElasticContainerServiceConfig,omitempty" yaml:"amazonElasticContainerServiceConfig,omitempty"`
+	AssetsImageOverride                                  string                          `json:"assetsImageOverride,omitempty" yaml:"assetsImageOverride,omitempty"`
 	AzureKubernetesServiceConfig                         map[string]interface{}          `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization   `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets                 `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
@@ -46,6 +49,7 @@ type ClusterSpec struct {
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                          `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 	Description                                          string                          `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                                    string                          `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
+	DesiredAssetsImage                                   string                          `json:"desiredAssetsImage,omitempty" yaml:"desiredAssetsImage,omitempty"`
 	DesiredAuthImage                                     string                          `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
 	DisplayName                                          string                          `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`

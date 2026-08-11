@@ -25,6 +25,8 @@ const (
 	ClusterFieldAppliedEnableNetworkPolicy                           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedSpec                                          = "appliedSpec"
 	ClusterFieldAppliedWebhookDeploymentCustomization                = "appliedWebhookDeploymentCustomization"
+	ClusterFieldAssetsImage                                          = "assetsImage"
+	ClusterFieldAssetsImageOverride                                  = "assetsImageOverride"
 	ClusterFieldAuthImage                                            = "authImage"
 	ClusterFieldCACert                                               = "caCert"
 	ClusterFieldCapabilities                                         = "capabilities"
@@ -41,6 +43,7 @@ const (
 	ClusterFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
 	ClusterFieldDescription                                          = "description"
 	ClusterFieldDesiredAgentImage                                    = "desiredAgentImage"
+	ClusterFieldDesiredAssetsImage                                   = "desiredAssetsImage"
 	ClusterFieldDesiredAuthImage                                     = "desiredAuthImage"
 	ClusterFieldDockerRootDir                                        = "dockerRootDir"
 	ClusterFieldDriver                                               = "driver"
@@ -108,6 +111,8 @@ type Cluster struct {
 	AppliedEnableNetworkPolicy                           bool                            `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedSpec                                          *ClusterSpec                    `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AppliedWebhookDeploymentCustomization                *WebhookDeploymentCustomization `json:"appliedWebhookDeploymentCustomization,omitempty" yaml:"appliedWebhookDeploymentCustomization,omitempty"`
+	AssetsImage                                          string                          `json:"assetsImage,omitempty" yaml:"assetsImage,omitempty"`
+	AssetsImageOverride                                  string                          `json:"assetsImageOverride,omitempty" yaml:"assetsImageOverride,omitempty"`
 	AuthImage                                            string                          `json:"authImage,omitempty" yaml:"authImage,omitempty"`
 	CACert                                               string                          `json:"caCert,omitempty" yaml:"caCert,omitempty"`
 	Capabilities                                         *Capabilities                   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
@@ -124,6 +129,7 @@ type Cluster struct {
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                          `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 	Description                                          string                          `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                                    string                          `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
+	DesiredAssetsImage                                   string                          `json:"desiredAssetsImage,omitempty" yaml:"desiredAssetsImage,omitempty"`
 	DesiredAuthImage                                     string                          `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
 	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	Driver                                               string                          `json:"driver,omitempty" yaml:"driver,omitempty"`

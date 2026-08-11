@@ -1,0 +1,122 @@
+name: Nightly Provisioning Tests
+on:
+  schedule:
+    # Runs every weekday at 05:00 UTC
+    # (1 AM EST, 10PM PST, 7AM CEST)
+    - cron: '0 5 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: none
+
+env:
+  ARCH: amd64
+  TAG: v2.16-${{ github.sha }}-head
+  GIT_TAG: v2.16-${{ github.sha }}-head
+  HEAD_TAG: "head"
+  COMMIT: ${{ github.sha }}
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+jobs:
+  build-server:
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: ./.github/actions/build-images/server
+  build-agent:
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: ./.github/actions/build-images/agent
+  build-installer:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - name: Verify installer Dockerfile build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./package/Dockerfile.installer
+          build-args: |
+            BUILDARCH=amd64
+            VERSION=0.0.0
+          platforms: linux/amd64
+          load: false
+          push: false
+          cache-from: type=gha,scope=pr-build-installer
+          cache-to: type=gha,mode=min,scope=pr-build-installer
+  integration-tests:
+    permissions:
+      contents: read
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+  provisioning-tests:
+    permissions:
+      contents: read
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/provisioning-tests.yml
+
+  # Publish provisioning results into this run's job summary (and a check run).
+  # The nightly is schedule/dispatch only, so it runs in this workflows context with the
+  # permissions granted here, no workflow_run indirection needed.
+  # use `if always()` so results publish even when tests fail. failed jobs
+  # which are retried regenerates the summary for that _attempt_.
+  publish-results:
+    if: always()
+    needs: [provisioning-tests]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    permissions:
+      contents: read
+      checks: write
+      actions: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Publish Test Results
+        uses: ./.github/actions/publish-provisioning-test-results
+        with:
+          commit: ${{ github.sha }}
+          event-name: ${{ github.event_name }}
+          create-comment: 'off'
+          run-id: ${{ github.run_id }}
+

@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	RancherVersionDev                 = "2.15.99"
+	RancherVersionDev                 = "2.16.99"
 	DefaultMaxUIPluginFileSizeInBytes = 30 * 1024 * 1024 // 30MB
 	AgentTLSModeStrict                = "strict"
 	AgentTLSModeSystemStore           = "system-store"
@@ -86,8 +86,8 @@ var (
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	AzureGroupCacheSize                 = NewSetting("azure-group-cache-size", "10000")
 	CACerts                             = NewSetting("cacerts", "")
-	CRTDefaultTTL                       = NewSetting("crt-default-ttl-minutes", "43200")        //30 days
-	CRTDefaultGracePeriod               = NewSetting("crt-default-grace-period-minutes", "180") //3 hours
+	CRTDefaultTTL                       = NewSetting("crt-default-ttl-minutes", "43200")        // 30 days
+	CRTDefaultGracePeriod               = NewSetting("crt-default-grace-period-minutes", "180") // 3 hours
 	CLIURLDarwin                        = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                         = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLWindows                       = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
@@ -111,11 +111,11 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.15")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.16")
 	MachineVersion                      = NewSetting("machine-version", "dev")
-	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
+	Namespace                           = NewSetting("namespace", "").WithEnvDefault("CATTLE_NAMESPACE")
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
-	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
+	PeerServices                        = NewSetting("peer-service", "").WithEnvDefault("CATTLE_PEER_SERVICE")
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
 	KEv2Operators                       = NewSetting("kev2-operators", "{}")
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
@@ -127,7 +127,7 @@ var (
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
 	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.15.0/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.16.0-rc.2/install.ps1")
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.16.0-rc.3/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -147,7 +147,7 @@ var (
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 	// ATTENTION: This file and the following line are used in the rancher/webhook CI to extract the default branch they need
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.15")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", buildconfig.ChartDefaultBranch)
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
@@ -178,7 +178,7 @@ var (
 	// server args (unless overridden by the per-cluster provisioning.cattle.io/rke2-prime-enabled annotation).
 	// Defaults to empty (treated as "false") in standard builds; Prime builds set
 	// CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=true to override.
-	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", os.Getenv("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT"))
+	Rke2ProvisioningPrimeDefault = NewSetting("rke2-provisioning-prime-default", "").WithEnvDefault("CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT")
 
 	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
@@ -233,14 +233,14 @@ var (
 
 	// CSPAdapterMinVersion is used to determine if an existing installation of the CSP adapter should be upgraded to a new version
 	// has no effect if the csp adapter is not installed.
-	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", "")
+	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", buildconfig.CspAdapterMinVersion)
 
 	// FleetMinVersion is the minimum version of the Fleet chart that Rancher will install.
 	// Deprecated in favor of FleetVersion, kept for backward compatibility purposes.
 	FleetMinVersion = NewSetting("fleet-min-version", "")
 
 	// FleetVersion is the exact version of the Fleet chart that Rancher will install.
-	FleetVersion = NewSetting("fleet-version", "")
+	FleetVersion = NewSetting("fleet-version", buildconfig.FleetVersion)
 
 	// AksOperatorVersion is the exact version of the aks-operator and aks-operator-crd charts that Rancher will install.
 	AksOperatorVersion = NewSetting("aks-operator-version", "")
@@ -263,30 +263,30 @@ var (
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
-	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", "main")
+	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", buildconfig.PartnerChartDefaultBranch)
 
 	// PartnerChartDefaultURL represents the default URL for the partner charts repo. It should only be set for test
 	// or debug purposes.
 	PartnerChartDefaultURL = NewSetting("partner-chart-default-url", "https://git.rancher.io/")
 
 	// RancherWebhookVersion is the exact version of the webhook that Rancher will install.
-	RancherWebhookVersion = NewSetting("rancher-webhook-version", "")
+	RancherWebhookVersion = NewSetting("rancher-webhook-version", buildconfig.WebhookVersion)
 
 	// RemoteDialerProxyVersion is the exact version of the RDP that Rancher will install.
-	RemoteDialerProxyVersion = NewSetting("remotedialer-proxy-version", "")
+	RemoteDialerProxyVersion = NewSetting("remotedialer-proxy-version", buildconfig.RemoteDialerProxyVersion)
 
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
-	RancherTurtlesVersion = NewSetting("rancher-turtles-version", "")
+	RancherTurtlesVersion = NewSetting("rancher-turtles-version", buildconfig.TurtlesVersion)
 
 	// ClusterAutoscalerChartRepository represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
 	// can be an OCI image path or a regular helm repo.
-	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", os.Getenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY"))
+	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
 
 	// ClusterAutoscalerImage represents the default image repository for the cluster autoscaler
-	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", os.Getenv("CATTLE_CLUSTER_AUTOSCALER_IMAGE"))
+	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
-	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
+	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", buildconfig.Rke2ChartDefaultBranch)
 
 	// RKE2ChartDefaultURL represents the default URL for the RKE2 charts repo. It should only be set for test or
 	// debug purposes.
@@ -301,11 +301,11 @@ var (
 
 	// SystemDefaultRegistry is the default container registry used for images.
 	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
-	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
+	SystemDefaultRegistry = NewSetting("system-default-registry", "").WithEnvDefault("CATTLE_BASE_REGISTRY")
 
 	// SystemDefaultRegistryPullSecrets are the default pull secrets used for authenticating to the system default container registry.
 	// The environmental variable "CATTLE_BASE_REGISTRY_PULL_SECRETS" controls the default value of this setting.
-	SystemDefaultRegistryPullSecrets = NewSetting("system-default-registry-pull-secrets", os.Getenv("CATTLE_BASE_REGISTRY_PULL_SECRETS"))
+	SystemDefaultRegistryPullSecrets = NewSetting("system-default-registry-pull-secrets", "").WithEnvDefault("CATTLE_BASE_REGISTRY_PULL_SECRETS")
 
 	// K3sBasedUpgraderUninstallConcurrency defines the maximum number of clusters
 	// for which Rancher can simultaneously uninstall the legacy K3s-based upgrade app.
@@ -320,7 +320,7 @@ var (
 
 	// UIBrand High level 'brand' value, for example `suse`.
 	// Fallback env, not a user-facing setting, used to indicate if this is a Prime install
-	UIBrand = NewSetting("ui-brand", os.Getenv("CATTLE_BASE_UI_BRAND"))
+	UIBrand = NewSetting("ui-brand", "").WithEnvDefault("CATTLE_BASE_UI_BRAND")
 
 	// UICommunityLinks displays community links in the UI.
 	// Deprecated in favour of UICustomLinks.
@@ -400,7 +400,7 @@ var (
 
 	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
 	// This setting is for development purposes only.
-	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
+	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", "")
 	MachineProvisionImagePullPolicy    = NewSetting("machine-provision-image-pull-policy", string(v1.PullAlways))
 
 	// The following settings are only used outside of Rancher (for example,
@@ -451,6 +451,9 @@ var (
 	ExpireSCIMTokensAfter = NewSetting("expire-scim-tokens-after", "720h") // 30 days
 
 	ImportedClusterDay2OpsEnabledDefault = NewSetting("imported-cluster-day2-ops-enabled", "true")
+
+	// AssetsImage is the image used for Rancher's `ClusterRepo` assets on downstream clusters.
+	AssetsImage = NewSetting("charts-image", buildconfig.DefaultAssetsImage)
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
@@ -626,6 +629,14 @@ func NewSetting(name, def string) Setting {
 	s := Setting{
 		Name:    name,
 		Default: def,
+	}
+	settings[s.Name] = s
+	return s
+}
+
+func (s Setting) WithEnvDefault(key string) Setting {
+	if def := os.Getenv(key); def != "" {
+		s.Default = def
 	}
 	settings[s.Name] = s
 	return s

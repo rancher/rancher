@@ -12,8 +12,8 @@ permissions:
 
 env:
   ARCH: amd64
-  TAG: v2.14-${{ github.sha }}-head
-  GIT_TAG: v2.14-${{ github.sha }}-head
+  TAG: v2.16-${{ github.sha }}-head
+  GIT_TAG: v2.16-${{ github.sha }}-head
   HEAD_TAG: "head"
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -25,48 +25,75 @@ jobs:
     uses: ./.github/workflows/unit-test.yml
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:a491bffcf6fce8e242fa2a64df51375f2d0400ddbfb7a6649365f808eb11abca # go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
     permissions:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/rancher-chart/build
-  build-server:
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+  # Tests only consume the linux/amd64 images, so the amd64 builds gate tests
+  # while the arm64 builds run as separate, non-gating jobs below.
+  build-server-amd64:
+    # On the critical path with a CPU-bound Go compile, so use 8cpu to shorten
+    # the build head; arm64 is off the critical path and stays on 4cpu.
+    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     env:
-      ARCH: ${{ matrix.arch }}
-      OS: ${{ matrix.OS }}
+      ARCH: x64
+      OS: linux
     permissions:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/build-images/server
-  build-agent:
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+  build-agent-amd64:
+    # 8cpu for the same reason as build-server-amd64.
+    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     env:
-      ARCH: ${{ matrix.arch }}
-      OS: ${{ matrix.OS }}
+      ARCH: x64
+      OS: linux
     permissions:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: ./.github/actions/build-images/agent
+  # arm64 builds validate that the images compile for arm64. Nothing downstream
+  # depends on them, so they run in parallel, off the critical path.
+  build-server-arm64:
+    runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
+    env:
+      ARCH: arm64
+      OS: linux
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: ./.github/actions/build-images/server
+  build-agent-arm64:
+    runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
+    env:
+      ARCH: arm64
+      OS: linux
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
       - name: setup and build
@@ -77,7 +104,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
       - name: Set up Docker Buildx
@@ -98,10 +125,10 @@ jobs:
   integration-tests:
     permissions:
       contents: read
-    needs: [build-server, build-agent]
+    needs: [build-server-amd64, build-agent-amd64]
     uses: ./.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
       contents: read
-    needs: [build-server, build-agent]
+    needs: [build-server-amd64, build-agent-amd64]
     uses: ./.github/workflows/provisioning-tests.yml

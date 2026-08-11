@@ -221,6 +221,12 @@ systemRegistryInheritsPullSecrets: false
 # Set to use the packaged system charts
 useBundledSystemChart: false
 
+# Charts image used for bundled Helm charts
+# Important: update build.yaml when this default image needs to be changed, then run `go generate`.
+assetsImage:
+  repository: rancher/rancher-assets
+  tag: v2.16-20260805T1815Z-dev
+
 # Certmanager version compatibility
 certmanager:
   version: ""
@@ -249,7 +255,7 @@ postDelete:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.8.1-rc.2"
+    tag: "v0.8.1"
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     # pullPolicy: "Always"
@@ -269,7 +275,7 @@ preUpgrade:
     # Optional: Image-specific registry override
     # registry: ""
     repository: "rancher/shell"
-    tag: "v0.8.1-rc.2"
+    tag: "v0.8.1"
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
 

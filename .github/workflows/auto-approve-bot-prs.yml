@@ -1,0 +1,128 @@
+name: Renovate Auto-Approve
+
+on:
+  schedule:
+    # 15:00 UTC, Monday through Friday.
+    - cron: '0 15 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Ignore minimum PR age
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+jobs:
+  approve:
+    name: Approve Renovate PRs
+    permissions:
+      checks: read # Read CI conclusions before approval.
+      id-token: write # Allow Vault action to authenticate with GitHub OIDC.
+      pull-requests: read # Read PR restrictions and review state.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR eligibility
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RENOVATE_BOT_USERNAME: ${{ vars.RENOVATE_BOT_USERNAME || 'app/renovate-rancher' }}
+          MIN_WORKING_DAYS: ${{ vars.RENOVATE_AUTO_APPROVE_MIN_WORKING_DAYS || '1' }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$MIN_WORKING_DAYS" =~ ^[0-9]+$ ]]; then
+            echo "RENOVATE_AUTO_APPROVE_MIN_WORKING_DAYS must be a non-negative integer."
+            exit 1
+          fi
+
+          today=$(date -u +%F)
+          eligible_prs=()
+          while IFS= read -r pr_json; do
+            pr_number=$(jq -r '.number' <<<"$pr_json")
+            head_ref=$(jq -r '.headRefName' <<<"$pr_json")
+
+            if [[ $(jq -r '.state' <<<"$pr_json") != "OPEN" ||
+                  $(jq -r '.autoMergeRequest' <<<"$pr_json") == "null" ||
+                  $(jq -r '.headRepository.nameWithOwner' <<<"$pr_json") != "$REPO" ||
+                  $(jq -r '.author.login' <<<"$pr_json") != "$RENOVATE_BOT_USERNAME" ||
+                  "$head_ref" != renovate/* ]]; then
+              continue
+            fi
+
+            created_date=$(date -u -d "$(jq -r '.createdAt' <<<"$pr_json")" +%F)
+            working_days=0
+            date_cursor=$created_date
+            while [[ "$date_cursor" < "$today" ]]; do
+              [[ $(date -u -d "$date_cursor" +%u) -lt 6 ]] && \
+                working_days=$((working_days + 1))
+              date_cursor=$(date -u -d "$date_cursor + 1 day" +%F)
+            done
+            if [[ "$FORCE" != "true" ]] && (( working_days < MIN_WORKING_DAYS )); then
+              echo "PR #$pr_number is too new ($working_days working days old)."
+              continue
+            fi
+
+            if ! check_buckets=$(gh pr checks "$pr_number" --repo "$REPO" --json bucket); then
+              echo "Could not read checks for PR #$pr_number."
+              continue
+            fi
+            if ! jq -e 'length > 0 and all(.[]; .bucket == "pass")' <<<"$check_buckets" >/dev/null; then
+              echo "PR #$pr_number does not have all checks green."
+              continue
+            fi
+
+            eligible_prs+=("$pr_number")
+          done < <(gh pr list --repo "$REPO" --state open \
+            --author "$RENOVATE_BOT_USERNAME" \
+            --json number,state,autoMergeRequest,headRepository,headRefName,author,createdAt \
+            --jq '.[] | @json')
+
+          printf 'eligible_prs=%s\n' "${eligible_prs[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Read App Secrets
+        if: steps.eligibility.outputs.eligible_prs != ''
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/auto-approve/app-credentials appId | APP_ID ;
+            secret/data/github/repo/${{ github.repository }}/github/auto-approve/app-credentials privateKey | PRIVATE_KEY
+
+      - name: Create App Token
+        if: steps.eligibility.outputs.eligible_prs != ''
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ github.event.repository.name }}
+          permission-pull-requests: write
+
+      - name: Approve PR
+        if: steps.eligibility.outputs.eligible_prs != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBERS: ${{ steps.eligibility.outputs.eligible_prs }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          for pr_number in $PR_NUMBERS; do
+            review_decision=$(gh pr view "$pr_number" --repo "$REPO" \
+              --json reviewDecision --jq '.reviewDecision')
+
+            if [[ "$review_decision" == "APPROVED" ]]; then
+              echo "PR #$pr_number is currently approved."
+              continue
+            fi
+
+            gh pr review "$pr_number" \
+              --repo "$REPO" \
+              --approve \
+              --body "Auto-approving Renovate PR with auto-merge enabled."
+          done

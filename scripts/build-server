@@ -2,7 +2,6 @@
 set -ex
 
 source $(dirname $0)/version
-source $(dirname $0)/export-config
 
 cd $(dirname $0)/..
 

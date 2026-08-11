@@ -17,11 +17,11 @@ ARG GODEP_STEVE_PATH
 ARG GODEP_WRANGLER=scratch
 ARG GODEP_WRANGLER_PATH
 
-ARG CHART_DEFAULT_BRANCH=dev-v2.15
+ARG CHART_DEFAULT_BRANCH=dev-v2.16
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.15
+ARG CATTLE_KDM_BRANCH=dev-v2.16
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -67,32 +67,6 @@ ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
 ENV GOCACHE=/root/.cache/go/cache
-
-FROM builder AS rancher-charts
-ARG CHART_DEFAULT_BRANCH
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone --no-checkout -b $CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
-
-FROM builder AS partner-charts
-ARG PARTNER_CHART_DEFAULT_BRANCH
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone --no-checkout -b $PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
-
-
-FROM builder AS rke2-charts
-ARG RKE2_CHART_DEFAULT_BRANCH
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone --no-checkout -b $RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
-
 
 FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
@@ -154,8 +128,8 @@ ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.6
 ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=7db00430a1c047e6627681446a99219815156e971043ba7a22a083d69fafe44a
 ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=e536ded30af40bdfa53a1010e39dfe2f72f5add499b564b9516c1385ee3a98c5
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.2
-ENV CATTLE_WINS_AGENT_CHECKSUM=9078b9ed1dd4bd14b496a9810786a38104ca897e5a40770746b279349bca43b3
+ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.3
+ENV CATTLE_WINS_AGENT_CHECKSUM=ee4e7a54e87948bd2a5e19341500d907901ea6a8baa5b931c9e12f8f4a32ba96
 ENV CATTLE_WINS_AGENT_CHECKSUM_install=b2837612bc0fb3da630748392923459ec344de98e31a42739418747162de18bd
 ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=a55a1b229d9d80aa64687f9c617a41a4265aff862a4f73f31139d05ddc6cc858
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -186,23 +160,6 @@ ARG CATTLE_GKE_OPERATOR_VERSION
 ENV CATTLE_GKE_OPERATOR_VERSION=$CATTLE_GKE_OPERATOR_VERSION
 ARG CATTLE_ALI_OPERATOR_VERSION
 ENV CATTLE_ALI_OPERATOR_VERSION=$CATTLE_ALI_OPERATOR_VERSION
-# System charts minimal version
-# Deprecated in favor of CATTLE_FLEET_VERSION.
-ENV CATTLE_FLEET_MIN_VERSION=""
-ARG CATTLE_FLEET_VERSION
-ENV CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
-ARG CATTLE_RANCHER_WEBHOOK_VERSION
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
-ARG CATTLE_REMOTEDIALER_PROXY_VERSION
-ENV CATTLE_REMOTEDIALER_PROXY_VERSION=$CATTLE_REMOTEDIALER_PROXY_VERSION
-ARG CATTLE_RANCHER_TURTLES_VERSION
-ENV CATTLE_RANCHER_TURTLES_VERSION=$CATTLE_RANCHER_TURTLES_VERSION
-ARG CATTLE_CSP_ADAPTER_MIN_VERSION
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
-
-COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
-COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
-COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 
 
 RUN case "${ARCH}" in \
@@ -320,8 +277,8 @@ ENV CATTLE_BASE_UI_BRAND=
 ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=
 
 # Cluster Autoscaler related settings, only set in prime installs
-ENV CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
-ENV CATTLE_CLUSTER_AUTOSCALER_IMAGE=
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION=1.1.11
@@ -473,8 +430,8 @@ ARG VERSION
 ARG BASE_REGISTRY
 ARG BASE_UI_BRAND
 ARG RANCHER_VERSION_TYPE
-ARG CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
-ARG CATTLE_CLUSTER_AUTOSCALER_IMAGE
+ARG CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
+ARG CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE
 ARG CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT
 
 ENV CATTLE_BASE_REGISTRY=$BASE_REGISTRY
@@ -483,9 +440,12 @@ ENV RANCHER_VERSION_TYPE=$RANCHER_VERSION_TYPE
 ENV CATTLE_SERVER_VERSION=${VERSION}
 ENV CATTLE_AGENT_IMAGE=${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE=${IMAGE_REPO}/${IMAGE_NAME}
-ENV CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=$CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
-ENV CATTLE_CLUSTER_AUTOSCALER_IMAGE=$CATTLE_CLUSTER_AUTOSCALER_IMAGE
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=$CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=$CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE
 ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=$CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT
+
+# We still create the catalogs dir
+RUN mkdir -p /var/lib/rancher-data/local-catalogs
 
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
@@ -496,6 +456,7 @@ COPY --chown=root:root --chmod=0755 \
     package/entrypoint.sh \
     package/jailer.sh /usr/bin/
 
+VOLUME /var/lib/rancher-data/local-catalogs
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
@@ -545,19 +506,17 @@ LABEL io.cattle.agent=true
 ARG RANCHER_REPO=rancher
 ARG VERSION
 ENV AGENT_IMAGE=${RANCHER_REPO}/rancher-agent:${VERSION}
-# For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
-ARG CATTLE_RANCHER_WEBHOOK_VERSION
-ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
-ARG CATTLE_RANCHER_TURTLES_VERSION
-ENV CATTLE_RANCHER_TURTLES_VERSION=$CATTLE_RANCHER_TURTLES_VERSION
+
 ENV SSL_CERT_DIR=/etc/kubernetes/ssl/certs
-COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
-COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
-COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
 COPY --from=agent-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
+
+# We still create the catalogs dir
+RUN mkdir -p /var/lib/rancher-data/local-catalogs
+
+VOLUME /var/lib/rancher-data/local-catalogs
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
     "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
