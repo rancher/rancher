@@ -5,7 +5,7 @@ scm:
   token: 'UPDATECLI_GITHUB_TOKEN'
   owner: 'rancher'
   repo: 'rancher'
-  branch: 'main'
+  branch: 'release/v2.15'
   # This option allows for the commits to be signed (verified). However, the
   # GraphQL API doesn't allow the commits to be squashed. For the moment we
   # prefer to squash them in order to reduce the noise given the amount of
