@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/steve/pkg/stores/proxy"
+	steveclient "github.com/rancher/steve/pkg/client"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -13,7 +13,7 @@ type UserPreference struct {
 	Data map[string]string `json:"data"`
 }
 
-func Register(schemas *types.APISchemas, cg proxy.ClientGetter) {
+func Register(schemas *types.APISchemas, cg steveclient.ClientGetter) {
 	schemas.InternalSchemas.TypeName("userpreference", UserPreference{})
 	schemas.MustImportAndCustomize(UserPreference{}, func(schema *types.APISchema) {
 		schema.CollectionMethods = []string{http.MethodGet}

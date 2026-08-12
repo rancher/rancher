@@ -116,12 +116,6 @@ var (
 		true,
 		false,
 		true)
-	UISQLCache = newFeature(
-		"ui-sql-cache",
-		"Improve performance by enabling SQLite-backed caching. This also enables server-side pagination and other scaling based performance improvements.",
-		true,
-		false,
-		true)
 	ProvisioningPreBootstrap = newFeature(
 		"provisioningprebootstrap",
 		"Support running pre-bootstrap workloads on downstream clusters",
@@ -287,6 +281,13 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 	err := featuresClient.Delete("external-rules", &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		logrus.Errorf("unable to delete external-rules feature: %v", err)
+	}
+
+	// ui-sql-cache feature flag was removed in 2.16, the SQLite-backed cache is
+	// always enabled. We need to delete it for users upgrading from 2.15.
+	err = featuresClient.Delete("ui-sql-cache", &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		logrus.Errorf("unable to delete ui-sql-cache feature: %v", err)
 	}
 
 	// creates any features in map that do not exist, updates features with new default value
