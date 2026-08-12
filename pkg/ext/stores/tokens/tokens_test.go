@@ -11,6 +11,7 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1061,6 +1062,7 @@ func TestStoreCreate(t *testing.T) {
 		tok        *ext.Token            // token input
 		rtok       *ext.Token            // expected op result, created token
 		opts       *metav1.CreateOptions // create options
+		defaultmin string                // not empty --> use as modified default ttl setting
 		storeSetup func(                 // configure store backend clients
 			space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
@@ -1415,7 +1417,7 @@ func TestStoreCreate(t *testing.T) {
 			},
 		},
 		{
-			name: "created secret ok",
+			name: "created secret ok, ttl == default == max",
 			err:  nil,
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
@@ -1459,10 +1461,319 @@ func TestStoreCreate(t *testing.T) {
 				// Fake current time
 				timer.EXPECT().Now().Return("this is a fake now")
 
-				// note: returning an arbitrary good secret here.
-				// no connection to the token spec which went into create
 				secrets.EXPECT().Create(gomock.Any()).
-					Return(&properSecret, nil)
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldTTL:              "7776000000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name: "created secret ok, ttl > max, clamped",
+			err:  nil,
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+					TTL:    8776000000,
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldTTL:              "7776000000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name:       "created secret ok, ttl == default > max, clamped",
+			err:        nil,
+			defaultmin: "146266",
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldTTL:              "7776000000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
+			},
+			rtok: func() *ext.Token {
+				copy := properToken.DeepCopy()
+				copy.Status.Hash = ""
+				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
+				return copy
+			}(),
+		},
+		{
+			name:       "created secret ok, ttl == default < max",
+			err:        nil,
+			defaultmin: "112933",
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+
+				// session token fetch for user principal
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
+
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+
+				// Fake value and hash -- See rtok below
+				hasher.EXPECT().MakeAndHashSecret().Return("94084kdlafj43", "", nil)
+
+				// Fake current time
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().Create(gomock.Any()).
+					DoAndReturn(func(have *corev1.Secret) (*corev1.Secret, error) {
+						// the uid of the input is not fixed, and we cannot use
+						// Any() on the field. as solution we simply copy this
+						// field from have to want, ensuring that this particular
+						// comparison is a no-op, effectively any.
+						want := &corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace:    TokenNamespace,
+								GenerateName: GeneratePrefix,
+								Labels: map[string]string{
+									KindLabel:       "",
+									SecretKindLabel: SecretKindLabelValue,
+									UserIDLabel:     "world",
+								},
+							},
+							StringData: map[string]string{
+								FieldClusterName:      "",
+								FieldDescription:      "",
+								FieldEnabled:          "true",
+								FieldHash:             "",
+								FieldKind:             "",
+								FieldLastActivitySeen: "",
+								FieldLastUpdateTime:   "this is a fake now",
+								FieldLastUsedAt:       "",
+								FieldPrincipal:        `{"name":"local://world"}`,
+								FieldTTL:              "6775980000",
+								FieldUID:              have.StringData[FieldUID],
+								FieldUserID:           "world",
+							},
+						}
+
+						assert.Equal(t, want, have)
+						// note: returning an arbitrary good secret here.
+						// no connection to the token spec which went into create
+						return &properSecret, nil
+					})
 			},
 			rtok: func() *ext.Token {
 				copy := properToken.DeepCopy()
@@ -1498,6 +1809,15 @@ func TestStoreCreate(t *testing.T) {
 
 			store := New(nil, nil, nsCache, secrets, users, tcache, ccache, timer, hasher, auth)
 			test.storeSetup(nil, secrets, scache, ucache, tcache, ccache, timer, hasher, auth)
+
+			// inject a modified auth-token-default-ttl-minutes setting
+			if test.defaultmin != "" {
+				prior := settings.AuthTokenDefaultTTLMinutes.Get()
+				assert.NoError(t, settings.AuthTokenDefaultTTLMinutes.Set(test.defaultmin))
+				t.Cleanup(func() {
+					assert.NoError(t, settings.AuthTokenDefaultTTLMinutes.Set(prior))
+				})
+			}
 
 			// perform test and validate results
 			tok, err := store.create(context.TODO(), test.tok, test.opts)
