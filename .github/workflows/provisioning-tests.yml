@@ -30,17 +30,16 @@ jobs:
         run: |
           set -eo pipefail
 
-          # Decide what the matrix script should look at:
+          # On a PR, diff against the base (target) SHA 
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            CHANGED="$(git diff --name-only "$BASE_SHA...HEAD")"
-            export CHANGED
+            export DIFF_BASE="$BASE_SHA"
           else
             export ALL=1
           fi
 
           MATRIX="$(bash .github/scripts/resolve-provisioning-matrix.sh)"
 
-          # Expect compact {"include":[...]} JSON on a single line; bail otherwise.
+          # Expect compact {"include":[...]} JSON on a single line, bail otherwise.
           if ! echo "$MATRIX" | jq -e 'has("include") and (.include | type == "array")' >/dev/null; then
             echo "error: unexpected matrix output: $MATRIX" >&2
             exit 1
@@ -167,7 +166,12 @@ jobs:
       - name: Generate provisioning tests summary
         run: |
           echo "Provisioning Test Summary"
-          echo "--------------------------------"
+          echo "--------------------------------"        
+          if [[ "${{ needs.setup-matrix.result }}" != "success" && "${{ needs.setup-matrix.result }}" != "skipped" ]]; then
+            echo "Failed to setup test matrix."
+            exit 1
+          fi
+          
           if [[ "${{ needs.provisioning_tests.result }}" != "success" && "${{ needs.provisioning_tests.result }}" != "skipped" ]]; then
             echo "Some provisioning tests failed. Please check the logs for details."
             exit 1

@@ -31,7 +31,11 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG="${SCOPES_CONFIG:-$DIR/provisioning-test-scopes.yaml}"
 SCOPES="$(yq '.scopes | keys | join(" ")' "$CONFIG")"
 
-UPSTREAM_REF="@{upstream}"
+# The ref to diff against. CI passes the target branch's SHA
+# via DIFF_BASE. Locally it falls back to the branch's upstream tracking ref.
+if [ -z "${DIFF_BASE:-}" ]; then
+  DIFF_BASE='@{upstream}'
+fi
 
 # Stop early if a prerequisite is missing. Shouldn't happen, rancher managed CI images
 # include jq and yq as universal deps.
@@ -43,7 +47,7 @@ command -v jq >/dev/null || { echo "error: jq is required" >&2; exit 1; }
 # CHANGED can also be used, and is expected to be a newline-separated list of file paths.
 ALL="${ALL:-0}"
 if [ "$ALL" != "1" ] && [ -z "${CHANGED:-}" ]; then
-  CHANGED="$(git diff --name-only "$UPSTREAM_REF")"
+  CHANGED="$(git diff --name-only "$DIFF_BASE...HEAD")"
 fi
 CHANGED="${CHANGED:-}"
 
@@ -123,7 +127,7 @@ file_has_substring() {
 
   # only the actual added/removed lines, not the "+++ / ---" file headers or unchanged context.
   local changed_lines
-  changed_lines="$(git diff -U0 "$UPSTREAM_REF" -- "$file" 2>/dev/null | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)')"
+  changed_lines="$(git diff -U0 "$DIFF_BASE...HEAD" -- "$file" | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)')"
   test -n "$changed_lines" || return 1
 
   # check each substring one at a time against the changed lines, the first hit wins.

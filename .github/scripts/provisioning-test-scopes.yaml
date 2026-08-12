@@ -37,6 +37,7 @@
 #
 #   full : Any match runs EVERY provisioning test. This is reserved for
 #          core functionality like the planner, where changes could impact all of provisioning.
+#          Valid entries can be package paths, or absolute file paths.
 #
 #   skip : Documents coverage gaps. This scope runs nothing, and is identical
 #          to leaving a path unlisted. It exists to prevent accidental
@@ -58,6 +59,7 @@ scopes:
       - '^pkg/controllers/provisioningv2/fleetworkspace/'
       - '^pkg/controllers/provisioningv2/managedchart/'
       - '^pkg/controllers/provisioningv2/machineconfigcleanup/'
+      - '^pkg/controllers/capr/autoscaler/'
       - '^pkg/controllers/capr/bootstrap/'
       - '^pkg/controllers/capr/bootstraptoken/'       # also imported
       - '^pkg/controllers/capr/managesystemagent/'
@@ -93,6 +95,7 @@ scopes:
       - '^tests/v2prov/tests/custom/'                 # also operations
       - '^tests/v2prov/tests/machineprovisioning/'    # also operations
       - '^tests/v2prov/tests/fleet/'
+      - '^tests/v2prov/tests/autoscaler/'
     file-paths:
       - path: '^build.yaml'
         substrings:
@@ -150,7 +153,15 @@ scopes:
       - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
       - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
 
+#  An example of a scope that should only run when ALL=1, or the 'full' scope is triggered
+#  nightly:
+#    tests:
+#      - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+#      - { dist: rke2,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+
 full:
+  - '^pkg/controllers/capr/controllers.go'
+  - '^pkg/controllers/provisioningv2/controllers.go'
   - '^pkg/capr/planner/'
   - '^pkg/plan/'
   - '^pkg/controllers/capr/planner/'
