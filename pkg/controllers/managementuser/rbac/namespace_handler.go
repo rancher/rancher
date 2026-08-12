@@ -393,15 +393,13 @@ func (n *nsLifecycle) prtbOwnerInCurrentProject(rb *rbacv1.RoleBinding, backingN
 		}
 	}
 
+	// empty legacy values naturally miss the index lookup, so no special-casing needed here.
 	for label, index := range legacyOwnerIndexes {
 		raw, ok := rb.Labels[label]
 		if !ok {
 			continue
 		}
 		value := convert.ToString(raw)
-		if value == "" {
-			continue
-		}
 		prtbs, lookupErr := n.m.prtbIndexer.ByIndex(index, value)
 		if lookupErr != nil {
 			return owned, inProject, errors.Wrapf(lookupErr, "couldn't find prtb for %s", rb.Name)
@@ -427,7 +425,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 		if ns.DeletionTimestamp == nil {
 			var found bool
 			_, projectName, found = strings.Cut(ns.Annotations[projectIDAnnotation], ":")
-			if found {
+			if found && projectName != "" {
 				desiredRole = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, name)
 			}
 		}

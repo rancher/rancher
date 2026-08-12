@@ -168,6 +168,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 
 	// Re-evaluate a namespace's InitialRolesPopulated condition when the project RBAC it waits for
 	// appears: PRTB-owned RoleBindings (project-member access) and project-namespace ClusterRoles.
+	// ClusterRoleBindings don't have a similar watch, but will be caught by the 5 second retry timer in the InitialRolesPopulated condition handler.
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespace-by-rolebinding", roleBindingEnqueueNamespace, workload.Corew.Namespace(), workload.RBACw.RoleBinding())
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespace-by-clusterrole", clusterRoleEnqueueNamespace, workload.Corew.Namespace(), workload.RBACw.ClusterRole())
 
