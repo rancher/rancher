@@ -116,25 +116,63 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 			}
 		})
 
-		root := http.NewServeMux()
+		routes := authRoutes{
+			limit:    utils.APIBodyLimitingHandler(apiLimit),
+			saml:     saml,
+			v1Public: v1PublicAPI,
+			v3:       v3Handler,
+			logout:   logout,
+			next:     next,
+		}
+		if features.V3Public.Enabled() {
+			routes.v3Public = v3PublicAPI // Deprecated. Use /v1-public instead.
+		}
+		if features.SCIM.Enabled() {
+			routes.scim = scim.NewHandler(scaledContext)
+		}
+
+		root := newRootMux(routes)
 
 		p := handler.NewFromAuthConfigInterface(scaledContext.Management.AuthConfigs(""))
 		p.RegisterOIDCProviderHandlers(root)
 
-		limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
-		root.Handle("/v1-saml/", limitingHandler(saml))
-		if features.V3Public.Enabled() {
-			root.Handle("/v3-public/", limitingHandler(v3PublicAPI)) // Deprecated. Use /v1-public instead.
-		}
-		root.Handle("/v1-public/", limitingHandler(v1PublicAPI))
-		if features.SCIM.Enabled() {
-			root.Handle(fmt.Sprint(scim.URLPrefix, "/"), limitingHandler(scim.NewHandler(scaledContext)))
-		}
-		root.Handle("/v3/", v3Handler)
-		root.Handle("/", next)
-
 		return root
 	}, nil
+}
+
+// authRoutes are the handlers served by the auth server's root mux. All
+// handlers are required except v3Public and scim, which are feature gated:
+// when nil, their paths fall through to next.
+type authRoutes struct {
+	limit    func(http.Handler) http.Handler
+	saml     http.Handler
+	v3Public http.Handler
+	v1Public http.Handler
+	scim     http.Handler
+	v3       http.Handler
+	logout   http.Handler
+	next     http.Handler
+}
+
+func newRootMux(routes authRoutes) *http.ServeMux {
+	root := http.NewServeMux()
+
+	root.Handle("/v1-saml/", routes.limit(routes.saml))
+	if routes.v3Public != nil {
+		root.Handle("/v3-public/", routes.limit(routes.v3Public)) // Deprecated. Use /v1-public instead.
+	}
+	root.Handle("/v1-public/", routes.limit(routes.v1Public))
+	if routes.scim != nil {
+		root.Handle(fmt.Sprint(scim.URLPrefix, "/"), routes.limit(routes.scim))
+	}
+	// The multi-cluster management router serves this route too, but it only
+	// runs when MCM is enabled. Registering it here keeps logout working when
+	// MCM is disabled, as in standalone Harvester.
+	root.Handle("POST /v1/logout", routes.limit(requests.NewAuthenticatedFilter(routes.logout)))
+	root.Handle("/v3/", routes.v3)
+	root.Handle("/", routes.next)
+
+	return root
 }
 
 func (s *Server) OnLeader(ctx context.Context) error {
