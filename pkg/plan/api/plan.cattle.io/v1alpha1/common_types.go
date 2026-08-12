@@ -94,6 +94,11 @@ const (
 // prefix — an operation-type-specific step prefix registered in a controller package still matches.
 const hookLabelKeyMarker = ".hook.operation.cattle.io/"
 
+// BeaconOwnerLabelKey is set by handlers when writing machine-plans. This label is subsequently
+// used by the webhook to reject requests to update machine-plans if the label does not match the
+// value on the beacon resource.
+const BeaconOwnerLabelKey = "plan.cattle.io/beacon-owner"
+
 // HasActiveLifecycleHook reports whether obj still carries at least one lifecycle-hook label
 // (phase or step). While such a label is present, the op's owning controller MUST NOT garbage
 // collect the object even after its terminal phase and TTL have expired — the delegate needs a
