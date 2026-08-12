@@ -18,7 +18,9 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 	// If the repositories are rancher managed and if bundled is set
 	// don't fetch anything from upstream.
 	if IsBundled(git.Directory) && settings.SystemCatalog.Get() == "bundled" {
-		return nil
+		if err := git.reset("HEAD"); err != nil {
+			return fmt.Errorf("ensure failure: %w", err)
+		}
 	}
 
 	if err := git.clone(""); err != nil {
