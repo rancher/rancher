@@ -643,6 +643,7 @@ func Test_namespaceHandler_getProjectFromNamespace(t *testing.T) {
 				tt.setupProjectCache(projectCache)
 			}
 			n := &namespaceHandler{
+				clusterName:  "c-abc123",
 				projectCache: projectCache,
 			}
 			got, err := n.getProjectFromNamespace(tt.namespace)

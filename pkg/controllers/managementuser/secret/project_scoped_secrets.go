@@ -235,6 +235,10 @@ func (n *namespaceHandler) getProjectFromNamespace(namespace *corev1.Namespace) 
 		return nil, nil
 	}
 
+	if clusterName != n.clusterName {
+		return nil, nil
+	}
+
 	project, err := n.projectCache.Get(clusterName, projectName)
 	if apierrors.IsNotFound(err) {
 		logrus.Warnf("Namespace %s references project %s:%s which does not exist. Not re-enqueueing", namespace.Name, clusterName, projectName)
