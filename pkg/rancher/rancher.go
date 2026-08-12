@@ -500,7 +500,17 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return errors.New("dashboard.Register() failed: " + err.Error())
 		}
 
-		return runMigrations(r.Wrangler)
+		if err := runMigrations(r.Wrangler); err != nil {
+			return err
+		}
+
+		if err := r.Wrangler.StartFactoryWithTransaction(ctx, func(ctx context.Context) error {
+			dashboard.RegisterPostMigration(ctx, r.Wrangler)
+			return nil
+		}); err != nil {
+			return errors.New("dashboard.RegisterPostMigration() failed: " + err.Error())
+		}
+		return nil
 	})
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::DefferedCAPIRegistration", func(ctx context.Context) error {
