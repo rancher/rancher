@@ -237,35 +237,28 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
-	if features.Auth.Enabled() {
-		sc, err := config.NewScaledContext(*restConfig, nil)
-		if err != nil {
-			return nil, err
-		}
+	sc, err := config.NewScaledContext(*restConfig, nil)
+	if err != nil {
+		return nil, err
+	}
 
-		sc.Wrangler = wranglerContext
+	sc.Wrangler = wranglerContext
 
-		sc.UserManager, err = common.NewUserManagerNoBindings(wranglerContext)
-		if err != nil {
-			return nil, err
-		}
+	sc.UserManager, err = common.NewUserManagerNoBindings(wranglerContext)
+	if err != nil {
+		return nil, err
+	}
 
-		sc.ClientGetter, err = normanStoreProxy.NewClientGetterFromConfig(*restConfig)
-		if err != nil {
-			return nil, err
-		}
+	sc.ClientGetter, err = normanStoreProxy.NewClientGetterFromConfig(*restConfig)
+	if err != nil {
+		return nil, err
+	}
 
-		tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
+	tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
 
-		authServer, err = auth.NewServer(ctx, wranglerContext, sc, tokenAuthenticator)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		authServer, err = auth.NewAlwaysAdmin()
-		if err != nil {
-			return nil, err
-		}
+	authServer, err = auth.NewServer(ctx, wranglerContext, sc, tokenAuthenticator)
+	if err != nil {
+		return nil, err
 	}
 
 	if !features.Turtles.Enabled() {

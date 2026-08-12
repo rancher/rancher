@@ -56,12 +56,6 @@ var (
 		true,
 		false,
 		true)
-	Auth = newFeature(
-		"auth",
-		"Enable authentication",
-		true,
-		false,
-		false)
 	ManagedSystemUpgradeController = newFeature(
 		"managed-system-upgrade-controller",
 		"Enable the installation of the system-upgrade-controller app as a managed system chart",
@@ -288,6 +282,13 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 	err = featuresClient.Delete("ui-sql-cache", &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		logrus.Errorf("unable to delete ui-sql-cache feature: %v", err)
+	}
+
+	// auth feature flag was removed in 2.16, authentication is always enabled.
+	// We need to delete it for users upgrading from 2.15.
+	err = featuresClient.Delete("auth", &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		logrus.Errorf("unable to delete auth feature: %v", err)
 	}
 
 	// creates any features in map that do not exist, updates features with new default value
