@@ -22,6 +22,14 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; the
   sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
 fi
 
+echo "Total system resources: $(nproc) CPUs, $(free -m | awk '/^Mem:/{print $2}')MB RAM"
+
+vmstat 5 > /tmp/c &
+CPU_PID=$!
+
+( while true; do free -m | awk '/^Mem:/{print $3}'; sleep 5; done ) > /tmp/m &
+MEM_PID=$!
+
 cleanup()
 {
     EXIT=$?
@@ -33,6 +41,12 @@ cleanup()
       kill $PID
       wait $PID
     fi
+
+    kill $CPU_PID $MEM_PID 2>/dev/null
+    awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
+    awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
+    rm -f /tmp/c /tmp/m
+
     return $EXIT
 }
 
@@ -134,6 +148,16 @@ fi
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
 touch /tmp/rancher.log
 
+# Try and use RAM as the storage for k3s etcd to speed up provisioning tests.
+# If the mount fails, fall back to disk.
+ETCD_DIR=/var/lib/rancher/k3s/server/db/etcd
+if ! mountpoint -q "$ETCD_DIR"; then
+  mkdir -p "$ETCD_DIR"
+  mount -t tmpfs -o size=${V2PROV_ETCD_TMPFS_SIZE:-2g} tmpfs "$ETCD_DIR" \
+    && echo "Mounted tmpfs over $ETCD_DIR" \
+    || echo "WARNING: tmpfs mount failed; k3s etcd using disk"
+fi
+
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
@@ -148,6 +172,8 @@ build_and_run_rancher()
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
+            awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
+            awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
             dump_rancher_logs
             echo K3s logs were:
             echo -e "-----K3S-LOG-DUMP-START-----"
@@ -167,7 +193,7 @@ build_and_run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          ./scripts/run --debug >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
