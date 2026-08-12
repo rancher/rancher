@@ -845,7 +845,11 @@ func migrateCRTTokensToSecretsFunc(w *wrangler.Context) error {
 	}
 
 	cm.Data[crtTokensToSecretsMigratedKey] = "true"
-	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+	if err := createOrUpdateConfigMap(w.Core.ConfigMap(), cm); err != nil {
+		return err
+	}
+	logrus.Infof("Successfully migrated cluster registration tokens to secrets")
+	return nil
 }
 
 // migrateExistingRKE2ClustersPrimeAnnotation sets the provisioning.cattle.io/rke2-prime-enabled=false
@@ -975,10 +979,6 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 		return fmt.Errorf("failed to create token secret: %w", createErr)
 	}
 
-	crtCopy := crt.DeepCopy()
-	crtCopy.Status.Token = ""
-	crtCopy.Status.TokenSecretName = secretName
-
 	if apierrors.IsAlreadyExists(createErr) {
 		existing, err := w.Core.Secret().Get(crt.Namespace, secretName, metav1.GetOptions{})
 		if err != nil {
@@ -994,28 +994,33 @@ func migrateSingleCRT(w *wrangler.Context, crt *v32.ClusterRegistrationToken) er
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	if cluster != nil {
-		newStatus, err := clusterregistrationtoken.AssignCommands(&crtCopy.Status, crt.Spec.ClusterName, w.Mgmt.Cluster().Cache())
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := w.Mgmt.ClusterRegistrationToken().Get(crt.Namespace, crt.Name, metav1.GetOptions{})
 		if err != nil {
-			logrus.Warnf("Failed to regenerate commands for CRT %s/%s: %v",
-				crt.Namespace, crt.Name, err)
-		} else {
-			crtCopy.Status = newStatus
+			return err
 		}
-	}
 
-	if expiresAt != "" {
-		crtCopy.Status.ExpiresAt = expiresAt
-	}
+		crtCopy := latest.DeepCopy()
+		crtCopy.Status.Token = ""
+		crtCopy.Status.TokenSecretName = secretName
 
-	_, err = w.Mgmt.ClusterRegistrationToken().UpdateStatus(crtCopy)
-	if err != nil {
-		return fmt.Errorf("failed to update CRT status: %w", err)
-	}
+		if cluster != nil {
+			newStatus, err := clusterregistrationtoken.AssignCommands(&crtCopy.Status, cluster)
+			if err != nil {
+				logrus.Warnf("Failed to regenerate commands for CRT %s/%s: %v",
+					crt.Namespace, crt.Name, err)
+			} else {
+				crtCopy.Status = newStatus
+			}
+		}
 
-	logrus.Infof("Successfully migrated CRT %s/%s token to secret %s",
-		crt.Namespace, crt.Name, secretName)
-	return nil
+		if expiresAt != "" {
+			crtCopy.Status.ExpiresAt = expiresAt
+		}
+
+		_, err = w.Mgmt.ClusterRegistrationToken().Update(crtCopy)
+		return err
+	})
 }
 
 func computeMigrationJitter(ttl time.Duration) time.Duration {
