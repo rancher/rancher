@@ -3,6 +3,7 @@ package globalroles
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -62,9 +63,10 @@ var (
 )
 
 const (
+	// crbNameAnnotation records the name of the ClusterRoleBinding created for a GlobalRoleBinding, for
+	// reference purposes. It is not read back for reconciliation.
 	crbNameAnnotation             = "authz.management.cattle.io/crb-name"
 	crtbGrbOwnerIndex             = "authz.management.cattle.io/crtb-owner"
-	crbNamePrefix                 = "cattle-globalrolebinding-"
 	localClusterName              = "local"
 	grbOwnerLabel                 = "authz.management.cattle.io/grb-owner"
 	fleetWorkspacePermissionLabel = "authz.management.cattle.io/fleet-workspace-permissions"
@@ -385,58 +387,16 @@ func (l *globalRoleBindingLifecycle) findMissingRTs(wantRTs []string, cluster *v
 func (l *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: globalRoleBindingReconciled}
 
-	crbName, ok := globalRoleBinding.Annotations[crbNameAnnotation]
-	if !ok {
-		crbName = crbNamePrefix + globalRoleBinding.Name
+	crbName := getCRBName(globalRoleBinding.Name)
+	if globalRoleBinding.Annotations == nil {
+		globalRoleBinding.Annotations = map[string]string{}
 	}
+	globalRoleBinding.Annotations[crbNameAnnotation] = crbName
 
-	subject := rbac.GetGRBSubject(globalRoleBinding)
+	grLabels := map[string]string{grbOwnerLabel: globalRoleBinding.Name}
+	maps.Copy(grLabels, globalRoleBindingLabel)
 
-	crb, _ := l.crbLister.Get("", crbName)
-	if crb != nil {
-		subjects := []v1.Subject{subject}
-		updateSubject := !reflect.DeepEqual(subjects, crb.Subjects)
-
-		updateRoleRef := false
-		var roleRef v1.RoleRef
-		gr, _ := l.grLister.Get("", globalRoleBinding.GlobalRoleName)
-		if gr != nil {
-			crNameFromGR := getCRName(gr)
-			if crNameFromGR != crb.RoleRef.Name {
-				updateRoleRef = true
-				roleRef = v1.RoleRef{
-					Name: crNameFromGR,
-					Kind: clusterRoleKind,
-				}
-			}
-		}
-		if updateSubject || updateRoleRef {
-			crb = crb.DeepCopy()
-			if updateRoleRef {
-				crb.RoleRef = roleRef
-			}
-			crb.Subjects = subjects
-			logrus.Infof("[%v] Updating clusterRoleBinding %v for globalRoleBinding %v user %v", grbController, crb.Name, globalRoleBinding.Name, globalRoleBinding.UserName)
-			if _, err := l.crbClient.Update(crb); err != nil {
-				l.status.AddCondition(localConditions, condition, failedToUpdateClusterRoleBinding, err)
-				return fmt.Errorf("couldn't update ClusterRoleBinding %v: %w", crb.Name, err)
-			}
-		}
-
-		l.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
-		return nil
-	}
-
-	logrus.Infof("Creating new GlobalRoleBinding for GlobalRoleBinding %v", globalRoleBinding.Name)
-	gr, _ := l.grLister.Get("", globalRoleBinding.GlobalRoleName)
-	var crName string
-	if gr != nil {
-		crName = getCRName(gr)
-	} else {
-		crName = generateCRName(globalRoleBinding.GlobalRoleName)
-	}
-	logrus.Infof("[%v] Creating clusterRoleBinding for globalRoleBinding %v for user %v with role %v", grbController, globalRoleBinding.Name, globalRoleBinding.UserName, crName)
-	_, err := l.crbClient.Create(&v1.ClusterRoleBinding{
+	desiredCRB := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crbName,
 			OwnerReferences: []metav1.OwnerReference{
@@ -447,26 +407,77 @@ func (l *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBindin
 					UID:        globalRoleBinding.UID,
 				},
 			},
-			Labels: globalRoleBindingLabel,
+			Labels: grLabels,
 		},
-		Subjects: []v1.Subject{subject},
+		Subjects: []v1.Subject{rbac.GetGRBSubject(globalRoleBinding)},
 		RoleRef: v1.RoleRef{
-			Name: crName,
+			Name: getCRName(globalRoleBinding.GlobalRoleName),
 			Kind: clusterRoleKind,
 		},
-	})
+	}
+
+	clusterRoleBindings, err := l.crbLister.List("", labels.SelectorFromSet(map[string]string{grbOwnerLabel: globalRoleBinding.Name}))
 	if err != nil {
-		l.status.AddCondition(localConditions, condition, failedToCreateClusterRoleBinding, err)
+		err = fmt.Errorf("couldn't list ClusterRoleBindings for globalRoleBinding %v: %w", globalRoleBinding.Name, err)
+		l.status.AddCondition(localConditions, condition, failedToUpdateClusterRoleBinding, err)
 		return err
 	}
-	// Add an annotation to the globalrole indicating the name we used for future updates
-	if globalRoleBinding.Annotations == nil {
-		globalRoleBinding.Annotations = map[string]string{}
+
+	// Delete any ClusterRoleBindings that were created for this GlobalRoleBinding but have the wrong name.
+	for _, clusterRoleBinding := range clusterRoleBindings {
+		if clusterRoleBinding.Name != crbName {
+			if err := l.crbClient.Delete(clusterRoleBinding.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				err = fmt.Errorf("couldn't delete ClusterRoleBinding %v for globalRoleBinding %v: %w", clusterRoleBinding.Name, globalRoleBinding.Name, err)
+				l.status.AddCondition(localConditions, condition, failedToUpdateClusterRoleBinding, err)
+				return err
+			}
+		}
 	}
-	globalRoleBinding.Annotations[crbNameAnnotation] = crbName
+
+	crb, _ := l.crbLister.Get("", crbName)
+	if crb == nil {
+		logrus.Infof("[%v] Creating clusterRoleBinding for globalRoleBinding %v for user %v with role %v", grbController, globalRoleBinding.Name, globalRoleBinding.UserName, desiredCRB.RoleRef.Name)
+		if _, err := l.crbClient.Create(desiredCRB); err != nil {
+			l.status.AddCondition(localConditions, condition, failedToCreateClusterRoleBinding, err)
+			return err
+		}
+		l.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
+		return nil
+	}
+
+	// RoleRef is immutable on an existing ClusterRoleBinding, so a RoleRef change can only be applied by
+	// deleting and recreating it rather than updating it in place.
+	if !reflect.DeepEqual(crb.RoleRef, desiredCRB.RoleRef) {
+		logrus.Infof("[%v] Recreating clusterRoleBinding %v for globalRoleBinding %v with role %v", grbController, crb.Name, globalRoleBinding.Name, desiredCRB.RoleRef.Name)
+		if err := l.crbClient.Delete(crb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			l.status.AddCondition(localConditions, condition, failedToUpdateClusterRoleBinding, err)
+			return fmt.Errorf("couldn't delete ClusterRoleBinding %v: %w", crb.Name, err)
+		}
+		if _, err := l.crbClient.Create(desiredCRB); err != nil {
+			l.status.AddCondition(localConditions, condition, failedToCreateClusterRoleBinding, err)
+			return fmt.Errorf("couldn't create ClusterRoleBinding %v: %w", desiredCRB.Name, err)
+		}
+		l.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
+		return nil
+	}
+
+	if !reflect.DeepEqual(crb.Subjects, desiredCRB.Subjects) {
+		crb = crb.DeepCopy()
+		crb.Subjects = desiredCRB.Subjects
+		logrus.Infof("[%v] Updating clusterRoleBinding %v for globalRoleBinding %v user %v", grbController, crb.Name, globalRoleBinding.Name, globalRoleBinding.UserName)
+		if _, err := l.crbClient.Update(crb); err != nil {
+			l.status.AddCondition(localConditions, condition, failedToUpdateClusterRoleBinding, err)
+			return fmt.Errorf("couldn't update ClusterRoleBinding %v: %w", crb.Name, err)
+		}
+	}
 
 	l.status.AddCondition(localConditions, condition, globalRoleBindingReconciled, nil)
 	return nil
+}
+
+// getCRBName returns the name of the ClusterRoleBinding backing a GlobalRoleBinding with the given name.
+func getCRBName(grbName string) string {
+	return wrangler.SafeConcatName("cattle-globalrolebinding", grbName)
 }
 
 // reconcileNamespacedRoleBindings ensures that RoleBindings exist for each namespace listed in NamespacedRules
