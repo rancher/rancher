@@ -312,7 +312,7 @@ func (a *CAPRKE2Adapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 // back to the first sorted candidate.
 func (a *CAPRKE2Adapter) FindOrElectLeader(operation string, filter Filter) (*corev1.Secret, error) {
 	secrets := a.clients.Core.Secret()
-	candidates, err := plan.NewCollector(secrets, a.controlPlane, a.controlPlane.Namespace).
+	candidates, err := plan.NewCollector(secrets, a.cluster, a.cluster.Namespace).
 		WithFilter(plan.FilterFunc(filter)).
 		WithSorter(plan.DefaultSorter()).
 		Collect()
@@ -515,10 +515,11 @@ func (a *CAPRKE2Adapter) KubeconfigPath(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/rke2.yaml"
 }
 
-// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKE2ControlPlane. CAPI's
-// Cluster name matches the RKE2ControlPlane name by convention. Mirrors CAPRAdapter.PauseCluster.
+// PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKE2ControlPlane.
+// Uses a.cluster since CAPI-native control plane objects do not necessarily have the
+// same name as the CAPI-native cluster object.
 func (a *CAPRKE2Adapter) PauseCluster(pause bool) error {
-	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.cluster.Namespace, a.cluster.Name)
 	if err != nil {
 		return err
 	}
