@@ -27,8 +27,6 @@ echo "Total system resources: $(nproc) CPUs, $(free -m | awk '/^Mem:/{print $2}'
 vmstat 5 > /tmp/c &
 CPU_PID=$!
 
-# Poll memory usage every 5 seconds and write to /tmp/m.
-# This is used to calculate min/max/avg memory usage at the end of the test run.
 ( while true; do free -m | awk '/^Mem:/{print $3}'; sleep 5; done ) > /tmp/m &
 MEM_PID=$!
 
@@ -45,7 +43,6 @@ cleanup()
     fi
 
     kill $CPU_PID $MEM_PID 2>/dev/null
-    # Print out min, max, and average CPU and RAM usage during the test run.
     awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
     awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
     rm -f /tmp/c /tmp/m
@@ -184,6 +181,8 @@ build_and_run_rancher()
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
+            awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
+            awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
             dump_rancher_logs
             echo K3s logs were:
             echo -e "-----K3S-LOG-DUMP-START-----"
@@ -203,7 +202,7 @@ build_and_run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          ./scripts/run --debug >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
