@@ -70,10 +70,10 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/aws/aws-sdk-go v1.55.8
-	github.com/aws/aws-sdk-go-v2 v1.42.1
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.26
-	github.com/aws/aws-sdk-go-v2/service/eks v1.88.1
-	github.com/aws/aws-sdk-go-v2/service/sts v1.43.5
+	github.com/aws/aws-sdk-go-v2 v1.43.0
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.30
+	github.com/aws/aws-sdk-go-v2/service/eks v1.90.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.45.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/bradleyfalzon/ghinstallation/v2 v2.16.0
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -114,15 +114,15 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/rancher/aks-operator v1.15.0
-	github.com/rancher/ali-operator v1.15.0-rc.3
+	github.com/rancher/aks-operator v1.15.1-rc.1
+	github.com/rancher/ali-operator v1.15.0-rc.4
 	github.com/rancher/apiserver v0.9.8
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.0
 	github.com/rancher/dynamiclistener v0.9.0
-	github.com/rancher/eks-operator v1.15.0
+	github.com/rancher/eks-operator v1.15.1-rc.1
 	github.com/rancher/fleet/pkg/apis v0.16.1-beta.1
-	github.com/rancher/gke-operator v1.15.0
+	github.com/rancher/gke-operator v1.15.1-rc.1
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.9
@@ -151,7 +151,7 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/text v0.40.0
-	google.golang.org/api v0.287.0
+	google.golang.org/api v0.291.0
 	google.golang.org/grpc v1.82.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -179,7 +179,7 @@ require (
 
 require (
 	cel.dev/expr v0.25.1 // indirect
-	cloud.google.com/go/auth v0.20.0 // indirect
+	cloud.google.com/go/auth v0.22.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
@@ -191,19 +191,19 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.27 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.31 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.73.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.311.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.54.7 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.31 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.32 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.75.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.317.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/iam v1.56.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.30 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.2.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.31.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.36.8 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.31 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.5.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.33.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.0 // indirect
 	github.com/aws/smithy-go v1.27.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
@@ -246,7 +246,7 @@ require (
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.17 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.19 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
@@ -292,8 +292,8 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260724162435-b2f20204f0df // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/controller-manager v0.0.0 // indirect
@@ -360,7 +360,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/hashicorp/go-version v1.6.0
 	github.com/huandu/xstrings v1.5.0 // indirect
@@ -410,9 +410,9 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.6.10 // indirect
 	go.etcd.io/etcd/client/v3 v3.6.10 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
-	go.opentelemetry.io/otel v1.43.0 // indirect
+	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
