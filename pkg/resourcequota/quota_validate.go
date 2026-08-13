@@ -89,7 +89,7 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 		failedExceeded = nil
 	}
 
-	failedNegative := quota.Mask(nssResourceList, negatives)
+	failedNegative := quota.Mask(nsResourceList, negatives)
 	if len(failedNegative) == 0 {
 		failedNegative = nil
 	}
