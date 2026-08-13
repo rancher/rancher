@@ -59,6 +59,7 @@ func TestInitializeFeatures(t *testing.T) {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
 				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 
 				return mock
 			},
@@ -69,6 +70,7 @@ func TestInitializeFeatures(t *testing.T) {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
 				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 				mock.EXPECT().Get("locked-feature", gomock.Any()).Return(nil, fmt.Errorf("not found"))
 				mock.EXPECT().Create(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
 					assert.Equal(t, "locked-feature", feature.Name)
@@ -96,6 +98,7 @@ func TestInitializeFeatures(t *testing.T) {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
 				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 				mock.EXPECT().Get("unlocked-feature", gomock.Any()).Return(nil, fmt.Errorf("not found"))
 				mock.EXPECT().Create(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
 					assert.Equal(t, "unlocked-feature", feature.Name)
@@ -122,6 +125,7 @@ func TestInitializeFeatures(t *testing.T) {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
 				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 
 				existingFeature := &v3.Feature{
 					ObjectMeta: metav1.ObjectMeta{
@@ -163,6 +167,7 @@ func TestInitializeFeatures(t *testing.T) {
 				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
 				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
 				mock.EXPECT().Delete("ui-sql-cache", &metav1.DeleteOptions{})
+				mock.EXPECT().Delete("auth", &metav1.DeleteOptions{})
 
 				existingFeature := &v3.Feature{
 					ObjectMeta: metav1.ObjectMeta{

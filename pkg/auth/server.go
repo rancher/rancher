@@ -34,24 +34,6 @@ type Server struct {
 	scaledContext *config.ScaledContext
 }
 
-func NewAlwaysAdmin() (*Server, error) {
-	return &Server{
-		Authenticator: steveauth.ToMiddleware(steveauth.AuthenticatorFunc(steveauth.AlwaysAdmin)),
-		Management: func(next http.Handler) http.Handler {
-			return next
-		},
-	}, nil
-}
-
-func NewHeaderAuth() (*Server, error) {
-	return &Server{
-		Authenticator: steveauth.ToMiddleware(steveauth.AuthenticatorFunc(steveauth.Impersonation)),
-		Management: func(next http.Handler) http.Handler {
-			return next
-		},
-	}, nil
-}
-
 func NewServer(ctx context.Context, wContext *wrangler.Context, scaledContext *config.ScaledContext, authenticator requests.Authenticator) (*Server, error) {
 	authManagement, err := newAPIManagement(ctx, scaledContext, authenticator)
 	if err != nil {
@@ -174,20 +156,16 @@ func (s *Server) Start(ctx context.Context, leader bool) error {
 
 func SetXAPICattleAuthHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if features.Auth.Enabled() {
-			user, ok := request.UserFrom(req.Context())
-			if ok {
-				ok = false
-				for _, group := range user.GetGroups() {
-					if group == "system:authenticated" {
-						ok = true
-					}
+		user, ok := request.UserFrom(req.Context())
+		if ok {
+			ok = false
+			for _, group := range user.GetGroups() {
+				if group == "system:authenticated" {
+					ok = true
 				}
 			}
-			rw.Header().Set("X-API-Cattle-Auth", fmt.Sprint(ok))
-		} else {
-			rw.Header().Set("X-API-Cattle-Auth", "none")
 		}
+		rw.Header().Set("X-API-Cattle-Auth", fmt.Sprint(ok))
 		next.ServeHTTP(rw, req)
 	})
 }
