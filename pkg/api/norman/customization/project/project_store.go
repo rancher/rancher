@@ -154,12 +154,14 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 		return err
 	}
 	if len(nsQuotaLimitMap) != len(projectQuotaLimitMap) {
-		return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, fmt.Sprintf("does not have all fields defined on a %s", quotaField))
+		return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField,
+			fmt.Sprintf("does not have all fields defined on a %s", quotaField))
 	}
 
 	for k := range projectQuotaLimitMap {
 		if _, ok := nsQuotaLimitMap[k]; !ok {
-			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField, fmt.Sprintf("misses %s defined on a %s", k, quotaField))
+			return httperror.NewFieldAPIError(httperror.MissingRequired, namespaceQuotaField,
+				fmt.Sprintf("misses %s defined on a %s", k, quotaField))
 		}
 	}
 	return s.isQuotaFit(apiContext, nsQuotaLimit, projectQuotaLimit, id)
@@ -175,7 +177,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if !isFit {
 		if negatives != nil {
 			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, namespaceQuotaField,
-				fmt.Sprintf("has negative inputs on fields: %s", utils.FormatResourceList(negatives)))
+				fmt.Sprintf("is negative on fields: %s", utils.FormatResourceList(negatives)))
 		}
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
 			fmt.Sprintf("exceeds limits on fields: %s", utils.FormatResourceList(exceeded)))
@@ -241,7 +243,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if !isFit {
 		if negatives != nil {
 			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, quotaField,
-				fmt.Sprintf("has negative inputs on fields: %s", utils.FormatResourceList(negatives)))
+				fmt.Sprintf("is negative on fields: %s", utils.FormatResourceList(negatives)))
 		}
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField,
 			fmt.Sprintf("is below the used limit on fields: %s", utils.FormatResourceList(exceeded)))
@@ -280,7 +282,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 
 	if negatives != nil {
 		return httperror.NewFieldAPIError(httperror.MinLimitExceeded, namespaceQuotaField,
-			fmt.Sprintf("has negative inputs on fields %s when applied to all namespaces in a project",
+			fmt.Sprintf("is negative on fields %s when applied to all namespaces in a project",
 				utils.FormatResourceList(negatives)))
 	}
 	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,

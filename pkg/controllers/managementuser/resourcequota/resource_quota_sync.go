@@ -442,7 +442,7 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 			if msg != "" {
 				msg = msg + "; "
 			}
-			msg = msg + fmt.Sprintf("Resource quota [%v] are based on negative inputs", utils.FormatResourceList(negatives))
+			msg = msg + fmt.Sprintf("Negative resource quota [%v]", utils.FormatResourceList(negatives))
 		}
 	}
 

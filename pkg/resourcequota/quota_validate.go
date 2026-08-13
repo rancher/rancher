@@ -16,6 +16,7 @@ import (
 const ExtendedKey = "extended"
 
 var (
+	zeroQuantity            = resource.MustParse("0")
 	projectLockCache        = cache.NewLRUExpireCache(1000)
 	resourceQuotaConversion = map[string]string{
 		"replicationControllers": "replicationcontrollers",
@@ -43,47 +44,50 @@ func GetProjectLock(projectID string) *sync.Mutex {
 
 // IsQuotaFit puts the various limits (of the namespace itself, and its
 // siblings) together and checks if they still fit into the project. It reports
-// the names of all found bad resources. A resource is flagged as bad either
-// because its sum goes beyond the project limit, or because it had bogus
-// (negative values) among the summed inputs.
+// the names of all bad resources. A resource is flagged as bad either because
+// its sum goes beyond the project limit (oversubscription), or because it is
+// negative.  Negative values in the data taken from the sibling namespaces are
+// treated as zero, as these are blocked anyway.
 func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, api.ResourceList, error) {
 	nssResourceList := api.ResourceList{}
 	nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("checking quota fit: %w", err)
 	}
-	negativeResources := quota.IsNegative(nsResourceList)
-	nssResourceList = quota.Add(nssResourceList, nsResourceList)
+	negatives := quota.IsNegative(nsResourceList)
+	nssResourceList = quota.Add(nssResourceList, ZeroOutResourceList(nsResourceList, negatives))
 
+	// Detect over-subscription
 	for _, nsLimit := range nsLimits {
 		nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 		if err != nil {
 			return false, nil, nil, fmt.Errorf("checking namespace limits: %w", err)
 		}
-		negativeResources = append(negativeResources, quota.IsNegative(nsResourceList)...)
-		nssResourceList = quota.Add(nssResourceList, nsResourceList)
+		// zero any negative limits coming from the sibling namespace
+		nssResourceList = quota.Add(nssResourceList, ZeroOutResourceList(nsResourceList, quota.IsNegative(nsResourceList)))
 	}
-
 	projectResourceList, err := ConvertLimitToResourceList(projectLimit)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("checking project limits: %w", err)
 	}
-
-	// Start the set of bad resources with the oversubscribed resources ...
 	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
 
-	// Include resources with negative inputs among the bad resources, their sums are bogus.
-	badResources := append(exceeded, negativeResources...)
+	// Compute full set of bad resources for current namespace, this is the
+	// union of exceeded and negatives.
+	badResources := append(exceeded, negatives...)
 	badResources = uniqueResourceNames(badResources)
+
 	if len(badResources) == 0 {
 		return true, nil, nil, nil
 	}
-	failedExceeded := quota.Mask(nssResourceList, exceeded)
-	failedNegative := quota.Mask(nssResourceList, negativeResources)
 
+	// We have problems. Fail the fit, and report the affected resources
+	failedExceeded := quota.Mask(nssResourceList, exceeded)
 	if len(failedExceeded) == 0 {
 		failedExceeded = nil
 	}
+
+	failedNegative := quota.Mask(nssResourceList, negatives)
 	if len(failedNegative) == 0 {
 		failedNegative = nil
 	}
@@ -145,4 +149,22 @@ func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList
 		toReturn[resourceName] = resourceQuantity
 	}
 	return toReturn, nil
+}
+
+// ZeroOutResourceList takes a resource list and a list of bad resources, and
+// returns a new list with the bad resources set to zero.
+func ZeroOutResourceList(limit api.ResourceList, badResources []api.ResourceName) api.ResourceList {
+	// fast path, nothing zero out
+	if len(badResources) == 0 {
+		return limit
+	}
+	// copy input, then zero the bad parts
+	zeroed := api.ResourceList{}
+	for k, v := range limit {
+		zeroed[k] = v
+	}
+	for _, k := range badResources {
+		zeroed[k] = zeroQuantity
+	}
+	return zeroed
 }
