@@ -15,7 +15,7 @@
     "go.qase.io/client"
   ],
   "prHourlyLimit": 6,
-  "prConcurrentLimit": 10,
+  "prConcurrentLimit": 20,
   "packageRules": [
     {
       "matchBaseBranches": [
