@@ -25,6 +25,38 @@ func TestAgentEnvVars(t *testing.T) {
 			},
 		},
 	}
+	cWithLineBreakSuffixes := &v3.Cluster{
+		Spec: v3.ClusterSpec{
+			ClusterSpecBase: v3.ClusterSpecBase{
+				AgentEnvVars: []corev1.EnvVar{
+					{
+						Name:  "HTTPS_PROXY",
+						Value: "https://0.0.0.0\n",
+					},
+					{
+						Name:  "HTTP_PROXY",
+						Value: "http://0.0.0.0\r\n",
+					},
+				},
+			},
+		},
+	}
+	cWithOnlyLineBreaks := &v3.Cluster{
+		Spec: v3.ClusterSpec{
+			ClusterSpecBase: v3.ClusterSpecBase{
+				AgentEnvVars: []corev1.EnvVar{
+					{
+						Name:  "ONLY_BREAKS",
+						Value: "\r\n",
+					},
+					{
+						Name:  "HTTP_PROXY",
+						Value: "http://0.0.0.0",
+					},
+				},
+			},
+		},
+	}
 	tests := []struct {
 		name     string
 		cluster  *v3.Cluster
@@ -60,6 +92,30 @@ func TestAgentEnvVars(t *testing.T) {
 			cluster:  c,
 			envType:  PowerShell,
 			expected: "$env:HTTPS_PROXY=\"https://0.0.0.0\"; $env:HTTP_PROXY=\"http://0.0.0.0\";",
+		},
+		{
+			name:     "Envvars should strip trailing line break suffixes for Linux",
+			cluster:  cWithLineBreakSuffixes,
+			envType:  Linux,
+			expected: "HTTPS_PROXY=\"https://0.0.0.0\" HTTP_PROXY=\"http://0.0.0.0\"",
+		},
+		{
+			name:     "Envvars should strip trailing line break suffixes for Docker",
+			cluster:  cWithLineBreakSuffixes,
+			envType:  Docker,
+			expected: "-e \"HTTPS_PROXY=https://0.0.0.0\" -e \"HTTP_PROXY=http://0.0.0.0\"",
+		},
+		{
+			name:     "Envvars should strip trailing line break suffixes for PowerShell",
+			cluster:  cWithLineBreakSuffixes,
+			envType:  PowerShell,
+			expected: "$env:HTTPS_PROXY=\"https://0.0.0.0\"; $env:HTTP_PROXY=\"http://0.0.0.0\";",
+		},
+		{
+			name:     "Envvars with only line breaks should be skipped",
+			cluster:  cWithOnlyLineBreaks,
+			envType:  Linux,
+			expected: "HTTP_PROXY=\"http://0.0.0.0\"",
 		},
 	}
 	for _, tt := range tests {
