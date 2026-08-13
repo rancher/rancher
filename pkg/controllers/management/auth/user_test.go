@@ -110,9 +110,12 @@ func TestCreate(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockUserManager := userMocks.NewMockManager(ctrl)
+	usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+	impClientMock := wranglerfake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 
 	ul := &userLifecycle{
 		userManager: mockUserManager,
+		users:       usersMock,
 	}
 
 	tests := []struct {
@@ -131,7 +134,13 @@ func TestCreate(t *testing.T) {
 				},
 				PrincipalIDs: []string{},
 			},
-			mockSetup: func() {},
+			mockSetup: func() {
+				usersMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil)
+				impClientMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.Contains(t, u.PrincipalIDs, "local://testuser")
+					return u, nil
+				})
+			},
 			expectedUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testuser",
@@ -153,6 +162,11 @@ func TestCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(nil)
+				usersMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil)
+				impClientMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					assert.Contains(t, u.PrincipalIDs, "local://testuser")
+					return u, nil
+				})
 			},
 			expectedUser: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
@@ -174,6 +188,45 @@ func TestCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(fmt.Errorf("role binding error"))
+				usersMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil)
+				impClientMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+					return u, nil
+				})
+			},
+			expectedUser:  nil,
+			expectedError: true,
+		},
+		{
+			name: "User with local principal ID is not updated",
+			inputUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{},
+				},
+				PrincipalIDs: []string{"local://testuser"},
+			},
+			mockSetup: func() {},
+			expectedUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{},
+				},
+				PrincipalIDs: []string{"local://testuser"},
+			},
+			expectedError: false,
+		},
+		{
+			name: "Error updating principal IDs",
+			inputUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{},
+				},
+				PrincipalIDs: []string{},
+			},
+			mockSetup: func() {
+				usersMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil)
+				impClientMock.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update error"))
 			},
 			expectedUser:  nil,
 			expectedError: true,

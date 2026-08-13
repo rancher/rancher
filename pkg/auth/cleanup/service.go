@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	ranchercontrollers "github.com/rancher/rancher/pkg/controllers"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -239,7 +240,11 @@ func (s *Service) resetLocalUser(user *v3.User) error {
 	}
 
 	user.PrincipalIDs = []string{localID}
-	_, err := s.userClient.Update(user)
+	impClient, err := s.userClient.WithImpersonation(ranchercontrollers.WebhookImpersonation())
+	if err != nil {
+		return fmt.Errorf("impersonating webhook to reset user principals: %w", err)
+	}
+	_, err = impClient.Update(user)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

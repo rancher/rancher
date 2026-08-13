@@ -148,6 +148,25 @@ func hasLocalPrincipalID(user *v3.User) bool {
 func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	if !hasLocalPrincipalID(user) {
 		user.PrincipalIDs = append(user.PrincipalIDs, "local://"+user.Name)
+
+		// The webhook only allows the principal IDs to be changed by itself, so the
+		// update has to be made on its behalf. This handler runs under norman's object
+		// lifecycle adapter, which issues its own update, without impersonation, once
+		// the handler returns. The updated user therefore replaces the one passed in so
+		// that update carries the principal IDs as persisted here and the webhook lets
+		// it through because they are unchanged. In v2.15 and later the controller is a
+		// wrangler handler that owns its writes, so it persists the principal IDs along
+		// with the rest of its changes in a single impersonated update.
+		impClient, err := l.users.WithImpersonation(controllers.WebhookImpersonation())
+		if err != nil {
+			return nil, fmt.Errorf("impersonating webhook to update user: %w", err)
+		}
+
+		updated, err := impClient.Update(user)
+		if err != nil {
+			return nil, fmt.Errorf("updating principal IDs of user %s: %w", user.Name, err)
+		}
+		user = updated
 	}
 
 	// creatorIDAnn indicates it was created through the API, create the new
