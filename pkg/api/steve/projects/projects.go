@@ -82,25 +82,28 @@ func (s *projectServer) newAPIHandler() http.Handler {
 }
 
 func (s *projectServer) middleware() func(http.Handler) http.Handler {
-	server := s.newAPIHandler()
-	server = prefix(server)
+	server := prefix(s.newAPIHandler())
 
 	return func(next http.Handler) http.Handler {
-		router := http.NewServeMux()
-		router.HandleFunc("/v1/management.cattle.io.clusters/{namespace}", func(w http.ResponseWriter, r *http.Request) {
-			link := r.URL.Query().Get("link")
-			if link == "projects" || link == "project" {
-				server.ServeHTTP(w, r)
-			} else {
-				next.ServeHTTP(w, r)
-			}
-		})
-		router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}", server)
-		router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}", server)
-		router.Handle("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}", server)
-		router.Handle("/", next)
-		return router
+		return NewProjectsMux(server, next)
 	}
+}
+
+func NewProjectsMux(server, next http.Handler) *http.ServeMux {
+	router := http.NewServeMux()
+	router.HandleFunc("/v1/management.cattle.io.clusters/{namespace}", func(w http.ResponseWriter, r *http.Request) {
+		link := r.URL.Query().Get("link")
+		if link == "projects" || link == "project" {
+			server.ServeHTTP(w, r)
+		} else {
+			next.ServeHTTP(w, r)
+		}
+	})
+	router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}", server)
+	router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}", server)
+	router.Handle("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}", server)
+	router.Handle("/", next)
+	return router
 }
 
 func prefix(next http.Handler) http.Handler {

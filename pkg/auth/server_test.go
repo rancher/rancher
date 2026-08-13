@@ -19,14 +19,14 @@ func markerHandler(name string) http.Handler {
 	})
 }
 
-func testRoutes() authRoutes {
-	return authRoutes{
-		limit:    func(next http.Handler) http.Handler { return next },
-		saml:     markerHandler("saml"),
-		v1Public: markerHandler("v1Public"),
-		v3:       markerHandler("v3"),
-		logout:   markerHandler("logout"),
-		next:     markerHandler("next"),
+func testRoutes() AuthRoutes {
+	return AuthRoutes{
+		Limit:    func(next http.Handler) http.Handler { return next },
+		SAML:     markerHandler("saml"),
+		V1Public: markerHandler("v1Public"),
+		V3:       markerHandler("v3"),
+		Logout:   markerHandler("logout"),
+		Next:     markerHandler("next"),
 	}
 }
 
@@ -115,7 +115,7 @@ func TestNewRootMux(t *testing.T) {
 			}
 
 			rec := httptest.NewRecorder()
-			newRootMux(testRoutes()).ServeHTTP(rec, req)
+			NewRootMux(testRoutes()).ServeHTTP(rec, req)
 
 			require.Equal(t, test.wantCode, rec.Code)
 			if test.wantBody != "" {
@@ -131,7 +131,7 @@ func TestNewRootMuxOptionalRoutes(t *testing.T) {
 	t.Run("v3 public and scim fall through when not configured", func(t *testing.T) {
 		t.Parallel()
 
-		mux := newRootMux(testRoutes())
+		mux := NewRootMux(testRoutes())
 
 		for _, path := range []string{"/v3-public/authProviders", "/v1-scim/v2/Users"} {
 			rec := httptest.NewRecorder()
@@ -145,9 +145,9 @@ func TestNewRootMuxOptionalRoutes(t *testing.T) {
 		t.Parallel()
 
 		routes := testRoutes()
-		routes.v3Public = markerHandler("v3Public")
-		routes.scim = markerHandler("scim")
-		mux := newRootMux(routes)
+		routes.V3Public = markerHandler("v3Public")
+		routes.SCIM = markerHandler("scim")
+		mux := NewRootMux(routes)
 
 		for path, want := range map[string]string{
 			"/v3-public/authProviders": "v3Public",
