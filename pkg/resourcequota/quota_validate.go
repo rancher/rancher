@@ -44,10 +44,10 @@ func GetProjectLock(projectID string) *sync.Mutex {
 
 // IsQuotaFit puts the various limits (of the namespace itself, and its
 // siblings) together and checks if they still fit into the project. It reports
-// the names of all bad resources. A resource is flagged as bad either because
-// its sum goes beyond the project limit (oversubscription), or because it is
-// negative.  Negative values in the data taken from the sibling namespaces are
-// treated as zero, as these are blocked anyway.
+// the names of all bad resources, separate by reason. A resource is flagged as
+// bad either because its sum goes beyond the project limit (oversubscription),
+// or because the resource is negative. Negative values in the data taken from
+// the sibling namespaces are treated as zero, as these are blocked anyway.
 func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, api.ResourceList, error) {
 	nssResourceList := api.ResourceList{}
 	nsResourceList, err := ConvertLimitToResourceList(nsLimit)
@@ -137,7 +137,7 @@ func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList
 // ZeroOutResourceList takes a resource list and a list of bad resources, and
 // returns a new list with the bad resources set to zero.
 func ZeroOutResourceList(limit api.ResourceList, badResources []api.ResourceName) api.ResourceList {
-	// fast path, nothing zero out
+	// fast path, nothing to zero out
 	if len(badResources) == 0 {
 		return limit
 	}
