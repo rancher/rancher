@@ -72,9 +72,11 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 	}
 	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
 
-	// Compute full set of bad resources for current namespace, this is the
-	// union of exceeded and negatives.
-	badResources := append(exceeded, negatives...)
+	// Compute the full set of bad resources for the current namespace as
+	// the union of exceeded and negatives.
+	badResources := []api.ResourceName{}
+	badResources = append(badResources, exceeded...)
+	badResources = append(badResources, negatives...)
 	badResources = uniqueResourceNames(badResources)
 
 	if len(badResources) == 0 {
