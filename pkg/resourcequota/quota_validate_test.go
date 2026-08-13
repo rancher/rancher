@@ -248,7 +248,8 @@ func TestIsQuotaFit(t *testing.T) {
 
 			assert.Equal(t, spec.wantFit, fit)
 			if spec.wantErr != nil {
-				assert.Error(t, spec.wantErr, err)
+				assert.Error(t, err)
+				assert.Equal(t, spec.wantErr, err)
 			} else {
 				assert.NoError(t, err)
 			}
