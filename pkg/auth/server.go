@@ -136,7 +136,17 @@ func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext, aut
 	root.PathPrefix("/v3/user").Handler(otherAPIs)
 	root.PathPrefix("/v3/schema").Handler(otherAPIs)
 	root.PathPrefix("/v3/subscribe").Handler(otherAPIs)
+	// The multi-cluster management router serves this route too, but it only
+	// runs when MCM is enabled. Registering it here keeps logout working when
+	// MCM is disabled, as in standalone Harvester.
+	root.NewRoute().MatcherFunc(onlyPost).Path("/v1/logout").Handler(logout)
 	return root, nil
+}
+
+// onlyPost will match only POST but will not return a 405 like route.Methods
+// and instead just not match, so other methods fall through to the next handler.
+func onlyPost(req *http.Request, m *mux.RouteMatch) bool {
+	return req.Method == http.MethodPost
 }
 
 func (s *Server) OnLeader(ctx context.Context) error {
