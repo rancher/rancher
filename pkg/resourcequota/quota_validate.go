@@ -72,14 +72,8 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 	}
 	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
 
-	// Compute the full set of bad resources for the current namespace as
-	// the union of exceeded and negatives.
-	badResources := []api.ResourceName{}
-	badResources = append(badResources, exceeded...)
-	badResources = append(badResources, negatives...)
-	badResources = uniqueResourceNames(badResources)
-
-	if len(badResources) == 0 {
+	// Without issues abort early
+	if len(exceeded) == 0 && len(negatives) == 0 {
 		return true, nil, nil, nil
 	}
 
@@ -95,19 +89,6 @@ func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLi
 	}
 
 	return false, failedExceeded, failedNegative, nil
-}
-
-func uniqueResourceNames(resources []api.ResourceName) []api.ResourceName {
-	seen := map[api.ResourceName]struct{}{}
-	unique := make([]api.ResourceName, 0, len(resources))
-	for _, resource := range resources {
-		if _, ok := seen[resource]; ok {
-			continue
-		}
-		seen[resource] = struct{}{}
-		unique = append(unique, resource)
-	}
-	return unique
 }
 
 func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList, error) {
