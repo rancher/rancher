@@ -297,7 +297,11 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, beacon *planv1alph
 	if secret.Labels == nil {
 		secret.Labels = map[string]string{}
 	}
-	secret.Labels[planv1alpha1.BeaconOwnerLabelKey] = beacon.Status.Owner
+	// The beacon owner is recorded so the webhook can reject writes from a controller which no longer
+	// holds the beacon. There is nothing to record when the plan is assigned without one.
+	if beacon != nil {
+		secret.Labels[planv1alpha1.BeaconOwnerLabelKey] = beacon.Status.Owner
+	}
 
 	result := &PlanStatus{
 		Secret: secret,

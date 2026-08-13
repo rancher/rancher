@@ -73,7 +73,8 @@ func (s *ETCDSnapshotSaveStatus) SetStep(step ETCDSnapshotSaveStep) {
 // +kubebuilder:resource:path=etcdsnapshotsaves,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
-// +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
+// +kubebuilder:metadata:annotations={"operation.cattle.io/preemption-priority=0"}
+// +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Step",type=string,JSONPath=".status.step"
