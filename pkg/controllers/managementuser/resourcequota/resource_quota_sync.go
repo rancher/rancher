@@ -393,9 +393,8 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 	if err != nil {
 		return false, ns, nil, nil, err
 	}
-
 	if projectLimit == nil {
-		return true, ns, nil, nil, err
+		return true, ns, nil, nil, nil
 	}
 
 	updatedNs := ns.DeepCopy()
