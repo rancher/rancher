@@ -85,7 +85,9 @@ func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string,
 type fakeDynamic struct {
 	gets       map[string]runtime.Object
 	enqueued   []string
+	updated    []runtime.Object
 	getErr     error
+	updateErr  error
 	enqueueErr error
 }
 
@@ -97,6 +99,14 @@ func (f *fakeDynamic) Get(gvk schema.GroupVersionKind, ns, name string) (runtime
 		return obj, nil
 	}
 	return nil, apierrors.NewNotFound(schema.GroupResource{}, name)
+}
+
+func (f *fakeDynamic) Update(obj runtime.Object) (runtime.Object, error) {
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
+	f.updated = append(f.updated, obj)
+	return obj, nil
 }
 
 func (f *fakeDynamic) Enqueue(gvk schema.GroupVersionKind, ns, name string) error {
@@ -127,9 +137,15 @@ func newScope(op *opv1alpha1.ETCDSnapshotSave, beacon *planv1alpha1.Beacon, adap
 	cluster.SetNamespace("fleet-default")
 	cluster.SetAPIVersion("provisioning.cattle.io/v1")
 	cluster.SetKind("Cluster")
+	operation, err := opv1alpha1.ToOperation(op)
+	if err != nil {
+		panic(err)
+	}
 	return &scope{
 		ownerKey:   planapi.ControllerOwnerKey(op, ControllerOwnerKey),
 		op:         op,
+		operation:  operation,
+		started:    op.Status.Step != "",
 		beacon:     beacon,
 		namespace:  "fleet-default",
 		clusterObj: cluster,

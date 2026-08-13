@@ -165,6 +165,11 @@ type handler struct {
 
 	dynamic *dynamic.Controller
 
+	// coordinator implements the behaviour shared by every kind of operation: preempting the
+	// operations this one may cancel, and marking a cluster as requiring a restore. A nil coordinator
+	// is inert.
+	coordinator *ops.Coordinator
+
 	clients *wrangler.CAPIContext
 }
 
@@ -178,6 +183,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		secretCache:          clients.Core.Secret().Cache(),
 		dynamic:              clients.Dynamic,
 		store:                plan.NewStore(clients.Core.Secret()),
+		coordinator:          ops.NewCoordinator(clients, clients.Dynamic),
 		clients:              clients,
 	}
 
@@ -221,7 +227,9 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		return status, nil
 	}
 
-	if ops.IsPaused(&op.Spec.OperationSpec) {
+	// Cancellation takes precedence over pausing: a paused operation still holds the beacon, so it
+	// must be able to unwind.
+	if ops.IsPaused(&op.Spec.OperationSpec) && !op.Spec.Cancel {
 		logrus.Debugf("[etcdsnapshotrestore] %s/%s: skipping paused operation", op.Namespace, op.Name)
 		return status, nil
 	}
@@ -289,13 +297,27 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		return status, err
 	}
 
+	operation, err := opv1alpha1.ToOperation(op)
+	if err != nil {
+		return status, err
+	}
+
 	s := &scope{
 		ownerKey:   plan.ControllerOwnerKey(op, ControllerOwnerKey),
 		op:         op,
+		operation:  operation,
+		started:    op.Status.Step != "",
 		beacon:     beacon,
 		namespace:  namespace,
 		clusterObj: clusterObj,
 		adapter:    a,
+	}
+
+	// A user, or an operation permitted to preempt this one, may request cancellation at any point
+	// before the operation reaches a terminal phase.
+	if op.Spec.Cancel && !status.Phase.IsTerminal() {
+		logrus.Infof("[etcdsnapshotrestore] %s/%s: cancellation requested, unwinding from phase %s", op.Namespace, op.Name, status.Phase)
+		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
 	}
 
 	switch status.Phase {
@@ -325,6 +347,14 @@ type scope struct {
 
 	op        *opv1alpha1.ETCDSnapshotRestore
 	namespace string
+
+	// operation is the kind-agnostic view of op, for the logic which is shared by every kind of
+	// operation.
+	operation *opv1alpha1.Operation
+
+	// started records whether the operation ever reached the InProgress phase, and so whether
+	// cancelling it may have left the cluster part-way through a change.
+	started bool
 
 	beacon     *planv1alpha1.Beacon
 	clusterObj *unstructured.Unstructured
@@ -447,9 +477,16 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 			return status, err
 		}
 		if acquired == nil {
+			// Another controller holds the beacon. Cancel whichever of the operations in flight this
+			// one is permitted to preempt, and keep waiting for the rest.
+			blocking, err := h.coordinator.Preempt(s.operation)
+			if err != nil {
+				return status, err
+			}
+
 			opv1alpha1.PendingCondition.True(&status)
 			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
-			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+			opv1alpha1.PendingCondition.Message(&status, ops.WaitingForBeaconMessage(blocking))
 			return status, nil
 		}
 		s.beacon = acquired
@@ -645,7 +682,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			},
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, s.beacon, 1, -1)
 		if err != nil {
 			return status, err
 		}
@@ -781,7 +818,7 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 			OneTimeInstructions: instructions,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, s.beacon, 1, -1)
 		if err != nil {
 			return status, err
 		}
@@ -957,7 +994,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		},
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(secret, nodePlan, s.beacon, 1, -1)
 	if err != nil {
 		return status, err
 	}
@@ -1156,7 +1193,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			},
 		}
 
-		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, s.beacon, 1, -1)
 		if err != nil {
 			return status, err
 		}
@@ -1190,7 +1227,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		})
 	}
 
-	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, s.beacon, 1, -1)
 	if err != nil {
 		return status, err
 	}
@@ -1346,7 +1383,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 			}
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, s.beacon, 1, -1)
 		if err != nil {
 			return status, err
 		}
@@ -1517,7 +1554,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	planStatus, err := h.store.AssignPlan(initSecret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(initSecret, nodePlan, s.beacon, 1, -1)
 	if err != nil {
 		return status, err
 	}
@@ -1566,6 +1603,23 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
 		return status, nil
+	}
+
+	// An operation which canceled itself - a failed preflight check, say - has already recorded why,
+	// and never mutated the cluster. Only a requested cancellation records who asked and may leave the
+	// cluster requiring a restore.
+	if s.op.Spec.Cancel {
+		restoreRequired := false
+		if s.started {
+			var err error
+			if restoreRequired, err = h.coordinator.OnCanceled(s.operation); err != nil {
+				return status, err
+			}
+		}
+
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, ops.CanceledReason(s.op))
+		opv1alpha1.CanceledCondition.Message(&status, ops.CanceledMessage(s.op, s.op.Spec.ClusterRef, restoreRequired))
 	}
 
 	// Owner and mid-chain delegates both go through ReleaseBeacon: it clears the beacon fully
@@ -1621,6 +1675,12 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 		return status, nil
 	}
 
+	// A kind of operation whose CustomResourceDefinition declares that it returns the cluster to a
+	// known-good state clears the restore-required mark left by any operation canceled earlier.
+	if err := h.coordinator.OnSucceeded(s.operation); err != nil {
+		return status, err
+	}
+
 	// Owner does the full teardown + enqueues the cluster; a mid-chain delegate just removes
 	// itself. Only owner cleanup implies downstream reconciliation, so only owner enqueues.
 	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
@@ -1673,6 +1733,16 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnap
 		opv1alpha1.SucceededCondition.False(&status)
 		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.NotSuccessfulReason)
 		opv1alpha1.SucceededCondition.Message(&status, "Operation failed")
+	} else if status.Phase == opv1alpha1.OperationPhaseCanceled {
+		opv1alpha1.PendingCondition.False(&status)
+		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
+		opv1alpha1.PendingCondition.Message(&status, "Operation canceled")
+		opv1alpha1.InProgressCondition.False(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
+		opv1alpha1.InProgressCondition.Message(&status, "Operation canceled")
+		opv1alpha1.SucceededCondition.False(&status)
+		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.NotSuccessfulReason)
+		opv1alpha1.SucceededCondition.Message(&status, "Operation canceled")
 	}
 
 	return status

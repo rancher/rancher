@@ -5,6 +5,7 @@ import (
 
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/wrangler/v3/pkg/condition"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -80,7 +81,23 @@ const (
 	WaitingForEncryptionKeyRotationReason = "WaitingForEncryptionKeyRotation"
 
 	PreflightCheckFailedReason = "PreflightCheckFailed"
+
+	// CanceledByUserReason surfaces when an operation was canceled because spec.cancel was set.
+	CanceledByUserReason = "CanceledByUser"
+
+	// PreemptedReason surfaces when an operation was canceled because another operation preempted it.
+	PreemptedReason = "Preempted"
 )
+
+// RestoreRequiredMessage returns the message recorded on a canceled operation whose cluster was
+// marked as requiring a restore.
+func RestoreRequiredMessage(cluster *corev1.ObjectReference) string {
+	if cluster == nil {
+		return ""
+	}
+
+	return "cluster " + cluster.Name + " requires a restore following cancellation"
+}
 
 func WaitingForDelegateMessage(beacon *planv1alpha1.Beacon) string {
 	if beacon == nil {
