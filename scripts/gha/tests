@@ -79,23 +79,11 @@ curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYS
 
 dump_rancher_logs()
 {
-  echo Dumping Rancher + K3s Container Logs
-  echo -e "-----RANCHER-LOG-DUMP-START-----"
+  echo "Dumping Rancher + K3s container logs to /tmp/rancher.log and /tmp/k3s.log"
   docker logs rancher-server &> /tmp/rancher.log
-  if [ -s /tmp/rancher.log ]; then
-    cat /tmp/rancher.log | gzip | base64 -w 0
-  else
-    echo "------EMPTY------"
-  fi
-  echo -e "\n-----RANCHER-LOG-DUMP-END-----"
   docker cp rancher-server:/var/lib/rancher/k3s.log /tmp/k3s.log
-  echo -e "-----K3S-LOG-DUMP-START-----"
-  if [ -s /tmp/k3s.log ]; then
-    cat /tmp/k3s.log | gzip | base64 -w 0
-  else
-    echo "------EMPTY------"
-  fi
-  echo -e "\n-----K3S-LOG-DUMP-END-----"
+  # Written while running under sudo; make readable so the CI workflow can upload them as an artifact.
+  chmod 644 /tmp/rancher.log /tmp/k3s.log 2>/dev/null || true
 }
 
 export -f dump_rancher_logs
