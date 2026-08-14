@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
@@ -462,6 +463,7 @@ func (t *Store) Get(
 	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
 	token.Status.BearerToken = ""
+	token.Status.Hash = ""
 
 	return token, nil
 }
@@ -966,6 +968,7 @@ func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, option
 
 		// Filtering for users is done already, see above where the options are set up and/or merged.
 		token.Status.Current = token.Name == authTokenID
+		token.Status.Hash = ""
 		tokens = append(tokens, *token)
 	}
 
@@ -1039,6 +1042,10 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
 
+	// The stored hash was carried through toSecret above; never return it to
+	// the client.
+	token.Status.Hash = ""
+
 	// Abort, user does not wish to actually change anything.
 	if dryRun {
 		return token, nil
@@ -1057,6 +1064,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	newToken.Status.Current = newToken.Name == authTokenID
 	newToken.Status.Value = ""
+	newToken.Status.Hash = ""
 	return newToken, nil
 }
 
@@ -1238,6 +1246,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					// ListOptionMerge above) takes care of only
 					// asking for owned tokens
 					token.Status.Current = token.Name == authTokenID
+					token.Status.Hash = ""
 					obj = token
 				default: // watch.Error
 					obj = event.Object
@@ -1551,38 +1560,24 @@ func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptio
 		return *options, nil
 	}
 
-	// for non-admins we additionally filter the result for their own tokens
-	userIDSelector := labels.Set(map[string]string{
-		UserIDLabel: userName,
-	})
-	if options == nil || *options == empty {
-		// No external filter to contend with, just set the internal filter.
-		localOptions = metav1.ListOptions{
-			LabelSelector: userIDSelector.AsSelector().String(),
-		}
-	} else {
-		// We have to contend with an external filter, and merge ours into it.
+	// For non-admins the effective selector always constrains the owner label
+	// to the requesting user. Parse the caller's selector (if any) and AND the
+	// owner requirement onto it. A selector that already pins the owner label to
+	// a different value then holds two conflicting equality requirements and is
+	// unsatisfiable, so it matches nothing.
+	if options != nil {
 		localOptions = *options
-		callerSelector, err := labels.ConvertSelectorToLabelsMap(localOptions.LabelSelector)
-		if err != nil {
-			return localOptions, err
-		}
-		if callerSelector.Has(UserIDLabel) {
-			// The external filter does filter for a user, possible conflict.
-			if callerSelector[UserIDLabel] != userName {
-				// It asks for a user other than the current.
-				// We can bail now, with an empty result, as
-				// nothing can match.
-				return localOptions, nil
-			}
-			// It asks for the current user, same as the internal
-			// filter would do.  We can pass the options as is.
-		} else {
-			// The external filter has nothing about the user.
-			// We can simply add the internal filter.
-			localOptions.LabelSelector = labels.Merge(callerSelector, userIDSelector).AsSelector().String()
-		}
 	}
+
+	selector, err := labels.Parse(localOptions.LabelSelector)
+	if err != nil {
+		return empty, err
+	}
+	ownerReq, err := labels.NewRequirement(UserIDLabel, selection.Equals, []string{userName})
+	if err != nil {
+		return empty, err
+	}
+	localOptions.LabelSelector = selector.Add(*ownerReq).String()
 
 	return localOptions, nil
 }
