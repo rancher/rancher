@@ -163,7 +163,8 @@ echo "resolved selected scopes: [$selected]" >&2
 # scopes and rename the friendly keys to the ones the workflow reads:
 #   dist -> V2PROV_TEST_DIST | regex -> V2PROV_TEST_RUN_REGEX | features -> CATTLE_FEATURES
 # Each test lives in exactly one scope (see the YAML invariants), so no de-duplication
-# is needed. An empty `selected` will return {"include":[]}.
+# is needed. An empty `selected` will return {"include":[]}. This block also controls the
+# default configuration of the underlying ec2 runners, unless overridden by a specific test.
 yq -o=json '.' "$CONFIG" | jq -c --arg selected "$selected" '
   {
     include: [
@@ -172,6 +173,7 @@ yq -o=json '.' "$CONFIG" | jq -c --arg selected "$selected" '
       | { V2PROV_TEST_DIST: .dist, V2PROV_TEST_RUN_REGEX: .regex }
         + (if .features then { CATTLE_FEATURES: .features } else {} end)
         + (if .cpus then { V2PROV_TEST_CPUS: .cpus } else { V2PROV_TEST_CPUS: 16 } end)
+        + (if .disk then { V2PROV_TEST_DISK: .disk } else {V2PROV_TEST_DISK: "large" } end)
     ]
   }
 '

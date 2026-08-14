@@ -115,6 +115,7 @@ scopes:
       - path: "^package/Dockerfile"
         substrings:
           - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
+          - 'CATTLE_K3S_VERSION'
     tests:
       - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
       - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$'}
@@ -150,8 +151,8 @@ scopes:
       - '^pkg/provisioningv2/prebootstrap/'
       - '^tests/v2prov/tests/prebootstrap/'
     tests:
-      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8, disk: "" }
+      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8, disk: "" }
 
 #  An example of a scope that should only run when ALL=1, or the 'full' scope is triggered
 #  nightly:
