@@ -151,6 +151,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3").Handler(managementAPI)
+	// The auth server registers this route too, and serves it when MCM is
+	// disabled. Keep the two in sync.
 	authed.Methods(http.MethodPost).Path("/v1/logout").Handler(logout)
 
 	// Metrics authenticated route
