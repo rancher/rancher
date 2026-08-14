@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/controllers"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -172,7 +173,11 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 	if !slice.ContainsString(user.PrincipalIDs, principal.Name) {
 		user.PrincipalIDs = append(user.PrincipalIDs, principal.Name)
 		logrus.Infof("Updating user %v. Adding principal", user.Name)
-		return m.users.Update(user)
+		impClient, err := m.users.WithImpersonation(controllers.WebhookImpersonation())
+		if err != nil {
+			return nil, fmt.Errorf("impersonating webhook to update principal: %w", err)
+		}
+		return impClient.Update(user)
 	}
 	return user, nil
 }
