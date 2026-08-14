@@ -3,6 +3,7 @@ package integration
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
@@ -39,9 +40,12 @@ func (p *RTBTestSuite) TestUserVsUserBaseGlobalRoleVisibility() {
 	p.Require().NoError(err)
 	p.Require().Len(user1Users.Data, 1, "user should only see themselves")
 
-	// user1 can see all roleTemplates.
-	user1RTs, err := user1Client.Management.RoleTemplate.List(nil)
-	p.Require().NoError(err)
+	// user1 can see all roleTemplates once the "user" role's RBAC permissions propagate.
+	var user1RTs *management.RoleTemplateCollection
+	p.Require().Eventually(func() bool {
+		user1RTs, err = user1Client.Management.RoleTemplate.List(nil)
+		return err == nil && len(user1RTs.Data) > 0
+	}, 30*time.Second, time.Second, "timed out waiting for user to see roleTemplates")
 	p.Require().NotEmpty(user1RTs.Data, "user should be able to see all roleTemplates")
 
 	// user2 (user-base role) should only see themselves.
@@ -66,24 +70,28 @@ func (p *RTBTestSuite) TestKontainerDriverVisibilityByGlobalRole() {
 	}
 
 	// Standard "user" role can see kontainer drivers.
-	kds, err := createUserWithRole("user").Management.KontainerDriver.List(nil)
-	p.Require().NoError(err)
-	p.Require().Len(kds.Data, 3)
+	p.assertKontainerDriverCount(createUserWithRole("user"), 3)
 
 	// "clusters-create" role can see kontainer drivers.
-	kds, err = createUserWithRole("clusters-create").Management.KontainerDriver.List(nil)
-	p.Require().NoError(err)
-	p.Require().Len(kds.Data, 3)
+	p.assertKontainerDriverCount(createUserWithRole("clusters-create"), 3)
 
 	// "kontainerdrivers-manage" role can see kontainer drivers.
-	kds, err = createUserWithRole("kontainerdrivers-manage").Management.KontainerDriver.List(nil)
-	p.Require().NoError(err)
-	p.Require().Len(kds.Data, 3)
+	p.assertKontainerDriverCount(createUserWithRole("kontainerdrivers-manage"), 3)
 
 	// "settings-manage" role cannot see kontainer drivers.
-	kds, err = createUserWithRole("settings-manage").Management.KontainerDriver.List(nil)
-	p.Require().NoError(err)
-	p.Require().Empty(kds.Data)
+	p.assertKontainerDriverCount(createUserWithRole("settings-manage"), 0)
+}
+
+// assertKontainerDriverCount polls until the client's visible kontainer driver count matches expected,
+// since GlobalRoleBinding permissions are reconciled asynchronously by RBAC controllers.
+func (p *RTBTestSuite) assertKontainerDriverCount(c *rancher.Client, expected int) {
+	var kds *management.KontainerDriverCollection
+	p.Require().Eventually(func() bool {
+		var err error
+		kds, err = c.Management.KontainerDriver.List(nil)
+		return err == nil && len(kds.Data) == expected
+	}, 30*time.Second, time.Second, "timed out waiting for kontainer driver visibility to reach %d item(s)", expected)
+	p.Require().Len(kds.Data, expected)
 }
 
 // TestBuiltinGlobalRoleOnlyNewUserDefaultEditable tests that admins can only edit
