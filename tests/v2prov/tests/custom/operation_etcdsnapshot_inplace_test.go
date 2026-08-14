@@ -59,7 +59,7 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, nil)
 	require.NoError(t, err)
 
-	_, err = cluster.WaitForCreate(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
 	require.NoError(t, err)
 
 	cm := corev1.ConfigMap{

@@ -28,10 +28,20 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+// alternateRKE2KubernetesVersion and alternateK3sKubernetesVersion are synthetic Kubernetes
+// versions used only to prove that RestoreRKEConfigAll/RestoreRKEConfigKubernetesVersion roll
+// Spec.KubernetesVersion back to the snapshot's version. They are never actually provisioned.
 const (
 	alternateRKE2KubernetesVersion = "v1.36.0+rke2test1"
 	alternateK3sKubernetesVersion  = "v1.36.0+k3stest1"
 )
+
+func configMapNamespace(configMap corev1.ConfigMap) string {
+	if configMap.Namespace != "" {
+		return configMap.Namespace
+	}
+	return corev1.NamespaceDefault
+}
 
 func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
 	defer func() {
@@ -86,13 +96,19 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	}
 
 	// Create an etcd snapshot
+	var firstGeneration int
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
+		if newC.Spec.RKEConfig.ETCDSnapshotCreate == nil {
+			firstGeneration = 1
+		} else {
+			firstGeneration = newC.Spec.RKEConfig.ETCDSnapshotCreate.Generation + 1
+		}
 		newC.Spec.RKEConfig.ETCDSnapshotCreate = &rkev1.ETCDSnapshotCreate{
-			Generation: 1,
+			Generation: firstGeneration,
 		}
 		newC, err = clients.Provisioning.Cluster().Update(newC)
 		if err != nil {
@@ -105,7 +121,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "first etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 1 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
+		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == firstGeneration && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -116,19 +132,29 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	// This is not very disruptive for provisioned clusters, as controlplane nodes are typically reconciled immediately
 	// after operation processing, however, imported clusters are not "reconciled" outside the operation context,
 	// leading to scenarios where a node may depend on other nodes being available.
+	//
+	// Because of this, we always take two snapshots and only use the second one below: the first
+	// snapshot works around https://github.com/k3s-io/k3s/issues/9047, where the etcd snapshot
+	// configmap may not exist for the very first snapshot taken on a node.
 
 	time.Sleep(30 * time.Second)
 
 	snapshotsValidTime := time.Now()
 
 	// Create a second etcd snapshot
+	var secondGeneration int
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
+		if newC.Spec.RKEConfig.ETCDSnapshotCreate == nil {
+			secondGeneration = 1
+		} else {
+			secondGeneration = newC.Spec.RKEConfig.ETCDSnapshotCreate.Generation + 1
+		}
 		newC.Spec.RKEConfig.ETCDSnapshotCreate = &rkev1.ETCDSnapshotCreate{
-			Generation: 2,
+			Generation: secondGeneration,
 		}
 		newC, err = clients.Provisioning.Cluster().Update(newC)
 		if err != nil {
@@ -141,7 +167,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "second etcd snapshot creation", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
-		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == 2 && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
+		return rkeControlPlane.Status.ETCDSnapshotCreate != nil && rkeControlPlane.Status.ETCDSnapshotCreate.Generation == secondGeneration && rkeControlPlane.Status.ETCDSnapshotCreatePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -184,14 +210,17 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 					if err != nil {
 						continue
 					}
-					snapshotTime := metav1.NewTime(time.Unix(rawTime, 0))
-					// Only count snapshots that were created after the first snapshots were taken.
-					if snapshotTime.After(snapshotsValidTime) {
+					// Snapshot file names only carry second-level precision, so compare against
+					// snapshotsValidTime truncated to whole seconds rather than time.Time.After,
+					// which would incorrectly exclude a snapshot taken in the same wall-clock
+					// second as snapshotsValidTime but before its nanosecond component.
+					if rawTime >= snapshotsValidTime.Unix() {
+						snapshotTime := metav1.NewTime(time.Unix(rawTime, 0))
 						sCopy := s.DeepCopy()
 						if sCopy.SnapshotFile.CreatedAt == nil {
 							sCopy.SnapshotFile.CreatedAt = &snapshotTime
 						}
-						snapshots = append(snapshots, s.DeepCopy())
+						snapshots = append(snapshots, sCopy)
 					}
 				}
 			}
@@ -226,10 +255,8 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	return snapshot
 }
 
-func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
-	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, "none", false, "")
-}
-
+// RunSnapshotCreateTests calls RunSnapshotCreateTest count times and returns count distinct
+// ETCDSnapshot resources for c.
 func RunSnapshotCreateTests(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string, count int) []*rkev1.ETCDSnapshot {
 	t.Helper()
 
@@ -237,20 +264,39 @@ func RunSnapshotCreateTests(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		t.Fatal("snapshot count must be positive")
 	}
 
+	seen := make(map[string]bool, count)
 	snapshots := make([]*rkev1.ETCDSnapshot, 0, count)
 	for i := 0; i < count; i++ {
 		snapshot := RunSnapshotCreateTest(t, clients, c, configMap, targetNode)
+		if snapshot == nil {
+			t.Fatalf("snapshot create %d/%d returned a nil snapshot", i+1, count)
+		}
+		if seen[snapshot.Name] {
+			t.Fatalf("snapshot create %d/%d returned duplicate snapshot %q", i+1, count, snapshot.Name)
+		}
+		seen[snapshot.Name] = true
 		snapshots = append(snapshots, snapshot)
 	}
 
 	return snapshots
 }
 
+func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, "none", false, "")
+}
+
+// RunSnapshotRestoreTestWithRKEConfig behaves like RunSnapshotRestoreTest, but additionally sets
+// restoreRKEConfig on the restore request and uses monotonically increasing restore generations,
+// so it is safe to call multiple times in sequence against the same cluster.
 func RunSnapshotRestoreTestWithRKEConfig(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string) {
 	t.Helper()
 	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, restoreRKEConfig, true, "")
 }
 
+// RunSnapshotRestoreTestWithRKEConfigAndKubernetesVersion behaves like
+// RunSnapshotRestoreTestWithRKEConfig, but also sets Spec.KubernetesVersion as part of the same
+// restore request, to prove that RestoreRKEConfigAll/RestoreRKEConfigKubernetesVersion roll it
+// back to the version recorded in the snapshot.
 func RunSnapshotRestoreTestWithRKEConfigAndKubernetesVersion(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig, kubernetesVersion string) {
 	t.Helper()
 	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, restoreRKEConfig, true, kubernetesVersion)
@@ -269,34 +315,53 @@ func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		}
 	}()
 
+	// When incrementGeneration is false (the original RunSnapshotRestoreTest API, used by the
+	// new-node tests), a single restore is always requested against a cluster that has never had
+	// ETCDSnapshotRestore set, so generation 1 matches prior/main-branch behavior exactly.
 	generation := 1
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if incrementGeneration && newC.Spec.RKEConfig.ETCDSnapshotRestore != nil {
-			generation = newC.Spec.RKEConfig.ETCDSnapshotRestore.Generation + 1
-		}
-		newC.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
-			Name:             snapshotName,
-			Generation:       generation,
-			RestoreRKEConfig: restoreRKEConfig,
-		}
-		if kubernetesVersion != "" {
-			newC.Spec.KubernetesVersion = kubernetesVersion
-		}
-		newC, err = clients.Provisioning.Cluster().Update(newC)
-		if err != nil {
-			return err
-		}
-		c = newC
-		return nil
+	missingSnapshotMessage := fmt.Sprintf("etcd restore references missing snapshot %s", snapshotName)
+	err := retry.OnError(wait.Backoff{
+		Steps:    18,
+		Duration: 5 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}, func(err error) bool {
+		return apierrors.IsBadRequest(err) && strings.Contains(err.Error(), missingSnapshotMessage)
+	}, func() error {
+		return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if incrementGeneration {
+				if newC.Spec.RKEConfig.ETCDSnapshotRestore == nil {
+					generation = 1
+				} else {
+					generation = newC.Spec.RKEConfig.ETCDSnapshotRestore.Generation + 1
+				}
+			}
+			newC.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
+				Name:             snapshotName,
+				Generation:       generation,
+				RestoreRKEConfig: restoreRKEConfig,
+			}
+			if kubernetesVersion != "" {
+				newC.Spec.KubernetesVersion = kubernetesVersion
+			}
+			newC, err = clients.Provisioning.Cluster().Update(newC)
+			if err != nil {
+				return err
+			}
+			c = newC
+			return nil
+		})
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Require the exact requested generation in status, not merely "restore finished": otherwise a
+	// leftover Finished/Ready status from a previous restore could incorrectly satisfy this wait.
 	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot restore", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		restoreComplete := rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane)
 		if !incrementGeneration {
@@ -310,7 +375,7 @@ func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitForCreate(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,8 +409,10 @@ func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	assert.Equal(t, expectedNodeCount, nonDeletingNodes, "Unexpected number of nodes after restore")
 }
 
-// PrepareConfigMapForRestore ensures the expected ConfigMap exists before deleting it and waiting
-// for NotFound. This keeps each restore assertion focused on etcd data recovery from the snapshot.
+// PrepareConfigMapForRestore ensures the expected ConfigMap exists, then deletes it and polls
+// until it is confirmed gone (NotFound). This gives every restore test a proven-absent starting
+// point, so that the ConfigMap's return after a restore is meaningful evidence of etcd data
+// recovery.
 func PrepareConfigMapForRestore(t *testing.T, clients *clients.Clients, c *v1.Cluster, expectedConfigMap corev1.ConfigMap) {
 	t.Helper()
 
@@ -356,25 +423,24 @@ func PrepareConfigMapForRestore(t *testing.T, clients *clients.Clients, c *v1.Cl
 
 	ns := configMapNamespace(expectedConfigMap)
 
-	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), expectedConfigMap.Name, metav1.GetOptions{})
+	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(clients.Ctx, expectedConfigMap.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		toCreate := expectedConfigMap.DeepCopy()
 		toCreate.Namespace = ns
-		retrievedConfigMap, err = clientset.CoreV1().ConfigMaps(ns).Create(context.TODO(), toCreate, metav1.CreateOptions{})
+		retrievedConfigMap, err = clientset.CoreV1().ConfigMaps(ns).Create(clients.Ctx, toCreate, metav1.CreateOptions{})
 	}
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("preparing configmap %s/%s for restore: %v", ns, expectedConfigMap.Name, err)
 	}
 
 	assert.Equal(t, expectedConfigMap.Name, retrievedConfigMap.Name)
 	assert.Equal(t, expectedConfigMap.Data, retrievedConfigMap.Data)
 
-	err = clientset.CoreV1().ConfigMaps(ns).Delete(context.TODO(), expectedConfigMap.Name, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatal(err)
+	if err := clientset.CoreV1().ConfigMaps(ns).Delete(clients.Ctx, expectedConfigMap.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("deleting configmap %s/%s before restore: %v", ns, expectedConfigMap.Name, err)
 	}
 
-	err = wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(clients.Ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 		_, getErr := clientset.CoreV1().ConfigMaps(ns).Get(ctx, expectedConfigMap.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(getErr) {
 			return true, nil
@@ -385,10 +451,14 @@ func PrepareConfigMapForRestore(t *testing.T, clients *clients.Clients, c *v1.Cl
 		return false, nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("waiting for configmap %s/%s to be deleted before restore: %v", ns, expectedConfigMap.Name, err)
 	}
 }
 
+// SnapshotKubernetesVersion returns the Kubernetes version recorded in snapshot's cluster-spec
+// metadata. Callers must use this (rather than an in-memory Cluster object) as the expected
+// restore target, since the live Cluster object may have since diverged from what was captured
+// in the snapshot.
 func SnapshotKubernetesVersion(t *testing.T, snapshot *rkev1.ETCDSnapshot) string {
 	t.Helper()
 
@@ -402,6 +472,10 @@ func SnapshotKubernetesVersion(t *testing.T, snapshot *rkev1.ETCDSnapshot) strin
 	return spec.KubernetesVersion
 }
 
+// AlternateKubernetesVersionForSnapshot returns a synthetic Kubernetes version of the same
+// runtime (RKE2 or K3s) as snapshotKubernetesVersion, guaranteed to differ from it. It is only
+// safe to apply to a cluster in a restore mode that immediately replaces it with the snapshot's
+// version (RestoreRKEConfigAll or RestoreRKEConfigKubernetesVersion).
 func AlternateKubernetesVersionForSnapshot(t *testing.T, snapshotKubernetesVersion string) string {
 	t.Helper()
 
@@ -415,27 +489,17 @@ func AlternateKubernetesVersionForSnapshot(t *testing.T, snapshotKubernetesVersi
 		alternateVersion = alternateK3sKubernetesVersion
 	default:
 		t.Fatalf("unsupported runtime %q for snapshot version %q", snapshotRuntime, snapshotKubernetesVersion)
-		return ""
 	}
 
 	if alternateVersion == snapshotKubernetesVersion {
 		t.Fatalf("alternate Kubernetes version %q must differ from snapshot version %q", alternateVersion, snapshotKubernetesVersion)
-		return ""
 	}
 
 	if capr.GetRuntime(alternateVersion) != snapshotRuntime {
 		t.Fatalf("alternate Kubernetes version %q runtime does not match snapshot runtime %q", alternateVersion, snapshotRuntime)
-		return ""
 	}
 
 	return alternateVersion
-}
-
-func configMapNamespace(configMap corev1.ConfigMap) string {
-	if configMap.Namespace != "" {
-		return configMap.Namespace
-	}
-	return corev1.NamespaceDefault
 }
 
 // ModifyClusterAdditionalManifest updates the AdditionalManifest field on the cluster spec.

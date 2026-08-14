@@ -18,7 +18,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +29,9 @@ import (
 // a snapshot on a completely new etcd node from file (without a corresponding snapshot file)
 func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 	clients, err := clients.New()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
@@ -47,18 +48,26 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	command, err := cluster.CustomCommand(clients, c)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assert.NotEmpty(t, command)
 
 	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane --worker", map[string]string{"custom-cluster-name": c.Name}, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tmpDirSeed, err := randomtoken.Generate()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	tmpDir := os.TempDir() + "/snapshot-" + tmpDirSeed[:32]
 
 	// store the snapshots in a universal directory
@@ -68,13 +77,15 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 
 	var etcdNodePodName string
 	if etcdNode, err := systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir); err != nil {
-		require.NoError(t, err)
+		t.Fatal(err)
 	} else {
 		etcdNodePodName = etcdNode.Name
 	}
 
 	_, err = cluster.WaitForCreate(clients, c)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -85,40 +96,51 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		},
 	}
 
-	snapshots := operations.RunSnapshotCreateTests(t, clients, c, cm, "etcd-test-node", 1)
-	require.Len(t, snapshots, 1, "expected 1 snapshot to be created")
-	snapshot := snapshots[0]
+	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "etcd-test-node")
+	assert.NotNil(t, snapshot)
 
 	err = clients.Core.Pod().Delete(c.Namespace, etcdNodePodName, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
 		return clients.Core.Pod().Get(c.Namespace, etcdNodePodName, metav1.GetOptions{})
 	}); err != nil {
-		require.NoError(t, err)
+		t.Fatal(err)
 	}
 
 	// Delete the machine from the cluster too...
 	oldEtcdMachines, err := clients.CAPI.Machine().List(c.Namespace, metav1.ListOptions{LabelSelector: capr.EtcdRoleLabel + "=true"})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, machine := range oldEtcdMachines.Items {
 		err = clients.CAPI.Machine().Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating insane cluster", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
 	})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name}, etcdSnapshotDir)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating restoration required", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
 	})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm, 2)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)

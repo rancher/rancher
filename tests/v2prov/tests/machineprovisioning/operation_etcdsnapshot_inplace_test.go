@@ -63,7 +63,7 @@ func Test_Operation_SetA_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = cluster.WaitForCreate(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
 	require.NoError(t, err)
 
 	machines, err := clients.CAPI.Machine().List(c.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.EtcdRoleLabel, "true")})
