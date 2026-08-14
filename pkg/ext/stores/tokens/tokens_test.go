@@ -103,8 +103,12 @@ var (
 			UserPrincipal: properPrincipal,
 		},
 		Status: ext.TokenStatus{
-			Value:          "",
-			Hash:           "kla9jkdmj",
+			Value: "",
+			// Hash is intentionally empty: every API read path (get, list,
+			// watch, update response) strips the stored hash. properToken
+			// models a token as returned to a client. The backing secret in
+			// properSecret still carries the hash in its data.
+			Hash:           "",
 			Expired:        true,
 			ExpiresAt:      "0001-01-01T00:00:04Z",
 			LastUpdateTime: "13:00:05",
@@ -795,13 +799,13 @@ func TestStoreWatch(t *testing.T) {
 		// return fake bookmark for easy channel management
 		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		// Expect a watch() call with filter for user
-		secrets.EXPECT().Watch("cattle-tokens", metav1.ListOptions{
-			LabelSelector: UserIDLabel + "=lkajdl/ksjlkds",
+		secrets.EXPECT().Watch(TokenNamespace, metav1.ListOptions{
+			LabelSelector: UserIDLabel + "=" + properUser,
 		}).Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("", nil)
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -1528,6 +1532,37 @@ func TestSystemStoreList(t *testing.T) {
 					List("cattle-tokens", metav1.ListOptions{
 						LabelSelector: UserIDLabel + "=other",
 					}).Return(&corev1.SecretList{Items: []corev1.Secret{}}, nil)
+			},
+		},
+		{
+			// A non-admin selector that pins the owner label to a different
+			// value gains a second, conflicting owner requirement when the
+			// requesting user's own owner requirement is ANDed on. The combined
+			// selector is unsatisfiable, so the backing store matches nothing.
+			name: "non-admin selector is scoped to the requesting user",
+			user: "alice",
+			opts: &metav1.ListOptions{LabelSelector: UserIDLabel + "=otheruser"},
+			err:  nil,
+			toks: &ext.TokenList{Items: []ext.Token{}},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					List(TokenNamespace, gomock.Any()).
+					DoAndReturn(func(_ string, o metav1.ListOptions) (*corev1.SecretList, error) {
+						sel, err := labels.Parse(o.LabelSelector)
+						require.NoError(t, err)
+						reqs, _ := sel.Requirements()
+						var userIDValues []string
+						for _, r := range reqs {
+							if r.Key() == UserIDLabel {
+								userIDValues = append(userIDValues, r.Values().List()...)
+							}
+						}
+						// Both the caller's value and the requesting user's own
+						// value are present, so the selector is unsatisfiable
+						// rather than reduced to the caller's value alone.
+						assert.ElementsMatch(t, []string{"alice", "otheruser"}, userIDValues)
+						return &corev1.SecretList{Items: []corev1.Secret{}}, nil
+					})
 			},
 		},
 	}
@@ -2271,7 +2306,11 @@ func TestSystemStoreGet(t *testing.T) {
 					UserPrincipal: properPrincipal,
 				},
 				Status: ext.TokenStatus{
-					Value:          "",
+					Value: "",
+					// SystemStore.Get is an internal accessor, not the public
+					// get verb (that is Store.Get, which strips the hash). It
+					// intentionally returns the stored hash for internal
+					// verification callers.
 					Hash:           "kla9jkdmj",
 					Expired:        true,
 					ExpiresAt:      "0001-01-01T00:00:04Z",
