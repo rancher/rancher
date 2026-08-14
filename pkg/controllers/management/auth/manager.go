@@ -533,6 +533,12 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	}
 	for _, c := range current {
 		rb := c.(*v1.RoleBinding)
+		// The crt-token-reader rolebinding is managed by ensureCRTTokenReaderRoleBinding/removeCRTTokenReaderRoleBinding
+		// (in crtb_handler.go) even though it shares an OwnerReference with this binding. Skip it here so this reconcile
+		// doesn't delete it as undesired on every sync.
+		if rb.RoleRef.Name == "crt-token-reader" {
+			continue
+		}
 		currentRBs[rb.Name] = rb
 	}
 
