@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/publicsuffix"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -414,7 +415,8 @@ func isOverlyBroad(pattern string) bool {
 // findMatchingRoute returns the first ProxyEndpointRoute whose domain pattern matches host,
 // or nil if no match is found. It uses the same wildcard/regex logic as isAllowed.
 func (p *proxy) findMatchingRoute(host string) *mgmt.ProxyEndpointRoute {
-	endpoints, err := p.proxyEndpointCache.List(nil)
+	nilSelector := labels.Nothing()
+	endpoints, err := p.proxyEndpointCache.List(nilSelector)
 	if err != nil {
 		logrus.Debugf("httpproxy: failed to list ProxyEndpoints for route lookup: %v", err)
 		return nil
