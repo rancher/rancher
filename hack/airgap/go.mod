@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/airgap
 
-go 1.25.7
+go 1.25.8
 
 toolchain go1.25.12
 
