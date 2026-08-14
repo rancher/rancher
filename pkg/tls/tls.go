@@ -507,7 +507,10 @@ func ensureInternalCertSANs(secrets corev1controllers.SecretController, clusterI
 	}
 
 	// If the clusterIP is already recorded in the SAN annotations, nothing to do.
-	if !factory.NeedsUpdate(0, secret, clusterIP) {
+	// NeedsUpdate is a method on factory.TLS as of dynamiclistener v0.9.1; a
+	// zero-value TLS applies no filter, so the check is unchanged.
+	var tlsFactory factory.TLS
+	if !tlsFactory.NeedsUpdate(0, secret, clusterIP) {
 		return nil
 	}
 

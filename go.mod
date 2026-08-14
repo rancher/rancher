@@ -116,10 +116,10 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.15.1-rc.1
 	github.com/rancher/ali-operator v1.15.0-rc.4
-	github.com/rancher/apiserver v0.9.8
+	github.com/rancher/apiserver v0.9.9
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.0
-	github.com/rancher/dynamiclistener v0.9.0
+	github.com/rancher/dynamiclistener v0.9.1
 	github.com/rancher/eks-operator v1.15.1-rc.1
 	github.com/rancher/fleet/pkg/apis v0.16.1-beta.1
 	github.com/rancher/gke-operator v1.15.1-rc.1
@@ -128,16 +128,16 @@ require (
 	github.com/rancher/lasso v0.2.9
 	github.com/rancher/machine v0.15.0-rancher145
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.9.8
+	github.com/rancher/norman v0.9.10
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.8.0
 	github.com/rancher/shepherd v0.0.0-20260610155525-6d926c75d49a
-	github.com/rancher/steve v0.9.19
+	github.com/rancher/steve v0.9.20
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
-	github.com/rancher/wrangler/v3 v3.7.1-rc.2
+	github.com/rancher/wrangler/v3 v3.7.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
@@ -245,6 +245,7 @@ require (
 	github.com/google/go-github/v67 v67.0.0 // indirect
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/renameio/v2 v2.0.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.19 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
