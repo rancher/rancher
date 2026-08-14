@@ -80,8 +80,10 @@ curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYS
 dump_rancher_logs()
 {
   echo "Dumping Rancher + K3s container logs to /tmp/rancher.log and /tmp/k3s.log"
-  docker logs rancher-server &> /tmp/rancher.log
-  docker cp rancher-server:/var/lib/rancher/k3s.log /tmp/k3s.log
+  # Best-effort: this runs under `set -e`, so don't let a missing container/log
+  # abort the caller or leave the workflow's artifact upload step empty-handed.
+  docker logs rancher-server &> /tmp/rancher.log || echo "failed to fetch rancher-server logs" >> /tmp/rancher.log
+  docker cp rancher-server:/var/lib/rancher/k3s.log /tmp/k3s.log || echo "failed to fetch k3s.log from rancher-server" > /tmp/k3s.log
   # Written while running under sudo; make readable so the CI workflow can upload them as an artifact.
   chmod 644 /tmp/rancher.log /tmp/k3s.log 2>/dev/null || true
 }
