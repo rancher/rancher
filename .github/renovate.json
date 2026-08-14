@@ -56,6 +56,34 @@
       "extends": [
         "github>rancher/renovate-config//rancher-2.11#release"
       ]
+    },
+    {
+      "description": "Automerge patch and minor updates on main",
+      "matchBaseBranches": [
+        "main"
+      ],
+      "matchJsonata": [
+        "$not($exists(vulnerabilityFixVersion) or $exists(isVulnerabilityAlert))"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "Automerge security updates on main",
+      "matchBaseBranches": [
+        "main"
+      ],
+      "matchJsonata": [
+        "$exists(vulnerabilityFixVersion) or $exists(isVulnerabilityAlert)"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true
     }
   ]
 }
