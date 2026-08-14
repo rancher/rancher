@@ -260,7 +260,9 @@ func newMockCleanupService(t *testing.T,
 		delete(userStore, name)
 		return nil
 	}).AnyTimes()
-	userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
+	impUserClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+	userClient.EXPECT().WithImpersonation(gomock.Any()).Return(impUserClient, nil).AnyTimes()
+	impUserClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(user *v3.User) (*v3.User, error) {
 		userStore[user.Name] = user
 		return user, nil
 	}).AnyTimes()
