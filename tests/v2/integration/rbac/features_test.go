@@ -3,6 +3,7 @@ package integration
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/pkg/clientbase"
@@ -44,9 +45,13 @@ func (p *RTBTestSuite) TestCanListFeatures() {
 	userClient, err := client.AsUser(user)
 	p.Require().NoError(err)
 
-	// Standard user should be able to list features.
-	userFeatures, err := userClient.Management.Feature.List(nil)
-	p.Require().NoError(err)
+	// Standard user should be able to list features once the "user" role's RBAC permissions propagate.
+	var userFeatures *management.FeatureCollection
+	p.Require().Eventually(func() bool {
+		var err error
+		userFeatures, err = userClient.Management.Feature.List(nil)
+		return err == nil && len(userFeatures.Data) > 0
+	}, 30*time.Second, time.Second, "timed out waiting for user to see features")
 	p.Require().NotEmpty(userFeatures.Data)
 
 	// Admin should be able to list features.
