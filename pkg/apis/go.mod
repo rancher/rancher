@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.25.8
+go 1.25.9
 
 toolchain go1.25.12
 

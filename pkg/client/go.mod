@@ -1,6 +1,6 @@
 module github.com/rancher/rancher/pkg/client
 
-go 1.25.0
+go 1.25.1
 
 toolchain go1.25.12
 
