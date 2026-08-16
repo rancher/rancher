@@ -3,7 +3,6 @@ package globalroles
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -30,7 +29,8 @@ import (
 )
 
 const (
-	globalRoleLabel       = "authz.management.cattle.io/globalrole"
+	globalRoleLabel = "authz.management.cattle.io/globalrole"
+	// crNameAnnotation is used to store the name of the ClusterRole created for a GlobalRole. It is only for informational purposes and is not used for reconciliation.
 	crNameAnnotation      = "authz.management.cattle.io/cr-name"
 	initialSyncAnnotation = "authz.management.cattle.io/initial-sync"
 	clusterRoleKind       = "ClusterRole"
@@ -45,8 +45,7 @@ const (
 	InheritedNamespacedRuleRoleExists = "InheritedNamespacedRuleRoleExists"
 	NamespaceNotAvailable             = "NamespaceNotAvailable"
 	FailedToGetNamespace              = "GetNamespaceFailed"
-	FailedToCreateClusterRole         = "CreateClusterRoleFailed"
-	FailedToUpdateClusterRole         = "UpdateClusterRoleFailed"
+	FailedToReconcileClusterRole      = "ReconcileClusterRoleFailed"
 	FailedToGetCluster                = "GetClusterFailed"
 )
 
@@ -58,7 +57,6 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 	return &globalRoleLifecycle{
 		clusters:                management.Wrangler.Mgmt.Cluster(),
 		clusterManager:          clusterManager,
-		crLister:                management.Wrangler.RBAC.ClusterRole().Cache(),
 		crClient:                management.Wrangler.RBAC.ClusterRole(),
 		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
 		rLister:                 management.Wrangler.RBAC.Role().Cache(),
@@ -74,7 +72,6 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 type globalRoleLifecycle struct {
 	clusters                mgmtv3.ClusterClient
 	clusterManager          *clustermanager.Manager
-	crLister                wrbacv1.ClusterRoleCache
 	crClient                wrbacv1.ClusterRoleClient
 	nsCache                 wcorev1.NamespaceCache
 	rLister                 wrbacv1.RoleCache
@@ -107,7 +104,7 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj, &localConditions),
 		gr.updateStatus(obj, localConditions),
 	)
-	return nil, returnError
+	return obj, returnError
 }
 
 func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error) {
@@ -139,39 +136,18 @@ func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error
 }
 
 func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, localConditions *[]metav1.Condition) error {
-	crName := getCRName(globalRole)
+	crName := getCRName(globalRole.Name)
+	// Set the name of the cluster role in an annotation on the globalrole for informational purposes. This is not used for reconciliation.
+	if globalRole.Annotations == nil {
+		globalRole.Annotations = map[string]string{}
+	}
+	globalRole.Annotations[crNameAnnotation] = crName
+
 	condition := metav1.Condition{
 		Type: ClusterRoleExists,
 	}
 
-	clusterRole, _ := gr.crLister.Get(crName)
-	if clusterRole != nil {
-		updated := false
-		clusterRole = clusterRole.DeepCopy()
-		if !reflect.DeepEqual(globalRole.Rules, clusterRole.Rules) {
-			clusterRole.Rules = globalRole.Rules
-			logrus.Infof("[%v] Updating clusterRole %v. GlobalRole rules have changed. Have: %+v. Want: %+v", grController, clusterRole.Name, clusterRole.Rules, globalRole.Rules)
-			updated = true
-		}
-		// Ensure existing ClusterRoles have the correct grOwnerLabel pointing to the owning GlobalRole.
-		if grName := clusterRole.Labels[grOwnerLabel]; grName != globalRole.Name {
-			clusterRole.Labels[grOwnerLabel] = globalRole.Name
-			logrus.Infof("[%v] Updating clusterRole %s owner from %s to %s.", grController, clusterRole.Name, grName, globalRole.Name)
-			updated = true
-		}
-
-		if updated {
-			if _, err := gr.crClient.Update(clusterRole); err != nil {
-				gr.status.AddCondition(localConditions, condition, FailedToUpdateClusterRole, err)
-				return fmt.Errorf("couldn't update ClusterRole %v: %w", clusterRole.Name, err)
-			}
-		}
-		gr.status.AddCondition(localConditions, condition, ClusterRoleExists, nil)
-		return nil
-	}
-
-	logrus.Infof("[%s] Creating clusterRole %s for corresponding GlobalRole", grController, crName)
-	_, err := gr.crClient.Create(&rbacv1.ClusterRole{
+	desiredClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
@@ -188,18 +164,49 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 			},
 		},
 		Rules: globalRole.Rules,
+	}
+
+	clusterRoles, err := gr.crClient.List(metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", grOwnerLabel, globalRole.Name),
 	})
 	if err != nil {
-		gr.status.AddCondition(localConditions, condition, FailedToCreateClusterRole, err)
+		err = fmt.Errorf("couldn't list ClusterRoles for globalRole %v: %w", globalRole.Name, err)
+		gr.status.AddCondition(localConditions, condition, FailedToReconcileClusterRole, err)
 		return err
 	}
-	// Add an annotation to the globalrole indicating the name we used for future updates
-	if globalRole.Annotations == nil {
-		globalRole.Annotations = map[string]string{}
+
+	// Delete any ClusterRoles that were created for this GlobalRole but have the wrong name.
+	for _, clusterRole := range clusterRoles.Items {
+		if clusterRole.Name != crName {
+			if err := rbac.DeleteResource(clusterRole.Name, gr.crClient); err != nil {
+				err = fmt.Errorf("couldn't delete ClusterRole %v for globalRole %v: %w", clusterRole.Name, globalRole.Name, err)
+				gr.status.AddCondition(localConditions, condition, FailedToReconcileClusterRole, err)
+				return err
+			}
+		}
 	}
-	globalRole.Annotations[crNameAnnotation] = crName
+
+	if err := rbac.CreateOrUpdateResource(desiredClusterRole, gr.crClient, areGlobalRoleClusterRolesSame); err != nil {
+		gr.status.AddCondition(localConditions, condition, FailedToReconcileClusterRole, err)
+		return fmt.Errorf("couldn't reconcile ClusterRole %v: %w", crName, err)
+	}
+
 	gr.status.AddCondition(localConditions, condition, ClusterRoleExists, nil)
 	return nil
+}
+
+// areGlobalRoleClusterRolesSame returns true if the ClusterRole created for a GlobalRole matches the desired Rules, owner label, and owner reference.
+func areGlobalRoleClusterRolesSame(currentCR, desiredCR *rbacv1.ClusterRole) bool {
+	if !equality.Semantic.DeepEqual(currentCR.Rules, desiredCR.Rules) {
+		return false
+	}
+	if currentCR.Labels[grOwnerLabel] != desiredCR.Labels[grOwnerLabel] {
+		return false
+	}
+	if !equality.Semantic.DeepEqual(currentCR.OwnerReferences, desiredCR.OwnerReferences) {
+		return false
+	}
+	return true
 }
 
 // reconcileNamespacedRoles ensures that Roles exist in each namespace of NamespacedRules
@@ -481,15 +488,8 @@ func (gr *globalRoleLifecycle) updateStatus(globalRole *v3.GlobalRole, localCond
 	})
 }
 
-func getCRName(globalRole *v3.GlobalRole) string {
-	if crName, ok := globalRole.Annotations[crNameAnnotation]; ok {
-		return crName
-	}
-	return generateCRName(globalRole.Name)
-}
-
-func generateCRName(name string) string {
-	return "cattle-globalrole-" + name
+func getCRName(grName string) string {
+	return name.SafeConcatName("cattle-globalrole", grName)
 }
 
 // validateNamespace checks if a namespace exists and is not terminating

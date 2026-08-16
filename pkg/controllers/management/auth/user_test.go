@@ -111,6 +111,7 @@ func TestOnCreate(t *testing.T) {
 
 	mockUserManager := userMocks.NewMockManager(ctrl)
 	usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+	impClientMock := wranglerfake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
 
 	ul := &userLifecycle{
 		userManager: mockUserManager,
@@ -133,7 +134,8 @@ func TestOnCreate(t *testing.T) {
 				PrincipalIDs: []string{},
 			},
 			mockSetup: func() {
-				usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+				usersMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil)
+				impClientMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
 					assert.Contains(t, u.PrincipalIDs, "local://testuser")
 					assert.Contains(t, u.Finalizers, userLifecycleFinalizer)
 					assert.Equal(t, "true", u.Annotations[userLifecycleAnnotation])
@@ -154,7 +156,8 @@ func TestOnCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				mockUserManager.EXPECT().CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).Return(nil)
-				usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+				usersMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil)
+				impClientMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
 					assert.Contains(t, u.PrincipalIDs, "local://testuser")
 					assert.Contains(t, u.Finalizers, userLifecycleFinalizer)
 					assert.Equal(t, "true", u.Annotations[userLifecycleAnnotation])
@@ -1102,7 +1105,9 @@ func TestOnChange(t *testing.T) {
 		t.Parallel()
 		ctrl := gomock.NewController(t)
 		usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
-		usersMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+		impClientMock := wranglerfake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		usersMock.EXPECT().WithImpersonation(gomock.Any()).Return(impClientMock, nil)
+		impClientMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
 			assert.Equal(t, "true", u.Annotations[userLifecycleAnnotation])
 			assert.Contains(t, u.Finalizers, userLifecycleFinalizer)
 			assert.Contains(t, u.PrincipalIDs, "local://u-new")
