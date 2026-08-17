@@ -35,7 +35,7 @@ type ProxyEndpointRoute struct {
 	// 1) Prefix wildcard (*): Matches any subdomain or prefix. Can only appear as the
 	//    leftmost character of the domain. For example:
 	//    - *.example.com matches foo.example.com and bar.example.com
-	//    - *test.com matches footest.com and bartest.com
+	//    - *test.com matches footest.com and contest.com
 	//    The wildcard character is taken literally; *.*.com is not valid.
 	//
 	// 2) Single-segment placeholder (%): Matches exactly one domain segment.
