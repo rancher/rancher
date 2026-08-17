@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/plan
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 replace (
 	k8s.io/api => k8s.io/api v0.36.3
