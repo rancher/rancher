@@ -2097,8 +2097,9 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
-			Name: getCRName("test-gr"),
-			Kind: clusterRoleKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     getCRName("test-gr"),
+			Kind:     clusterRoleKind,
 		},
 	}
 
@@ -2126,8 +2127,9 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
-			Name: getCRName("test-gr"),
-			Kind: clusterRoleKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     getCRName("test-gr"),
+			Kind:     clusterRoleKind,
 		},
 	}
 
