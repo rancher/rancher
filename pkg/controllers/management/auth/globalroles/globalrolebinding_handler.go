@@ -406,8 +406,9 @@ func (l *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBindin
 		},
 		Subjects: []rbacv1.Subject{rbac.GetGRBSubject(globalRoleBinding)},
 		RoleRef: rbacv1.RoleRef{
-			Name: getCRName(globalRoleBinding.GlobalRoleName),
-			Kind: clusterRoleKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     getCRName(globalRoleBinding.GlobalRoleName),
+			Kind:     clusterRoleKind,
 		},
 	}
 
