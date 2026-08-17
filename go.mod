@@ -94,7 +94,7 @@ require (
 	github.com/google/go-containerregistry v0.21.9
 	github.com/google/go-github/v73 v73.0.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
-	github.com/hashicorp/golang-lru v1.0.2
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/invopop/jsonschema v0.14.0
 	github.com/k3s-io/api v0.1.4
 	github.com/mattn/go-colorable v0.1.15
