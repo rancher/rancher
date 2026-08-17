@@ -45,9 +45,9 @@ runs:
     - name: Install Python deps
       shell: bash
       run: |
-        zypper --non-interactive install python311 python311-pip python311-virtualenv which
+        zypper --non-interactive install python313 python313-pip python313-virtualenv which
         # set python as the default python (essentially just a symlink)
-        update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+        update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1
 
     - name: mkdir test-results
       shell: bash
