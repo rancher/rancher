@@ -134,6 +134,8 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		return nil, err
 	}
 
+	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
 	p := proxy{
 		authorizer:         authorizer,
 		prefix:             prefix,
@@ -142,9 +144,7 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		mgmtClustersCache:  scaledContext.Wrangler.Mgmt.Cluster().Cache(),
 		provClustersCache:  scaledContext.Wrangler.Provisioning.Cluster().Cache(),
 		proxyEndpointCache: scaledContext.Wrangler.Mgmt.ProxyEndpoint().Cache(),
-		insecureTransport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // intentional, opt-in per route
-		},
+		insecureTransport:  insecureTransport,
 	}
 
 	return &httputil.ReverseProxy{
