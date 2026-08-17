@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/deployer/types"
 	"github.com/rancher/rancher/pkg/scc/util/generic"
