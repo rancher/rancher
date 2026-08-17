@@ -11,7 +11,7 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.3.6 // CVE-2024-45310
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.16 // CVE-2025-58058
 	golang.org/x/crypto => golang.org/x/crypto v0.54.0
-	golang.org/x/net => golang.org/x/net v0.56.0
+	golang.org/x/net => golang.org/x/net v0.57.0
 )
 
 require (
