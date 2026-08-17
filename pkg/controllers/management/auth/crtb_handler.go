@@ -68,7 +68,20 @@ const (
 	failedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace      = "FailedToDeleteMGMTClusterScopedPrivilegesInProjectNamespace"
 	failedToDeleteAuthV2Permissions                                  = "FailedToDeleteAuthV2Permissions"
 	failedToRevokeManagementPlanePrivileges                          = "FailedToRevokeManagementPlanePrivileges"
+	crtTokenReaderRoleName                                           = "crt-token-reader"
 )
+
+var crtTokenReaderRoleRef = v1.RoleRef{
+	Kind:     "Role",
+	Name:     crtTokenReaderRoleName,
+	APIGroup: "rbac.authorization.k8s.io",
+}
+
+// crtTokenReaderRoleBindingName returns the deterministic name of the reserved crt-token-reader
+// RoleBinding for the given namespace and subject.
+func crtTokenReaderRoleBindingName(namespace string, subject v1.Subject) string {
+	return pkgrbac.NameForRoleBinding(namespace, crtTokenReaderRoleRef, subject)
+}
 
 var clusterManagementPlaneResources = map[string]string{
 	"clusterscans":                "management.cattle.io",
@@ -374,8 +387,7 @@ func grantsCRTAccessFromRoleTemplate(rt *v3.RoleTemplate, crLister typesrbacv1.C
 
 // ensureCRTTokenReaderRoleBinding ensures RoleBinding to crt-token-reader exists
 func (c *crtbLifecycle) ensureCRTTokenReaderRoleBinding(binding *v3.ClusterRoleTemplateBinding, subject v1.Subject) error {
-	roleRef := v1.RoleRef{Kind: "Role", Name: "crt-token-reader", APIGroup: "rbac.authorization.k8s.io"}
-	rbName := pkgrbac.NameForRoleBinding(binding.Namespace, roleRef, subject)
+	rbName := crtTokenReaderRoleBindingName(binding.Namespace, subject)
 
 	// Check if already exists
 	existing, err := c.rbLister.Get(binding.Namespace, rbName)
@@ -383,14 +395,14 @@ func (c *crtbLifecycle) ensureCRTTokenReaderRoleBinding(binding *v3.ClusterRoleT
 		// Already exists - verify it's correct
 		if len(existing.Subjects) == 1 &&
 			existing.Subjects[0] == subject &&
-			existing.RoleRef.Name == "crt-token-reader" {
+			existing.RoleRef.Name == crtTokenReaderRoleName {
 			return nil
 		}
 
 		// Exists but incorrect - update
 		updated := existing.DeepCopy()
 		updated.Subjects = []v1.Subject{subject}
-		updated.RoleRef = roleRef
+		updated.RoleRef = crtTokenReaderRoleRef
 		_, err = c.rbClient.Update(updated)
 		return err
 	}
@@ -414,7 +426,7 @@ func (c *crtbLifecycle) ensureCRTTokenReaderRoleBinding(binding *v3.ClusterRoleT
 			},
 		},
 		Subjects: []v1.Subject{subject},
-		RoleRef:  roleRef,
+		RoleRef:  crtTokenReaderRoleRef,
 	}
 
 	_, err = c.rbClient.Create(rb)
@@ -426,8 +438,7 @@ func (c *crtbLifecycle) ensureCRTTokenReaderRoleBinding(binding *v3.ClusterRoleT
 
 // removeCRTTokenReaderRoleBinding deletes the RoleBinding to crt-token-reader if it exists
 func (c *crtbLifecycle) removeCRTTokenReaderRoleBinding(binding *v3.ClusterRoleTemplateBinding, subject v1.Subject) error {
-	roleRef := v1.RoleRef{Kind: "Role", Name: "crt-token-reader", APIGroup: "rbac.authorization.k8s.io"}
-	rbName := pkgrbac.NameForRoleBinding(binding.Namespace, roleRef, subject)
+	rbName := crtTokenReaderRoleBindingName(binding.Namespace, subject)
 
 	err := c.rbClient.DeleteNamespaced(binding.Namespace, rbName, &metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
