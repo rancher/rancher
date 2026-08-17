@@ -37,7 +37,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/pr-actions-write-app/credentials privateKey | PRIVATE_KEY
 
       - name: "Create temporary token"
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
@@ -51,7 +51,7 @@ jobs:
 
       - name: Checkout repository
         # zizmor: ignore[artipacked] -- this job must retain checkout credentials for authenticated branch fetch and push operations.
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup and create branch
         id: branch-setup

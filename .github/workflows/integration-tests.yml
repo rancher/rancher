@@ -66,7 +66,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Configure Docker for cgroupfs
@@ -79,7 +79,7 @@ jobs:
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
       - name: Download Docker images artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: "/tmp"
           merge-multiple: true
@@ -124,7 +124,7 @@ jobs:
           mkdir -p bin
           curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > bin/data.json
       - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
       - name: Run Tests
