@@ -16,7 +16,7 @@ pytest-ordering>=0.6
 python-digitalocean==1.13.2
 python-terraform==0.10.1
 PyYAML==6.0.1
-requests==2.31.0
+requests==2.33.0
 rsa==4.7.2
 websocket-client==0.57.0
 semver==2.13.0
