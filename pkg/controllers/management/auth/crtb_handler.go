@@ -20,7 +20,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/util/retry"
+	rbacauth "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 const (
@@ -255,21 +257,24 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return err
 	}
 
-	// Check if RoleTemplate grants CRT access, and if so, grant access to CRT token secrets
-	grantsCRT, err := c.mgr.checkIfRoleTemplateGrantsCRTAccess(binding.RoleTemplateName)
+	// Check if RoleTemplate grants CRT access, and if so, grant access to CRT token secrets -
+	// unless the RoleTemplate already grants unrestricted secret access, which makes a
+	// separate crt-token-reader RoleBinding redundant.
+	grantsCRT, hasUnrestrictedSecretAccess, err := c.mgr.checkIfRoleTemplateGrantsCRTAccess(binding.RoleTemplateName)
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToCheckReferencedRole, err)
 		return err
 	}
 
-	if grantsCRT {
+	if grantsCRT && !hasUnrestrictedSecretAccess {
 		if err := c.ensureCRTTokenReaderRoleBinding(binding, subject); err != nil {
 			c.s.AddCondition(localConditions, condition, failedToGrantManagementPlanePrivileges, err)
 			return err
 		}
 	} else {
-		// Role doesn't grant CRT access - ensure RoleBinding is removed if it exists
-		// (handles case where RoleTemplate was updated to remove CRT permissions)
+		// Role doesn't grant CRT access, or already grants unrestricted secret access that
+		// covers it - ensure RoleBinding is removed if it exists (handles the case where the
+		// RoleTemplate was updated to remove CRT permissions, or gained unrestricted secret access).
 		// Unlike the CRTB deletion path, the CRTB is still alive here so owner reference GC
 		// will not clean this up - we must return the error to trigger a re-enqueue.
 		if err := c.removeCRTTokenReaderRoleBinding(binding, subject); err != nil {
@@ -322,13 +327,13 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	return nil
 }
 
-// grantsCRTAccessFromRoleTemplate checks if a RoleTemplate grants read/create access
-// to clusterregistrationtokens. Handles both External and non-External RoleTemplates.
-func grantsCRTAccessFromRoleTemplate(rt *v3.RoleTemplate, crLister typesrbacv1.ClusterRoleLister) bool {
-	readOrCreateVerbs := map[string]bool{
-		"get": true, "list": true, "watch": true, "create": true, "*": true,
-	}
+var crtReadOrCreateVerbs = []string{"get", "list", "watch", "create"}
 
+// grantsCRTAccessFromRoleTemplate reports whether a RoleTemplate grants access to
+// clusterregistrationtokens, and whether it separately grants unrestricted secret
+// access (making a dedicated crt-token-reader RoleBinding redundant). Uses the same
+// rule-matching semantics as the Kubernetes RBAC authorizer (via rbacauth.RulesAllow).
+func grantsCRTAccessFromRoleTemplate(rt *v3.RoleTemplate, crLister typesrbacv1.ClusterRoleLister) (grantsCRT bool, hasUnrestrictedSecretAccess bool) {
 	var rules []v1.PolicyRule
 	if rt.External {
 		if rt.ExternalRules != nil {
@@ -336,7 +341,7 @@ func grantsCRTAccessFromRoleTemplate(rt *v3.RoleTemplate, crLister typesrbacv1.C
 		} else {
 			externalRole, err := crLister.Get("", rt.Name)
 			if err != nil || externalRole == nil {
-				return false
+				return false, false
 			}
 			rules = externalRole.Rules
 		}
@@ -344,43 +349,27 @@ func grantsCRTAccessFromRoleTemplate(rt *v3.RoleTemplate, crLister typesrbacv1.C
 		rules = rt.Rules
 	}
 
-	for _, rule := range rules {
-		hasCRTResource := false
-		hasManagementAPI := false
-		hasReadOrCreate := false
-
-		for _, resource := range rule.Resources {
-			if resource == "clusterregistrationtokens" || resource == "*" {
-				hasCRTResource = true
-				break
-			}
-		}
-		if !hasCRTResource {
-			continue
-		}
-
-		for _, apiGroup := range rule.APIGroups {
-			if apiGroup == "management.cattle.io" || apiGroup == "*" {
-				hasManagementAPI = true
-				break
-			}
-		}
-		if !hasManagementAPI {
-			continue
-		}
-
-		for _, verb := range rule.Verbs {
-			if readOrCreateVerbs[verb] {
-				hasReadOrCreate = true
-				break
-			}
-		}
-
-		if hasReadOrCreate {
-			return true
+	for _, verb := range crtReadOrCreateVerbs {
+		if rbacauth.RulesAllow(authorizer.AttributesRecord{
+			Verb:            verb,
+			APIGroup:        "management.cattle.io",
+			Resource:        "clusterregistrationtokens",
+			ResourceRequest: true,
+		}, rules...) {
+			grantsCRT = true
+			break
 		}
 	}
-	return false
+
+	// Name left empty: only matches rules with no ResourceNames restriction, i.e. unrestricted access.
+	hasUnrestrictedSecretAccess = rbacauth.RulesAllow(authorizer.AttributesRecord{
+		Verb:            "get",
+		APIGroup:        "",
+		Resource:        "secrets",
+		ResourceRequest: true,
+	}, rules...)
+
+	return grantsCRT, hasUnrestrictedSecretAccess
 }
 
 // ensureCRTTokenReaderRoleBinding ensures RoleBinding to crt-token-reader exists
