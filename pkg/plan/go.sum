@@ -60,8 +60,8 @@ github.com/prometheus/procfs v0.19.2 h1:zUMhqEW66Ex7OXIiDkll3tl9a1ZdilUOd/F6ZXw4
 github.com/prometheus/procfs v0.19.2/go.mod h1:M0aotyiemPhBCM0z5w87kL22CxfcH05ZpYlu+b4J7mw=
 github.com/rancher/lasso v0.2.9 h1:5Xk9Qid+YDOLpa6s5xalcSR0cA5BMbgWcaOZ8kdNU7k=
 github.com/rancher/lasso v0.2.9/go.mod h1:PMtxoVahRQvhEAi1HVOfyLDe1CrtGwTqOtkPVjSSkns=
-github.com/rancher/wrangler/v3 v3.7.1-rc.2 h1:wnbPQE8/bw2GbLS3Ga71qY438CNgtb3w26FZYvy/9jw=
-github.com/rancher/wrangler/v3 v3.7.1-rc.2/go.mod h1:SRd8RgvLACW1sOeOE/JagsO1gWVgSduKGQtPSsKzntI=
+github.com/rancher/wrangler/v3 v3.7.1 h1:3IoJWG8YEsPJ3oYXEDTNjITsrqxDuDz722ivCFXQOGQ=
+github.com/rancher/wrangler/v3 v3.7.1/go.mod h1:SRd8RgvLACW1sOeOE/JagsO1gWVgSduKGQtPSsKzntI=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/sirupsen/logrus v1.9.4 h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w=
