@@ -18,7 +18,7 @@ import (
 	kubeimport "github.com/rancher/rancher/pkg/kontainer-engine/drivers/import"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 const (
