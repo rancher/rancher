@@ -44,7 +44,7 @@ const (
 	Params                       = "X-API-Tunnel-Params"
 	caFileLocation               = "/etc/kubernetes/ssl/certs/serverca"
 	defaultMaxConnectionAttempts = 30
-	maxConnectionAttemptsEnv     = "CATTLE_MAX_CONNECTION_ATTEMPTS"
+	maxConnectionAttemptsEnv     = "CATTLE_AGENT_CONNECT_ERROR_THRESHOLD"
 )
 
 func main() {
