@@ -51,13 +51,22 @@ var (
 			readPodPolicyRule,
 		},
 	}
+	defaultGROwnerRefs = []metav1.OwnerReference{
+		{
+			APIVersion: defaultGR.TypeMeta.APIVersion,
+			Kind:       defaultGR.TypeMeta.Kind,
+			Name:       defaultGR.Name,
+			UID:        defaultGR.UID,
+		},
+	}
 	readConfigCR = rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterRole",
+			Name: getCRName(defaultGR.Name),
 			Labels: map[string]string{
 				"authz.management.cattle.io/globalrole": "true",
 				"authz.management.cattle.io/gr-owner":   defaultGR.Name,
 			},
+			OwnerReferences: defaultGROwnerRefs,
 		},
 		Rules: []rbacv1.PolicyRule{
 			readConfigPolicyRule,
@@ -65,7 +74,32 @@ var (
 	}
 	readPodCR = rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterRole",
+			Name: getCRName(defaultGR.Name),
+			Labels: map[string]string{
+				"authz.management.cattle.io/globalrole": "true",
+				"authz.management.cattle.io/gr-owner":   defaultGR.Name,
+			},
+			OwnerReferences: defaultGROwnerRefs,
+		},
+		Rules: []rbacv1.PolicyRule{
+			readPodPolicyRule,
+		},
+	}
+	missingLabelCR = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getCRName(defaultGR.Name),
+			Labels: map[string]string{
+				"authz.management.cattle.io/globalrole": "true",
+			},
+			OwnerReferences: defaultGROwnerRefs,
+		},
+		Rules: []rbacv1.PolicyRule{
+			readPodPolicyRule,
+		},
+	}
+	missingOwnerRefCR = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getCRName(defaultGR.Name),
 			Labels: map[string]string{
 				"authz.management.cattle.io/globalrole": "true",
 				"authz.management.cattle.io/gr-owner":   defaultGR.Name,
@@ -75,12 +109,14 @@ var (
 			readPodPolicyRule,
 		},
 	}
-	missingLabelCR = rbacv1.ClusterRole{
+	staleNamedCR = rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterRole",
+			Name: "stale-cluster-role-name",
 			Labels: map[string]string{
 				"authz.management.cattle.io/globalrole": "true",
+				"authz.management.cattle.io/gr-owner":   defaultGR.Name,
 			},
+			OwnerReferences: defaultGROwnerRefs,
 		},
 		Rules: []rbacv1.PolicyRule{
 			readPodPolicyRule,
@@ -114,8 +150,8 @@ func TestReconcileGlobalRole(t *testing.T) {
 
 	type controllers struct {
 		crController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
-		crCache      *fake.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]
 	}
+	notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "clusterRole")
 	tests := []struct {
 		name             string
 		setupControllers func(controllers)
@@ -127,7 +163,8 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "no changes to clusterRole",
 			setupControllers: func(c controllers) {
-				c.crCache.EXPECT().Get(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readPodCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  false,
@@ -139,7 +176,8 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "clusterRole is updated",
 			setupControllers: func(c controllers) {
-				c.crCache.EXPECT().Get(gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readConfigCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
 				c.crController.EXPECT().Update(gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
@@ -152,33 +190,36 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "update clusterRole fails",
 			setupControllers: func(c controllers) {
-				c.crCache.EXPECT().Get(gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readConfigCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
 				c.crController.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("error"))
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  true,
 			condition: reducedCondition{
-				reason: FailedToUpdateClusterRole,
+				reason: FailedToReconcileClusterRole,
 				status: metav1.ConditionFalse,
 			},
 		},
 		{
 			name: "create clusterRole fails",
 			setupControllers: func(c controllers) {
-				c.crCache.EXPECT().Get(gomock.Any()).Return(nil, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{}, nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("error"))
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  true,
 			condition: reducedCondition{
-				reason: FailedToCreateClusterRole,
+				reason: FailedToReconcileClusterRole,
 				status: metav1.ConditionFalse,
 			},
 		},
 		{
 			name: "clusterRole is created",
 			setupControllers: func(c controllers) {
-				c.crCache.EXPECT().Get(gomock.Any()).Return(nil, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{}, nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
@@ -187,12 +228,13 @@ func TestReconcileGlobalRole(t *testing.T) {
 				reason: ClusterRoleExists,
 				status: metav1.ConditionTrue,
 			},
-			annotation: getCRName(&defaultGR),
+			annotation: getCRName(defaultGR.Name),
 		},
 		{
 			name: "missing grOwnerLabel in clusterRole triggers update",
 			setupControllers: func(c controllers) {
-				c.crCache.EXPECT().Get(gomock.Any()).Return(missingLabelCR.DeepCopy(), nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*missingLabelCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(missingLabelCR.DeepCopy(), nil)
 				c.crController.EXPECT().Update(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
@@ -202,6 +244,75 @@ func TestReconcileGlobalRole(t *testing.T) {
 				status: metav1.ConditionTrue,
 			},
 		},
+		{
+			name: "missing OwnerReference in clusterRole triggers update",
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*missingOwnerRefCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(missingOwnerRefCR.DeepCopy(), nil)
+				c.crController.EXPECT().Update(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  false,
+			condition: reducedCondition{
+				reason: ClusterRoleExists,
+				status: metav1.ConditionTrue,
+			},
+		},
+		{
+			name: "stale-named ClusterRole is deleted and the correct one is created",
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(nil)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
+				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  false,
+			condition: reducedCondition{
+				reason: ClusterRoleExists,
+				status: metav1.ConditionTrue,
+			},
+		},
+		{
+			name: "stale-named ClusterRole already gone is not an error",
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(notFoundErr)
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
+				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  false,
+			condition: reducedCondition{
+				reason: ClusterRoleExists,
+				status: metav1.ConditionTrue,
+			},
+		},
+		{
+			name: "deleting a stale-named ClusterRole fails",
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
+				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(fmt.Errorf("error"))
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  true,
+			condition: reducedCondition{
+				reason: FailedToReconcileClusterRole,
+				status: metav1.ConditionFalse,
+			},
+		},
+		{
+			name: "listing ClusterRoles fails",
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().List(gomock.Any()).Return(nil, fmt.Errorf("error"))
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  true,
+			condition: reducedCondition{
+				reason: FailedToReconcileClusterRole,
+				status: metav1.ConditionFalse,
+			},
+		},
 	}
 
 	ctrl := gomock.NewController(t)
@@ -209,7 +320,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			controllers := controllers{
 				crController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
-				crCache:      fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl),
 			}
 			if test.setupControllers != nil {
 				test.setupControllers(controllers)
@@ -217,7 +327,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 
 			grLifecycle := globalRoleLifecycle{
 				crClient: controllers.crController,
-				crLister: controllers.crCache,
 			}
 			err := grLifecycle.reconcileGlobalRole(test.globalRole)
 
