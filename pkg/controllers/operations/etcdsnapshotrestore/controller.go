@@ -72,6 +72,18 @@ const (
 	// reconciliation.
 	RestartClusterStepHookLabelPrefix = "restart-cluster.step.hook.operation.cattle.io/"
 
+	// TokenHashCommandFormat is the shell command the Preflight step runs on every etcd node to hash
+	// the server token persisted on disk, so it can be compared against the hash the distro stamped
+	// on the snapshot. The single format argument is the distro data directory.
+	//
+	// The distro persists the token under its data directory, but the layout differs between versions
+	// (and between server and agent nodes), so the file is resolved rather than assumed — a missing
+	// file exits non-zero, and because plans are assigned with a failure threshold of -1 that would
+	// stall the operation rather than fail it.
+	//
+	// Exported so tests can derive the same value the check derives.
+	TokenHashCommandFormat = `f=%[1]s/server/token; [ -f "$f" ] || f=%[1]s/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
+
 	// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
 	// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
 	idempotencyKey = "etcd-restore"
@@ -644,9 +656,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 						Command: "/bin/sh",
 						Args: []string{
 							"-c",
-							fmt.Sprintf(`tr -d '[:space:]' < %s/token | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`,
-								s.adapter.DistroDataDirectory(secret),
-							),
+							fmt.Sprintf(TokenHashCommandFormat, s.adapter.DistroDataDirectory(secret)),
 						},
 					},
 				},
@@ -673,6 +683,8 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			return status, nil
 		}
 
+		// The token hash can only be validated once the node has applied the plan and reported its
+		// output, so a waiting node is skipped entirely until a later reconcile.
 		if planStatus.Waiting() {
 			logrus.Debugf("[etcdsnapshotrestore] %s/%s: waiting for preflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
@@ -680,6 +692,8 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			if concurrency <= 0 {
 				break
 			}
+
+			continue
 		}
 
 		if snapshot != nil {
@@ -687,6 +701,9 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			if err != nil {
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: could not read preflight check output for %s/%s",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+				status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
 				opv1alpha1.FailedCondition.True(&status)
 				opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
 				opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("could not read preflight check output for %s/%s", secret.Namespace, secret.Name))
@@ -694,19 +711,19 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 				return status, nil
 			}
 			if hash, ok := snapshot.Annotations[capr.SnapshotTokenHashAnnotation]; ok && hash != "" {
-				if b, ok := output["preflight"]; ok && string(b) != hash {
+				// The instruction pipes through cut, so the saved output carries a trailing newline
+				// which the annotation does not.
+				if b, ok := output["preflight"]; ok && strings.TrimSpace(string(b)) != hash {
 					logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check output for %s/%s does not match snapshot token hash",
 						s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+					status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
 					opv1alpha1.FailedCondition.True(&status)
 					opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
 					opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
 
 					return status, nil
-				}
-
-				concurrency--
-				if concurrency <= 0 {
-					break
 				}
 			} else {
 				logrus.Warnf("[etcdsnapshotrestore] %s/%s: could not find snapshot token hash for %s/%s, preflight check output will not be validated",
