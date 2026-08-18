@@ -41,15 +41,12 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) error {
 	if err := nsInformer.AddIndexers(nsIndexers); err != nil {
 		return err
 	}
-	sync := &SyncController{
-		Namespaces:          cluster.Corew.Namespace(),
-		NsIndexer:           nsInformer.GetIndexer(),
-		ResourceQuotas:      cluster.Corew.ResourceQuota(),
-		ResourceQuotaLister: cluster.Corew.ResourceQuota().Cache(),
-		LimitRange:          cluster.Corew.LimitRange(),
-		LimitRangeLister:    cluster.Corew.LimitRange().Cache(),
-		ProjectCache:        cluster.Management.Wrangler.Mgmt.Project().Cache(),
+
+	sync, err := NewSyncController(cluster, nsInformer, cluster.Management.Wrangler.Mgmt)
+	if err != nil {
+		return err
 	}
+
 	cluster.Corew.Namespace().OnChange(ctx, "resourceQuotaSyncController", sync.syncResourceQuota)
 
 	reconcile := &reconcileController{

@@ -8,10 +8,12 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -48,6 +50,36 @@ type SyncController struct {
 	LimitRange          corew.LimitRangeClient
 	LimitRangeLister    corew.LimitRangeCache
 	NsIndexer           clientcache.Indexer
+}
+
+func NewSyncController(
+	cluster *config.UserContext,
+	nsInformer clientcache.SharedIndexInformer,
+	mgmt wmgmtv3.Interface,
+) (*SyncController, error) {
+
+	rqClient := cluster.Corew.ResourceQuota()
+	resourceQuotaImpClient, err := rqClient.WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return nil, err
+	}
+
+	limitRangeImpClient, err := cluster.Corew.LimitRange().WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return nil, err
+	}
+
+	sync := &SyncController{
+		Namespaces:          cluster.Corew.Namespace(),
+		NsIndexer:           nsInformer.GetIndexer(),
+		ResourceQuotas:      resourceQuotaImpClient,
+		ResourceQuotaLister: cluster.Corew.ResourceQuota().Cache(),
+		LimitRange:          limitRangeImpClient,
+		LimitRangeLister:    cluster.Corew.LimitRange().Cache(),
+		ProjectCache:        mgmt.Project().Cache(),
+	}
+
+	return sync, nil
 }
 
 func (c *SyncController) syncResourceQuota(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {
