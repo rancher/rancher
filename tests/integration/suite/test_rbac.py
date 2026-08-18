@@ -400,17 +400,24 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
     assert len(users1.data) == 1, "user should only see themselves"
 
     # user1 can see all roleTemplates
-    role_templates = user1.client.list_role_template()
-    assert len(role_templates.data) > 0, ("user should be able to see all " +
-                                          "roleTemplates")
+    def user1_can_see_role_templates():
+        return len(user1.client.list_role_template().data) > 0
+
+    wait_for(user1_can_see_role_templates,
+             fail_handler=lambda: ("user should be able to see all " +
+                                   "roleTemplates"))
 
     # user2 should only see themselves in the user list
     users2 = user2.client.list_user()
     assert len(users2.data) == 1, "user should only see themselves"
+
     # user2 should not see any role templates
-    role_templates = user2.client.list_role_template()
-    assert len(role_templates.data) == 0, ("user2 does not have permission " +
-                                           "to view roleTemplates")
+    def user2_cannot_see_role_templates():
+        return len(user2.client.list_role_template().data) == 0
+
+    wait_for(user2_cannot_see_role_templates,
+             fail_handler=lambda: ("user2 does not have permission " +
+                                   "to view roleTemplates"))
 
 
 def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
@@ -517,18 +524,41 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
 
 
 def test_appropriate_users_can_see_kontainer_drivers(user_factory):
-    kds = user_factory().client.list_kontainer_driver()
-    assert len(kds) == 3
+    client = user_factory().client
 
-    kds = user_factory('clusters-create').client.list_kontainer_driver()
-    assert len(kds) == 3
+    def can_see_kontainer_drivers():
+        return len(client.list_kontainer_driver()) == 3
 
-    kds = user_factory('kontainerdrivers-manage').client. \
-        list_kontainer_driver()
-    assert len(kds) == 3
+    wait_for(can_see_kontainer_drivers,
+             fail_handler=lambda: "user should be able to see kontainer "
+                                  "drivers")
 
-    kds = user_factory('settings-manage').client.list_kontainer_driver()
-    assert len(kds) == 0
+    client = user_factory('clusters-create').client
+
+    def clusters_create_can_see_kontainer_drivers():
+        return len(client.list_kontainer_driver()) == 3
+
+    wait_for(clusters_create_can_see_kontainer_drivers,
+             fail_handler=lambda: "clusters-create user should be able to "
+                                  "see kontainer drivers")
+
+    client = user_factory('kontainerdrivers-manage').client
+
+    def kontainerdrivers_manage_can_see_kontainer_drivers():
+        return len(client.list_kontainer_driver()) == 3
+
+    wait_for(kontainerdrivers_manage_can_see_kontainer_drivers,
+             fail_handler=lambda: "kontainerdrivers-manage user should be "
+                                  "able to see kontainer drivers")
+
+    client = user_factory('settings-manage').client
+
+    def settings_manage_cannot_see_kontainer_drivers():
+        return len(client.list_kontainer_driver()) == 0
+
+    wait_for(settings_manage_cannot_see_kontainer_drivers,
+             fail_handler=lambda: "settings-manage user should not see "
+                                  "kontainer drivers")
 
 
 def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
