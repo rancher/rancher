@@ -123,8 +123,8 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 	// slow fsyncs / etcd leader loss. SizeLimit is a cap, not a reservation
 	etcdTmpfsSize := resource.MustParse("512Mi")
 	for i, etcdPath := range []string{
-		"/var/lib/rancher/rke2/server/db/etcd",
-		"/var/lib/rancher/k3s/server/db/etcd",
+		"/var/lib/rancher/rke2/server/db",
+		"/var/lib/rancher/k3s/server/db",
 	} {
 		name := fmt.Sprintf("etcd-tmpfs-%d", i)
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
