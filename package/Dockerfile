@@ -32,7 +32,7 @@ FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
 
-FROM registry.suse.com/bci/bci-micro:15.7 AS final
+FROM registry.suse.com/bci/bci-micro:16.0 AS final
 RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
 
 # Temporary build stage image
