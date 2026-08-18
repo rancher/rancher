@@ -35,7 +35,7 @@ type ProxyEndpointRoute struct {
 	// 1) Prefix wildcard (*): Matches any subdomain or prefix. Can only appear as the
 	//    leftmost character of the domain. For example:
 	//    - *.example.com matches foo.example.com and bar.example.com
-	//    - *test.com matches footest.com and bartest.com
+	//    - *test.com matches footest.com and contest.com
 	//    The wildcard character is taken literally; *.*.com is not valid.
 	//
 	// 2) Single-segment placeholder (%): Matches exactly one domain segment.
@@ -59,6 +59,66 @@ type ProxyEndpointRoute struct {
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Pattern=`^(\*\.?)?([a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]?|(%\.([a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]?|%))+)(\.(([a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]?)|%))*\.[a-zA-Z][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`
 	Domain string `json:"domain,omitempty"`
+
+	// InsecureSkipTLSVerify disables TLS certificate verification when proxying to this domain.
+	// Use this only for development or when the endpoint uses a self-signed certificate.
+	// +optional
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// CredentialInjection defines how credentials are applied to proxied requests for this domain.
+	// When set, clients only need to supply a credential ID via X-API-CattleAuth-Header;
+	// the proxy applies credentials according to this server-defined pattern.
+	// +optional
+	CredentialInjection *CredentialInjectionSpec `json:"credentialInjection,omitempty"`
+}
+
+// CredentialInjectionSpec defines how a credential secret's values are injected into a proxied request.
+type CredentialInjectionSpec struct {
+	// +kubebuilder:validation:XValidation:rule="self.mode != 'bearer' || has(self.tokenField) && self.tokenField != ''",message="tokenField is required when mode is bearer"
+	// +kubebuilder:validation:XValidation:rule="self.mode != 'basic' || (has(self.usernameField) && self.usernameField != '' && has(self.passwordField) && self.passwordField != '')",message="usernameField and passwordField are required when mode is basic"
+	// +kubebuilder:validation:XValidation:rule="(self.mode != 'headerinject' && self.mode != 'bodyinject') || (has(self.fields) && size(self.fields) > 0)",message="fields is required when mode is headerinject or bodyinject"
+	// Mode controls how the credential is applied to the request.
+	// "bearer"      – sets Authorization: Bearer <token>
+	// "basic"       – sets Authorization: Basic base64(username:password)
+	// "headerinject" – sets one or more arbitrary request headers
+	// "bodyinject"  – merges fields into the top-level JSON request body
+	// +required
+	// +kubebuilder:validation:Enum=bearer;basic;headerinject;bodyinject
+	Mode string `json:"mode"`
+
+	// TokenField is the key within the credential secret whose value is used as the Bearer token.
+	// Required when Mode is "bearer".
+	// +optional
+	TokenField string `json:"tokenField,omitempty"`
+
+	// UsernameField is the key within the credential secret whose value is used as the Basic-auth username.
+	// Required when Mode is "basic".
+	// +optional
+	UsernameField string `json:"usernameField,omitempty"`
+
+	// PasswordField is the key within the credential secret whose value is used as the Basic-auth password.
+	// Required when Mode is "basic".
+	// +optional
+	PasswordField string `json:"passwordField,omitempty"`
+
+	// Fields maps credential secret keys to header names (headerinject) or JSON body keys (bodyinject).
+	// Required when Mode is "headerinject" or "bodyinject".
+	// +optional
+	Fields []InjectionFieldMapping `json:"fields,omitempty"`
+}
+
+// InjectionFieldMapping pairs a destination key (header name or JSON body key) with the name
+// of the field to read from the credential secret.
+type InjectionFieldMapping struct {
+	// Key is the header name (for headerinject) or the top-level JSON body key (for bodyinject).
+	// +required
+	Key string `json:"key"`
+
+	// SecretField is the name of the field within the credential secret to read the value from.
+	// For secrets created via the cloudCredential API the field name is the portion after the
+	// config-type prefix (e.g. for "genericConfig-apiKey" the SecretField is "apiKey").
+	// +required
+	SecretField string `json:"secretField"`
 }
 
 type ProxyEndpointStatus struct{}
