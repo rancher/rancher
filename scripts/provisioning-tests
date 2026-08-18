@@ -161,6 +161,15 @@ fi
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
 touch /tmp/rancher.log
 
+# Point the local k3s etcd database to ram to avoid disk pressure
+ETCD_DIR=/var/lib/rancher/k3s/server/db
+if ! mountpoint -q "$ETCD_DIR"; then
+  mkdir -p "$ETCD_DIR"
+  mount -t tmpfs -o size=${V2PROV_ETCD_TMPFS_SIZE:-2g} tmpfs "$ETCD_DIR" \
+    && echo "Mounted tmpfs over $ETCD_DIR" \
+    || echo "WARNING: tmpfs mount failed; k3s etcd using disk"
+fi
+
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
