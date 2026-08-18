@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -35,16 +36,15 @@ import (
 )
 
 var (
-	VERSION             = "dev"
-	hasEverConnected    = false
-	consecutiveFailures = 0
-	maxAttempts         = 30
+	VERSION = "dev"
 )
 
 const (
-	Token          = "X-API-Tunnel-Token"
-	Params         = "X-API-Tunnel-Params"
-	caFileLocation = "/etc/kubernetes/ssl/certs/serverca"
+	Token                        = "X-API-Tunnel-Token"
+	Params                       = "X-API-Tunnel-Params"
+	caFileLocation               = "/etc/kubernetes/ssl/certs/serverca"
+	defaultMaxConnectionAttempts = 30
+	maxConnectionAttemptsEnv     = "CATTLE_MAX_CONNECTION_ATTEMPTS"
 )
 
 func main() {
@@ -119,6 +119,8 @@ func connected() {
 
 func run(ctx context.Context) error {
 	topContext := signals.SetupSignalContext()
+	hasEverConnected := false
+	consecutiveFailures := 0
 
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
 	params, err := getParams()
@@ -309,12 +311,28 @@ func run(ctx context.Context) error {
 		}, onConnect)
 		if hasEverConnected {
 			consecutiveFailures++
-			if consecutiveFailures >= maxAttempts {
-				logrus.Fatalf("Cannot reconnect to %s after %d consecutive attempts, exiting for pod restart", wsURL, consecutiveFailures)
+			maxAttempts := getMaxConnectionAttempts()
+			if maxAttempts >= 0 && consecutiveFailures >= maxAttempts {
+				return fmt.Errorf("cannot reconnect to %s after %d consecutive attempts, exiting for pod restart", wsURL, consecutiveFailures)
 			}
 		}
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func getMaxConnectionAttempts() int {
+	raw := os.Getenv(maxConnectionAttemptsEnv)
+	if raw == "" {
+		return defaultMaxConnectionAttempts
+	}
+
+	attempts, err := strconv.Atoi(raw)
+	if err != nil {
+		logrus.Warnf("invalid %s=%q, using default %d", maxConnectionAttemptsEnv, raw, defaultMaxConnectionAttempts)
+		return defaultMaxConnectionAttempts
+	}
+
+	return attempts
 }
 
 func exitCertWriter(ctx context.Context) {
