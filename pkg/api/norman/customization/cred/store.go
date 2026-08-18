@@ -64,11 +64,6 @@ func configExists(data map[string]interface{}) bool {
 // callers include a "genericConfig" field in their data, e.g.:
 //   { "genericConfig": { "apiKey": "...", "username": "..." } }
 
-// Note: the check above accepts any "*Config" suffix, including "genericConfig".
-// This means generic (non-cloud-provider) credentials are supported as long as
-// callers include a "genericConfig" field in their data, e.g.:
-//   { "genericConfig": { "apiKey": "...", "username": "..." } }
-
 func decodeNonPasswordFields(data data.Object) error {
 	for key, val := range data {
 		if strings.HasSuffix(key, "Config") {
