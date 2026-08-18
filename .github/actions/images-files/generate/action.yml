@@ -11,7 +11,7 @@ runs:
     - id: env
       name: Setup Dependencies Env Variables
       uses: ./.github/actions/setup-build-env
-    - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
       with:
         go-version: '${{ steps.env.outputs.GO_VERSION }}'
         cache: false

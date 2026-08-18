@@ -14,18 +14,18 @@ permissions:
 env:
   GOARCH: amd64
   CGO_ENABLED: 0
-  SETUP_GO_VERSION: '1.22.*'
+  SETUP_GO_VERSION: '1.26.*'
 
 jobs:
   run-tests:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.3.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.SETUP_GO_VERSION }}
           cache: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }} # zizmor: ignore[cache-poisoning] -- test-only dependency cache; release workflows are separate.
