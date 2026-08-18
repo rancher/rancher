@@ -293,7 +293,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
@@ -338,8 +338,9 @@ func TestCreateUpdate(t *testing.T) {
 							Name: "cattle-globalrolebinding-test-grb",
 						},
 						RoleRef: rbacv1.RoleRef{
-							Name: getCRName(gr.Name),
-							Kind: clusterRoleKind,
+							APIGroup: rbacv1.GroupName,
+							Name:     getCRName(gr.Name),
+							Kind:     clusterRoleKind,
 						},
 					}, nil
 				}
@@ -431,7 +432,7 @@ func TestCreateUpdate(t *testing.T) {
 				bindingName := "cattle-globalrolebinding-" + grb.Name
 				roleName := "cattle-globalrole-" + gr.Name
 				require.Equal(stateChanges.t, bindingName, crb.Name)
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 
 				// fleet workspace assertions
@@ -551,7 +552,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, "GlobalRoleBinding", ownerRef.Kind)
 				require.Equal(stateChanges.t, "test-grb", ownerRef.Name)
 				require.Equal(stateChanges.t, types.UID("1234"), ownerRef.UID)
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
@@ -683,7 +684,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
@@ -799,7 +800,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 				// fleet workspace assertions
@@ -929,7 +930,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
