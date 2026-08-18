@@ -118,7 +118,7 @@ scopes:
           - 'CATTLE_K3S_VERSION'
     tests:
       - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
-      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$'}
+      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$' }
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
@@ -126,6 +126,7 @@ scopes:
       - '^pkg/controllers/capr/etcdmgmt/'             # also imported
       - '^pkg/controllers/capr/machinedrain/'         # also basic
       - '^pkg/rkecerts/'
+      - '^pkg/operations/'
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     tests:
@@ -151,8 +152,8 @@ scopes:
       - '^pkg/provisioningv2/prebootstrap/'
       - '^tests/v2prov/tests/prebootstrap/'
     tests:
-      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8, disk: "" }
-      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8, disk: "" }
+      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
 
 #  An example of a scope that should only run when ALL=1, or the 'full' scope is triggered
 #  nightly:
