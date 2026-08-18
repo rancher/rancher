@@ -179,11 +179,11 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 	}{
 		// NOTE: These test can be run in parallel only if the global role names are unique
 		{
-			name: "create primary cluster role given cr-name",
+			name: "ignore cr-name label and use global role name for cluster role",
 			globalRole: v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						crNameLabel: "cr-name",
+						crNameLabel: "cr-label",
 					},
 					Name: "cr-name-gr",
 				},
@@ -191,7 +191,7 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 			},
 			clusterRole: rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "cr-name",
+					Name: "cattle-globalrole-cr-name-gr",
 				},
 				Rules: []rbacv1.PolicyRule{getPodRule},
 			},
@@ -252,7 +252,6 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		s.Run(test.name, func() {
 			t := s.T()
 			t.Parallel()
