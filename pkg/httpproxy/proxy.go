@@ -43,6 +43,12 @@ const (
 	hostRegex    = "[A-Za-z0-9-]+"
 	CSP          = "Content-Security-Policy"
 	XContentType = "X-Content-Type-Options"
+
+	MatchScoreExcellent = 3
+	MatchScoreGood      = 2
+	MatchScoreFair      = 1
+	MatchScorePoor      = 0
+	MatchScoreLowest    = -1
 )
 
 var (
@@ -429,7 +435,7 @@ func (p *proxy) findMatchingRoute(host string) *mgmt.ProxyEndpointRoute {
 		return nil
 	}
 	var best *mgmt.ProxyEndpointRoute
-	bestScore := -1
+	bestScore := MatchScoreLowest
 	bestPatternLen := -1
 	for _, ep := range endpoints {
 		for i := range ep.Spec.Routes {
@@ -459,20 +465,20 @@ func routeMatchesHost(pattern, host string) bool {
 // Higher score means higher specificity.
 func routeMatchScore(pattern, host string) (int, bool) {
 	if pattern == host {
-		return 3, true
+		return MatchScoreExcellent, true
 	}
 	if isOverlyBroad(pattern) {
-		return 0, false
+		return MatchScorePoor, false
 	}
 	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(host, pattern[1:]) {
-		return 1, true
+		return MatchScoreFair, true
 	}
 	if strings.Contains(pattern, ".%.") || strings.HasPrefix(pattern, "%.") {
 		if constructRegex(pattern).MatchString(host) {
-			return 2, true
+			return MatchScoreGood, true
 		}
 	}
-	return 0, false
+	return MatchScorePoor, false
 }
 
 // applyRouteInjection fetches the credential identified by credID in cAuth, then applies the
