@@ -293,7 +293,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
@@ -336,6 +336,11 @@ func TestCreateUpdate(t *testing.T) {
 					return &rbacv1.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "cattle-globalrolebinding-test-grb",
+						},
+						RoleRef: rbacv1.RoleRef{
+							APIGroup: rbacv1.GroupName,
+							Name:     getCRName(gr.Name),
+							Kind:     clusterRoleKind,
 						},
 					}, nil
 				}
@@ -427,14 +432,14 @@ func TestCreateUpdate(t *testing.T) {
 				bindingName := "cattle-globalrolebinding-" + grb.Name
 				roleName := "cattle-globalrole-" + gr.Name
 				require.Equal(stateChanges.t, bindingName, crb.Name)
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 
 				// fleet workspace assertions
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(&grb, testPrincipal),
+			wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
 			wantError:    false,
 		},
 		{
@@ -547,7 +552,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, "GlobalRoleBinding", ownerRef.Kind)
 				require.Equal(stateChanges.t, "test-grb", ownerRef.Name)
 				require.Equal(stateChanges.t, types.UID("1234"), ownerRef.UID)
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
@@ -679,7 +684,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
@@ -687,7 +692,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(&grb, testPrincipal),
+			wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
 			wantError:    true,
 		},
 		{
@@ -795,14 +800,14 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 				// fleet workspace assertions
 				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
 			},
 			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(&grb, testPrincipal),
+			wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
 			wantError:    true,
 		},
 		{
@@ -925,7 +930,7 @@ func TestCreateUpdate(t *testing.T) {
 				require.Equal(stateChanges.t, bindingName, crb.Name)
 				require.Len(stateChanges.t, crb.OwnerReferences, 1)
 				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+				require.Equal(stateChanges.t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
 				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
 				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
 
@@ -1276,7 +1281,11 @@ func TestCreateUpdate(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
 				grListerMock := fakes.GlobalRoleListerMock{}
-				crbListerMock := rbacFakes.ClusterRoleBindingListerMock{}
+				crbListerMock := rbacFakes.ClusterRoleBindingListerMock{
+					ListFunc: func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+						return nil, nil
+					},
+				}
 				clusterCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
 				crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
 				crbClientMock := rbacFakes.ClusterRoleBindingInterfaceMock{}
@@ -2043,6 +2052,432 @@ func TestReconcileClusterPermissions(t *testing.T) {
 			}
 			if test.stateAssertions != nil {
 				test.stateAssertions(*state.stateChanges)
+			}
+		})
+	}
+
+}
+
+func TestReconcileGlobalRoleBinding(t *testing.T) {
+	t.Parallel()
+
+	testGRB := v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-grb",
+			UID:  "1234",
+		},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "GlobalRoleBinding",
+		},
+		GlobalRoleName: "test-gr",
+		UserName:       "test-user",
+	}
+
+	expectedCRB := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: getCRBName("test-grb"),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "GlobalRoleBinding",
+					Name:       "test-grb",
+					UID:        "1234",
+				},
+			},
+			Labels: map[string]string{
+				"authz.management.cattle.io/globalrolebinding": "true",
+				grbOwnerLabel: "test-grb",
+			},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: rbacv1.GroupName,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Name:     getCRName("test-gr"),
+			Kind:     clusterRoleKind,
+		},
+	}
+
+	staleNamedCRB := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "stale-cluster-role-binding-name",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "GlobalRoleBinding",
+					Name:       "test-grb",
+					UID:        "1234",
+				},
+			},
+			Labels: map[string]string{
+				"authz.management.cattle.io/globalrolebinding": "true",
+				grbOwnerLabel: "test-grb",
+			},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: rbacv1.GroupName,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Name:     getCRName("test-gr"),
+			Kind:     clusterRoleKind,
+		},
+	}
+
+	type controllers struct {
+		crbLister *rbacFakes.ClusterRoleBindingListerMock
+		crbClient *rbacFakes.ClusterRoleBindingInterfaceMock
+	}
+
+	tests := []struct {
+		name             string
+		setupControllers func(t *testing.T, c controllers)
+		inputObject      *v3.GlobalRoleBinding
+		wantError        bool
+		wantAnnotation   string
+	}{
+		{
+			name: "create new clusterRoleBinding",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					require.Equal(t, expectedCRB.DeepCopy(), crb)
+					return &expectedCRB, nil
+				}
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: getCRBName("test-grb"),
+		},
+		{
+			name: "clusterRoleBinding creation fails",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, fmt.Errorf("server unavailable")
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "clusterRoleBinding already exists no update needed",
+			setupControllers: func(t *testing.T, c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{existingCRB}, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return existingCRB, nil
+				}
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: getCRBName("test-grb"),
+		},
+		{
+			name: "update clusterRoleBinding subject",
+			setupControllers: func(t *testing.T, c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "User",
+						Name:     "old-user",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{existingCRB}, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return existingCRB, nil
+				}
+				updatedCRB := expectedCRB.DeepCopy()
+				c.crbClient.UpdateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					require.Equal(t, updatedCRB, crb)
+					return updatedCRB, nil
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   false,
+		},
+		{
+			name: "update clusterRoleBinding roleRef",
+			setupControllers: func(t *testing.T, c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.RoleRef = rbacv1.RoleRef{
+					Name: "old-role",
+					Kind: clusterRoleKind,
+				}
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{existingCRB}, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return existingCRB, nil
+				}
+				c.crbClient.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					require.Equal(t, existingCRB.Name, name)
+					return nil
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					require.Equal(t, expectedCRB.DeepCopy(), crb)
+					return expectedCRB.DeepCopy(), nil
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   false,
+		},
+		{
+			name: "update clusterRoleBinding subject and roleRef",
+			setupControllers: func(t *testing.T, c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "User",
+						Name:     "old-user",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				existingCRB.RoleRef = rbacv1.RoleRef{
+					Name: "old-role",
+					Kind: clusterRoleKind,
+				}
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{existingCRB}, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return existingCRB, nil
+				}
+				c.crbClient.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					require.Equal(t, existingCRB.Name, name)
+					return nil
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					require.Equal(t, expectedCRB.DeepCopy(), crb)
+					return expectedCRB.DeepCopy(), nil
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   false,
+		},
+		{
+			name: "roleRef change: delete fails",
+			setupControllers: func(t *testing.T, c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.RoleRef = rbacv1.RoleRef{
+					Name: "old-role",
+					Kind: clusterRoleKind,
+				}
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{existingCRB}, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return existingCRB, nil
+				}
+				c.crbClient.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("server unavailable")
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "roleRef change: recreate fails",
+			setupControllers: func(t *testing.T, c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.RoleRef = rbacv1.RoleRef{
+					Name: "old-role",
+					Kind: clusterRoleKind,
+				}
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{existingCRB}, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return existingCRB, nil
+				}
+				c.crbClient.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return nil
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, fmt.Errorf("server unavailable")
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "update clusterRoleBinding fails",
+			setupControllers: func(t *testing.T, c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "User",
+						Name:     "old-user",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{existingCRB}, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return existingCRB, nil
+				}
+				c.crbClient.UpdateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, fmt.Errorf("server unavailable")
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "stale-named ClusterRoleBinding is deleted and the correct one is created",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{staleNamedCRB.DeepCopy()}, nil
+				}
+				c.crbClient.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					require.Equal(t, staleNamedCRB.Name, name)
+					return nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					return expectedCRB.DeepCopy(), nil
+				}
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: getCRBName("test-grb"),
+		},
+		{
+			name: "stale-named ClusterRoleBinding already gone is not an error",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{staleNamedCRB.DeepCopy()}, nil
+				}
+				c.crbClient.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}, staleNamedCRB.Name)
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					return expectedCRB.DeepCopy(), nil
+				}
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: getCRBName("test-grb"),
+		},
+		{
+			name: "deleting a stale-named ClusterRoleBinding fails",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return []*rbacv1.ClusterRoleBinding{staleNamedCRB.DeepCopy()}, nil
+				}
+				c.crbClient.DeleteFunc = func(name string, options *metav1.DeleteOptions) error {
+					return fmt.Errorf("server unavailable")
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "listing ClusterRoleBindings fails",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return nil, fmt.Errorf("server unavailable")
+				}
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "group principal binding",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(namespace string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				c.crbLister.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+					return nil, nil
+				}
+				groupCRB := expectedCRB.DeepCopy()
+				groupCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "Group",
+						Name:     "test-group",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					require.Equal(t, groupCRB, crb)
+					return groupCRB, nil
+				}
+			},
+			inputObject: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-grb",
+					UID:  "1234",
+				},
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "GlobalRoleBinding",
+				},
+				GlobalRoleName:     "test-gr",
+				GroupPrincipalName: "test-group",
+			},
+			wantError:      false,
+			wantAnnotation: getCRBName("test-grb"),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			controllers := controllers{
+				crbLister: &rbacFakes.ClusterRoleBindingListerMock{},
+				crbClient: &rbacFakes.ClusterRoleBindingInterfaceMock{},
+			}
+			if test.setupControllers != nil {
+				test.setupControllers(t, controllers)
+			}
+
+			grbLifecycle := globalRoleBindingLifecycle{
+				crbLister: controllers.crbLister,
+				crbClient: controllers.crbClient,
+				status:    status.NewStatus(),
+			}
+			var conditions []metav1.Condition
+			resErr := grbLifecycle.reconcileGlobalRoleBinding(test.inputObject, &conditions)
+			if test.wantError {
+				require.Error(t, resErr)
+			} else {
+				require.NoError(t, resErr)
+			}
+
+			if test.wantAnnotation != "" {
+				require.Equal(t, test.wantAnnotation, test.inputObject.Annotations[crbNameAnnotation])
 			}
 		})
 	}
