@@ -526,6 +526,9 @@ func (h *handler) ensureCRTTokenReaderRole(namespace string) error {
 	for _, crt := range crts {
 		secretNames = append(secretNames, SecretName(crt.Name))
 	}
+	// Sort so the desired Rules are deterministic and the DeepEqual doesn't
+	// trigger an unnecessary Update when the list is unchanged.
+	slices.Sort(secretNames)
 
 	// If no CRT Secrets exist, delete the Role if it exists
 	if len(secretNames) == 0 {
