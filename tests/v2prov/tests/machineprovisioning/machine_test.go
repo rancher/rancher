@@ -39,6 +39,7 @@ func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -127,6 +128,7 @@ func Test_Provisioning_MP_MachineTemplateClonedAnnotations(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
+	t.Parallel()
 
 	clients, err := clients.New()
 	if err != nil {
@@ -191,6 +193,7 @@ func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
+	t.Parallel()
 
 	clients, err := clients.New()
 	if err != nil {
@@ -421,7 +424,6 @@ func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) 
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
-	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -478,6 +480,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	drainOpt := rkev1.DrainOptions{
 		IgnoreDaemonSets:                ptr.To(true),
@@ -674,6 +677,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	clients, err := clients.New()
 	require.NoError(t, err)
 	defer clients.Close()
+	t.Parallel()
 
 	ctx := clients.Ctx
 

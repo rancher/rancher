@@ -27,6 +27,7 @@ func Test_Fleet_ClusterBootstrap(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	t.Run("fleet local cluster and cluster group present", func(t *testing.T) {
 		lc := &fleetv1api.Cluster{}
