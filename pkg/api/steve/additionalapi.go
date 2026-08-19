@@ -22,19 +22,16 @@ import (
 
 func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Handler {
 	if features.RKE2.Enabled() {
-		connectHandler := configserver.New(config)
-		mux := http.NewServeMux()
-		mux.Handle(configserver.ConnectAgent, connectHandler)
-		mux.Handle(configserver.ConnectConfigYamlPath, connectHandler)
-		mux.Handle(configserver.ConnectClusterInfo, connectHandler)
-		mux.Handle(installer.SystemAgentInstallPath, installer.Handler)
-		mux.Handle(installer.WindowsRke2InstallPath, installer.Handler)
 		var nextHandler http.Handler
-		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if nextHandler != nil {
-				nextHandler.ServeHTTP(w, r)
-			}
-		}))
+		mux := NewPreMCMMux(PreMCMRoutes{
+			ConfigServer: configserver.New(config),
+			Installer:    installer.Handler,
+			Next: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if nextHandler != nil {
+					nextHandler.ServeHTTP(w, r)
+				}
+			}),
+		})
 		return func(next http.Handler) http.Handler {
 			nextHandler = next
 			return mux
@@ -44,6 +41,25 @@ func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Hand
 	return func(next http.Handler) http.Handler {
 		return next
 	}
+}
+
+// PreMCMRoutes are the handlers served ahead of the multi-cluster management
+// mux. All fields are required.
+type PreMCMRoutes struct {
+	ConfigServer http.Handler
+	Installer    http.Handler
+	Next         http.Handler
+}
+
+func NewPreMCMMux(routes PreMCMRoutes) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle(configserver.ConnectAgent, routes.ConfigServer)
+	mux.Handle(configserver.ConnectConfigYamlPath, routes.ConfigServer)
+	mux.Handle(configserver.ConnectClusterInfo, routes.ConfigServer)
+	mux.Handle(installer.SystemAgentInstallPath, routes.Installer)
+	mux.Handle(installer.WindowsRke2InstallPath, routes.Installer)
+	mux.Handle("/", routes.Next)
+	return mux
 }
 
 func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.Server) (func(http.Handler) http.Handler, error) {
@@ -60,14 +76,20 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 		return nil, err
 	}
 
-	mux := http.NewServeMux()
-	if features.UIExtension.Enabled() {
-		catalog.RegisterUIPluginHandlers(mux)
+	var nextHandler http.Handler
+	routes := AdditionalAPIRoutes{
+		Github: githubHandler,
+		Tunnel: Tunnel(config),
+		Next: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if nextHandler != nil {
+				nextHandler.ServeHTTP(w, r)
+			}
+		}),
 	}
-	mux.Handle("/v1/github/{path...}", githubHandler)
-	mux.Handle("/v3/connect", Tunnel(config))
 
-	health.Register(mux)
+	if features.UIExtension.Enabled() {
+		routes.RegisterUIPlugins = catalog.RegisterUIPluginHandlers
+	}
 
 	if features.OIDCProvider.Enabled() {
 		p, err := provider.NewProvider(ctx, exttokenstore.NewSystemFromWrangler(config),
@@ -79,19 +101,45 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 		if err != nil {
 			return nil, err
 		}
-		p.RegisterOIDCProviderHandles(mux)
+		routes.RegisterOIDC = p.RegisterOIDCProviderHandles
 	}
 
-	var nextHandler http.Handler
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if nextHandler != nil {
-			nextHandler.ServeHTTP(w, r)
-		}
-	}))
+	mux := NewAdditionalAPIMux(routes)
+
 	return func(next http.Handler) http.Handler {
 		nextHandler = clusterAPI(next)
 		return mux
 	}, nil
+}
+
+// AdditionalAPIRoutes are the handlers served by the extras mux. Github, Tunnel
+// and Next are required. RegisterUIPlugins and RegisterOIDC are feature gated:
+// when nil, their paths fall through to Next.
+type AdditionalAPIRoutes struct {
+	Github http.Handler
+	Tunnel http.Handler
+	Next   http.Handler
+
+	RegisterUIPlugins func(*http.ServeMux)
+	RegisterOIDC      func(*http.ServeMux)
+}
+
+func NewAdditionalAPIMux(routes AdditionalAPIRoutes) *http.ServeMux {
+	mux := http.NewServeMux()
+	if routes.RegisterUIPlugins != nil {
+		routes.RegisterUIPlugins(mux)
+	}
+	mux.Handle("/v1/github/{path...}", routes.Github)
+	mux.Handle("/v3/connect", routes.Tunnel)
+
+	health.Register(mux)
+
+	if routes.RegisterOIDC != nil {
+		routes.RegisterOIDC(mux)
+	}
+
+	mux.Handle("/", routes.Next)
+	return mux
 }
 
 func Tunnel(config *wrangler.Context) http.Handler {
