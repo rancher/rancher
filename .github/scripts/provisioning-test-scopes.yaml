@@ -178,6 +178,7 @@ full:
   - '^tests/v2prov/(clients|cluster|defaults|namespace|nodeconfig|objectstore|operations|registry|systemdnode|utils|wait)/' # framework (everything under tests/v2prov except 'tests/'. Individual tests are included in more specific scopes above)
   - '^scripts/provisioning-tests$'                    # the runner
   - '^\.github/workflows/provisioning-tests\.ya?ml$'
+  - '^trigger_ci$' # created by the 'Create CI Testing PR' workflow
 
 # Mainly here for documentation, these directories are provisioning related but don't
 # actually have any existing test coverage in the provv2 test suite. They're listed here
