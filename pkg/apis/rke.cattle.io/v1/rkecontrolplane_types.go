@@ -8,7 +8,7 @@ import (
 type RKEControlPlaneSpec struct {
 	ClusterConfiguration `json:",inline"`
 
-	// This field is used to store the chart values for the RKE2 or K3s Helm chart
+	// This field is used to store the chart values for Helm chart
 	// that is used to deploy the control plane components.
 	// Carrying the values as an opaque string keeps them intact, because a string
 	// is replaced atomically by a merge patch.
