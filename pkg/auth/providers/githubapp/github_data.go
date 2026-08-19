@@ -10,7 +10,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v73/github"
+	"github.com/google/go-github/v90/github"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"golang.org/x/oauth2"
 	"k8s.io/utils/ptr"
