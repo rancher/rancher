@@ -22,6 +22,54 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; the
   sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
 fi
 
+echo "Total system resources: $(nproc) CPUs, $(free -m | awk '/^Mem:/{print $2}')MB RAM"
+
+vmstat 5 > /tmp/c &
+CPU_PID=$!
+
+# 1s cadence (not 5s): a pre-OOM memory spike that kills embedded k3s/Rancher can rise and
+# get SIGKILLed inside a single 5s window. `free -m` in a loop is essentially free.
+( while true; do free -m | awk '/^Mem:/{print $3}'; sleep 1; done ) > /tmp/m &
+MEM_PID=$!
+
+# Per-core CPU sampler (1s). The aggregate vmstat number above hides single-core saturation:
+# on a 16-core box one pegged core reads as ~6% aggregate, yet etcd's raft-apply/fsync path is
+# largely single-threaded, so a single saturated (or steal-starved) core can stall etcd while
+# overall CPU looks idle - and logs keep flowing, since the process as a whole is still scheduled.
+# Records, every second, the busiest single core, the average across cores, and aggregate
+# iowait/steal + run-queue, so a CPU spike can be lined up against etcd slow-write markers in the
+# correlation in disk-telemetry.sh. Reads /proc/stat directly (no sysstat/mpstat dependency).
+CPU_PERCORE_CSV=/tmp/cpu-percore.csv
+echo "epoch,elapsed_s,ncpu,max_core_busy_pct,avg_core_busy_pct,agg_iowait_pct,agg_steal_pct,runq" > "$CPU_PERCORE_CSV"
+# Emit, per /proc/stat cpu line: name, total-jiffies, idle, iowait, steal.
+percore_snapshot() { awk '/^cpu[0-9]*[[:space:]]/{tot=0; for(i=2;i<=NF;i++) tot+=$i; print $1, tot, $5, $6, $9}' /proc/stat; }
+(
+  prev=$(percore_snapshot)
+  while true; do
+    sleep 1
+    cur=$(percore_snapshot)
+    awk -v epoch="$(date +%s)" -v el="$SECONDS" -v runq="$(cut -d' ' -f1 /proc/loadavg)" '
+      FNR==NR { pt[$1]=$2; pidle[$1]=$3; piow[$1]=$4; pst[$1]=$5; next }
+      {
+        dt=$2-pt[$1]; if (dt<=0) next
+        didle=$3-pidle[$1]; diow=$4-piow[$1]; dst=$5-pst[$1]
+        busy=100*(dt-didle-diow)/dt          # user+sys+irq+softirq+steal (excludes idle & iowait)
+        if ($1=="cpu") { agg_iow=100*diow/dt; agg_st=100*dst/dt }
+        else { n++; s+=busy; if (n==1 || busy>mx) mx=busy }
+      }
+      END { if (n) printf "%s,%s,%d,%.1f,%.1f,%.1f,%.1f,%s\n", epoch, el, n, mx, s/n, agg_iow, agg_st, runq }
+    ' <(printf '%s\n' "$prev") <(printf '%s\n' "$cur") >> "$CPU_PERCORE_CSV"
+    prev=$cur
+  done
+) &
+CPU_PERCORE_PID=$!
+
+# Disk I/O telemetry: timestamped queue depth/throughput/latency, best-effort EBS throttle
+# counters on Nitro/NVMe instances, and correlation against etcd slow-write log markers.
+# See scripts/disk-telemetry.sh for what disk_telemetry_start/disk_telemetry_report do.
+source ./scripts/disk-telemetry.sh
+disk_telemetry_start
+
 cleanup()
 {
     EXIT=$?
@@ -33,6 +81,15 @@ cleanup()
       kill $PID
       wait $PID
     fi
+
+    kill $CPU_PID $MEM_PID $CPU_PERCORE_PID $DISK_SAMPLER_PID 2>/dev/null
+    awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
+    awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
+    awk -F, 'NR>1{mc=$4; n++; s+=mc; if(n==1||mc>x)x=mc; iw+=$6; st+=$7; if(mc>=90)hot++} END{if(n) printf "Per-core CPU -- Peak single-core: %.0f%% | Avg busiest-core: %.0f%% | Samples w/ a core >=90%%: %d/%d | Avg iowait: %.1f%% | Avg steal: %.1f%%\n", x, s/n, hot+0, n, iw/n, st/n}' /tmp/cpu-percore.csv
+
+    disk_telemetry_report
+    rm -f /tmp/c /tmp/m /tmp/cpu-percore.csv
+
     return $EXIT
 }
 
@@ -134,6 +191,16 @@ fi
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
 touch /tmp/rancher.log
 
+# Try and use RAM as the storage for k3s etcd to speed up provisioning tests.
+# If the mount fails, fall back to disk.
+ETCD_DIR=/var/lib/rancher/k3s/server/db
+if ! mountpoint -q "$ETCD_DIR"; then
+  mkdir -p "$ETCD_DIR"
+  mount -t tmpfs -o size=${V2PROV_ETCD_TMPFS_SIZE:-2g} tmpfs "$ETCD_DIR" \
+    && echo "Mounted tmpfs over $ETCD_DIR" \
+    || echo "WARNING: tmpfs mount failed; k3s etcd using disk"
+fi
+
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
@@ -148,6 +215,42 @@ build_and_run_rancher()
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
+            # --- Crash forensics -------------------------------------------------------------
+            # The process is already gone, so capture *why* before restarting. Averages below
+            # describe the whole run and can't explain a point-in-time death; the snapshots here
+            # target the moment of the crash.
+            #
+            # Reap the dead child to recover its exit status. 128+N means it was killed by signal
+            # N; 137 (= 128 + SIGKILL) is the classic kernel OOM-kill signature.
+            set +e
+            wait "$PID" 2>/dev/null; RANCHER_EXIT=$?
+            set -e
+            if [ "${RANCHER_EXIT:-0}" -gt 128 ]; then
+                echo "Rancher process exit status: ${RANCHER_EXIT} (killed by signal $((RANCHER_EXIT - 128)))"
+            else
+                echo "Rancher process exit status: ${RANCHER_EXIT} (exited on its own)"
+            fi
+            # A kernel OOM-kill leaves NO panic in rancher.log (the process just gets SIGKILL), so
+            # dmesg is the only evidence. If nothing matches the OOM grep, the death was not an
+            # OOM and rancher.log/k3s.log below should carry a panic or fatal error.
+            echo "=== dmesg tail (kernel/OOM evidence) ==="
+            dmesg 2>/dev/null | tail -50 || echo "dmesg unavailable"
+            echo "=== dmesg OOM-killer matches ==="
+            dmesg 2>/dev/null | grep -iE "oom-kill|killed process|out of memory|oom_reaper" | tail -20 || true
+            # Ring-buffer: the seconds leading up to the death, at sampler resolution, instead of
+            # the run-wide averages. vmstat columns of interest: r=run-queue, b=blocked-on-IO,
+            # wa=iowait%, bo=blocks-written/s - a direct read on what was starved at crash time.
+            echo "=== last ~75s CPU before death (raw vmstat; watch r / b / wa / bo) ==="
+            tail -15 /tmp/c 2>/dev/null || true
+            echo "=== last ~60s mem used (MB) before death ==="
+            tail -60 /tmp/m 2>/dev/null || true
+            echo "=== last ~30s per-core CPU before death (max/avg busy, iowait, steal, runq) ==="
+            { head -1 /tmp/cpu-percore.csv; tail -30 /tmp/cpu-percore.csv; } 2>/dev/null || true
+            disk_telemetry_death_snapshot
+            # --- end crash forensics ---------------------------------------------------------
+            awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
+            awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
+            awk -F, 'NR>1{mc=$4; n++; s+=mc; if(n==1||mc>x)x=mc; iw+=$6; st+=$7; if(mc>=90)hot++} END{if(n) printf "Per-core CPU -- Peak single-core: %.0f%% | Avg busiest-core: %.0f%% | Samples w/ a core >=90%%: %d/%d | Avg iowait: %.1f%% | Avg steal: %.1f%%\n", x, s/n, hot+0, n, iw/n, st/n}' /tmp/cpu-percore.csv
             dump_rancher_logs
             echo K3s logs were:
             echo -e "-----K3S-LOG-DUMP-START-----"
@@ -167,7 +270,7 @@ build_and_run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          ./scripts/run --debug >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2

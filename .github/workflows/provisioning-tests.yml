@@ -38,6 +38,7 @@ jobs:
       - spot=false
       - runner=16cpu-linux-x64
       - run-id=${{ github.run_id }}
+      - disk=large
     env:
       # The registry-cache pod exposes a host port, so use the Docker bridge IP from the runner.
       REGISTRY: "172.17.0.2:5000"
