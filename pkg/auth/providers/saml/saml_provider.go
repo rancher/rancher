@@ -1,10 +1,12 @@
 package saml
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/pkg/errors"
@@ -54,28 +56,32 @@ type Provider struct {
 	sloForced       bool
 
 	getSamlConfig  func() (*apiv3.SamlConfig, error)
-	assertionCache *assertionCache
+	assertionStore assertionStore
 }
 
 var SamlProviders = make(map[string]*Provider)
 
-func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	provider := &Provider{
-		authConfigs:    mgmtCtx.Management.AuthConfigs(""),
-		secrets:        mgmtCtx.Wrangler.Core.Secret(),
-		samlTokens:     mgmtCtx.Management.SamlTokens(""),
-		userMGR:        userMGR,
-		tokenMGR:       tokenMGR,
-		name:           name,
-		userType:       name + "_user",
-		groupType:      name + "_group",
-		userSearcher:   common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
-		assertionCache: newAssertionCache(),
+		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
+		secrets:      mgmtCtx.Wrangler.Core.Secret(),
+		samlTokens:   mgmtCtx.Management.SamlTokens(""),
+		userMGR:      userMGR,
+		tokenMGR:     tokenMGR,
+		name:         name,
+		userType:     name + "_user",
+		groupType:    name + "_group",
+		userSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 	}
 	provider.getSamlConfig = provider.getSamlConfigFromUnstructured
 	if provider.hasLdapGroupSearch() {
 		provider.ldapProvider = ldap.Configure(mgmtCtx, userMGR, tokenMGR, name)
 	}
+
+	logrus.Debugf("SAML: Using ConfigMap assertion store for %v", name)
+	store := newConfigMapIDStore(mgmtCtx.Wrangler.Core.ConfigMap(), mgmtCtx.Wrangler.Core.ConfigMap().Cache())
+	provider.assertionStore = store
+	go store.cleanUpExpiredAssertionIDs(ctx, time.Tick(time.Minute))
 
 	SamlProviders[name] = provider
 	return provider
