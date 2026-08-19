@@ -132,7 +132,8 @@ scopes:
     tests:
       - { dist: k3s,  regex: '^Test_Operation_.*$'}        # k3s runs all ops in one instance
       - { dist: rke2, regex: '^Test_Operation_SetA_.*$'}
-      - { dist: rke2, regex: '^Test_Operation_SetB_.*$'}
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$'}
+      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
 
   imported:
     package-paths:
