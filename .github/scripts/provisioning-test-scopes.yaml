@@ -97,6 +97,21 @@ scopes:
       - '^tests/v2prov/tests/fleet/'
       - '^tests/v2prov/tests/autoscaler/'
     file-paths:
+      - path: "^go.mod$"
+        substrings:
+          - 'github.com/rancher/wrangler'
+          - 'github.com/rancher/lasso'
+          - 'github.com/k3s'
+          - 'github.com/rancher/dynamiclistener'
+          - 'github.com/rancher/remotedialer'
+          - 'github.com/rancher/fleet'
+          - 'github.com/rancher/machine'
+          - 'github.com/rancher/remotedialer-proxy'
+          - 'github.com/rancher/steve'
+          - 'github.com/stretchr/testify'
+      - path: "^pkg/apis/go.mod$"
+        substrings:
+            - 'github.com/rancher/norman'
       - path: '^build.yaml'
         substrings:
           - 'turtlesVersion:'
@@ -163,6 +178,15 @@ scopes:
 #      - { dist: rke2,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
 
 full:
+  - path: '^go.mod$'
+    substrings:
+      - 'github.com/rancher/cluster-api-provider-rke2'
+      - 'k8s.io/' # all kubernetes dependencies
+      - 'sigs.k8s.io/'
+  - path: '^pkg/apis/go.mod$'
+    substrings:
+      - 'k8s.io/'
+      - 'sigs.k8s.io/'
   - '^pkg/controllers/capr/controllers.go'
   - '^pkg/controllers/provisioningv2/controllers.go'
   - '^pkg/capr/planner/'
