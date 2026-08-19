@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
