@@ -132,6 +132,8 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	scalingUpFound := false
 	scalingDownFound := false
 	rollingOutFound := false
+	betterCIFound := true
+	_ = betterCIFound
 
 	for _, cond := range status.Conditions {
 		if cond.Type == string(capiScalingUpCondition) {
