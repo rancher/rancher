@@ -1,7 +1,6 @@
 package saml
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
@@ -23,8 +22,9 @@ import (
 func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
 	// just enough scaffolding to run the Configure function.
-	ctx := context.Background()
+	ctx := t.Context()
 	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
+	mgmtCtx.RunContext = ctx
 	require.NoError(t, err, "Failed to create NewScaledContext")
 
 	// Create the dummy wrangler context
@@ -33,7 +33,7 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	mgmtCtx.Wrangler = wranglerContext
 
 	tokenMGR := tokens.NewManager(wranglerContext)
-	provider, ok := Configure(mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
+	provider, ok := Configure(t.Context(), mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
 	require.True(t, ok, "Failed to Configure a valid Provider")
 
 	assert.True(t, provider.hasLdapGroupSearch(), "Missing LDAP group search capability for okta provider")
