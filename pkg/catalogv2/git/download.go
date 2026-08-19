@@ -21,6 +21,10 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 		if err := git.reset("HEAD"); err != nil {
 			return fmt.Errorf("ensure failure: %w", err)
 		}
+		// Always use HEAD in bundled mode. During upgrades, ClusterRepo.Status.Commit may reference
+		// an old commit. Without this return, attempting to reset to that old commit could revert
+		// bundled charts to an older version, removing new charts needed by the upgraded Rancher.
+		return nil
 	}
 
 	if err := git.clone(""); err != nil {
