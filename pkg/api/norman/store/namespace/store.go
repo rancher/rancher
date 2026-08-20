@@ -170,7 +170,7 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		message := fmt.Sprintf("negative on fields: %s; exceeds projectLimit on fields: %s",
 			utils.FormatResourceList(negatives),
 			utils.FormatResourceList(exceeded))
-		httperror.NewFieldAPIError(httperror.InvalidState, quotaField, message)
+		return httperror.NewFieldAPIError(httperror.InvalidState, quotaField, message)
 	}
 
 	if len(negatives) > 0 {
