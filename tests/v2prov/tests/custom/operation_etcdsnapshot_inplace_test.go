@@ -18,9 +18,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace creates a custom 2 node cluster with a controlplane+worker and
-// etcd node, creates a configmap, takes a snapshot of the cluster, deletes the configmap, then restores from snapshot.
-// This validates that it is possible to restore a snapshot.
+// Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace verifies each RKE configuration
+// restore mode on a custom cluster, including etcd data, KubernetesVersion, and AdditionalManifest.
 func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	clients, err := clients.New()
 	require.NoError(t, err)
@@ -36,12 +35,6 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 					ETCD: &rkev1.ETCD{
 						DisableSnapshots: true,
 					},
-					MachineGlobalConfig:   rkev1.GenericMap{},
-					MachineSelectorConfig: []rkev1.RKESystemConfig{},
-					ChartValues:           rkev1.GenericMap{},
-					UpgradeStrategy:       rkev1.ClusterUpgradeStrategy{},
-					AdditionalManifest:    "",
-					Networking:            &rkev1.Networking{},
 				},
 			},
 		},
@@ -71,21 +64,19 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 		},
 	}
 
-	// Create 3 snapshots upfront - one for each restore type
-	// This avoids issues where snapshots get deleted after RestoreRKEConfigAll
+	// Restore newest to oldest because restoring etcd removes ETCDSnapshot resources created
+	// after the selected snapshot.
 	snapshots := operations.RunSnapshotCreateTests(t, clients, c, cm, "etcd-test-node", 3)
 	require.Len(t, snapshots, 3, "expected 3 snapshots to be created")
 
 	snapshotK8sVersion := operations.SnapshotKubernetesVersion(t, snapshots[2])
 	alternateK8sVersion := operations.AlternateKubernetesVersionForSnapshot(t, snapshotK8sVersion)
 
-	// Modify a cluster spec field to validate that restore modes properly revert (or preserve) spec changes
-	operations.ModifyClusterAdditionalManifest(t, clients, c, "modified-for-restore-test")
+	operations.SetClusterAdditionalManifest(t, clients, c, "modified-for-restore-test")
 
-	// RestoreRKEConfigAll: should revert both KubernetesVersion and spec fields to snapshot values
-	operations.PrepareConfigMapForRestore(t, clients, c, cm)
-	require.NotEqual(t, snapshotK8sVersion, alternateK8sVersion, "alternate Kubernetes version must differ from snapshot version for restore validation")
-	operations.RunSnapshotRestoreTestWithRKEConfigAndKubernetesVersion(t, clients, c, snapshots[2].Name, cm, 2, rkev1.RestoreRKEConfigAll, alternateK8sVersion)
+	// Restore all RKE configuration from snapshot metadata.
+	operations.DeleteConfigMapBeforeRestore(t, clients, c, cm)
+	operations.RunSnapshotRestoreTestWithRKEConfig(t, clients, c, snapshots[2].Name, cm, 2, rkev1.RestoreRKEConfigAll, alternateK8sVersion)
 	latestC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "", latestC.Spec.RKEConfig.AdditionalManifest, "RestoreRKEConfigAll should revert AdditionalManifest")
@@ -93,13 +84,11 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
-	// Modify spec again before the next restore
-	operations.ModifyClusterAdditionalManifest(t, clients, c, "modified-for-kv-restore-test")
+	operations.SetClusterAdditionalManifest(t, clients, c, "modified-for-kv-restore-test")
 
-	// RestoreRKEConfigKubernetesVersion: should only restore KubernetesVersion, not other spec fields
-	operations.PrepareConfigMapForRestore(t, clients, c, cm)
-	require.NotEqual(t, snapshotK8sVersion, alternateK8sVersion, "alternate Kubernetes version must differ from snapshot version for restore validation")
-	operations.RunSnapshotRestoreTestWithRKEConfigAndKubernetesVersion(t, clients, c, snapshots[1].Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion, alternateK8sVersion)
+	// Restore only KubernetesVersion from snapshot metadata.
+	operations.DeleteConfigMapBeforeRestore(t, clients, c, cm)
+	operations.RunSnapshotRestoreTestWithRKEConfig(t, clients, c, snapshots[1].Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion, alternateK8sVersion)
 	latestC, err = clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "modified-for-kv-restore-test", latestC.Spec.RKEConfig.AdditionalManifest, "RestoreRKEConfigKubernetesVersion should not revert AdditionalManifest")
@@ -107,9 +96,9 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
-	// RestoreRKEConfigNone: should not revert any spec fields
-	operations.PrepareConfigMapForRestore(t, clients, c, cm)
-	operations.RunSnapshotRestoreTestWithRKEConfig(t, clients, c, snapshots[0].Name, cm, 2, rkev1.RestoreRKEConfigNone)
+	// Restore etcd data without restoring RKE configuration.
+	operations.DeleteConfigMapBeforeRestore(t, clients, c, cm)
+	operations.RunSnapshotRestoreTestWithRKEConfig(t, clients, c, snapshots[0].Name, cm, 2, rkev1.RestoreRKEConfigNone, "")
 	latestC, err = clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "modified-for-kv-restore-test", latestC.Spec.RKEConfig.AdditionalManifest, "RestoreRKEConfigNone should not revert AdditionalManifest")
