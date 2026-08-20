@@ -1,6 +1,7 @@
 package resourcequota
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 	"testing"
@@ -192,6 +193,10 @@ func TestIsQuotaFit(t *testing.T) {
 
 	failedResource := []api.ResourceName{api.ResourceLimitsMemory}
 
+	badLimit := &v32.ResourceQuotaLimit{LimitsMemory: "not a proper quantity"}
+	parseError := fmt.Errorf("quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'")
+	limitError := fmt.Errorf("parsing quantity %q: %w", "limitsMemory", parseError)
+
 	testcases := map[string]struct {
 		wantErr      error
 		wantExceeds  []api.ResourceName
@@ -200,6 +205,16 @@ func TestIsQuotaFit(t *testing.T) {
 		current      *v32.ResourceQuotaLimit
 		peer         *v32.ResourceQuotaLimit
 	}{
+		"current bad, peer ok, error": {
+			current: badLimit,
+			peer:    peerLimitOk,
+			wantErr: fmt.Errorf("checking quota fit: %w", limitError),
+		},
+		"current ok, peer bad, error": {
+			current: currentLimitOk,
+			peer:    badLimit,
+			wantErr: fmt.Errorf("checking namespace limits: %w", limitError),
+		},
 		"negative for current, ok peer, fail": {
 			wantNegative: failedResource,
 			current:      currentLimitNegative,
