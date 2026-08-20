@@ -79,8 +79,8 @@ const (
 	// persisted on disk, so it can be compared against the hash the distro stamped on the snapshot.
 	// The single format argument is the distro data directory, where the token file is persisted.
 	//
-	// Exported so tests can derive the same value the check derives.
-	TokenHashCommandFormat = `f=%[1]s/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
+	// Exported so e2e tests can derive the same value the check derives.
+	TokenHashCommandFormat = `f=%[1]s/server/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
 
 	// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
 	// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
@@ -90,10 +90,11 @@ const (
 	// helper scripts the controller writes to nodes during the restore.
 	etcdRestoreBinSubdir = "etcd-restore/bin"
 
+	// waitForPodListScriptName is the name of the script file containing the instruction to list pods in all namespaces.
 	waitForPodListScriptName = "wait_for_pod_list.sh"
 
-	nodeCleanupScriptName = "clean_up_nodes.sh"
-
+	// waitForPodListScript is the bash script for listing pods in all namespaces.
+	// Although the script itself accepts a template to execute, it is only used for listing pods.
 	waitForPodListScript = `#!/bin/sh
 
 i=0
@@ -108,6 +109,11 @@ done
 exit 1
 `
 
+	// nodeCleanupScriptName is the name of the script file containing the instruction to clean up nodes no longer
+	// present after restoring.
+	nodeCleanupScriptName = "clean_up_nodes.sh"
+
+	// nodeCleanupScript is the bash script for cleaning up nodes no longer present after restoring.
 	nodeCleanupScript = `#!/bin/sh
 
 if [ -z "$KUBECTL" ]; then
@@ -162,8 +168,7 @@ rm "$NODENAMESFILE"
 
 type handler struct {
 	etcdsnapshotrestores operationcontrollers.ETCDSnapshotRestoreController
-
-	etcdsnapshots rkecontrollers.ETCDSnapshotController
+	etcdsnapshots        rkecontrollers.ETCDSnapshotController
 
 	beacons     plancontrollers.BeaconClient
 	beaconCache plancontrollers.BeaconCache
@@ -171,11 +176,11 @@ type handler struct {
 	secrets     corecontrollers.SecretClient
 	secretCache corecontrollers.SecretCache
 
-	store *plan.Store
-
 	dynamic *dynamic.Controller
 
 	clients *wrangler.CAPIContext
+
+	store *plan.Store
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
@@ -187,8 +192,8 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		secrets:              clients.Core.Secret(),
 		secretCache:          clients.Core.Secret().Cache(),
 		dynamic:              clients.Dynamic,
-		store:                plan.NewStore(clients.Core.Secret()),
 		clients:              clients,
+		store:                plan.NewStore(clients.Core.Secret()),
 	}
 
 	operationcontrollers.RegisterETCDSnapshotRestoreStatusHandler(ctx, clients.Operation.ETCDSnapshotRestore(), "", "etcd-snapshot-restore-handler", h.OnChange)
@@ -1409,7 +1414,6 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 			{
 				SaveOutput: true,
 				CommonInstruction: plan.CommonInstruction{
-					// The name is the key the output is read back under; see reconcilePreflight.
 					Name:    preflightInstructionName,
 					Command: "/bin/sh",
 					Args: []string{

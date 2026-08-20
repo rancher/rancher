@@ -274,8 +274,6 @@ func (f *fakeBeaconClient) UpdateStatus(b *planv1alpha1.Beacon) (*planv1alpha1.B
 	return b, nil
 }
 
-// --- updateStatus ---------------------------------------------------------------------------
-
 func TestUpdateStatusPaused(t *testing.T) {
 	t.Parallel()
 
@@ -337,6 +335,8 @@ func TestUpdateStatusByPhase(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			op := newOp()
 			status := updateStatus(op, opv1alpha1.ETCDSnapshotSaveStatus{
 				OperationStatus: opv1alpha1.OperationStatus{Phase: tc.phase},
@@ -345,8 +345,6 @@ func TestUpdateStatusByPhase(t *testing.T) {
 		})
 	}
 }
-
-// --- handlePending --------------------------------------------------------------------------
 
 func TestHandlePending_NilBeacon(t *testing.T) {
 	t.Parallel()
@@ -418,8 +416,6 @@ func TestHandlePending_WaitForRegisterErrorBubbles(t *testing.T) {
 	assert.ErrorIs(t, err, sentinel)
 }
 
-// --- handleInProgress -----------------------------------------------------------------------
-
 func TestHandleInProgress_BeaconLost(t *testing.T) {
 	t.Parallel()
 
@@ -446,8 +442,6 @@ func TestHandleInProgress_UnknownStep(t *testing.T) {
 	assert.Equal(t, opv1alpha1.OperationPhaseFailed, got.Phase)
 	assert.Equal(t, opv1alpha1.UnknownStepReason, opv1alpha1.FailedCondition.GetReason(&got))
 }
-
-// --- handleFailed / handleSucceeded --------------------------------------------------------
 
 func TestHandleFailed_HoldingBeaconReleases(t *testing.T) {
 	t.Parallel()
@@ -515,8 +509,6 @@ func TestHandleSucceeded_HoldingBeaconEnqueuesCluster(t *testing.T) {
 		assert.Equal(t, "provisioning.cattle.io/v1, Kind=Cluster/fleet-default/test", dyn.enqueued[0])
 	}
 }
-
-// --- reconcileSave --------------------------------------------------------------------------
 
 // expectedSaveInstruction builds the snapshot save instruction the controller will dispatch given
 // an op spec and stubAdapter, so tests can predict the exact plan bytes the agent will see.
@@ -658,8 +650,6 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	}
 }
 
-// --- reconcileRestart -----------------------------------------------------------------------
-
 func TestReconcileRestart_MarksSucceededWhenApplied(t *testing.T) {
 	t.Parallel()
 
@@ -771,6 +761,8 @@ func TestAssignedPlansAreOperationScoped(t *testing.T) {
 		"restart": func(op *opv1alpha1.ETCDSnapshotSave) *planapi.Plan { return expectedRestartPlan(op, adapter) },
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			marshal := func(uid types.UID) string {
 				data, err := json.Marshal(build(opWithUID(uid)))
 				assert.NoError(t, err)
