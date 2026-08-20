@@ -306,6 +306,19 @@ func run(ctx context.Context) error {
 	}
 }
 
+// retryDurationFromEnv parses a duration; unset or invalid values yield def.
+func retryDurationFromEnv(key string, def time.Duration) time.Duration {
+	v := os.Getenv(key)
+	d, err := time.ParseDuration(v)
+	if v != "" && err != nil {
+		logrus.Warnf("Ignoring %s=%q, want a duration like 30s or 5m", key, v)
+	}
+	if d <= 0 {
+		return def
+	}
+	return d
+}
+
 func exitCertWriter(ctx context.Context) {
 	// share-mnt process needs an always restart policy and to be killed so it can restart on startup
 	// this functionality is really only needed for OSes with ephemeral /etc like RancherOS
