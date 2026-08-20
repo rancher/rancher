@@ -567,12 +567,14 @@ func servicesApply(requested []string, secret *corev1.Secret) bool {
 		relevant["k3s-controller"] = struct{}{}
 		relevant["admin"] = struct{}{}
 		relevant["cloud-controller"] = struct{}{}
+		relevant["supervisor"] = struct{}{}
 	}
 	if ops.IsEtcd(secret) {
 		relevant["etcd"] = struct{}{}
 		relevant["kubelet"] = struct{}{}
 		relevant["k3s-server"] = struct{}{}
 		relevant["rke2-server"] = struct{}{}
+		relevant["supervisor"] = struct{}{}
 	}
 	for _, s := range requested {
 		if _, ok := relevant[s]; ok {

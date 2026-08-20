@@ -8,7 +8,7 @@ import (
 type CertificateRotationArgs struct {
 	// Services is a list of services to rotate certificates for.
 	// If empty, all supported services are rotated.
-	// +kubebuilder:validation:items:Enum=admin;api-server;auth-proxy;cloud-controller;controller-manager;etcd;k3s-controller;k3s-server;kubelet;kube-proxy;rke2-controller;rke2-server;scheduler
+	// +kubebuilder:validation:items:Enum=admin;api-server;auth-proxy;cloud-controller;controller-manager;etcd;k3s-controller;k3s-server;kubelet;kube-proxy;rke2-controller;rke2-server;scheduler;supervisor
 	// +nullable
 	// +optional
 	Services []string `json:"services,omitempty"`
