@@ -250,6 +250,10 @@ func listSharedSubnets(ctx context.Context, cap *Capabilities) ([]byte, int, err
 
 // listDiskTypes lists the available disk types for a given GCP project and region.
 func listDiskTypes(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
+	if cap.ProjectID == "" || cap.Zone == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("projectId and zone are required")
+	}
+
 	client, err := getComputeServiceClient(ctx, cap.Credentials)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
