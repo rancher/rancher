@@ -426,7 +426,14 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if assertion.Conditions != nil && !assertion.Conditions.NotOnOrAfter.IsZero() {
 		assertionExpiry = assertion.Conditions.NotOnOrAfter
 	}
-	if s.assertionCache.seen(assertion.ID, assertionExpiry) {
+	seen, err := s.assertionStore.seen(assertion.ID, assertionExpiry)
+	if err != nil {
+		log.Errorf("SAML: failed to lookup assertion ID %q: %v", assertion.ID, err)
+		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		return
+	}
+
+	if seen {
 		log.Errorf("SAML: Rejected previous assertion ID %q", assertion.ID)
 		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
@@ -708,41 +715,7 @@ func checkAssertionTimeConditions(now time.Time, conditions *saml.Conditions) er
 	return nil
 }
 
-// assertionCache tracks recently seen SAML assertion IDs to prevent replay attacks.
-type assertionCache struct {
-	mu      sync.Mutex
-	entries map[string]time.Time // assertion ID -> expiry time
-}
-
-func newAssertionCache() *assertionCache {
-	return &assertionCache{
-		entries: make(map[string]time.Time),
-	}
-}
-
-// seen returns true if the assertion ID was seen before.
-//
-// If not seen, it records the ID with its expiry time and returns false.
-// Expired entries are evicted lazily on each call.
-func (c *assertionCache) seen(id string, expiry time.Time) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.evict()
-	if _, ok := c.entries[id]; ok {
-		return true
-	}
-	c.entries[id] = expiry
-	return false
-}
-
-// evict removes expired entries.
-//
-// Must be called with c.mu held.
-func (c *assertionCache) evict() {
-	now := time.Now()
-	for id, exp := range c.entries {
-		if now.After(exp) {
-			delete(c.entries, id)
-		}
-	}
+type assertionStore interface {
+	// seen returns true if the assertion ID was seen before.
+	seen(id string, expiry time.Time) (bool, error)
 }

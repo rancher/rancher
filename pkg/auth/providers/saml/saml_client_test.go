@@ -194,63 +194,6 @@ func TestValidateFinalRedirectURL(t *testing.T) {
 	}
 }
 
-func TestAssertionCache(t *testing.T) {
-	t.Parallel()
-
-	t.Run("new ID is not seen", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		expiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-1", expiry))
-	})
-
-	t.Run("same ID seen twice", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		expiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-replay", expiry))
-		assert.True(t, c.seen("id-replay", expiry))
-	})
-
-	t.Run("different IDs are tracked independently", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		expiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-a", expiry))
-		assert.False(t, c.seen("id-b", expiry))
-		assert.True(t, c.seen("id-a", expiry))
-		assert.True(t, c.seen("id-b", expiry))
-	})
-
-	t.Run("expired ID is evicted and accepted again", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		// Insert with an already-expired time.
-		pastExpiry := time.Now().Add(-time.Second)
-		assert.False(t, c.seen("id-expired", pastExpiry))
-
-		// The entry is expired; the next call should evict it and accept a fresh one.
-		futureExpiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-expired", futureExpiry))
-	})
-
-	t.Run("eviction does not remove live entries", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		liveExpiry := time.Now().Add(time.Minute)
-		pastExpiry := time.Now().Add(-time.Second)
-
-		assert.False(t, c.seen("id-live", liveExpiry))
-		assert.False(t, c.seen("id-stale", pastExpiry))
-
-		// Trigger eviction via any seen() call.
-		assert.False(t, c.seen("id-new", liveExpiry))
-
-		// The live entry must still be detected as a replay.
-		assert.True(t, c.seen("id-live", liveExpiry))
-	})
-}
-
 func TestCheckAssertionTimeConditions(t *testing.T) {
 	t.Parallel()
 
