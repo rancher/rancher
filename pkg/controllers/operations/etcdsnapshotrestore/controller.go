@@ -80,7 +80,7 @@ const (
 	// The single format argument is the distro data directory, where the token file is persisted.
 	//
 	// Exported so tests can derive the same value the check derives.
-	TokenHashCommandFormat = `f=%[1]s/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
+	TokenHashCommandFormat = `f=%[1]s/server/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
 
 	// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
 	// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.

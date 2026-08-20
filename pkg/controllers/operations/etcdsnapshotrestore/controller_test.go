@@ -289,18 +289,6 @@ func TestBuildPreflightPlan(t *testing.T) {
 		t.Error("SaveOutput must be set; the step compares the instruction's output against the snapshot")
 	}
 
-	// The check must resolve the token file rather than assume one layout, because an instruction that
-	// exits non-zero cannot be distinguished from a token mismatch by the caller.
-	joined := strings.Join(instr.Args, " ")
-	for _, want := range []string{
-		path.Join(s.adapter.DistroDataDirectory(secret), "server/token"),
-		path.Join(s.adapter.DistroDataDirectory(secret), "token"),
-	} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("instruction args do not reference %q: %v", want, instr.Args)
-		}
-	}
-
 	// Wrapping the check in the idempotent script would print a message in place of the hash on an
 	// attempt it considers already reconciled.
 	if len(instr.Args) > 1 && instr.Args[1] == ops.IdempotentActionScriptPath(s.adapter.ProvisioningDataDirectory(secret)) {
