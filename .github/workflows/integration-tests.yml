@@ -133,6 +133,17 @@ jobs:
           INTEGRATION_TEST_PACKAGES: ${{ matrix.packages }}
           INTEGRATION_TEST_RUN: ${{ matrix.run }}
         run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
+      - name: Upload Rancher + K3s logs if tests failed
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: "Rancher + K3s logs (${{ matrix.shard }})"
+          path: |
+            /tmp/rancher.log
+            /tmp/k3s.log
+          if-no-files-found: ignore
+          retention-days: 7
   # Aggregates the shard matrix into the single stable check
   # "integration-tests / test" that branch protection requires, so the shard
   # matrix can change without editing repo-level required-check settings. Its
