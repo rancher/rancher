@@ -104,27 +104,27 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	ProviderNames[ldap.FreeIpaName] = true
 	Providers[ldap.FreeIpaName] = p
 
-	p = saml.Configure(mgmt, userMGR, tokenMGR, saml.PingName)
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.PingName)
 	ProviderNames[saml.PingName] = true
 	UnrefreshableProviders[saml.PingName] = true
 	Providers[saml.PingName] = p
 
-	p = saml.Configure(mgmt, userMGR, tokenMGR, saml.ADFSName)
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ADFSName)
 	ProviderNames[saml.ADFSName] = true
 	UnrefreshableProviders[saml.ADFSName] = true
 	Providers[saml.ADFSName] = p
 
-	p = saml.Configure(mgmt, userMGR, tokenMGR, saml.KeyCloakName)
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.KeyCloakName)
 	ProviderNames[saml.KeyCloakName] = true
 	UnrefreshableProviders[saml.KeyCloakName] = true
 	Providers[saml.KeyCloakName] = p
 
-	p = saml.Configure(mgmt, userMGR, tokenMGR, saml.OKTAName)
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.OKTAName)
 	ProviderNames[saml.OKTAName] = true
 	UnrefreshableProviders[saml.OKTAName] = true
 	Providers[saml.OKTAName] = p
 
-	p = saml.Configure(mgmt, userMGR, tokenMGR, saml.ShibbolethName)
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ShibbolethName)
 	ProviderNames[saml.ShibbolethName] = true
 	UnrefreshableProviders[saml.ShibbolethName] = false
 	Providers[saml.ShibbolethName] = p
