@@ -86,6 +86,7 @@ spec:
                       - rke2-controller
                       - rke2-server
                       - scheduler
+                      - supervisor
                       type: string
                     nullable: true
                     type: array

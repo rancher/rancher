@@ -212,6 +212,9 @@ func TestServicesApply(t *testing.T) {
 		{name: "scheduler excludes worker", services: []string{"scheduler"}, secret: worker},
 		{name: "etcd selects etcd", services: []string{"etcd"}, secret: etcd, want: true},
 		{name: "etcd excludes worker", services: []string{"etcd"}, secret: worker},
+		{name: "supervisor selects control plane", services: []string{"supervisor"}, secret: controlPlane, want: true},
+		{name: "supervisor selects etcd", services: []string{"supervisor"}, secret: etcd, want: true},
+		{name: "supervisor excludes worker", services: []string{"supervisor"}, secret: worker},
 		{name: "kubelet selects worker", services: []string{"kubelet"}, secret: worker, want: true},
 	}
 
