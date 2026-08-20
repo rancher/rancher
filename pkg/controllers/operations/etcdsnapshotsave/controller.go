@@ -552,6 +552,8 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	concurrency := len(secrets)
 	results := make([]plan.PlanStatus, 0, concurrency)
 
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
+
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
@@ -580,7 +582,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
 		if err != nil {
 			return status, err
 		}
@@ -665,6 +667,8 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	concurrency := 1
 	results := make([]plan.PlanStatus, 0, concurrency)
 
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
+
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
@@ -687,7 +691,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
 		if err != nil {
 			return status, err
 		}
