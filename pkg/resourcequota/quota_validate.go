@@ -137,15 +137,16 @@ func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList
 // ZeroOutResourceList takes a resource list and a list of bad resources, and
 // returns a new list with the bad resources set to zero.
 func ZeroOutResourceList(limit api.ResourceList, badResources []api.ResourceName) api.ResourceList {
-	// fast path, nothing to zero out
-	if len(badResources) == 0 {
-		return limit
-	}
-	// copy input, then zero the bad parts
+	// copy input (we promised a new list)
 	zeroed := api.ResourceList{}
 	for k, v := range limit {
 		zeroed[k] = v
 	}
+	// fast path, nothing to zero out
+	if len(badResources) == 0 {
+		return zeroed
+	}
+	// zero the bad parts
 	for _, k := range badResources {
 		zeroed[k] = zeroQuantity
 	}
