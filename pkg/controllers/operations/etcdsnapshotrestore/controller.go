@@ -67,26 +67,20 @@ const (
 	// correspond to a machine in the cluster.
 	PostRestoreNodeCleanupStepHookLabelPrefix = "post-restore-node-cleanup.step.hook.operation.cattle.io/"
 
-	// RestartClusterStepHookLabelPrefix gates the final restart pass, after node cleanup. This
-	// removes the temporary server-URL override and lets each node return to its normal
-	// reconciliation.
+	// RestartClusterStepHookLabelPrefix gates the final restart pass, after node cleanup. This removes the temporary
+	// server-URL override and lets each node return to its normal reconciliation.
 	RestartClusterStepHookLabelPrefix = "restart-cluster.step.hook.operation.cattle.io/"
 
-	// preflightInstructionName is the name of the Preflight step's instruction, and therefore the key
-	// its output is saved under on the machine-plan secret.
+	// preflightInstructionName is the name of the Preflight step's instruction, and therefore the key its output is
+	// saved under on the machine-plan secret.
 	preflightInstructionName = "preflight"
 
-	// TokenHashCommandFormat is the shell command the Preflight step runs on every etcd node to hash
-	// the server token persisted on disk, so it can be compared against the hash the distro stamped
-	// on the snapshot. The single format argument is the distro data directory.
-	//
-	// The distro persists the token under its data directory, but the layout differs between versions
-	// (and between server and agent nodes), so the file is resolved rather than assumed — a missing
-	// file exits non-zero, and because plans are assigned with a failure threshold of -1 that would
-	// stall the operation rather than fail it.
+	// TokenHashCommandFormat is the shell command the Preflight step runs on every etcd node to hash the server token
+	// persisted on disk, so it can be compared against the hash the distro stamped on the snapshot.
+	// The single format argument is the distro data directory, where the token file is persisted.
 	//
 	// Exported so tests can derive the same value the check derives.
-	TokenHashCommandFormat = `f=%[1]s/server/token; [ -f "$f" ] || f=%[1]s/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
+	TokenHashCommandFormat = `f=%[1]s/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
 
 	// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
 	// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
@@ -608,7 +602,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 }
 
 func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling shutdown", s.op.Namespace, s.op.Name)
+	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
 
 	delegated, err := h.handleHook(s, PreflightStepHookLabelPrefix)
 	if err != nil {
@@ -652,44 +646,48 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
-	for _, secret := range secrets {
-		// A finite failure threshold, unlike the other steps: the check only reads a file, so there is
-		// nothing to gain from retrying it, and without one a check which cannot run at all would
-		// leave the operation in progress indefinitely instead of reaching the cancellation below.
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildPreflightPlan(s, secret), opEnv), 1, 1)
-		if err != nil {
-			return status, err
-		}
+	hash := ""
+	if snapshot != nil && snapshot.Annotations != nil && snapshot.Annotations[capr.SnapshotTokenHashAnnotation] != "" {
+		hash = snapshot.Annotations[capr.SnapshotTokenHashAnnotation]
+	}
 
-		results = append(results, *planStatus)
-
-		if planStatus.Failure() {
-			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check failed for %s/%s",
-				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
-
-			status.SetPhase(opv1alpha1.OperationPhaseCanceled)
-
-			opv1alpha1.CanceledCondition.True(&status)
-			opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-			opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
-
-			return status, nil
-		}
-
-		// The token hash can only be validated once the node has applied the plan and reported its
-		// output, so a waiting node is skipped entirely until a later reconcile.
-		if planStatus.Waiting() {
-			logrus.Debugf("[etcdsnapshotrestore] %s/%s: waiting for preflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
-
-			concurrency--
-			if concurrency <= 0 {
-				break
+	if hash == "" {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: could not find snapshot token hash in snapshot %s/%s, skipping preflight step", s.op.Namespace, s.op.Name, s.adapter.EtcdSnapshotNamespace(), snapshotName)
+	} else {
+		for _, secret := range secrets {
+			planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildPreflightPlan(s, secret), opEnv), 1, 1)
+			if err != nil {
+				return status, err
 			}
 
-			continue
-		}
+			results = append(results, *planStatus)
 
-		if snapshot != nil {
+			if planStatus.Failure() {
+				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check failed for %s/%s",
+					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+				status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+				opv1alpha1.CanceledCondition.True(&status)
+				opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+				opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
+
+				return status, nil
+			}
+
+			// The token hash can only be validated once the node has applied the plan and reported its
+			// output, so a waiting node is skipped entirely until a later reconcile.
+			if planStatus.Waiting() {
+				logrus.Debugf("[etcdsnapshotrestore] %s/%s: waiting for preflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+				concurrency--
+				if concurrency <= 0 {
+					break
+				}
+
+				continue
+			}
+
 			output, err := plan.ReadAppliedOutput(secret)
 			if err != nil {
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: could not read preflight check output for %s/%s",
@@ -703,24 +701,20 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 
 				return status, nil
 			}
-			if hash, ok := snapshot.Annotations[capr.SnapshotTokenHashAnnotation]; ok && hash != "" {
-				// The instruction pipes through cut, so the saved output carries a trailing newline
-				// which the annotation does not.
-				if b, ok := output[preflightInstructionName]; ok && strings.TrimSpace(string(b)) != hash {
-					logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check output for %s/%s does not match snapshot token hash",
-						s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-					status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-					opv1alpha1.FailedCondition.True(&status)
-					opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-					opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
-
-					return status, nil
-				}
-			} else {
-				logrus.Warnf("[etcdsnapshotrestore] %s/%s: could not find snapshot token hash for %s/%s, preflight check output will not be validated",
+			// The instruction pipes through cut, so the saved output carries a trailing newline which the annotation
+			// does not.
+			if b, ok := output[preflightInstructionName]; ok && strings.TrimSpace(string(b)) != hash {
+				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check output for %s/%s does not match snapshot token hash",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+				status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+				opv1alpha1.FailedCondition.True(&status)
+				opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+				opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
+
+				return status, nil
 			}
 		}
 	}
@@ -777,7 +771,7 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
 	for _, secret := range secrets {
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildShutdownPlan(s, secret), opEnv), 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildShutdownPlan(s, secret), opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -954,7 +948,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		},
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
+	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1154,7 +1148,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			},
 		}
 
-		planStatus, err := h.store.AssignPlan(etcdSecret, ops.WithOperationEnv(etcdNodePlan, opEnv), 1, -1)
+		planStatus, err := h.store.AssignPlan(etcdSecret, ops.WithOperationEnv(etcdNodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1188,7 +1182,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		})
 	}
 
-	planStatus, err := h.store.AssignPlan(controlPlaneSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
+	planStatus, err := h.store.AssignPlan(controlPlaneSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1345,7 +1339,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 			}
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1599,7 +1593,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
-	planStatus, err := h.store.AssignPlan(initSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
+	planStatus, err := h.store.AssignPlan(initSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}

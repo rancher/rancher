@@ -464,10 +464,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	return status, nil
 }
 
-// reconcilePreflight is responsible for determining if an etcd snapshot taken on this node may be restored.
-// It will grep for the `token` key in both the config file and directory (e.g., /etc/rancher/rke2/config.yaml &
-// /etc/rancher/rke2/config.yaml.d).
-// It will validate both json and yaml formatted config files.
+// reconcilePreflight does not currently run any plans, but exists to ensure that the cluster has a sufficient amount of
+// etcd nodes to run the operation on.
 func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
 
@@ -582,7 +580,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -691,7 +689,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
