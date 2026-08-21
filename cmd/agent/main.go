@@ -291,7 +291,7 @@ func run(ctx context.Context) error {
 		}
 
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
-		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
+		remotedialer.ClientConnectWithOpts(ctx, wsURL, headers, nil, func(proto, address string) bool {
 			switch proto {
 			case "tcp":
 				return true
@@ -301,7 +301,11 @@ func run(ctx context.Context) error {
 				return address == "//./pipe/docker_engine"
 			}
 			return false
-		}, onConnect)
+		}, onConnect, &remotedialer.ConnectOpts{Backoff: remotedialer.Backoff{
+			Min: retryDurationFromEnv("CATTLE_CONNECT_RETRY_MIN", 10*time.Second),
+			Max: retryDurationFromEnv("CATTLE_CONNECT_RETRY_MAX", 0),
+		}})
+		// Only reached once the context is cancelled.
 		time.Sleep(5 * time.Second)
 	}
 }
