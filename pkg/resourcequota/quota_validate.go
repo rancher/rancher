@@ -16,6 +16,7 @@ import (
 const ExtendedKey = "extended"
 
 var (
+	zeroQuantity            = resource.MustParse("0")
 	projectLockCache        = cache.NewLRUExpireCache(1000)
 	resourceQuotaConversion = map[string]string{
 		"replicationControllers": "replicationcontrollers",
@@ -41,35 +42,53 @@ func GetProjectLock(projectID string) *sync.Mutex {
 	return mu
 }
 
-func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, error) {
+// IsQuotaFit puts the various limits (of the namespace itself, and its
+// siblings) together and checks if they still fit into the project. It reports
+// the names of all bad resources, separate by reason. A resource is flagged as
+// bad either because its sum goes beyond the project limit (oversubscription),
+// or because the resource is negative. Negative values in the data taken from
+// the sibling namespaces are treated as zero, as these are blocked anyway.
+func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, api.ResourceList, error) {
 	nssResourceList := api.ResourceList{}
 	nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 	if err != nil {
-		return false, nil, fmt.Errorf("checking quota fit: %w", err)
+		return false, nil, nil, fmt.Errorf("checking quota fit: %w", err)
 	}
-	nssResourceList = quota.Add(nssResourceList, nsResourceList)
+	negatives := quota.IsNegative(nsResourceList)
+	nssResourceList = quota.Add(nssResourceList, ZeroOutResourceList(nsResourceList, negatives))
 
+	// Detect over-subscription
 	for _, nsLimit := range nsLimits {
 		nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 		if err != nil {
-			return false, nil, fmt.Errorf("checking namespace limits: %w", err)
+			return false, nil, nil, fmt.Errorf("checking namespace limits: %w", err)
 		}
-		nssResourceList = quota.Add(nssResourceList, nsResourceList)
+		// zero any negative limits coming from the sibling namespace
+		nssResourceList = quota.Add(nssResourceList, ZeroOutResourceList(nsResourceList, quota.IsNegative(nsResourceList)))
 	}
-
 	projectResourceList, err := ConvertLimitToResourceList(projectLimit)
 	if err != nil {
-		return false, nil, fmt.Errorf("checking project limits: %w", err)
+		return false, nil, nil, fmt.Errorf("checking project limits: %w", err)
+	}
+	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
+
+	// Without issues abort early
+	if len(exceeded) == 0 && len(negatives) == 0 {
+		return true, nil, nil, nil
 	}
 
-	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
-	// Include resources with negative values among exceeded resources.
-	exceeded = append(exceeded, quota.IsNegative(nsResourceList)...)
-	if len(exceeded) == 0 {
-		return true, nil, nil
+	// We have problems. Fail the fit, and report the affected resources
+	failedExceeded := quota.Mask(nssResourceList, exceeded)
+	if len(failedExceeded) == 0 {
+		failedExceeded = nil
 	}
-	failedHard := quota.Mask(nssResourceList, exceeded)
-	return false, failedHard, nil
+
+	failedNegative := quota.Mask(nsResourceList, negatives)
+	if len(failedNegative) == 0 {
+		failedNegative = nil
+	}
+
+	return false, failedExceeded, failedNegative, nil
 }
 
 func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList, error) {
@@ -113,4 +132,23 @@ func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList
 		toReturn[resourceName] = resourceQuantity
 	}
 	return toReturn, nil
+}
+
+// ZeroOutResourceList takes a resource list and a list of bad resources, and
+// returns a new list with the bad resources set to zero.
+func ZeroOutResourceList(limit api.ResourceList, badResources []api.ResourceName) api.ResourceList {
+	// copy input (we promised a new list)
+	zeroed := api.ResourceList{}
+	for k, v := range limit {
+		zeroed[k] = v
+	}
+	// fast path, nothing to zero out
+	if len(badResources) == 0 {
+		return zeroed
+	}
+	// zero the bad parts
+	for _, k := range badResources {
+		zeroed[k] = zeroQuantity
+	}
+	return zeroed
 }
