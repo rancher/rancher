@@ -287,20 +287,38 @@ func isVSphereProvider(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (b
 	return data["cloud-provider-name"] == "rancher-vsphere", nil
 }
 
-func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (map[string]interface{}, error) {
-	if isVSphere, err := isVSphereProvider(controlPlane, entry); err != nil {
-		return nil, err
-	} else if isVSphere && controlPlane.Spec.ChartValues.Data["rancher-vsphere-csi"] == nil {
-		// ensure we have this chart config so that the global.cattle.clusterId is set
-		newData := controlPlane.Spec.ChartValues.DeepCopy()
-		if newData.Data == nil {
-			newData.Data = map[string]interface{}{}
+func chartValues(controlPlane *rkev1.RKEControlPlane) (map[string]interface{}, error) {
+	if controlPlane.Spec.ChartValuesJSON != "" {
+		values := map[string]interface{}{}
+		if err := json.Unmarshal([]byte(controlPlane.Spec.ChartValuesJSON), &values); err != nil {
+			return nil, fmt.Errorf("controlplane %s/%s: error unmarshalling chartValuesJSON: %w", controlPlane.Namespace, controlPlane.Name, err)
 		}
-		newData.Data["rancher-vsphere-csi"] = map[string]interface{}{}
-		return newData.Data, nil
+		return values, nil
 	}
 
-	return controlPlane.Spec.ChartValues.Data, nil
+	// Fall back to the structured field for control planes that have not been
+	// reconciled since the upgrade that introduced chartValuesJSON.
+	return controlPlane.Spec.ChartValues.DeepCopy().Data, nil
+}
+
+func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (map[string]interface{}, error) {
+	values, err := chartValues(controlPlane)
+	if err != nil {
+		return nil, err
+	}
+	isVSphere, err := isVSphereProvider(controlPlane, entry)
+	if err != nil {
+		return nil, err
+	}
+	if isVSphere && values["rancher-vsphere-csi"] == nil {
+		// ensure we have this chart config so that the global.cattle.clusterId is set
+		if values == nil {
+			values = map[string]interface{}{}
+		}
+		values["rancher-vsphere-csi"] = map[string]interface{}{}
+	}
+
+	return values, nil
 }
 
 type helmChartConfig struct {

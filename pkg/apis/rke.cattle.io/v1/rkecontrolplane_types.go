@@ -8,6 +8,14 @@ import (
 type RKEControlPlaneSpec struct {
 	ClusterConfiguration `json:",inline"`
 
+	// This field is used to store the chart values for Helm chart
+	// that is used to deploy the control plane components.
+	// Carrying the values as an opaque string keeps them intact, because a string
+	// is replaced atomically by a merge patch.
+	// +nullable
+	// +optional
+	ChartValuesJSON string `json:"chartValuesJSON,omitempty"`
+
 	// AgentEnvVars is a list of environment variables that will be set on
 	// the cluster agent deployment and system agent service.
 	// +nullable
