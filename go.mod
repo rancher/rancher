@@ -434,3 +434,5 @@ require (
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 )
+
+replace github.com/rancher/remotedialer => github.com/rohitsuse/remotedialer v0.4.2-0.20260820214538-cfab00138c5a
