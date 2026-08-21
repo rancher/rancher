@@ -1,4 +1,4 @@
-package namespace
+package clients
 
 import (
 	wranglercore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
@@ -47,6 +47,6 @@ type wrapperWranglerNamespace struct {
 }
 
 func (n *wrapperWranglerNamespace) Create(ns *corev1.Namespace) (*corev1.Namespace, error) {
-	ApplyLabelsAndAnnotations(ns)
+	handler(ns)
 	return n.NamespaceController.Create(ns)
 }

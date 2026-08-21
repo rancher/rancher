@@ -11,6 +11,7 @@ const (
 )
 
 var (
+	// Currently mutator is only set once so no need for a mutex.
 	mutator Mutator
 )
 
