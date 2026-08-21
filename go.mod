@@ -114,15 +114,15 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
-	github.com/rancher/aks-operator v1.15.1-rc.1
-	github.com/rancher/ali-operator v1.15.0-rc.4
+	github.com/rancher/aks-operator v1.15.1
+	github.com/rancher/ali-operator v1.15.0
 	github.com/rancher/apiserver v0.9.9
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.0
 	github.com/rancher/dynamiclistener v0.9.1
-	github.com/rancher/eks-operator v1.15.1-rc.1
+	github.com/rancher/eks-operator v1.15.1
 	github.com/rancher/fleet/pkg/apis v0.16.1
-	github.com/rancher/gke-operator v1.15.1-rc.1
+	github.com/rancher/gke-operator v1.15.1
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.9
