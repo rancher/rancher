@@ -18,6 +18,7 @@ var (
 // Mutator describes how rancher namespaces will be mutated at creation time.
 type Mutator struct {
 	Enabled     bool              `json:"enabled"`
+	Strict      bool              `json:"enabled"`
 	Annotations map[string]string `json:"annotations"`
 	Labels      map[string]string `json:"labels"`
 }

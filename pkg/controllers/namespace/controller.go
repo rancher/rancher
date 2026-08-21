@@ -24,8 +24,10 @@ func (h *handler) shouldManage(ns *corev1.Namespace) bool {
 		return true
 	}
 
-	if _, ok := ns.Annotations[project.ProjectIDAnnotation]; ok {
-		return true
+	if !namespace.GetMutator().Strict {
+		if _, ok := ns.Annotations[project.ProjectIDAnnotation]; ok {
+			return true
+		}
 	}
 
 	return false
