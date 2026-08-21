@@ -18,6 +18,7 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/tls"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/secret"
 )
 
@@ -47,7 +49,6 @@ const (
 	rkeBootstrapName                       = "rke.cattle.io/rkebootstrap-name"
 	capiMachinePreTerminateAnnotation      = "pre-terminate.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
 	capiMachinePreTerminateAnnotationOwner = "rke-bootstrap-controller"
-	electionBackoff                        = 20 * time.Second
 )
 
 type handler struct {
@@ -578,16 +579,34 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	}
 
 	_, isEtcd := machine.Labels[capr.EtcdRoleLabel]
+	logrus.Tracef("[rkebootstrap] %s/%s: evaluating machine %s/%s for pre-terminate hook reconciliation (etcd=%t, machineDeleting=%t, bootstrapDeleting=%t, nodeRef=%t)",
+		bootstrap.Namespace, bootstrap.Name,
+		machine.Namespace, machine.Name,
+		isEtcd,
+		!machine.DeletionTimestamp.IsZero(),
+		!bootstrap.DeletionTimestamp.IsZero(),
+		machine.Status.NodeRef.IsDefined(),
+	)
 
 	forceRemove, ok := bootstrap.Annotations[capr.ForceRemoveEtcdAnnotation]
 	if (ok && strings.ToLower(forceRemove) == "true") || !isEtcd {
 		// If the force remove annotation is "true" or the node is not an etcd node, then ensure the machine pre terminate annotation is removed.
+		logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because etcd protection does not apply (etcd=%t, forceRemove=%q)",
+			bootstrap.Namespace, bootstrap.Name,
+			machine.Namespace, machine.Name,
+			isEtcd,
+			forceRemove,
+		)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
 	// Only add the pre-terminate hook annotation if the corresponding machine and bootstrap are NOT deleting
 	if machine.DeletionTimestamp.IsZero() && bootstrap.DeletionTimestamp.IsZero() {
 		// annotate the CAPI machine with the pre-terminate.delete.hook.machine.cluster.x-k8s.io annotation if it is an etcd machine
+		logrus.Tracef("[rkebootstrap] %s/%s: ensuring pre-terminate hook on machine %s/%s before delete starts",
+			bootstrap.Namespace, bootstrap.Name,
+			machine.Namespace, machine.Name,
+		)
 		if val, ok := machine.GetAnnotations()[capiMachinePreTerminateAnnotation]; !ok || val != capiMachinePreTerminateAnnotationOwner {
 			machine = machine.DeepCopy()
 			if machine.Annotations == nil {
@@ -600,6 +619,15 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 			}
 		}
 		return bootstrap, nil
+	}
+
+	// Start of safe removal validations
+
+	// Safe removal requires the deleting machine's downstream node name. Without a NodeRef, there is no
+	// known downstream node to remove, so release the hook.
+	if !machine.Status.NodeRef.IsDefined() {
+		logrus.Infof("[rkebootstrap] No associated node found for machine %s/%s in cluster %s, ensuring machine pre-terminate annotation is removed", machine.Namespace, machine.Name, bootstrap.Spec.ClusterName)
+		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
 	if bootstrap.Spec.ClusterName == "" {
@@ -631,53 +659,59 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	}
 
 	if !cp.DeletionTimestamp.IsZero() || !capiCluster.DeletionTimestamp.IsZero() {
+		// Cluster or control plane deletion does not require per-member protection.
+		logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because the cluster or control plane is deleting (controlPlaneDeleting=%t, clusterDeleting=%t)",
+			bootstrap.Namespace, bootstrap.Name,
+			machine.Namespace, machine.Name,
+			!cp.DeletionTimestamp.IsZero(),
+			!capiCluster.DeletionTimestamp.IsZero(),
+		)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
-	if !machine.Status.NodeRef.IsDefined() {
-		logrus.Infof("[rkebootstrap] No associated node found for machine %s/%s in cluster %s, ensuring machine pre-terminate annotation is removed", machine.Namespace, machine.Name, bootstrap.Spec.ClusterName)
-		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
+	// Plan secrets record whether another machine still depends on this machine's join URL.
+	planSecret, err := h.secretCache.Get(bootstrap.Namespace, capr.PlanSecretFromBootstrapName(bootstrap.Name))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return bootstrap, fmt.Errorf("error retrieving plan secret to validate it was not an init node: %v", err)
 	}
 
-	// If the RKEControlPlane is not deleting, then make sure this node is not being used as an init node.
-	if cp.DeletionTimestamp.IsZero() {
-		planSecret, err := h.secretCache.Get(bootstrap.Namespace, capr.PlanSecretFromBootstrapName(bootstrap.Name))
-		if err != nil && !apierrors.IsNotFound(err) {
-			return bootstrap, fmt.Errorf("error retrieving plan secret to validate it was not an init node: %v", err)
-		}
+	planSecrets, err := h.secretCache.List(bootstrap.Namespace, labels.SelectorFromSet(map[string]string{
+		capi.ClusterNameLabel: bootstrap.Spec.ClusterName,
+	}))
+	if err != nil {
+		return bootstrap, fmt.Errorf("error encountered list plansecrets to validate etcd safe removal: %v", err)
+	}
+	logrus.Tracef("[rkebootstrap] %s/%s: loaded delete state for machine %s/%s (hasPlanSecret=%t, planSecrets=%d)",
+		bootstrap.Namespace, bootstrap.Name,
+		machine.Namespace, machine.Name,
+		planSecret != nil,
+		len(planSecrets),
+	)
 
-		if planSecret != nil {
-			// validate that no other nodes are joined to this node, otherwise removing it will cause a bunch of nodes to start crashing.
-			joinURL := planSecret.Annotations[capr.JoinURLAnnotation]
-			planSecrets, err := h.secretCache.List(bootstrap.Namespace, labels.SelectorFromSet(map[string]string{
-				capi.ClusterNameLabel: bootstrap.Spec.ClusterName,
-			}))
-			if err != nil {
-				return bootstrap, fmt.Errorf("error encountered list plansecrets to ensure node was not joined: %v", err)
+	if planSecret != nil {
+		// Do not remove a machine while another plan secret still references its join URL.
+		joinURL := planSecret.Annotations[capr.JoinURLAnnotation]
+		if joinURL != "" {
+			if joinedMachine, joined := machineStillJoinedToJoinURL(planSecrets, joinURL); joined {
+				logrus.Debugf("[rkebootstrap] %s/%s: waiting: deleting etcd machine %s/%s is still the join target for machine %s",
+					bootstrap.Namespace, bootstrap.Name,
+					machine.Namespace, machine.Name,
+					joinedMachine,
+				)
+				h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
+				return bootstrap, generic.ErrSkip
 			}
-			for _, ps := range planSecrets {
-				if ps.GetAnnotations()[capr.JoinedToAnnotation] == joinURL {
-					logrus.Errorf("[rkebootstrap] %s/%s: cluster %s/%s machine %s/%s was still joined to deleting etcd machine %s/%s", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name, bootstrap.Namespace, ps.GetLabels()[capr.MachineNameLabel], machine.Namespace, machine.Name)
-					h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
-					return bootstrap, generic.ErrSkip
-				}
-			}
 		}
 	}
 
-	if wait, err := h.electionBackoffWait(bootstrap, machine); err != nil {
-		return bootstrap, err
-	} else if wait > 0 {
-		machineDeletionTime := machine.DeletionTimestamp.Time
-		logrus.Infof("[rkebootstrap] %s/%s: single-remaining etcd; deferring safe removal for %s (until %s) to avoid etcd election race",
-			bootstrap.Namespace, bootstrap.Name, wait.Round(time.Second), machineDeletionTime.Add(electionBackoff).Format(time.RFC3339))
-		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, wait)
-		return bootstrap, generic.ErrSkip
-	}
-
+	// Without the downstream kubeconfig, Rancher cannot perform member removal, so release the hook.
 	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(bootstrap.Spec.ClusterName, secret.Kubeconfig))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
+			logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because the downstream kubeconfig secret is missing",
+				bootstrap.Namespace, bootstrap.Name,
+				machine.Namespace, machine.Name,
+			)
 			return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 		}
 		return bootstrap, err
@@ -688,10 +722,33 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		return bootstrap, err
 	}
 
+	// Wait for the elected replacement etcd machine to complete its plan and report NodeReady.
+	replacementReady, err := h.replacementEtcdMachineReady(bootstrap, machine, planSecrets)
+	if err != nil {
+		return bootstrap, err
+	}
+	if !replacementReady {
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: deleting etcd machine %s/%s does not yet have a replacement machine with NodeReady=True and passed plan probes",
+			bootstrap.Namespace, bootstrap.Name, machine.Namespace, machine.Name)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
+		return bootstrap, generic.ErrSkip
+	}
+	logrus.Debugf("[rkebootstrap] %s/%s: deleting etcd machine %s/%s has a replacement machine ready for safe removal",
+		bootstrap.Namespace, bootstrap.Name,
+		machine.Namespace, machine.Name,
+	)
+
+	// Member removal is asynchronous; keep the hook until the downstream controller confirms completion.
 	removed, err := etcdmgmt.SafelyRemoved(restConfig, capr.GetRuntimeCommand(cp.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
 	if err != nil {
 		return bootstrap, err
 	}
+	logrus.Debugf("[rkebootstrap] %s/%s: safe remove for machine %s/%s returned %t for node %s",
+		bootstrap.Namespace, bootstrap.Name,
+		machine.Namespace, machine.Name,
+		removed,
+		machine.Status.NodeRef.Name,
+	)
 	if !removed {
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
 		return bootstrap, generic.ErrSkip
@@ -714,37 +771,109 @@ func (h *handler) ensureMachinePreTerminateAnnotationRemoved(bootstrap *rkev1.RK
 	return bootstrap, err
 }
 
-// electionBackoffWait returns how long to defer safe removal when there is
-// exactly one other etcd machine still present which leads to a risky window
-// for leader election. A zero duration means "no backoff".
-func (h *handler) electionBackoffWait(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (time.Duration, error) {
-	// Only meaningful when this machine is deleting.
-	if machine == nil || machine.DeletionTimestamp.IsZero() {
-		return 0, nil
+// replacementEtcdMachineReady reports whether another elected init etcd machine has completed its plan
+// and reports NodeReady in CAPI.
+func (h *handler) replacementEtcdMachineReady(bootstrap *rkev1.RKEBootstrap, deletingMachine *capi.Machine, planSecrets []*corev1.Secret) (bool, error) {
+	if deletingMachine == nil {
+		return false, nil
 	}
 
-	// List all the etcd machines in the cluster
-	machines, err := h.machineCache.List(bootstrap.Namespace, labels.SelectorFromSet(labels.Set{
-		capi.ClusterNameLabel: bootstrap.Spec.ClusterName,
-		capr.EtcdRoleLabel:    "true",
-	}))
-	if err != nil {
-		return 0, err
-	}
-	if len(machines) != 2 { // Only care about the 2-node transition case.
-		return 0, nil
-	}
+	for _, ps := range planSecrets {
+		// Only consider live machine-plan secrets.
+		if !ps.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if ps.Type != capr.SecretTypeMachinePlan {
+			continue
+		}
 
-	// Find the other etcd machine; if it’s not deleting, we back off.
-	for _, m := range machines {
-		if m.DeletionTimestamp.IsZero() && m.Name != machine.Name {
-			// Exactly one remaining etcd member; back off to let leadership settle.
-			since := time.Since(machine.DeletionTimestamp.Time)
-			if since < electionBackoff {
-				return electionBackoff - since, nil
+		// Only consider the elected init etcd machine as a replacement.
+		if ps.GetLabels()[capr.EtcdRoleLabel] != "true" {
+			continue
+		}
+		if ps.GetLabels()[capr.InitNodeLabel] != "true" {
+			continue
+		}
+
+		// Require a Machine for local cluster and readiness validation.
+		machineName := ps.GetLabels()[capr.MachineNameLabel]
+		if machineName == "" {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate skipped because the machine name label is missing", bootstrap.Namespace, bootstrap.Name)
+			continue
+		}
+		machineNamespace := ps.GetLabels()[capr.MachineNamespaceLabel]
+		if machineNamespace == "" {
+			machineNamespace = bootstrap.Namespace
+		}
+		if machineName == deletingMachine.Name && machineNamespace == deletingMachine.Namespace {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because it is the deleting machine", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+
+		// A join URL indicates that the candidate can accept joining members.
+		if ps.GetAnnotations()[capr.JoinURLAnnotation] == "" {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because join URL is not set", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+		// Passed probes show that the candidate's current plan was healthy at least once.
+		if ps.GetAnnotations()[planapi.PlanProbesPassedAnnotation] == "" {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because plan probes have not passed yet", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+
+		machine, err := h.machineCache.Get(machineNamespace, machineName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because the machine object was not found", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+				continue
 			}
+			return false, err
+		}
+
+		if machine.Spec.ClusterName != deletingMachine.Spec.ClusterName {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because it belongs to a different cluster", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+		if machine.GetLabels()[capr.EtcdRoleLabel] != "true" {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because the machine object does not carry the etcd role label", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+		if !machine.DeletionTimestamp.IsZero() {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because the machine is deleting", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+		if !machine.Status.NodeRef.IsDefined() {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because it has no NodeRef yet", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+
+		// The machine controller mirrors node readiness onto the local machine object, so we can
+		// validate replacement readiness without querying the downstream cluster directly.
+		if !conditions.IsTrue(machine, capi.MachineNodeReadyCondition) {
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because NodeReady is not true", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			continue
+		}
+
+		logrus.Debugf("[rkebootstrap] %s/%s: replacement candidate %s/%s is ready", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// machineStillJoinedToJoinURL reports whether any plan secret in planSecrets records joinURL as its
+// "joined-to" target, meaning that machine joined the cluster through the machine advertising joinURL.
+// It returns the machine-name label of the first matching plan secret and true if found.
+func machineStillJoinedToJoinURL(planSecrets []*corev1.Secret, joinURL string) (string, bool) {
+	for _, ps := range planSecrets {
+		joinedTo := ps.GetAnnotations()[capr.JoinedToAnnotation]
+		if joinedTo == "" {
+			continue
+		}
+		if joinedTo == joinURL {
+			return ps.GetLabels()[capr.MachineNameLabel], true
 		}
 	}
 
-	return 0, nil
+	return "", false
 }
