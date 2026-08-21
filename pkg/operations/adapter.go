@@ -18,6 +18,7 @@ const (
 	SecurePortArgument  = "secure-port"
 	CertDirArgument     = "cert-dir"
 	TLSCertFileArgument = "tls-cert-file"
+	TLSPrivateKeyFile   = "tls-private-key-file"
 
 	ETCDProbeName                  = "etcd"
 	KubeAPIServerProbeName         = "kube-apiserver"
@@ -41,6 +42,29 @@ const (
 
 	OperationLeaderAnnotation = "rke.cattle.io/operation-leader"
 )
+
+// ComponentTLSSettings captures the TLS-related runtime arguments used by the
+// scheduler and controller-manager secure probes and certificate cleanup logic.
+type ComponentTLSSettings struct {
+	SecurePort        string
+	TLSCertFile       string
+	TLSPrivateKeyFile string
+}
+
+// HasCompleteTLSConfig reports whether both cert and key paths are explicitly configured.
+func (s ComponentTLSSettings) HasCompleteTLSConfig() bool {
+	return s.TLSCertFile != "" && s.TLSPrivateKeyFile != ""
+}
+
+// convertInterfaceSliceToStringSlice converts an interface slice to strings.
+// Adapter configuration may originate from unstructured Kubernetes data.
+func convertInterfaceSliceToStringSlice(input []any) []string {
+	stringArr := make([]string, 0, len(input))
+	for _, v := range input {
+		stringArr = append(stringArr, fmt.Sprintf("%v", v))
+	}
+	return stringArr
+}
 
 var (
 	AllProbes = map[string]plan.Probe{
@@ -176,6 +200,10 @@ type Adapter interface {
 	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
 	// supervisor probe to fail.
 	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
+
+	// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
+	// TLS argument settings for the node represented by secret.
+	CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error)
 
 	// KubectlPath returns the path to the kubectl binary on the host relative to the machine-plan secret.
 	KubectlPath(secret *corev1.Secret) string
