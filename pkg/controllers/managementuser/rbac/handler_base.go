@@ -145,14 +145,9 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	management.Wrangler.Mgmt.Cluster().OnChange(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
-	sync := &resourcequota.SyncController{
-		Namespaces:          workload.Corew.Namespace(),
-		NsIndexer:           nsInformer.GetIndexer(),
-		ResourceQuotas:      workload.Corew.ResourceQuota(),
-		ResourceQuotaLister: workload.Corew.ResourceQuota().Cache(),
-		LimitRange:          workload.Corew.LimitRange(),
-		LimitRangeLister:    workload.Corew.LimitRange().Cache(),
-		ProjectCache:        management.Wrangler.Mgmt.Project().Cache(),
+	sync, err := resourcequota.NewSyncController(workload, nsInformer, management.Wrangler.Mgmt)
+	if err != nil {
+		return err
 	}
 
 	nsLifecycle := newNamespaceLifecycle(r, sync)
