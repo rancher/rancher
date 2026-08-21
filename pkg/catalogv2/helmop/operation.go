@@ -39,6 +39,7 @@ import (
 	rbacv1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -894,8 +895,10 @@ func (s *Operations) createRoleAndRoleBindings(op *catalog.Operation, user strin
 
 // createNamespace creates a new k8s namespace and returns its object.
 // It can also set the field.cattle.io/projectId annotation on the namespace if a non-empty projectID is provided.
-// It creates a watch on the namespace and waits for the v3.ProjectConditionInitialRolesPopulated condition
-// If the condition is not met within 30 seconds, it returns an error
+// It creates a watch on the namespace and waits for the v3.ProjectConditionInitialRolesPopulated condition.
+// If the condition is not met within 30 seconds, it logs a warning and returns the namespace anyway; the
+// condition may never be reachable (e.g. a PRTB referencing a deleted role template), and the actual
+// permission check happens later when the operation pod's impersonated helm/kubectl calls run.
 func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*corev1.Namespace, error) {
 	apiContext := types.GetAPIContext(ctx)
 	client, err := s.cg.K8sInterface(apiContext)
@@ -954,7 +957,13 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 		}
 	}
 
-	return nil, fmt.Errorf("failed to wait for roles to be populated")
+	// The watch ended before InitialRolesPopulated was observed - this can happen if the project's
+	// RBAC can never fully converge (e.g. a PRTB referencing a deleted role template). Proceed with
+	// the namespace as-is rather than failing the install outright; the RBAC controller keeps
+	// reconciling roles for it in the background, and any permission gap will surface when the
+	// operation pod's impersonated helm/kubectl calls run against the namespace.
+	logrus.Warnf("[helmop] timed out waiting for roles to be populated in namespace %s, proceeding anyway", namespace)
+	return adminClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 }
 
 // createPod creates the struct of the pod for the operation to run in. It also mounts a secret with the secretdata provided.
