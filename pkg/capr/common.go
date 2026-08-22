@@ -82,7 +82,8 @@ const (
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
 
-	SnapshotNameAnnotation = "etcdsnapshot.rke.io/snapshot-name"
+	SnapshotNameAnnotation      = "etcdsnapshot.rke.io/snapshot-name"
+	SnapshotTokenHashAnnotation = "rke.cattle.io/snapshot-token-hash"
 
 	JoinServerImplausible = "implausible"
 

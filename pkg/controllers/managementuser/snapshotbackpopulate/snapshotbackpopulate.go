@@ -419,6 +419,22 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstru
 	return strings.Join(availableModes, ",")
 }
 
+// getSnapshotHash returns the value of the "etcd.rke2.cattle.io/snapshot-token-hash" or
+// "etcd.k3s.cattle.io/snapshot-token-hash" annotation on the downstream snapshot object for RKE2 and K3s respectively.
+// Ideally this function should check one or the other depending on the detected distro, but for now it checks both as
+// this would ideally be supported via the operations.Adapter interface, which is currently disabled for v2prov.
+func getSnapshotHash(downstream *k3s.ETCDSnapshotFile) string {
+	if downstream == nil || downstream.Annotations == nil {
+		return ""
+	}
+
+	if hash := downstream.Annotations["etcd.rke2.cattle.io/snapshot-token-hash"]; hash != "" {
+		return hash
+	}
+
+	return downstream.Annotations["etcd.k3s.cattle.io/snapshot-token-hash"]
+}
+
 // populateUpstreamSnapshotFromDownstream sets the labels, annotations, spec and status fields which are governed by the
 // downstream snapshot. Also sets the relevant owner references (machine for local, capi cluster for s3), and
 // namespace/name if the snapshot is being created.
@@ -460,6 +476,11 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
 	upstream.Annotations[SnapshotFileNameAnnotationKey] = downstream.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name
+
+	hash := getSnapshotHash(downstream)
+	if hash != "" {
+		upstream.Annotations[capr.SnapshotTokenHashAnnotation] = hash
+	}
 
 	upstream.Spec.ClusterName = clusterName
 	upstream.SnapshotFile = rkev1.ETCDSnapshotFile{
