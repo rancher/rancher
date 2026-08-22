@@ -11,9 +11,7 @@ import (
 // etcdsnapshotsave/etcdsnapshotrestore controllers use this to decide when to release the beacon
 // and when to respect the TTL for automatic deletion.
 func IsTerminal(phase opv1alpha1.OperationPhase) bool {
-	return phase == opv1alpha1.OperationPhaseSucceeded ||
-		phase == opv1alpha1.OperationPhaseFailed ||
-		phase == opv1alpha1.OperationPhaseCanceled
+	return phase.IsTerminal()
 }
 
 // IsExpired returns true when the operation has lived longer than its TTL measured from its

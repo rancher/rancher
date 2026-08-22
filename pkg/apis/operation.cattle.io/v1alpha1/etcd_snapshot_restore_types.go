@@ -84,11 +84,12 @@ func (s *ETCDSnapshotRestoreStatus) SetStep(step ETCDSnapshotRestoreStep) {
 // +kubebuilder:resource:path=etcdsnapshotrestores,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
-// +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
+// +kubebuilder:metadata:annotations={"operation.cattle.io/preemption-priority=100","operation.cattle.io/restore-required-on-cancellation=true","operation.cattle.io/clears-restore-required=true"}
+// +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
 // +kubebuilder:printcolumn:name="Snapshot",type=string,JSONPath=".spec.args.name"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
-// +kubebuilder:printcolumn:name="Step",type=string,JSONPath=".spec.step"
+// +kubebuilder:printcolumn:name="Step",type=string,JSONPath=".status.step"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
 // ETCDSnapshotRestore is the mechanism for initiating an RKE2 or K3s etcd restore operation for v2prov, CAPI, and

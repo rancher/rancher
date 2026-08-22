@@ -57,6 +57,7 @@ func (s *EncryptionKeyRotationStatus) SetStep(step EncryptionKeyRotationStep) {
 // +kubebuilder:resource:path=encryptionkeyrotations,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:metadata:annotations={"operation.cattle.io/preemption-priority=0","operation.cattle.io/restore-required-on-cancellation=true"}
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"

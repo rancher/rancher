@@ -103,6 +103,8 @@ type enqueueCall struct {
 type fakeDynamic struct {
 	getObj       runtime.Object
 	getErr       error
+	updateErr    error
+	updated      []runtime.Object
 	enqueueErr   error
 	enqueueCalls []enqueueCall
 }
@@ -112,6 +114,14 @@ func (d *fakeDynamic) Get(_ schema.GroupVersionKind, _, _ string) (runtime.Objec
 		return nil, d.getErr
 	}
 	return d.getObj, nil
+}
+
+func (d *fakeDynamic) Update(obj runtime.Object) (runtime.Object, error) {
+	if d.updateErr != nil {
+		return nil, d.updateErr
+	}
+	d.updated = append(d.updated, obj)
+	return obj, nil
 }
 
 func (d *fakeDynamic) Enqueue(gvk schema.GroupVersionKind, namespace, name string) error {
@@ -154,8 +164,14 @@ func newScope(op *opv1alpha1.EncryptionKeyRotation, beacon *planv1alpha1.Beacon,
 	cluster.SetKind("Cluster")
 	cluster.SetNamespace("fleet-default")
 	cluster.SetName("test")
+	operation, err := opv1alpha1.ToOperation(op)
+	if err != nil {
+		panic(err)
+	}
 	return &scope{
 		op:         op,
+		operation:  operation,
+		started:    op.Status.Step != "",
 		beacon:     beacon,
 		namespace:  "fleet-default",
 		clusterObj: cluster,

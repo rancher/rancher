@@ -19,6 +19,15 @@ type OperationSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty"`
 
+	// Cancel requests cancellation of the operation.
+	// Cancellation is a latch: once set to true it cannot be unset, and an operation which has
+	// already reached a terminal phase is unaffected.
+	// A canceled operation halts at the current step boundary; partially applied work is not rolled
+	// back, which is why cancelling an operation that mutates cluster state marks the cluster as
+	// requiring a restore.
+	// +optional
+	Cancel bool `json:"cancel,omitempty"`
+
 	// TTL is the time-to-live for the operation in seconds.
 	// This TTL is only enforced when the operation is not paused and has reached a terminal state.
 	// Setting a value < 0 represents +infinity, i.e. an operation which does not expire.
@@ -47,6 +56,16 @@ const (
 	// OperationPhaseCanceled indicates the operation was canceled by the user or system.
 	OperationPhaseCanceled OperationPhase = "Canceled"
 )
+
+// IsTerminal returns true if the phase is one from which an operation will not transition again.
+func (p OperationPhase) IsTerminal() bool {
+	switch p {
+	case OperationPhaseSucceeded, OperationPhaseFailed, OperationPhaseCanceled:
+		return true
+	}
+
+	return false
+}
 
 // OperationStatus defines the observed state of an operation.
 type OperationStatus struct {
