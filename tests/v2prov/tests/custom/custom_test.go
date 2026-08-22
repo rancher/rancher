@@ -1,3 +1,6 @@
+// Package custom contains integration tests for custom (non-machine-provisioned) v2prov clusters.
+// Custom clusters use manually created systemd-node pods to simulate node registration
+// via the cluster registration token command.
 package custom
 
 import (
@@ -6,68 +9,52 @@ import (
 	"strings"
 	"testing"
 
-	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
-	"github.com/rancher/rancher/tests/v2prov/systemdnode"
+	"github.com/rancher/rancher/tests/v2prov/tests/testhelpers"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Test_Provisioning_Custom_OneNodeWithDelete creates a custom single-node cluster
+// with all roles (worker, etcd, controlplane), verifies it provisions correctly,
+// and then deletes it to ensure cleanup works properly.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
-	clients, err := clients.New()
+	tc := testhelpers.NewTestClients(t)
+
+	c, err := testhelpers.CreateCustomCluster(t, tc, "test-custom-one-node", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clients.Close()
 
-	c, err := cluster.New(clients, &provisioningv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-custom-one-node",
-		},
-		Spec: provisioningv1.ClusterSpec{
-			RKEConfig: &provisioningv1.RKEConfig{},
-		},
+	command := testhelpers.GetCustomCommand(t, tc, c)
+
+	testhelpers.CreateCustomClusterNode(t, tc, c, command, testhelpers.CustomClusterNodeOptions{
+		Worker:       true,
+		ControlPlane: true,
+		Etcd:         true,
+		Labels:       []string{"foo=bar", "ball=life"},
 	})
+
+	c = testhelpers.WaitForClusterReady(t, tc, c, 1)
+
+	machines, err := cluster.Machines(tc.Clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	command, err := cluster.CustomCommand(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotEmpty(t, command)
-
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label foo=bar --label ball=life", map[string]string{"custom-cluster-name": c.Name}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	machines, err := cluster.Machines(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Len(t, machines.Items, 1)
 	assert.Equal(t, machines.Items[0].Labels[capr.WorkerRoleLabel], "true")
 	assert.Equal(t, machines.Items[0].Labels[capr.ControlPlaneRoleLabel], "true")
 	assert.Equal(t, machines.Items[0].Labels[capr.EtcdRoleLabel], "true")
 	assert.Len(t, machines.Items[0].Status.Addresses, 2)
 	assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
 
-	secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	secret, err := tc.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
 	assert.NoError(t, err)
 
 	assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
@@ -78,71 +65,47 @@ func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
 	assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "foo": "bar", "ball": "life"})
 
 	// Delete the cluster and wait for cleanup.
-	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	testhelpers.DeleteClusterAndWait(t, tc, c)
 
-	c, err = cluster.WaitForDelete(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
-	assert.NoError(t, err)
+	testhelpers.EnsureMinimalConflicts(t, tc, c)
 }
 
+// Test_Provisioning_Custom_ThreeNode creates a custom three-node cluster
+// with all roles on each node. This tests multi-node custom cluster provisioning
+// and verifies that all nodes are properly registered with the correct roles.
 func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
+	tc := testhelpers.NewTestClients(t)
 
-	c, err := cluster.New(clients, &provisioningv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-custom-three-node",
-		},
-		Spec: provisioningv1.ClusterSpec{
-			RKEConfig: &provisioningv1.RKEConfig{},
-		},
-	})
+	c, err := testhelpers.CreateCustomCluster(t, tc, "test-custom-three-node", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	command, err := cluster.CustomCommand(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotEmpty(t, command)
+	command := testhelpers.GetCustomCommand(t, tc, c)
 
 	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome", map[string]string{"custom-cluster-name": c.Name}, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testhelpers.CreateCustomClusterNode(t, tc, c, command, testhelpers.CustomClusterNodeOptions{
+			Worker:       true,
+			ControlPlane: true,
+			Etcd:         true,
+			Labels:       []string{"rancher=awesome"},
+		})
 	}
 
-	_, err = cluster.WaitForCreate(clients, c)
+	c = testhelpers.WaitForClusterReady(t, tc, c, 3)
+
+	machines, err := cluster.Machines(tc.Clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	machines, err := cluster.Machines(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Len(t, machines.Items, 3)
 	for _, m := range machines.Items {
 		assert.Equal(t, m.Labels[capr.WorkerRoleLabel], "true")
 		assert.Equal(t, m.Labels[capr.ControlPlaneRoleLabel], "true")
 		assert.Equal(t, m.Labels[capr.EtcdRoleLabel], "true")
 		assert.NotNil(t, machines.Items[0].Spec.Bootstrap.ConfigRef)
 
-		secret, err := clients.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+		secret, err := tc.Core.Secret().Get(machines.Items[0].Namespace, capr.PlanSecretFromBootstrapName(machines.Items[0].Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
 		assert.NoError(t, err)
 
 		assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
@@ -152,66 +115,46 @@ func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 		}
 		assert.Equal(t, labels, map[string]string{"cattle.io/os": "linux", "rancher": "awesome"})
 	}
-	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
-	assert.NoError(t, err)
+	testhelpers.EnsureMinimalConflicts(t, tc, c)
 }
 
+// Test_Provisioning_Custom_UniqueRoles creates a custom cluster with separate nodes
+// for each role: 3 etcd nodes, 1 control plane node, and 1 worker node.
+// This tests the ability to run a cluster with dedicated role assignments.
 func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
+	tc := testhelpers.NewTestClients(t)
 
-	c, err := cluster.New(clients, &provisioningv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-custom-unique-roles",
-		},
-		Spec: provisioningv1.ClusterSpec{
-			RKEConfig: &provisioningv1.RKEConfig{},
-		},
-	})
+	c, err := testhelpers.CreateCustomCluster(t, tc, "test-custom-unique-roles", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	command, err := cluster.CustomCommand(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	command := testhelpers.GetCustomCommand(t, tc, c)
 
-	assert.NotEmpty(t, command)
-
+	// Create 3 etcd nodes
 	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name}, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testhelpers.CreateCustomClusterNode(t, tc, c, command, testhelpers.CustomClusterNodeOptions{
+			Etcd: true,
+		})
 	}
 
-	for i := 0; i < 1; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane", map[string]string{"custom-cluster-name": c.Name}, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
+	// Create 1 controlplane node
+	testhelpers.CreateCustomClusterNode(t, tc, c, command, testhelpers.CustomClusterNodeOptions{
+		ControlPlane: true,
+	})
 
-	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker", map[string]string{"custom-cluster-name": c.Name}, nil)
+	// Create 1 worker node
+	testhelpers.CreateCustomClusterNode(t, tc, c, command, testhelpers.CustomClusterNodeOptions{
+		Worker: true,
+	})
+
+	c = testhelpers.WaitForClusterReady(t, tc, c, 5)
+
+	machines, err := cluster.Machines(tc.Clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	machines, err := cluster.Machines(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Len(t, machines.Items, 5)
 	var (
 		worker       = 0
 		controlPlane = 0
@@ -232,70 +175,55 @@ func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
 	assert.Equal(t, worker, 1)
 	assert.Equal(t, etcd, 3)
 	assert.Equal(t, controlPlane, 1)
-	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
-	assert.NoError(t, err)
+	testhelpers.EnsureMinimalConflicts(t, tc, c)
 }
 
+// Test_Provisioning_Custom_ThreeNodeWithTaints creates a three-node custom cluster
+// and applies a taint to one of the nodes. This tests the ability to pass taints
+// via the node registration command.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
+	tc := testhelpers.NewTestClients(t)
 
-	c, err := cluster.New(clients, &provisioningv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-custom-three-node-with-taints",
-		},
-		Spec: provisioningv1.ClusterSpec{
-			RKEConfig: &provisioningv1.RKEConfig{},
-		},
-	})
+	c, err := testhelpers.CreateCustomCluster(t, tc, "test-custom-three-node-with-taints", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	command, err := cluster.CustomCommand(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.NotEmpty(t, command)
+	command := testhelpers.GetCustomCommand(t, tc, c)
 
 	for i := 0; i < 3; i++ {
-		var taint string
+		opts := testhelpers.CustomClusterNodeOptions{
+			Worker:       true,
+			ControlPlane: true,
+			Etcd:         true,
+			Labels:       []string{"rancher=awesome"},
+		}
 		// Put a taint on one of the nodes.
 		if i == 1 {
-			taint = " --taint key=value:NoExecute"
+			opts.Taints = []string{"key=value:NoExecute"}
 		}
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome"+taint, map[string]string{"custom-cluster-name": c.Name}, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		testhelpers.CreateCustomClusterNode(t, tc, c, command, opts)
 	}
 
-	_, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	c = testhelpers.WaitForClusterReady(t, tc, c, 3)
 
-	machines, err := cluster.Machines(clients, c)
+	machines, err := cluster.Machines(tc.Clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var taintFound bool
-	assert.Len(t, machines.Items, 3)
 	for _, m := range machines.Items {
 		assert.Equal(t, m.Labels[capr.WorkerRoleLabel], "true")
 		assert.Equal(t, m.Labels[capr.ControlPlaneRoleLabel], "true")
 		assert.Equal(t, m.Labels[capr.EtcdRoleLabel], "true")
 		assert.NotNil(t, m.Spec.Bootstrap.ConfigRef)
 
-		secret, err := clients.Core.Secret().Get(m.Namespace, capr.PlanSecretFromBootstrapName(m.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+		secret, err := tc.Core.Secret().Get(m.Namespace, capr.PlanSecretFromBootstrapName(m.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
 		assert.NoError(t, err)
 
 		assert.NotEmpty(t, secret.Annotations[capr.LabelsAnnotation])
@@ -323,6 +251,5 @@ func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
 	}
 
 	assert.True(t, taintFound)
-	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
-	assert.NoError(t, err)
+	testhelpers.EnsureMinimalConflicts(t, tc, c)
 }
