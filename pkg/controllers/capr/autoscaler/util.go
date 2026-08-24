@@ -59,7 +59,11 @@ func helmOpName(cluster *capi.Cluster) string {
 // This is then used to identify the correct dockerconfigjson auth entry defined within the
 // first configured pull secret in the settings.SystemDefaultRegistryPullSecrets list.
 func autoScalerChartRepositoryHost() string {
-	host := settings.ClusterAutoscalerChartRepository.Get()
+	return chartRepositoryHost(settings.ClusterAutoscalerChartRepository.Get())
+}
+
+func chartRepositoryHost(repository string) string {
+	host := repository
 	_, hostWithoutProto, found := strings.Cut(host, "://")
 	if !found {
 		hostWithoutProto = host

@@ -116,13 +116,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		return
 	}
 
-	// warn the user if they have the autoscaling feature-flag enabled but no chart repo set,
-	// then do not run the controller.
-	if settings.ClusterAutoscalerChartRepository.Get() == "" {
-		logrus.Warnf("[autoscaler] no value is set for the cluster-autoscaler-chart-repo Setting - cannot enable autoscaling!")
-		return
-	}
-
 	// Start background token renewal process, runs daily to refresh tokens that expire within a month.
 	h.startTokenRenewal(ctx)
 
