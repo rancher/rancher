@@ -165,8 +165,8 @@ func (s *Store) processHarvesterCloudCredential(data map[string]any) error {
 	return nil
 }
 
-func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data data.Object) (map[string]interface{}, error) {
-	if err := s.processHarvesterCloudCredential(data); err != nil {
+func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}) (map[string]interface{}, error) {
+	if err := s.processHarvesterCloudCredential(obj); err != nil {
 		return nil, fmt.Errorf("failed to process harvester cloud credential: %w", err)
 	}
 
@@ -174,8 +174,12 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	// This label is used for auditing and owner-based list filtering; access control
 	// is still enforced via Kubernetes RBAC on the underlying secret.
 	if apiContext.Request != nil {
-		data.SetNested(apiContext.Request.Header.Get("Impersonate-User"), "metadata", "labels", "cattle.io/creator")
-	return s.Store.Create(apiContext, schema, data)
+		userID := apiContext.Request.Header.Get("Impersonate-User")
+		if userID == "" {
+			data.PutValue(obj, userID, "metadata", "labels", "cattle.io/creator")
+		}
+	}
+	return s.Store.Create(apiContext, schema, obj)
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {

@@ -415,8 +415,7 @@ func isOverlyBroad(pattern string) bool {
 // findMatchingRoute returns the first ProxyEndpointRoute whose domain pattern matches host,
 // or nil if no match is found. It uses the same wildcard/regex logic as isAllowed.
 func (p *proxy) findMatchingRoute(host string) *mgmt.ProxyEndpointRoute {
-	nilSelector := labels.Nothing()
-	endpoints, err := p.proxyEndpointCache.List(nilSelector)
+	endpoints, err := p.proxyEndpointCache.List(labels.Everything())
 	if err != nil {
 		logrus.Debugf("httpproxy: failed to list ProxyEndpoints for route lookup: %v", err)
 		return nil

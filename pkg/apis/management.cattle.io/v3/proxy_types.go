@@ -66,7 +66,9 @@ type ProxyEndpointRoute struct {
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
 	// CredentialInjection defines how credentials are applied to proxied requests for this domain.
-	// When set, clients only need to supply a credential ID via X-API-CattleAuth-Header;
+	// When set, clients need to supply a credential ID and values for the secret fields via X-API-CattleAuth-Header;
+
+	// e.g.: credID=cattle-global-data/my-cred headers=X-Token=token;X-User=user
 	// the proxy applies credentials according to this server-defined pattern.
 	// +optional
 	CredentialInjection *CredentialInjectionSpec `json:"credentialInjection,omitempty"`
