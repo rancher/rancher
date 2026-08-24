@@ -63,7 +63,38 @@ scope_matches() {
     return 0
   fi
 
-  list_matches ".scopes.$scope.package-paths" "$scope" "$CHANGED"
+  # These files already had their chance to trigger the scope above and didn't, so they're
+  # removed from the pool before checking package-paths.
+  local claimed remaining
+  claimed="$(files_matching_file_paths ".scopes.$scope.file-paths" "$CHANGED")"
+  remaining="$(exclude_files "$CHANGED" "$claimed")"
+
+  list_matches ".scopes.$scope.package-paths" "$scope" "$remaining"
+}
+
+# files_matching_file_paths prints every changed file that matches the path regex of any entry in
+# the given file-paths list, regardless of whether its substring check passed.
+files_matching_file_paths() {
+  local yq_path="$1"
+  local files_pool="$2"
+  local n i path
+
+  n="$(yq "($yq_path // []) | length" "$CONFIG")"
+  for ((i = 0; i < n; i++)); do
+    path="$(yq "$yq_path[$i] | (.path // .)" "$CONFIG")"
+    test -n "$path" || continue
+    printf '%s\n' "$files_pool" | grep -E "$path" || true
+  done
+}
+
+# exclude_files prints every line of files_pool that isn't also a line in exclude_list.
+exclude_files() {
+  local files_pool="$1"
+  local exclude_list="$2"
+
+  test -n "$exclude_list" || { printf '%s\n' "$files_pool"; return; }
+
+  printf '%s\n' "$files_pool" | grep -vFxf <(printf '%s\n' "$exclude_list") || true
 }
 
 # list_matches iterates over the list of file-paths or package-paths for a given scope,
