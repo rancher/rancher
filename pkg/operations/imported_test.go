@@ -343,7 +343,7 @@ func TestImportedAdapter_WaitForRegister_SecretPointsToUnexpectedNode(t *testing
 	assert.False(t, ok, "secret pointing to unexpected node should return false")
 }
 
-func TestComponentTLSSettingsFromOuterArgs(t *testing.T) {
+func TestImportedAdapter_ComponentTLSSettingsFromNodeArgs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -433,11 +433,18 @@ func TestComponentTLSSettingsFromOuterArgs(t *testing.T) {
 			component: KubeSchedulerProbeName,
 			want:      ComponentTLSSettings{SecurePort: "10262"},
 		},
+		{
+			name: "unknown component returns empty",
+			args: []string{
+				"--kube-controller-manager-arg", "secure-port=10261",
+			},
+			component: "unknown-component",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := componentTLSSettingsFromOuterArgs(tt.args, tt.component)
+			got := componentTLSSettingsFromNodeArgs(tt.args, tt.component)
 			assert.Equal(t, tt.want, got)
 			if tt.name == "incomplete TLS pair" {
 				assert.False(t, got.HasCompleteTLSConfig())

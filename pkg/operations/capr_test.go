@@ -501,3 +501,94 @@ func TestFilterField(t *testing.T) {
 		})
 	}
 }
+
+// --- CertificateRotationComponentTLSSettings ------------------------------------------------
+
+func TestCAPRAdapter_CertificateRotationComponentTLSSettings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		config    map[string]any
+		component string
+		want      ComponentTLSSettings
+	}{
+		{
+			name: "scheduler with []any config",
+			config: map[string]any{
+				KubeSchedulerArg: []any{
+					"secure-port=10262",
+					"tls-cert-file=/custom/ks.crt",
+					"tls-private-key-file=/custom/ks.key",
+				},
+			},
+			component: KubeSchedulerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10262",
+				TLSCertFile:       "/custom/ks.crt",
+				TLSPrivateKeyFile: "/custom/ks.key",
+			},
+		},
+		{
+			name: "controller-manager with []string config",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{
+					"secure-port=10261",
+					"tls-cert-file=/custom/kcm.crt",
+					"tls-private-key-file=/custom/kcm.key",
+				},
+			},
+			component: KubeControllerManagerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10261",
+				TLSCertFile:       "/custom/kcm.crt",
+				TLSPrivateKeyFile: "/custom/kcm.key",
+			},
+		},
+		{
+			name: "string config value",
+			config: map[string]any{
+				KubeSchedulerArg: "secure-port=10262",
+			},
+			component: KubeSchedulerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10262"},
+		},
+		{
+			name: "cert-dir is ignored",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{
+					"cert-dir=/custom",
+					"secure-port=10261",
+				},
+			},
+			component: KubeControllerManagerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10261"},
+		},
+		{
+			name: "unknown component returns empty",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{"secure-port=10261"},
+			},
+			component: "unknown-component",
+		},
+		{
+			name:      "missing config key returns empty",
+			config:    map[string]any{},
+			component: KubeSchedulerProbeName,
+		},
+		{
+			name: "nil config value returns empty",
+			config: map[string]any{
+				KubeSchedulerArg: nil,
+			},
+			component: KubeSchedulerProbeName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := componentTLSSettingsFromRenderedConfig(tt.config, tt.component)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

@@ -3,6 +3,7 @@ package operations
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
@@ -229,7 +230,27 @@ func (a *CAPRKE2Adapter) extraArgsFor(component string) []string {
 // CertificateRotationComponentTLSSettings returns scheduler/controller-manager
 // TLS settings from CAPRKE2 control-plane extra args.
 func (a *CAPRKE2Adapter) CertificateRotationComponentTLSSettings(_ *corev1.Secret, component string) (ComponentTLSSettings, error) {
-	return componentTLSSettingsFromConfigArg(a.extraArgsFor(component)), nil
+	args := a.extraArgsFor(component)
+	if args == nil {
+		return ComponentTLSSettings{}, nil
+	}
+
+	var settings ComponentTLSSettings
+	for _, arg := range args {
+		key, value, ok := strings.Cut(arg, "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case TLSPrivateKeyFile:
+			settings.TLSPrivateKeyFile = value
+		}
+	}
+	return settings, nil
 }
 
 // RenderProbes renders the per-role probe set for a machine-plan secret. Mirrors the structure of
@@ -279,21 +300,13 @@ func (a *CAPRKE2Adapter) RenderProbes(secret *corev1.Secret, supervisor bool) (m
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
-		if err != nil {
-			return probes, err
-		}
-		kcmProbe, err := renderSecureProbe(secureProbeArguments(kcmSettings), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmProbe, err := renderSecureProbe(a.extraArgsFor(KubeControllerManagerProbeName), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
-		if err != nil {
-			return probes, err
-		}
-		ksProbe, err := renderSecureProbe(secureProbeArguments(ksSettings), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbe(a.extraArgsFor(KubeSchedulerProbeName), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}

@@ -186,6 +186,40 @@ func TestComponentCertificateCleanupInstructions_AdapterError(t *testing.T) {
 	assert.EqualError(t, err, "settings failed")
 }
 
+func TestCertificateRotationComponentProbes(t *testing.T) {
+	t.Parallel()
+
+	s := &scope{
+		adapter: &stubAdapter{
+			dataDir: "/var/lib/rancher/rke2",
+			controllerManager: ops.ComponentTLSSettings{
+				SecurePort:  "10261",
+				TLSCertFile: "/custom/kube-controller-manager.crt",
+			},
+		},
+	}
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "fleet-default",
+		Name:      "machine-plan",
+		Labels:    map[string]string{capr.ControlPlaneRoleLabel: "true"},
+	}}
+	probes := map[string]plan.Probe{
+		ops.KubeControllerManagerProbeName: {
+			HTTPGetAction: plan.HTTPGetAction{URL: "https://[::1]:10257/healthz"},
+		},
+		ops.KubeSchedulerProbeName: {
+			HTTPGetAction: plan.HTTPGetAction{URL: "https://[::1]:10259/healthz"},
+		},
+	}
+
+	got, err := renderCertificateRotationComponentProbes(s, secret, probes)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://[::1]:10261/healthz", got[ops.KubeControllerManagerProbeName].HTTPGetAction.URL)
+	assert.Equal(t, "/custom/kube-controller-manager.crt", got[ops.KubeControllerManagerProbeName].HTTPGetAction.CACert)
+	assert.Equal(t, "https://[::1]:10259/healthz", got[ops.KubeSchedulerProbeName].HTTPGetAction.URL)
+	assert.Equal(t, "/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt", got[ops.KubeSchedulerProbeName].HTTPGetAction.CACert)
+}
+
 func TestWindowsIdempotentRestartInstructions_UsesPassedRuntime(t *testing.T) {
 	t.Parallel()
 

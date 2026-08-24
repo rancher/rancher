@@ -56,16 +56,6 @@ func (s ComponentTLSSettings) HasCompleteTLSConfig() bool {
 	return s.TLSCertFile != "" && s.TLSPrivateKeyFile != ""
 }
 
-// convertInterfaceSliceToStringSlice converts an interface slice to strings.
-// Adapter configuration may originate from unstructured Kubernetes data.
-func convertInterfaceSliceToStringSlice(input []any) []string {
-	stringArr := make([]string, 0, len(input))
-	for _, v := range input {
-		stringArr = append(stringArr, fmt.Sprintf("%v", v))
-	}
-	return stringArr
-}
-
 var (
 	AllProbes = map[string]plan.Probe{
 		CalicoProbeName: {

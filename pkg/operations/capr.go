@@ -192,6 +192,53 @@ func (a *CAPRAdapter) ServerUnit() string {
 	return "k3s"
 }
 
+// componentTLSSettingsFromRenderedConfig extracts scheduler/controller-manager
+// TLS settings from a rendered CAPR config map.
+func componentTLSSettingsFromRenderedConfig(config map[string]any, component string) ComponentTLSSettings {
+	var arg any
+	switch component {
+	case KubeControllerManagerProbeName:
+		arg = config[KubeControllerManagerArg]
+	case KubeSchedulerProbeName:
+		arg = config[KubeSchedulerArg]
+	default:
+		return ComponentTLSSettings{}
+	}
+
+	// Parse the rendered config value which can be string, []string, or []any
+	var keyValueArgs []string
+	switch v := arg.(type) {
+	case []any:
+		keyValueArgs = make([]string, len(v))
+		for i, item := range v {
+			keyValueArgs[i] = fmt.Sprintf("%v", item)
+		}
+	case []string:
+		keyValueArgs = v
+	case string:
+		keyValueArgs = []string{v}
+	default:
+		return ComponentTLSSettings{}
+	}
+
+	var settings ComponentTLSSettings
+	for _, argument := range keyValueArgs {
+		key, value, ok := strings.Cut(argument, "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case TLSPrivateKeyFile:
+			settings.TLSPrivateKeyFile = value
+		}
+	}
+	return settings
+}
+
 // CertificateRotationComponentTLSSettings returns scheduler/controller-manager
 // TLS settings from the rendered per-machine runtime config.
 func (a *CAPRAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
@@ -199,15 +246,7 @@ func (a *CAPRAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Sec
 	if err != nil {
 		return ComponentTLSSettings{}, err
 	}
-
-	switch component {
-	case KubeControllerManagerProbeName:
-		return componentTLSSettingsFromConfigArg(config[KubeControllerManagerArg]), nil
-	case KubeSchedulerProbeName:
-		return componentTLSSettingsFromConfigArg(config[KubeSchedulerArg]), nil
-	default:
-		return ComponentTLSSettings{}, nil
-	}
+	return componentTLSSettingsFromRenderedConfig(config, component), nil
 }
 
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
@@ -243,6 +282,11 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 
 	loopbackAddress := capr.GetLoopbackAddress(a.controlPlane)
 
+	config, err := a.renderConfig(secret)
+	if err != nil {
+		return nil, err
+	}
+
 	// render this probe separately because it has a specific format
 	if supervisor && (IsEtcd(secret) || IsControlPlane(secret)) {
 		supervisorProbe := AllProbes[SupervisorProbeName]
@@ -257,21 +301,13 @@ func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
-		if err != nil {
-			return probes, err
-		}
-		kcmProbe, err := renderSecureProbe(secureProbeArguments(kcmSettings), probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksSettings, err := a.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
-		if err != nil {
-			return probes, err
-		}
-		ksProbe, err := renderSecureProbe(secureProbeArguments(ksSettings), probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
@@ -506,6 +542,16 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 	return cni == "" ||
 		cni == CalicoProbeName ||
 		cni == "calico+multus"
+}
+
+// convertInterfaceSliceToStringSlice converts an interface slice to strings.
+// Used by getArgValue for processing unstructured config data.
+func convertInterfaceSliceToStringSlice(input []any) []string {
+	stringArr := make([]string, 0, len(input))
+	for _, v := range input {
+		stringArr = append(stringArr, fmt.Sprintf("%v", v))
+	}
+	return stringArr
 }
 
 // getArgValue will search the passed in interface (arg) for a key that matches the searchArg. If a match is found, it
