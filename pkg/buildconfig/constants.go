@@ -8,7 +8,7 @@ const (
 	DefaultSccOperatorImage  = "rancher/scc-operator:v0.5.1"
 	DefaultShellVersion      = "rancher/shell:v0.7.1"
 	FleetVersion             = "109.0.6+up0.15.6"
-	RemoteDialerProxyVersion = "109.0.5+up0.7.5-rc.1"
+	RemoteDialerProxyVersion = "109.0.5+up0.7.5"
 	TurtlesVersion           = "109.0.5+up0.26.5"
 	WebhookVersion           = "109.0.6+up0.10.10"
 )
