@@ -175,9 +175,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, obj m
 	// is still enforced via Kubernetes RBAC on the underlying secret.
 	if apiContext.Request != nil {
 		userID := apiContext.Request.Header.Get("Impersonate-User")
-		if userID == "" {
-			data.PutValue(obj, userID, "metadata", "labels", "cattle.io/creator")
-		}
+		data.PutValue(obj, userID, "metadata", "labels", "cattle.io/creator")
 	}
 	return s.Store.Create(apiContext, schema, obj)
 }
