@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/features"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/tests/controllers/common"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -25,6 +27,7 @@ type IndexerTestSuite struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	testEnv         *envtest.Environment
+	restCfg         *rest.Config
 	wranglerContext *wrangler.Context
 }
 
@@ -35,6 +38,7 @@ func (s *IndexerTestSuite) SetupSuite() {
 	restCfg, err := s.testEnv.Start()
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), restCfg)
+	s.restCfg = restCfg
 
 	common.RegisterCRDs(s.ctx, s.T(), restCfg,
 		crd.CRD{
@@ -108,6 +112,25 @@ func (s *IndexerTestSuite) TestGRBByGlobalRoleIndex() {
 	assert.NoError(t, err)
 	err = s.wranglerContext.Mgmt.GlobalRole().Delete(gr.Name, &metav1.DeleteOptions{})
 	assert.NoError(t, err)
+}
+
+// TestGRBByGlobalRoleIndexWithoutMCM covers the rancher instance embedded in the cluster agent, which
+// runs the same registration with MCM off. The GlobalRoleBinding CRD is not installed there, so the
+// cache must be left alone rather than started against a resource that does not exist.
+func (s *IndexerTestSuite) TestGRBByGlobalRoleIndexWithoutMCM() {
+	t := s.T()
+
+	features.MCM.Set(false)
+	defer features.MCM.Set(true)
+
+	// A separate context so the indexer registered by the suite is not visible here.
+	noMCMContext, err := wrangler.NewContext(s.ctx, nil, s.restCfg)
+	assert.NoError(t, err)
+
+	managementauth.RegisterWranglerIndexers(noMCMContext)
+
+	_, err = noMCMContext.Mgmt.GlobalRoleBinding().Cache().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "indexed-gr")
+	assert.ErrorContains(t, err, pkgrbac.GRBGlobalRoleIndex)
 }
 
 func TestIndexerTestSuite(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/roletemplates"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -34,7 +35,12 @@ func RegisterWranglerIndexers(config *wrangler.Context) {
 		return indexByMembershipBindingOwner(obj)
 	})
 
-	globalroles.RegisterWranglerIndexers(config.Mgmt.GlobalRoleBinding().Cache())
+	// The GlobalRoleBinding CRD is only installed when MCM is enabled. Instantiating its cache in a
+	// non-MCM instance, such as the rancher embedded in the cluster agent, starts a watch for a
+	// resource that does not exist and takes the process down with it.
+	if features.MCM.Enabled() {
+		globalroles.RegisterWranglerIndexers(config.Mgmt.GlobalRoleBinding().Cache())
+	}
 }
 
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
