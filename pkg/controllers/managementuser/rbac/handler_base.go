@@ -167,7 +167,9 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	// on the leader replica and cannot be enqueued from here: this namespace watch runs on the
 	// replica that owns the cluster, which in HA is usually a different pod, so the resources are
 	// reconciled for this cluster directly.
-	workload.Corew.Namespace().OnChange(ctx, inheritedNamespacedRulesHandlerName, newInheritedNamespacedRulesHandler(workload).onNamespaceChange)
+	RegisterInheritedNamespacedRulesHandler(ctx, workload.Corew.Namespace(),
+		management.Wrangler.Mgmt.GlobalRole().Cache(), management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
+		workload.RBACw.Role(), workload.RBACw.RoleBinding(), workload.ClusterName)
 
 	// Register roletemplate-aggregation controllers
 	if err := roletemplates.Register(ctx, workload); err != nil {

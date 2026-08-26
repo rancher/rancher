@@ -1,13 +1,14 @@
 package rbac
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
-	"github.com/rancher/rancher/pkg/types/config"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	wname "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
@@ -38,15 +39,27 @@ type inheritedNamespacedRulesHandler struct {
 	clusterName  string
 }
 
-func newInheritedNamespacedRulesHandler(workload *config.UserContext) *inheritedNamespacedRulesHandler {
-	return &inheritedNamespacedRulesHandler{
-		grCache:      workload.Management.Wrangler.Mgmt.GlobalRole().Cache(),
-		grbCache:     workload.Management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
-		roles:        workload.RBACw.Role(),
-		roleBindings: workload.RBACw.RoleBinding(),
-		rbCache:      workload.RBACw.RoleBinding().Cache(),
-		clusterName:  workload.ClusterName,
+// RegisterInheritedNamespacedRulesHandler wires the handler onto the cluster's namespace
+// controller. Split from Register so tests can run the owner-plane registration without the
+// rest of the user context.
+func RegisterInheritedNamespacedRulesHandler(
+	ctx context.Context,
+	namespaces corew.NamespaceController,
+	grCache mgmtv3.GlobalRoleCache,
+	grbCache mgmtv3.GlobalRoleBindingCache,
+	roles wrbacv1.RoleController,
+	roleBindings wrbacv1.RoleBindingController,
+	clusterName string,
+) {
+	h := &inheritedNamespacedRulesHandler{
+		grCache:      grCache,
+		grbCache:     grbCache,
+		roles:        roles,
+		roleBindings: roleBindings,
+		rbCache:      roleBindings.Cache(),
+		clusterName:  clusterName,
 	}
+	namespaces.OnChange(ctx, inheritedNamespacedRulesHandlerName, h.onNamespaceChange)
 }
 
 func (h *inheritedNamespacedRulesHandler) onNamespaceChange(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {
