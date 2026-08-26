@@ -58,31 +58,18 @@
       ]
     },
     {
-      "description": "Automerge patch and minor updates",
-      "matchJsonata": [
-        "$not($exists(vulnerabilityFixVersion) or $exists(isVulnerabilityAlert))"
+      "description": "Activate automerge for eligible updates",
+      "matchBaseBranches": [
+        "main",
+        "release/v2.15",
+        "release/v2.14",
+        "release/v2.13",
+        "release/v2.12",
+        "release/v2.11"
       ],
-      "matchUpdateTypes": [
-        "patch",
-        "minor"
-      ],
-      "automerge": true
-    },
-    {
-      "description": "Automerge security updates",
-      "matchDepTypes": [
-        "!devDependencies",
-        "!dev-dependencies",
-        "!test"
-      ],
-      "matchJsonata": [
-        "$exists(vulnerabilityFixVersion) or $exists(isVulnerabilityAlert)"
-      ],
-      "matchUpdateTypes": [
-        "patch",
-        "minor"
-      ],
-      "automerge": true
+      "extends": [
+        "github>rancher/renovate-config//automerge#main"
+      ]
     }
   ]
 }
