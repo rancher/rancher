@@ -82,6 +82,7 @@ func Test_Fleet_Cluster(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	cluster := &fleetv1api.Cluster{}
 	// wait for fleet local cluster with default affinity
