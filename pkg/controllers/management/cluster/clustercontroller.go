@@ -1,4 +1,5 @@
 package cluster
+
 import (
 	"context"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
