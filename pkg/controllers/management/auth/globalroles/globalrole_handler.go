@@ -35,7 +35,7 @@ const (
 	initialSyncAnnotation = "authz.management.cattle.io/initial-sync"
 	clusterRoleKind       = "ClusterRole"
 	// grOwnerLabel is used to label ClusterRoles and Roles created by the GlobalRole with the name of the owning GlobalRole.
-	grOwnerLabel = "authz.management.cattle.io/gr-owner"
+	grOwnerLabel = rbac.GrOwnerLabel
 )
 
 // Condition reason types

@@ -64,7 +64,7 @@ const (
 	crbNameAnnotation             = "authz.management.cattle.io/crb-name"
 	crtbGrbOwnerIndex             = "authz.management.cattle.io/crtb-owner"
 	localClusterName              = "local"
-	grbOwnerLabel                 = "authz.management.cattle.io/grb-owner"
+	grbOwnerLabel                 = rbac.GrbOwnerLabel
 	fleetWorkspacePermissionLabel = "authz.management.cattle.io/fleet-workspace-permissions"
 )
 
