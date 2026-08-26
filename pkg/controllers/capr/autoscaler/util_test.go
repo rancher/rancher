@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/settings"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -288,75 +287,69 @@ func TestHelmOpName(t *testing.T) {
 	}
 }
 
-func TestAutoScalerChartRepositoryHost(t *testing.T) {
+func TestChartRepositoryHost(t *testing.T) {
 	tests := []struct {
-		name     string
-		setting  string
-		expected string
+		name       string
+		repository string
+		expected   string
 	}{
 		{
-			name:     "full URL with https and path",
-			setting:  "https://charts.example.com/autoscaler/charts",
-			expected: "charts.example.com",
+			name:       "full URL with https and path",
+			repository: "https://charts.example.com/autoscaler/charts",
+			expected:   "charts.example.com",
 		},
 		{
-			name:     "OCI URL with https and path",
-			setting:  "oci://charts.example.com/autoscaler/charts",
-			expected: "charts.example.com",
+			name:       "OCI URL with https and path",
+			repository: "oci://charts.example.com/autoscaler/charts",
+			expected:   "charts.example.com",
 		},
 		{
-			name:     "full URL with http and path",
-			setting:  "http://charts.example.com/some/path",
-			expected: "charts.example.com",
+			name:       "full URL with http and path",
+			repository: "http://charts.example.com/some/path",
+			expected:   "charts.example.com",
 		},
 		{
-			name:     "URL with no path",
-			setting:  "https://charts.example.com",
-			expected: "charts.example.com",
+			name:       "URL with no path",
+			repository: "https://charts.example.com",
+			expected:   "charts.example.com",
 		},
 		{
-			name:     "host only, no protocol",
-			setting:  "charts.example.com",
-			expected: "charts.example.com",
+			name:       "host only, no protocol",
+			repository: "charts.example.com",
+			expected:   "charts.example.com",
 		},
 		{
-			name:     "host with path, no protocol",
-			setting:  "charts.example.com/some/path",
-			expected: "charts.example.com",
+			name:       "host with path, no protocol",
+			repository: "charts.example.com/some/path",
+			expected:   "charts.example.com",
 		},
 		{
-			name:     "empty setting",
-			setting:  "",
-			expected: "",
+			name:       "empty setting",
+			repository: "",
+			expected:   "",
 		},
 		{
-			name:     "host with port and path",
-			setting:  "https://registry.example.com:5000/helm/charts",
-			expected: "registry.example.com:5000",
+			name:       "host with port and path",
+			repository: "https://registry.example.com:5000/helm/charts",
+			expected:   "registry.example.com:5000",
 		},
 		{
-			name:     "host with port, no path",
-			setting:  "https://registry.example.com:5000",
-			expected: "registry.example.com:5000",
+			name:       "host with port, no path",
+			repository: "https://registry.example.com:5000",
+			expected:   "registry.example.com:5000",
 		},
 		{
-			name:     "oci protocol",
-			setting:  "oci://registry.example.com/charts",
-			expected: "registry.example.com",
+			name:       "oci protocol",
+			repository: "oci://registry.example.com/charts",
+			expected:   "registry.example.com",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prev := settings.ClusterAutoscalerChartRepository.Get()
-			settings.ClusterAutoscalerChartRepository.Set(tt.setting)
-			t.Cleanup(func() {
-				settings.ClusterAutoscalerChartRepository.Set(prev)
-			})
-
-			result := autoScalerChartRepositoryHost()
+			result := chartRepositoryHost(tt.repository)
 			if result != tt.expected {
-				t.Errorf("autoScalerChartRepositoryHost() = %q, want %q", result, tt.expected)
+				t.Errorf("chartRepositoryHost() = %q, want %q", result, tt.expected)
 			}
 		})
 	}

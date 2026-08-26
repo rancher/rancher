@@ -741,20 +741,59 @@ func (s *autoscalerSuite) TestManageHelmOpSecrets_GSDREqualsChartHost_ClusterHas
 			"because clusters with their own SDR do not get GSDR credentials in their containerd config")
 }
 
-func (s *autoscalerSuite) TestSyncRootHelmOpSecret_UsesConfiguredChartRepository() {
+func (s *autoscalerSuite) TestEnsureRootHelmOpSecrets_UsesProvidedChartHost() {
 	const (
-		chartHost      = "charts.example.com"
+		chartRepository = "oci://charts.example.com/rancher/cluster-autoscaler"
+		globalRegistry  = "registry.example.com"
+		pullSecretName  = "autoscaler-pull-secret"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepository,
+		settings.SystemDefaultRegistry:            globalRegistry,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	pullSecretData, err := dockerConfigSecretData(globalRegistry, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+
+	created := map[string]*corev1.Secret{}
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+		created[secret.Name] = secret
+		return secret, nil
+	}).Times(2)
+
+	helmOpSec, imagePullSec, err := s.h.ensureRootHelmOpSecrets(globalRegistry)
+	s.NoError(err)
+	s.Equal(autoscalerHelmSecretResourceName, helmOpSec)
+	s.Equal(autoscalerChartImagePullSecretName, imagePullSec)
+	s.Contains(string(created[autoscalerChartImagePullSecretName].Data[corev1.DockerConfigJsonKey]), globalRegistry)
+}
+
+func (s *autoscalerSuite) TestSyncRootHelmOpSecret_UsesSystemDefaultRegistry() {
+	const (
+		globalRegistry = "registry.example.com"
 		chartRepo      = "oci://charts.example.com/rancher/cluster-autoscaler"
 		pullSecretName = "autoscaler-pull-secret"
 	)
 
 	s.withSettings(map[settings.Setting]string{
 		settings.ClusterAutoscalerChartRepository: chartRepo,
-		settings.SystemDefaultRegistry:            chartHost,
+		settings.SystemDefaultRegistry:            globalRegistry,
 		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
 	})
 
-	pullSecretData, err := dockerConfigSecretData(chartHost, "user", "pass")
+	pullSecretData, err := dockerConfigSecretData(globalRegistry, "user", "pass")
 	s.Require().NoError(err)
 	globalPullSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
@@ -777,7 +816,7 @@ func (s *autoscalerSuite) TestSyncRootHelmOpSecret_UsesConfiguredChartRepository
 	result, err := s.h.syncRootHelmOpSecret("", setting)
 	s.NoError(err)
 	s.Same(setting, result)
-	s.Contains(string(created[autoscalerChartImagePullSecretName].Data[corev1.DockerConfigJsonKey]), chartHost)
+	s.Contains(string(created[autoscalerChartImagePullSecretName].Data[corev1.DockerConfigJsonKey]), globalRegistry)
 }
 
 func (s *autoscalerSuite) TestSyncRootHelmOpSecret_IgnoresUnrelatedSetting() {

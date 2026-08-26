@@ -49,7 +49,7 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 		return "", "", err
 	}
 
-	return h.ensureRootHelmOpSecrets()
+	return h.ensureRootHelmOpSecrets(chartHost)
 }
 
 // ensureRootHelmOpSecrets manages the shared Helm basic-auth secret and dockerconfigjson image
@@ -57,8 +57,8 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 // pull secret, or empty strings if no credentials are available (in which case any previously
 // created secrets are also deleted). Creating two shared root secrets helps reduce the number
 // of objects created when there are many clusters using the GSDR and the autoscaler.
-func (h *autoscalerHandler) ensureRootHelmOpSecrets() (string, string, error) {
-	username, password, err := h.findGlobalClusterAutoScalerHostnameCreds()
+func (h *autoscalerHandler) ensureRootHelmOpSecrets(chartHost string) (string, string, error) {
+	username, password, err := h.findGlobalClusterAutoScalerHostnameCreds(chartHost)
 	if err != nil {
 		return "", "", err
 	}
@@ -78,7 +78,7 @@ func (h *autoscalerHandler) ensureRootHelmOpSecrets() (string, string, error) {
 		return "", "", err
 	}
 
-	dockerConfigData, err := dockerConfigSecretData(autoScalerChartRepositoryHost(), username, password)
+	dockerConfigData, err := dockerConfigSecretData(chartHost, username, password)
 	if err != nil {
 		return "", "", err
 	}
@@ -190,13 +190,12 @@ func (h *autoscalerHandler) upsertSecret(namespace, secretName string, secretTyp
 }
 
 // findGlobalClusterAutoScalerHostnameCreds iterates over globally configured pull secrets and
-// returns the first username/password pair that covers the autoscaler chart repository host.
+// returns the first username/password pair that covers the provided chart host.
 // When the global system default registry URL is not set, it falls back to searching the
 // SystemDefaultRegistryPullSecrets directly, since those secrets may still contain credentials
-// for the autoscaler chart repository even without a GSDR URL configured.
+// for the provided chart host even without a GSDR URL configured.
 // Returns empty strings (no error) when no matching credentials are found.
-func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds() (string, string, error) {
-	chartHost := autoScalerChartRepositoryHost()
+func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds(chartHost string) (string, string, error) {
 	registry, _ := cluster.GetPrivateRegistry(nil)
 	pullSecrets := cluster.GlobalPullSecretRefs()
 	if registry != nil {

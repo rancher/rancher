@@ -132,7 +132,7 @@ func (h *autoscalerHandler) syncRootHelmOpSecret(_ string, setting *v3.Setting) 
 	if setting == nil || (setting.Name != settings.SystemDefaultRegistryPullSecrets.Name && setting.Name != settings.SystemDefaultRegistry.Name) {
 		return setting, nil
 	}
-	_, _, err := h.ensureRootHelmOpSecrets()
+	_, _, err := h.ensureRootHelmOpSecrets(settings.SystemDefaultRegistry.Get())
 	return setting, err
 }
 
