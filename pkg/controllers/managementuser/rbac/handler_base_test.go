@@ -406,7 +406,7 @@ func TestNamespaceEnqueueGRBs(t *testing.T) {
 					grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, gomock.Any()).Return(test.grResults, test.grErr).AnyTimes()
 					for _, gr := range test.grResults {
 						grbs := test.grbResults[gr.Name]
-						grbCache.EXPECT().GetByIndex("mgmt-auth-grb-gr-idex", gr.Name).Return(grbs, test.grbErr).AnyTimes()
+						grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, gr.Name).Return(grbs, test.grbErr).AnyTimes()
 					}
 				}
 			}
