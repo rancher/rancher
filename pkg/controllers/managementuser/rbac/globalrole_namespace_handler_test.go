@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -33,12 +34,6 @@ func TestOnNamespaceChangeSkipsIrrelevantNamespaces(t *testing.T) {
 					Name:              "testns3",
 					DeletionTimestamp: &metav1.Time{},
 				},
-			},
-		},
-		"namespace terminating": {
-			ns: &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "testns3"},
-				Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
 			},
 		},
 	}
@@ -134,6 +129,8 @@ func TestOnNamespaceChangeCreatesRole(t *testing.T) {
 		},
 		Rules: rules,
 	}
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(nil, errRoleNotFound)
 	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
 	roles.EXPECT().Get("testns3", "nsgrole3-testns3", metav1.GetOptions{}).Return(nil, errRoleNotFound)
 	roles.EXPECT().Create(wantRole).Return(wantRole, nil)
@@ -142,6 +139,7 @@ func TestOnNamespaceChangeCreatesRole(t *testing.T) {
 		grCache:      grCache,
 		grbCache:     grbCache,
 		roles:        roles,
+		roleCache:    roleCache,
 		roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
 		rbCache:      wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl),
 		clusterName:  "c-m-test",
@@ -190,6 +188,8 @@ func TestOnNamespaceChangeUpdatesRoleWithDifferentRules(t *testing.T) {
 	wantRole := existing.DeepCopy()
 	wantRole.Rules = rules
 
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(existing, nil)
 	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
 	roles.EXPECT().Get("testns3", "nsgrole3-testns3", metav1.GetOptions{}).Return(existing, nil)
 	roles.EXPECT().Update(wantRole).Return(wantRole, nil)
@@ -198,6 +198,7 @@ func TestOnNamespaceChangeUpdatesRoleWithDifferentRules(t *testing.T) {
 		grCache:      grCache,
 		grbCache:     grbCache,
 		roles:        roles,
+		roleCache:    roleCache,
 		roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
 		rbCache:      wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl),
 		clusterName:  "c-m-test",
@@ -234,8 +235,8 @@ func TestOnNamespaceChangeCreatesRoleBindingsForGRBs(t *testing.T) {
 	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
 	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return([]*v3.GlobalRoleBinding{grb}, nil)
 
-	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
-	roles.EXPECT().Get("testns3", "nsgrole3-testns3", metav1.GetOptions{}).Return(&rbacv1.Role{
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(&rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nsgrole3-testns3",
 			Namespace: "testns3",
@@ -273,7 +274,8 @@ func TestOnNamespaceChangeCreatesRoleBindingsForGRBs(t *testing.T) {
 	h := &inheritedNamespacedRulesHandler{
 		grCache:      grCache,
 		grbCache:     grbCache,
-		roles:        roles,
+		roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+		roleCache:    roleCache,
 		roleBindings: roleBindings,
 		rbCache:      rbCache,
 		clusterName:  "c-m-test",
@@ -310,8 +312,8 @@ func TestOnNamespaceChangeLeavesCorrectRoleBindingAlone(t *testing.T) {
 	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
 	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return([]*v3.GlobalRoleBinding{grb}, nil)
 
-	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
-	roles.EXPECT().Get("testns3", "nsgrole3-testns3", metav1.GetOptions{}).Return(&rbacv1.Role{
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(&rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nsgrole3-testns3",
 			Namespace: "testns3",
@@ -348,7 +350,8 @@ func TestOnNamespaceChangeLeavesCorrectRoleBindingAlone(t *testing.T) {
 	h := &inheritedNamespacedRulesHandler{
 		grCache:      grCache,
 		grbCache:     grbCache,
-		roles:        roles,
+		roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+		roleCache:    roleCache,
 		roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
 		rbCache:      rbCache,
 		clusterName:  "c-m-test",
@@ -385,8 +388,8 @@ func TestOnNamespaceChangeRecreatesIncorrectRoleBinding(t *testing.T) {
 	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
 	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return([]*v3.GlobalRoleBinding{grb}, nil)
 
-	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
-	roles.EXPECT().Get("testns3", "nsgrole3-testns3", metav1.GetOptions{}).Return(&rbacv1.Role{
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(&rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "nsgrole3-testns3",
 			Namespace: "testns3",
@@ -433,7 +436,8 @@ func TestOnNamespaceChangeRecreatesIncorrectRoleBinding(t *testing.T) {
 	h := &inheritedNamespacedRulesHandler{
 		grCache:      grCache,
 		grbCache:     grbCache,
-		roles:        roles,
+		roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+		roleCache:    roleCache,
 		roleBindings: roleBindings,
 		rbCache:      rbCache,
 		clusterName:  "c-m-test",
@@ -442,4 +446,22 @@ func TestOnNamespaceChangeRecreatesIncorrectRoleBinding(t *testing.T) {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
 	_, err := h.onNamespaceChange("testns3", ns)
 	assert.NoError(t, err)
+}
+
+// TestRegisterInheritedNamespacedRulesHandlerSkipsLocalCluster ensures the handler is not wired
+// for the local cluster: inheritedNamespacedRules apply to downstream clusters only, and the
+// leader-side controllers deliberately exclude local.
+func TestRegisterInheritedNamespacedRulesHandlerSkipsLocalCluster(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	// no OnChange registration expected on the namespace controller
+	namespaces := wfakes.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+	roleBindings := wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+
+	RegisterInheritedNamespacedRulesHandler(context.Background(), namespaces,
+		wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
+		wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl),
+		roles, roleBindings, "local")
 }

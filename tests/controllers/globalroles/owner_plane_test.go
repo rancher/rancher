@@ -94,6 +94,11 @@ func (s *OwnerPlaneTestSuite) SetupSuite() {
 		schema.GroupVersionKind{
 			Group:   "rbac.authorization.k8s.io",
 			Version: "v1",
+			Kind:    "Role",
+		},
+		schema.GroupVersionKind{
+			Group:   "rbac.authorization.k8s.io",
+			Version: "v1",
 			Kind:    "RoleBinding",
 		},
 	)

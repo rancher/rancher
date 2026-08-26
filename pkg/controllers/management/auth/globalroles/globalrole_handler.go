@@ -249,7 +249,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			Rules: rules,
 		}
 
-		role, err := rbac.CreateOrUpdateNamespacedResource(newRole, gr.rClient, areRolesEqual)
+		role, err := rbac.CreateOrUpdateNamespacedResource(newRole, gr.rClient, rbac.AreRolesSame)
 		if role != nil && err == nil {
 			roleUIDs[role.GetUID()] = struct{}{}
 		}
@@ -336,8 +336,8 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRolesForCluster(clust
 	roleUIDs := sets.New[types.UID]()
 
 	// Iterate through all namespaces in InheritedNamespacedRules
-	for ns, rules := range globalRole.InheritedNamespacedRules {
-		roleUID, nsErr := gr.reconcileInheritedRoleInNamespace(cluster.Name, ns, rules, globalRole.Name, roleClient, namespaceCache)
+	for ns := range globalRole.InheritedNamespacedRules {
+		roleUID, nsErr := gr.reconcileInheritedRoleInNamespace(cluster.Name, ns, globalRole, roleClient, namespaceCache)
 		if nsErr != nil {
 			returnError = errors.Join(returnError, nsErr)
 			continue
@@ -357,10 +357,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRolesForCluster(clust
 }
 
 // reconcileInheritedRoleInNamespace reconciles a single role in a specific namespace of a downstream cluster
-func (gr *globalRoleLifecycle) reconcileInheritedRoleInNamespace(clusterName, ns string, rules []rbacv1.PolicyRule, globalRoleName string, roleClient wrbacv1.RoleClient, namespaceCache wcorev1.NamespaceCache) (types.UID, error) {
-	roleName := name.SafeConcatName(globalRoleName, ns)
-	safeGlobalRoleName := name.SafeConcatName(globalRoleName)
-
+func (gr *globalRoleLifecycle) reconcileInheritedRoleInNamespace(clusterName, ns string, globalRole *v3.GlobalRole, roleClient wrbacv1.RoleClient, namespaceCache wcorev1.NamespaceCache) (types.UID, error) {
 	// Check if the namespace exists in this cluster
 	shouldSkip, err := validateNamespace(namespaceCache, ns, fmt.Sprintf("cluster %s", clusterName))
 	if shouldSkip {
@@ -370,18 +367,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedRoleInNamespace(clusterName, ns
 		return "", fmt.Errorf("couldn't validate namespace %s in cluster %s: %w", ns, clusterName, err)
 	}
 
-	newRole := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: ns,
-			Labels: map[string]string{
-				grOwnerLabel: safeGlobalRoleName,
-			},
-		},
-		Rules: rules,
-	}
-
-	role, err := rbac.CreateOrUpdateNamespacedResource(newRole, roleClient, areRolesEqual)
+	role, err := rbac.CreateOrUpdateNamespacedResource(rbac.BuildInheritedRole(globalRole, ns), roleClient, rbac.AreRolesSame)
 	if role == nil {
 		return "", err
 	}
@@ -514,12 +500,6 @@ func validateNamespace(nsCache wcorev1.NamespaceCache, ns, context string) (bool
 	}
 
 	return false, nil
-}
-
-// areRolesEqual compares the Rules and Labels of two Roles and returns true if they are equal
-func areRolesEqual(existingRole, desiredRole *rbacv1.Role) bool {
-	return equality.Semantic.DeepEqual(desiredRole.Rules, existingRole.Rules) &&
-		equality.Semantic.DeepEqual(desiredRole.Labels, existingRole.Labels)
 }
 
 // createOwnerLabelSelector creates a label selector for roles owned by a GlobalRole

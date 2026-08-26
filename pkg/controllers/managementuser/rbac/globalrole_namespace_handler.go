@@ -10,13 +10,9 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	wname "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const inheritedNamespacedRulesHandlerName = "inherited-namespaced-rules-sync"
@@ -34,6 +30,7 @@ type inheritedNamespacedRulesHandler struct {
 	grCache      mgmtv3.GlobalRoleCache
 	grbCache     mgmtv3.GlobalRoleBindingCache
 	roles        wrbacv1.RoleClient
+	roleCache    wrbacv1.RoleCache
 	roleBindings wrbacv1.RoleBindingClient
 	rbCache      wrbacv1.RoleBindingCache
 	clusterName  string
@@ -51,10 +48,16 @@ func RegisterInheritedNamespacedRulesHandler(
 	roleBindings wrbacv1.RoleBindingController,
 	clusterName string,
 ) {
+	// InheritedNamespacedRules apply to downstream clusters only; the leader-side GlobalRole and
+	// GlobalRoleBinding controllers deliberately exclude the local cluster, and so must this handler.
+	if clusterName == "local" {
+		return
+	}
 	h := &inheritedNamespacedRulesHandler{
 		grCache:      grCache,
 		grbCache:     grbCache,
 		roles:        roles,
+		roleCache:    roles.Cache(),
 		roleBindings: roleBindings,
 		rbCache:      roleBindings.Cache(),
 		clusterName:  clusterName,
@@ -63,7 +66,7 @@ func RegisterInheritedNamespacedRulesHandler(
 }
 
 func (h *inheritedNamespacedRulesHandler) onNamespaceChange(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {
-	if ns == nil || ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating {
+	if ns == nil || ns.DeletionTimestamp != nil {
 		return ns, nil
 	}
 
@@ -74,11 +77,10 @@ func (h *inheritedNamespacedRulesHandler) onNamespaceChange(_ string, ns *corev1
 
 	var returnError error
 	for _, gr := range grs {
-		rules, ok := gr.InheritedNamespacedRules[ns.Name]
-		if !ok {
+		if _, ok := gr.InheritedNamespacedRules[ns.Name]; !ok {
 			continue
 		}
-		if err := h.ensureRole(gr, ns.Name, rules); err != nil {
+		if err := h.ensureRole(gr, ns.Name); err != nil {
 			returnError = errors.Join(returnError, err)
 			continue
 		}
@@ -89,7 +91,7 @@ func (h *inheritedNamespacedRulesHandler) onNamespaceChange(_ string, ns *corev1
 			continue
 		}
 		for _, grb := range grbs {
-			if err := h.ensureRoleBinding(gr, grb, ns.Name); err != nil {
+			if err := h.ensureRoleBinding(grb, ns.Name); err != nil {
 				returnError = errors.Join(returnError, err)
 			}
 		}
@@ -98,50 +100,26 @@ func (h *inheritedNamespacedRulesHandler) onNamespaceChange(_ string, ns *corev1
 	return ns, returnError
 }
 
-// ensureRole creates or updates the Role for a GlobalRole's inherited rules in the namespace,
-// with the same name, labels and rules as the leader-side GlobalRole controller.
-func (h *inheritedNamespacedRulesHandler) ensureRole(gr *v3.GlobalRole, ns string, rules []rbacv1.PolicyRule) error {
-	desired := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      wname.SafeConcatName(gr.Name, ns),
-			Namespace: ns,
-			Labels: map[string]string{
-				pkgrbac.GrOwnerLabel: wname.SafeConcatName(gr.Name),
-			},
-		},
-		Rules: rules,
+// ensureRole creates or updates the Role for a GlobalRole's inherited rules in the namespace.
+func (h *inheritedNamespacedRulesHandler) ensureRole(gr *v3.GlobalRole, ns string) error {
+	desired := pkgrbac.BuildInheritedRole(gr, ns)
+
+	// A matching cached Role means there is nothing to write; skip the API round-trip.
+	if cached, err := h.roleCache.Get(ns, desired.Name); err == nil && pkgrbac.AreRolesSame(cached, desired) {
+		return nil
 	}
 
-	_, err := pkgrbac.CreateOrUpdateNamespacedResource(desired, h.roles, func(existing, desired *rbacv1.Role) bool {
-		return equality.Semantic.DeepEqual(desired.Rules, existing.Rules) &&
-			equality.Semantic.DeepEqual(desired.Labels, existing.Labels)
-	})
+	_, err := pkgrbac.CreateOrUpdateNamespacedResource(desired, h.roles, pkgrbac.AreRolesSame)
 	if err != nil {
 		return fmt.Errorf("failed to ensure Role for GlobalRole %s in namespace %s in cluster %s: %w", gr.Name, ns, h.clusterName, err)
 	}
 	return nil
 }
 
-// ensureRoleBinding creates the RoleBinding for a GlobalRoleBinding in the namespace, with the
-// same name, labels and content as the leader-side GlobalRoleBinding controller. An existing
+// ensureRoleBinding creates the RoleBinding for a GlobalRoleBinding in the namespace. An existing
 // RoleBinding with incorrect content is deleted and recreated because RoleRef is immutable.
-func (h *inheritedNamespacedRulesHandler) ensureRoleBinding(gr *v3.GlobalRole, grb *v3.GlobalRoleBinding, ns string) error {
-	grbName := wname.SafeConcatName(grb.Name)
-	desired := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      wname.SafeConcatName(grbName, ns),
-			Namespace: ns,
-			Labels: map[string]string{
-				pkgrbac.GrbOwnerLabel: grbName,
-			},
-		},
-		Subjects: []rbacv1.Subject{pkgrbac.GetGRBSubject(grb)},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "Role",
-			Name:     wname.SafeConcatName(wname.SafeConcatName(gr.Name), ns),
-		},
-	}
+func (h *inheritedNamespacedRulesHandler) ensureRoleBinding(grb *v3.GlobalRoleBinding, ns string) error {
+	desired := pkgrbac.BuildInheritedRoleBinding(grb, ns)
 
 	existing, err := h.rbCache.Get(ns, desired.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -149,7 +127,7 @@ func (h *inheritedNamespacedRulesHandler) ensureRoleBinding(gr *v3.GlobalRole, g
 	}
 
 	if existing != nil {
-		labelCorrect := existing.Labels != nil && existing.Labels[pkgrbac.GrbOwnerLabel] == grbName
+		labelCorrect := existing.Labels != nil && existing.Labels[pkgrbac.GrbOwnerLabel] == desired.Labels[pkgrbac.GrbOwnerLabel]
 		if labelCorrect && pkgrbac.IsRoleBindingContentSame(existing, desired) {
 			return nil
 		}
