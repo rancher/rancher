@@ -675,7 +675,7 @@ func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Ob
 	}
 	var keys []relatedresource.Key
 	for _, gr := range grs {
-		grbs, err := g.grbLister.GetByIndex("mgmt-auth-grb-gr-idex", gr.Name)
+		grbs, err := g.grbLister.GetByIndex(pkgrbac.GRBGlobalRoleIndex, gr.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list GlobalRoleBindings for GlobalRole %s: %w", gr.Name, err)
 		}

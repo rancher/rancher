@@ -6,6 +6,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
@@ -18,7 +19,7 @@ import (
 )
 
 const (
-	grbGrIndex                 = "mgmt-auth-grb-gr-idex"
+	grbGrIndex                 = pkgrbac.GRBGlobalRoleIndex
 	grNsIndex                  = "mgmt-auth-gr-ns-index"
 	grSafeConcatIndex          = "mgmt-auth-gr-concat-index"
 	grbSafeConcatIndex         = "mgmt-auth-grb-concat-index"

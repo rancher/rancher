@@ -33,6 +33,8 @@ func RegisterWranglerIndexers(config *wrangler.Context) {
 	config.RBAC.RoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *rbacv1.RoleBinding) ([]string, error) {
 		return indexByMembershipBindingOwner(obj)
 	})
+
+	globalroles.RegisterWranglerIndexers(config.Mgmt.GlobalRoleBinding().Cache())
 }
 
 func RegisterIndexers(scaledContext *config.ScaledContext) error {

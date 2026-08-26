@@ -65,6 +65,8 @@ const (
 	AggregationFeatureLabel               = "management.cattle.io/roletemplate-aggregation"
 	// GRDownstreamNSIndex is the cache index name for looking up GlobalRoles by the namespaces in InheritedNamespacedRules.
 	GRDownstreamNSIndex = "mgmt-auth-gr-downstream-ns-index"
+	// GRBGlobalRoleIndex is the cache index name for looking up GlobalRoleBindings by the GlobalRole they reference.
+	GRBGlobalRoleIndex = "mgmt-auth-grb-gr-idex"
 )
 
 // BuildSubjectFromRTB This function will generate
