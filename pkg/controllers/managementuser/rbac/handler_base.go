@@ -168,7 +168,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	// replica that owns the cluster, which in HA is usually a different pod, so the resources are
 	// reconciled for this cluster directly.
 	RegisterInheritedNamespacedRulesHandler(ctx, workload.Corew.Namespace(),
-		management.Wrangler.Mgmt.GlobalRole().Cache(), management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
+		management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.GlobalRoleBinding(),
 		workload.RBACw.Role(), workload.RBACw.RoleBinding(), workload.ClusterName)
 
 	// Register roletemplate-aggregation controllers

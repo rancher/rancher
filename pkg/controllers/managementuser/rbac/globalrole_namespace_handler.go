@@ -10,9 +10,11 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const inheritedNamespacedRulesHandlerName = "inherited-namespaced-rules-sync"
@@ -42,8 +44,8 @@ type inheritedNamespacedRulesHandler struct {
 func RegisterInheritedNamespacedRulesHandler(
 	ctx context.Context,
 	namespaces corew.NamespaceController,
-	grCache mgmtv3.GlobalRoleCache,
-	grbCache mgmtv3.GlobalRoleBindingCache,
+	globalRoles mgmtv3.GlobalRoleController,
+	globalRoleBindings mgmtv3.GlobalRoleBindingController,
 	roles wrbacv1.RoleController,
 	roleBindings wrbacv1.RoleBindingController,
 	clusterName string,
@@ -54,8 +56,8 @@ func RegisterInheritedNamespacedRulesHandler(
 		return
 	}
 	h := &inheritedNamespacedRulesHandler{
-		grCache:      grCache,
-		grbCache:     grbCache,
+		grCache:      globalRoles.Cache(),
+		grbCache:     globalRoleBindings.Cache(),
 		roles:        roles,
 		roleCache:    roles.Cache(),
 		roleBindings: roleBindings,
@@ -63,6 +65,59 @@ func RegisterInheritedNamespacedRulesHandler(
 		clusterName:  clusterName,
 	}
 	namespaces.OnChange(ctx, inheritedNamespacedRulesHandlerName, h.onNamespaceChange)
+
+	// A namespace event can fire before this replica's caches have observed the GlobalRole or
+	// GlobalRoleBinding it depends on; an empty lookup is not an error, so nothing would retry.
+	// Watching the grant objects themselves closes that race: whichever event arrives last
+	// re-enqueues the namespace, and each watch is guaranteed to see its own object.
+	relatedresource.WatchClusterScoped(ctx, inheritedNamespacedRulesHandlerName+"-gr",
+		h.globalRoleEnqueueNamespaces, namespaces, globalRoles)
+	relatedresource.WatchClusterScoped(ctx, inheritedNamespacedRulesHandlerName+"-grb",
+		h.globalRoleBindingEnqueueNamespaces, namespaces, globalRoleBindings)
+}
+
+// globalRoleEnqueueNamespaces enqueues the namespaces named in a changed GlobalRole's
+// InheritedNamespacedRules.
+func (h *inheritedNamespacedRulesHandler) globalRoleEnqueueNamespaces(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	gr, ok := obj.(*v3.GlobalRole)
+	if !ok {
+		logrus.Errorf("[%s] unable to convert object: %[2]v, type %[2]T to a GlobalRole", inheritedNamespacedRulesHandlerName, obj)
+		return nil, nil
+	}
+	keys := make([]relatedresource.Key, 0, len(gr.InheritedNamespacedRules))
+	for ns := range gr.InheritedNamespacedRules {
+		keys = append(keys, relatedresource.Key{Name: ns})
+	}
+	return keys, nil
+}
+
+// globalRoleBindingEnqueueNamespaces enqueues the namespaces named in the InheritedNamespacedRules
+// of a changed GlobalRoleBinding's GlobalRole.
+func (h *inheritedNamespacedRulesHandler) globalRoleBindingEnqueueNamespaces(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	grb, ok := obj.(*v3.GlobalRoleBinding)
+	if !ok {
+		logrus.Errorf("[%s] unable to convert object: %[2]v, type %[2]T to a GlobalRoleBinding", inheritedNamespacedRulesHandlerName, obj)
+		return nil, nil
+	}
+	gr, err := h.grCache.Get(grb.GlobalRoleName)
+	if err != nil {
+		// A GlobalRole not observed yet is not an error: its own event enqueues its namespaces.
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get GlobalRole %s for GlobalRoleBinding %s: %w", grb.GlobalRoleName, grb.Name, err)
+	}
+	keys := make([]relatedresource.Key, 0, len(gr.InheritedNamespacedRules))
+	for ns := range gr.InheritedNamespacedRules {
+		keys = append(keys, relatedresource.Key{Name: ns})
+	}
+	return keys, nil
 }
 
 func (h *inheritedNamespacedRulesHandler) onNamespaceChange(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {

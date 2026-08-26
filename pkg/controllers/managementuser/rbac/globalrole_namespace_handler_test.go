@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -461,7 +462,70 @@ func TestRegisterInheritedNamespacedRulesHandlerSkipsLocalCluster(t *testing.T) 
 	roleBindings := wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
 
 	RegisterInheritedNamespacedRulesHandler(context.Background(), namespaces,
-		wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
-		wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl),
+		wfakes.NewMockNonNamespacedControllerInterface[*v3.GlobalRole, *v3.GlobalRoleList](ctrl),
+		wfakes.NewMockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl),
 		roles, roleBindings, "local")
+}
+
+func TestGlobalRoleEnqueueNamespaces(t *testing.T) {
+	t.Parallel()
+
+	h := &inheritedNamespacedRulesHandler{clusterName: "c-m-test"}
+
+	keys, err := h.globalRoleEnqueueNamespaces("", "", nil)
+	assert.NoError(t, err)
+	assert.Nil(t, keys)
+
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": {{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}},
+			"testns4": {{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"list"}}},
+		},
+	}
+	keys, err = h.globalRoleEnqueueNamespaces("", gr.Name, gr)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []relatedresource.Key{{Name: "testns3"}, {Name: "testns4"}}, keys)
+
+	noRules := &v3.GlobalRole{ObjectMeta: metav1.ObjectMeta{Name: "plain"}}
+	keys, err = h.globalRoleEnqueueNamespaces("", noRules.Name, noRules)
+	assert.NoError(t, err)
+	assert.Empty(t, keys)
+}
+
+func TestGlobalRoleBindingEnqueueNamespaces(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": {{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}},
+		},
+	}
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta:     metav1.ObjectMeta{Name: "grb1"},
+		GlobalRoleName: "nsgrole3",
+		UserName:       "user-abc",
+	}
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().Get("nsgrole3").Return(gr, nil)
+
+	h := &inheritedNamespacedRulesHandler{grCache: grCache, clusterName: "c-m-test"}
+
+	keys, err := h.globalRoleBindingEnqueueNamespaces("", grb.Name, grb)
+	assert.NoError(t, err)
+	assert.Equal(t, []relatedresource.Key{{Name: "testns3"}}, keys)
+
+	// a GlobalRole not yet in the cache is not an error: the GlobalRole's own event enqueues its namespaces
+	grCacheMissing := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCacheMissing.EXPECT().Get("missing").Return(nil, errRoleNotFound)
+	h = &inheritedNamespacedRulesHandler{grCache: grCacheMissing, clusterName: "c-m-test"}
+	keys, err = h.globalRoleBindingEnqueueNamespaces("", "grb2", &v3.GlobalRoleBinding{
+		ObjectMeta:     metav1.ObjectMeta{Name: "grb2"},
+		GlobalRoleName: "missing",
+	})
+	assert.NoError(t, err)
+	assert.Empty(t, keys)
 }

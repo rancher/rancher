@@ -69,7 +69,7 @@ func (s *OwnerPlaneTestSuite) SetupSuite() {
 
 	// The owner-plane handler under test, wired exactly like the user context does it.
 	userrbac.RegisterInheritedNamespacedRulesHandler(s.ctx, s.wranglerContext.Core.Namespace(),
-		s.wranglerContext.Mgmt.GlobalRole().Cache(), s.wranglerContext.Mgmt.GlobalRoleBinding().Cache(),
+		s.wranglerContext.Mgmt.GlobalRole(), s.wranglerContext.Mgmt.GlobalRoleBinding(),
 		s.wranglerContext.RBAC.Role(), s.wranglerContext.RBAC.RoleBinding(), "c-m-owner-plane")
 
 	common.StartWranglerControllers(s.ctx, s.T(), s.wranglerContext,
@@ -78,9 +78,6 @@ func (s *OwnerPlaneTestSuite) SetupSuite() {
 			Version: "v1",
 			Kind:    "Namespace",
 		},
-	)
-
-	common.StartWranglerCaches(s.ctx, s.T(), s.wranglerContext,
 		schema.GroupVersionKind{
 			Group:   "management.cattle.io",
 			Version: "v3",
@@ -91,6 +88,9 @@ func (s *OwnerPlaneTestSuite) SetupSuite() {
 			Version: "v3",
 			Kind:    "GlobalRoleBinding",
 		},
+	)
+
+	common.StartWranglerCaches(s.ctx, s.T(), s.wranglerContext,
 		schema.GroupVersionKind{
 			Group:   "rbac.authorization.k8s.io",
 			Version: "v1",
@@ -188,4 +188,51 @@ func (s *OwnerPlaneTestSuite) TestRoleAndRoleBindingCreatedForLateNamespace() {
 
 func TestOwnerPlaneTestSuite(t *testing.T) {
 	suite.Run(t, new(OwnerPlaneTestSuite))
+}
+
+// TestRoleCreatedWhenGlobalRoleArrivesAfterNamespace covers the reverse ordering: the namespace
+// already exists when the GlobalRole and GlobalRoleBinding are created. The GlobalRole and
+// GlobalRoleBinding watches must enqueue the namespace, closing the race where a namespace event
+// fires before the management caches have observed the grant objects.
+func (s *OwnerPlaneTestSuite) TestRoleCreatedWhenGlobalRoleArrivesAfterNamespace() {
+	t := s.T()
+
+	nsName := "owner-plane-ns-first"
+	_, err := s.wranglerContext.Core.Namespace().Create(&corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: nsName},
+	})
+	assert.NoError(t, err)
+
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "owner-plane-gr-late",
+		},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			nsName: {getPodRule},
+		},
+	}
+	_, err = s.wranglerContext.Mgmt.GlobalRole().Create(gr)
+	assert.NoError(t, err)
+
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "owner-plane-grb-late",
+		},
+		GlobalRoleName: gr.Name,
+		UserName:       "u-owner-plane-late",
+	}
+	_, err = s.wranglerContext.Mgmt.GlobalRoleBinding().Create(grb)
+	assert.NoError(t, err)
+
+	roleName := gr.Name + "-" + nsName
+	assert.Eventually(t, func() bool {
+		_, err := s.wranglerContext.RBAC.Role().Get(nsName, roleName, metav1.GetOptions{})
+		return err == nil
+	}, duration, tick, "Role was not created for a GlobalRole added after the namespace")
+
+	rbName := grb.Name + "-" + nsName
+	assert.Eventually(t, func() bool {
+		_, err := s.wranglerContext.RBAC.RoleBinding().Get(nsName, rbName, metav1.GetOptions{})
+		return err == nil
+	}, duration, tick, "RoleBinding was not created for a GlobalRoleBinding added after the namespace")
 }
