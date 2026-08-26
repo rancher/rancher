@@ -1215,11 +1215,16 @@ func TestReconcileInheritedRoleInNamespace(t *testing.T) {
 			tt.setupMocks(roleClient, nsCache)
 
 			gr := &globalRoleLifecycle{}
+			globalRole := &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{Name: tt.globalRoleName},
+				InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+					tt.namespace: tt.rules,
+				},
+			}
 			_, err := gr.reconcileInheritedRoleInNamespace(
 				tt.clusterName,
 				tt.namespace,
-				tt.rules,
-				tt.globalRoleName,
+				globalRole,
 				roleClient,
 				nsCache,
 			)
