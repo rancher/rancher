@@ -71,6 +71,10 @@ const (
 	GRDownstreamNSIndex = "mgmt-auth-gr-downstream-ns-index"
 	// GRBGlobalRoleIndex is the cache index name for looking up GlobalRoleBindings by the GlobalRole they reference.
 	GRBGlobalRoleIndex = "mgmt-auth-grb-gr-idex"
+	// GrOwnerLabel marks resources created for a GlobalRole with the SafeConcatName of the owning GlobalRole.
+	GrOwnerLabel = "authz.management.cattle.io/gr-owner"
+	// GrbOwnerLabel marks resources created for a GlobalRoleBinding with the SafeConcatName of the owning GlobalRoleBinding.
+	GrbOwnerLabel = "authz.management.cattle.io/grb-owner"
 )
 
 // BuildSubjectFromRTB This function will generate

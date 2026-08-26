@@ -1623,8 +1623,9 @@ func TestReconcileInheritedRoleBindingInNamespace(t *testing.T) {
 		Resource: "RoleBinding",
 	}, "")
 	subject := rbacv1.Subject{
-		Kind: "User",
-		Name: "testuser",
+		Kind:     "User",
+		Name:     "testuser",
+		APIGroup: rbacv1.GroupName,
 	}
 	globalRoleName := wrangler.SafeConcatName(inheritedNamespacedRulesGR.Name)
 	grbName := wrangler.SafeConcatName(inheritedNamespacedRulesGRB.Name)
@@ -1826,9 +1827,7 @@ func TestReconcileInheritedRoleBindingInNamespace(t *testing.T) {
 			err := lifecycle.reconcileInheritedRoleBindingInNamespace(
 				"cluster1",
 				"namespace1",
-				globalRoleName,
-				grbName,
-				subject,
+				&inheritedNamespacedRulesGRB,
 				rbController,
 				rbCache,
 				nsCache,
