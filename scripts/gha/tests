@@ -7,8 +7,8 @@ cleanup()
 {
     EXIT=$?
     set +ex
-    echo Stopping and removing rancher server container
-    docker rm -f rancher-server
+    echo Stopping and removing rancher server cluster
+    k3d cluster delete rancher-server
     return $EXIT
 }
 
@@ -67,7 +67,7 @@ fi
 echo Starting rancher server for test
 touch /tmp/rancher.log
 
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+export KUBECONFIG=$(pwd)/build/testdata/k3s.yaml
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
@@ -82,8 +82,8 @@ dump_rancher_logs()
   echo "Dumping Rancher + K3s container logs to /tmp/rancher.log and /tmp/k3s.log"
   # Best-effort: this runs under `set -e`, so don't let a missing container/log
   # abort the caller or leave the workflow's artifact upload step empty-handed.
-  docker logs rancher-server &> /tmp/rancher.log || echo "failed to fetch rancher-server logs" >> /tmp/rancher.log
-  docker cp rancher-server:/var/lib/rancher/k3s.log /tmp/k3s.log || echo "failed to fetch k3s.log from rancher-server" > /tmp/k3s.log
+  kubectl --kubeconfig "$KUBECONFIG" logs -n cattle-system -l app=rancher --tail=-1 &> /tmp/rancher.log || echo "failed to fetch rancher logs" >> /tmp/rancher.log
+  docker logs k3d-rancher-server-server-0 &> /tmp/k3s.log || echo "failed to fetch k3s.log" > /tmp/k3s.log
   # Written while running under sudo; make readable so the CI workflow can upload them as an artifact.
   chmod 644 /tmp/rancher.log /tmp/k3s.log 2>/dev/null || true
 }
@@ -92,6 +92,9 @@ export -f dump_rancher_logs
 
 ./scripts/gha/run 2>&1
 trap cleanup exit
+
+CATTLE_RANCHER_HOST="$(kubectl -n cattle-system get ingress rancher -o jsonpath='{.spec.rules[0].host}')"
+export CATTLE_RANCHER_HOST
 
 # Build integrationsetup and compile the integration test binaries in the
 # background while we wait for Rancher's deployments to roll out below, keeping
@@ -119,9 +122,9 @@ echo "Waiting for K3s kubeconfig to be generated"
   --timeout 300 `# Time out after 300 seconds (5 min)` \
   --sleep 5 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
-  --message "/etc/rancher/k3s/k3s.yaml did not exist after {{elapsed}} seconds" `# Print this progress message` \
+  --message "$KUBECONFIG did not exist after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why K3s did not start` \
-  "stat /etc/rancher/k3s/k3s.yaml &>/dev/null"
+  "stat $KUBECONFIG &>/dev/null"
 
 echo "Waiting up to 5 minutes for the api-extension deployment"
 ./scripts/retry \
@@ -130,7 +133,7 @@ echo "Waiting up to 5 minutes for the api-extension deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "api-extension was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why api-extension did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/api-extension &>/dev/null"
+  "kubectl --kubeconfig $KUBECONFIG rollout status -n cattle-system deploy/api-extension &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
@@ -139,7 +142,7 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
+  "kubectl --kubeconfig $KUBECONFIG rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-turtles deployment"
 ./scripts/retry \
@@ -148,8 +151,8 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-turtles was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why turtles did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-turtles-system &>/dev/null \
-    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
+  "kubectl --kubeconfig $KUBECONFIG get ns cattle-turtles-system &>/dev/null \
+    && kubectl --kubeconfig $KUBECONFIG rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
