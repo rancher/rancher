@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var TestCases = []struct{ host, service, region string }{
@@ -22,4 +23,18 @@ func TestGetServiceAndRegion(t *testing.T) {
 		assert.Equal(t, testCase.service, service)
 		assert.Equal(t, testCase.region, region)
 	}
+}
+
+func TestHeaderInjectSignSetsRequestHeaders(t *testing.T) {
+	req := makeRequest(nil)
+	sg := makeSecretGetter(map[string]string{
+		"token": "abc123",
+		"user":  "alice",
+	})
+	auth := "headerinject credID=cattle-global-data/my-cred headers=X-Token=token;X-User=user"
+
+	err := headerinject{}.sign(req, sg, auth)
+	require.NoError(t, err)
+	assert.Equal(t, "abc123", req.Header.Get("X-Token"))
+	assert.Equal(t, "alice", req.Header.Get("X-User"))
 }

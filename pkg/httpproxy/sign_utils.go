@@ -9,18 +9,18 @@ import (
 )
 
 func getAuthData(auth string, secrets SecretGetter, fields []string) (map[string]string, map[string]string, error) {
-	data := getRequestParams(auth)
-	if !requiredFieldsExist(data, fields) {
-		return data, nil, fmt.Errorf("required fields %s not set", fields)
+	params := getRequestParams(auth)
+	if !requiredFieldsExist(params, fields) {
+		return params, nil, fmt.Errorf("required fields %s not set", fields)
 	}
-	if data["credID"] == "" {
-		return data, nil, nil
+	if params["credID"] == "" {
+		return params, nil, nil
 	}
-	secret, err := getCredential(data["credID"], secrets)
+	secret, err := getCredential(params["credID"], secrets)
 	if err != nil {
-		return data, nil, err
+		return params, nil, err
 	}
-	return data, secret, nil
+	return params, secret, nil
 }
 
 func getRequestParams(auth string) map[string]string {
