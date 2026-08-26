@@ -92,17 +92,16 @@ func (s *IndexerTestSuite) TestGRBByGlobalRoleIndex() {
 	_, err = s.wranglerContext.Mgmt.GlobalRoleBinding().Create(grb)
 	assert.NoError(t, err)
 
+	// The last result is kept so a missing indexer reports its own error rather than only a timeout.
 	grbCache := s.wranglerContext.Mgmt.GlobalRoleBinding().Cache()
+	var indexed []*v3.GlobalRoleBinding
 	assert.Eventually(t, func() bool {
-		grbs, err := grbCache.GetByIndex(pkgrbac.GRBGlobalRoleIndex, gr.Name)
-		return err == nil && len(grbs) == 1
+		indexed, err = grbCache.GetByIndex(pkgrbac.GRBGlobalRoleIndex, gr.Name)
+		return err == nil && len(indexed) == 1
 	}, duration, tick)
-
-	// Repeated outside Eventually so a missing indexer reports its own error instead of a timeout.
-	grbs, err := grbCache.GetByIndex(pkgrbac.GRBGlobalRoleIndex, gr.Name)
 	assert.NoError(t, err)
-	if assert.Len(t, grbs, 1) {
-		assert.Equal(t, grb.Name, grbs[0].Name)
+	if assert.Len(t, indexed, 1) {
+		assert.Equal(t, grb.Name, indexed[0].Name)
 	}
 
 	err = s.wranglerContext.Mgmt.GlobalRoleBinding().Delete(grb.Name, &metav1.DeleteOptions{})

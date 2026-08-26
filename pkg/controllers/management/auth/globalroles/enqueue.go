@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	grbGrIndex                 = pkgrbac.GRBGlobalRoleIndex
 	grNsIndex                  = "mgmt-auth-gr-ns-index"
 	grSafeConcatIndex          = "mgmt-auth-gr-concat-index"
 	grbSafeConcatIndex         = "mgmt-auth-grb-concat-index"
@@ -74,7 +73,7 @@ func (g *globalRBACEnqueuer) enqueueGRBs(_, _ string, obj runtime.Object) ([]rel
 		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a global role", obj)
 		return nil, nil
 	}
-	bindings, err := g.grbCache.GetByIndex(grbGrIndex, globalRole.Name)
+	bindings, err := g.grbCache.GetByIndex(pkgrbac.GRBGlobalRoleIndex, globalRole.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get grbs for gr %s from indexer: %w", globalRole.Name, err)
 	}
