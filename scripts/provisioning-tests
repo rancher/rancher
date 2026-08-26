@@ -344,8 +344,12 @@ if [ -n "${PRECOMPILE_PID:-}" ]; then
   wait "$PRECOMPILE_PID" || { echo "background test compilation reported an error:"; cat /tmp/precompile.log || true; }
 fi
 
+if [ -z "${V2PROV_TEST_PARALLELISM}" ]; then
+  V2PROV_TEST_PARALLELISM=1
+fi
+
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -run "${V2PROV_TEST_RUN_REGEX}" -v -failfast -timeout 60m -p 3 ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
+go test -run "${V2PROV_TEST_RUN_REGEX}" -v -failfast -timeout 60m -p 3 -parallelism "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
      dump_rancher_logs
      exit 1
 }

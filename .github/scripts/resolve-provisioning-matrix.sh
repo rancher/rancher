@@ -204,6 +204,7 @@ yq -o=json '.' "$CONFIG" | jq -c --arg selected "$selected" '
       | { V2PROV_TEST_DIST: .dist, V2PROV_TEST_RUN_REGEX: .regex }
         + (if .features then { CATTLE_FEATURES: .features } else {} end)
         + (if .cpus then { V2PROV_TEST_CPUS: .cpus } else { V2PROV_TEST_CPUS: 16 } end)
+        + (if .parallelism then { V2PROV_TEST_PARALLELISM: .parallelism } else { V2PROV_TEST_PARALLELISM: 1 } end)
     ]
   }
 '

@@ -132,8 +132,8 @@ scopes:
           - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
           - 'CATTLE_K3S_VERSION'
     tests:
-      - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
-      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$' }
+      - { dist: k3s,  regex: '^Test_Provisioning_.*$', , parallelism: 10 }
+      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$', parallelism: 10 }
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
@@ -145,10 +145,10 @@ scopes:
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     tests:
-      - { dist: k3s,  regex: '^Test_Operation_.*$'}        # k3s runs all ops in one instance
-      - { dist: rke2, regex: '^Test_Operation_SetA_.*$'}
-      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$'}
-      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
+      - { dist: k3s,  regex: '^Test_Operation_.*$', , parallelism: 5 } # k3s runs all ops in one instance
+      - { dist: rke2, regex: '^Test_Operation_SetA_.*$', , parallelism: 5 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', , parallelism: 10 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$'}
 
   imported:
     package-paths:
@@ -160,8 +160,8 @@ scopes:
     tests:
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', , parallelism: 5 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', , parallelism: 5 }
 
   prebootstrap:
     package-paths:
