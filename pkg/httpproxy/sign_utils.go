@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v3/pkg/kv"
+	"github.com/sirupsen/logrus"
 )
 
 func getAuthData(auth string, secrets SecretGetter, fields []string) (map[string]string, map[string]string, error) {
@@ -33,6 +34,13 @@ func getRequestParams(auth string) map[string]string {
 	for _, term := range terms[1:] {
 		splitTerm := strings.SplitN(term, "=", 2)
 		if len(splitTerm) != 2 || splitTerm[0] == "" {
+			var msg string
+			if len(splitTerm) != 2 {
+				msg = fmt.Sprintf("should contain exactly one '=' character, but has %d", len(splitTerm)-1)
+			} else {
+				msg = "may not start with '='"
+			}
+			logrus.Warnf("ignoring request param %q: %s", term, msg)
 			continue
 		}
 		params[splitTerm[0]] = splitTerm[1]
