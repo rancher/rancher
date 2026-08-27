@@ -1,8 +1,5 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "github>rancher/renovate-config//rancher-main#main"
-  ],
   "baseBranchPatterns": [
     "main",
     "release/v2.15",
@@ -17,6 +14,14 @@
   "prHourlyLimit": 6,
   "prConcurrentLimit": 20,
   "packageRules": [
+    {
+      "matchBaseBranches": [
+        "main"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-main#main"
+      ]
+    },
     {
       "matchBaseBranches": [
         "release/v2.15"
