@@ -131,7 +131,7 @@ func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, in
 		return v3.Principal{}, nil, "", apierror.WrapAPIError(err, validation.ClusterUnavailable, StatusLoginDisabled)
 	}
 
-	lConn, err := p.ldapConnection(config, caPool)
+	lConn, err := p.ldapConnectionOrDefault(config, caPool)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -157,22 +157,31 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 		return principals, nil
 	}
 
-	lConn, err := p.ldapConnection(config, caPool)
+	lConn, err := p.ldapConnectionOrDefault(config, caPool)
 	if err != nil {
 		return principals, nil
 	}
 	defer lConn.Close()
 
 	principals, err = p.searchPrincipals(searchKey, principalType, config, lConn)
-	if err == nil {
-		for _, principal := range principals {
-			if principal.PrincipalType == "user" {
-				if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
-					principal.Me = true
-				}
-			} else if principal.PrincipalType == "group" {
-				principal.MemberOf = p.userMGR.IsMemberOf(myToken, principal)
+	if err != nil {
+		// A channel binding rejection or a malformed token is a fault an
+		// operator must see. Every other search failure keeps the historic
+		// behaviour of returning an empty result, because callers rely on
+		// principal search degrading rather than erroring.
+		if classifyBindFailure(err) != bindFailureNone {
+			return nil, apierror.WrapAPIError(err, validation.ServerError, mapBindError(err).Error())
+		}
+		return principals, nil
+	}
+
+	for _, principal := range principals {
+		if principal.PrincipalType == "user" {
+			if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
+				principal.Me = true
 			}
+		} else if principal.PrincipalType == "group" {
+			principal.MemberOf = p.userMGR.IsMemberOf(myToken, principal)
 		}
 	}
 

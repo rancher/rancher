@@ -1,7 +1,9 @@
 package activedirectory
 
 import (
+	"crypto/x509"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
@@ -23,6 +25,7 @@ const (
 	userName            = "user"
 	baseDN              = "ou=foo,dc=foo,dc=bar"
 	userDN              = "cn=user," + baseDN
+	groupDN             = "cn=group," + baseDN
 	userPassword        = "secret"
 	userObjectClassName = "person"
 )
@@ -400,4 +403,496 @@ func TestADProviderLoginUser(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, validation.Unauthorized, herr.Code)
 	})
+}
+
+func TestLoginUserNTLMRejectsUPNBeforeAnyDirectoryIO(t *testing.T) {
+	t.Parallel()
+
+	config := v3.ActiveDirectoryConfig{
+		BindMechanism:          bindMechanismNTLM,
+		TLS:                    true,
+		ServiceAccountUsername: saUsername,
+		ServiceAccountPassword: saPassword,
+		UserObjectClass:        userObjectClassName,
+		UserLoginAttribute:     "sAMAccountName",
+		UserSearchBase:         baseDN,
+	}
+
+	ldapConn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(string, string) error {
+			t.Fatal("no simple bind may be attempted")
+			return nil
+		},
+		NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			t.Fatal("no NTLM bind may be attempted")
+			return nil, nil
+		},
+		SearchFunc: func(*ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			t.Fatal("no search may be performed for an unsupported identity")
+			return nil, nil
+		},
+	}
+
+	provider := adProvider{tokenMGR: &tokens.Manager{}}
+	credentials := v3.BasicLogin{Username: "alice@example.com", Password: userPassword}
+
+	_, _, err := provider.loginUser(ldapConn, &credentials, &config)
+	require.Error(t, err)
+
+	herr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, validation.InvalidOption, herr.Code)
+}
+
+func TestLoginUserSimpleKeepsUPNBehaviour(t *testing.T) {
+	t.Parallel()
+
+	config := v3.ActiveDirectoryConfig{
+		ServiceAccountUsername: saUsername,
+		ServiceAccountPassword: saPassword,
+		UserObjectClass:        userObjectClassName,
+		UserLoginAttribute:     "sAMAccountName",
+		UserSearchBase:         baseDN,
+	}
+
+	var searched []string
+	ldapConn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(string, string) error { return nil },
+		SearchFunc: func(request *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			searched = append(searched, request.Filter)
+			return &ldapv3.SearchResult{}, nil
+		},
+	}
+
+	provider := adProvider{tokenMGR: &tokens.Manager{}}
+	credentials := v3.BasicLogin{Username: "alice@example.com", Password: userPassword}
+
+	// A UPN still reaches the search and fails there, exactly as before.
+	_, _, err := provider.loginUser(ldapConn, &credentials, &config)
+	require.Error(t, err)
+	require.Len(t, searched, 1)
+	assert.Contains(t, searched[0], "alice@example.com")
+}
+
+func TestLoginUserNTLMNeverPerformsASimpleBind(t *testing.T) {
+	t.Parallel()
+
+	config := v3.ActiveDirectoryConfig{
+		BindMechanism:               bindMechanismNTLM,
+		TLS:                         true,
+		DefaultLoginDomain:          "FOO",
+		ServiceAccountUsername:      saUsername,
+		ServiceAccountPassword:      saPassword,
+		UserObjectClass:             userObjectClassName,
+		UserLoginAttribute:          "sAMAccountName",
+		UserDisabledBitMask:         2,
+		UserEnabledAttribute:        "userAccountControl",
+		UserNameAttribute:           "name",
+		UserSearchBase:              baseDN,
+		GroupDNAttribute:            "distinguishedName",
+		GroupMemberMappingAttribute: "member",
+		GroupMemberUserAttribute:    "distinguishedName",
+		GroupNameAttribute:          "name",
+		GroupObjectClass:            "group",
+		GroupSearchAttribute:        "sAMAccountName",
+	}
+
+	userSearchResult := &ldapv3.SearchResult{
+		Entries: []*ldapv3.Entry{
+			{
+				DN: userDN,
+				Attributes: []*ldapv3.EntryAttribute{
+					{Name: ObjectClass, Values: []string{"top", "person", "user"}},
+					{Name: "name", Values: []string{"user"}},
+					{Name: "sAMAccountName", Values: []string{"user"}},
+					{Name: "userAccountControl", Values: []string{"512"}},
+				},
+			},
+		},
+	}
+
+	var ntlmBinds []ntlmIdentity
+	ldapConn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(username, password string) error {
+			t.Fatalf("simple bind reached with ntlm selected: %s", username)
+			return nil
+		},
+		TLSConnectionStateFunc: tlsStateWithPeer(),
+		NTLMChallengeBindFunc: func(request *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			ntlmBinds = append(ntlmBinds, ntlmIdentity{Domain: request.Domain, Username: request.Username})
+			return &ldapv3.NTLMBindResult{}, nil
+		},
+		SearchFunc: func(*ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			return userSearchResult, nil
+		},
+		SearchWithPagingFunc: func(*ldapv3.SearchRequest, uint32) (*ldapv3.SearchResult, error) {
+			return &ldapv3.SearchResult{}, nil
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().CheckAccess(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+
+	provider := adProvider{userMGR: userManager, tokenMGR: &tokens.Manager{}}
+	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
+
+	_, _, err := provider.loginUser(ldapConn, &credentials, &config)
+	require.NoError(t, err)
+
+	require.Len(t, ntlmBinds, 2, "the service account bind and the user bind both go through NTLM")
+	assert.Equal(t, ntlmIdentity{Domain: "FOO", Username: "sa"}, ntlmBinds[0])
+	assert.Equal(t, ntlmIdentity{Domain: "FOO", Username: userName}, ntlmBinds[1])
+}
+
+func TestNTLMMechanismNeverPerformsASimpleBind(t *testing.T) {
+	t.Parallel()
+
+	config := v3.ActiveDirectoryConfig{
+		BindMechanism:               bindMechanismNTLM,
+		TLS:                         true,
+		DefaultLoginDomain:          "FOO",
+		ServiceAccountUsername:      saUsername,
+		ServiceAccountPassword:      saPassword,
+		UserObjectClass:             userObjectClassName,
+		UserLoginAttribute:          "sAMAccountName",
+		UserNameAttribute:           "name",
+		UserSearchBase:              baseDN,
+		GroupDNAttribute:            "distinguishedName",
+		GroupMemberMappingAttribute: "member",
+		GroupMemberUserAttribute:    "distinguishedName",
+		GroupNameAttribute:          "name",
+		GroupObjectClass:            "group",
+		GroupSearchAttribute:        "sAMAccountName",
+		GroupSearchBase:             baseDN,
+	}
+
+	tests := []struct {
+		name string
+		call func(p *adProvider, conn ldapv3.Client, config *v3.ActiveDirectoryConfig)
+	}{
+		{
+			name: "refetch group principals",
+			call: func(p *adProvider, conn ldapv3.Client, config *v3.ActiveDirectoryConfig) {
+				_, _ = p.refetchGroupPrincipalsOnConn(conn, config, UserScope+"://"+userDN)
+			},
+		},
+		{
+			name: "group principals from search",
+			call: func(p *adProvider, conn ldapv3.Client, config *v3.ActiveDirectoryConfig) {
+				_, _ = p.getGroupPrincipalsFromSearch(conn, config, baseDN, "(objectClass=group)", []string{userDN})
+			},
+		},
+		{
+			name: "get principal",
+			call: func(p *adProvider, conn ldapv3.Client, config *v3.ActiveDirectoryConfig) {
+				_, _ = p.getPrincipalOnConn(conn, userDN, UserScope, config)
+			},
+		},
+		{
+			name: "search ldap",
+			call: func(p *adProvider, conn ldapv3.Client, config *v3.ActiveDirectoryConfig) {
+				_, _ = p.searchLdap("(objectClass=person)", UserScope, config, conn)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var ntlmBinds []ntlmIdentity
+			conn := &ldapFakes.FakeLdapConn{
+				BindFunc: func(username, _ string) error {
+					t.Fatalf("simple bind reached with ntlm selected: %s", username)
+					return nil
+				},
+				TLSConnectionStateFunc: tlsStateWithPeer(),
+				NTLMChallengeBindFunc: func(request *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+					ntlmBinds = append(ntlmBinds, ntlmIdentity{Domain: request.Domain, Username: request.Username})
+					return &ldapv3.NTLMBindResult{}, nil
+				},
+			}
+
+			localConfig := config
+			test.call(&adProvider{}, conn, &localConfig)
+
+			require.Len(t, ntlmBinds, 1, "the service account bind goes through NTLM")
+			assert.Equal(t, ntlmIdentity{Domain: "FOO", Username: "sa"}, ntlmBinds[0])
+		})
+	}
+}
+
+func TestLoginUserPreservesTheMissingServiceAccountPasswordCode(t *testing.T) {
+	t.Parallel()
+
+	config := v3.ActiveDirectoryConfig{
+		ServiceAccountUsername: saUsername,
+		// ServiceAccountPassword deliberately empty.
+		UserObjectClass:    userObjectClassName,
+		UserLoginAttribute: "sAMAccountName",
+		UserSearchBase:     baseDN,
+	}
+
+	ldapConn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(string, string) error {
+			t.Fatal("no bind should be attempted without a service account password")
+			return nil
+		},
+	}
+
+	provider := adProvider{tokenMGR: &tokens.Manager{}}
+	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
+
+	_, _, err := provider.loginUser(ldapConn, &credentials, &config)
+	require.Error(t, err)
+
+	herr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, validation.MissingRequired, herr.Code,
+		"the classifier must not flatten an APIError the bind helpers already produced")
+}
+
+func TestLoginUserNTLMSurfacesAChannelBindingRejection(t *testing.T) {
+	t.Parallel()
+
+	config := v3.ActiveDirectoryConfig{
+		BindMechanism:          bindMechanismNTLM,
+		TLS:                    true,
+		DefaultLoginDomain:     "FOO",
+		ServiceAccountUsername: saUsername,
+		ServiceAccountPassword: saPassword,
+		UserObjectClass:        userObjectClassName,
+		UserLoginAttribute:     "sAMAccountName",
+		UserSearchBase:         baseDN,
+	}
+
+	ldapConn := &ldapFakes.FakeLdapConn{
+		TLSConnectionStateFunc: tlsStateWithPeer(),
+		NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			return nil, ldapError(ldapv3.LDAPResultInvalidCredentials,
+				"comment: AcceptSecurityContext error, data 80090346, v4563")
+		},
+	}
+
+	provider := adProvider{tokenMGR: &tokens.Manager{}}
+	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
+
+	_, _, err := provider.loginUser(ldapConn, &credentials, &config)
+	require.Error(t, err)
+
+	herr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, validation.ServerError, herr.Code)
+	assert.Contains(t, herr.Message, "80090346")
+	assert.Contains(t, herr.Message, "channel binding")
+}
+
+// bindFailingProvider returns a provider whose connection is real enough to
+// bind and search, and whose bind fails with the given diagnostic.
+func bindFailingProvider(t *testing.T, diagnostic string, enabled bool) (*adProvider, *atomic.Bool) {
+	t.Helper()
+
+	var closed atomic.Bool
+	conn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(string, string) error {
+			return ldapError(ldapv3.LDAPResultInvalidCredentials, diagnostic)
+		},
+		SearchFunc: func(*ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			t.Fatal("search must not run after a failed bind")
+			return nil, nil
+		},
+		CloseFunc: func() error { closed.Store(true); return nil },
+	}
+
+	// No ownership assertion here. This helper serves two kinds of test, and
+	// only one of them owns the connection: a provider entry point defers
+	// Close, while the ...OnConn helpers deliberately do not close a
+	// connection they were handed. An unconditional cleanup assertion fails
+	// every direct-helper test even when its subject passes.
+	//
+	// Callers that do own the connection assert `closed` themselves.
+
+	return &adProvider{
+		loadConfig: func() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
+			return &v3.ActiveDirectoryConfig{
+				AuthConfig:             v3.AuthConfig{Enabled: enabled},
+				ServiceAccountUsername: saUsername,
+				ServiceAccountPassword: saPassword,
+				UserSearchBase:         baseDN,
+				UserObjectClass:        userObjectClassName,
+				UserLoginAttribute:     "sAMAccountName",
+				UserNameAttribute:      "name",
+				GroupObjectClass:       "group",
+				GroupNameAttribute:     "name",
+				GroupSearchAttribute:   "sAMAccountName",
+				GroupDNAttribute:       "distinguishedName",
+			}, nil, nil
+		},
+		dial: func(*v3.ActiveDirectoryConfig, *x509.CertPool) (ldapv3.Client, error) { return conn, nil },
+	}, &closed
+}
+
+func TestSearchPrincipalsSurfacesNonCredentialBindFailures(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		diagnostic string
+		wantInMsg  string
+	}{
+		{name: "bad bindings", diagnostic: capturedBadBindings, wantInMsg: "channel binding"},
+		{name: "malformed token", diagnostic: capturedBadToken, wantInMsg: "malformed"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider, closed := bindFailingProvider(t, test.diagnostic, true)
+
+			got, err := provider.SearchPrincipals("alice", "user", &v3.Token{})
+
+			require.Error(t, err, "the mapped error must reach the caller, not be swallowed")
+			assert.True(t, closed.Load(), "SearchPrincipals owns the connection and must close it")
+			assert.Empty(t, got)
+			assert.Contains(t, err.Error(), test.wantInMsg)
+
+			herr, ok := err.(*apierror.APIError)
+			require.True(t, ok)
+			assert.Equal(t, validation.ServerError, herr.Code)
+		})
+	}
+}
+
+func TestSearchPrincipalsStillSwallowsOrdinaryFailures(t *testing.T) {
+	t.Parallel()
+
+	// A wrong service-account password must keep returning an empty result and
+	// a nil error. Callers depend on principal search degrading rather than
+	// erroring, and only the two non-credential classes may change that.
+	provider, closed := bindFailingProvider(t, typicalWrongPassword, true)
+
+	got, err := provider.SearchPrincipals("alice", "user", &v3.Token{})
+
+	assert.NoError(t, err)
+	assert.Empty(t, got)
+	assert.True(t, closed.Load())
+}
+
+func TestGroupPrincipalsFallbackDistinguishesFailureKinds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		diagnostic   string
+		wantFallback bool   // degrade to memberOf-derived principals
+		wantInMsg    string // when not degrading
+	}{
+		{
+			name:         "rotated password still degrades",
+			diagnostic:   typicalWrongPassword,
+			wantFallback: true,
+		},
+		{
+			name:       "bad bindings surfaces",
+			diagnostic: capturedBadBindings,
+			wantInMsg:  "channel binding",
+		},
+		{
+			name:       "malformed token surfaces",
+			diagnostic: capturedBadToken,
+			wantInMsg:  "malformed",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider, _ := bindFailingProvider(t, test.diagnostic, true)
+			config, _, err := provider.configOrDefault()
+			require.NoError(t, err)
+			conn, err := provider.ldapConnectionOrDefault(config, nil)
+			require.NoError(t, err)
+
+			// getGroupPrincipalsFromSearch is handed a connection it does not
+			// own, so closing it is this test's job.
+			defer func() { _ = conn.Close() }()
+
+			got, err := provider.getGroupPrincipalsFromSearch(
+				conn, config, baseDN, "(objectClass=group)", []string{groupDN})
+
+			if test.wantFallback {
+				require.NoError(t, err, "a rotated password must still degrade")
+				require.Len(t, got, 1, "the fallback returns principals derived from memberOf")
+				assert.Equal(t, GroupScope+"://"+groupDN, got[0].Name)
+				return
+			}
+
+			require.Error(t, err)
+			assert.Empty(t, got, "partial group data must not be returned for a non-credential failure")
+			assert.Contains(t, err.Error(), test.wantInMsg)
+		})
+	}
+}
+
+func TestGetPrincipalFallbackDistinguishesFailureKinds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		diagnostic   string
+		wantFallback bool
+		wantInMsg    string
+	}{
+		{
+			name:         "rotated password still degrades",
+			diagnostic:   typicalWrongPassword,
+			wantFallback: true,
+		},
+		{
+			name:       "bad bindings surfaces",
+			diagnostic: capturedBadBindings,
+			wantInMsg:  "channel binding",
+		},
+		{
+			name:       "malformed token surfaces",
+			diagnostic: capturedBadToken,
+			wantInMsg:  "malformed",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider, _ := bindFailingProvider(t, test.diagnostic, true)
+			config, _, err := provider.configOrDefault()
+			require.NoError(t, err)
+			conn, err := provider.ldapConnectionOrDefault(config, nil)
+			require.NoError(t, err)
+
+			// Same ownership rule as site 4: the ...OnConn helper does not
+			// close a connection it was given.
+			defer func() { _ = conn.Close() }()
+
+			got, err := provider.getPrincipalOnConn(conn, userDN, UserScope, config)
+
+			if test.wantFallback {
+				// Site 5 degrades differently from site 4: it returns a single
+				// principal formed from the DN, not principals derived from
+				// memberOf.
+				require.NoError(t, err, "a rotated password must still degrade")
+				require.NotNil(t, got)
+				assert.Equal(t, UserScope+"://"+userDN, got.Name)
+				assert.Equal(t, userDN, got.LoginName)
+				return
+			}
+
+			require.Error(t, err)
+			assert.Nil(t, got, "a DN-formed principal must not stand in for a non-credential failure")
+			assert.Contains(t, err.Error(), test.wantInMsg)
+		})
+	}
 }
