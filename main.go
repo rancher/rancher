@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -27,6 +28,7 @@ var (
 )
 
 func main() {
+	fmt.Println("Ready are we recording?")
 	management.RegisterPasswordResetCommand()
 	management.RegisterEnsureDefaultAdminCommand()
 	if reexec.Init() {
