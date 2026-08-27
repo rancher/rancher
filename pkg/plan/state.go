@@ -75,9 +75,9 @@ func (s PlanState) IsTerminal() bool {
 // A checkpoint is scoped to the plan checksum. A checkpoint from a different plan is ignored.
 // This lets an agent resume a paused plan after a restart.
 type PlanProgress struct {
-	Checksum    string    `json:"checksum"`
-	Completed   int       `json:"completedInstructions"`
-	Total       int       `json:"totalInstructions"`
+	Checksum    string    `json:"checksum,omitempty"`
+	Completed   int       `json:"completedInstructions,omitempty"`
+	Total       int       `json:"totalInstructions,omitempty"`
 	ResumeState PlanState `json:"resumeState,omitempty"` // state restored when the pause lifts
 
 	// Paused identifies the checkpoint as a suspension. Only suspended checkpoints can be used to resume.
