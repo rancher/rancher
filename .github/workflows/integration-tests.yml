@@ -69,10 +69,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Configure Docker for cgroupfs
-        run: |
-          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - id: env
@@ -132,7 +128,7 @@ jobs:
         env:
           INTEGRATION_TEST_PACKAGES: ${{ matrix.packages }}
           INTEGRATION_TEST_RUN: ${{ matrix.run }}
-        run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
+        run: ./scripts/gha/tests
       - name: Upload Rancher + K3s logs if tests failed
         if: failure()
         continue-on-error: true
@@ -140,8 +136,8 @@ jobs:
         with:
           name: "Rancher + K3s logs (${{ matrix.shard }})"
           path: |
-            /tmp/rancher.log
-            /tmp/k3s.log
+            build/logs/rancher.log
+            build/logs/tmp/k3s.log
           if-no-files-found: ignore
           retention-days: 7
   # Aggregates the shard matrix into the single stable check
