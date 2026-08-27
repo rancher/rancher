@@ -1,5 +1,11 @@
 package plan
 
+import (
+	"encoding/json"
+
+	corev1 "k8s.io/api/core/v1"
+)
+
 // PlanState represents the lifecycle state of a plan tracked in the plan Secret's data.
 // The orchestrator writes Pending when delivering new plan content.
 // The agent drives all subsequent transitions.
@@ -32,15 +38,75 @@ const (
 	// has been marked as failed.
 	PlanStateFailed PlanState = "failed"
 
-	// PlanStateCancelled means the plan was cancelled via the
-	// plan.cattle.io/cancelled: "true" annotation. This transition is handled by
-	// the cancellation ticket and is listed here for completeness.
-	PlanStateCancelled PlanState = "cancelled"
+	// PlanStateCanceled means the plan was canceled via the plan.cattle.io/canceled: "true" annotation.
+	PlanStateCanceled PlanState = "canceled"
+
+	// PlanStatePaused is a non-terminal state where execution is held at an instruction boundary.
+	// Removing the paused annotation resumes execution using PlanProgress.ResumeState.
+	PlanStatePaused PlanState = "paused"
 )
 
-// IsTerminal returns true when the state is a terminal state (succeeded, failed, or cancelled).
+const (
+	// PlanProgressKey is the Secret data key holding the resume checkpoint.
+	PlanProgressKey = "plan-progress"
+
+	// PlanCanceledAnnotation is the Secret annotation used to cancel a plan.
+	// Setting it to "true" requests that the agent abort the plan.
+	// Removing the annotation does not resume the plan: cancellation is terminal and requires new content.
+	// The only valid values are "true" and "false".
+	PlanCanceledAnnotation = "plan.cattle.io/canceled"
+
+	// PlanPausedAnnotation is the Secret annotation used to pause a plan.
+	// Setting it to "true" requests that the agent stop executing the plan.
+	// While set, the agent performs no plan execution regardless of plan state or resume checkpoint.
+	// Clearing the annotation or setting it to "false" resumes the plan.
+	// The only valid values are "true" and "false".
+	PlanPausedAnnotation = "plan.cattle.io/paused"
+)
+
+// IsTerminal returns true when the state is a terminal state (succeeded, failed, or canceled).
 // A terminal plan requires the orchestrator to write new plan content before the agent will
 // act on it again.
 func (s PlanState) IsTerminal() bool {
-	return s == PlanStateSucceeded || s == PlanStateFailed || s == PlanStateCancelled
+	return s == PlanStateSucceeded || s == PlanStateFailed || s == PlanStateCanceled
+}
+
+// PlanProgress is the resume checkpoint stored under PlanProgressKey.
+// A checkpoint is scoped to the plan checksum. A checkpoint from a different plan is ignored.
+// This lets an agent resume a paused plan after a restart.
+type PlanProgress struct {
+	Checksum    string    `json:"checksum"`
+	Completed   int       `json:"completedInstructions"`
+	Total       int       `json:"totalInstructions"`
+	ResumeState PlanState `json:"resumeState,omitempty"` // state restored when the pause lifts
+
+	// Paused identifies the checkpoint as a suspension. Only suspended checkpoints can be used to resume.
+	// Cancellation and resuming from a pause write Paused=false.
+	Paused bool `json:"paused,omitempty"`
+
+	// TerminationIncomplete reports that processes from an interrupted instruction may still run.
+	// It is informational only; the agent does not act on it.
+	// Unlike Paused it persists across checkpoint rewrites until the checkpoint is cleared.
+	// It is a lower-bound signal: processes may still be running.
+	TerminationIncomplete bool `json:"terminationIncomplete,omitempty"`
+}
+
+// ParsePlanProgress decodes the resume checkpoint stored under PlanProgressKey.
+// Return nil when the key is absent, empty, unparsable, or the checksum does not match the current plan.
+func ParsePlanProgress(secret *corev1.Secret) *PlanProgress {
+	if secret == nil {
+		return nil
+	}
+	raw, ok := secret.Data[PlanProgressKey]
+	if !ok || len(raw) == 0 {
+		return nil
+	}
+	var p PlanProgress
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return nil
+	}
+	if p.Checksum == "" || p.Checksum != Checksum(secret.Data["plan"]) {
+		return nil
+	}
+	return &p
 }
