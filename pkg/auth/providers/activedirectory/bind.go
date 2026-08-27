@@ -8,7 +8,10 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/rancher/apiserver/pkg/apierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
+	"github.com/rancher/rancher/pkg/auth/providers/common/ldap/ntlm"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -87,4 +90,144 @@ func splitNTLMIdentity(username, defaultDomain string) (string, string, error) {
 	}
 
 	return domain, user, nil
+}
+
+// ntlmIdentity is a bind identity already resolved by splitNTLMIdentity.
+// loginUser resolves the end user's identity before any directory I/O and
+// passes the result down, so the raw login value is parsed exactly once.
+type ntlmIdentity struct {
+	Domain   string
+	Username string
+}
+
+// ntlmChallengeBinder is the part of *ldapv3.Conn that performs an NTLM bind.
+// ldapv3.Client does not include NTLMChallengeBind, so the concrete capability
+// is asserted at the call site.
+type ntlmChallengeBinder interface {
+	NTLMChallengeBind(request *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error)
+}
+
+// bindServiceAccount binds conn as the configured service account.
+//
+// The bind error is returned unclassified. Sites that build an API response
+// pass it through classifyServiceAccountBindError; sites with a config.Enabled
+// fallback must not, because that fallback inspects the LDAP result code.
+func (p *adProvider) bindServiceAccount(conn ldapv3.Client, config *v3.ActiveDirectoryConfig) error {
+	logrus.Debug("Binding service account username password")
+
+	if config.ServiceAccountPassword == "" {
+		return apierror.NewAPIError(validation.MissingRequired, "service account password not provided")
+	}
+	return p.bindAs(conn, config, nil, config.ServiceAccountUsername, config.ServiceAccountPassword)
+}
+
+// bindUser binds conn as an end user. identity may be nil for the simple
+// mechanism; the NTLM path requires it to have been resolved by loginUser.
+func (p *adProvider) bindUser(conn ldapv3.Client, config *v3.ActiveDirectoryConfig, identity *ntlmIdentity, username, password string) error {
+	return p.bindAs(conn, config, identity, username, password)
+}
+
+// bindAs binds conn according to config.BindMechanism. It is the only place in
+// the provider that performs a bind, so no path can reach the directory with a
+// mechanism the configuration did not select.
+//
+// identity, when non-nil, is an already-resolved NTLM identity and takes
+// precedence over parsing username.
+func (p *adProvider) bindAs(conn ldapv3.Client, config *v3.ActiveDirectoryConfig, identity *ntlmIdentity, username, password string) error {
+	// Defense in depth: the config is validated where it is loaded and where
+	// it is applied, but a future caller could reach here another way.
+	if err := validateBindConfiguration(config); err != nil {
+		return apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
+	}
+
+	if config.BindMechanism != bindMechanismNTLM {
+		return conn.Bind(ldap.GetUserExternalID(username, config.DefaultLoginDomain), password)
+	}
+
+	binder, ok := conn.(ntlmChallengeBinder)
+	if !ok {
+		// A programming error, not a configuration one. Never fall back to a
+		// simple bind: that would silently defeat channel binding.
+		return apierror.NewAPIError(validation.ServerError,
+			fmt.Sprintf("activedirectory: connection of type %T cannot perform an NTLM bind", conn))
+	}
+
+	if identity == nil {
+		domain, user, err := splitNTLMIdentity(username, config.DefaultLoginDomain)
+		if err != nil {
+			return err
+		}
+		identity = &ntlmIdentity{Domain: domain, Username: user}
+	}
+
+	state, ok := conn.TLSConnectionState()
+	if !ok {
+		return apierror.NewAPIError(validation.ServerError,
+			"activedirectory: an NTLM bind needs a TLS connection, but the connection is not using TLS")
+	}
+	if len(state.PeerCertificates) == 0 {
+		return apierror.NewAPIError(validation.ServerError,
+			"activedirectory: an NTLM bind needs the server certificate to derive a channel binding token, but the TLS connection presented none")
+	}
+
+	cbt, err := ntlm.ChannelBindingToken(state.PeerCertificates[0])
+	if err != nil {
+		return apierror.WrapAPIError(err, validation.ServerError, err.Error())
+	}
+
+	negotiator, err := ntlm.NewNegotiator(cbt)
+	if err != nil {
+		return apierror.WrapAPIError(err, validation.ServerError, err.Error())
+	}
+
+	logrus.Debugf("activedirectory: binding %s with mechanism %s", identity.Domain, bindMechanismNTLM)
+
+	// Password only. Leaving Hash empty keeps pass-the-hash unreachable and
+	// makes go-ldap derive the NT hash it passes to the negotiator.
+	//
+	// The error is returned unwrapped. Callers inspect it with
+	// ldapv3.IsErrorWithCode, and classification into an APIError happens at
+	// the call sites that produce an API response — never here.
+	_, err = binder.NTLMChallengeBind(&ldapv3.NTLMBindRequest{
+		Domain:     identity.Domain,
+		Username:   identity.Username,
+		Password:   password,
+		Negotiator: negotiator,
+	})
+	return err
+}
+
+// classifyServiceAccountBindError turns a service-account bind failure into
+// the APIError the login and refresh paths have always returned.
+//
+// It replaces the classification that lived in ldap.AuthenticateServiceAccountUser.
+// The channel-binding case is separated out because it arrives as
+// invalidCredentials but is a configuration fault, not a wrong password, and
+// apierror.WrapAPIError drops the cause from the response — so the mapped
+// explanation has to be the message.
+func classifyServiceAccountBindError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// bindServiceAccount and bindAs already return APIErrors for the problems
+	// they detect themselves: a missing service account password
+	// (MissingRequired), an invalid mechanism, a connection with no TLS state,
+	// a missing peer certificate, a CBT that cannot be derived. Those carry
+	// codes and messages an operator can act on, so they pass through
+	// untouched. Only an error from the directory reaches the LDAP
+	// classification below.
+	if apierror.IsAPIError(err) {
+		return err
+	}
+
+	// Both non-credential failures arrive as result code 49 and must be
+	// separated from a wrong password before the Unauthorized branch below.
+	if classifyBindFailure(err) != bindFailureNone {
+		return apierror.WrapAPIError(err, validation.ServerError, mapBindError(err).Error())
+	}
+	if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
+		return apierror.WrapAPIError(err, validation.Unauthorized, "authentication failed")
+	}
+	return apierror.WrapAPIError(err, validation.ServerError, "server error while authenticating")
 }

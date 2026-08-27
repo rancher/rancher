@@ -9,25 +9,42 @@ import (
 )
 
 type FakeLdapConn struct {
-	BindFunc             func(username, password string) error
-	SearchFunc           func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error)
-	SearchWithPagingFunc func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error)
+	BindFunc               func(username, password string) error
+	SearchFunc             func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error)
+	SearchWithPagingFunc   func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error)
+	NTLMChallengeBindFunc  func(request *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error)
+	TLSConnectionStateFunc func() (tls.ConnectionState, bool)
+	CloseFunc              func() error
 }
 
 func (m *FakeLdapConn) Start()                     { panic("unimplemented") }
 func (m *FakeLdapConn) StartTLS(*tls.Config) error { panic("unimplemented") }
-func (m *FakeLdapConn) Close() error               { panic("unimplemented") }
-func (m *FakeLdapConn) GetLastError() error        { panic("unimplemented") }
-func (m *FakeLdapConn) IsClosing() bool            { panic("unimplemented") }
-func (m *FakeLdapConn) SetTimeout(time.Duration)   { panic("unimplemented") }
+func (m *FakeLdapConn) Close() error {
+	if m.CloseFunc != nil {
+		return m.CloseFunc()
+	}
+	return nil
+}
+func (m *FakeLdapConn) GetLastError() error      { panic("unimplemented") }
+func (m *FakeLdapConn) IsClosing() bool          { panic("unimplemented") }
+func (m *FakeLdapConn) SetTimeout(time.Duration) { panic("unimplemented") }
 func (m *FakeLdapConn) TLSConnectionState() (tls.ConnectionState, bool) {
-	panic("unimplemented")
+	if m.TLSConnectionStateFunc != nil {
+		return m.TLSConnectionStateFunc()
+	}
+	return tls.ConnectionState{}, false
 }
 func (m *FakeLdapConn) Bind(username, password string) error {
 	if m.BindFunc != nil {
 		return m.BindFunc(username, password)
 	}
 	return nil
+}
+func (m *FakeLdapConn) NTLMChallengeBind(request *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+	if m.NTLMChallengeBindFunc != nil {
+		return m.NTLMChallengeBindFunc(request)
+	}
+	return &ldapv3.NTLMBindResult{}, nil
 }
 func (m *FakeLdapConn) UnauthenticatedBind(username string) error { panic("unimplemented") }
 func (m *FakeLdapConn) NTLMUnauthenticatedBind(domain, username string) error {

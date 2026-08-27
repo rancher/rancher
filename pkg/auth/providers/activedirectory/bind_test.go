@@ -1,6 +1,7 @@
 package activedirectory
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -320,4 +321,217 @@ func TestSplitNTLMIdentity(t *testing.T) {
 			assert.Equal(t, test.wantUser, user)
 		})
 	}
+}
+
+// testPeerCertificate returns a certificate a channel binding token can be
+// derived from.
+func testPeerCertificate() *x509.Certificate {
+	return &x509.Certificate{Raw: []byte("test-der-bytes"), SignatureAlgorithm: x509.SHA256WithRSA}
+}
+
+func tlsStateWithPeer() func() (tls.ConnectionState, bool) {
+	return func() (tls.ConnectionState, bool) {
+		return tls.ConnectionState{PeerCertificates: []*x509.Certificate{testPeerCertificate()}}, true
+	}
+}
+
+func TestBindAsSimpleMechanism(t *testing.T) {
+	t.Parallel()
+
+	var bound []v3.BasicLogin
+	conn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(username, password string) error {
+			bound = append(bound, v3.BasicLogin{Username: username, Password: password})
+			return nil
+		},
+		NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			t.Fatal("an NTLM bind must not happen for the simple mechanism")
+			return nil, nil
+		},
+	}
+
+	config := &v3.ActiveDirectoryConfig{DefaultLoginDomain: "FOO"}
+	provider := &adProvider{}
+
+	require.NoError(t, provider.bindAs(conn, config, nil, "alice", "secret"))
+	require.Len(t, bound, 1)
+	assert.Equal(t, v3.BasicLogin{Username: `FOO\alice`, Password: "secret"}, bound[0],
+		"the simple path keeps using GetUserExternalID verbatim")
+}
+
+func TestBindAsNTLMMechanism(t *testing.T) {
+	t.Parallel()
+
+	var request *ldapv3.NTLMBindRequest
+	conn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(string, string) error {
+			t.Fatal("a simple bind must never happen once ntlm is selected")
+			return nil
+		},
+		TLSConnectionStateFunc: tlsStateWithPeer(),
+		NTLMChallengeBindFunc: func(r *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			request = r
+			return &ldapv3.NTLMBindResult{}, nil
+		},
+	}
+
+	config := &v3.ActiveDirectoryConfig{BindMechanism: bindMechanismNTLM, TLS: true, DefaultLoginDomain: "FOO"}
+	provider := &adProvider{}
+
+	require.NoError(t, provider.bindAs(conn, config, nil, "alice", "secret"))
+	require.NotNil(t, request)
+	assert.Equal(t, "FOO", request.Domain)
+	assert.Equal(t, "alice", request.Username)
+	assert.Equal(t, "secret", request.Password)
+	assert.Empty(t, request.Hash, "pass the hash is never exposed")
+	assert.NotNil(t, request.Negotiator)
+}
+
+func TestBindAsNTLMUsesThePreflightIdentity(t *testing.T) {
+	t.Parallel()
+
+	var request *ldapv3.NTLMBindRequest
+	conn := &ldapFakes.FakeLdapConn{
+		BindFunc:               func(string, string) error { t.Fatal("no simple bind"); return nil },
+		TLSConnectionStateFunc: tlsStateWithPeer(),
+		NTLMChallengeBindFunc: func(r *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			request = r
+			return &ldapv3.NTLMBindResult{}, nil
+		},
+	}
+
+	config := &v3.ActiveDirectoryConfig{BindMechanism: bindMechanismNTLM, TLS: true, DefaultLoginDomain: "IGNORED"}
+	provider := &adProvider{}
+	identity := &ntlmIdentity{Domain: "BAR", Username: "bob"}
+
+	require.NoError(t, provider.bindAs(conn, config, identity, "whatever-raw-value", "secret"))
+	require.NotNil(t, request)
+	assert.Equal(t, "BAR", request.Domain)
+	assert.Equal(t, "bob", request.Username, "the resolved identity is used, the raw value is not re-parsed")
+}
+
+func TestBindAsRejects(t *testing.T) {
+	t.Parallel()
+
+	failIfBound := func(t *testing.T) *ldapFakes.FakeLdapConn {
+		t.Helper()
+		return &ldapFakes.FakeLdapConn{
+			BindFunc: func(string, string) error {
+				t.Fatal("no bind of any kind should be attempted")
+				return nil
+			},
+			NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+				t.Fatal("no bind of any kind should be attempted")
+				return nil, nil
+			},
+		}
+	}
+
+	t.Run("unknown mechanism", func(t *testing.T) {
+		t.Parallel()
+
+		provider := &adProvider{}
+		config := &v3.ActiveDirectoryConfig{BindMechanism: "gssapi", TLS: true}
+		require.Error(t, provider.bindAs(failIfBound(t), config, nil, "alice", "secret"))
+	})
+
+	t.Run("ntlm over plaintext", func(t *testing.T) {
+		t.Parallel()
+
+		provider := &adProvider{}
+		config := &v3.ActiveDirectoryConfig{BindMechanism: bindMechanismNTLM}
+		require.Error(t, provider.bindAs(failIfBound(t), config, nil, "alice", "secret"))
+	})
+
+	t.Run("no tls connection state", func(t *testing.T) {
+		t.Parallel()
+
+		conn := &ldapFakes.FakeLdapConn{
+			BindFunc: func(string, string) error { t.Fatal("no simple bind fallback"); return nil },
+			TLSConnectionStateFunc: func() (tls.ConnectionState, bool) {
+				return tls.ConnectionState{}, false
+			},
+			NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+				t.Fatal("an unbound NTLM bind must not be attempted")
+				return nil, nil
+			},
+		}
+		provider := &adProvider{}
+		config := &v3.ActiveDirectoryConfig{BindMechanism: bindMechanismNTLM, TLS: true}
+		require.Error(t, provider.bindAs(conn, config, nil, "alice", "secret"))
+	})
+
+	t.Run("no peer certificate", func(t *testing.T) {
+		t.Parallel()
+
+		conn := &ldapFakes.FakeLdapConn{
+			BindFunc: func(string, string) error { t.Fatal("no simple bind fallback"); return nil },
+			TLSConnectionStateFunc: func() (tls.ConnectionState, bool) {
+				return tls.ConnectionState{}, true
+			},
+			NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+				t.Fatal("an unbound NTLM bind must not be attempted")
+				return nil, nil
+			},
+		}
+		provider := &adProvider{}
+		config := &v3.ActiveDirectoryConfig{BindMechanism: bindMechanismNTLM, TLS: true}
+		require.Error(t, provider.bindAs(conn, config, nil, "alice", "secret"))
+	})
+
+	t.Run("connection cannot do an ntlm challenge bind", func(t *testing.T) {
+		t.Parallel()
+
+		provider := &adProvider{}
+		config := &v3.ActiveDirectoryConfig{BindMechanism: bindMechanismNTLM, TLS: true, DefaultLoginDomain: "FOO"}
+
+		conn := &nonNTLMConn{Client: failIfBound(t)}
+		require.Error(t, provider.bindAs(conn, config, nil, "alice", "secret"))
+	})
+
+	t.Run("upn is rejected before any bind", func(t *testing.T) {
+		t.Parallel()
+
+		provider := &adProvider{}
+		config := &v3.ActiveDirectoryConfig{BindMechanism: bindMechanismNTLM, TLS: true}
+		conn := failIfBound(t)
+		conn.TLSConnectionStateFunc = tlsStateWithPeer()
+
+		require.Error(t, provider.bindAs(conn, config, nil, "alice@example.com", "secret"))
+	})
+}
+
+// nonNTLMConn stands in for a connection that cannot carry an NTLM bind.
+// Embedding the ldapv3.Client interface rather than the fake struct promotes
+// only the interface's methods, and NTLMChallengeBind is not one of them, so
+// the value satisfies ldapv3.Client but fails the ntlmChallengeBinder
+// assertion.
+type nonNTLMConn struct {
+	ldapv3.Client
+}
+
+var (
+	_ ldapv3.Client = &nonNTLMConn{}
+	_ ldapv3.Client = &ldapFakes.FakeLdapConn{}
+)
+
+func TestBindServiceAccountRequiresAPassword(t *testing.T) {
+	t.Parallel()
+
+	provider := &adProvider{}
+	config := &v3.ActiveDirectoryConfig{ServiceAccountUsername: `FOO\sa`}
+
+	conn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(string, string) error {
+			t.Fatal("an empty service account password must not reach a bind")
+			return nil
+		},
+	}
+
+	err := provider.bindServiceAccount(conn, config)
+	require.Error(t, err)
+
+	herr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, validation.MissingRequired, herr.Code)
 }
