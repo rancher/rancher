@@ -246,7 +246,7 @@ func TestNegotiatorLayouts(t *testing.T) {
 			assert.Equal(t, test.wantHeaderSize, l.authenticateHeaderSize())
 			assert.Equal(t, test.wantNegotiateSize, l.negotiateHeaderSize())
 
-			n := testNegotiator(t, [16]byte{0x01}, WithVersion(test.version), WithMIC(test.mic))
+			n := testNegotiator(t, [16]byte{0x01}, withVersion(test.version), withMIC(test.mic))
 
 			negotiate, err := n.Negotiate(specDomain, "")
 			require.NoError(t, err)

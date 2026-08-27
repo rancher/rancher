@@ -63,6 +63,12 @@ func TestParseADDiagnostic(t *testing.T) {
 			err:  ldapError(ldapv3.LDAPResultInvalidCredentials, "the data was rejected"),
 		},
 		{name: "not an ldap error", err: errors.New("connection refused")},
+		{
+			// go-ldap's Error() renders through Err, so a nil Err must be
+			// rejected before anything calls it.
+			name: "ldap error with no underlying error",
+			err:  &ldapv3.Error{ResultCode: ldapv3.LDAPResultInvalidCredentials},
+		},
 		{name: "nil", err: nil},
 	}
 

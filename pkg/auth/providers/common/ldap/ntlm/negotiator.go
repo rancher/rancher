@@ -63,19 +63,19 @@ func WithNonceSource(read func([]byte) error) Option {
 	return func(n *Negotiator) { n.nonce = read }
 }
 
-// WithVersion controls whether the 8-byte VERSION field is emitted. Turning it
+// withVersion controls whether the 8-byte VERSION field is emitted. Turning it
 // off moves the MIC from offset 72 to 64 and the payload base from 88 to 80.
 //
 // Exists so the header layout can be measured against a real domain
 // controller. Production code must not call it; see the deviation note in the
 // plan.
-func WithVersion(on bool) Option {
+func withVersion(on bool) Option {
 	return func(n *Negotiator) { n.layout.version = on }
 }
 
-// WithMIC controls whether a message integrity code is emitted and whether the
-// MsvAvFlags MIC-present bit is set. Same caveat as WithVersion.
-func WithMIC(on bool) Option {
+// withMIC controls whether a message integrity code is emitted and whether the
+// MsvAvFlags MIC-present bit is set. Same caveat as withVersion.
+func withMIC(on bool) Option {
 	return func(n *Negotiator) { n.layout.mic = on }
 }
 

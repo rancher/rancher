@@ -96,6 +96,15 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
 			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 		}
+		if apierror.IsAPIError(err) {
+			// bindAs reports its own preconditions — an invalid mechanism, a
+			// connection without TLS state, a missing peer certificate, an
+			// underivable channel binding token — as APIErrors carrying
+			// actionable messages. Re-wrapping would replace the message with
+			// the generic one, because WrapAPIError drops the cause from the
+			// response.
+			return v3.Principal{}, nil, err
+		}
 		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.ServerError, "server error while authenticating")
 	}
 

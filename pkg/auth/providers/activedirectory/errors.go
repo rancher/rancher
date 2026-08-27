@@ -56,12 +56,14 @@ func parseADDiagnostic(err error) (adDiagnostic, bool) {
 		return adDiagnostic{}, false
 	}
 
-	// ldapv3.Error.Error() prefixes its own text, so match against the
-	// underlying diagnostic where the security status is still leading.
-	diagnostic := ldapErr.Error()
-	if ldapErr.Err != nil {
-		diagnostic = ldapErr.Err.Error()
+	// Match against the underlying diagnostic, where the security status is
+	// still leading: ldapv3.Error.Error() prefixes its own text, and it also
+	// renders through Err unconditionally, so with a nil Err there is both
+	// nothing to parse and nothing safe to call.
+	if ldapErr.Err == nil {
+		return adDiagnostic{}, false
 	}
+	diagnostic := ldapErr.Err.Error()
 
 	var out adDiagnostic
 	if m := securityStatusPattern.FindStringSubmatch(diagnostic); m != nil {

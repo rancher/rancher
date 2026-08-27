@@ -1,6 +1,7 @@
 package activedirectory
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"sync/atomic"
@@ -895,4 +896,62 @@ func TestGetPrincipalFallbackDistinguishesFailureKinds(t *testing.T) {
 			assert.Contains(t, err.Error(), test.wantInMsg)
 		})
 	}
+}
+
+func TestLoginUserNTLMSurfacesABindPreconditionFailure(t *testing.T) {
+	t.Parallel()
+
+	config := v3.ActiveDirectoryConfig{
+		BindMechanism:          bindMechanismNTLM,
+		TLS:                    true,
+		DefaultLoginDomain:     "FOO",
+		ServiceAccountUsername: saUsername,
+		ServiceAccountPassword: saPassword,
+		UserObjectClass:        userObjectClassName,
+		UserLoginAttribute:     "sAMAccountName",
+		UserSearchBase:         baseDN,
+	}
+
+	// The TLS state disappears between the service-account bind and the user
+	// bind, so the user bind fails one of the bind helper's own preconditions.
+	// The APIError it returns must reach the caller with its message intact
+	// rather than be re-wrapped into the generic server error.
+	var tlsStateCalls atomic.Int32
+	ldapConn := &ldapFakes.FakeLdapConn{
+		TLSConnectionStateFunc: func() (tls.ConnectionState, bool) {
+			if tlsStateCalls.Add(1) == 1 {
+				return tlsStateWithPeer()()
+			}
+			return tls.ConnectionState{}, false
+		},
+		NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			return &ldapv3.NTLMBindResult{}, nil
+		},
+		SearchFunc: func(*ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+			return &ldapv3.SearchResult{
+				Entries: []*ldapv3.Entry{
+					{
+						DN: userDN,
+						Attributes: []*ldapv3.EntryAttribute{
+							{Name: ObjectClass, Values: []string{"top", "person", "user"}},
+							{Name: "sAMAccountName", Values: []string{userName}},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	provider := adProvider{tokenMGR: &tokens.Manager{}}
+	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
+
+	_, _, err := provider.loginUser(ldapConn, &credentials, &config)
+	require.Error(t, err)
+
+	herr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, validation.ServerError, herr.Code)
+	assert.Contains(t, herr.Message, "TLS")
+	assert.NotEqual(t, "server error while authenticating", herr.Message,
+		"the bind helper's own diagnostic must not be flattened to the generic message")
 }
