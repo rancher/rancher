@@ -22,7 +22,7 @@ cd build/testdata
 # Setup environment variables
 export CATTLE_DEV_MODE=yes
 HOST_IP=$(ip route get 8.8.8.8 | awk '{print $7}')
-export CATTLE_SERVER_URL="https://${HOST_IP}.sslip.io"
+export CATTLE_SERVER_URL="https://${HOST_IP}.sslip.io:8443"
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 if [ -n "$CATTLE_FEATURES" ]; then
   export CATTLE_FEATURES="$CATTLE_FEATURES,harvester=false"
@@ -38,7 +38,7 @@ fi
 k3d cluster create rancher-server \
   --api-port 6443 \
   -p "8080:80@loadbalancer" \
-  -p "443:443@loadbalancer" \
+  -p "8443:443@loadbalancer" \
   --wait
 
 # Import local development images into the k3d cluster
