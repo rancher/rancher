@@ -234,10 +234,6 @@ var (
 	// Deprecated: to be removed in 2.8.0
 	ConfigMapName = NewSetting("config-map-name", "rancher-config")
 
-	// CSPAdapterMinVersion is used to determine if an existing installation of the CSP adapter should be upgraded to a new version
-	// has no effect if the csp adapter is not installed.
-	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", buildconfig.CspAdapterMinVersion)
-
 	// FleetMinVersion is the minimum version of the Fleet chart that Rancher will install.
 	// Deprecated in favor of FleetVersion, kept for backward compatibility purposes.
 	FleetMinVersion = NewSetting("fleet-min-version", "")
