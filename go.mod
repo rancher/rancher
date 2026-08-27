@@ -139,7 +139,7 @@ require (
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
 	github.com/rancher/wrangler/v3 v3.7.1
 	github.com/robfig/cron v1.2.0
-	github.com/sirupsen/logrus v1.10.0
+	github.com/sirupsen/logrus v1.10.1
 	github.com/stretchr/testify v1.12.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.17

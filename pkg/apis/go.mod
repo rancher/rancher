@@ -44,7 +44,7 @@ require (
 	github.com/rancher/norman v0.10.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/wrangler/v3 v3.7.1
-	github.com/sirupsen/logrus v1.10.0
+	github.com/sirupsen/logrus v1.10.1
 	github.com/stretchr/testify v1.12.0
 	k8s.io/api v0.36.3
 	k8s.io/apimachinery v0.36.3
