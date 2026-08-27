@@ -11,7 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -454,4 +457,318 @@ func TestImportedAdapter_ComponentTLSSettingsFromNodeArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- CertificateRotationComponentTLSSettings error handling --------------------------------
+
+// fakeRESTMapper is a minimal RESTMapper implementation for testing
+type fakeRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (f *fakeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return &meta.RESTMapping{
+		Resource:         mgmtv3.SchemeGroupVersion.WithResource("nodes"),
+		GroupVersionKind: mgmtv3.SchemeGroupVersion.WithKind("Machine"),
+		Scope:            meta.RESTScopeNamespace,
+	}, nil
+}
+
+func TestImportedAdapter_CertificateRotationComponentTLSSettings_NodeNotFound(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "c-mine",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "node-a",
+			},
+		},
+	}
+
+	nodeCache.EXPECT().Get("c-mine", "node-a").Return(nil, apierrors.NewNotFound(
+		mgmtv3.Resource("node"), "node-a"))
+
+	stubMgmt := &stubMgmtInterface{nodeCache: nodeCache}
+	adapter := &ImportedAdapter{
+		cluster: &mgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+			Status:     mgmtv3.ClusterStatus{Provider: "rke2"},
+		},
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt:       stubMgmt,
+				RESTMapper: &fakeRESTMapper{},
+			},
+		},
+	}
+
+	_, err := adapter.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to find")
+	assert.Contains(t, err.Error(), "c-mine/node-a")
+}
+
+func TestImportedAdapter_CertificateRotationComponentTLSSettings_MalformedJSON(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "c-mine",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "node-a",
+			},
+		},
+	}
+
+	node := &mgmtv3.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "node-a",
+			Namespace: "c-mine",
+		},
+		Status: mgmtv3.NodeStatus{
+			NodeAnnotations: map[string]string{
+				rke2NodeArgsAnnotation: `{this is not valid JSON`,
+			},
+		},
+	}
+
+	nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil)
+
+	stubMgmt := &stubMgmtInterface{nodeCache: nodeCache}
+	adapter := &ImportedAdapter{
+		cluster: &mgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+			Status:     mgmtv3.ClusterStatus{Provider: "rke2"},
+		},
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt:       stubMgmt,
+				RESTMapper: &fakeRESTMapper{},
+			},
+		},
+	}
+
+	_, err := adapter.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to parse")
+	assert.Contains(t, err.Error(), "rke2.io/node-args")
+}
+
+func TestImportedAdapter_CertificateRotationComponentTLSSettings_IgnoresMalformedNodeEnv(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "c-mine",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "node-a",
+			},
+		},
+	}
+
+	node := &mgmtv3.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "node-a",
+			Namespace: "c-mine",
+		},
+		Status: mgmtv3.NodeStatus{
+			NodeAnnotations: map[string]string{
+				rke2NodeArgsAnnotation: `[]`,
+				rke2NodeEnvAnnotation:  `{invalid-json`,
+			},
+		},
+	}
+
+	nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil).Times(2)
+
+	stubMgmt := &stubMgmtInterface{nodeCache: nodeCache}
+	adapter := &ImportedAdapter{
+		cluster: &mgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+			Status:     mgmtv3.ClusterStatus{Provider: "rke2"},
+		},
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt:       stubMgmt,
+				RESTMapper: &fakeRESTMapper{},
+			},
+		},
+	}
+
+	settings, err := adapter.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+	assert.NoError(t, err)
+	assert.Equal(t, ComponentTLSSettings{}, settings)
+
+	dataDir := adapter.DistroDataDirectory(secret)
+	assert.Equal(t, defaultRKE2DataDirectory, dataDir)
+}
+
+// --- importedDistroDataDirectory tests --------------------------------
+
+func TestImportedDistroDataDirectory(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		runtime string
+		args    []string
+		env     map[string]string
+		want    string
+	}{
+		{
+			name:    "RKE2_DATA_DIR env overrides args",
+			runtime: capr.RuntimeRKE2,
+			args:    []string{"--data-dir", "/custom/from/args"},
+			env:     map[string]string{"RKE2_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/env",
+		},
+		{
+			name:    "K3S_DATA_DIR env overrides args",
+			runtime: capr.RuntimeK3S,
+			args:    []string{"-d=/custom/from/args"},
+			env:     map[string]string{"K3S_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/env",
+		},
+		{
+			name:    "last data-dir argument wins across aliases",
+			runtime: capr.RuntimeRKE2,
+			args:    []string{"--data-dir", "/first", "-d", "/second", "--data-dir=/third"},
+			want:    "/third",
+		},
+		{
+			name:    "RKE2 defaults correctly when no config provided",
+			runtime: capr.RuntimeRKE2,
+			want:    "/var/lib/rancher/rke2",
+		},
+		{
+			name:    "K3s defaults correctly when no config provided",
+			runtime: capr.RuntimeK3S,
+			want:    "/var/lib/rancher/k3s",
+		},
+		{
+			name:    "RKE2 env var does not affect K3s",
+			runtime: capr.RuntimeK3S,
+			env:     map[string]string{"RKE2_DATA_DIR": "/should/be/ignored"},
+			want:    "/var/lib/rancher/k3s",
+		},
+		{
+			name:    "K3S env var does not affect RKE2",
+			runtime: capr.RuntimeRKE2,
+			env:     map[string]string{"K3S_DATA_DIR": "/should/be/ignored"},
+			want:    "/var/lib/rancher/rke2",
+		},
+		{
+			name:    "empty env var is ignored",
+			runtime: capr.RuntimeRKE2,
+			args:    []string{"--data-dir", "/custom"},
+			env:     map[string]string{"RKE2_DATA_DIR": ""},
+			want:    "/custom",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := importedDistroDataDirectory(tt.runtime, tt.args, tt.env)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// --- arguments tests --------------------------------
+
+func TestArgumentsLast(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		args  []string
+		names []string
+		value string
+	}{
+		{
+			name:  "split long option",
+			args:  []string{"server", "--data-dir", "/custom/rke2"},
+			names: []string{"--data-dir", "-d"},
+			value: "/custom/rke2",
+		},
+		{
+			name:  "combined short option",
+			args:  []string{"-d=/custom/rke2"},
+			names: []string{"--data-dir", "-d"},
+			value: "/custom/rke2",
+		},
+		{
+			name:  "last option wins across aliases",
+			args:  []string{"-d", "/first", "--data-dir=/second"},
+			names: []string{"--data-dir", "-d"},
+			value: "/second",
+		},
+		{
+			name:  "last option wins with mixed aliases",
+			args:  []string{"--data-dir", "/first", "-d", "/second", "--data-dir=/third"},
+			names: []string{"--data-dir", "-d"},
+			value: "/third",
+		},
+		{
+			name:  "missing option value",
+			args:  []string{"--data-dir"},
+			names: []string{"--data-dir", "-d"},
+		},
+		{
+			name:  "does not match option prefix",
+			args:  []string{"--data-directory=/custom/rke2"},
+			names: []string{"--data-dir", "-d"},
+		},
+		{
+			name:  "empty value is ignored",
+			args:  []string{"--data-dir", "/first", "-d", ""},
+			names: []string{"--data-dir", "-d"},
+			value: "/first",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.value, newArguments(tt.args).Last(tt.names...))
+		})
+	}
+}
+
+func TestArgumentsValues(t *testing.T) {
+	t.Parallel()
+
+	args := newArguments([]string{
+		"--kube-scheduler-arg", "secure-port=10262",
+		"--kube-scheduler-arg=tls-cert-file=/custom/scheduler.crt",
+		"--kube-controller-manager-arg", "secure-port=10261",
+		"--kube-scheduler-arg", "tls-private-key-file=/custom/scheduler.key",
+		"--kube-scheduler-args=not-a-match",
+		"--kube-scheduler-arg",
+	})
+
+	assert.Equal(t, []string{
+		"secure-port=10262",
+		"tls-cert-file=/custom/scheduler.crt",
+		"tls-private-key-file=/custom/scheduler.key",
+	}, args.Values("--kube-scheduler-arg"))
+	assert.Nil(t, args.Values("--missing"))
 }

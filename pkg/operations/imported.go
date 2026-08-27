@@ -25,6 +25,8 @@ import (
 const (
 	rke2NodeArgsAnnotation = "rke2.io/node-args"
 	k3sNodeArgsAnnotation  = "k3s.io/node-args"
+	rke2NodeEnvAnnotation  = "rke2.io/node-env"
+	k3sNodeEnvAnnotation   = "k3s.io/node-env"
 
 	defaultRKE2DataDirectory = "/var/lib/rancher/rke2"
 	defaultK3sDataDirectory  = "/var/lib/rancher/k3s"
@@ -279,61 +281,192 @@ func (a *ImportedAdapter) ServerUnit() string {
 	return capr.RuntimeK3S
 }
 
-// nodeArgs returns the selected runtime's node arguments for the machine-plan secret.
-// It follows the machine-plan Secret -> lifecycle labels -> management Node -> status
-// nodeAnnotations lookup chain and returns no arguments when any link is unavailable.
-func (a *ImportedAdapter) nodeArgs(secret *corev1.Secret) []string {
+// managementNodeForSecret resolves the machine-plan Secret -> lifecycle labels ->
+// management Node cache lookup chain. Returns (nil, nil) when the secret carries no
+// lifecycle labels.
+func (a *ImportedAdapter) managementNodeForSecret(secret *corev1.Secret) (*mgmtv3.Node, error) {
 	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
-		return nil
+		return nil, nil
 	}
 
 	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret, secret.Namespace, a.clients.RESTMapper)
 	if err != nil {
-		logrus.Debugf("[imported adapter] unable to resolve machine lifecycle labels for %s/%s: %v", secret.Namespace, secret.Name, err)
-		return nil
+		return nil, fmt.Errorf("unable to resolve lifecycle reference for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
 	}
 
 	node, err := a.clients.Mgmt.Node().Cache().Get(ref.Namespace, ref.Name)
 	if apierrors.IsNotFound(err) {
-		logrus.Debugf("[imported adapter] node %s/%s not found for secret %s/%s", ref.Namespace, ref.Name, secret.Namespace, secret.Name)
-		return nil
-	}
-	if err != nil {
-		logrus.Debugf("[imported adapter] error fetching node %s/%s: %v", ref.Namespace, ref.Name, err)
-		return nil
+		return nil, fmt.Errorf("unable to find management node %s/%s for machine-plan secret %s/%s", ref.Namespace, ref.Name, secret.Namespace, secret.Name)
+	} else if err != nil {
+		return nil, fmt.Errorf("unable to get management node %s/%s for machine-plan secret %s/%s: %w", ref.Namespace, ref.Name, secret.Namespace, secret.Name, err)
 	}
 
-	annotationKey := rke2NodeArgsAnnotation
-	if a.RuntimeCommand() == capr.RuntimeK3S {
-		annotationKey = k3sNodeArgsAnnotation
+	return node, nil
+}
+
+// nodeArgsForRuntime parses the runtime-specific node-args annotation off the management
+// Node's status. Returns nil, nil when node is nil or the annotation is absent/empty.
+func nodeArgsForRuntime(node *mgmtv3.Node, runtime string) ([]string, error) {
+	if node == nil {
+		return nil, nil
 	}
-	v, ok := node.Status.NodeAnnotations[annotationKey]
-	if !ok || v == "" {
-		return nil
+
+	argsKey := rke2NodeArgsAnnotation
+	if runtime == capr.RuntimeK3S {
+		argsKey = k3sNodeArgsAnnotation
+	}
+
+	argsJSON, ok := node.Status.NodeAnnotations[argsKey]
+	if !ok || argsJSON == "" {
+		return nil, nil
 	}
 
 	var args []string
-	if err := json.Unmarshal([]byte(v), &args); err != nil {
-		logrus.Debugf("[imported adapter] unable to parse %s JSON for node %s/%s: %v", annotationKey, ref.Namespace, ref.Name, err)
-		return nil
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return nil, fmt.Errorf("unable to parse %s annotation on management node %s/%s: %w", argsKey, node.Namespace, node.Name, err)
 	}
-	return args
+	return args, nil
 }
 
-func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
-	defaultDir := defaultRKE2DataDirectory
-	if a.RuntimeCommand() == capr.RuntimeK3S {
-		defaultDir = defaultK3sDataDirectory
+// nodeEnvForRuntime parses the runtime-specific node-env annotation off the management
+// Node's status. Returns nil, nil when node is nil or the annotation is absent/empty.
+func nodeEnvForRuntime(node *mgmtv3.Node, runtime string) (map[string]string, error) {
+	if node == nil {
+		return nil, nil
 	}
 
-	args := a.nodeArgs(secret)
+	envKey := rke2NodeEnvAnnotation
+	if runtime == capr.RuntimeK3S {
+		envKey = k3sNodeEnvAnnotation
+	}
 
-	// A node-level data directory overrides the distribution default.
-	if dataDir := newArguments(args).First("--data-dir", "-d"); dataDir != "" {
+	envJSON, ok := node.Status.NodeAnnotations[envKey]
+	if !ok || envJSON == "" {
+		return nil, nil
+	}
+
+	var env map[string]string
+	if err := json.Unmarshal([]byte(envJSON), &env); err != nil {
+		return nil, fmt.Errorf("unable to parse %s annotation on management node %s/%s: %w", envKey, node.Namespace, node.Name, err)
+	}
+	return env, nil
+}
+
+// nodeArgs returns the selected runtime's node arguments for the machine-plan secret.
+// It follows the machine-plan Secret -> lifecycle labels -> management Node -> status
+// nodeAnnotations lookup chain and returns an error when the lookup or parsing fails.
+func (a *ImportedAdapter) nodeArgs(secret *corev1.Secret) ([]string, error) {
+	node, err := a.managementNodeForSecret(secret)
+	if err != nil {
+		return nil, err
+	}
+	return nodeArgsForRuntime(node, a.RuntimeCommand())
+}
+
+// arguments is an ordered command-line argument list. It is a lightweight view
+// over the supplied slice; newArguments does not copy the values.
+type arguments []string
+
+// newArguments creates an arguments view for querying command-line options.
+func newArguments(args []string) arguments {
+	return arguments(args)
+}
+
+// Last returns the last non-empty value supplied for any exact option name, or
+// an empty string when none has a value. It accepts both split (--option value)
+// and combined (--option=value) forms. When multiple aliases are given, the last
+// value wins across all aliases.
+func (a arguments) Last(names ...string) string {
+	var last string
+	for i, arg := range a {
+		for _, name := range names {
+			if arg == name {
+				if i+1 < len(a) && a[i+1] != "" {
+					last = a[i+1]
+				}
+				continue
+			}
+			if strings.HasPrefix(arg, name+"=") {
+				if v := strings.TrimPrefix(arg, name+"="); v != "" {
+					last = v
+				}
+			}
+		}
+	}
+	return last
+}
+
+// Values returns every value supplied for one exact option name, preserving
+// command-line order. It accepts both split (--option value) and combined
+// (--option=value) forms, which is useful for repeated wrapper options.
+func (a arguments) Values(name string) []string {
+	var values []string
+	for i, arg := range a {
+		if arg == name {
+			if i+1 < len(a) {
+				values = append(values, a[i+1])
+			}
+			continue
+		}
+		if strings.HasPrefix(arg, name+"=") {
+			values = append(values, strings.TrimPrefix(arg, name+"="))
+		}
+	}
+	return values
+}
+
+// importedDistroDataDirectory returns the data directory for an imported cluster
+// using runtime-specific precedence rules.
+func importedDistroDataDirectory(runtime string, args []string, env map[string]string) string {
+	// Environment variables take precedence over command-line arguments.
+	if runtime == capr.RuntimeRKE2 {
+		if dir := env["RKE2_DATA_DIR"]; dir != "" {
+			return dir
+		}
+	} else if runtime == capr.RuntimeK3S {
+		if dir := env["K3S_DATA_DIR"]; dir != "" {
+			return dir
+		}
+	}
+
+	// Check for explicit data directory in command-line arguments.
+	if dataDir := newArguments(args).Last("--data-dir", "-d"); dataDir != "" {
 		return dataDir
 	}
 
-	return defaultDir
+	// Fall back to runtime default.
+	if runtime == capr.RuntimeRKE2 {
+		return defaultRKE2DataDirectory
+	}
+	return defaultK3sDataDirectory
+}
+
+func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
+	runtime := a.RuntimeCommand()
+	defaultDir := defaultRKE2DataDirectory
+	if runtime == capr.RuntimeK3S {
+		defaultDir = defaultK3sDataDirectory
+	}
+
+	node, err := a.managementNodeForSecret(secret)
+	if err != nil {
+		logrus.Debugf("[imported adapter] unable to read node configuration for %s/%s, using default data directory: %v", secret.Namespace, secret.Name, err)
+		return defaultDir
+	}
+
+	args, err := nodeArgsForRuntime(node, runtime)
+	if err != nil {
+		logrus.Debugf("[imported adapter] unable to parse node args for %s/%s, using default data directory: %v", secret.Namespace, secret.Name, err)
+		return defaultDir
+	}
+
+	env, err := nodeEnvForRuntime(node, runtime)
+	if err != nil {
+		logrus.Debugf("[imported adapter] unable to parse node env for %s/%s, using default data directory: %v", secret.Namespace, secret.Name, err)
+		return defaultDir
+	}
+
+	return importedDistroDataDirectory(runtime, args, env)
 }
 
 // componentTLSSettingsFromNodeArgs extracts scheduler/controller-manager
@@ -372,7 +505,11 @@ func componentTLSSettingsFromNodeArgs(args []string, component string) Component
 // CertificateRotationComponentTLSSettings returns scheduler/controller-manager
 // TLS settings parsed from the imported node's effective runtime arguments.
 func (a *ImportedAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
-	return componentTLSSettingsFromNodeArgs(a.nodeArgs(secret), component), nil
+	args, err := a.nodeArgs(secret)
+	if err != nil {
+		return ComponentTLSSettings{}, err
+	}
+	return componentTLSSettingsFromNodeArgs(args, component), nil
 }
 
 func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -456,8 +593,7 @@ func (a *ImportedAdapter) isSuitableLeader(s *corev1.Secret) (bool, error) {
 	node, err := a.clients.Mgmt.Node().Cache().Get(a.cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		return false, nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return false, err
 	}
 	if node.DeletionTimestamp != nil {

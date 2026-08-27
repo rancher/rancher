@@ -253,9 +253,8 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.CertificateRotationS
 
 	logrus.Infof("[certificaterotation] %s/%s: transitioning to rotate", s.op.Namespace, s.op.Name)
 
-	status.Phase = opv1alpha1.OperationPhaseInProgress
-	status.LastUpdated = metav1.Now()
-	status.Step = opv1alpha1.CertificateRotationStepRotate
+	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
+	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
@@ -264,23 +263,19 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.CertificateRotationS
 
 // handleInProgress enforces beacon authorization and executes the current step.
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
-	ownerKey := s.ownerKey
-	stepPrefix := RotateStepHookLabelPrefix
-
 	// Stage 1 (loose): the op must appear SOMEWHERE in the ownership chain (owner or any
 	// delegate). Being absent entirely means the beacon was reassigned to another controller and
 	// we can't recover. If a step hook is currently active on the op, treat the absence as a
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
-	if !plan.IsOwningBeaconHolder(s.beacon, ownerKey) && !plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if planv1alpha1.HasStepHookLabel(s.op, RotateStepHookLabelPrefix) {
 			opv1alpha1.InProgressCondition.True(&status)
 			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
 			return status, nil
 		}
-		status.Phase = opv1alpha1.OperationPhaseFailed
-		status.LastUpdated = metav1.Now()
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
@@ -310,15 +305,14 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 	// primary owner or the most-recent delegate on the chain to drive step work. If a step hook
 	// is still active on the op, treat the missing-top state as an intentional delegation and
 	// wait; otherwise this is a genuine beacon loss and we fail.
-	if !plan.AuthorizedForBeacon(s.beacon, ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
+		if planv1alpha1.HasStepHookLabel(s.op, RotateStepHookLabelPrefix) {
 			opv1alpha1.InProgressCondition.True(&status)
 			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
 			return status, nil
 		}
-		status.Phase = opv1alpha1.OperationPhaseFailed
-		status.LastUpdated = metav1.Now()
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
 		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
@@ -332,8 +326,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 		return h.reconcileRotate(s, status)
 	}
 
-	status.Phase = opv1alpha1.OperationPhaseFailed
-	status.LastUpdated = metav1.Now()
+	status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
@@ -518,8 +511,7 @@ func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 // markFailed transitions status to the Failed phase with the given reason and condition message.
 // Callers are responsible for logging before calling.
 func markFailed(status *opv1alpha1.CertificateRotationStatus, reason, condMsg string) {
-	status.Phase = opv1alpha1.OperationPhaseFailed
-	status.LastUpdated = metav1.Now()
+	status.SetPhase(opv1alpha1.OperationPhaseFailed)
 	opv1alpha1.FailedCondition.True(status)
 	opv1alpha1.FailedCondition.Reason(status, reason)
 	opv1alpha1.FailedCondition.Message(status, condMsg)
@@ -752,8 +744,8 @@ func certificateRotationStopInstructions(provisioningDir, operationID, serverUni
 
 // certificateRotationRuntimeInstructions invokes the runtime's certificate rotation command.
 // An empty services slice deliberately rotates every service supported by the runtime.
-func certificateRotationRuntimeInstructions(provisioningDir, operationID, runtime string, services []string, env []string) []plan.OneTimeInstruction {
-	args := []string{"certificate", "rotate"}
+func certificateRotationRuntimeInstructions(provisioningDir, operationID, runtime, dataDir string, services []string, env []string) []plan.OneTimeInstruction {
+	args := []string{"certificate", "rotate", "--data-dir", dataDir}
 	for _, service := range services {
 		args = append(args, "-s", service)
 	}
@@ -857,7 +849,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			oneTime := certificateRotationStopInstructions(provisioningDir, string(s.op.UID), serverUnit, env)
 			// Keep stop and rotate as separate idempotent instructions. A retry can
 			// resume safely without rerunning an instruction already applied by the agent.
-			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, s.op.Spec.Args.Services, env)...)
+			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, s.op.Spec.Args.Services, env)...)
 
 			if ops.IsControlPlane(secret) {
 				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret)
@@ -933,8 +925,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 	logrus.Infof("[certificaterotation] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
-	status.Phase = opv1alpha1.OperationPhaseSucceeded
-	status.LastUpdated = metav1.Now()
+	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
 
 	opv1alpha1.SucceededCondition.True(&status)
 	opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.FinishedReason)

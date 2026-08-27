@@ -44,6 +44,7 @@ type CertificateRotationStatus struct {
 	Step CertificateRotationStep `json:"step,omitempty"`
 }
 
+// SetPhase sets the status phase, updating LastUpdated only when the value changes.
 func (s *CertificateRotationStatus) SetPhase(phase OperationPhase) {
 	if s.Phase == phase {
 		return
@@ -52,6 +53,7 @@ func (s *CertificateRotationStatus) SetPhase(phase OperationPhase) {
 	s.LastUpdated = metav1.Now()
 }
 
+// SetStep sets the status step, updating LastUpdated only when the value changes.
 func (s *CertificateRotationStatus) SetStep(step CertificateRotationStep) {
 	if s.Step == step {
 		return

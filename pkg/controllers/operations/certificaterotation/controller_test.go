@@ -228,6 +228,45 @@ func TestWindowsIdempotentRestartInstructions_UsesPassedRuntime(t *testing.T) {
 	assert.Contains(t, instructions[0].Args, capr.RuntimeK3S)
 }
 
+func TestCertificateRotationRuntimeInstructions_CustomDataDirWithServices(t *testing.T) {
+	t.Parallel()
+
+	instructions := certificateRotationRuntimeInstructions(
+		"/var/lib/rancher/capr", "operation", capr.RuntimeRKE2, "/custom/data-dir",
+		[]string{"etcd", "api-server"}, nil)
+	assert.Len(t, instructions, 1)
+
+	args := instructions[0].Args
+	assert.Equal(t, []string{
+		"certificate",
+		"rotate",
+		"--data-dir",
+		"/custom/data-dir",
+		"-s",
+		"etcd",
+		"-s",
+		"api-server",
+	}, args[len(args)-8:])
+}
+
+func TestCertificateRotationRuntimeInstructions_CustomDataDirNoServices(t *testing.T) {
+	t.Parallel()
+
+	instructions := certificateRotationRuntimeInstructions(
+		"/var/lib/rancher/capr", "operation", capr.RuntimeRKE2, "/custom/data-dir",
+		nil, nil)
+	assert.Len(t, instructions, 1)
+
+	args := instructions[0].Args
+	assert.Equal(t, []string{
+		"certificate",
+		"rotate",
+		"--data-dir",
+		"/custom/data-dir",
+	}, args[len(args)-4:])
+	assert.NotContains(t, args, "-s")
+}
+
 func TestServicesApply(t *testing.T) {
 	t.Parallel()
 
