@@ -68,9 +68,46 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		config.ServiceAccountPassword = value
 	}
 
-	caPool, err := newCAPool(config.Certificate)
+	lConn, err := p.connectForTestAndApply(configApplyInput)
 	if err != nil {
 		return err
+	}
+	defer lConn.Close()
+
+	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config)
+	if err != nil {
+		return err
+	}
+
+	// If this works, save adConfig CR adding enabled flag.
+	config.Enabled = configApplyInput.Enabled
+	err = p.saveActiveDirectoryConfig(config)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save activedirectory config: %v", err))
+	}
+
+	user, err := p.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
+	if err != nil {
+		return err
+	}
+
+	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+	}); err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
+	}
+
+	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request)
+}
+
+// validateTestAndApplyInput checks the parts of a testAndApply request that
+// can be validated without a directory connection.
+func (p *adProvider) validateTestAndApplyInput(input *v32.ActiveDirectoryTestAndApplyInput) error {
+	config := &input.ActiveDirectoryConfig
+
+	if err := validateBindConfiguration(config); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
 	if len(config.Servers) < 1 {
@@ -131,41 +168,24 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		}
 	}
 
-	lConn, err := p.ldapConnection(config, caPool)
+	return nil
+}
+
+// connectForTestAndApply validates before it dials. The order is the contract:
+// an invalid mechanism must never open a socket.
+func (p *adProvider) connectForTestAndApply(input *v32.ActiveDirectoryTestAndApplyInput) (ldapv3.Client, error) {
+	if err := p.validateTestAndApplyInput(input); err != nil {
+		return nil, err
+	}
+	caPool, err := newCAPool(input.ActiveDirectoryConfig.Certificate)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer lConn.Close()
-
-	userPrincipal, groupPrincipals, err := p.loginUser(lConn, login, config)
-	if err != nil {
-		return err
-	}
-
-	// If this works, save adConfig CR adding enabled flag.
-	config.Enabled = configApplyInput.Enabled
-	err = p.saveActiveDirectoryConfig(config)
-	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save activedirectory config: %v", err))
-	}
-
-	user, err := p.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
-	if err != nil {
-		return err
-	}
-
-	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
-	}); err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
-	}
-
-	return p.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, "", 0, "Token via AD Configuration", request)
+	return p.ldapConnectionOrDefault(&input.ActiveDirectoryConfig, caPool)
 }
 
 func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig) error {
-	storedConfig, _, err := p.getActiveDirectoryConfig()
+	storedConfig, _, err := p.configOrDefault()
 	if err != nil {
 		return err
 	}
