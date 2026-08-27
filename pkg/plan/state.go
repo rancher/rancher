@@ -42,13 +42,13 @@ const (
 	PlanStateCanceled PlanState = "canceled"
 
 	// PlanStatePaused is a non-terminal state where execution is held at an instruction boundary.
-	// Removing the paused annotation resumes execution using PlanProgress.ResumeState.
+	// Removing the paused annotation resumes execution using PlanCheckpoint.ResumeState.
 	PlanStatePaused PlanState = "paused"
 )
 
 const (
-	// PlanProgressKey is the Secret data key holding the resume checkpoint.
-	PlanProgressKey = "plan-progress"
+	// PlanCheckpointKey is the Secret data key holding the resume checkpoint.
+	PlanCheckpointKey = "plan-checkpoint"
 
 	// PlanCanceledAnnotation is the Secret annotation used to cancel a plan.
 	// Setting it to "true" requests that the agent abort the plan.
@@ -71,10 +71,10 @@ func (s PlanState) IsTerminal() bool {
 	return s == PlanStateSucceeded || s == PlanStateFailed || s == PlanStateCanceled
 }
 
-// PlanProgress is the resume checkpoint stored under PlanProgressKey.
+// PlanCheckpoint is the resume checkpoint stored under PlanCheckpointKey.
 // A checkpoint is scoped to the plan checksum. A checkpoint from a different plan is ignored.
 // This lets an agent resume a paused plan after a restart.
-type PlanProgress struct {
+type PlanCheckpoint struct {
 	Checksum    string    `json:"checksum,omitempty"`
 	Completed   int       `json:"completedInstructions,omitempty"`
 	Total       int       `json:"totalInstructions,omitempty"`
@@ -91,17 +91,17 @@ type PlanProgress struct {
 	TerminationIncomplete bool `json:"terminationIncomplete,omitempty"`
 }
 
-// ParsePlanProgress decodes the resume checkpoint stored under PlanProgressKey.
+// ParsePlanCheckpoint decodes the resume checkpoint stored under PlanCheckpointKey.
 // Return nil when the key is absent, empty, unparsable, or the checksum does not match the current plan.
-func ParsePlanProgress(secret *corev1.Secret) *PlanProgress {
+func ParsePlanCheckpoint(secret *corev1.Secret) *PlanCheckpoint {
 	if secret == nil {
 		return nil
 	}
-	raw, ok := secret.Data[PlanProgressKey]
+	raw, ok := secret.Data[PlanCheckpointKey]
 	if !ok || len(raw) == 0 {
 		return nil
 	}
-	var p PlanProgress
+	var p PlanCheckpoint
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil
 	}
