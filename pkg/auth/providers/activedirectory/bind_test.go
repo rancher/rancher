@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	ldapFakes "github.com/rancher/rancher/pkg/auth/providers/common/ldap"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -251,4 +253,71 @@ func TestConnectForTestAndApplyDialsWhenValid(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, dialled.Load())
+}
+
+func TestSplitNTLMIdentity(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		username      string
+		defaultDomain string
+		wantDomain    string
+		wantUser      string
+		wantErr       bool
+	}{
+		{
+			name:       "domain qualified",
+			username:   `FOO\alice`,
+			wantDomain: "FOO",
+			wantUser:   "alice",
+		},
+		{
+			name:          "domain qualified ignores the default domain",
+			username:      `FOO\alice`,
+			defaultDomain: "BAR",
+			wantDomain:    "FOO",
+			wantUser:      "alice",
+		},
+		{
+			name:          "bare name uses the default domain",
+			username:      "alice",
+			defaultDomain: "FOO",
+			wantDomain:    "FOO",
+			wantUser:      "alice",
+		},
+		{
+			name:     "bare name without a default domain",
+			username: "alice",
+			wantErr:  true,
+		},
+		{name: "empty", username: "", defaultDomain: "FOO", wantErr: true},
+		{name: "empty domain", username: `\alice`, defaultDomain: "FOO", wantErr: true},
+		{name: "empty user", username: `FOO\`, wantErr: true},
+		{name: "only a backslash", username: `\`, wantErr: true},
+		{name: "two backslashes", username: `A\B\alice`, wantErr: true},
+		{name: "upn", username: "alice@example.com", defaultDomain: "FOO", wantErr: true},
+		{name: "upn with a domain prefix", username: `FOO\alice@example.com`, wantErr: true},
+		{name: "distinguished name", username: "cn=alice,ou=foo,dc=example,dc=com", defaultDomain: "FOO", wantErr: true},
+		{name: "whitespace only", username: "   ", defaultDomain: "FOO", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			domain, user, err := splitNTLMIdentity(test.username, test.defaultDomain)
+			if test.wantErr {
+				require.Error(t, err)
+
+				herr, ok := err.(*apierror.APIError)
+				require.True(t, ok, "callers map this to an operator readable API error")
+				assert.Equal(t, validation.InvalidOption, herr.Code)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantDomain, domain)
+			assert.Equal(t, test.wantUser, user)
+		})
+	}
 }
