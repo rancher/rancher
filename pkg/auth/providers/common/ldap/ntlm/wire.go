@@ -14,9 +14,8 @@ const (
 	messageTypeChallenge    = 2
 	messageTypeAuthenticate = 3
 
-	// maxVarFieldLen is the largest payload an MS-NLMP security buffer can
-	// describe. The length is a 16-bit field, so anything larger cannot be
-	// represented and must be an error rather than a silent truncation.
+	// maxVarFieldLen is the largest payload an MS-NLMP security buffer's
+	// 16-bit length field can describe.
 	maxVarFieldLen = 65535
 )
 
@@ -117,8 +116,8 @@ func putVarField(dst []byte, length, offset int, name string) error {
 // with them.
 //
 // The shipping configuration is both true. The other three combinations exist
-// only so Task 8A can measure which one a real domain controller accepts; see
-// the deviation note at the top of the plan.
+// only so withVersion and withMIC can measure which one a real domain
+// controller accepts during development.
 type layout struct {
 	version bool
 	mic     bool

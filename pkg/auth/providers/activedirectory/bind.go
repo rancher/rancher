@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Values of ActiveDirectoryConfig.BindMechanism.
 const (
 	bindMechanismSimple   = "simple"
 	bindMechanismNTLM     = "ntlm"
@@ -93,8 +94,6 @@ func splitNTLMIdentity(username, defaultDomain string) (string, string, error) {
 }
 
 // ntlmIdentity is a bind identity already resolved by splitNTLMIdentity.
-// loginUser resolves the end user's identity before any directory I/O and
-// passes the result down, so the raw login value is parsed exactly once.
 type ntlmIdentity struct {
 	Domain   string
 	Username string
@@ -121,8 +120,8 @@ func (p *adProvider) bindServiceAccount(conn ldapv3.Client, config *v3.ActiveDir
 	return p.bindAs(conn, config, nil, config.ServiceAccountUsername, config.ServiceAccountPassword)
 }
 
-// bindUser binds conn as an end user. identity may be nil for the simple
-// mechanism; the NTLM path requires it to have been resolved by loginUser.
+// bindUser binds conn as an end user. identity is optional: when nil, the
+// NTLM path in bindAs parses username itself.
 func (p *adProvider) bindUser(conn ldapv3.Client, config *v3.ActiveDirectoryConfig, identity *ntlmIdentity, username, password string) error {
 	return p.bindAs(conn, config, identity, username, password)
 }
@@ -133,6 +132,11 @@ func (p *adProvider) bindUser(conn ldapv3.Client, config *v3.ActiveDirectoryConf
 //
 // identity, when non-nil, is an already-resolved NTLM identity and takes
 // precedence over parsing username.
+//
+// Failures bindAs detects itself — an invalid mechanism, a connection
+// without TLS state, a missing peer certificate, an underivable channel
+// binding token — are returned as APIErrors carrying actionable messages.
+// Only an error from the directory comes back unclassified.
 func (p *adProvider) bindAs(conn ldapv3.Client, config *v3.ActiveDirectoryConfig, identity *ntlmIdentity, username, password string) error {
 	// Defense in depth: the config is validated where it is loaded and where
 	// it is applied, but a future caller could reach here another way.
@@ -211,9 +215,7 @@ func classifyServiceAccountBindError(err error) error {
 	}
 
 	// bindServiceAccount and bindAs already return APIErrors for the problems
-	// they detect themselves: a missing service account password
-	// (MissingRequired), an invalid mechanism, a connection with no TLS state,
-	// a missing peer certificate, a CBT that cannot be derived. Those carry
+	// they detect themselves (see the bindAs doc for the list). Those carry
 	// codes and messages an operator can act on, so they pass through
 	// untouched. Only an error from the directory reaches the LDAP
 	// classification below.

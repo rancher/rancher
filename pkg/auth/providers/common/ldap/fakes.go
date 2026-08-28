@@ -40,6 +40,9 @@ func (m *FakeLdapConn) Bind(username, password string) error {
 	}
 	return nil
 }
+
+// NTLMChallengeBind defaults to success rather than panicking, matching Bind,
+// so tests exercising paths after a bind need not stub it.
 func (m *FakeLdapConn) NTLMChallengeBind(request *ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
 	if m.NTLMChallengeBindFunc != nil {
 		return m.NTLMChallengeBindFunc(request)

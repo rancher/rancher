@@ -126,8 +126,6 @@ func mapBindError(err error) error {
 
 	switch classifyBindFailure(err) {
 	case bindFailureBadBindings:
-		// A bad-bindings result on a TLS channel Rancher already verified most
-		// often means the channel is being terminated somewhere in between.
 		return fmt.Errorf("the domain controller rejected the channel binding token (%s, SEC_E_BAD_BINDINGS). "+
 			"Likely causes, in order: the bind carried no channel binding token or a malformed one; "+
 			"the token was derived with the wrong certificate hash algorithm; "+

@@ -83,10 +83,7 @@ func parseTargetInfo(buf []byte) ([]avPair, error) {
 }
 
 // serializeTargetInfo encodes pairs followed by exactly one MsvAvEOL.
-//
-// An AV pair's length is a 16-bit field, so an oversized value is an error
-// rather than a truncation: a truncated length would produce a buffer that
-// re-parses into different pairs than the ones written.
+// An oversized value is an error, not a truncation (see putVarField).
 func serializeTargetInfo(pairs []avPair) ([]byte, error) {
 	size := 4
 	for _, p := range pairs {

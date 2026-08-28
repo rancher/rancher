@@ -33,11 +33,11 @@ const (
 // exact NEGOTIATE bytes must be carried across. It is created and owned by one
 // NTLMChallengeBind call and is not safe for concurrent use.
 //
-// Callers cannot match on the errors returned here. go-ldap v3.4.14 renders
-// negotiator failures with %s, not %w (bind.go:514 and :633), so error
-// identity is destroyed before NTLMChallengeBind returns. Do not build
+// Callers cannot match on the errors returned here. go-ldap (v3.4.14) renders
+// negotiator failures with %s, not %w, so error identity is destroyed before
+// NTLMChallengeBind returns. Do not build
 // errors.Is checks on ErrInvalidExchangeState or ErrMissingDomain outside this
-// package; %w preservation is part of the upstreaming request.
+// package; that only becomes possible if go-ldap starts preserving %w itself.
 type Negotiator struct {
 	state          exchangeState
 	cbt            [16]byte
@@ -67,8 +67,7 @@ func WithNonceSource(read func([]byte) error) Option {
 // off moves the MIC from offset 72 to 64 and the payload base from 88 to 80.
 //
 // Exists so the header layout can be measured against a real domain
-// controller. Production code must not call it; see the deviation note in the
-// plan.
+// controller during development. Production code must not call it.
 func withVersion(on bool) Option {
 	return func(n *Negotiator) { n.layout.version = on }
 }

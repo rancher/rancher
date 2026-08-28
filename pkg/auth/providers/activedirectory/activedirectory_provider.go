@@ -226,7 +226,7 @@ func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x50
 	return p.decodeActiveDirectoryConfig(u.UnstructuredContent())
 }
 
-// decodeActiveDirectoryConfig holds everything after the fetch: decode,
+// decodeActiveDirectoryConfig performs everything after the fetch: decode,
 // validate, CA pool, service-account secret. Pure with respect to the API
 // server, so it is directly testable from a map.
 func (p *adProvider) decodeActiveDirectoryConfig(storedADConfigMap map[string]any) (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {

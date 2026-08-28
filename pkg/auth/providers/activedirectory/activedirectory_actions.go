@@ -171,8 +171,8 @@ func (p *adProvider) validateTestAndApplyInput(input *v32.ActiveDirectoryTestAnd
 	return nil
 }
 
-// connectForTestAndApply validates before it dials. The order is the contract:
-// an invalid mechanism must never open a socket.
+// connectForTestAndApply validates before dialing so an invalid mechanism
+// never opens a socket.
 func (p *adProvider) connectForTestAndApply(input *v32.ActiveDirectoryTestAndApplyInput) (ldapv3.Client, error) {
 	if err := p.validateTestAndApplyInput(input); err != nil {
 		return nil, err

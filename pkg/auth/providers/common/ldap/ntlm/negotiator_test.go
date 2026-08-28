@@ -221,9 +221,9 @@ func TestNegotiatorLayouts(t *testing.T) {
 	t.Parallel()
 
 	// All four header layouts must build and stay self-consistent. Only
-	// version=true, mic=true ships; the rest exist for the Task 8A gate, and
-	// they are unit-tested here so the spike measures working code rather than
-	// discovering the layout surface at the domain controller.
+	// version=true, mic=true ships; the rest exist so the layout a real domain
+	// controller accepts can be measured against known-working code, instead of
+	// discovering the layout surface at the domain controller from scratch.
 	tests := []struct {
 		name              string
 		version, mic      bool

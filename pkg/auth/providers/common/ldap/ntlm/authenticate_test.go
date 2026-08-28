@@ -12,9 +12,8 @@ import (
 )
 
 // MS-NLMP 4.2.4 NTLMv2 test values. Every constant below is published in the
-// specification and was independently reproduced before this plan was written;
-// none is a value this implementation generated. If a test using them fails,
-// the implementation is wrong, not the constant.
+// specification; none is a value this implementation generated. If a test
+// using them fails, the implementation is wrong, not the constant.
 const (
 	specUser     = "User"
 	specDomain   = "Domain"
@@ -397,7 +396,5 @@ func TestMICChangesWhenTheChannelBindingChanges(t *testing.T) {
 // they cannot catch is a correct field assembled at the wrong offset.
 //
 // Restoring that coverage needs a capture from a lab domain controller with
-// disposable names and a single-use account. See the "Deviation from the spec"
-// section of the implementation plan for what the live run established, and the
-// AD lab plan for the throwaway environment that would produce a publishable
-// capture.
+// disposable names and a single-use account, run in a throwaway environment so
+// the resulting capture is safe to publish.
