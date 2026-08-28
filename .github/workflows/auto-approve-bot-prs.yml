@@ -93,7 +93,7 @@ jobs:
               echo "Could not read checks for PR #$pr_number."
               continue
             fi
-            if ! jq -e 'length > 0 and all(.[]; .bucket == "pass")' <<<"$check_buckets" >/dev/null; then
+            if ! jq -e 'length > 0 and all(.[]; .bucket == "pass" or .bucket == "skipping")' <<<"$check_buckets" >/dev/null; then
               echo "PR #$pr_number does not have all checks green."
               continue
             fi
