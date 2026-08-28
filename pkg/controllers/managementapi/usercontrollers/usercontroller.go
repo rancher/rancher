@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/features"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -113,7 +114,10 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 	}
 
 	// Skip usercontrollers if cluster is not yet provisioned
-	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+	//if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+	//	return cluster, nil
+	//}
+	if !clusterconnected.Connected.IsTrue(cluster) {
 		return cluster, nil
 	}
 
@@ -198,7 +202,10 @@ func (u *userControllersController) reconcileClusterOwnership() error {
 	)
 
 	for _, cluster := range clusters {
-		if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		//if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		//	continue
+		//}
+		if cluster.DeletionTimestamp != nil || !clusterconnected.Connected.IsTrue(cluster) {
 			continue
 		}
 

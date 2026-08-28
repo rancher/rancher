@@ -20,6 +20,7 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	rancherFeatures "github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -158,6 +159,10 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 
 	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
+		return nil
+	}
+
+	if !clusterconnected.Connected.IsTrue(cluster) {
 		return nil
 	}
 
