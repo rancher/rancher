@@ -34,15 +34,49 @@
 #   however care must be taken to ensure that the regexes are mutually exclusive.
 #   Otherwise, the same test will run multiple times in a single workflow run.
 #
-#   In addition to path specific scopes, there are two special scopes:
+#   In addition to path specific scopes, there are three special fields:
 #
-#   full : Any match runs EVERY provisioning test. This is reserved for
-#          core functionality like the planner, where changes could impact all of provisioning.
-#          Valid entries can be package paths, or absolute file paths.
+#   full : Any match runs EVERY provisioning test defined in the path specific scopes.
+#          This is reserved for core functionality like the planner, where changes
+#          could impact all of provisioning. Valid entries can be package paths,
+#          or absolute file paths.
 #
 #   skip : Documents coverage gaps. This scope runs nothing, and is identical
 #          to leaving a path unlisted. It exists to prevent accidental
 #          inclusion of these paths in the future.
+#
+#  explicit : A list of scopes that can only be invoked by explicitly requesting them.
+#            This list is useful when you want to define a test matrix, but don't want it
+#            to be considered when determining what tests to run for a given PR (even if ALL=1).
+#            This can also be useful to track tests that downstream repositories should execute
+#            when importing the provisioning tests.
+
+explicit:
+  - name: nightly
+    meta:
+      branches:
+        - main
+        # - release/v2.15 uncomment once the nightly workflow has been backported
+    tests:
+      - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+      - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
+      - { dist: rke2, regex: '^Test_(General|Provisioning|Provisioning_Custom|Fleet)_.*$' }
+      - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance
+      - { dist: rke2, regex: '^Test_Operation_SetA_.*$', parallelism: 2 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$' }
+      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+# This field could also track scopes for repos
+# which import the provisioning tests.
+# - name: kdm
+# - name: system-agent
+# - name: turtles
 
 scopes:
   # general + custom + machine provisioning + fleet
@@ -133,7 +167,7 @@ scopes:
           - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
           - 'CATTLE_K3S_VERSION'
     tests:
-      - { dist: k3s,  regex: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', parallelism: 3 }
+      - { dist: k3s, regex: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_(General|Provisioning_SetA|Provisioning_Custom_SetA|Fleet)_.*$', parallelism: 3 }
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
@@ -171,15 +205,6 @@ scopes:
     tests:
       - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
       - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
-
-  # An example of a scope that should only run when ALL=1, or the 'full' scope is triggered.
-  # These tests run in addition to the other defined scopes.
-  nightly:
-    tests:
-      - { dist: k3s,  regex: '^Test_Provisioning_(SetB|Custom_SetB)_.*$' }
-      - { dist: rke2, regex: '^Test_Provisioning_(SetB|Custom_SetB)_.*$' }
-#      - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
-#      - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
 
 full:
   - path: '^go.mod$'

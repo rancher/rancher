@@ -1,0 +1,44 @@
+# Execute Nightly Provisioning Tests kicks off the nightly provisioning tests
+# for each supported release line of Rancher. Scheduled actions can only ever
+# target the default branch, so this step is required to ensure that nightly tests
+# continue to run on older release lines (e.g. release/v2.15)
+name: Execute Nightly Provisioning Tests
+on:
+  schedule:
+    # Runs every weekday at 05:00 UTC
+    # (1 AM EST, 10PM PST, 7AM CEST)
+    - cron: '0 5 * * 1-5'
+
+jobs:
+  get-target-branches:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+    permissions:
+      contents: read
+    outputs:
+      branches: ${{ steps.get-branches.outputs.branches }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: get-branches
+        id: get-branches
+        run: |
+          branches=$(yq -o=json '.explicit[] | select(.name == "nightly") | .meta.branches' .github/scripts/provisioning-test-scopes.yaml | jq -c '.')
+          echo "branches=${branches}" >> "$GITHUB_OUTPUT"
+
+  start-nightly-provisioning-tests:
+    needs: get-target-branches
+    strategy:
+      matrix:
+        release-branch: ${{ fromJson(needs.get-target-branches.outputs.branches) }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_BRANCH: ${{ matrix.release-branch }}
+    steps:
+      - name: invoke-nightly-test-workflow
+        run: |
+          gh workflow run nightly-provisioning-tests.yml --repo rancher/rancher --ref "${RELEASE_BRANCH}"

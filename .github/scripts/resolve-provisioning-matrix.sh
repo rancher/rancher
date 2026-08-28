@@ -7,8 +7,12 @@
 # relevant to the changes in a PR.
 #
 # It works in three steps:
-#   Step 1: get the list of changed files (or "run everything" when ALL=1).
-#   Step 2: pick the "scopes" whose path patterns match a changed file.
+#   Step 1: if EXPLICIT_SCOPES is passed, immediately resolve those scopes. An explicit scope
+#           is never triggered by a changed file, so change matching is skipped entirely.
+#           Each explicit scope is tracked in a separate '.explicit' array in
+#           provisioning-test-scopes.yaml,
+#   Step 2 (otherwise): get the list of changed files (or "run everything" when ALL=1), then
+#           pick the "scopes" whose path patterns match a changed file.
 #     2a: If a file is explicitly mentioned in the scopes 'file-paths' list,
 #          that scope is picked if the file's changed lines contain one
 #          of the listed substrings (or unconditionally if no substrings are listed).
@@ -30,6 +34,7 @@ set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG="${SCOPES_CONFIG:-$DIR/provisioning-test-scopes.yaml}"
 SCOPES="$(yq '.scopes | keys | join(" ")' "$CONFIG")"
+EXPLICIT_SCOPE_NAMES="$(yq '.explicit // [] | map(.name) | join(" ")' "$CONFIG")"
 
 # The ref to diff against. CI passes the target branch's SHA
 # via DIFF_BASE. Locally it falls back to the branch's upstream tracking ref.
@@ -46,10 +51,12 @@ command -v jq >/dev/null || { echo "error: jq is required" >&2; exit 1; }
 # ALL=1 means "run the whole matrix", otherwise fall back to computing it from git.
 # CHANGED can also be used, and is expected to be a newline-separated list of file paths.
 ALL="${ALL:-0}"
-if [ "$ALL" != "1" ] && [ -z "${CHANGED:-}" ]; then
-  CHANGED="$(git diff --name-only "$DIFF_BASE...HEAD")"
-fi
-CHANGED="${CHANGED:-}"
+
+# EXPLICIT_SCOPES opts into one or more explicit-only scopes by name (space-separated, e.g.
+# "nightly"). It is intentionally kept separate from ALL/full so those scopes never get pulled
+# into a normal PR's matrix. When set, it short-circuits everything else below -- there's no
+# need to diff or match against changed files at all.
+EXPLICIT_SCOPES="${EXPLICIT_SCOPES:-}"
 
 # scope_matches checks if the changed files trigger any of the defined scopes. This is the case if
 # a changed file is either:
@@ -173,19 +180,59 @@ file_has_substring() {
   return 1
 }
 
-selected=""
-if [ "$ALL" = "1" ] || list_matches '.full' "full" "$CHANGED"; then
-  selected="$SCOPES"
-else
+# add_scope appends $2 to the space-separated scope list in $1 and prints the result.
+add_scope() {
+  local list="$1" scope="$2"
+  if [ -z "$list" ]; then
+    printf '%s' "$scope"
+  else
+    printf '%s %s' "$list" "$scope"
+  fi
+}
+
+# resolve_explicit_scopes prints the subset of EXPLICIT_SCOPES that are actually declared
+# under the config's 'explicit' array.
+resolve_explicit_scopes() {
+  local selected="" scope
+  for scope in $EXPLICIT_SCOPES; do
+    if ! printf '%s\n' "$EXPLICIT_SCOPE_NAMES" | grep -qw -- "$scope"; then
+      echo "warning: ignoring requested scope '$scope', not declared under 'explicit' in $CONFIG" >&2
+      continue
+    fi
+    selected="$(add_scope "$selected" "$scope")"
+  done
+  printf '%s' "$selected"
+}
+
+# resolve_changed_scopes prints every scope in $SCOPES matching CHANGED (or every scope, if
+# ALL=1 or a 'full' path matched). It also fills in the global CHANGED if it wasn't passed in
+# by looking at the current git diff.
+resolve_changed_scopes() {
+  CHANGED="${CHANGED:-}"
+  if [ "$ALL" != "1" ] && [ -z "$CHANGED" ]; then
+    CHANGED="$(git diff --name-only "$DIFF_BASE...HEAD")"
+  fi
+
+  if [ "$ALL" = "1" ] || list_matches '.full' "full" "$CHANGED"; then
+    printf '%s' "$SCOPES"
+    return
+  fi
+
+  local selected="" scope
   for scope in $SCOPES; do
     if scope_matches "$scope"; then
-      if [ -z "$selected" ]; then
-        selected="$scope"
-      else
-        selected="$selected $scope"
-      fi
+      selected="$(add_scope "$selected" "$scope")"
     fi
   done
+  printf '%s' "$selected"
+}
+
+# Explicit scopes bypass CHANGED/ALL/full entirely -- they're never matched by path, so
+# there's nothing to diff or check changed files against when they're requested.
+if [ -n "$EXPLICIT_SCOPES" ]; then
+  selected="$(resolve_explicit_scopes)"
+else
+  selected="$(resolve_changed_scopes)"
 fi
 
 echo "resolved selected scopes: [$selected]" >&2
@@ -196,11 +243,15 @@ echo "resolved selected scopes: [$selected]" >&2
 # Each test lives in exactly one scope (see the YAML invariants), so no de-duplication
 # is needed. An empty `selected` will return {"include":[]}. This block also controls the
 # default configuration of the underlying ec2 runners, unless overridden by a specific test.
+#
+# A scope's tests are normally read from '.scopes.<name>.tests'; explicit-only scopes are
+# instead entries of the top-level '.explicit' array, keyed by their 'name' field.
 yq -o=json '.' "$CONFIG" | jq -c --arg selected "$selected" '
-  {
+  (.explicit // [] | map({(.name): .}) | add // {}) as $explicit
+  | {
     include: [
       ($selected | split(" ") | map(select(length > 0))[]) as $scope
-      | (.scopes[$scope].tests // [])[]
+      | ((.scopes[$scope] // $explicit[$scope] // {}).tests // [])[]
       | { V2PROV_TEST_DIST: .dist, V2PROV_TEST_RUN_REGEX: .regex }
         + (if .features then { CATTLE_FEATURES: .features } else {} end)
         + (if .cpus then { V2PROV_TEST_CPUS: .cpus } else { V2PROV_TEST_CPUS: 16 } end)
