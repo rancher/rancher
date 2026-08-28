@@ -10,7 +10,7 @@ jobs:
   setup-matrix:
     name: Build Test Matrix
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     permissions:
       contents: read
     outputs:
@@ -162,7 +162,7 @@ jobs:
     name: Provisioning Tests Summary
     needs: [setup-matrix, provisioning_tests]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     env:
       SETUP_MATRIX_RESULT: ${{ needs.setup-matrix.result }}
       PROVISIONING_TESTS_RESULT: ${{ needs.provisioning_tests.result }}
@@ -186,7 +186,7 @@ jobs:
     name: Convert test report to xml
     needs: [provisioning_tests]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     steps:
       - name: Fetch plaintext test output
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -208,7 +208,7 @@ jobs:
   event-file:
     name: Upload event file
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     steps:
       - name: Upload GH Event File
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

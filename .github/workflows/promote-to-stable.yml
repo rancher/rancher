@@ -15,7 +15,7 @@ jobs:
   promote-docker-image:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+      image: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     permissions:
       contents: read
       id-token: write
@@ -35,7 +35,7 @@ jobs:
   promote-chart:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+      image: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     permissions:
       contents: read
       id-token: write
@@ -72,7 +72,7 @@ jobs:
     needs: [promote-docker-image, promote-chart]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/rancher/ci-image/go1.26@sha256:8a85de7228e1b3bd7e29e7797b98dc0c24e82effc1d8a12d24a14462f4d13324 # go1.26
+      image: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     permissions:
       contents: write
       pull-requests: write
