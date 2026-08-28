@@ -68,7 +68,7 @@ func TestConfiguredGenericSAMLProviderHasNoLdap(t *testing.T) {
 	mgmtCtx.Wrangler = wranglerContext
 
 	tokenMGR := tokens.NewManager(wranglerContext)
-	provider, ok := Configure(mgmtCtx, mgmtCtx.UserManager, tokenMGR, GenericSAMLName).(*Provider)
+	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR, GenericSAMLName).(*Provider)
 	require.True(t, ok, "Failed to Configure a valid Provider")
 
 	assert.False(t, provider.hasLdapGroupSearch(), "Generic SAML provider must not have LDAP group search")
