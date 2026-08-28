@@ -127,7 +127,8 @@ func safeRename(src, dst string) error {
 	}
 
 	// Check if the error is specifically an "invalid cross-device link"
-	if linkErr, ok := errors.AsType[*os.LinkError](err); ok && errors.Is(linkErr.Err, syscall.EXDEV) {
+	var linkErr *os.LinkError
+	if errors.As(err, &linkErr) && errors.Is(linkErr.Err, syscall.EXDEV) {
 		// Different partitions detected, execute copy-and-delete fallback
 		return copyAndDelete(src, dst)
 	}
