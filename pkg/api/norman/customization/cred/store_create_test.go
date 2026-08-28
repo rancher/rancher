@@ -43,7 +43,6 @@ func TestStore_Create_StampsCreatorLabel_NoExistingLabels(t *testing.T) {
 	metadata, ok := inner.capturedData["metadata"].(map[string]interface{})
 	require.True(t, ok)
 	labels, ok := metadata["labels"].(map[string]interface{})
-	labels, ok := inner.capturedData["labels"].(map[string]interface{})
 	require.True(t, ok, "labels should be a map[string]interface{}")
 	assert.Equal(t, "user-abc123", labels["cattle.io/creator"])
 }
