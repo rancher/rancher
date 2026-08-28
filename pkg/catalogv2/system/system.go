@@ -197,23 +197,39 @@ func getIntervalOrDefault(interval string) time.Duration {
 }
 
 // installCharts installs charts with takeOwnership.
+//
+// A chart that is not in the repo index yet is retried by re-enqueuing the ClusterRepo
+// rather than by sleeping here. installCharts runs on the single runSync goroutine, so
+// blocking on one chart also stalls every other chart, the refresh ticker, and any pending
+// Ensure calls. On a fresh cluster, where the index is still being built, that is how one
+// not-yet-indexed chart delays all of them indefinitely.
 func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, takeOwnership bool) error {
 	var errs []error
 
 	for key, values := range charts {
-		for {
-			if err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
-				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.chartName, err)
-				time.Sleep(5 * time.Second)
-				continue
-			} else if err != nil {
-				logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
-				errs = append(errs, err)
-			}
-			break
+		err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride)
+		switch {
+		case err == nil:
+		case errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err):
+			logrus.Infof("System chart %s is not in the %s index yet, retrying in %s", key.chartName, systemChartsRepoName, chartNotInIndexRetryDelay)
+			m.retryInstallLater()
+			// Returned as an error so the caller does not record the chart as installed.
+			errs = append(errs, err)
+		default:
+			logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
+			errs = append(errs, err)
 		}
 	}
 	return merr.NewErrors(errs...)
+}
+
+// retryInstallLater re-drives the ClusterRepo handler, which re-evaluates the chart list and
+// pushes anything still desired back onto the sync channel.
+func (m *Manager) retryInstallLater() {
+	if m.clusterRepos == nil {
+		return
+	}
+	m.clusterRepos.EnqueueAfter(systemChartsRepoName, chartNotInIndexRetryDelay)
 }
 
 func (m *Manager) Uninstall(namespace, name string) error {
@@ -344,11 +360,7 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 		}
 	}
 
-	timeout := settings.SystemManagedChartsOperationTimeout.Get()
-	t, err := time.ParseDuration(timeout)
-	if err != nil {
-		t = 5 * time.Minute
-	}
+	t := operationTimeout()
 	upgrade, err := json.Marshal(types.ChartUpgradeAction{
 		Timeout:                &metav1.Duration{Duration: t},
 		Wait:                   true,
@@ -379,9 +391,35 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 	return m.waitPodDone(op)
 }
 
-// waitPodDone receives an operation, get its pod and check if it's done and
-// returns nil if it is. If not, creates a watch for the pod with a timeout of 300 seconds
-// that will check if the pod is done and return nil. If the watch timeouts, it returns an error.
+const (
+	// systemChartsRepoName is the ClusterRepo that system charts are installed from.
+	systemChartsRepoName = "rancher-charts"
+
+	// chartNotInIndexRetryDelay is how long to wait before re-driving the ClusterRepo
+	// handler when a system chart is not in the repo index yet.
+	chartNotInIndexRetryDelay = 5 * time.Second
+)
+
+// operationTimeout returns how long a helm operation pod is allowed to run, which is also
+// how long waitPodDone waits for it.
+func operationTimeout() time.Duration {
+	t, err := time.ParseDuration(settings.SystemManagedChartsOperationTimeout.Get())
+	if err != nil {
+		return 5 * time.Minute
+	}
+	return t
+}
+
+// waitPodDone receives an operation, gets its pod and checks if it's done, returning nil if
+// it is. Otherwise it watches the pod until it completes or the helm operation's own timeout
+// elapses.
+//
+// The watch is re-established when the API server closes it early rather than being treated
+// as a failure. A closed watch says nothing about the pod: on a fresh cluster the first
+// install routinely outlives a single watch (image pulls plus Wait:true on the helm action),
+// and reporting that as "pod failed, watch closed" makes installCharts record an error, drop
+// the chart from desiredCharts, and not retry it until the next ClusterRepo event — up to an
+// hour later.
 func (m *Manager) waitPodDone(op *catalog.Operation) error {
 	pod, err := m.pods.Get(op.Status.PodNamespace, op.Status.PodName, metav1.GetOptions{})
 	if err != nil {
@@ -394,14 +432,41 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 		return nil
 	}
 
-	sec := int64(60)
+	timeout := operationTimeout()
+	deadline := time.Now().Add(timeout)
+	resourceVersion := pod.ResourceVersion
+
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return fmt.Errorf("timed out after %s waiting for pod %s/%s to complete", timeout, pod.Namespace, pod.Name)
+		}
+
+		done, lastResourceVersion, err := m.watchPodOnce(op, pod, resourceVersion, remaining)
+		if err != nil {
+			return err
+		}
+		if done {
+			return nil
+		}
+		if lastResourceVersion != "" {
+			resourceVersion = lastResourceVersion
+		}
+	}
+}
+
+// watchPodOnce watches a single pod until it completes, the watch closes, or timeout elapses.
+// It reports whether the pod completed, plus the last resourceVersion it observed so the
+// caller can resume without replaying events it has already seen.
+func (m *Manager) watchPodOnce(op *catalog.Operation, pod *v1.Pod, resourceVersion string, timeout time.Duration) (bool, string, error) {
+	sec := int64(timeout.Seconds()) + 1
 	resp, err := m.pods.Watch(op.Status.PodNamespace, metav1.ListOptions{
 		FieldSelector:   "metadata.name=" + pod.Name,
-		ResourceVersion: pod.ResourceVersion,
+		ResourceVersion: resourceVersion,
 		TimeoutSeconds:  &sec,
 	})
 	if err != nil {
-		return err
+		return false, resourceVersion, err
 	}
 	defer func() {
 		go func() {
@@ -418,14 +483,15 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 		if !ok {
 			continue
 		}
+		resourceVersion = newPod.ResourceVersion
 		if ok, err := podDone(op.Status.Chart, newPod); err != nil {
-			return err
+			return false, resourceVersion, err
 		} else if ok {
-			return nil
+			return true, resourceVersion, nil
 		}
 	}
 
-	return fmt.Errorf("pod %s/%s failed, watch closed", pod.Namespace, pod.Name)
+	return false, resourceVersion, nil
 }
 
 // podDone receives a chart name and a pod. It will check all containers in that pod and
