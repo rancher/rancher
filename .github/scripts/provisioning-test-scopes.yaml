@@ -146,8 +146,8 @@ scopes:
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     tests:
-      - { dist: k3s,  regex: '^Test_Operation_.*$', parallelism: 3 } # k3s runs all ops in one instance
-      - { dist: rke2, regex: '^Test_Operation_SetA_.*$', parallelism: 3 }
+      - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance. This shard is too heavily to parallelize at the moment.
+      - { dist: rke2, regex: '^Test_Operation_SetA_.*$' }
       - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$'}
 
