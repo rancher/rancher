@@ -24,10 +24,11 @@
 #       keeps triggering unconditionally via package-paths.
 #
 #   scopes.<name>.tests : the matrix rows to run when this scope is selected. Each row:
-#       dist      (required) -> V2PROV_TEST_DIST        (k3s | rke2)
-#       regex     (required) -> V2PROV_TEST_RUN_REGEX   (go test -run regex)
-#       features  (optional) -> CATTLE_FEATURES         (omit when unused)
-#       cpus      (optional) -> V2PROV_TEST_CPUS        (16 by default)
+#       dist        (required) -> V2PROV_TEST_DIST        (k3s | rke2)
+#       regex       (required) -> V2PROV_TEST_RUN_REGEX   (go test -run regex)
+#       features    (optional) -> CATTLE_FEATURES         (omit when unused)
+#       cpus        (optional) -> V2PROV_TEST_CPUS        (16 by default)
+#       parallelism (optional) -> V2PROV_TEST_PARALLELISM (1 by default)
 #
 #   Tests within a specific scope can be sharded by adding additional test entries,
 #   however care must be taken to ensure that the regexes are mutually exclusive.
@@ -132,8 +133,8 @@ scopes:
           - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
           - 'CATTLE_K3S_VERSION'
     tests:
-      - { dist: k3s,  regex: '^Test_Provisioning_.*$' }
-      - { dist: rke2, regex: '^Test_(General|Provisioning|Fleet)_.*$' }
+      - { dist: k3s,  regex: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_(General|Provisioning_SetA|Provisioning_Custom_SetA|Fleet)_.*$', parallelism: 3 }
 
   # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
   operations:
@@ -145,10 +146,10 @@ scopes:
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     tests:
-      - { dist: k3s,  regex: '^Test_Operation_.*$'}        # k3s runs all ops in one instance
-      - { dist: rke2, regex: '^Test_Operation_SetA_.*$'}
-      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$'}
-      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$' }
+      - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance. This shard is too heavily to parallelize at the moment.
+      - { dist: rke2, regex: '^Test_Operation_SetA_.*$' }
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$'}
 
   imported:
     package-paths:
@@ -160,8 +161,8 @@ scopes:
     tests:
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$' }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', parallelism: 3 }
 
   prebootstrap:
     package-paths:
@@ -171,11 +172,14 @@ scopes:
       - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
       - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
 
-#  An example of a scope that should only run when ALL=1, or the 'full' scope is triggered
-#  nightly:
-#    tests:
+  # An example of a scope that should only run when ALL=1, or the 'full' scope is triggered.
+  # These tests run in addition to the other defined scopes.
+  nightly:
+    tests:
+      - { dist: k3s,  regex: '^Test_Provisioning_(SetB|Custom_SetB)_.*$' }
+      - { dist: rke2, regex: '^Test_Provisioning_(SetB|Custom_SetB)_.*$' }
 #      - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
-#      - { dist: rke2,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+#      - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
 
 full:
   - path: '^go.mod$'

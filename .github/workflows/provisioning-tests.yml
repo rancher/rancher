@@ -80,6 +80,7 @@ jobs:
       REGISTRY: "172.17.0.2:5000"
       DRONE_BUILD_EVENT: "${{ github.event_name }}"
       V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
+      V2PROV_TEST_PARALLELISM: "${{ matrix.V2PROV_TEST_PARALLELISM }}"
       V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
       CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
       TAG: ${{ github.sha }}-head
