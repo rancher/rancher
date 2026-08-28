@@ -47,7 +47,7 @@ func mapBackingError(err error, resource string) error {
 		}
 		return rebuilt
 	case apierrors.IsInvalid(err):
-		logrus.Warnf("invalid backing object for kubeconfig %s: %v", resource, err)
+		logrus.Warnf("kubeconfig: invalid backing object for kubeconfig %s: %v", resource, err)
 		var errs field.ErrorList
 		if details := statusDetails(err); details != nil {
 			for _, c := range details.Causes {
@@ -60,20 +60,20 @@ func mapBackingError(err error, resource string) error {
 		}
 		return apierrors.NewInvalid(schema.GroupKind{Group: gvr.Group, Kind: Kind}, resource, errs)
 	case apierrors.IsBadRequest(err):
-		logrus.Warnf("bad request on backing object for kubeconfig %s: %v", resource, err)
+		logrus.Warnf("kubeconfig: bad request on backing object for kubeconfig %s: %v", resource, err)
 		return apierrors.NewBadRequest(fmt.Sprintf("invalid request for kubeconfig %s", resource))
 	case apierrors.IsTooManyRequests(err):
 		var retryAfter int32
 		if details := statusDetails(err); details != nil {
 			retryAfter = details.RetryAfterSeconds
 		}
-		logrus.Warnf("backing store throttled for kubeconfig %s: %v", resource, err)
+		logrus.Warnf("kubeconfig: backing store throttled for kubeconfig %s: %v", resource, err)
 		return apierrors.NewTooManyRequests(fmt.Sprintf("too many requests for kubeconfig %s", resource), int(retryAfter))
 	case apierrors.IsServiceUnavailable(err):
-		logrus.Warnf("backing store unavailable for kubeconfig %s: %v", resource, err)
+		logrus.Warnf("kubeconfig: backing store unavailable for kubeconfig %s: %v", resource, err)
 		return apierrors.NewServiceUnavailable(fmt.Sprintf("backing store unavailable for kubeconfig %s", resource))
 	default:
-		logrus.Errorf("backing store error for kubeconfig %s: %v", resource, err)
+		logrus.Errorf("kubeconfig: backing store error for kubeconfig %s: %v", resource, err)
 		return apierrors.NewInternalError(errors.New("error accessing backing object for kubeconfig " + resource))
 	}
 }
