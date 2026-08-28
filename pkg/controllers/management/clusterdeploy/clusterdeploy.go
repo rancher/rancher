@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
 	rancherFeatures "github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -47,6 +48,7 @@ const (
 	AgentForceDeployAnn        = "io.cattle.agent.force.deploy"
 	AgentRegistrationTokenHash = "io.cattle.agent.registration-token-hash"
 	clusterImage               = "clusterImage"
+	systemCRTName              = "system"
 )
 
 var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes API")
@@ -694,7 +696,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired taints are [%v] for cluster [%s]", taints, cluster.Name)
 
-	token, err := cd.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
+	token, err := cd.clusterAgentToken(cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -867,19 +869,60 @@ func formatKubectlApplyOutput(log string) string {
 	return log
 }
 
-func (cd *clusterDeploy) getSystemCRTToken(clusterName string) (string, error) {
-	systemCRT, err := cd.crtLister.Get(clusterName, "system")
+// clusterAgentCRTName returns the name of the ClusterRegistrationToken whose token is
+// rendered into this cluster's cattle-cluster-agent manifest.
+//
+// For a v2prov (CAPR) cluster the CAPR planner renders the same manifest into the node
+// plan, and rke2/k3s applies it from the server manifests directory, so both writers must
+// pick the same token. The token is hashed into TokenKey, which names the
+// cattle-credentials-<TokenKey> secret, CATTLE_CREDENTIAL_NAME and the agent pod's
+// credential volume, so disagreeing would mutate the Deployment on every apply and roll
+// the agent. See generateClusterAgentManifest in pkg/capr/planner.
+//
+// This keys off the annotation directly rather than
+// imported.IsAdministratedByProvisioningCluster because the latter also reads
+// Status.Driver, and the returned token must never change over a cluster's lifetime.
+func clusterAgentCRTName(cluster *apimgmtv3.Cluster) string {
+	if cluster.Annotations[imported.AdministratedAnnotation] == "true" {
+		return capr.DefaultClusterRegistrationTokenName
+	}
+	return systemCRTName
+}
+
+// clusterAgentToken returns the registration token to render into the cluster agent
+// manifest, creating the ClusterRegistrationToken if this controller owns it.
+func (cd *clusterDeploy) clusterAgentToken(cluster *apimgmtv3.Cluster) (string, error) {
+	if clusterAgentCRTName(cluster) == systemCRTName {
+		return cd.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
+	}
+
+	// The default token is owned by the provisioningv2 cluster controller, so wait for it
+	// rather than creating one here. Returning an error makes deployAgent retry.
+	token, err := cd.getClusterAgentCRTToken(cluster)
+	if err != nil {
+		return "", err
+	}
+	if token == "" {
+		return "", fmt.Errorf("waiting for cluster registration token %s/%s to be populated", cluster.Name, clusterAgentCRTName(cluster))
+	}
+	return token, nil
+}
+
+// getClusterAgentCRTToken returns the registration token rendered into the cluster agent
+// manifest, or "" if it does not exist yet.
+func (cd *clusterDeploy) getClusterAgentCRTToken(cluster *apimgmtv3.Cluster) (string, error) {
+	crtObj, err := cd.crtLister.Get(cluster.Name, clusterAgentCRTName(cluster))
 	if apierrors.IsNotFound(err) {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return crt.GetTokenFromSecret(cd.secretLister, systemCRT)
+	return crt.GetTokenFromSecret(cd.secretLister, crtObj)
 }
 
 func (cd *clusterDeploy) registrationTokenHashChanged(cluster *apimgmtv3.Cluster) (bool, error) {
-	token, err := cd.getSystemCRTToken(cluster.Name)
+	token, err := cd.getClusterAgentCRTToken(cluster)
 	if err != nil {
 		return false, err
 	}
@@ -900,7 +943,7 @@ func (cd *clusterDeploy) registrationTokenHashChanged(cluster *apimgmtv3.Cluster
 }
 
 func (cd *clusterDeploy) updateRegistrationTokenHash(cluster *apimgmtv3.Cluster) {
-	token, err := cd.getSystemCRTToken(cluster.Name)
+	token, err := cd.getClusterAgentCRTToken(cluster)
 	if err != nil || token == "" {
 		return
 	}

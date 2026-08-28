@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
@@ -25,20 +27,130 @@ var (
 	Connected = condition.Cond("Connected")
 )
 
+const (
+	// checkInterval is how often every cluster's connectivity is polled. This is the only
+	// mechanism that can clear the Connected condition, so it also bounds how long a
+	// disconnect goes unnoticed.
+	checkInterval = 15 * time.Second
+
+	// sessionSettleDelay is how long the tunnel hook waits before probing a cluster. The
+	// authorizer callback fires before the session is registered with the tunnel server,
+	// so probing immediately would always miss.
+	sessionSettleDelay = 2 * time.Second
+
+	// hookRateLimit is the minimum gap between two hook-driven checks of the same cluster.
+	hookRateLimit = 5 * time.Second
+
+	// hookQueueSize bounds the pending hook-driven checks. Overflow is dropped rather than
+	// blocking the tunnel request; the ticker is the backstop.
+	hookQueueSize = 100
+)
+
 func Register(ctx context.Context, wrangler *wrangler.Context) {
-	c := checker{
-		clusterCache: wrangler.Mgmt.Cluster().Cache(),
-		clusters:     wrangler.Mgmt.Cluster(),
-		tunnelServer: wrangler.TunnelServer,
-	}
+	c := newChecker(wrangler)
 
 	go func() {
-		for range ticker.Context(ctx, 15*time.Second) {
+		for range ticker.Context(ctx, checkInterval) {
 			if err := c.check(); err != nil {
 				logrus.Errorf("failed to check cluster connectivity: %v", err)
 			}
 		}
 	}()
+}
+
+// RegisterTunnelHook promotes a cluster's Connected condition to true as soon as its agent
+// authorizes a tunnel session, instead of waiting up to checkInterval for the next poll.
+// Provisioning is gated on this condition (via RKEControlPlane.Status.AgentConnected), so
+// the poll interval is otherwise paid in full on every new cluster.
+//
+// Unlike Register this must run on every Rancher pod, not just the leader: a tunnel connect
+// lands on whichever pod the load balancer picked, and only that pod sees the callback.
+//
+// The hook is deliberately promote-only. It never sets Connected to false, so a spurious or
+// duplicated callback cannot report a false disconnect; clearing the condition remains the
+// ticker's job.
+func RegisterTunnelHook(ctx context.Context, wrangler *wrangler.Context) {
+	if wrangler.TunnelAuthorizer == nil {
+		return
+	}
+
+	c := newChecker(wrangler)
+	queue := make(chan string, hookQueueSize)
+
+	wrangler.TunnelAuthorizer.OnAuthorized(func(clientKey string) {
+		// Both the mcm session (keyed on the cluster name) and the steve session (keyed
+		// on proxy.Prefix + cluster name) are authorized for a connecting agent. Only the
+		// latter is what hasSession probes, so key off it and ignore everything else,
+		// including the per-node "<cluster>:<node>" keys.
+		if !strings.HasPrefix(clientKey, proxy.Prefix) {
+			return
+		}
+		select {
+		case queue <- strings.TrimPrefix(clientKey, proxy.Prefix):
+		default:
+			logrus.Debugf("[clusterConnectedCondition] dropping tunnel hook for %s, queue is full", clientKey)
+		}
+	})
+
+	go c.processTunnelHooks(ctx, queue)
+}
+
+func newChecker(wrangler *wrangler.Context) *checker {
+	return &checker{
+		clusterCache: wrangler.Mgmt.Cluster().Cache(),
+		clusters:     wrangler.Mgmt.Cluster(),
+		tunnelServer: wrangler.TunnelServer,
+	}
+}
+
+func (c *checker) processTunnelHooks(ctx context.Context, queue <-chan string) {
+	lastCheck := map[string]time.Time{}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case clusterName := <-queue:
+			if time.Since(lastCheck[clusterName]) < hookRateLimit {
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(sessionSettleDelay):
+			}
+
+			lastCheck[clusterName] = time.Now()
+			if err := c.promoteCluster(clusterName); err != nil {
+				logrus.Debugf("[clusterConnectedCondition] failed to promote cluster %s on tunnel connect: %v", clusterName, err)
+			}
+		}
+	}
+}
+
+// promoteCluster sets Connected to true if the cluster now has a working tunnel session. It
+// is a no-op in every other case, including when the session has already gone away again.
+func (c *checker) promoteCluster(clusterName string) error {
+	cluster, err := c.clusterCache.Get(clusterName)
+	if err != nil {
+		return err
+	}
+
+	if Connected.IsTrue(cluster) || !c.hasSession(cluster) {
+		return nil
+	}
+
+	// RKE2: wait to mark the agent connected until the cluster is pre-bootstrapped. Mirrors
+	// the same carve-out in checkCluster.
+	if capr.PreBootstrap(cluster) &&
+		cluster.Annotations[imported.AdministratedAnnotation] == "true" &&
+		cluster.Name != "local" {
+		return nil
+	}
+
+	logrus.Debugf("[clusterConnectedCondition] promoting cluster %v to connected on tunnel connect", clusterName)
+	return c.updateClusterConnectedCondition(cluster, true)
 }
 
 type checker struct {
@@ -106,7 +218,7 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 
 	// RKE2: wait to update the connected condition until it is pre-bootstrapped
 	if capr.PreBootstrap(cluster) &&
-		cluster.Annotations["provisioning.cattle.io/administrated"] == "true" &&
+		cluster.Annotations[imported.AdministratedAnnotation] == "true" &&
 		cluster.Name != "local" {
 		// overriding it to be disconnected until bootstrapping is done
 		logrus.Debugf("[pre-bootstrap][%v] Waiting for cluster to be pre-bootstrapped - not marking agent connected", cluster.Name)

@@ -210,6 +210,12 @@ const (
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
 
+	// DefaultClusterRegistrationTokenName is the name of the ClusterRegistrationToken
+	// created for every management cluster. It is the token rendered into the
+	// cattle-cluster-agent manifest, by both the CAPR planner and the clusterdeploy
+	// controller, so that the two agree on the credential secret's name.
+	DefaultClusterRegistrationTokenName = "default-token"
+
 	MaxHelmReleaseNameLength = 53
 
 	MinimumHostnameLengthLimit = 10
