@@ -196,11 +196,15 @@ resolve_explicit_scopes() {
   local selected="" scope
   for scope in $EXPLICIT_SCOPES; do
     if ! printf '%s\n' "$EXPLICIT_SCOPE_NAMES" | grep -qw -- "$scope"; then
-      echo "warning: ignoring requested scope '$scope', not declared under 'explicit' in $CONFIG" >&2
-      continue
+      echo "fatal: requested scope '$scope', not declared under 'explicit' in $CONFIG" >&2
+      return 1
     fi
     selected="$(add_scope "$selected" "$scope")"
   done
+  if [ -z "$selected" ]; then
+    echo "fatal: EXPLICIT_SCOPES was set but resolved to no scopes" >&2
+    return 1
+  fi
   printf '%s' "$selected"
 }
 
@@ -230,9 +234,9 @@ resolve_changed_scopes() {
 # Explicit scopes bypass CHANGED/ALL/full entirely -- they're never matched by path, so
 # there's nothing to diff or check changed files against when they're requested.
 if [ -n "$EXPLICIT_SCOPES" ]; then
-  selected="$(resolve_explicit_scopes)"
+  selected="$(resolve_explicit_scopes)" || exit 1
 else
-  selected="$(resolve_changed_scopes)"
+  selected="$(resolve_changed_scopes)" || exit 1
 fi
 
 echo "resolved selected scopes: [$selected]" >&2

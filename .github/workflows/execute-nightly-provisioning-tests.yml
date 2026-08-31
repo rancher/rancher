@@ -30,6 +30,7 @@ jobs:
   start-nightly-provisioning-tests:
     needs: get-target-branches
     strategy:
+      fail-fast: false
       matrix:
         release-branch: ${{ fromJson(needs.get-target-branches.outputs.branches) }}
     runs-on: ubuntu-latest
