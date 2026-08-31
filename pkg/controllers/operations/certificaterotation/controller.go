@@ -758,9 +758,10 @@ func certificateRotationRuntimeInstructions(provisioningDir, operationID, runtim
 // rke2ManifestRemovalInstructions removes generated RKE2 manifests so the server recreates
 // them using the rotated certificates when it starts again.
 func rke2ManifestRemovalInstructions(provisioningDir, operationID, dataDir string) []plan.OneTimeInstruction {
-	rmCmd := fmt.Sprintf("rm -rf %s/rke2-*.yaml", path.Join(dataDir, "server/manifests"))
+	manifestDir := path.Join(dataDir, "server", "manifests")
 	return []plan.OneTimeInstruction{
-		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", operationID, "/bin/sh", []string{"-c", rmCmd}, nil),
+		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", operationID, "/bin/sh",
+			[]string{"-c", `rm -f -- "$1"/rke2-*.yaml`, "--", manifestDir}, nil),
 	}
 }
 

@@ -267,6 +267,29 @@ func TestCertificateRotationRuntimeInstructions_CustomDataDirNoServices(t *testi
 	assert.NotContains(t, args, "-s")
 }
 
+func TestRKE2ManifestRemovalInstructions_DataDirWithSpacesIsNotInterpolated(t *testing.T) {
+	t.Parallel()
+
+	dataDir := "/var/lib/rancher/testing/certificate rotation"
+	instructions := rke2ManifestRemovalInstructions("/var/lib/rancher/capr", "operation", dataDir)
+	assert.Len(t, instructions, 1)
+
+	instr := instructions[0]
+	assert.Equal(t, "/bin/sh", instr.Command)
+
+	args := instr.Args
+	assert.Equal(t, []string{
+		"-c",
+		`rm -f -- "$1"/rke2-*.yaml`,
+		"--",
+		"/var/lib/rancher/testing/certificate rotation/server/manifests",
+	}, args[len(args)-4:])
+
+	for _, arg := range args[:len(args)-1] {
+		assert.NotContains(t, arg, dataDir, "shell script/command arguments must not embed the data directory")
+	}
+}
+
 func TestServicesApply(t *testing.T) {
 	t.Parallel()
 
