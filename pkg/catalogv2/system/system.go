@@ -155,33 +155,78 @@ func (m *Manager) onTrigger(_ string, obj *catalog.ClusterRepo) (*catalog.Cluste
 	return obj, nil
 }
 
+// runSync owns m.desiredCharts. Installs themselves run on worker goroutines, bounded by
+// maxConcurrentInstalls, and report back on the results channel so that the map is still only
+// ever touched from this goroutine.
+//
+// Installs used to run inline here, one at a time. Because install waits for the helm operation
+// pod to finish — and the helm action sets Wait: true, so that means waiting for the installed
+// workload to become Ready — a single slow chart delayed every other chart, the refresh ticker,
+// and any pending Ensure. On a new downstream cluster that made two independent charts take the
+// sum of their install times instead of the longer of the two.
 func (m *Manager) runSync() {
 	t := time.NewTicker(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
-	defer t.Stop()
+	defer func() { t.Stop() }()
+
+	var (
+		results  = make(chan installResult, maxConcurrentInstalls)
+		sem      = make(chan struct{}, maxConcurrentInstalls)
+		inFlight = map[desiredKey]struct{}{}
+	)
+
+	// dispatch starts an install unless one is already running for this key. It must only be
+	// called from this goroutine.
+	dispatch := func(d desired) {
+		if _, busy := inFlight[d.key]; busy {
+			return
+		}
+		inFlight[d.key] = struct{}{}
+
+		go func() {
+			select {
+			case sem <- struct{}{}:
+			case <-m.ctx.Done():
+				return
+			}
+			defer func() { <-sem }()
+
+			err := m.installOne(d.key, d.values, d.takeOwnership)
+			select {
+			case results <- installResult{key: d.key, values: d.values, err: err}:
+			case <-m.ctx.Done():
+			}
+		}()
+	}
+
+	// dispatchDesired re-drives everything already known to be desired, e.g. on the refresh
+	// ticker. Reading the map here keeps it on this goroutine.
+	dispatchDesired := func() {
+		for key, values := range m.desiredCharts {
+			dispatch(desired{key: key, values: values, takeOwnership: true})
+		}
+	}
 
 	for {
 		select {
 		case <-m.refreshIntervalChange:
+			t.Stop()
 			t = time.NewTicker(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
 		case <-m.ctx.Done():
 			return
 		case <-m.trigger:
-			_ = m.installCharts(m.desiredCharts, true)
+			dispatchDesired()
 		case <-t.C:
-			_ = m.installCharts(m.desiredCharts, true)
-		case desired := <-m.sync:
-			v, exists := m.desiredCharts[desired.key]
+			dispatchDesired()
+		case d := <-m.sync:
 			// newly requested or changed
-			if !exists || !equality.Semantic.DeepEqual(v, desired.values) {
-				err := m.installCharts(
-					map[desiredKey]map[string]interface{}{
-						desired.key: desired.values,
-					},
-					desired.takeOwnership,
-				)
-				if err == nil {
-					m.desiredCharts[desired.key] = desired.values
-				}
+			if v, exists := m.desiredCharts[d.key]; exists && equality.Semantic.DeepEqual(v, d.values) {
+				continue
+			}
+			dispatch(d)
+		case r := <-results:
+			delete(inFlight, r.key)
+			if r.err == nil {
+				m.desiredCharts[r.key] = r.values
 			}
 		}
 	}
@@ -207,20 +252,39 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, ta
 	var errs []error
 
 	for key, values := range charts {
-		err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride)
-		switch {
-		case err == nil:
-		case errors.Is(err, repo.ErrNoChartName) || apierrors.IsNotFound(err):
-			logrus.Infof("System chart %s is not in the %s index yet, retrying in %s", key.chartName, systemChartsRepoName, chartNotInIndexRetryDelay)
-			m.retryInstallLater()
-			// Returned as an error so the caller does not record the chart as installed.
-			errs = append(errs, err)
-		default:
-			logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
+		if err := m.installOne(key, values, takeOwnership); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return merr.NewErrors(errs...)
+}
+
+// isIndexNotReady reports whether err means the rancher-charts index is not available yet,
+// which is the normal state of a freshly started cluster agent and is retriable.
+//
+// Deliberately does not cover "the index exists but lacks the pinned version": the index
+// ConfigMap is written complete, so that is a version mismatch rather than a transient state,
+// and retrying it every few seconds forever would be worse than surfacing it.
+func isIndexNotReady(err error) bool {
+	return apierrors.IsNotFound(err) || errors.Is(err, repo.ErrNoChartName)
+}
+
+// installOne installs a single chart and classifies the outcome. A not-yet-built index
+// schedules a retry; any error is returned so the caller does not record the chart as
+// installed.
+func (m *Manager) installOne(key desiredKey, values map[string]interface{}, takeOwnership bool) error {
+	err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride)
+	switch {
+	case err == nil:
+		return nil
+	case isIndexNotReady(err):
+		logrus.Infof("System chart %s is not in the %s index yet, retrying in %s: %v",
+			key.chartName, systemChartsRepoName, chartNotInIndexRetryDelay, err)
+		m.retryInstallLater()
+	default:
+		logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
+	}
+	return err
 }
 
 // retryInstallLater re-drives the ClusterRepo handler, which re-evaluates the chart list and
@@ -260,21 +324,36 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
+// Ensure requests that a chart be installed. Requests are queued in call order.
+//
+// This deliberately sends on the channel directly instead of from a goroutine per call. Callers
+// pass charts in a meaningful order — getChartsToInstall lists rancher-webhook before
+// system-upgrade-controller, and the webhook should go first — and a goroutine per call
+// randomised that. The channel is buffered and runSync no longer blocks on installs, so sending
+// here does not stall the calling controller.
 func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error {
-	go func() {
-		m.sync <- desired{
-			key: desiredKey{
-				namespace:            namespace,
-				chartName:            chartName,
-				releaseName:          releaseName,
-				minVersion:           minVersion,
-				exactVersion:         exactVersion,
-				installImageOverride: installImageOverride,
-			},
-			values:        values,
-			takeOwnership: takeOwnership,
-		}
-	}()
+	d := desired{
+		key: desiredKey{
+			namespace:            namespace,
+			chartName:            chartName,
+			releaseName:          releaseName,
+			minVersion:           minVersion,
+			exactVersion:         exactVersion,
+			installImageOverride: installImageOverride,
+		},
+		values:        values,
+		takeOwnership: takeOwnership,
+	}
+
+	if m.ctx == nil {
+		m.sync <- d
+		return nil
+	}
+
+	select {
+	case m.sync <- d:
+	case <-m.ctx.Done():
+	}
 	return nil
 }
 
@@ -322,8 +401,10 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 	// It instead returns the latest version in the index.
 	chart, err := index.Get(chartName, v)
 	if err != nil {
-		// The helm library is using github.com/pkg/errors which is deprecated
-		return errors.New(err.Error())
+		// Returned as-is rather than flattened through errors.New(err.Error()): index.Get
+		// returns the bare repo.ErrNoChartName sentinel, and installOne classifies on it with
+		// errors.Is, which a flattened copy would never match.
+		return err
 	}
 	// Because of the behavior of `index.Get`, we need this check.
 	if v != latestVersionMatcher && chart.Version != v {
@@ -398,7 +479,19 @@ const (
 	// chartNotInIndexRetryDelay is how long to wait before re-driving the ClusterRepo
 	// handler when a system chart is not in the repo index yet.
 	chartNotInIndexRetryDelay = 5 * time.Second
+
+	// maxConcurrentInstalls bounds how many chart installs run at once. Installs are
+	// independent helm releases so they do not contend, but each one runs a helm operation pod
+	// in the target cluster, so this is kept small.
+	maxConcurrentInstalls = 4
 )
+
+// installResult carries an install's outcome back to runSync, which owns desiredCharts.
+type installResult struct {
+	key    desiredKey
+	values map[string]interface{}
+	err    error
+}
 
 // operationTimeout returns how long a helm operation pod is allowed to run, which is also
 // how long waitPodDone waits for it.
