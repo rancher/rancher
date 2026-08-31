@@ -195,10 +195,10 @@ scopes:
     tests:
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
       - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
-      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node)$', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', cpus: 8 }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', parallelism: 3 }
       - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', parallelism: 3 }
-      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node)$' }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedCertificateRotation|ImportedCertificateRotation_Multi_Node|ImportedCertificateRotation_Custom_Data_Dir)$', parallelism: 3 }
 
   prebootstrap:
     package-paths:

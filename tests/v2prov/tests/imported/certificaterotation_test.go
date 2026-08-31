@@ -2,6 +2,7 @@ package imported
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"strconv"
@@ -69,6 +70,43 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 
 	assertDownstreamAPIUsableAfterRotation(t, fx)
+}
+
+// Test_Imported_Operation_SetD_ImportedCertificateRotation_Custom_Data_Dir validates that
+// certificate rotation on an imported node correctly resolves and rotates certificates from a
+// custom RKE2/K3s data directory configured before bootstrap, rather than the runtime default.
+func Test_Imported_Operation_SetD_ImportedCertificateRotation_Custom_Data_Dir(t *testing.T) {
+	cs, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
+	dataDir := fmt.Sprintf("/var/lib/rancher/testing/certificate-rotation-%s", runtimeName)
+
+	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-custom-data-dir", []cluster.ImportedNodePool{
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1, DistroDataDir: dataDir},
+	})
+
+	assertNodeArgsContainDataDir(t, cs, fx.mgmtCluster.Name, runtimeName, dataDir)
+
+	requiredPaths := requiredCertificatePathsForDataDir(dataDir)
+	before := collectRequiredCertificateMetadata(t, fx, requiredPaths)
+
+	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
+	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
+	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
+	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
+
+	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
+	assertDownstreamAPIUsableAfterRotation(t, fx)
+
+	after := collectRequiredCertificateMetadata(t, fx, requiredPaths)
+	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 }
 
 func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t *testing.T) {
@@ -357,14 +395,78 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Multi_Node(t *test
 	assertWorkerAgentRestarted(t, beforeWorkerAgentTimestamp, afterWorkerAgentTimestamp)
 }
 
+// assertNodeArgsContainDataDir waits for the registered management-cluster Node to publish a
+// runtime node-args annotation whose parsed arguments include the expected custom data-dir. Node
+// registration is eventually consistent, so this polls rather than checking once.
+func assertNodeArgsContainDataDir(t *testing.T, cs *clients.Clients, mgmtClusterName, runtimeName, dataDir string) {
+	t.Helper()
+
+	annotationKey := "rke2.io/node-args"
+	if runtimeName == capr.RuntimeK3S {
+		annotationKey = "k3s.io/node-args"
+	}
+
+	var nodeName string
+	var lastErr error
+	err := utilwait.PollUntilContextTimeout(cs.Ctx, 2*time.Second, 5*time.Minute, true, func(_ context.Context) (bool, error) {
+		nodes, err := cs.Mgmt.Node().List(mgmtClusterName, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(nodes.Items) == 0 {
+			lastErr = fmt.Errorf("no management-cluster Nodes registered")
+			return false, nil
+		}
+		for _, node := range nodes.Items {
+			nodeName = node.Name
+			if lastErr = nodeArgsContainDataDir(node.Status.NodeAnnotations, annotationKey, dataDir); lastErr == nil {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("node-args annotation did not expose expected data-dir: runtime=%s annotation=%s expectedDataDir=%s mgmtNode=%s: %v",
+			runtimeName, annotationKey, dataDir, nodeName, lastErr)
+	}
+}
+
+// nodeArgsContainDataDir parses the given runtime node-args annotation as a JSON []string and
+// checks it for the expected custom data-dir in any valid CLI form.
+func nodeArgsContainDataDir(annotations map[string]string, annotationKey, dataDir string) error {
+	raw, ok := annotations[annotationKey]
+	if !ok || raw == "" {
+		return fmt.Errorf("missing %s annotation", annotationKey)
+	}
+
+	var args []string
+	if err := json.Unmarshal([]byte(raw), &args); err != nil {
+		return fmt.Errorf("failed to parse %s annotation JSON: %w", annotationKey, err)
+	}
+
+	for i, arg := range args {
+		switch {
+		case (arg == "--data-dir" || arg == "-d") && i+1 < len(args) && args[i+1] == dataDir:
+			return nil
+		case arg == "--data-dir="+dataDir, arg == "-d="+dataDir:
+			return nil
+		}
+	}
+	return fmt.Errorf("expected data-dir argument %q not found in %s", dataDir, annotationKey)
+}
+
 func requiredCertificatePaths(runtimeName string) []string {
+	return requiredCertificatePathsForDataDir(fmt.Sprintf("/var/lib/rancher/%s", runtimeName))
+}
+
+func requiredCertificatePathsForDataDir(dataDir string) []string {
 	return []string{
-		fmt.Sprintf("/var/lib/rancher/%s/server/tls/client-admin.crt", runtimeName),
-		fmt.Sprintf("/var/lib/rancher/%s/server/tls/serving-kube-apiserver.crt", runtimeName),
-		fmt.Sprintf("/var/lib/rancher/%s/server/tls/etcd/server-client.crt", runtimeName),
-		fmt.Sprintf("/var/lib/rancher/%s/server/tls/etcd/peer-server-client.crt", runtimeName),
-		fmt.Sprintf("/var/lib/rancher/%s/server/tls/kube-controller-manager/kube-controller-manager.crt", runtimeName),
-		fmt.Sprintf("/var/lib/rancher/%s/server/tls/kube-scheduler/kube-scheduler.crt", runtimeName),
+		path.Join(dataDir, "server/tls/client-admin.crt"),
+		path.Join(dataDir, "server/tls/serving-kube-apiserver.crt"),
+		path.Join(dataDir, "server/tls/etcd/server-client.crt"),
+		path.Join(dataDir, "server/tls/etcd/peer-server-client.crt"),
+		path.Join(dataDir, "server/tls/kube-controller-manager/kube-controller-manager.crt"),
+		path.Join(dataDir, "server/tls/kube-scheduler/kube-scheduler.crt"),
 	}
 }
 
@@ -531,10 +633,7 @@ func waitForImportedCertificateRotationRecovery(t *testing.T, clients *clients.C
 	})
 	handleCertificateRotationError(t, clients, fx.mgmtCluster.Name, op, err)
 
-	binDir := fmt.Sprintf("/var/lib/rancher/%s/bin", runtimeName)
-	kubeconfig := fmt.Sprintf("/etc/rancher/%s/%s.yaml", runtimeName, runtimeName)
-	kubectlEnv := fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
-	waitForImportedNodesReady(t, clients, fx.ns.Name, fx.pods[0].Name, kubectlEnv, []string{"imported-init-0"})
+	waitForImportedNodesReady(t, clients, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, []string{"imported-init-0"})
 
 	if out, err := fx.execKubectl(t, "kubectl get --raw=/readyz"); err != nil {
 		t.Fatalf("downstream API readyz check failed: %v\noutput: %s", err, strings.TrimSpace(out))
