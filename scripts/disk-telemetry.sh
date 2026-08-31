@@ -12,6 +12,47 @@ disk_dev_snapshot()
     awk -v d="$DISK_DEV" '$3==d{print $4,$6,$7,$8,$10,$11,$12,$13}' /proc/diskstats
 }
 
+# Resolve the filesystem type and mount options for the device backing DISK_TARGET, and flag the
+# options that matter for etcd write latency. noatime/relatime avoid a metadata write on every
+# read, nobarrier trades crash-safety for skipping cache-flush ordering, and ext4's data= mode
+# (ordered vs writeback vs journal) changes how much gets written on each fdatasync.a slow
+# run can be blamed on a bad mount config rather than the device itself. Sets DISK_MOUNT_SUMMARY.
+disk_mount_flags()
+{
+    local mp fstype opts atime barrier datamode discard commit flags
+    mp=$(df --output=target "$DISK_TARGET" 2>/dev/null | tail -1)
+    if command -v findmnt >/dev/null 2>&1; then
+        fstype=$(findmnt -no FSTYPE --target "$DISK_TARGET" 2>/dev/null)
+        opts=$(findmnt -no OPTIONS --target "$DISK_TARGET" 2>/dev/null)
+    else
+        # /proc/mounts fields: 2=mountpoint 3=fstype 4=options. df already resolved the exact
+        # mountpoint, so match it exactly; END keeps the last (effective) mount if stacked.
+        read -r fstype opts < <(awk -v mp="$mp" '$2==mp{f=$3; o=$4} END{print f, o}' /proc/mounts)
+    fi
+
+    case ",$opts," in
+        *,noatime,*)   atime="noatime" ;;
+        *,relatime,*)  atime="relatime" ;;
+        *,strictatime,*|*,atime,*) atime="atime(writes-on-read!)" ;;
+        *) atime="atime(default)" ;;
+    esac
+    case ",$opts," in
+        *,nobarrier,*|*,barrier=0,*) barrier="nobarrier(unsafe/fast)" ;;
+        *) barrier="barrier(safe/default)" ;;
+    esac
+    datamode=$(printf '%s' "$opts" | grep -oE 'data=[a-z]+')
+    case ",$opts," in *,discard,*) discard="discard" ;; *) discard="" ;; esac
+    commit=$(printf '%s' "$opts" | grep -oE 'commit=[0-9]+')
+
+    flags="$atime $barrier"
+    [ -n "$datamode" ] && flags="$flags $datamode"
+    [ -n "$commit" ]   && flags="$flags $commit"
+    [ -n "$discard" ]  && flags="$flags $discard"
+
+    DISK_MOUNT_SUMMARY="mount: $DISK_TARGET on ${mp:-?} type ${fstype:-?} [${opts:-?}] -> $flags"
+    echo "disk telemetry: $DISK_MOUNT_SUMMARY"
+}
+
 # Sets up DISK_DEV/DISK_START/DISK_TS_CSV/EBS_TS_CSV, resolves and installs nvme-cli when the
 # underlying device is NVMe, and starts the background sampler (DISK_SAMPLER_PID).
 disk_telemetry_start()
@@ -27,10 +68,12 @@ disk_telemetry_start()
     [ -d "$DISK_TARGET" ] || DISK_TARGET=.
     DISK_DEV=$(basename "$(df --output=source "$DISK_TARGET" | tail -1)")
     echo "disk telemetry: sampling device '$DISK_DEV' (backing $DISK_TARGET)"
+    disk_mount_flags
     DISK_START=$(disk_dev_snapshot)
     DISK_TS_CSV=/tmp/disk-timeseries.csv
     EBS_TS_CSV=/tmp/nvme-ebs-timeseries.csv
     CORRELATION_CSV=/tmp/etcd-disk-correlation.csv
+    IO_BOTTLENECK_CSV=/tmp/io-bottleneck.csv
     echo "epoch,elapsed_s,queue_depth,r_iops,w_iops,r_kBps,w_kBps,r_await_ms,w_await_ms,util_pct" > "$DISK_TS_CSV"
 
     # On Nitro EC2 instances, EBS volumes attached as NVMe expose a vendor log page (0xD0) with
@@ -154,6 +197,55 @@ correlate_etcd_disk_stalls()
     done
 }
 
+# Join the disk time-series (5s) with the per-core CPU series (1s, written by the sampler in
+# scripts/provisioning-tests) on epoch, to answer "was the CPU waiting because the disk was the
+# bottleneck?" independent of whether etcd logged a slow write. For each disk window it pulls the
+# nearest CPU sample's iowait/steal/runq, marks the window I/O-bound when %util is saturated, and
+# compares avg iowait in saturated vs unsaturated windows - a large gap is direct evidence that
+# the CPU wait is I/O-bound rather than compute-bound. Note iowait is aggregate across all cores,
+# so on a many-core box a single I/O-blocked thread shows only ~100/ncpu%; watch runq alongside it.
+# Thresholds are overridable via IO_UTIL_HI (%util counted as saturated) and IO_TOPN (worst windows
+# to list). Writes the full join to $IO_BOTTLENECK_CSV for spreadsheet/offline analysis.
+correlate_io_bottleneck()
+{
+    local util_hi=${IO_UTIL_HI:-80} topn=${IO_TOPN:-8}
+    [ -s "$DISK_TS_CSV" ] || return 0
+    if [ ! -s /tmp/cpu-percore.csv ]; then
+        echo "(no CPU samples at /tmp/cpu-percore.csv; skipping I/O-bottleneck correlation)"
+        return 0
+    fi
+
+    echo "epoch,elapsed_s,util_pct,queue_depth,w_await_ms,r_await_ms,iowait_pct,steal_pct,runq,io_bound" > "$IO_BOTTLENECK_CSV"
+    # Pass 1 (cpu-percore.csv) loads iowait/steal/runq keyed by sample index; pass 2 (disk series)
+    # finds the nearest CPU epoch per disk window and appends the joined row to OUTCSV.
+    awk -F, -v uhi="$util_hi" -v topn="$topn" -v OUTCSV="$IO_BOTTLENECK_CSV" '
+        FNR==NR { if (FNR>1) { ce[++nc]=$1; iow[nc]=$6; stl[nc]=$7; rq[nc]=$8 } next }
+        FNR>1 {
+            best=-1; j=0
+            for (i=1;i<=nc;i++){ d=ce[i]-$1; if(d<0)d=-d; if(best<0||d<best){best=d; j=i} }
+            iw = j? iow[j] : 0; st = j? stl[j] : 0; rr = j? rq[j] : ""
+            util=$10; q=$3; wa=$9; ra=$8
+            bound = (util>=uhi) ? 1 : 0
+            printf "%s,%s,%.1f,%d,%.2f,%.2f,%.1f,%.1f,%s,%d\n", $1,$2,util,q,wa,ra,iw,st,rr,bound >> OUTCSV
+
+            n++; iw_all+=iw
+            if (bound){ nb++; iw_b+=iw } else { nu++; iw_u+=iw }
+            el[n]=$2; uw[n]=util; qn[n]=q; wan[n]=wa; iwn[n]=iw; rqn[n]=rr
+        }
+        END {
+            if (!n){ print "(no disk samples for I/O-bottleneck correlation)"; exit }
+            printf "I/O bottleneck -- Avg iowait: %.1f%% over %d windows | while disk saturated (util>=%d%%): %.1f%% (%d win) | otherwise: %.1f%% (%d win)\n", \
+                iw_all/n, n, uhi, (nb?iw_b/nb:0), nb, (nu?iw_u/nu:0), nu
+            printf "Worst %d I/O windows (t=elapsed_s):\n", (topn<n?topn:n)
+            for (k=0;k<topn && k<n;k++){
+                mx=-1; mi=0
+                for (i=1;i<=n;i++) if(uw[i]>mx){ mx=uw[i]; mi=i }
+                if(mi){ printf "  t=%ss util=%.0f%% q=%d w_await=%.2fms iowait=%.1f%% runq=%s\n", el[mi], uw[mi], qn[mi], wan[mi], iwn[mi], rqn[mi]; uw[mi]=-1 }
+            }
+        }
+    ' /tmp/cpu-percore.csv "$DISK_TS_CSV"
+}
+
 # Dump the last ~60s of the disk/EBS time-series. Called from the crash handler in
 # build_and_run_rancher when the embedded k3s/Rancher process dies mid-run, so the disk state in
 # the seconds leading up to the death is visible right there in the log - the run-wide summary in
@@ -182,6 +274,7 @@ disk_telemetry_death_snapshot()
 # Call from cleanup(), after DISK_SAMPLER_PID has been killed.
 disk_telemetry_report()
 {
+    [ -n "$DISK_MOUNT_SUMMARY" ] && echo "$DISK_MOUNT_SUMMARY"
     read -r s_rc s_rsec s_rms s_wc s_wsec s_wms _ s_busy <<< "$DISK_START"
     read -r e_rc e_rsec e_rms e_wc e_wsec e_wms _ e_busy <<< "$(disk_dev_snapshot)"
     awk -v secs="$SECONDS" -v rc="$((e_rc - s_rc))" -v rt="$((e_rms - s_rms))" -v wc="$((e_wc - s_wc))" -v wt="$((e_wms - s_wms))" -v busy="$((e_busy - s_busy))" \
@@ -193,6 +286,10 @@ disk_telemetry_report()
         # unrelated bursts like the docker image load that ran before the test started.
         awk -F, 'NR==2{fi=$3;ft=$4;ci=$5;ct=$6} END{printf "EBS Throttle DURING RUN (delta) -- Vol IOPS: %.1fms | Vol Throughput: %.1fms || EC2 bandwidth IOPS: %.1fms | Throughput: %.1fms | Final Queue Length: %s\n", ($3-fi)/1000, ($4-ft)/1000, ($5-ci)/1000, ($6-ct)/1000, $7}' "$EBS_TS_CSV"
     fi
+
+    echo ""
+    echo "=== CPU I/O-wait vs disk saturation ==="
+    correlate_io_bottleneck
 
     echo ""
     echo "=== etcd slow-write / disk correlation ==="
@@ -216,6 +313,10 @@ disk_telemetry_report()
             echo "## etcd-disk-correlation.csv"
             cat "$CORRELATION_CSV"
         fi
+        if [ -s "$IO_BOTTLENECK_CSV" ]; then
+            echo "## io-bottleneck.csv"
+            cat "$IO_BOTTLENECK_CSV"
+        fi
         if [ -s /tmp/nvme-ebs-raw.hex ]; then
             echo "## nvme-ebs-raw.hex (magic mismatch, unparsed)"
             cat /tmp/nvme-ebs-raw.hex
@@ -223,5 +324,5 @@ disk_telemetry_report()
     } | gzip | base64 -w 0
     echo -e "\n-----DISK-TELEMETRY-DUMP-END-----"
 
-    rm -f "$DISK_TS_CSV" "$EBS_TS_CSV" "$CORRELATION_CSV" /tmp/nvme-ebs-log.bin /tmp/nvme-ebs-raw.hex
+    rm -f "$DISK_TS_CSV" "$EBS_TS_CSV" "$CORRELATION_CSV" "$IO_BOTTLENECK_CSV" /tmp/nvme-ebs-log.bin /tmp/nvme-ebs-raw.hex
 }
