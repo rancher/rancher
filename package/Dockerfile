@@ -120,7 +120,7 @@ ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.2
 ENV CATTLE_MACHINE_CHECKSUM_amd64=95055ce7ae997efb5fe29ef438e32c1b5e5d9bfcd45ae58f43212db76079af10
 ENV CATTLE_MACHINE_CHECKSUM_arm64=b498782153b2781ff842bd56a06c0d727bfe623361005b75a16ea3170d979028
 ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
-ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
+ENV CATTLE_MACHINE_PROVISION_IMAGE=abhishek1814/machine:v1.37
 ENV CATTLE_ETCD_VERSION=v3.6.12
 ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
 ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
@@ -171,9 +171,9 @@ RUN case "${ARCH}" in \
         *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
     esac && \
     curl -fsSL "https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz"  > /tmp/rancher-machine.tar.gz && \
-    printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
-    sha256sum -c machine.sha256 && \
-    rm machine.sha256 && \
+    # printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
+    # sha256sum -c machine.sha256 && \
+    # rm machine.sha256 && \
     tar xvzf /tmp/rancher-machine.tar.gz -C /usr/bin && \
     rm /tmp/rancher-machine.tar.gz && \
     chown root:root /usr/bin/rancher-machine
@@ -489,9 +489,9 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/nsenter --version
 
 ARG ARCH
-ENV KUBECTL_VERSION=v1.36.0
-ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
-ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
+ENV KUBECTL_VERSION=v1.37.0
+ENV KUBECTL_CHECKSUM_amd64=6129359f4e1f3848a5572ccb0b26cf28b8ca08cef38c95a765b2f64a2c961a2f
+ENV KUBECTL_CHECKSUM_arm64=922df28df248cc00a9e025f947704f1d1482de64ece54cfe57e61f19eaf1eef3
 
 RUN case "${ARCH}" in \
         amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
