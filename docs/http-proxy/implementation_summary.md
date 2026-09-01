@@ -250,6 +250,6 @@ bash scripts/go-generate
 go test ./pkg/httpproxy -v
 
 # Certificate management tests only
-go test ./pkg/httpproxy -v -run "Cert|TLS"
+go test ./pkg/httpproxy -v -run 'Cert|TLS'
 ```
 
