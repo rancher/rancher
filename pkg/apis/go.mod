@@ -5,10 +5,10 @@ go 1.26.0
 toolchain go1.26.6
 
 replace (
-	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.13.0-rc.1.0.20260831034930-9a99317b9217
-	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260831041216-ecd0761dcffb
-	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.13.0-rc.1.0.20260831035631-2e6f3e9d237c
-	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.13.0-rc.1.0.20260831040702-46ba83d5854d
+	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.14.0-rc.1.0.20260902074845-42b70cc84c64
+	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260902103845-8111ed396886
+	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e1194d9
+	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb
 	github.com/rancher/lasso => github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7
 	github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
 	github.com/rancher/wrangler/v3 => github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545
