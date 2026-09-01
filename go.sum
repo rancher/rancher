@@ -659,8 +659,8 @@ github.com/rancher/norman v0.10.0 h1:vBIp5gNHelyS64IAs6FONPUfv0VTYWiMSrEbDS2l+hM
 github.com/rancher/norman v0.10.0/go.mod h1:ExdLbr95m15PLbzQRrCVjGf8ah6kAVcttk484HSI9cM=
 github.com/rancher/remotedialer v0.6.1 h1:smq2sHKJn+NxxIeQ8To9CGGkz8l6Ir7EPzfAdjUTt2s=
 github.com/rancher/remotedialer v0.6.1/go.mod h1:0+dmsw9TPjcqNUPrgAVFZpvbxy1r/fRaGPpVa84OMjU=
-github.com/rancher/remotedialer-proxy v0.8.0 h1:PYKBT1i9HVu0AX7jKjUxNz3EuXVo0jkdWBcvS63RT4s=
-github.com/rancher/remotedialer-proxy v0.8.0/go.mod h1:VTxB4I+jt2dJBncXGtJ6Df5hK19XWS1Wr1AYR8p8y/o=
+github.com/rancher/remotedialer-proxy v0.9.0-rc.2 h1:xM+ko4RaqtjfGFS8l7n2hn4XFQygLGfh/q7IA2PqIZ0=
+github.com/rancher/remotedialer-proxy v0.9.0-rc.2/go.mod h1:tUvcbs5xQgIGVUWSWpdTp9kubmOIKCA+D3DTYaPv8fM=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20260824145520-00de4a01fb4d h1:F6yRcp5IrkabzVlPYm6IAMGuhBx4msWNIT7MUbQYG1M=
