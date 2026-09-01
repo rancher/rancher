@@ -27,6 +27,7 @@ type ProxyEndpointSpec struct {
 	Routes []ProxyEndpointRoute `json:"routes,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!(has(self.caBundle) && self.caBundle != ” && self.insecureSkipTLSVerify)",message="caBundle cannot be set when insecureSkipTLSVerify is true"
 type ProxyEndpointRoute struct {
 	// Domain is the domain to be added to the proxy allowlist.
 	// Absolute domain names (e.g., example.com) and wildcard patterns are supported.
@@ -65,6 +66,33 @@ type ProxyEndpointRoute struct {
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 
+	// CABundle is a PEM-encoded bundle of CA certificates to trust when verifying the TLS
+	// certificate of the endpoint. This is useful for self-signed certificates or certificates
+	// from non-public Certificate Authorities.
+	// When specified, only these CA certificates (plus the system's root CAs) will be trusted
+	// for verifying the endpoint's certificate. Do not use this with InsecureSkipTLSVerify.
+	// +optional
+	// +kubebuilder:validation:MaxLength=100000
+	CABundle string `json:"caBundle,omitempty"`
+
+	// ClientCertificate references a Kubernetes Secret containing client certificate and key
+	// for mutual TLS (mTLS) authentication. The secret must be in the same namespace as the
+	// ProxyEndpoint. The secret must contain "tls.crt" and "tls.key" fields with PEM-encoded
+	// certificate and private key respectively.
+	// +optional
+	ClientCertificate *SecretReference `json:"clientCertificate,omitempty"`
+
+	// ServerName is the SNI (Server Name Indication) hostname to use during the TLS handshake.
+	// If not specified, the domain hostname is used. This is useful when the endpoint domain
+	// does not match the certificate's CN or SAN fields.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	ServerName string `json:"serverName,omitempty"`
+
+	// TLSVerificationOptions controls certificate verification behavior.
+	// +optional
+	TLSVerificationOptions *TLSVerificationSpec `json:"tlsVerificationOptions,omitempty"`
+
 	// CredentialInjection defines how credentials are applied to proxied requests for this domain.
 	// When set, clients need to supply a credential ID and values for the secret fields via X-API-CattleAuth-Header;
 
@@ -75,6 +103,10 @@ type ProxyEndpointRoute struct {
 }
 
 // CredentialInjectionSpec defines how a credential secret's values are injected into a proxied request.
+
+// +kubebuilder:validation:XValidation:rule="(self.mode != 'headerinject' && self.mode != 'bodyinject') || (has(self.fields) && size(self.fields) > 0)",message="fields is required when mode is headerinject or bodyinject"
+// +kubebuilder:validation:XValidation:rule="self.mode != 'bearer' || has(self.tokenField) && size(self.tokenField) > 0",message="tokenField is required when mode is bearer"
+// +kubebuilder:validation:XValidation:rule="self.mode != 'basic' || (has(self.usernameField) && size(self.usernameField) > 0 && has(self.passwordField) && size(self.passwordField) > 0)",message="usernameField and passwordField are required when mode is basic"
 type CredentialInjectionSpec struct {
 	// Mode controls how the credential is applied to the request.
 	// "bearer"      – sets Authorization: Bearer <token>
@@ -118,6 +150,28 @@ type InjectionFieldMapping struct {
 	// config-type prefix (e.g. for "genericConfig-apiKey" the SecretField is "apiKey").
 	// +required
 	SecretField string `json:"secretField"`
+}
+
+// SecretReference refers to a Kubernetes secret in the same namespace.
+type SecretReference struct {
+	// Name is the name of the secret object.
+	// +required
+	Name string `json:"name"`
+}
+
+// TLSVerificationSpec controls certificate verification behavior for TLS connections.
+type TLSVerificationSpec struct {
+	// VerifyHostname controls whether the certificate's hostname matches the connection hostname.
+	// Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
+	// +optional
+	// +kubebuilder:validation:default=true
+	VerifyHostname *bool `json:"verifyHostname,omitempty"`
+
+	// VerifyExpiration controls whether the certificate's validity period is checked.
+	// Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
+	// +optional
+	// +kubebuilder:validation:default=true
+	VerifyExpiration *bool `json:"verifyExpiration,omitempty"`
 }
 
 type ProxyEndpointStatus struct{}
