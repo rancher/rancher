@@ -118,6 +118,11 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	}
 	status = updateStatus(op, status)
 
+	// Paused operations resume on a spec change; skip TTL cleanup and polling until then.
+	if ops.IsPaused(&op.Spec.OperationSpec) {
+		return status, nil
+	}
+
 	if equality.Semantic.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
 		//

@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	corev1 "k8s.io/api/core/v1"
@@ -120,6 +123,21 @@ func makePlanSecret(name, nodeName string, labels map[string]string) *corev1.Sec
 			UID:       types.UID(name + "-uid"),
 		},
 	}
+}
+
+type fakeETCDSnapshotRestoreController struct {
+	operationcontrollers.ETCDSnapshotRestoreController
+	enqueueCalls int
+	deleteCalls  int
+}
+
+func (f *fakeETCDSnapshotRestoreController) EnqueueAfter(_, _ string, _ time.Duration) {
+	f.enqueueCalls++
+}
+
+func (f *fakeETCDSnapshotRestoreController) Delete(_, _ string, _ *metav1.DeleteOptions) error {
+	f.deleteCalls++
+	return nil
 }
 
 func TestBuildPostRestoreNodeCleanupPlan(t *testing.T) {
@@ -490,5 +508,128 @@ func TestUpdateStatusPausedCondition(t *testing.T) {
 				t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
 			}
 		})
+	}
+}
+
+func TestOnChange_StablePausedOperation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		phase       opv1alpha1.OperationPhase
+		step        opv1alpha1.ETCDSnapshotRestoreStep
+		ttl         int64
+		lastUpdated metav1.Time
+	}{
+		{
+			name:        "stable in-progress paused operation",
+			phase:       opv1alpha1.OperationPhaseInProgress,
+			step:        opv1alpha1.ETCDSnapshotRestoreStepRestore,
+			ttl:         300,
+			lastUpdated: metav1.Now(),
+		},
+		{
+			name:        "stable terminal expired paused operation",
+			phase:       opv1alpha1.OperationPhaseSucceeded,
+			step:        opv1alpha1.ETCDSnapshotRestoreStepRestore,
+			ttl:         0,
+			lastUpdated: metav1.NewTime(metav1.Now().Add(-10 * time.Minute)),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOp()
+			op.Spec.Paused = true
+			op.Spec.TTL = tc.ttl
+			op.Generation = 7
+
+			initialStatus := opv1alpha1.ETCDSnapshotRestoreStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase:       tc.phase,
+					LastUpdated: tc.lastUpdated,
+				},
+				Step: tc.step,
+			}
+
+			// Pre-compute the expected status with paused condition
+			currentStatus := updateStatus(op, initialStatus)
+			op.Status = currentStatus
+
+			controller := &fakeETCDSnapshotRestoreController{}
+			h := &handler{
+				etcdsnapshotrestores: controller,
+			}
+
+			returnedStatus, err := h.OnChange(op, op.Status)
+			if err != nil {
+				t.Fatalf("OnChange returned error: %v", err)
+			}
+
+			// Verify status unchanged
+			if !reflect.DeepEqual(returnedStatus, currentStatus) {
+				t.Errorf("returnedStatus differs from currentStatus")
+			}
+
+			// Verify phase and step preserved
+			if returnedStatus.Phase != tc.phase {
+				t.Errorf("Phase = %q, want %q", returnedStatus.Phase, tc.phase)
+			}
+			if returnedStatus.Step != tc.step {
+				t.Errorf("Step = %q, want %q", returnedStatus.Step, tc.step)
+			}
+
+			// Verify no delete occurred
+			if controller.deleteCalls != 0 {
+				t.Errorf("Delete called %d times, want 0", controller.deleteCalls)
+			}
+
+			// Verify no enqueue occurred
+			if controller.enqueueCalls != 0 {
+				t.Errorf("EnqueueAfter called %d times, want 0", controller.enqueueCalls)
+			}
+		})
+	}
+}
+
+func TestOnChange_Paused(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Paused = true
+	op.Generation = 7
+
+	initialStatus := opv1alpha1.ETCDSnapshotRestoreStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase: opv1alpha1.OperationPhaseInProgress,
+		},
+		Step: opv1alpha1.ETCDSnapshotRestoreStepRestore,
+	}
+
+	op.Status = initialStatus
+
+	h := &handler{}
+	status, err := h.OnChange(op, op.Status)
+
+	if err != nil {
+		t.Fatalf("OnChange returned error: %v", err)
+	}
+	if got := opv1alpha1.PausedCondition.GetStatus(&status); got != "True" {
+		t.Errorf("PausedCondition status = %q, want %q", got, "True")
+	}
+	if got := opv1alpha1.PausedCondition.GetReason(&status); got != opv1alpha1.PausedReason {
+		t.Errorf("PausedCondition reason = %q, want %q", got, opv1alpha1.PausedReason)
+	}
+	if got := opv1alpha1.PausedCondition.GetMessage(&status); got != "Operation is paused" {
+		t.Errorf("PausedCondition message = %q, want %q", got, "Operation is paused")
+	}
+	if status.ObservedGeneration != int64(7) {
+		t.Errorf("ObservedGeneration = %d, want 7", status.ObservedGeneration)
+	}
+	if status.Phase != initialStatus.Phase {
+		t.Errorf("Phase = %q, want %q (unchanged)", status.Phase, initialStatus.Phase)
+	}
+	if status.Step != initialStatus.Step {
+		t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
 	}
 }
