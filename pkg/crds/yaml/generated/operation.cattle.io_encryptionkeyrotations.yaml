@@ -4,6 +4,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
+    operation.cattle.io/preemption-priority: "0"
+    operation.cattle.io/restore-required-on-cancellation: "true"
   labels:
     auth.cattle.io/cluster-indexed: "true"
   name: encryptionkeyrotations.operation.cattle.io
@@ -61,6 +63,15 @@ spec:
           spec:
             description: Spec defines the desired state of the EncryptionKeyRotation.
             properties:
+              cancel:
+                description: |-
+                  Cancel requests cancellation of the operation.
+                  Cancellation is a latch: once set to true it cannot be unset, and an operation which has
+                  already reached a terminal phase is unaffected.
+                  A canceled operation halts at the current step boundary; partially applied work is not rolled
+                  back, which is why cancelling an operation that mutates cluster state marks the cluster as
+                  requiring a restore.
+                type: boolean
               clusterRef:
                 description: ClusterRef is a reference to the Cluster this operation
                   is associated with.

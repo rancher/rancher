@@ -4,6 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
+    operation.cattle.io/clears-restore-required: "true"
+    operation.cattle.io/preemption-priority: "100"
+    operation.cattle.io/restore-required-on-cancellation: "true"
   labels:
     auth.cattle.io/cluster-indexed: "true"
   name: etcdsnapshotrestores.operation.cattle.io
@@ -19,7 +22,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.clusterRef.Name
+    - jsonPath: .spec.clusterRef.name
       name: Cluster
       type: string
     - jsonPath: .spec.args.name
@@ -31,7 +34,7 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.step
+    - jsonPath: .status.step
       name: Step
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -73,6 +76,15 @@ spec:
                     description: Name specifies the name of the ETCD snapshot file.
                     type: string
                 type: object
+              cancel:
+                description: |-
+                  Cancel requests cancellation of the operation.
+                  Cancellation is a latch: once set to true it cannot be unset, and an operation which has
+                  already reached a terminal phase is unaffected.
+                  A canceled operation halts at the current step boundary; partially applied work is not rolled
+                  back, which is why cancelling an operation that mutates cluster state marks the cluster as
+                  requiring a restore.
+                type: boolean
               clusterRef:
                 description: ClusterRef is a reference to the Cluster this operation
                   is associated with.

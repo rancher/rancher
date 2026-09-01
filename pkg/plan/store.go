@@ -281,7 +281,7 @@ func PlanHash(plan []byte) string {
 // AssignPlan assigns the plan to the secret.
 // Returns a PlanStatus indicating the current state of the plan.
 // This function is based off the CAPR assignAndCheckPlan function and will supersede it in the future once its CAPI dependency is unraveled.
-func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failureThreshold int) (*PlanStatus, error) {
+func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, beacon *planv1alpha1.Beacon, maxFailures, failureThreshold int) (*PlanStatus, error) {
 	data, err := json.Marshal(&plan)
 	if err != nil {
 		return nil, err
@@ -293,6 +293,14 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 	}
 	if secret.Annotations == nil {
 		secret.Annotations = map[string]string{}
+	}
+	if secret.Labels == nil {
+		secret.Labels = map[string]string{}
+	}
+	// The beacon owner is recorded so the webhook can reject writes from a controller which no longer
+	// holds the beacon. There is nothing to record when the plan is assigned without one.
+	if beacon != nil {
+		secret.Labels[planv1alpha1.BeaconOwnerLabelKey] = beacon.Status.Owner
 	}
 
 	result := &PlanStatus{
