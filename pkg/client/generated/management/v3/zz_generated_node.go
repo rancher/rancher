@@ -35,6 +35,7 @@ const (
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldPodCidrs             = "podCidrs"
+	NodeFieldPodPreemptionPolicy  = "podPreemptionPolicy"
 	NodeFieldProviderId           = "providerId"
 	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
@@ -84,6 +85,7 @@ type Node struct {
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	PodCidrs             []string                  `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
+	PodPreemptionPolicy  *NodePodPreemptionPolicy  `json:"podPreemptionPolicy,omitempty" yaml:"podPreemptionPolicy,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty" yaml:"providerId,omitempty"`
 	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
