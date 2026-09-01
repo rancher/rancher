@@ -94,14 +94,14 @@ Integration tests with real TLS servers
 
 ### 5. Documentation
 
-**User-facing documentation** (`docs/certificate-trust-management.md`):
+**User-facing documentation** (`docs/http-proxy/certificate-trust-management.md`):
 - Feature overview and use cases
 - Configuration examples
 - Precedence rules
 - Security best practices
 - Troubleshooting guide
 
-**Developer documentation** (`docs/CERT_MANAGEMENT_DEVELOPER.md`):
+**Developer documentation** (`docs/http-proxy/cert_management_developer.md`):
 - Architecture overview
 - Implementation details
 - Function flow diagrams
@@ -178,22 +178,16 @@ Route Matching:
 
 ## Testing Coverage
 
-### Unit Tests: 19 tests
-- 9 TLS config tests
-- 3 transport build tests
-- 7 integration tests with existing proxy tests
+### Unit Tests
+- TLS config tests
+- transport build tests
+- integration tests with existing proxy tests
 
 ### Integration Tests
 - Real TLS server connections
 - Self-signed certificate scenarios
 - CA bundle verification
 - Route matching with certificate options
-
-### Test Results
-- ✅ All 19 new tests passing
-- ✅ All existing httpproxy tests passing
-- ✅ No regressions
-- ✅ Ready for production
 
 ## Backward Compatibility
 
@@ -235,12 +229,10 @@ Route Matching:
 ### Verify Installation
 ```bash
 # Check types
-grep -n "ClientCertificate\|ServerName\|TLSVerificationOptions" \
-  pkg/apis/management.cattle.io/v3/proxy_types.go
+grep -n 'ClientCertificate\|ServerName\|TLSVerificationOptions' pkg/apis/management.cattle.io/v3/proxy_types.go
 
 # Check implementation
-grep -n "buildTLSConfigForRoute\|buildTransportForRoute" \
-  pkg/httpproxy/proxy.go
+grep -n 'buildTLSConfigForRoute\|buildTransportForRoute' pkg/httpproxy/proxy.go
 
 # Check tests
 go test ./pkg/httpproxy -v -run "TestBuild"
@@ -248,9 +240,9 @@ go test ./pkg/httpproxy -v -run "TestBuild"
 
 ### Generate CRD
 ```bash
-# Run controller-gen to regenerate from types
-make generate-manifests
+# Run controller-gen to regenerate CRDs from types
 ```
+bash scripts/go-generate
 
 ### Run Tests
 ```bash
@@ -260,33 +252,4 @@ go test ./pkg/httpproxy -v
 # Certificate management tests only
 go test ./pkg/httpproxy -v -run "Cert|TLS"
 ```
-
-## Files Modified
-
-1. ✅ `pkg/apis/management.cattle.io/v3/proxy_types.go` - Added types
-2. ✅ `pkg/httpproxy/proxy.go` - Added implementation
-3. ✅ `pkg/crds/yaml/generated/management.cattle.io_proxyendpoints.yaml` - Updated schema
-4. ✅ `pkg/httpproxy/cert_management_test.go` - New test file
-5. ✅ `docs/certificate-trust-management.md` - User documentation
-6. ✅ `docs/CERT_MANAGEMENT_DEVELOPER.md` - Developer documentation
-
-## Key Metrics
-
-- **Lines of code added**: ~250 (implementation) + ~400 (tests)
-- **Functions added**: 2 main + 3 helper
-- **Test cases**: 19 new tests
-- **Documentation**: 2 markdown files
-- **Type definitions**: 2 new types
-- **CRD fields**: 3 new fields in ProxyEndpointRoute
-
-## Summary
-
-This implementation successfully adds enterprise-grade certificate and trust management to Rancher's HTTP proxy. The features are:
-
-- ✅ Production-ready
-- ✅ Fully tested (19 tests, 100% passing)
-- ✅ Backward compatible
-- ✅ Well documented
-- ✅ Secure by default
-- ✅ Extensible for future enhancements
 

@@ -129,7 +129,7 @@ spec:
 When the Go types change, regenerate the CRD manifests:
 
 ```bash
-make generate-manifests
+bash scripts/go-generate
 ```
 
 
