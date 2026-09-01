@@ -2,7 +2,6 @@ package saml
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -21,6 +20,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -36,7 +37,28 @@ import (
 func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
 	// just enough scaffolding to run the Configure function.
-	ctx := context.Background()
+	ctx := t.Context()
+	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
+	mgmtCtx.RunContext = ctx
+	require.NoError(t, err, "Failed to create NewScaledContext")
+
+	// Create the dummy wrangler context
+	wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{})
+	require.NoError(t, err, "Failed to create wranglerContext")
+	mgmtCtx.Wrangler = wranglerContext
+
+	tokenMGR := tokens.NewManager(wranglerContext)
+	provider, ok := Configure(t.Context(), mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
+	require.True(t, ok, "Failed to Configure a valid Provider")
+
+	assert.True(t, provider.hasLdapGroupSearch(), "Missing LDAP group search capability for okta provider")
+	assert.NotNil(t, provider.ldapProvider, "Configured okta provider did not receive child LDAP provider")
+}
+
+func TestConfiguredGenericSAMLProviderHasNoLdap(t *testing.T) {
+	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
+	// just enough scaffolding to run the Configure function.
+	ctx := t.Context()
 	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
 	require.NoError(t, err, "Failed to create NewScaledContext")
 
@@ -46,11 +68,11 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	mgmtCtx.Wrangler = wranglerContext
 
 	tokenMGR := tokens.NewManager(wranglerContext)
-	provider, ok := Configure(mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
+	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR, GenericSAMLName).(*Provider)
 	require.True(t, ok, "Failed to Configure a valid Provider")
 
-	assert.True(t, provider.hasLdapGroupSearch(), "Missing LDAP group search capability for okta provider")
-	assert.NotNil(t, provider.ldapProvider, "Configured okta provider did not receive child LDAP provider")
+	assert.False(t, provider.hasLdapGroupSearch(), "Generic SAML provider must not have LDAP group search")
+	assert.Nil(t, provider.ldapProvider, "Generic SAML provider must not receive a child LDAP provider")
 }
 
 func TestSearchPrincipals(t *testing.T) {
@@ -667,4 +689,22 @@ func TestSearchPrincipalsUserSearchError(t *testing.T) {
 	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
 	require.ErrorContains(t, err, "cache is not synced")
 	assert.Nil(t, got)
+}
+
+func TestFormSamlRedirectURLGenericSAML(t *testing.T) {
+	cfg := map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	}
+	got := formSamlRedirectURLFromMap(cfg, GenericSAMLName)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login", got)
+}
+
+func TestTransformToAuthProviderGenericSAML(t *testing.T) {
+	p := &Provider{name: GenericSAMLName}
+	out, err := p.TransformToAuthProvider(map[string]any{
+		client.GenericSAMLConfigFieldRancherAPIHost: "https://rancher.example.com",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login",
+		out[publicclient.GenericSAMLProviderFieldRedirectURL])
 }

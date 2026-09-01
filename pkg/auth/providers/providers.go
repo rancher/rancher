@@ -49,11 +49,12 @@ var (
 
 	// samlProviders lists all SAML provider names. Used to look up the provider based on the type.
 	samlProviders = map[string]bool{
-		saml.PingName:       true,
-		saml.ADFSName:       true,
-		saml.KeyCloakName:   true,
-		saml.OKTAName:       true,
-		saml.ShibbolethName: true,
+		saml.PingName:        true,
+		saml.ADFSName:        true,
+		saml.KeyCloakName:    true,
+		saml.OKTAName:        true,
+		saml.ShibbolethName:  true,
+		saml.GenericSAMLName: true,
 	}
 )
 
@@ -102,11 +103,12 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[activedirectory.Name] = activedirectory.Configure(mgmt, userMGR, tokenMGR)
 	providers[ldap.OpenLdapName] = ldap.Configure(mgmt, userMGR, tokenMGR, ldap.OpenLdapName)
 	providers[ldap.FreeIpaName] = ldap.Configure(mgmt, userMGR, tokenMGR, ldap.FreeIpaName)
-	providers[saml.PingName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.PingName)
-	providers[saml.ADFSName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.ADFSName)
-	providers[saml.KeyCloakName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.KeyCloakName)
-	providers[saml.OKTAName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.OKTAName)
-	providers[saml.ShibbolethName] = saml.Configure(mgmt, userMGR, tokenMGR, saml.ShibbolethName)
+	providers[saml.PingName] = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.PingName)
+	providers[saml.ADFSName] = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ADFSName)
+	providers[saml.KeyCloakName] = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.KeyCloakName)
+	providers[saml.OKTAName] = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.OKTAName)
+	providers[saml.ShibbolethName] = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ShibbolethName)
+	providers[saml.GenericSAMLName] = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.GenericSAMLName)
 	providers[googleoauth.Name] = googleoauth.Configure(mgmt, userMGR, tokenMGR)
 	providers[oidc.Name] = oidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	providers[keycloakoidc.Name] = keycloakoidc.Configure(ctx, mgmt, userMGR, tokenMGR)

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
@@ -462,6 +463,7 @@ func (t *Store) Get(
 	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
 	token.Status.BearerToken = ""
+	token.Status.Hash = ""
 
 	return token, nil
 }
@@ -966,6 +968,7 @@ func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, option
 
 		// Filtering for users is done already, see above where the options are set up and/or merged.
 		token.Status.Current = token.Name == authTokenID
+		token.Status.Hash = ""
 		tokens = append(tokens, *token)
 	}
 
@@ -1018,9 +1021,9 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		ttl, err := clampMaxTTL(token.Spec.TTL)
+		ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to ingest token time-to-live: %w", err))
 		}
 		token.Spec.TTL = ttl
 		if ttlGreater(ttl, oldToken.Spec.TTL) {
@@ -1038,6 +1041,10 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
+
+	// The stored hash was carried through toSecret above; never return it to
+	// the client.
+	token.Status.Hash = ""
 
 	// Abort, user does not wish to actually change anything.
 	if dryRun {
@@ -1057,6 +1064,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	newToken.Status.Current = newToken.Name == authTokenID
 	newToken.Status.Value = ""
+	newToken.Status.Hash = ""
 	return newToken, nil
 }
 
@@ -1238,6 +1246,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					// ListOptionMerge above) takes care of only
 					// asking for owned tokens
 					token.Status.Current = token.Name == authTokenID
+					token.Status.Hash = ""
 					obj = token
 				default: // watch.Error
 					obj = event.Object
@@ -1551,38 +1560,24 @@ func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptio
 		return *options, nil
 	}
 
-	// for non-admins we additionally filter the result for their own tokens
-	userIDSelector := labels.Set(map[string]string{
-		UserIDLabel: userName,
-	})
-	if options == nil || *options == empty {
-		// No external filter to contend with, just set the internal filter.
-		localOptions = metav1.ListOptions{
-			LabelSelector: userIDSelector.AsSelector().String(),
-		}
-	} else {
-		// We have to contend with an external filter, and merge ours into it.
+	// For non-admins the effective selector always constrains the owner label
+	// to the requesting user. Parse the caller's selector (if any) and AND the
+	// owner requirement onto it. A selector that already pins the owner label to
+	// a different value then holds two conflicting equality requirements and is
+	// unsatisfiable, so it matches nothing.
+	if options != nil {
 		localOptions = *options
-		callerSelector, err := labels.ConvertSelectorToLabelsMap(localOptions.LabelSelector)
-		if err != nil {
-			return localOptions, err
-		}
-		if callerSelector.Has(UserIDLabel) {
-			// The external filter does filter for a user, possible conflict.
-			if callerSelector[UserIDLabel] != userName {
-				// It asks for a user other than the current.
-				// We can bail now, with an empty result, as
-				// nothing can match.
-				return localOptions, nil
-			}
-			// It asks for the current user, same as the internal
-			// filter would do.  We can pass the options as is.
-		} else {
-			// The external filter has nothing about the user.
-			// We can simply add the internal filter.
-			localOptions.LabelSelector = labels.Merge(callerSelector, userIDSelector).AsSelector().String()
-		}
 	}
+
+	selector, err := labels.Parse(localOptions.LabelSelector)
+	if err != nil {
+		return empty, err
+	}
+	ownerReq, err := labels.NewRequirement(UserIDLabel, selection.Equals, []string{userName})
+	if err != nil {
+		return empty, err
+	}
+	localOptions.LabelSelector = selector.Add(*ownerReq).String()
 
 	return localOptions, nil
 }
@@ -1627,7 +1622,7 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	// spec values
 	// injects default on creation and update
-	ttl, err := clampMaxTTL(token.Spec.TTL)
+	ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -1778,62 +1773,79 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-func clampMaxTTL(ttl int64) (int64, error) {
-	max, err := maxTTL()
+// IngestTTL returns the input ttl (milliseconds) with requests for defaults
+// resolved, and further limited to the maximum allowed, as per the given
+// settings.
+func IngestTTL(ttl int64, maxSetting, defaultSetting settings.Setting) (int64, error) {
+	maxValue, err := ParseTTLToMilliseconds(maxSetting)
+	if err != nil {
+		return 0, err
+	}
+	if maxValue < 1 {
+		maxValue = -1 // "0" means no max — use the real "never expires" value.
+	}
+	defaultValue, err := ParseTTLToMilliseconds(defaultSetting)
 	if err != nil {
 		return 0, err
 	}
 
-	// decision table
-	// max | ttl         | note                                        | result
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
-	// < 1 | = 0         | max = +inf = default, ttl default requested | -1 = +inf
-	// < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// > 0 | < 0         | ttl = +inf, clamp to max                    | max
-	// > 0 | = 0         | ttl default requested, this is max          | max
-	// > 0 | > 0, <= max | less than max                               | ttl
-	// > 0 | > max       | clamp to max                                | max
+	// We fall back to the maximum when the default value requests a default itself
+	defaultValue = DefaultTTL(defaultValue, maxValue)
 
-	if max < 1 {
-		if ttl == 0 {
-			return -1, nil
-		}
-		return ttl, nil
-	}
-	if ttl > max || ttl <= 0 {
-		return max, nil
-	}
-	return ttl, nil
+	// Then resolve a default request in the input and clamp
+	return ClampToMaxTTL(DefaultTTL(ttl, defaultValue), maxValue), nil
 }
 
-// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
-// See also pkg/auth/tokens/manager.go
-func ParseTokenTTL(ttl string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vm", ttl)
-	dur, err := time.ParseDuration(durString)
+// ParseTTLToMilliseconds retrieves a ttl setting (in minutes) and returns it as milliseconds
+func ParseTTLToMilliseconds(ttlSetting settings.Setting) (int64, error) {
+	ttl, err := ParseTTLToDuration(ttlSetting.Get())
 	if err != nil {
-		return 0, fmt.Errorf("error parsing token ttl: %v", err)
+		return 0, fmt.Errorf("failed to process setting '%s': %w", ttlSetting.Name, err)
+	}
+	return ttl.Milliseconds(), nil
+}
+
+// ParseTTLToDuration parses an integer representing minutes as a string and returns it as a duration.
+func ParseTTLToDuration(ttl string) (time.Duration, error) {
+	dur, err := time.ParseDuration(fmt.Sprintf("%vm", ttl))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing ttl minutes: %w", err)
 	}
 	return dur, nil
 }
 
-func maxTTL() (int64, error) {
-	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
-
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
+// DefaultTTL returns the default ttl, if such was requested by the input
+// (`value == 0`), or else the input as is.
+func DefaultTTL(ttl, defaultValue int64) int64 {
+	if ttl == 0 {
+		return defaultValue
 	}
+	return ttl
+}
 
-	return maxTTL.Milliseconds(), nil
+// ClampToMaxTTL ensures that the returned ttl is smaller than the specified
+// maximum. In other words, it returns the minimum of the 2 inputs, taking into
+// account the special encoding of `infinity` (`value < 0`) for both max and
+// ttl. The function assumes that `ttl` is not `0`, i.e. that a request for the
+// default has been resolved already.
+func ClampToMaxTTL(ttl, max int64) int64 {
+	if max < 1 {
+		// maximum is infinity, ttl is always smaller or equal
+		return ttl
+	}
+	if ttl < 0 {
+		// ttl asked for infinity, but max is finite — cap it at max.
+		return max
+	}
+	// for a finite maximum we can do a simple
+	return min(ttl, max)
 }
 
 // ttlGreater compares the two TTL a and b. It returns true if a is greater than b.
 // Important special cases for TTL:
 // Any value < 0 represents +infinity.
 // A value > 0 is that many milliseconds.
-// The default of `0` cannot arrive here. `clampMaxTTL` resolved that already.
+// The default of `0` cannot arrive here. `IngestTTL` resolved that already.
 func ttlGreater(a, b int64) bool {
 	// Decision table
 	//

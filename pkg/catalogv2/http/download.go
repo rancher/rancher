@@ -16,7 +16,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
-	repo "helm.sh/helm/v4/pkg/repo/v1"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -52,14 +52,18 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	}
 	defer resp.Body.Close()
 
+	limitedReader := io.LimitedReader{
+		R: resp.Body,
+		N: 1 * 1024 * 1024, // 1MB limit
+	}
 	if resp.StatusCode != http.StatusOK {
-		defer io.ReadAll(resp.Body)
+		io.Copy(io.Discard, &limitedReader)
 		return nil, "", validation.ErrorCode{
 			Status: resp.StatusCode,
 		}
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(&limitedReader)
 	if err != nil {
 		return nil, "", err
 	}
@@ -101,7 +105,21 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 	}
 	defer resp.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
+	limitedReader := io.LimitedReader{
+		R: resp.Body,
+		N: 5 * 1024 * 1024, // 5MB limit
+	}
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, &limitedReader)
+		return nil, validation.ErrorCode{
+			Status: resp.StatusCode,
+		}
+	}
+
+	data, err := io.ReadAll(&limitedReader)
+	if err != nil {
+		return nil, err
+	}
 	return io.NopCloser(bytes.NewBuffer(data)), err
 }
 
@@ -135,7 +153,18 @@ func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insec
 	}
 	defer resp.Body.Close()
 
-	bytes, err := io.ReadAll(resp.Body)
+	limitedReader := io.LimitedReader{
+		R: resp.Body,
+		N: 5 * 1024 * 1024, // 5MB limit
+	}
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, &limitedReader)
+		return nil, validation.ErrorCode{
+			Status: resp.StatusCode,
+		}
+	}
+
+	b, err := io.ReadAll(&limitedReader)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +172,7 @@ func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insec
 	// Marshall to file to ensure it matches the schema and this component doesn't just
 	// become a "fetch any file" service.
 	index := &repo.IndexFile{}
-	if err := yaml.Unmarshal(bytes, index); err != nil {
+	if err := yaml.Unmarshal(b, index); err != nil {
 		logrus.Errorf("failed to unmarshal %s: %v", url, err)
 		return nil, fmt.Errorf("failed to parse response from %s", url)
 	}

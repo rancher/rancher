@@ -36,7 +36,7 @@ const (
 type handler struct {
 	clusterRegistrationTokenCache      v32.ClusterRegistrationTokenCache
 	clusterRegistrationTokenController v32.ClusterRegistrationTokenController
-	clusters                           v32.ClusterCache
+	clustersCache                      v32.ClusterCache
 	secrets                            corecontrollers.SecretClient
 	secretCache                        corecontrollers.SecretCache
 	roles                              rbaccontrollers.RoleClient
@@ -48,7 +48,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusterRegistrationTokenController: clients.Mgmt.ClusterRegistrationToken(),
 		clusterRegistrationTokenCache:      clients.Mgmt.ClusterRegistrationToken().Cache(),
-		clusters:                           clients.Mgmt.Cluster().Cache(),
+		clustersCache:                      clients.Mgmt.Cluster().Cache(),
 		secrets:                            clients.Core.Secret(),
 		secretCache:                        clients.Core.Secret().Cache(),
 		roles:                              clients.RBAC.Role(),
@@ -526,6 +526,9 @@ func (h *handler) ensureCRTTokenReaderRole(namespace string) error {
 	for _, crt := range crts {
 		secretNames = append(secretNames, SecretName(crt.Name))
 	}
+	// Sort so the desired Rules are deterministic and the DeepEqual doesn't
+	// trigger an unnecessary Update when the list is unchanged.
+	slices.Sort(secretNames)
 
 	// If no CRT Secrets exist, delete the Role if it exists
 	if len(secretNames) == 0 {

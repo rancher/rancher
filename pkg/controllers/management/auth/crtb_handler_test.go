@@ -223,7 +223,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(errDefault)
 				cts.managerMock.EXPECT().
 					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
-					Return(false, nil).
+					Return(false, false, nil).
 					AnyTimes()
 			},
 			wantError: true,
@@ -258,7 +258,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(nil)
 				cts.managerMock.EXPECT().
 					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
-					Return(false, nil)
+					Return(false, false, nil)
 				cts.projectListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Project, error) {
 					return nil, errDefault
 				}
@@ -295,7 +295,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(nil)
 				cts.managerMock.EXPECT().
 					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
-					Return(false, nil)
+					Return(false, false, nil)
 				cts.projectListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Project, error) {
 					p := defaultProject.DeepCopy()
 					return []*v3.Project{p}, nil
@@ -333,7 +333,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(nil)
 				cts.managerMock.EXPECT().
 					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
-					Return(false, nil)
+					Return(false, false, nil)
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "test-project", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
@@ -372,7 +372,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(nil)
 				cts.managerMock.EXPECT().
 					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
-					Return(false, nil)
+					Return(false, false, nil)
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "test-project", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
@@ -411,7 +411,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(nil)
 				cts.managerMock.EXPECT().
 					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
-					Return(false, nil)
+					Return(false, false, nil)
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "c-ABC-p-XYZ", gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil)
@@ -450,7 +450,7 @@ func TestReconcileBindings(t *testing.T) {
 					Return(nil)
 				cts.managerMock.EXPECT().
 					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
-					Return(false, nil)
+					Return(false, false, nil)
 				// This should not be called
 				cts.managerMock.EXPECT().
 					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "deleting-project", gomock.Any(), gomock.Any(), gomock.Any()).
@@ -463,6 +463,49 @@ func TestReconcileBindings(t *testing.T) {
 					p := deletingProject.DeepCopy()
 					return []*v3.Project{p}, nil
 				}
+			},
+			crtb: defaultCRTB.DeepCopy(),
+			wantConditions: []v1.Condition{
+				{
+					Type:   bindingExists,
+					Status: v1.ConditionTrue,
+					Reason: bindingExists,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+			},
+		},
+		{
+			name: "skip crt-token-reader rolebinding when role grants unrestricted secret access",
+			stateSetup: func(cts crtbTestState) {
+				cts.managerMock.EXPECT().
+					checkReferencedRoles("roleTemplate", "cluster", gomock.Any()).
+					Return(true, nil)
+				cts.managerMock.EXPECT().
+					ensureClusterMembershipBinding("clustername-clusterowner", gomock.Any(), gomock.Any(), true, gomock.Any()).
+					Return(nil)
+				cts.managerMock.EXPECT().
+					grantManagementPlanePrivileges("roleTemplate", gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
+				cts.managerMock.EXPECT().
+					checkIfRoleTemplateGrantsCRTAccess("roleTemplate").
+					Return(true, true, nil)
+				cts.managerMock.EXPECT().
+					grantManagementClusterScopedPrivilegesInProjectNamespace("roleTemplate", "test-project", gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
+				cts.clusterListerMock.GetFunc = func(namespace, name string) (*v3.Cluster, error) {
+					c := defaultCluster.DeepCopy()
+					return c, nil
+				}
+				cts.projectListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Project, error) {
+					p := defaultProject.DeepCopy()
+					return []*v3.Project{p}, nil
+				}
+				// ensureCRTTokenReaderRoleBinding must not be called since the RoleTemplate
+				// already grants unrestricted secret access; rbClient.Create is left unmocked
+				// (nil CreateFunc panics) so any unexpected Create call fails the test.
+				// removeCRTTokenReaderRoleBinding is expected instead, which only deletes.
 			},
 			crtb: defaultCRTB.DeepCopy(),
 			wantConditions: []v1.Condition{

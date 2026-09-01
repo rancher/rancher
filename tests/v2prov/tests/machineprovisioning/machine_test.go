@@ -33,12 +33,13 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
+func Test_Provisioning_SetA_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -123,137 +124,7 @@ func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_MachineTemplateClonedAnnotations(t *testing.T) {
-	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
-		t.Skip()
-	}
-
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
-
-	c, err := cluster.New(clients, &provisioningv1api.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-machine-template-cloned-annotations",
-		},
-		Spec: provisioningv1api.ClusterSpec{
-			KubernetesVersion: defaults.SomeK8sVersion,
-			RKEConfig: &provisioningv1api.RKEConfig{
-				MachinePools: []provisioningv1api.RKEMachinePool{{
-					EtcdRole:         true,
-					ControlPlaneRole: true,
-					WorkerRole:       true,
-					Quantity:         &defaults.One,
-				}},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	infraMachines, err := cluster.PodInfraMachines(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, infraMachine := range infraMachines.Items {
-		templateGroupKind := schema.ParseGroupKind(infraMachine.GetAnnotations()[capi.TemplateClonedFromGroupKindAnnotation])
-
-		machineTemplate, err := clients.Dynamic.
-			Resource(schema.GroupVersionResource{Group: templateGroupKind.Group, Version: "v1", Resource: strings.ToLower(templateGroupKind.Kind) + "s"}).
-			Namespace(infraMachine.GetNamespace()).
-			Get(clients.Ctx, infraMachine.GetAnnotations()[capi.TemplateClonedFromNameAnnotation], metav1.GetOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		gv, err := schema.ParseGroupVersion(machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromGroupVersionAnn])
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assert.Equal(t, gv.String(), capr.DefaultMachineConfigAPIVersion)
-		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromKindAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Kind)
-		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromNameAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Name)
-	}
-	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
-	assert.NoError(t, err)
-}
-
-func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
-	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
-		t.Skip()
-	}
-
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
-
-	c, err := cluster.New(clients, &provisioningv1api.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-machine-set-delete-policy-oldest-set",
-		},
-		Spec: provisioningv1api.ClusterSpec{
-			KubernetesVersion: defaults.SomeK8sVersion,
-			RKEConfig: &provisioningv1api.RKEConfig{
-				MachinePools: []provisioningv1api.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Quantity:         &defaults.One,
-					},
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Quantity:         &defaults.One,
-						RollingUpdate: &provisioningv1api.RKEMachinePoolRollingUpdate{
-							MaxUnavailable: &intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "10%",
-							},
-							MaxSurge: &intstr.IntOrString{
-								Type:   intstr.String,
-								StrVal: "10%",
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	machineSets, err := cluster.MachineSets(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, machineSet := range machineSets.Items {
-		assert.Equal(t, capi.OldestMachineSetDeletionOrder, machineSet.Spec.Deletion.Order)
-	}
-	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
-	assert.NoError(t, err)
-}
-
-func Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
+func Test_Provisioning_SetA_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -360,7 +231,195 @@ func Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
+func Test_Provisioning_SetB_MP_DrainNoDelete(t *testing.T) {
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-drain-no-delete",
+		},
+		Spec: provisioningv1api.ClusterSpec{
+			KubernetesVersion: defaults.SomeK8sVersion,
+			RKEConfig: &provisioningv1api.RKEConfig{
+				MachinePools: []provisioningv1api.RKEMachinePool{
+					{
+						EtcdRole:          true,
+						ControlPlaneRole:  true,
+						Quantity:          &defaults.One,
+						DrainBeforeDelete: false,
+					},
+					{
+						WorkerRole:        true,
+						Quantity:          &defaults.One,
+						DrainBeforeDelete: true,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(machines.Items), 2)
+
+	excludeNodeDraining, ok := machines.Items[0].Annotations[capi.ExcludeNodeDrainingAnnotation]
+	assert.True(t, ok)
+	assert.Equal(t, excludeNodeDraining, "true")
+
+	_, ok = machines.Items[1].Annotations[capi.ExcludeNodeDrainingAnnotation]
+	assert.False(t, ok)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_SetB_MP_MachineTemplateClonedAnnotations(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	t.Parallel()
+
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-machine-template-cloned-annotations",
+		},
+		Spec: provisioningv1api.ClusterSpec{
+			KubernetesVersion: defaults.SomeK8sVersion,
+			RKEConfig: &provisioningv1api.RKEConfig{
+				MachinePools: []provisioningv1api.RKEMachinePool{{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Quantity:         &defaults.One,
+				}},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	infraMachines, err := cluster.PodInfraMachines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, infraMachine := range infraMachines.Items {
+		templateGroupKind := schema.ParseGroupKind(infraMachine.GetAnnotations()[capi.TemplateClonedFromGroupKindAnnotation])
+
+		machineTemplate, err := clients.Dynamic.
+			Resource(schema.GroupVersionResource{Group: templateGroupKind.Group, Version: "v1", Resource: strings.ToLower(templateGroupKind.Kind) + "s"}).
+			Namespace(infraMachine.GetNamespace()).
+			Get(clients.Ctx, infraMachine.GetAnnotations()[capi.TemplateClonedFromNameAnnotation], metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		gv, err := schema.ParseGroupVersion(machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromGroupVersionAnn])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, gv.String(), capr.DefaultMachineConfigAPIVersion)
+		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromKindAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Kind)
+		assert.Equal(t, machineTemplate.GetAnnotations()[capr.MachineTemplateClonedFromNameAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Name)
+	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_SetB_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+	t.Parallel()
+
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-machine-set-delete-policy-oldest-set",
+		},
+		Spec: provisioningv1api.ClusterSpec{
+			KubernetesVersion: defaults.SomeK8sVersion,
+			RKEConfig: &provisioningv1api.RKEConfig{
+				MachinePools: []provisioningv1api.RKEMachinePool{
+					{
+						EtcdRole:         true,
+						ControlPlaneRole: true,
+						WorkerRole:       true,
+						Quantity:         &defaults.One,
+					},
+					{
+						EtcdRole:         true,
+						ControlPlaneRole: true,
+						WorkerRole:       true,
+						Quantity:         &defaults.One,
+						RollingUpdate: &provisioningv1api.RKEMachinePoolRollingUpdate{
+							MaxUnavailable: &intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "10%",
+							},
+							MaxSurge: &intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "10%",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machineSets, err := cluster.MachineSets(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, machineSet := range machineSets.Items {
+		assert.Equal(t, capi.OldestMachineSetDeletionOrder, machineSet.Spec.Deletion.Order)
+	}
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
+
+func Test_Provisioning_SetB_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -417,11 +476,10 @@ func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
+func Test_Provisioning_SetB_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
-	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -472,12 +530,13 @@ func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) 
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_Drain(t *testing.T) {
+func Test_Provisioning_SetB_MP_Drain(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clients.Close()
+	t.Parallel()
 
 	drainOpt := rkev1.DrainOptions{
 		IgnoreDaemonSets:                ptr.To(true),
@@ -614,66 +673,11 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clients.Close()
-
-	c, err := cluster.New(clients, &provisioningv1api.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-drain-no-delete",
-		},
-		Spec: provisioningv1api.ClusterSpec{
-			KubernetesVersion: defaults.SomeK8sVersion,
-			RKEConfig: &provisioningv1api.RKEConfig{
-				MachinePools: []provisioningv1api.RKEMachinePool{
-					{
-						EtcdRole:          true,
-						ControlPlaneRole:  true,
-						Quantity:          &defaults.One,
-						DrainBeforeDelete: false,
-					},
-					{
-						WorkerRole:        true,
-						Quantity:          &defaults.One,
-						DrainBeforeDelete: true,
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	machines, err := cluster.Machines(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, len(machines.Items), 2)
-
-	excludeNodeDraining, ok := machines.Items[0].Annotations[capi.ExcludeNodeDrainingAnnotation]
-	assert.True(t, ok)
-	assert.Equal(t, excludeNodeDraining, "true")
-
-	_, ok = machines.Items[1].Annotations[capi.ExcludeNodeDrainingAnnotation]
-	assert.False(t, ok)
-	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
-	assert.NoError(t, err)
-}
-
-func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
+func Test_Provisioning_SetB_Single_Node_All_Roles_Drain(t *testing.T) {
 	clients, err := clients.New()
 	require.NoError(t, err)
 	defer clients.Close()
+	t.Parallel()
 
 	ctx := clients.Ctx
 

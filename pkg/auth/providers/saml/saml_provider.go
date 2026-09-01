@@ -1,10 +1,12 @@
 package saml
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/pkg/errors"
@@ -33,6 +35,7 @@ const (
 	KeyCloakName        = "keycloak"
 	OKTAName            = "okta"
 	ShibbolethName      = "shibboleth"
+	GenericSAMLName     = "genericsaml"
 	loginAction         = "login"
 	testAndEnableAction = "testAndEnable"
 )
@@ -54,28 +57,32 @@ type Provider struct {
 	sloForced       bool
 
 	getSamlConfig  func() (*apiv3.SamlConfig, error)
-	assertionCache *assertionCache
+	assertionStore assertionStore
 }
 
 var SamlProviders = make(map[string]*Provider)
 
-func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	provider := &Provider{
-		authConfigs:    mgmtCtx.Management.AuthConfigs(""),
-		secrets:        mgmtCtx.Wrangler.Core.Secret(),
-		samlTokens:     mgmtCtx.Management.SamlTokens(""),
-		userMGR:        userMGR,
-		tokenMGR:       tokenMGR,
-		name:           name,
-		userType:       name + "_user",
-		groupType:      name + "_group",
-		userSearcher:   common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
-		assertionCache: newAssertionCache(),
+		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
+		secrets:      mgmtCtx.Wrangler.Core.Secret(),
+		samlTokens:   mgmtCtx.Management.SamlTokens(""),
+		userMGR:      userMGR,
+		tokenMGR:     tokenMGR,
+		name:         name,
+		userType:     name + "_user",
+		groupType:    name + "_group",
+		userSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 	}
 	provider.getSamlConfig = provider.getSamlConfigFromUnstructured
 	if provider.hasLdapGroupSearch() {
 		provider.ldapProvider = ldap.Configure(mgmtCtx, userMGR, tokenMGR, name)
 	}
+
+	logrus.Debugf("SAML: Using ConfigMap assertion store for %v", name)
+	store := newConfigMapIDStore(mgmtCtx.Wrangler.Core.ConfigMap(), mgmtCtx.Wrangler.Core.ConfigMap().Cache())
+	provider.assertionStore = store
+	go store.cleanUpExpiredAssertionIDs(ctx, time.Tick(time.Minute))
 
 	SamlProviders[name] = provider
 	return provider
@@ -103,6 +110,8 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]any) (map[strin
 		p[publicclient.OKTAProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	case ShibbolethName:
 		p[publicclient.ShibbolethProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
+	case GenericSAMLName:
+		p[publicclient.GenericSAMLProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	}
 	return p, nil
 }
@@ -306,6 +315,8 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 		configType = client.OKTAConfigType
 	case ShibbolethName:
 		configType = client.ShibbolethConfigType
+	case GenericSAMLName:
+		configType = client.GenericSAMLConfigType
 	}
 
 	config.APIVersion = "management.cattle.io/v3"
@@ -479,6 +490,8 @@ func formSamlRedirectURLFromMap(config map[string]any, name string) string {
 		hostname, _ = config[client.OKTAConfigFieldRancherAPIHost].(string)
 	case ShibbolethName:
 		hostname, _ = config[client.ShibbolethConfigFieldRancherAPIHost].(string)
+	case GenericSAMLName:
+		hostname, _ = config[client.GenericSAMLConfigFieldRancherAPIHost].(string)
 	}
 
 	path := hostname + "/v1-saml/" + name + "/login"

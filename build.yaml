@@ -1,18 +1,16 @@
 # Container tags
 chartAuditLogImage: rancher/mirrored-bci-micro:16.0-15.11
 defaultShellVersion: rancher/shell:v0.8.1
-defaultSccOperatorImage: rancher/scc-operator:v0.5.1-rc.2
-
+defaultSccOperatorImage: rancher/scc-operator:v0.5.2-rc.1
 # Notes: ClusterRepo asset and branch versions
 defaultAssetsImage: rancher/rancher-assets:v2.16-20260805T1815Z-dev
 chartDefaultBranch: dev-v2.16
 partnerChartDefaultBranch: main
 rke2ChartDefaultBranch: main
-
 # Charts Versions
 cspAdapterMinVersion: 110.0.0+up10.0.0
-fleetVersion: 110.0.0+up0.16.0-rc.5
+fleetVersion: 111.0.0+up0.17.0-alpha.1
 remoteDialerProxyVersion: 110.0.0+up0.8.0-rc.10
 # NOTE: CAPI controller version has to be updated in scripts/package-env
 turtlesVersion: 110.0.0+up0.27.0
-webhookVersion: 111.0.0+up0.12.1-rc.1
+webhookVersion: 111.0.0+up0.12.1-rc.3

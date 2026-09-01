@@ -8,55 +8,55 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFilter(t *testing.T) {
-	type testCase struct {
-		Name    string
-		Filter  Filter
-		log     logEntry
-		Allowed bool
-	}
-
-	cases := []testCase{
+func TestFilterActionForURI(t *testing.T) {
+	tests := []struct {
+		name       string
+		filter     Filter
+		requestURI string
+		expected   auditlogv1.FilterAction
+	}{
 		{
-			Name: "Allow All",
-			Filter: Filter{
+			name: "allow filter matches",
+			filter: Filter{
 				action: auditlogv1.FilterActionAllow,
-				uri:    regexp.MustCompile(".*"),
+				uri:    regexp.MustCompile(".*pods.*"),
 			},
-			log: logEntry{
-				RequestURI: "/api/v1/namespaces/default/pods",
-			},
-			Allowed: true,
+			requestURI: "/api/v1/namespaces/default/pods",
+			expected:   auditlogv1.FilterActionAllow,
 		},
 		{
-			Name: "Deny All",
-			Filter: Filter{
+			name: "deny filter matches",
+			filter: Filter{
 				action: auditlogv1.FilterActionDeny,
-				uri:    regexp.MustCompile(".*"),
+				uri:    regexp.MustCompile(".*secrets.*"),
 			},
-			log: logEntry{
-				RequestURI: "/api/v1/namespaces/default/pods",
-			},
-			Allowed: false,
+			requestURI: "/api/v1/namespaces/default/secrets/my-secret",
+			expected:   auditlogv1.FilterActionDeny,
 		},
-
 		{
-			Name: "Block Secret Operations",
-			Filter: Filter{
+			name: "allow filter does not match",
+			filter: Filter{
+				action: auditlogv1.FilterActionAllow,
+				uri:    regexp.MustCompile(".*secrets.*"),
+			},
+			requestURI: "/api/v1/namespaces/default/pods",
+			expected:   auditlogv1.FilterActionUnknown,
+		},
+		{
+			name: "deny filter does not match",
+			filter: Filter{
 				action: auditlogv1.FilterActionDeny,
-				uri:    regexp.MustCompile("/api/v1/namespaces/.*/secrets.*"),
+				uri:    regexp.MustCompile("/healthz"),
 			},
-			log: logEntry{
-				RequestURI: "/api/v1/namespaces/default/secrets/my-secret",
-			},
-			Allowed: false,
+			requestURI: "/api/v1/namespaces/default/pods",
+			expected:   auditlogv1.FilterActionUnknown,
 		},
 	}
 
-	for _, c := range cases {
-		t.Run(c.Name, func(t *testing.T) {
-			actual := c.Filter.LogAllowed(&c.log)
-			assert.Equal(t, c.Allowed, actual)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := tt.filter.ActionForURI(tt.requestURI)
+			assert.Equal(t, tt.expected, actual)
 		})
 	}
 }

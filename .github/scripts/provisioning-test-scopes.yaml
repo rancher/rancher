@@ -1,0 +1,218 @@
+# This file is consumed by .github/scripts/resolve-provisioning-matrix.sh,
+# which looks at a change set and emits the GitHub Actions matrix (the actual V2PROV_TEST_* rows) directly.
+#
+# STRUCTURE
+#   scopes.<name>.package-paths : anchored grep -E regexes over a changed file path, one per
+#       package/directory. Any changed file matching one of these triggers the scope unconditionally
+#       -- UNLESS that specific file also matches a scopes.<name>.file-paths entry (see below), in
+#       which case the file-paths entry decides instead.
+#
+#   scopes.<name>.file-paths : fine-grained overrides for individual files that mix provisioning-relevant
+#       and unrelated content, where reacting to any change under package-paths would be too broad.
+#
+#       Each entry points at one specific file, and is either:
+#       - a plain string: an anchored grep -E regex over a changed file path. Any change to a
+#         matching file triggers the scope.
+#       - a mapping { path: <regex>, substrings: [<literal>, ...] }: the scope only triggers if a
+#         changed file matches <regex> AND at least one changed line (added or removed, from a
+#         zero-context diff) in that file contains one of the literal <substrings>.
+#
+#       Example: only reacting to the rancher-turtles chart version bumping in build.yaml, not every
+#       chart/image pin in that file. A file-paths entry can also target one file within a
+#       package-paths directory (e.g. a single .go file inside a package listed in package-paths)
+#       to carve out a stricter rule for just that file, while every other file in that directory
+#       keeps triggering unconditionally via package-paths.
+#
+#   scopes.<name>.tests : the matrix rows to run when this scope is selected. Each row:
+#       dist        (required) -> V2PROV_TEST_DIST        (k3s | rke2)
+#       regex       (required) -> V2PROV_TEST_RUN_REGEX   (go test -run regex)
+#       features    (optional) -> CATTLE_FEATURES         (omit when unused)
+#       cpus        (optional) -> V2PROV_TEST_CPUS        (16 by default)
+#       parallelism (optional) -> V2PROV_TEST_PARALLELISM (1 by default)
+#
+#   Tests within a specific scope can be sharded by adding additional test entries,
+#   however care must be taken to ensure that the regexes are mutually exclusive.
+#   Otherwise, the same test will run multiple times in a single workflow run.
+#
+#   In addition to path specific scopes, there are two special scopes:
+#
+#   full : Any match runs EVERY provisioning test. This is reserved for
+#          core functionality like the planner, where changes could impact all of provisioning.
+#          Valid entries can be package paths, or absolute file paths.
+#
+#   skip : Documents coverage gaps. This scope runs nothing, and is identical
+#          to leaving a path unlisted. It exists to prevent accidental
+#          inclusion of these paths in the future.
+
+scopes:
+  # general + custom + machine provisioning + fleet
+  basic:
+    package-paths:
+      - '^cmd/agent/'
+      - '^pkg/agent/'
+      - '^pkg/apis/'
+      - '^pkg/capr/configserver/'                     # also imported
+      - '^pkg/capr/installer/'
+      - '^pkg/cluster/'
+      - '^pkg/clusterprovisioninglogger/'
+      - '^pkg/controllers/provisioningv2/provisioninglog/'
+      - '^pkg/controllers/provisioningv2/fleetcluster/'
+      - '^pkg/controllers/provisioningv2/fleetworkspace/'
+      - '^pkg/controllers/provisioningv2/managedchart/'
+      - '^pkg/controllers/provisioningv2/machineconfigcleanup/'
+      - '^pkg/controllers/capr/autoscaler/'
+      - '^pkg/controllers/capr/bootstrap/'
+      - '^pkg/controllers/capr/bootstraptoken/'       # also imported
+      - '^pkg/controllers/capr/managesystemagent/'
+      - '^pkg/controllers/capr/machineprovision/'
+      - '^pkg/controllers/capr/machinedrain/'         # also operations
+      - '^pkg/controllers/capr/machinenodelookup/'
+      - '^pkg/controllers/capr/dynamicschema/'
+      - '^pkg/controllers/management/authprovisioningv2/'
+      - '^pkg/controllers/management/clusterconnected/'
+      - '^pkg/controllers/management/clusterdeploy/'
+      - '^pkg/controllers/management/systemagent/'
+      - '^pkg/controllers/management/node/'
+      - '^pkg/controllers/managementagent/'
+      - '^pkg/controllers/managementuser/'
+      - '^pkg/controllers/dashboard/fleetcharts/'
+      - '^pkg/controllers/dashboard/clusterregistrationtoken/'
+      - '^pkg/controllers/dashboard/systemcharts/'
+      - '^pkg/data/dashboard'
+      - '^pkg/fleet/'
+      - '^pkg/image/'
+      - '^pkg/impersonation/'
+      - '^pkg/node/'
+      - '^pkg/multiclustermanager/'
+      - '^pkg/provisioningv2/systeminfo/'
+      - '^pkg/provisioningv2/kubeconfig/'
+      - '^pkg/provisioningv2/image/'
+      - '^pkg/systemtemplate/'
+      - '^pkg/serviceaccounttoken/'
+      - '^pkg/systemtokens/'
+      - '^pkg/taints/'
+      - '^pkg/wrangler/'
+      - '^tests/v2prov/tests/general/'
+      - '^tests/v2prov/tests/custom/'                 # also operations
+      - '^tests/v2prov/tests/machineprovisioning/'    # also operations
+      - '^tests/v2prov/tests/fleet/'
+      - '^tests/v2prov/tests/autoscaler/'
+    file-paths:
+      - path: "^go.mod$"
+        substrings:
+          - 'github.com/rancher/wrangler'
+          - 'github.com/rancher/lasso'
+          - 'github.com/k3s'
+          - 'github.com/rancher/dynamiclistener'
+          - 'github.com/rancher/remotedialer'
+          - 'github.com/rancher/fleet'
+          - 'github.com/rancher/machine'
+          - 'github.com/rancher/remotedialer-proxy'
+          - 'github.com/rancher/steve'
+          - 'github.com/stretchr/testify'
+      - path: "^pkg/apis/go.mod$"
+        substrings:
+            - 'github.com/rancher/norman'
+      - path: '^build.yaml'
+        substrings:
+          - 'turtlesVersion:'
+          - 'fleetVersion:'
+          - 'webhookVersion:'
+      - path: "^pkg/settings/setting.go"
+        substrings:
+          - 'agent-image'
+          - 'kdm-branch'
+          - 'system-agent-version'
+          - 'wins-agent-version'
+          - 'system-agent-install-script'
+          - 'wins-agent-install-script'
+          - 'chart-default-branch'
+          - 'machine-provision-image'
+      - path: "^package/Dockerfile"
+        substrings:
+          - 'CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION'
+          - 'CATTLE_K3S_VERSION'
+    tests:
+      - { dist: k3s,  regex: '^Test_Provisioning_(SetA|Custom_SetA)_.*$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_(General|Provisioning_SetA|Provisioning_Custom_SetA|Fleet)_.*$', parallelism: 3 }
+
+  # day-2 ops (cert rotation, etcd snapshot, drain) on custom + machine provisioning
+  operations:
+    package-paths:
+      - '^pkg/controllers/capr/etcdmgmt/'             # also imported
+      - '^pkg/controllers/capr/machinedrain/'         # also basic
+      - '^pkg/rkecerts/'
+      - '^pkg/operations/'
+      - '^tests/v2prov/tests/custom/'                 # also basic
+      - '^tests/v2prov/tests/machineprovisioning/'    # also basic
+    tests:
+      - { dist: k3s,  regex: '^Test_Operation_.*$' } # k3s runs all ops in one instance. This shard is too heavily to parallelize at the moment.
+      - { dist: rke2, regex: '^Test_Operation_SetA_.*$' }
+      - { dist: rke2, regex: '^Test_Operation_SetB_.*EtcdSnapshotOperationsOnNew.*$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode$'}
+
+  imported:
+    package-paths:
+      - '^pkg/controllers/capr/unmanaged/'
+      - '^pkg/controllers/capr/bootstraptoken/'       # also basic
+      - '^pkg/controllers/capr/etcdmgmt/'             # also operations
+      - '^pkg/capr/configserver/'                     # also basic
+      - '^tests/v2prov/tests/imported/'
+    tests:
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore)$', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_Imported_Operation_SetD_(ImportedDisableSingleNode|ImportedDisableMultiNode)$', cpus: 8 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedETCDSnapshotSave|ImportedETCDSnapshotRestore|ImportedDisableSingleNode|ImportedDisableMultiNode)$', parallelism: 3 }
+      - { dist: rke2, regex: '^Test_Imported_Operation_SetD_(ImportedEncryptionKeyRotation|ImportedEncryptionKeyRotation_MultiNodeMixedRoles)$', parallelism: 3 }
+
+  prebootstrap:
+    package-paths:
+      - '^pkg/provisioningv2/prebootstrap/'
+      - '^tests/v2prov/tests/prebootstrap/'
+    tests:
+      - { dist: rke2, regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+      - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
+
+  # An example of a scope that should only run when ALL=1, or the 'full' scope is triggered.
+  # These tests run in addition to the other defined scopes.
+  nightly:
+    tests:
+      - { dist: k3s,  regex: '^Test_Provisioning_(SetB|Custom_SetB)_.*$' }
+      - { dist: rke2, regex: '^Test_Provisioning_(SetB|Custom_SetB)_.*$' }
+#      - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+#      - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
+
+full:
+  - path: '^go.mod$'
+    substrings:
+      - 'github.com/rancher/cluster-api-provider-rke2'
+      - 'k8s.io/' # all kubernetes dependencies
+      - 'sigs.k8s.io/'
+  - path: '^pkg/apis/go.mod$'
+    substrings:
+      - 'k8s.io/'
+      - 'sigs.k8s.io/'
+  - '^pkg/controllers/capr/controllers.go'
+  - '^pkg/controllers/provisioningv2/controllers.go'
+  - '^pkg/capr/planner/'
+  - '^pkg/plan/'
+  - '^pkg/controllers/capr/planner/'
+  - '^pkg/controllers/capr/rkecontrolplane/'
+  - '^pkg/controllers/capr/rkecluster/'
+  - '^pkg/controllers/capr/plansecret/'
+  - '^pkg/controllers/provisioningv2/cluster/'
+  - '^pkg/controllers/provisioningv2/provisioningcluster/'
+  - '^pkg/controllers/provisioningv2/rke2/'
+  - '^pkg/controllers/provisioningv2/secret/'
+  - '^tests/v2prov/(clients|cluster|defaults|namespace|nodeconfig|objectstore|operations|registry|systemdnode|utils|wait)/' # framework (everything under tests/v2prov except 'tests/'. Individual tests are included in more specific scopes above)
+  - '^scripts/provisioning-tests$'                    # the runner
+  - '^\.github/workflows/provisioning-tests\.ya?ml$'
+  - '^trigger_ci$' # created by the 'Create CI Testing PR' workflow
+
+# Mainly here for documentation, these directories are provisioning related but don't
+# actually have any existing test coverage in the provv2 test suite. They're listed here
+# so that they don't accidentally get included in the above scopes in the future.
+skip:
+  - '^pkg/(kontainer-engine|kontainerdriver|kontainerdrivermetadata|channelserver|clustermanager)/'
+  - '^pkg/controllers/nodedriver/'
+  - '^pkg/controllers/provisioningv2/harvestercleanup/'
+  - '^pkg/controllers/management/(aks|eks|gke|alibaba|clusteroperator|imported|importedclusterversionmanagement|clusterprovisioner|drivers|cloudcredential|agentupgrade|k3sbasedupgrade|certsexpiration)/'

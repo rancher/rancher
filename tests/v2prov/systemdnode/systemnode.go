@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -76,7 +77,7 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 				Name:  "container",
 				Image: defaults.PodTestImage,
 				SecurityContext: &corev1.SecurityContext{
-					Privileged: &[]bool{true}[0],
+					Privileged: new(true),
 				},
 				Stdin:     true,
 				StdinOnce: true,
@@ -116,6 +117,29 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 			}},
 			AutomountServiceAccountToken: new(bool),
 		},
+	}
+
+	// Back downstream etcd with tmpfs to avoid disk pressure, which can cause
+	// slow fsyncs / etcd leader loss. SizeLimit is a cap, not a reservation
+	etcdTmpfsSize := resource.MustParse("512Mi")
+	for i, etcdPath := range []string{
+		"/var/lib/rancher/rke2/server/db",
+		"/var/lib/rancher/k3s/server/db",
+	} {
+		name := fmt.Sprintf("etcd-tmpfs-%d", i)
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+			Name: name,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium:    corev1.StorageMediumMemory,
+					SizeLimit: &etcdTmpfsSize,
+				},
+			},
+		})
+		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      name,
+			MountPath: etcdPath,
+		})
 	}
 
 	for i, v := range extraDirs {

@@ -1,8 +1,5 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "github>rancher/renovate-config//rancher-main#release"
-  ],
   "baseBranchPatterns": [
     "main",
     "release/v2.15",
@@ -15,14 +12,22 @@
     "go.qase.io/client"
   ],
   "prHourlyLimit": 6,
-  "prConcurrentLimit": 10,
+  "prConcurrentLimit": 20,
   "packageRules": [
+    {
+      "matchBaseBranches": [
+        "main"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-main#main"
+      ]
+    },
     {
       "matchBaseBranches": [
         "release/v2.15"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.15#release"
+        "github>rancher/renovate-config//rancher-2.15#main"
       ]
     },
     {
@@ -30,7 +35,7 @@
         "release/v2.14"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.14#release"
+        "github>rancher/renovate-config//rancher-2.14#main"
       ]
     },
     {
@@ -38,7 +43,7 @@
         "release/v2.13"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.13#release"
+        "github>rancher/renovate-config//rancher-2.13#main"
       ]
     },
     {
@@ -46,7 +51,7 @@
         "release/v2.12"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.12#release"
+        "github>rancher/renovate-config//rancher-2.12#main"
       ]
     },
     {
@@ -54,7 +59,21 @@
         "release/v2.11"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.11#release"
+        "github>rancher/renovate-config//rancher-2.11#main"
+      ]
+    },
+    {
+      "description": "Activate automerge for eligible updates",
+      "matchBaseBranches": [
+        "main",
+        "release/v2.15",
+        "release/v2.14",
+        "release/v2.13",
+        "release/v2.12",
+        "release/v2.11"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//automerge#main"
       ]
     }
   ]

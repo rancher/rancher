@@ -127,7 +127,7 @@ var (
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
 	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.15.0/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.16.0-rc.3/install.ps1")
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.16.0-rc.4/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -159,7 +159,7 @@ var (
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	AlibabaUpstreamRefresh              = NewSetting("alibaba-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher145")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher146-rc.2")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -182,6 +182,9 @@ var (
 
 	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
 	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "129600") // 90 days
+
+	// AuthTokenDefaultTTLMinutes is the default allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
+	AuthTokenDefaultTTLMinutes = NewSetting("auth-token-default-ttl-minutes", "129600") // 90 days
 
 	// AuthUserInfoMaxAgeSeconds represents the maximum age of a users auth tokens before an auth provider group membership sync will be performed.
 	AuthUserInfoMaxAgeSeconds = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
@@ -257,6 +260,10 @@ var (
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "43200") // 30 days
+
+	// KubeconfigMaxTokenTTLMinutes is the max time to live applied to kubeconfigs created for users.
+	// This setting will take effect regardless of the kubeconfig-generate-token status.
+	KubeconfigMaxTokenTTLMinutes = NewSetting("kubeconfig-max-token-ttl-minutes", "129600") // 90 days
 
 	// KubeconfigGenerateToken determines whether the UI will return a generate token with kubeconfigs.
 	// If set to false the kubeconfig will contain a command to login to Rancher.
