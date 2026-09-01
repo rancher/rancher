@@ -164,7 +164,11 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 		return nil
 	}
 
+	// Everything below talks to the downstream cluster, so wait for the agent tunnel. Connected
+	// is derived from that tunnel and not from how the cluster was created, so this applies
+	// uniformly to node-driver, custom, imported and hosted clusters.
 	if !clusterconnected.Connected.IsTrue(cluster) {
+		logrus.Tracef("clusterDeploy: doSync: cluster [%s] agent is not connected", cluster.Name)
 		return nil
 	}
 

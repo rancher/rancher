@@ -113,11 +113,17 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 		return nil, err
 	}
 
-	// Skip usercontrollers if cluster is not yet provisioned
-	//if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
-	//	return cluster, nil
-	//}
-	if !clusterconnected.Connected.IsTrue(cluster) {
+	// Both conditions are real preconditions for starting the per-cluster controllers, and
+	// neither implies the other:
+	//
+	//   - Provisioned, because clustermanager.ToRESTConfig returns a nil config without it, so
+	//     Start would either no-op or error in a retry loop until it flips.
+	//   - Connected, because the controllers all talk to the downstream cluster through the
+	//     agent tunnel, and starting them before it is up just produces connection errors.
+	//
+	// Neither of these cares how the cluster was created. Connected is derived from the agent's
+	// tunnel session, which every cluster type establishes identically.
+	if !v3.ClusterConditionProvisioned.IsTrue(cluster) || !clusterconnected.Connected.IsTrue(cluster) {
 		return cluster, nil
 	}
 
@@ -202,10 +208,10 @@ func (u *userControllersController) reconcileClusterOwnership() error {
 	)
 
 	for _, cluster := range clusters {
-		//if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
-		//	continue
-		//}
-		if cluster.DeletionTimestamp != nil || !clusterconnected.Connected.IsTrue(cluster) {
+		// Same preconditions as sync above.
+		if cluster.DeletionTimestamp != nil ||
+			!v3.ClusterConditionProvisioned.IsTrue(cluster) ||
+			!clusterconnected.Connected.IsTrue(cluster) {
 			continue
 		}
 

@@ -72,8 +72,9 @@ func TestWaitPodDone(t *testing.T) {
 	})
 
 	// The regression: the API server routinely closes a watch before a slow first install
-	// finishes. Treating that as a failure made installCharts drop the chart until the next
-	// ClusterRepo event, up to an hour later.
+	// finishes. Treating that as a failure reported the install as failed even though the pod was
+	// still running fine, which at the time dropped the chart until the next ClusterRepo event,
+	// up to an hour later.
 	t.Run("watch closing early is retried, not reported as failure", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		pods := fake.NewMockClientInterface[*v1.Pod, *v1.PodList](ctrl)

@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 var (
@@ -101,7 +102,7 @@ func endpointExists(name string, clients *wrangler.Context) (*v3.ProxyEndpoint, 
 }
 
 func createOrDisableEndpoint(endpoint v3.ProxyEndpoint, disabled bool, clients *wrangler.Context) error {
-	existingEndpoint, exists, err := endpointExists(endpoint.Name, clients)
+	_, exists, err := endpointExists(endpoint.Name, clients)
 	if err != nil {
 		return err
 	}
@@ -119,13 +120,40 @@ func createOrDisableEndpoint(endpoint v3.ProxyEndpoint, disabled bool, clients *
 		}
 		return nil
 	}
-
-	if !disabled {
-		// if it exists and is not disabled, ensure it has the correct routes
-		existingEndpoint = existingEndpoint.DeepCopy()
-		existingEndpoint.Spec.Routes = endpoint.Spec.Routes
-		_, err = clients.Mgmt.ProxyEndpoint().Update(existingEndpoint)
+	if disabled {
+		return nil
 	}
 
-	return err
+	// It exists and is not disabled, so ensure it has the current routes.
+	//
+	// This has to tolerate a conflict. AddProxyEndpointData is reached from two places at once:
+	// the startup seeding path, where any error is fatal (pkg/multiclustermanager/app.go), and
+	// the proxysettings controller, which re-runs it on every Setting change
+	// (pkg/controllers/managementapi/whitelistproxy/proxysettings). Settings churn heavily during
+	// startup, so the two writers race on the same object and Rancher used to die with
+	// "Operation cannot be fulfilled on proxyendpoints.management.cattle.io".
+	//
+	// The read has to come from the live client rather than the cache: on a conflict the cache
+	// still holds the copy that lost, so retrying against it would conflict again every time.
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := clients.Mgmt.ProxyEndpoint().Get(endpoint.Name, v1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Deleted underneath us, e.g. it was disabled concurrently. Nothing to update.
+				return nil
+			}
+			return err
+		}
+
+		if slices.Equal(current.Spec.Routes, endpoint.Spec.Routes) {
+			// Already correct. Skipping the write is what keeps the two writers from
+			// contending in the first place.
+			return nil
+		}
+
+		current = current.DeepCopy()
+		current.Spec.Routes = endpoint.Spec.Routes
+		_, err = clients.Mgmt.ProxyEndpoint().Update(current)
+		return err
+	})
 }

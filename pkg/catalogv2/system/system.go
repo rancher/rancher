@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -26,7 +27,6 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v4/pkg/action"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
@@ -86,11 +86,17 @@ type ContentClient interface {
 }
 
 type Manager struct {
-	ctx                   context.Context
-	operation             OperationClient
-	content               ContentClient
-	pods                  corecontrollers.PodClient
-	desiredCharts         map[desiredKey]map[string]interface{}
+	ctx       context.Context
+	operation OperationClient
+	content   ContentClient
+	pods      corecontrollers.PodClient
+
+	// desiredMu guards desiredCharts, and only desiredCharts. It is needed because Remove is
+	// called from the systemcharts controller goroutine while runSync reads and writes the same
+	// map. See the note on runSync.
+	desiredMu     sync.RWMutex
+	desiredCharts map[desiredKey]map[string]interface{}
+
 	sync                  chan desired
 	refreshIntervalChange chan struct{}
 	settings              mgmtcontrollers.SettingController
@@ -155,31 +161,64 @@ func (m *Manager) onTrigger(_ string, obj *catalog.ClusterRepo) (*catalog.Cluste
 	return obj, nil
 }
 
-// runSync owns m.desiredCharts. Installs themselves run on worker goroutines, bounded by
-// maxConcurrentInstalls, and report back on the results channel so that the map is still only
-// ever touched from this goroutine.
+// runSync drives every system chart install. Installs run on worker goroutines, bounded by
+// maxConcurrentInstalls, and report back on the results channel.
 //
 // Installs used to run inline here, one at a time. Because install waits for the helm operation
 // pod to finish — and the helm action sets Wait: true, so that means waiting for the installed
 // workload to become Ready — a single slow chart delayed every other chart, the refresh ticker,
 // and any pending Ensure. On a new downstream cluster that made two independent charts take the
 // sum of their install times instead of the longer of the two.
+//
+// inFlight and the retry queue below are owned by this goroutine and need no locking.
+// m.desiredCharts is different: Remove is called from the systemcharts controller goroutine, so
+// every access to it goes through the accessors that hold m.desiredMu. An earlier version of this
+// function claimed the map was only ever touched here, which was wrong, and iterating it here
+// while Remove deleted from it crashed Rancher with "concurrent map iteration and map write".
 func (m *Manager) runSync() {
 	t := time.NewTicker(getIntervalOrDefault(settings.SystemFeatureChartRefreshSeconds.Get()))
 	defer func() { t.Stop() }()
+
+	retryTicker := time.NewTicker(installRetryPollInterval)
+	defer retryTicker.Stop()
 
 	var (
 		results  = make(chan installResult, maxConcurrentInstalls)
 		sem      = make(chan struct{}, maxConcurrentInstalls)
 		inFlight = map[desiredKey]struct{}{}
+		retries  = newRetryQueue()
 	)
 
-	// dispatch starts an install unless one is already running for this key. It must only be
-	// called from this goroutine.
+	// webhookInFlight reports whether the rancher-webhook install is currently running. While it
+	// is, no other chart may start: the webhook validates secrets for every chart installed after
+	// it, so a chart that goes first races the webhook becoming ready and fails.
+	webhookInFlight := func() bool {
+		for key := range inFlight {
+			if key.chartName == webhookChartName {
+				return true
+			}
+		}
+		return false
+	}
+
+	// dispatch starts an install unless one is already running for this key, or unless it has to
+	// wait behind the webhook. It must only be called from this goroutine.
 	dispatch := func(d desired) {
 		if _, busy := inFlight[d.key]; busy {
 			return
 		}
+		if d.key.chartName != webhookChartName && webhookInFlight() {
+			// Only log the first time, otherwise the retry tick repeats this every few seconds for
+			// every held chart until the webhook is done.
+			if retries.park(d, time.Now()) {
+				logrus.Infof("Deferring system chart %s until the %s install finishes", d.key.chartName, webhookChartName)
+			}
+			return
+		}
+
+		// The retry entry is deliberately left in place until the install succeeds: it carries the
+		// attempt count, and clearing it here would reset the backoff on every retry. dispatch is
+		// a no-op while the key is inFlight, so the stale entry cannot double-start.
 		inFlight[d.key] = struct{}{}
 
 		go func() {
@@ -199,10 +238,17 @@ func (m *Manager) runSync() {
 	}
 
 	// dispatchDesired re-drives everything already known to be desired, e.g. on the refresh
-	// ticker. Reading the map here keeps it on this goroutine.
+	// ticker.
 	dispatchDesired := func() {
-		for key, values := range m.desiredCharts {
-			dispatch(desired{key: key, values: values, takeOwnership: true})
+		for _, d := range m.listDesired() {
+			dispatch(d)
+		}
+	}
+
+	// dispatchPending re-drives charts whose backoff has elapsed.
+	dispatchPending := func() {
+		for _, d := range retries.due(time.Now()) {
+			dispatch(d)
 		}
 	}
 
@@ -217,19 +263,117 @@ func (m *Manager) runSync() {
 			dispatchDesired()
 		case <-t.C:
 			dispatchDesired()
+		case <-retryTicker.C:
+			dispatchPending()
 		case d := <-m.sync:
 			// newly requested or changed
-			if v, exists := m.desiredCharts[d.key]; exists && equality.Semantic.DeepEqual(v, d.values) {
+			if v, exists := m.desiredValues(d.key); exists && equality.Semantic.DeepEqual(v, d.values) {
 				continue
 			}
 			dispatch(d)
 		case r := <-results:
 			delete(inFlight, r.key)
 			if r.err == nil {
-				m.desiredCharts[r.key] = r.values
+				retries.succeeded(r.key)
+				m.setDesired(r.key, r.values)
+			} else {
+				// Every install failure is retriable. Charts fail transiently for many reasons —
+				// the webhook is not serving yet, the index has not been built, the API server is
+				// rolling — and dropping a system chart on the floor until the next ClusterRepo
+				// event (up to an hour later) has broken provisioning before.
+				backoff, attempts := retries.failed(r.key, r.values, time.Now())
+				logrus.Infof("Retrying system chart %s in %s (attempt %d)", r.key.chartName, backoff, attempts)
+			}
+
+			// The webhook finishing releases anything held behind it.
+			if r.key.chartName == webhookChartName {
+				dispatchPending()
 			}
 		}
 	}
+}
+
+// pendingInstall is a chart install waiting to be retried.
+type pendingInstall struct {
+	desired  desired
+	attempts int
+	nextAt   time.Time
+}
+
+// retryQueue tracks charts waiting to be installed again, either because their install failed or
+// because they were deferred behind the webhook. It is owned by the runSync goroutine and needs
+// no locking.
+type retryQueue struct {
+	pending map[desiredKey]*pendingInstall
+}
+
+func newRetryQueue() *retryQueue {
+	return &retryQueue{pending: map[desiredKey]*pendingInstall{}}
+}
+
+// park holds a chart to be picked up at the given time without counting an attempt, for a chart
+// that was never tried because it is waiting behind the webhook. It reports whether the chart was
+// not already queued, so callers can log only the first time.
+func (q *retryQueue) park(d desired, at time.Time) bool {
+	if p, ok := q.pending[d.key]; ok {
+		p.desired = d
+		p.nextAt = at
+		return false
+	}
+	q.pending[d.key] = &pendingInstall{desired: d, nextAt: at}
+	return true
+}
+
+// failed records an install failure and returns the backoff applied and the attempt number.
+//
+// The attempt count is cumulative across retries: an entry stays in the queue while its install
+// is in flight precisely so that repeated failures back off further each time instead of retrying
+// every installRetryBaseDelay forever.
+func (q *retryQueue) failed(key desiredKey, values map[string]interface{}, now time.Time) (time.Duration, int) {
+	p, ok := q.pending[key]
+	if !ok {
+		p = &pendingInstall{}
+		q.pending[key] = p
+	}
+
+	p.desired = desired{key: key, values: values, takeOwnership: true}
+	p.attempts++
+	backoff := installBackoff(p.attempts)
+	p.nextAt = now.Add(backoff)
+	return backoff, p.attempts
+}
+
+// succeeded drops a chart from the queue, resetting its backoff.
+func (q *retryQueue) succeeded(key desiredKey) {
+	delete(q.pending, key)
+}
+
+// due returns the charts whose wait has elapsed. The result is a snapshot so that callers can
+// dispatch, and thereby add to the queue, while iterating it.
+func (q *retryQueue) due(now time.Time) []desired {
+	out := make([]desired, 0, len(q.pending))
+	for _, p := range q.pending {
+		if !p.nextAt.After(now) {
+			out = append(out, p.desired)
+		}
+	}
+	return out
+}
+
+// installBackoff returns how long to wait before the given attempt, doubling each time up to
+// maxInstallRetryDelay.
+func installBackoff(attempts int) time.Duration {
+	if attempts < 1 {
+		attempts = 1
+	}
+	delay := installRetryBaseDelay
+	for i := 1; i < attempts; i++ {
+		delay *= 2
+		if delay >= maxInstallRetryDelay {
+			return maxInstallRetryDelay
+		}
+	}
+	return delay
 }
 
 // getIntervalOrDefault Converts the input to a time.Duration or returns a default value
@@ -241,59 +385,26 @@ func getIntervalOrDefault(interval string) time.Duration {
 	return time.Duration(i) * time.Second
 }
 
-// installCharts installs charts with takeOwnership.
-//
-// A chart that is not in the repo index yet is retried by re-enqueuing the ClusterRepo
-// rather than by sleeping here. installCharts runs on the single runSync goroutine, so
-// blocking on one chart also stalls every other chart, the refresh ticker, and any pending
-// Ensure calls. On a fresh cluster, where the index is still being built, that is how one
-// not-yet-indexed chart delays all of them indefinitely.
-func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, takeOwnership bool) error {
-	var errs []error
-
-	for key, values := range charts {
-		if err := m.installOne(key, values, takeOwnership); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return merr.NewErrors(errs...)
-}
-
-// isIndexNotReady reports whether err means the rancher-charts index is not available yet,
-// which is the normal state of a freshly started cluster agent and is retriable.
-//
-// Deliberately does not cover "the index exists but lacks the pinned version": the index
-// ConfigMap is written complete, so that is a version mismatch rather than a transient state,
-// and retrying it every few seconds forever would be worse than surfacing it.
+// isIndexNotReady reports whether err means the rancher-charts index is not available yet, or
+// does not carry the wanted chart yet. This is the normal state of a freshly started cluster
+// agent, so it only selects the log level — every install failure is retried either way.
 func isIndexNotReady(err error) bool {
 	return apierrors.IsNotFound(err) || errors.Is(err, repo.ErrNoChartName)
 }
 
-// installOne installs a single chart and classifies the outcome. A not-yet-built index
-// schedules a retry; any error is returned so the caller does not record the chart as
-// installed.
+// installOne installs a single chart and logs the outcome. Any error is returned so runSync
+// schedules a retry rather than recording the chart as installed.
 func (m *Manager) installOne(key desiredKey, values map[string]interface{}, takeOwnership bool) error {
 	err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride)
 	switch {
 	case err == nil:
 		return nil
 	case isIndexNotReady(err):
-		logrus.Infof("System chart %s is not in the %s index yet, retrying in %s: %v",
-			key.chartName, systemChartsRepoName, chartNotInIndexRetryDelay, err)
-		m.retryInstallLater()
+		logrus.Infof("System chart %s is not in the %s index yet: %v", key.chartName, systemChartsRepoName, err)
 	default:
 		logrus.Errorf("Failed to install system chart %s (release name: %s): %v", key.chartName, key.releaseName, err)
 	}
 	return err
-}
-
-// retryInstallLater re-drives the ClusterRepo handler, which re-evaluates the chart list and
-// pushes anything still desired back onto the sync channel.
-func (m *Manager) retryInstallLater() {
-	if m.clusterRepos == nil {
-		return
-	}
-	m.clusterRepos.EnqueueAfter(systemChartsRepoName, chartNotInIndexRetryDelay)
 }
 
 func (m *Manager) Uninstall(namespace, name string) error {
@@ -358,11 +469,46 @@ func (m *Manager) Ensure(namespace, chartName, releaseName, minVersion, exactVer
 }
 
 func (m *Manager) Remove(namespace, releaseName string) {
+	m.desiredMu.Lock()
+	defer m.desiredMu.Unlock()
+
 	for k := range m.desiredCharts {
 		if k.namespace == namespace && k.releaseName == releaseName {
 			delete(m.desiredCharts, k)
 		}
 	}
+}
+
+// desiredValues returns the values a chart was last installed with, and whether it is recorded
+// as installed at all.
+func (m *Manager) desiredValues(key desiredKey) (map[string]interface{}, bool) {
+	m.desiredMu.RLock()
+	defer m.desiredMu.RUnlock()
+
+	values, ok := m.desiredCharts[key]
+	return values, ok
+}
+
+// setDesired records a chart as installed with the given values.
+func (m *Manager) setDesired(key desiredKey, values map[string]interface{}) {
+	m.desiredMu.Lock()
+	defer m.desiredMu.Unlock()
+
+	m.desiredCharts[key] = values
+}
+
+// listDesired snapshots the desired charts so that callers can iterate without holding the lock,
+// which matters because dispatching an install starts a goroutine and touches runSync's own
+// state.
+func (m *Manager) listDesired() []desired {
+	m.desiredMu.RLock()
+	defer m.desiredMu.RUnlock()
+
+	out := make([]desired, 0, len(m.desiredCharts))
+	for key, values := range m.desiredCharts {
+		out = append(out, desired{key: key, values: values, takeOwnership: true})
+	}
+	return out
 }
 
 // install tries to install a new version of a chart.
@@ -476,9 +622,22 @@ const (
 	// systemChartsRepoName is the ClusterRepo that system charts are installed from.
 	systemChartsRepoName = "rancher-charts"
 
-	// chartNotInIndexRetryDelay is how long to wait before re-driving the ClusterRepo
-	// handler when a system chart is not in the repo index yet.
-	chartNotInIndexRetryDelay = 5 * time.Second
+	// webhookChartName is the chart that has to be installed before any other, because it
+	// serves the admission webhooks that validate the resources every later chart creates.
+	//
+	// Kept as a local constant rather than using chart.WebhookChartName so that this package
+	// does not have to import pkg/controllers/dashboard/chart, which depends on it.
+	webhookChartName = "rancher-webhook"
+
+	// installRetryBaseDelay is how long to wait before the first retry of a failed install.
+	installRetryBaseDelay = 5 * time.Second
+
+	// maxInstallRetryDelay caps the retry backoff, so a chart that cannot be installed keeps
+	// being retried without spamming the log or the API server.
+	maxInstallRetryDelay = 5 * time.Minute
+
+	// installRetryPollInterval is how often runSync checks for retries whose backoff elapsed.
+	installRetryPollInterval = 5 * time.Second
 
 	// maxConcurrentInstalls bounds how many chart installs run at once. Installs are
 	// independent helm releases so they do not contend, but each one runs a helm operation pod

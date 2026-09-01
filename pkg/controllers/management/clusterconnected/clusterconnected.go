@@ -3,8 +3,6 @@ package clusterconnected
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
@@ -78,21 +75,30 @@ func RegisterTunnelHook(ctx context.Context, wrangler *wrangler.Context) {
 	queue := make(chan string, hookQueueSize)
 
 	wrangler.TunnelAuthorizer.OnAuthorized(func(clientKey string) {
-		// Both the mcm session (keyed on the cluster name) and the steve session (keyed
-		// on proxy.Prefix + cluster name) are authorized for a connecting agent. Only the
-		// latter is what hasSession probes, so key off it and ignore everything else,
-		// including the per-node "<cluster>:<node>" keys.
-		if !strings.HasPrefix(clientKey, proxy.Prefix) {
+		// Several kinds of key are authorized for a connecting agent: the cluster's own tunnel
+		// session, keyed on the bare cluster name; per-node sessions, keyed
+		// "<cluster>:<node>"; and the steve aggregation session, keyed on
+		// proxy.Prefix + cluster name. Only the first is what hasSession probes.
+		if !isClusterSessionKey(clientKey) {
 			return
 		}
 		select {
-		case queue <- strings.TrimPrefix(clientKey, proxy.Prefix):
+		case queue <- clientKey:
 		default:
 			logrus.Debugf("[clusterConnectedCondition] dropping tunnel hook for %s, queue is full", clientKey)
 		}
 	})
 
 	go c.processTunnelHooks(ctx, queue)
+}
+
+// isClusterSessionKey reports whether a tunnel client key is a cluster's own agent session, as
+// opposed to a per-node session ("<cluster>:<node>") or the steve aggregation session
+// (proxy.Prefix + cluster name). A cluster session key is just the cluster name.
+func isClusterSessionKey(clientKey string) bool {
+	return clientKey != "" &&
+		!strings.HasPrefix(clientKey, proxy.Prefix) &&
+		!strings.Contains(clientKey, ":")
 }
 
 func newChecker(wrangler *wrangler.Context) *checker {
@@ -153,10 +159,17 @@ func (c *checker) promoteCluster(clusterName string) error {
 	return c.updateClusterConnectedCondition(cluster, true)
 }
 
+// sessionChecker is the part of the remotedialer server this controller needs. Narrowed to an
+// interface so that tests can assert which session key is probed, which is the whole substance of
+// what Connected means.
+type sessionChecker interface {
+	HasSession(clientKey string) bool
+}
+
 type checker struct {
 	clusterCache managementcontrollers.ClusterCache
 	clusters     managementcontrollers.ClusterClient
-	tunnelServer *remotedialer.Server
+	tunnelServer sessionChecker
 }
 
 func (c *checker) check() error {
@@ -173,30 +186,33 @@ func (c *checker) check() error {
 	return nil
 }
 
+// hasSession reports whether the cluster's agent has a live tunnel session.
+//
+// That is deliberately all this asks, because it is what every consumer of Connected actually
+// depends on. clusterdeploy and usercontrollers both go straight on to build a downstream client;
+// managesystemagent writes downstream resources; rkecontrolplane copies this into
+// Status.AgentConnected. All of them ride pkg/dialer.Factory.clusterDialer, which dials through
+// exactly this session — "if f.TunnelServer.HasSession(cluster.Name)" in factory.go. So the
+// cluster's own tunnel session, keyed on the bare cluster name, is the honest predicate.
+//
+// Two things this intentionally does not do:
+//
+// It does not probe the steve aggregation session (proxy.Prefix + cluster name), which is what it
+// used to do. That is a different session for a different purpose: the agent only writes the
+// stv-aggregation secret from onConnect, so it comes up strictly after the tunnel above, and it
+// exists to let the Dashboard proxy into the cluster. Nothing consuming Connected needs it, and
+// the steve proxy checks HasSession for itself in pkg/api/steve/aggregation. Probing it made
+// Connected mean "the Dashboard can browse this cluster", and gated cluster lifecycle work on a
+// component that has nothing to do with whether Rancher can talk to the cluster.
+//
+// It also does not check that the downstream API answers. That is ClusterConditionReady's job,
+// which healthsyncer owns and which reports far more detail than a bool. Folding reachability in
+// here would make one condition mean two things and would report clusters whose API dialing does
+// not go through the tunnel at all — public cloud drivers take a direct dialer in factory.go — as
+// disconnected. A dead session is still noticed: remotedialer pings every PingWriteInterval and
+// drops the session when the read deadline passes, and the server removes it on close.
 func (c *checker) hasSession(cluster *v3.Cluster) bool {
-	clientKey := proxy.Prefix + cluster.Name
-	hasSession := c.tunnelServer.HasSession(clientKey)
-	if !hasSession {
-		return false
-	}
-
-	dialer := c.tunnelServer.Dialer(clientKey)
-	transport := &http.Transport{
-		DialContext: dialer,
-	}
-	defer transport.CloseIdleConnections()
-	client := &http.Client{
-		Transport: transport,
-	}
-	resp, err := client.Get("http://not-used/ping")
-	if err != nil {
-		return false
-	}
-	defer func() {
-		io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}()
-	return resp.StatusCode == http.StatusOK
+	return c.tunnelServer.HasSession(cluster.Name)
 }
 
 func (c *checker) checkCluster(cluster *v3.Cluster) error {
