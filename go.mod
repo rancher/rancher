@@ -3,18 +3,18 @@ module github.com/rancher/rancher
 go 1.26.5
 
 replace (
-	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.13.0-rc.1.0.20260831034930-9a99317b9217
-	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260831041216-ecd0761dcffb
+	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.14.0-rc.1.0.20260902074845-42b70cc84c64
+	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260902103845-8111ed396886
 	github.com/rancher/apiserver => github.com/Abhishek-Valaboju/apiserver v0.9.3-0.20260831054009-f4e34c2be4f4
 	github.com/rancher/channelserver => github.com/Abhishek-Valaboju/channelserver v0.0.0-20260831061235-834b3518e831
 	github.com/rancher/dynamiclistener => github.com/Abhishek-Valaboju/dynamiclistener v0.9.2-0.20260828093312-6c9b5c8443ba
-	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.13.0-rc.1.0.20260831035631-2e6f3e9d237c
-	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.13.0-rc.1.0.20260831040702-46ba83d5854d
+	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e1194d9
+	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb
 	github.com/rancher/lasso => github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7
 	github.com/rancher/machine => github.com/Abhishek-Valaboju/machine v0.15.1-0.20260828101855-1594dd5e692c
 	github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
 	github.com/rancher/remotedialer-proxy => github.com/Abhishek-Valaboju/remotedialer-proxy v0.9.0-rc.1.0.20260828104351-1fd17c3731f2
-	github.com/rancher/shepherd => github.com/Abhishek-Valaboju/shepherd v0.0.0-20260831081820-7b89498283e4
+	github.com/rancher/shepherd => github.com/Abhishek-Valaboju/shepherd v0.0.0-20260902171309-1a4f1c27c7f1
 	github.com/rancher/steve => github.com/Abhishek-Valaboju/steve v0.9.8-0.20260831074818-fb7007cf9486
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/Abhishek-Valaboju/system-upgrade-controller/pkg/apis v0.0.0-20260831051815-cbe86707c07c
 	github.com/rancher/wrangler/v3 => github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545
