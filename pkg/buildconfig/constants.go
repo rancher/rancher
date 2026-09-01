@@ -11,7 +11,7 @@ const (
 	DefaultShellVersion       = "rancher/shell:v0.8.1"
 	FleetVersion              = "111.0.0+up0.17.0-alpha.1"
 	PartnerChartDefaultBranch = "main"
-	RemoteDialerProxyVersion  = "110.0.0+up0.8.0-rc.10"
+	RemoteDialerProxyVersion  = "110.0.1+up0.8.1"
 	Rke2ChartDefaultBranch    = "main"
 	TurtlesVersion            = "110.0.0+up0.27.0"
 	WebhookVersion            = "111.0.0+up0.12.1-rc.3"
