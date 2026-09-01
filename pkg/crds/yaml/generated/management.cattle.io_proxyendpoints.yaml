@@ -70,30 +70,6 @@ spec:
                       required:
                       - name
                       type: object
-                    serverName:
-                      description: |-
-                        ServerName is the SNI (Server Name Indication) hostname to use during the TLS handshake.
-                        If not specified, the domain hostname is used. This is useful when the endpoint domain
-                        does not match the certificate's CN or SAN fields.
-                      maxLength: 253
-                      type: string
-                    tlsVerificationOptions:
-                      description: |-
-                        TLSVerificationOptions controls certificate verification behavior.
-                      properties:
-                        verifyExpiration:
-                          default: true
-                          description: |-
-                            VerifyExpiration controls whether the certificate's validity period is checked.
-                            Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
-                          type: boolean
-                        verifyHostname:
-                          default: true
-                          description: |-
-                            VerifyHostname controls whether the certificate's hostname matches the connection hostname.
-                            Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
-                          type: boolean
-                      type: object
                     credentialInjection:
                       description: |-
                         e.g.: credID=cattle-global-data/my-cred headers=X-Token=token;X-User=user
@@ -136,6 +112,19 @@ spec:
                           - headerinject
                           - bodyinject
                           type: string
+                          x-kubernetes-validations:
+                          - message: tokenField is required when mode is bearer
+                            rule: self.mode != 'bearer' || has(self.tokenField) &&
+                              self.tokenField != ''
+                          - message: usernameField and passwordField are required
+                              when mode is basic
+                            rule: self.mode != 'basic' || (has(self.usernameField)
+                              && self.usernameField != '' && has(self.passwordField)
+                              && self.passwordField != '')
+                          - message: fields is required when mode is headerinject
+                              or bodyinject
+                            rule: (self.mode != 'headerinject' && self.mode != 'bodyinject')
+                              || (has(self.fields) && size(self.fields) > 0)
                         passwordField:
                           description: |-
                             PasswordField is the key within the credential secret whose value is used as the Basic-auth password.
@@ -201,12 +190,35 @@ spec:
                         InsecureSkipTLSVerify disables TLS certificate verification when proxying to this domain.
                         Use this only for development or when the endpoint uses a self-signed certificate.
                       type: boolean
+                    serverName:
+                      description: |-
+                        ServerName is the SNI (Server Name Indication) hostname to use during the TLS handshake.
+                        If not specified, the domain hostname is used. This is useful when the endpoint domain
+                        does not match the certificate's CN or SAN fields.
+                      maxLength: 253
+                      type: string
+                    tlsVerificationOptions:
+                      description: TLSVerificationOptions controls certificate verification
+                        behavior.
+                      properties:
+                        verifyExpiration:
+                          description: |-
+                            VerifyExpiration controls whether the certificate's validity period is checked.
+                            Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
+                          type: boolean
+                        verifyHostname:
+                          description: |-
+                            VerifyHostname controls whether the certificate's hostname matches the connection hostname.
+                            Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
+                          type: boolean
+                      type: object
                   required:
                   - domain
                   type: object
                   x-kubernetes-validations:
-                  - message: caBundle cannot be set when insecureSkipTLSVerify is true
-                    rule: '!(has(self.caBundle) && self.caBundle != '''' && self.insecureSkipTLSVerify)'
+                  - message: caBundle cannot be set when insecureSkipTLSVerify is
+                      true
+                    rule: '!(has(self.caBundle) && self.caBundle != ” && self.insecureSkipTLSVerify)'
                 type: array
             required:
             - routes
