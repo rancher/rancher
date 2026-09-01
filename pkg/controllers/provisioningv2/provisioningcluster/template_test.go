@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 )
 
 func TestPopulateHostnameLengthLimitAnnotation(t *testing.T) {
@@ -115,32 +115,34 @@ func chartValuesCluster(t *testing.T, chartValues map[string]any) *provv1.Cluste
 	}
 }
 
-func TestRKEControlPlaneChartValuesJSON(t *testing.T) {
+// TestRKEControlPlaneClusterSpecAnnotationChartValues asserts that the cluster
+// spec annotation rkeControlPlane() writes carries chart values verbatim,
+// including explicit nulls.
+func TestRKEControlPlaneClusterSpecAnnotationChartValues(t *testing.T) {
 	tests := []struct {
 		name        string
 		chartValues map[string]any
 		expected    string
 	}{
 		{
-			name:        "nil chart values produce an empty string",
+			name:        "nil chart values",
 			chartValues: nil,
-			expected:    "",
+			expected:    `null`,
 		},
 		{
-			name:        "empty chart values produce an empty string",
+			name:        "empty chart values",
 			chartValues: map[string]any{},
-			expected:    "",
+			expected:    `{}`,
 		},
 		{
-			name: "chart values are serialized",
+			name: "chart values are carried",
 			chartValues: map[string]any{
 				"rke2-coredns": map[string]any{"replicas": 2},
 			},
 			expected: `{"rke2-coredns":{"replicas":2}}`,
 		},
 		{
-			// carry an explicit null across the merge patch to the RKEControlPlane.
-			name: "an explicit null is serialized",
+			name: "an explicit null is carried",
 			chartValues: map[string]any{
 				"rke2-coredns": map[string]any{
 					"resources": map[string]any{
@@ -156,60 +158,14 @@ func TestRKEControlPlaneChartValuesJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cp, err := rkeControlPlane(chartValuesCluster(t, tt.chartValues))
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, cp.Spec.ChartValuesJSON)
+
+			spec, err := snapshotutil.DecompressClusterSpec(cp.Annotations[capr.ClusterSpecAnnotation])
+			require.NoError(t, err)
+			require.NotNil(t, spec.RKEConfig)
+
+			got, err := json.Marshal(spec.RKEConfig.ChartValues.Data)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.expected, string(got))
 		})
 	}
-}
-
-// Wrangler's apply updates an existing RKEControlPlane with a
-// types.MergePatchType patch built by jsonmergepatch.CreateThreeWayJSONMergePatch,
-// because rke.cattle.io/v1 is a CRD and so is not registered in the client-go scheme.
-func TestRKEControlPlaneChartValuesSurviveMergePatch(t *testing.T) {
-	// The cluster as it was when the RKEControlPlane was last applied.
-	before, err := rkeControlPlane(chartValuesCluster(t, map[string]any{
-		"rke2-coredns": map[string]any{
-			"resources": map[string]any{
-				"limits": map[string]any{"memory": "128Mi"},
-			},
-		},
-	}))
-	require.NoError(t, err)
-
-	// The user now sets cpu to an explicit null to drop the chart default.
-	after, err := rkeControlPlane(chartValuesCluster(t, map[string]any{
-		"rke2-coredns": map[string]any{
-			"resources": map[string]any{
-				"limits": map[string]any{"cpu": nil, "memory": "130Mi"},
-			},
-		},
-	}))
-	require.NoError(t, err)
-
-	original, err := json.Marshal(before)
-	require.NoError(t, err)
-	modified, err := json.Marshal(after)
-	require.NoError(t, err)
-
-	// current is the live object, which here matches what was last applied.
-	patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, original)
-	require.NoError(t, err)
-
-	patched, err := jsonpatch.MergePatch(original, patch)
-	require.NoError(t, err)
-
-	result := &rkev1.RKEControlPlane{}
-	require.NoError(t, json.Unmarshal(patched, result))
-
-	assert.JSONEq(t,
-		`{"rke2-coredns":{"resources":{"limits":{"cpu":null,"memory":"130Mi"}}}}`,
-		result.Spec.ChartValuesJSON,
-		"the explicit null must survive the merge patch in the serialized field")
-
-	// Contrast: the structured field loses the null, which is the bug this works
-	// around. Asserting it keeps the workaround honest -- if a future change makes
-	// the structured field null-safe, this fails and the serialized field can go.
-	limits := result.Spec.ChartValues.Data["rke2-coredns"].(map[string]any)["resources"].(map[string]any)["limits"].(map[string]any)
-	assert.NotContains(t, limits, "cpu",
-		"the structured field is still expected to drop the null across a merge patch")
-	assert.Equal(t, "130Mi", limits["memory"])
 }

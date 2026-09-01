@@ -24,6 +24,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
@@ -287,18 +288,41 @@ func isVSphereProvider(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (b
 	return data["cloud-provider-name"] == "rancher-vsphere", nil
 }
 
+// chartValues returns the Helm chart values to render into HelmChartConfig
+// manifests, read from the cluster spec annotation rather than from
+// spec.chartValues.
+//
+// Wrangler applies an update to an existing RKEControlPlane as an RFC 7386 merge
+// patch, because rke.cattle.io/v1 is a CRD and so is not registered in the
+// client-go scheme. In such a patch a null member means "remove this key", not
+// "set this key to null". An explicit null -- the documented way to drop a chart
+// default -- is therefore inexpressible in spec.chartValues and is silently lost
+// between the Cluster and the RKEControlPlane. The annotation holds the same
+// values inside an opaque gzip+base64 string of the whole cluster spec, and a
+// merge patch replaces a string atomically, so nulls survive it.
+//
+// spec.chartValues is used as a fallback only when the annotation is absent,
+// which covers control planes not yet reconciled by a Rancher carrying this
+// change.
 func chartValues(controlPlane *rkev1.RKEControlPlane) (map[string]interface{}, error) {
-	if controlPlane.Spec.ChartValuesJSON != "" {
-		values := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(controlPlane.Spec.ChartValuesJSON), &values); err != nil {
-			return nil, fmt.Errorf("controlplane %s/%s: error unmarshalling chartValuesJSON: %w", controlPlane.Namespace, controlPlane.Name, err)
-		}
-		return values, nil
+	encodedSpec := controlPlane.Annotations[capr.ClusterSpecAnnotation]
+	if encodedSpec == "" {
+		return controlPlane.Spec.ChartValues.DeepCopy().Data, nil
 	}
 
-	// Fall back to the structured field for control planes that have not been
-	// reconciled since the upgrade that introduced chartValuesJSON.
-	return controlPlane.Spec.ChartValues.DeepCopy().Data, nil
+	// DecompressClusterSpec unmarshals into a freshly allocated ClusterSpec, so
+	// the map returned here is never the informer cache's copy and is safe for
+	// addVSphereCharts to write into.
+	clusterSpec, err := snapshotutil.DecompressClusterSpec(encodedSpec)
+	if err != nil {
+		return nil, fmt.Errorf("controlplane %s/%s: error decoding the %s annotation: %w",
+			controlPlane.Namespace, controlPlane.Name, capr.ClusterSpecAnnotation, err)
+	}
+	if clusterSpec.RKEConfig == nil {
+		return nil, nil
+	}
+
+	return clusterSpec.RKEConfig.ChartValues.Data, nil
 }
 
 func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (map[string]interface{}, error) {
