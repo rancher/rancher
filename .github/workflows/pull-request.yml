@@ -125,7 +125,7 @@ jobs:
   integration-tests:
     permissions:
       contents: read
-    needs: [build-server-amd64, build-agent-amd64]
+    needs: [build-chart, build-server-amd64, build-agent-amd64]
     uses: ./.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
