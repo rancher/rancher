@@ -35,6 +35,7 @@ const (
 	KeyCloakName        = "keycloak"
 	OKTAName            = "okta"
 	ShibbolethName      = "shibboleth"
+	GenericSAMLName     = "genericsaml"
 	loginAction         = "login"
 	testAndEnableAction = "testAndEnable"
 )
@@ -109,6 +110,8 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]any) (map[strin
 		p[publicclient.OKTAProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	case ShibbolethName:
 		p[publicclient.ShibbolethProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
+	case GenericSAMLName:
+		p[publicclient.GenericSAMLProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	}
 	return p, nil
 }
@@ -312,6 +315,8 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 		configType = client.OKTAConfigType
 	case ShibbolethName:
 		configType = client.ShibbolethConfigType
+	case GenericSAMLName:
+		configType = client.GenericSAMLConfigType
 	}
 
 	config.APIVersion = "management.cattle.io/v3"
@@ -485,6 +490,8 @@ func formSamlRedirectURLFromMap(config map[string]any, name string) string {
 		hostname, _ = config[client.OKTAConfigFieldRancherAPIHost].(string)
 	case ShibbolethName:
 		hostname, _ = config[client.ShibbolethConfigFieldRancherAPIHost].(string)
+	case GenericSAMLName:
+		hostname, _ = config[client.GenericSAMLConfigFieldRancherAPIHost].(string)
 	}
 
 	path := hostname + "/v1-saml/" + name + "/login"
