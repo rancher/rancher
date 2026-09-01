@@ -40,9 +40,9 @@ disk_mount_flags()
         *,nobarrier,*|*,barrier=0,*) barrier="nobarrier(unsafe/fast)" ;;
         *) barrier="barrier(safe/default)" ;;
     esac
-    datamode=$(printf '%s' "$opts" | grep -oE 'data=[a-z]+')
+    datamode=$(printf '%s' "$opts" | grep -oE 'data=[a-z]+' || true)
     case ",$opts," in *,discard,*) discard="discard" ;; *) discard="" ;; esac
-    commit=$(printf '%s' "$opts" | grep -oE 'commit=[0-9]+')
+    commit=$(printf '%s' "$opts" | grep -oE 'commit=[0-9]+' || true)
 
     flags="$atime $barrier"
     [ -n "$datamode" ] && flags="$flags $datamode"
