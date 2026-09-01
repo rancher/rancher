@@ -123,7 +123,7 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
-  "kubectl --kubeconfig $KUBECONFIG rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
+  "kubectl rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-turtles deployment"
 ./scripts/retry \
@@ -132,8 +132,8 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-turtles was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why turtles did not start` \
-  "kubectl --kubeconfig $KUBECONFIG get ns cattle-turtles-system &>/dev/null \
-    && kubectl --kubeconfig $KUBECONFIG rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
+  "kubectl get ns cattle-turtles-system &>/dev/null \
+    && kubectl rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
