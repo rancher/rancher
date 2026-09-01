@@ -11,6 +11,7 @@ const (
 	NodeSystemInfoFieldMachineID               = "machineID"
 	NodeSystemInfoFieldOSImage                 = "osImage"
 	NodeSystemInfoFieldOperatingSystem         = "operatingSystem"
+	NodeSystemInfoFieldRunningInUserNamespace  = "runningInUserNamespace"
 	NodeSystemInfoFieldSwap                    = "swap"
 	NodeSystemInfoFieldSystemUUID              = "systemUUID"
 )
@@ -25,6 +26,7 @@ type NodeSystemInfo struct {
 	MachineID               string          `json:"machineID,omitempty" yaml:"machineID,omitempty"`
 	OSImage                 string          `json:"osImage,omitempty" yaml:"osImage,omitempty"`
 	OperatingSystem         string          `json:"operatingSystem,omitempty" yaml:"operatingSystem,omitempty"`
+	RunningInUserNamespace  *bool           `json:"runningInUserNamespace,omitempty" yaml:"runningInUserNamespace,omitempty"`
 	Swap                    *NodeSwapStatus `json:"swap,omitempty" yaml:"swap,omitempty"`
 	SystemUUID              string          `json:"systemUUID,omitempty" yaml:"systemUUID,omitempty"`
 }

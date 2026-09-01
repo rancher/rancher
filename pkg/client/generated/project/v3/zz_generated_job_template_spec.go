@@ -12,6 +12,7 @@ const (
 	JobTemplateSpecFieldDNSPolicy                     = "dnsPolicy"
 	JobTemplateSpecFieldEnableServiceLinks            = "enableServiceLinks"
 	JobTemplateSpecFieldEphemeralContainers           = "ephemeralContainers"
+	JobTemplateSpecFieldEvictionResponders            = "evictionResponders"
 	JobTemplateSpecFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	JobTemplateSpecFieldFsgid                         = "fsgid"
 	JobTemplateSpecFieldGids                          = "gids"
@@ -74,6 +75,7 @@ type JobTemplateSpec struct {
 	DNSPolicy                     string                         `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`

@@ -8,6 +8,7 @@ const (
 	PersistentVolumeClaimStatusFieldCapacity                         = "capacity"
 	PersistentVolumeClaimStatusFieldConditions                       = "conditions"
 	PersistentVolumeClaimStatusFieldCurrentVolumeAttributesClassName = "currentVolumeAttributesClassName"
+	PersistentVolumeClaimStatusFieldHealthStatus                     = "healthStatus"
 	PersistentVolumeClaimStatusFieldModifyVolumeStatus               = "modifyVolumeStatus"
 	PersistentVolumeClaimStatusFieldPhase                            = "phase"
 )
@@ -19,6 +20,7 @@ type PersistentVolumeClaimStatus struct {
 	Capacity                         map[string]string                `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	Conditions                       []PersistentVolumeClaimCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	CurrentVolumeAttributesClassName string                           `json:"currentVolumeAttributesClassName,omitempty" yaml:"currentVolumeAttributesClassName,omitempty"`
+	HealthStatus                     *VolumeHealthStatus              `json:"healthStatus,omitempty" yaml:"healthStatus,omitempty"`
 	ModifyVolumeStatus               *ModifyVolumeStatus              `json:"modifyVolumeStatus,omitempty" yaml:"modifyVolumeStatus,omitempty"`
 	Phase                            string                           `json:"phase,omitempty" yaml:"phase,omitempty"`
 }

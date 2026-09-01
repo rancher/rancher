@@ -18,6 +18,7 @@ const (
 	PodFieldDescription                   = "description"
 	PodFieldEnableServiceLinks            = "enableServiceLinks"
 	PodFieldEphemeralContainers           = "ephemeralContainers"
+	PodFieldEvictionResponders            = "evictionResponders"
 	PodFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	PodFieldFsgid                         = "fsgid"
 	PodFieldGids                          = "gids"
@@ -86,6 +87,7 @@ type Pod struct {
 	Description                   string                         `json:"description,omitempty" yaml:"description,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`
