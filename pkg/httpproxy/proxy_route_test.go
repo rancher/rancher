@@ -1,9 +1,12 @@
 package httpproxy
 
 import (
+	"crypto/tls"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -116,6 +119,51 @@ func TestFindMatchingRoute_WildcardDomain(t *testing.T) {
 	assert.Equal(t, "*.example.com", route.Domain)
 }
 
+func TestFindMatchingRoute_PrefersExactOverWildcard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute("*.example.com", false, nil),
+		endpointWithRoute("api.example.com", true, nil),
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache}
+	route := p.findMatchingRoute("api.example.com")
+	require.NotNil(t, route)
+	assert.Equal(t, "api.example.com", route.Domain)
+	assert.True(t, route.InsecureSkipTLSVerify)
+}
+
+func TestFindMatchingRoute_PrefersMoreSpecificPatternWithinWildcardClass(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute("*.example.com", false, nil),
+		endpointWithRoute("*.sub.example.com", true, nil),
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache}
+	route := p.findMatchingRoute("api.sub.example.com")
+	require.NotNil(t, route)
+	assert.Equal(t, "*.sub.example.com", route.Domain)
+	assert.True(t, route.InsecureSkipTLSVerify)
+}
+
+func TestFindMatchingRoute_PrefersPercentWildcardOverStarWildcard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute("*.example.com", false, nil),
+		endpointWithRoute("%.example.com", true, nil),
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache}
+	route := p.findMatchingRoute("api.example.com")
+	require.NotNil(t, route)
+	assert.Equal(t, "%.example.com", route.Domain)
+	assert.True(t, route.InsecureSkipTLSVerify)
+}
+
 func TestFindMatchingRoute_SkipsOverlyBroadDomain(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
@@ -166,6 +214,21 @@ func TestApplyRouteInjection_NoUserInContext(t *testing.T) {
 	assert.Contains(t, err.Error(), "user")
 }
 
+func TestApplyRouteInjection_BareCredentialIDInHeader(t *testing.T) {
+	// A proxy with no authorizer or credentials — neither is reached because the
+	// secretGetter closure fails first when there is no user in the request context.
+	p := &proxy{}
+	req, _ := http.NewRequest(http.MethodGet, "https://api.example.com/path", nil)
+	route := &mgmt.ProxyEndpointRoute{
+		CredentialInjection: &mgmt.CredentialInjectionSpec{Mode: "bearer", TokenField: "token"},
+	}
+
+	// Bare credential IDs are accepted for server-defined route injection.
+	err := p.applyRouteInjection(req, "cattle-global-data/my-cred", route)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user")
+}
+
 // --- perRouteTLSTransport ---
 
 func TestPerRouteTLSTransport_UsesInsecureTransportWhenFlagSet(t *testing.T) {
@@ -198,7 +261,9 @@ func TestPerRouteTLSTransport_UsesDefaultTransportWhenInsecureNotSet(t *testing.
 	}))
 	defer ts.Close()
 
-	host := ts.Listener.Addr().String() // e.g. "127.0.0.1:PORT"
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+	host := tsURL.Hostname()
 
 	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
 	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
@@ -212,6 +277,122 @@ func TestPerRouteTLSTransport_UsesDefaultTransportWhenInsecureNotSet(t *testing.
 	resp, err := transport.RoundTrip(req)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.False(t, insecure.called, "insecure transport must not be used when InsecureSkipTLSVerify is false")
+}
+
+func TestPerRouteTLSTransport_SelfSignedRoute_InsecureSkipTLSVerifyTrue_Succeeds(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute(tsURL.Hostname(), true, nil),
+	}, nil)
+
+	p := &proxy{
+		proxyEndpointCache: cache,
+		insecureTransport:  &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+	}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestPerRouteTLSTransport_SelfSignedRoute_InsecureSkipTLSVerifyFalse_Fails(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute(tsURL.Hostname(), false, nil),
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache, insecureTransport: &recordingTransport{}}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	_, err = transport.RoundTrip(req)
+	require.Error(t, err)
+}
+
+func TestPerRouteTLSTransport_SelfSignedRoute_WithCABundle_Succeeds(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	insecure := &recordingTransport{}
+
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.Certificate().Raw})
+	require.NotEmpty(t, certPEM)
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		{
+			Spec: mgmt.ProxyEndpointSpec{Routes: []mgmt.ProxyEndpointRoute{{
+				Domain:   tsURL.Hostname(),
+				CABundle: string(certPEM),
+			}}},
+		},
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache, insecureTransport: insecure}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.False(t, insecure.called, "insecure transport must not be used when CABundle is provided")
+}
+
+func TestPerRouteTLSTransport_SelfSignedRoute_WithInvalidCABundle_Fails(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	insecure := &recordingTransport{}
+
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		{
+			Spec: mgmt.ProxyEndpointSpec{Routes: []mgmt.ProxyEndpointRoute{{
+				Domain:   tsURL.Hostname(),
+				CABundle: "not-a-valid-cert",
+			}}},
+		},
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache, insecureTransport: insecure}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	_, err = transport.RoundTrip(req)
+	require.Error(t, err)
 	assert.False(t, insecure.called, "insecure transport must not be used when InsecureSkipTLSVerify is false")
 }
 
@@ -238,4 +419,70 @@ func TestPerRouteTLSTransport_UsesDefaultTransportWhenNoRouteMatches(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.False(t, insecure.called, "insecure transport must not be used when no route matches")
+}
+
+// TestPerRouteTLSTransport_PrefersCAbundleOverInsecureSkipTLSVerify verifies that
+// when both InsecureSkipTLSVerify and CABundle are set, InsecureSkipTLSVerify takes precedence.
+func TestPerRouteTLSTransport_PrefersCAbundleOverInsecureSkipTLSVerify(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	insecure := &recordingTransport{}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	// Create an endpoint with both InsecureSkipTLSVerify and CABundle set.
+	// InsecureSkipTLSVerify should take precedence.
+	endpointWithBoth := &mgmt.ProxyEndpoint{
+		Spec: mgmt.ProxyEndpointSpec{
+			Routes: []mgmt.ProxyEndpointRoute{
+				{
+					Domain:                tsURL.Hostname(),
+					InsecureSkipTLSVerify: true,
+					CABundle:              "some-ca-bundle-data",
+				},
+			},
+		},
+	}
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{endpointWithBoth}, nil)
+
+	p := &proxy{proxyEndpointCache: cache, insecureTransport: insecure}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	_, err = transport.RoundTrip(req)
+
+	// The insecure transport should have been called since InsecureSkipTLSVerify is true.
+	assert.True(t, insecure.called, "insecure transport should be used when InsecureSkipTLSVerify is true")
+}
+
+// TestPerRouteTLSTransport_UsesDefaultTransportWhenNoRouteMatches verifies that
+// when no route matches, the default transport is used.
+func TestPerRouteTLSTransport_UsesDefaultTransportWhenNoMatches(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	cache := fake.NewMockNonNamespacedCacheInterface[*mgmt.ProxyEndpoint](ctrl)
+	// Return an endpoint that does NOT match.
+	cache.EXPECT().List(gomock.Any()).Return([]*mgmt.ProxyEndpoint{
+		endpointWithRoute("other.domain.com", false, nil),
+	}, nil)
+
+	p := &proxy{proxyEndpointCache: cache}
+	transport := &perRouteTLSTransport{proxy: p}
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/path", nil)
+	resp, err := transport.RoundTrip(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }

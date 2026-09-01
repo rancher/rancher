@@ -1,7 +1,10 @@
 package httpproxy
 
 import (
+	"bytes"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -43,6 +46,12 @@ const (
 	hostRegex    = "[A-Za-z0-9-]+"
 	CSP          = "Content-Security-Policy"
 	XContentType = "X-Content-Type-Options"
+
+	MatchScoreExcellent = 3
+	MatchScoreGood      = 2
+	MatchScoreFair      = 1
+	MatchScorePoor      = 0
+	MatchScoreLowest    = -1
 )
 
 var (
@@ -412,50 +421,74 @@ func isOverlyBroad(pattern string) bool {
 	return targetLabel == "*" || targetLabel == "%"
 }
 
-// findMatchingRoute returns the first ProxyEndpointRoute whose domain pattern matches host,
-// or nil if no match is found. It uses the same wildcard/regex logic as isAllowed.
+// findMatchingRoute returns the most-specific ProxyEndpointRoute whose domain pattern matches host,
+// or nil if no match is found.
+//
+// Specificity order:
+// 1. exact domain match
+// 2. single-segment wildcard (%) pattern match
+// 3. prefix wildcard (*) pattern match
+//
+// Within the same class, the longer pattern wins.
 func (p *proxy) findMatchingRoute(host string) *mgmt.ProxyEndpointRoute {
 	endpoints, err := p.proxyEndpointCache.List(labels.Everything())
 	if err != nil {
 		logrus.Debugf("httpproxy: failed to list ProxyEndpoints for route lookup: %v", err)
 		return nil
 	}
+	var best *mgmt.ProxyEndpointRoute
+	bestScore := MatchScoreLowest
+	bestPatternLen := -1
 	for _, ep := range endpoints {
 		for i := range ep.Spec.Routes {
 			route := &ep.Spec.Routes[i]
-			if routeMatchesHost(route.Domain, host) {
-				return route
+			score, matches := routeMatchScore(route.Domain, host)
+			if !matches {
+				continue
+			}
+			if score > bestScore || (score == bestScore && len(route.Domain) > bestPatternLen) {
+				best = route
+				bestScore = score
+				bestPatternLen = len(route.Domain)
 			}
 		}
 	}
-	return nil
+	return best
 }
 
 // routeMatchesHost reports whether the domain pattern from a ProxyEndpointRoute matches host,
 // using the same rules as proxy.isAllowed.
 func routeMatchesHost(pattern, host string) bool {
+	_, matches := routeMatchScore(pattern, host)
+	return matches
+}
+
+// routeMatchScore returns a specificity score and whether pattern matches host.
+// Higher score means higher specificity.
+func routeMatchScore(pattern, host string) (int, bool) {
 	if pattern == host {
-		return true
+		return MatchScoreExcellent, true
 	}
 	if isOverlyBroad(pattern) {
-		return false
+		return MatchScorePoor, false
 	}
 	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(host, pattern[1:]) {
-		return true
+		return MatchScoreFair, true
 	}
 	if strings.Contains(pattern, ".%.") || strings.HasPrefix(pattern, "%.") {
-		return constructRegex(pattern).MatchString(host)
+		if constructRegex(pattern).MatchString(host) {
+			return MatchScoreGood, true
+		}
 	}
-	return false
+	return MatchScorePoor, false
 }
 
 // applyRouteInjection fetches the credential identified by credID in cAuth, then applies the
 // injection pattern defined on the matching ProxyEndpoint route to the outgoing request.
 func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt.ProxyEndpointRoute) error {
-	params := getRequestParams(cAuth)
-	credID := params["credID"]
+	credID := credentialIDFromCattleAuth(cAuth)
 	if credID == "" {
-		return fmt.Errorf("server-defined injection requires credID in %s header", CattleAuth)
+		return fmt.Errorf("server-defined injection requires credID (credential ID) in %s header", CattleAuth)
 	}
 	secretData, err := getCredential(credID, p.secretGetter(req, cAuth))
 	if err != nil {
@@ -465,15 +498,197 @@ func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt
 }
 
 // perRouteTLSTransport selects the appropriate HTTP transport based on whether the destination
-// ProxyEndpointRoute has InsecureSkipTLSVerify enabled.
+// ProxyEndpointRoute has InsecureSkipTLSVerify enabled or provides a CABundle.
 type perRouteTLSTransport struct {
 	proxy *proxy
 }
 
 func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	route := t.proxy.findMatchingRoute(req.URL.Hostname())
+
+	// If the route explicitly disables TLS verification, use the insecure transport
 	if route != nil && route.InsecureSkipTLSVerify {
 		return t.proxy.insecureTransport.RoundTrip(req)
 	}
+
+	// If the route has custom certificate settings, build a transport for it
+	if route != nil && (route.CABundle != "" || route.ServerName != "" || route.TLSVerificationOptions != nil) {
+		transport, err := buildTransportForRoute(route, req.URL.Hostname())
+		if err != nil {
+			logrus.Warnf("httpproxy: failed to build transport for route: %v", err)
+			// Fall through to default transport
+			return http.DefaultTransport.RoundTrip(req)
+		}
+		return transport.RoundTrip(req)
+	}
+
+	// Use the default transport for standard certificate verification
 	return http.DefaultTransport.RoundTrip(req)
+}
+
+// buildTransportWithCABundle creates an HTTP transport that trusts the provided CA certificates.
+// The caBundle should be PEM-encoded certificates.
+func buildTransportWithCABundle(caBundle string) (*http.Transport, error) {
+	// Parse the CA certificates from PEM
+	caCertPool, err := parseCACertificates(caBundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CA certificates: %w", err)
+	}
+
+	// Clone the default transport and update its TLS config
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	return transport, nil
+}
+
+// parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool.
+// It combines the provided certificates with the system's root CAs.
+func parseCACertificates(caBundle string) (*x509.CertPool, error) {
+	if err := validateCABundleSecurity(caBundle); err != nil {
+		return nil, err
+	}
+
+	// Start with the system's root CAs
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		logrus.Debugf("httpproxy: failed to get system cert pool, using empty pool instead: %v", err)
+		caCertPool = x509.NewCertPool()
+	}
+
+	// Add the provided CA certificates to the pool
+	if !caCertPool.AppendCertsFromPEM([]byte(caBundle)) {
+		return nil, fmt.Errorf("failed to append CA certificates from PEM data")
+	}
+
+	return caCertPool, nil
+}
+
+// validateCABundleSecurity applies defensive checks for user-provided PEM data.
+// It rejects oversized bundles and accidental private key material.
+func validateCABundleSecurity(caBundle string) error {
+	if len(caBundle) > maxCABundleBytes {
+		return fmt.Errorf("CA bundle exceeds maximum size of %d bytes", maxCABundleBytes)
+	}
+
+	remaining := []byte(caBundle)
+	foundCertificate := false
+
+	for len(remaining) > 0 {
+		if len(bytes.TrimSpace(remaining)) == 0 {
+			break
+		}
+
+		block, rest := pem.Decode(remaining)
+		if block == nil {
+			return fmt.Errorf("failed to parse CA bundle PEM data")
+		}
+
+		if strings.Contains(strings.ToUpper(block.Type), "PRIVATE KEY") {
+			return fmt.Errorf("CA bundle must not contain private key material")
+		}
+
+		if strings.EqualFold(block.Type, "CERTIFICATE") {
+			foundCertificate = true
+		}
+
+		remaining = rest
+	}
+
+	if !foundCertificate {
+		return fmt.Errorf("CA bundle must contain at least one CERTIFICATE PEM block")
+	}
+
+	return nil
+}
+
+// buildTLSConfigForRoute creates a complete TLS config based on route certificate settings.
+// It handles CA bundles, client certificates, server name indication, and verification options.
+func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute, requestHostname string) (*tls.Config, error) {
+	tlsConfig := &tls.Config{}
+
+	// Set up root CAs from CA bundle
+	if route.CABundle != "" {
+		caCertPool, err := parseCACertificates(route.CABundle)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CA bundle: %w", err)
+		}
+		tlsConfig.RootCAs = caCertPool
+	} else {
+		// Use system cert pool
+		caCertPool, err := x509.SystemCertPool()
+		if err != nil {
+			logrus.Debugf("httpproxy: failed to get system cert pool: %v", err)
+			caCertPool = x509.NewCertPool()
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	// Set server name for SNI
+	serverName := requestHostname
+	if route.ServerName != "" {
+		serverName = route.ServerName
+	}
+	tlsConfig.ServerName = serverName
+
+	// Apply verification options if specified
+	if route.TLSVerificationOptions != nil {
+		if route.TLSVerificationOptions.VerifyHostname != nil && !*route.TLSVerificationOptions.VerifyHostname {
+			tlsConfig.InsecureSkipVerify = true
+		}
+		// Note: VerifyExpiration is handled by the underlying crypto/tls verification
+	}
+
+	return tlsConfig, nil
+}
+
+// buildTransportForRoute creates an HTTP transport based on the route's certificate settings.
+func buildTransportForRoute(route *mgmt.ProxyEndpointRoute, requestHostname string) (*http.Transport, error) {
+	tlsConfig, err := buildTLSConfigForRoute(route, requestHostname)
+	if err != nil {
+		return nil, err
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+
+	return transport, nil
+}
+
+// buildTransportWithCABundle creates an HTTP transport that trusts the provided CA certificates.
+// The caBundle should be PEM-encoded certificates.
+func buildTransportWithCABundle(caBundle string) (*http.Transport, error) {
+	// Parse the CA certificates from PEM
+	caCertPool, err := parseCACertificates(caBundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CA certificates: %w", err)
+	}
+
+	// Clone the default transport and update its TLS config
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	return transport, nil
+}
+
+// parseCACertificates parses PEM-encoded CA certificates and returns a certificate pool.
+// It combines the provided certificates with the system's root CAs.
+func parseCACertificates(caBundle string) (*x509.CertPool, error) {
+	// Start with the system's root CAs
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		logrus.Debugf("httpproxy: failed to get system cert pool, using empty pool instead: %v", err)
+		caCertPool = x509.NewCertPool()
+	}
+
+	// Add the provided CA certificates to the pool
+	if !caCertPool.AppendCertsFromPEM([]byte(caBundle)) {
+		return nil, fmt.Errorf("failed to append CA certificates from PEM data")
+	}
+
+	return caCertPool, nil
 }
