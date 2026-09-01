@@ -42,6 +42,8 @@ type nodeCertificateMetadata struct {
 	records map[string]certificateMetadata
 }
 
+// Test_Imported_Operation_SetD_ImportedCertificateRotation validates the baseline single-node
+// imported flow: certificate rotation succeeds and every server certificate is replaced.
 func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
@@ -49,23 +51,26 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 	}
 	defer cs.Close()
 
+	// Setup: bring up a single-node imported cluster with the default runtime data directory.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
+	// Before-rotation evidence: record certificate metadata so rotation can be proven later.
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	requiredPaths := requiredCertificatePaths(runtimeName)
 	before := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 
+	// Operation execution: run CertificateRotation to completion.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
-	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+	assertCertificateRotationSucceeded(t, op)
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
+	assertCertificateRotationSucceeded(t, op)
 
+	// Recovery: the cluster must come back healthy on the rotated certificates.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
+
+	// Final assertions: every required certificate actually rotated, and the API still works.
 	after := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 
@@ -82,6 +87,8 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Custom_Data_Dir(t 
 	}
 	defer cs.Close()
 
+	// Setup: bring up a single-node imported cluster with a non-default data-dir configured
+	// before bootstrap.
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	dataDir := fmt.Sprintf("/var/lib/rancher/testing/certificate-rotation-%s", runtimeName)
 
@@ -89,26 +96,31 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Custom_Data_Dir(t 
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1, DistroDataDir: dataDir},
 	})
 
+	// The node must actually report the custom data-dir before trusting cert paths derived from it.
 	assertNodeArgsContainDataDir(t, cs, fx.mgmtCluster.Name, runtimeName, dataDir)
 
+	// Before-rotation evidence, using cert paths under the custom data-dir.
 	requiredPaths := requiredCertificatePathsForDataDir(dataDir)
 	before := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 
+	// Operation execution.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
-	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+	assertCertificateRotationSucceeded(t, op)
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
+	assertCertificateRotationSucceeded(t, op)
 
+	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
+	// Final assertions: certificates under the custom data-dir actually rotated.
 	after := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 }
 
+// Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument validates that
+// restricting rotation to the "etcd" service rotates only etcd certificates and leaves the rest
+// of the server certificates untouched.
 func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
@@ -116,10 +128,12 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t
 	}
 	defer cs.Close()
 
+	// Setup.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-service-argument", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
+	// Before-rotation evidence, split by whether the cert is expected to rotate.
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	tlsDir := fmt.Sprintf("/var/lib/rancher/%s/server/tls", runtimeName)
 	etcdPaths := []string{
@@ -135,21 +149,26 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t
 	allPaths := append(append([]string(nil), etcdPaths...), nonEtcdPaths...)
 	before := collectRequiredCertificateMetadata(t, fx, allPaths)
 
+	// Operation execution, scoped to the etcd service only.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationServices("etcd"))
 	assert.Equal(t, []string{"etcd"}, op.Spec.Args.Services)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
-	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+	assertCertificateRotationSucceeded(t, op)
 
+	// Recovery.
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
+	// Final assertions: only etcd certs rotated, everything else stayed the same.
 	after := collectRequiredCertificateMetadata(t, fx, allPaths)
 	assertCertificateRotationMetadata(t, before, after, etcdPaths)
 	assertCertificateMetadataUnchanged(t, before, after, nonEtcdPaths)
 }
 
+// Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args validates that when the
+// kube-controller-manager/kube-scheduler serve on a custom TLS cert/key pair (via RKE2 node
+// args), CertificateRotation reads those node args, preserves the custom TLS pair, and rotates
+// the remaining targeted server certificates.
 func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *testing.T) {
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	if runtimeName != capr.RuntimeRKE2 {
@@ -162,6 +181,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 	}
 	defer cs.Close()
 
+	// Setup: bring up a single-node imported RKE2 cluster.
 	dataDir := "/var/lib/rancher/rke2"
 	kcmDefaultCert := dataDir + "/server/tls/kube-controller-manager/kube-controller-manager.crt"
 	kcmDefaultKey := dataDir + "/server/tls/kube-controller-manager/kube-controller-manager.key"
@@ -179,6 +199,8 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
+	// Reconfigure RKE2 to serve kube-controller-manager/kube-scheduler on a custom cert/key pair,
+	// via node args, so rotation must read node args rather than assuming default cert paths.
 	configureCommand := strings.Join([]string{
 		"set -e",
 		fmt.Sprintf("mkdir -p %s %s", shellQuote(kcmCustomDir), shellQuote(ksCustomDir)),
@@ -193,10 +215,9 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 		t.Fatalf("failed to configure RKE2 TLS arguments on pod %s: %v\noutput: %s", fx.pods[0].Name, err, strings.TrimSpace(out))
 	}
 
-	binDir := "/var/lib/rancher/rke2/bin"
-	kubeconfig := "/etc/rancher/rke2/rke2.yaml"
-	kubectlEnv := fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
-	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, kubectlEnv, []string{"imported-init-0"})
+	// Reconfiguration verification: wait for RKE2 and Rancher to recover, and confirm the
+	// registered node publishes the TLS arguments that rotation must later read.
+	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, []string{"imported-init-0"})
 	if out, err := fx.execKubectl(t, "kubectl get --raw=/readyz"); err != nil {
 		t.Fatalf("downstream API did not become ready after RKE2 TLS reconfiguration: %v\noutput: %s", err, strings.TrimSpace(out))
 	}
@@ -244,6 +265,8 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 		t.Fatalf("timed out waiting for imported management cluster %s to be Ready after RKE2 TLS reconfiguration: %v", fx.mgmtCluster.Name, err)
 	}
 
+	// Before-rotation evidence, split by whether the cert is expected to rotate: the custom
+	// kube-controller-manager/kube-scheduler pair is the active serving cert and must be left alone.
 	rotatingPaths := []string{
 		dataDir + "/server/tls/client-admin.crt",
 		dataDir + "/server/tls/serving-kube-apiserver.crt",
@@ -257,23 +280,30 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 	allPaths := append(append([]string(nil), rotatingPaths...), unchangedPaths...)
 	before := collectRequiredCertificateMetadata(t, fx, allPaths)
 
+	// Operation execution.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
-	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+	assertCertificateRotationSucceeded(t, op)
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
 
+	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
+
+	// Final assertions: server certs rotated, the custom TLS pair did not.
 	after := collectRequiredCertificateMetadata(t, fx, allPaths)
 	assertCertificateRotationMetadata(t, before, after, rotatingPaths)
 	assertCertificateMetadataUnchanged(t, before, after, unchangedPaths)
 }
 
+// shellQuote wraps value in single quotes so it is passed through `sh -c` as one literal argument.
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
+// Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook validates that a
+// delegate registered on the Rotate step hook and the Succeeded phase hook actually pauses the
+// operation at each hook point, and that the operation still completes and rotates once each
+// hook is advanced.
 func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
@@ -281,10 +311,12 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 	}
 	defer cs.Close()
 
+	// Setup.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-lifecycle-hook", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
+	// Before-rotation evidence.
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	requiredPaths := requiredCertificatePaths(runtimeName)
 	before := collectRequiredCertificateMetadata(t, fx, requiredPaths)
@@ -296,6 +328,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 	rotateHookKey := certificaterotation.RotateStepHookLabelPrefix + hookName
 	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
+	// Operation execution, delegated at both the Rotate step hook and the Succeeded phase hook.
 	op := CreateCertificateRotationOp(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationLabels(map[string]string{
 		rotateHookKey:    delegateName,
 		succeededHookKey: delegateName,
@@ -317,11 +350,12 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 	AdvancePastCertificateRotationHook(t, cs, op, beaconNS, beaconName, succeededHookKey, delegateName)
 
 	final := WaitForCertificateRotationSucceeded(t, cs, op, beaconNS, beaconName)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, final.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, final.Status.Step)
-	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&final.Status))
+	assertCertificateRotationSucceeded(t, final)
 
+	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, final)
+
+	// Final assertions: rotation still happened despite pausing at both hooks.
 	after := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 }
@@ -337,6 +371,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Multi_Node(t *test
 	}
 	defer cs.Close()
 
+	// Setup: 1 etcd-only, 1 control-plane-only, 2 worker-only nodes.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-multi-node", []cluster.ImportedNodePool{
 		{ETCD: true, Quantity: 1},
 		{ControlPlane: true, Quantity: 1},
@@ -344,16 +379,13 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Multi_Node(t *test
 	})
 
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
-	binDir := fmt.Sprintf("/var/lib/rancher/%s/bin", runtimeName)
-	kubeconfig := fmt.Sprintf("/etc/rancher/%s/%s.yaml", runtimeName, runtimeName)
-	kubectlEnv := fmt.Sprintf("KUBECONFIG=%s PATH=$PATH:%s", kubeconfig, binDir)
 	expectedNodes := []string{
 		"imported-init-0",
 		"imported-node-1",
 		"imported-node-2",
 		"imported-node-3",
 	}
-	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, kubectlEnv, expectedNodes)
+	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, expectedNodes)
 
 	etcdCertPaths := []string{
 		fmt.Sprintf("/var/lib/rancher/%s/server/tls/etcd/server-client.crt", runtimeName),
@@ -370,22 +402,25 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Multi_Node(t *test
 	controlPlanePodNames := []string{fx.pods[1].Name}
 	workerPodNames := []string{fx.pods[2].Name, fx.pods[3].Name}
 
+	// Before-rotation evidence, per role: server certs for etcd/control-plane, agent restart
+	// timestamp for workers (workers have no server certs to rotate).
 	beforeEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdCertPaths)
 	beforeControlPlane := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, controlPlaneCertPaths)
 	beforeWorkerAgentTimestamp := collectWorkerAgentActiveTimestamp(t, cs, fx, workerPodNames, runtimeName)
 
+	// Operation execution.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
-	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
-	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+	assertCertificateRotationSucceeded(t, op)
 
 	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 	op = WaitForCertificateRotationSucceeded(t, cs, op, beaconNS, beaconName)
 
+	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
-	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, kubectlEnv, expectedNodes)
+	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, expectedNodes)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
+	// Final assertions: etcd/control-plane certs rotated, worker agents restarted.
 	afterEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdCertPaths)
 	afterControlPlane := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, controlPlaneCertPaths)
 	afterWorkerAgentTimestamp := collectWorkerAgentActiveTimestamp(t, cs, fx, workerPodNames, runtimeName)
@@ -455,10 +490,14 @@ func nodeArgsContainDataDir(annotations map[string]string, annotationKey, dataDi
 	return fmt.Errorf("expected data-dir argument %q not found in %s", dataDir, annotationKey)
 }
 
+// requiredCertificatePaths returns the server certificate paths rotation must replace, under the
+// runtime's default data directory.
 func requiredCertificatePaths(runtimeName string) []string {
 	return requiredCertificatePathsForDataDir(fmt.Sprintf("/var/lib/rancher/%s", runtimeName))
 }
 
+// requiredCertificatePathsForDataDir returns the server certificate paths rotation must replace,
+// under the given data directory.
 func requiredCertificatePathsForDataDir(dataDir string) []string {
 	return []string{
 		path.Join(dataDir, "server/tls/client-admin.crt"),
@@ -470,6 +509,8 @@ func requiredCertificatePathsForDataDir(dataDir string) []string {
 	}
 }
 
+// collectRequiredCertificateMetadata collects certificate metadata from the init pod for each
+// path, keyed by path.
 func collectRequiredCertificateMetadata(t *testing.T, fx *importedClusterFixture, paths []string) map[string]certificateMetadata {
 	t.Helper()
 
@@ -480,6 +521,7 @@ func collectRequiredCertificateMetadata(t *testing.T, fx *importedClusterFixture
 	return metadata
 }
 
+// collectCertificateMetadata reads and parses one certificate's metadata from the init pod.
 func collectCertificateMetadata(t *testing.T, fx *importedClusterFixture, certPath string) certificateMetadata {
 	t.Helper()
 
@@ -495,6 +537,8 @@ func collectCertificateMetadata(t *testing.T, fx *importedClusterFixture, certPa
 	return record
 }
 
+// execCertificateMetadataCommandOnInitPod runs the openssl metadata command on the init pod via
+// fx.execKubectl.
 func execCertificateMetadataCommandOnInitPod(t *testing.T, fx *importedClusterFixture, certPath string) (string, error) {
 	t.Helper()
 
@@ -502,6 +546,8 @@ func execCertificateMetadataCommandOnInitPod(t *testing.T, fx *importedClusterFi
 	return fx.execKubectl(t, cmd)
 }
 
+// collectCertificateMetadataFromPod reads and parses one certificate's metadata from a specific
+// pod, used when the pod under test isn't the fixture's init pod.
 func collectCertificateMetadataFromPod(t *testing.T, clients *clients.Clients, fx *importedClusterFixture, podName, certPath string) certificateMetadata {
 	t.Helper()
 
@@ -518,6 +564,8 @@ func collectCertificateMetadataFromPod(t *testing.T, clients *clients.Clients, f
 	return record
 }
 
+// buildCertificateMetadataCommand builds a shell command that fails loudly if certPath is
+// missing, otherwise prints its serial, validity window, and SHA-256 fingerprint via openssl.
 func buildCertificateMetadataCommand(certPath string) string {
 	return fmt.Sprintf(
 		"if [ ! -f %q ]; then echo \"missing certificate: %s\" >&2; exit 1; fi; openssl x509 -in %q -noout -serial -startdate -enddate -fingerprint -sha256",
@@ -525,6 +573,8 @@ func buildCertificateMetadataCommand(certPath string) string {
 	)
 }
 
+// parseCertificateMetadataOutput parses buildCertificateMetadataCommand's openssl output into a
+// certificateMetadata record.
 func parseCertificateMetadataOutput(certPath, out string) (certificateMetadata, error) {
 	record := certificateMetadata{path: certPath}
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
@@ -562,6 +612,18 @@ func parseCertificateMetadataOutput(certPath, out string) (certificateMetadata, 
 	return record, nil
 }
 
+// assertCertificateRotationSucceeded verifies the operation finished in the Succeeded phase,
+// completed the Rotate step, and did not get stuck waiting for its plan to apply.
+func assertCertificateRotationSucceeded(t *testing.T, op *opv1alpha1.CertificateRotation) {
+	t.Helper()
+
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, op.Status.Phase)
+	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, op.Status.Step)
+	assert.NotEqual(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&op.Status))
+}
+
+// assertCertificateRotationMetadata fails the test unless every path in requiredPaths shows a
+// changed serial and fingerprint, with notBefore not moving backwards.
 func assertCertificateRotationMetadata(t *testing.T, before, after map[string]certificateMetadata, requiredPaths []string) {
 	t.Helper()
 
@@ -594,6 +656,8 @@ func assertCertificateRotationMetadata(t *testing.T, before, after map[string]ce
 	}
 }
 
+// assertCertificateMetadataUnchanged fails the test if any path in paths shows a different
+// serial, fingerprint, or validity window between before and after.
 func assertCertificateMetadataUnchanged(t *testing.T, before, after map[string]certificateMetadata, paths []string) {
 	t.Helper()
 
@@ -623,6 +687,9 @@ func assertCertificateMetadataUnchanged(t *testing.T, before, after map[string]c
 	}
 }
 
+// waitForImportedCertificateRotationRecovery waits for the mgmt cluster to go Ready, the init
+// node to rejoin, the downstream API to answer, and the runtime's own certificate check to pass.
+// On failure it routes through handleCertificateRotationError so the dumped bundle covers the op.
 func waitForImportedCertificateRotationRecovery(t *testing.T, clients *clients.Clients, fx *importedClusterFixture, runtimeName string, op *opv1alpha1.CertificateRotation) {
 	t.Helper()
 
@@ -645,6 +712,8 @@ func waitForImportedCertificateRotationRecovery(t *testing.T, clients *clients.C
 	}
 }
 
+// assertDownstreamAPIUsableAfterRotation proves the downstream API still serves authenticated
+// writes and reads after rotation by round-tripping a throwaway ConfigMap.
 func assertDownstreamAPIUsableAfterRotation(t *testing.T, fx *importedClusterFixture) {
 	t.Helper()
 
@@ -664,6 +733,8 @@ func assertDownstreamAPIUsableAfterRotation(t *testing.T, fx *importedClusterFix
 	}
 }
 
+// collectNodeCertificateMetadata collects certificate metadata for certPaths on each named pod,
+// used by the multi-node test where the pod under test differs per role.
 func collectNodeCertificateMetadata(t *testing.T, clients *clients.Clients, fx *importedClusterFixture, podNames, certPaths []string) []nodeCertificateMetadata {
 	t.Helper()
 
@@ -681,6 +752,9 @@ func collectNodeCertificateMetadata(t *testing.T, clients *clients.Clients, fx *
 	return nodes
 }
 
+// assertNodeCertificateRotationMetadata is the per-pod equivalent of
+// assertCertificateRotationMetadata: it fails the test unless every required path on every pod
+// shows a changed serial and fingerprint, with notBefore not moving backwards.
 func assertNodeCertificateRotationMetadata(t *testing.T, before, after []nodeCertificateMetadata, requiredPaths []string) {
 	t.Helper()
 
@@ -729,6 +803,9 @@ func assertNodeCertificateRotationMetadata(t *testing.T, before, after []nodeCer
 	}
 }
 
+// collectWorkerAgentActiveTimestamp reads each worker pod's runtime-agent
+// ActiveEnterTimestampMonotonic, keyed by pod name. Workers have no server certs, so a restart is
+// the only observable proof that CertificateRotation touched them.
 func collectWorkerAgentActiveTimestamp(t *testing.T, clients *clients.Clients, fx *importedClusterFixture, podNames []string, runtimeName string) map[string]uint64 {
 	t.Helper()
 
@@ -752,6 +829,8 @@ func collectWorkerAgentActiveTimestamp(t *testing.T, clients *clients.Clients, f
 	return values
 }
 
+// assertWorkerAgentRestarted fails the test unless every pod's ActiveEnterTimestampMonotonic
+// advanced, proving the runtime agent actually restarted.
 func assertWorkerAgentRestarted(t *testing.T, before, after map[string]uint64) {
 	t.Helper()
 

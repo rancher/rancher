@@ -108,7 +108,7 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 	kubeconfig := fmt.Sprintf("/etc/rancher/%s/%s.yaml", distro, distro)
 	var binDir string
 	if distro == capr.RuntimeRKE2 {
-		binDir = path.Join(initNodeDataDir(distro, pools), "bin")
+		binDir = path.Join(initNodeDataDirFromPools(distro, pools), "bin")
 	} else {
 		binDir = "/usr/local/bin"
 	}
@@ -157,11 +157,10 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 	}
 }
 
-// initNodeDataDir returns the effective RKE2/K3s data directory for the init node that
-// cluster.NewImportedClusterPods selects: the first pool with ETCD: true and Quantity > 0. It
-// mirrors that selection so the fixture's kubectl PATH matches the node actually brought up as
-// the init node.
-func initNodeDataDir(distro string, pools []cluster.ImportedNodePool) string {
+// initNodeDataDirFromPools returns the configured data directory of the bootstrap etcd pool (the
+// first pool with ETCD: true and Quantity > 0, matching cluster.NewImportedClusterPods' init-node
+// selection), or the runtime default when that pool sets none.
+func initNodeDataDirFromPools(distro string, pools []cluster.ImportedNodePool) string {
 	for _, pool := range pools {
 		if pool.ETCD && pool.Quantity > 0 {
 			if pool.DistroDataDir != "" {
