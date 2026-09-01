@@ -82,7 +82,7 @@ Security controls are validated in `pkg/httpproxy/cert_management_test.go`:
 Run all certificate security tests:
 
 ```bash
-go test ./pkg/httpproxy -run 'TestBuildTLSConfigForRoute'
+go test ./pkg/httpproxy -run TestBuildTLSConfigForRoute
 ```
 
 ## Best Practices
