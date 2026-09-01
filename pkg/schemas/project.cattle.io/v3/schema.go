@@ -339,6 +339,7 @@ func jobTypes(schemas *types.Schemas) *types.Schemas {
 					"activeDeadlineSeconds",
 					"backoffLimit",
 					"manualSelector",
+					"scheduling",
 				},
 				To: "jobConfig",
 			},
