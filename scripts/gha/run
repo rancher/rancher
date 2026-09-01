@@ -30,36 +30,28 @@ else
   export CATTLE_FEATURES="harvester=false"
 fi
 
-# Create k3d cluster. We expose:
-# - API Port: 6443
-# - 8080 host port -> 80 loadbalancer port
-# - 443 host port -> 443 loadbalancer port
-# This ensures tests communicating on these ports work seamlessly.
 k3d cluster create rancher-server \
   --api-port 6443 \
   -p "8080:80@loadbalancer" \
   -p "8443:443@loadbalancer" \
   --wait
 
-# Import local development images into the k3d cluster
-k3d image import $IMAGE $CATTLE_AGENT_IMAGE -c rancher-server
-
-# Deploy cert-manager using pinned/parameterized version
+# Deploy cert-manager and wait for its rollout
 CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.15.3"}
 kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
-
-# Wait for cert-manager deployments to roll out
 kubectl rollout status -n cert-manager deploy --timeout=150s
 
+# RANCHER_CHART is the path to the already packaged chart, recovered from a previous "build-chart" step
 if [ -z "${RANCHER_CHART:-}" ]; then
   # Build the local Rancher chart
   (cd ../.. && ./scripts/chart/build chart)
   RANCHER_CHART=../chart/rancher
 fi
 
-# Rancher server and agent images are set in the chart and server image respectively. There is no need to override them here
+# Rancher server and agent images are loaded from previous build steps and now imported directly into the cluster.
+# The chart and server image already references them, respectively, so there is no need to override them using helm values.
+k3d image import $IMAGE $CATTLE_AGENT_IMAGE -c rancher-server
 
-# Install Rancher via Helm
 helm upgrade --install rancher ${RANCHER_CHART} \
   --namespace cattle-system \
   --create-namespace \
