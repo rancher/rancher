@@ -57,14 +57,7 @@ if [ -z "${RANCHER_CHART:-}" ]; then
   RANCHER_CHART=../chart/rancher
 fi
 
-# Extract repository and tag from full $IMAGE string
-if [[ "$IMAGE" == *:* ]]; then
-  IMAGE_REPO=$(echo $IMAGE | rev | cut -d: -f2- | rev)
-  IMAGE_TAG=$(echo $IMAGE | rev | cut -d: -f1 | rev)
-else
-  IMAGE_REPO="$IMAGE"
-  IMAGE_TAG="latest"
-fi
+# Rancher server and agent images are set in the chart and server image respectively. There is no need to override them here
 
 # Install Rancher via Helm
 helm upgrade --install rancher ${RANCHER_CHART} \
@@ -78,9 +71,5 @@ helm upgrade --install rancher ${RANCHER_CHART} \
   --set extraEnv[1].value="$CATTLE_SERVER_URL" \
   --set extraEnv[2].name=CATTLE_FEATURES \
   --set extraEnv[2].value="$CATTLE_FEATURES" \
-  --set extraEnv[3].name=CATTLE_AGENT_IMAGE \
-  --set extraEnv[3].value="$CATTLE_AGENT_IMAGE" \
-  --set image.repository="${IMAGE_REPO}" \
-  --set image.tag="${IMAGE_TAG}" \
   --set replicas=1 \
   --wait
