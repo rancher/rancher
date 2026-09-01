@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+const TEST = "test"
+
 func SafelyRemoved(restConfig *rest.Config, runtime, nodeName string) (bool, error) {
 	removeAnnotation := "etcd." + runtime + ".cattle.io/remove"
 	removedNodeNameAnnotation := "etcd." + runtime + ".cattle.io/removed-node-name"
