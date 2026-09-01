@@ -79,8 +79,21 @@ const (
 	// persisted on disk, so it can be compared against the hash the distro stamped on the snapshot.
 	// The single format argument is the distro data directory, where the token file is persisted.
 	//
+	// It has to reproduce in a shell what the distro's do which respects colons as part of the password, treating
+	// everything after "server:" as the password.
+	//
+	// So two anchored, non-greedy substitutions recover the password: the first drops the `K10<CA-hash>::` prefix, the
+	// second drops the `server:` username. `[^:]*` cannot cross a colon, which is what makes them non-greedy; a greedy
+	// `.*:` would strip through the *last* colon. This also respects passwords ending in a colon.
+	//
+	// Whitespace is only trimmed at the edges, matching the bytes.TrimSpace the distro applies when it
+	// reads the same file; deleting all whitespace would corrupt a password that contains a space.
+	//
+	// The missing/empty guards are not incidental. Every element of the derivation is a pipeline, so without them a
+	// missing token file leaves the shell exiting 0 having printed sha256 of the empty string which is a valid hash.
+	//
 	// Exported so e2e tests can derive the same value the check derives.
-	TokenHashCommandFormat = `f=%[1]s/server/token; tr -d '[:space:]' < "$f" | sed 's/.*://' | tr -d '\n' | sha256sum | cut -c1-12`
+	TokenHashCommandFormat = `f=%[1]s/server/token; [ -s "$f" ] || { echo "server token file $f not found or empty" >&2; exit 1; }; p=$(head -n 1 "$f" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^K10[^:]*:://' -e 's/^[^:]*://'); [ -n "$p" ] || { echo "no server token password found in $f" >&2; exit 1; }; printf '%%s' "$p" | sha256sum | cut -c1-12`
 
 	// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
 	// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
