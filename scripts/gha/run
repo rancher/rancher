@@ -51,8 +51,11 @@ kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download
 # Wait for cert-manager deployments to roll out
 kubectl rollout status -n cert-manager deploy --timeout=150s
 
-# Build the local Rancher chart
-(cd ../.. && ./scripts/chart/build chart)
+if [ -z "${RANCHER_CHART:-}" ]; then
+  # Build the local Rancher chart
+  (cd ../.. && ./scripts/chart/build chart)
+  RANCHER_CHART=../chart/rancher
+fi
 
 # Extract repository and tag from full $IMAGE string
 if [[ "$IMAGE" == *:* ]]; then
@@ -64,7 +67,7 @@ else
 fi
 
 # Install Rancher via Helm
-helm upgrade --install rancher ../chart/rancher \
+helm upgrade --install rancher ${RANCHER_CHART} \
   --namespace cattle-system \
   --create-namespace \
   --set hostname="${HOST_IP}.sslip.io" \

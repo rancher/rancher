@@ -47,3 +47,17 @@ runs:
     - name: Package
       shell: bash
       run: ./scripts/chart/package
+    - name: Prepare for upload
+      shell: bash
+      run: |
+        set -e
+        source scripts/version
+        cp bin/chart/${CHART_REPO}/rancher-${CHART_VERSION}.tgz /tmp/rancher-chart.tgz
+    - name: Upload chart
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: "rancher-chart"
+        path: /tmp/rancher-chart.tgz
+        if-no-files-found: error
+        retention-days: 4
+        overwrite: false
