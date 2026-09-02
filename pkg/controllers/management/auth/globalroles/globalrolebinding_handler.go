@@ -64,7 +64,7 @@ const (
 	crbNameAnnotation             = "authz.management.cattle.io/crb-name"
 	crtbGrbOwnerIndex             = "authz.management.cattle.io/crtb-owner"
 	localClusterName              = "local"
-	grbOwnerLabel                 = "authz.management.cattle.io/grb-owner"
+	grbOwnerLabel                 = rbac.GrbOwnerLabel
 	fleetWorkspacePermissionLabel = "authz.management.cattle.io/fleet-workspace-permissions"
 )
 
@@ -624,7 +624,6 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindings(gl
 	}
 
 	var returnError error
-	grbName := wrangler.SafeConcatName(globalRoleBinding.Name)
 
 	// Get all clusters
 	clusters, err := l.clusterLister.List(labels.Everything())
@@ -633,15 +632,12 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindings(gl
 		return fmt.Errorf("couldn't list clusters: %w", err)
 	}
 
-	// Get the subject for the RoleBindings
-	subject := rbac.GetGRBSubject(globalRoleBinding)
-
 	// Iterate through all clusters except local
 	for _, cluster := range clusters {
 		if cluster.Name == localClusterName {
 			continue
 		}
-		returnError = errors.Join(returnError, l.reconcileInheritedNamespacedRoleBindingsForCluster(cluster, gr, grbName, subject))
+		returnError = errors.Join(returnError, l.reconcileInheritedNamespacedRoleBindingsForCluster(cluster, gr, globalRoleBinding))
 	}
 
 	l.status.AddCondition(localConditions, condition, inheritedNamespacedRoleBindingReconciled, returnError)
@@ -649,7 +645,7 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindings(gl
 }
 
 // reconcileInheritedNamespacedRoleBindingsForCluster reconciles RoleBindings for a single downstream cluster
-func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindingsForCluster(cluster *v3.Cluster, gr *v3.GlobalRole, grbName string, subject rbacv1.Subject) error {
+func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindingsForCluster(cluster *v3.Cluster, gr *v3.GlobalRole, grb *v3.GlobalRoleBinding) error {
 	// Get user context for the cluster
 	userContext, err := l.clusterManager.UserContext(cluster.Name)
 	if err != nil {
@@ -663,21 +659,20 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindingsFor
 	namespaceCache := userContext.Corew.Namespace().Cache()
 
 	var returnError error
-	globalRoleName := wrangler.SafeConcatName(gr.Name)
 
 	// Track all RoleBinding UIDs that should exist in this clusters
 	roleBindingUIDs := sets.New[types.UID]()
 
 	// Iterate through all namespaces in InheritedNamespacedRules
 	for ns := range gr.InheritedNamespacedRules {
-		nsErr := l.reconcileInheritedRoleBindingInNamespace(cluster.Name, ns, globalRoleName, grbName, subject, roleBindingClient, roleBindingCache, namespaceCache, roleBindingUIDs)
+		nsErr := l.reconcileInheritedRoleBindingInNamespace(cluster.Name, ns, grb, roleBindingClient, roleBindingCache, namespaceCache, roleBindingUIDs)
 		if nsErr != nil {
 			returnError = errors.Join(returnError, nsErr)
 		}
 	}
 
 	// Purge invalid RoleBindings in this cluster
-	purgeErr := l.purgeInvalidInheritedRoleBindingsInCluster(cluster.Name, grbName, roleBindingCache, roleBindingClient, roleBindingUIDs)
+	purgeErr := l.purgeInvalidInheritedRoleBindingsInCluster(cluster.Name, wrangler.SafeConcatName(grb.Name), roleBindingCache, roleBindingClient, roleBindingUIDs)
 	if purgeErr != nil {
 		returnError = errors.Join(returnError, purgeErr)
 	}
@@ -686,7 +681,7 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindingsFor
 }
 
 // reconcileInheritedRoleBindingInNamespace reconciles a single RoleBinding in a specific namespace of a downstream cluster
-func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(clusterName, ns, globalRoleName, grbName string, subject rbacv1.Subject, roleBindingClient wrbacv1.RoleBindingClient, roleBindingCache wrbacv1.RoleBindingCache, namespaceCache wcorev1.NamespaceCache, roleBindingUIDs sets.Set[types.UID]) error {
+func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(clusterName, ns string, grb *v3.GlobalRoleBinding, roleBindingClient wrbacv1.RoleBindingClient, roleBindingCache wrbacv1.RoleBindingCache, namespaceCache wcorev1.NamespaceCache, roleBindingUIDs sets.Set[types.UID]) error {
 	// Check if the namespace exists in this cluster
 	shouldSkip, err := validateNamespace(namespaceCache, ns, fmt.Sprintf("cluster %s", clusterName))
 	if shouldSkip {
@@ -696,30 +691,18 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(cl
 		return fmt.Errorf("couldn't validate namespace %s in cluster %s: %w", ns, clusterName, err)
 	}
 
-	// The Role name follows the pattern from globalrole_handler.go: <globalrole-name>-<namespace>
-	roleName := wrangler.SafeConcatName(globalRoleName, ns)
-	roleRef := rbacv1.RoleRef{
-		APIGroup: rbacv1.GroupName,
-		Kind:     "Role",
-		Name:     roleName,
-	}
-
-	// Generate a deterministic name for the RoleBinding
-	roleBindingName := wrangler.SafeConcatName(grbName, ns)
+	desired := rbac.BuildInheritedRoleBinding(grb, ns)
 
 	// Check if the RoleBinding exists and is correct
-	roleBinding, err := roleBindingCache.Get(ns, roleBindingName)
+	roleBinding, err := roleBindingCache.Get(ns, desired.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("couldn't get RoleBinding %s in namespace %s in cluster %s: %w", roleBindingName, ns, clusterName, err)
+		return fmt.Errorf("couldn't get RoleBinding %s in namespace %s in cluster %s: %w", desired.Name, ns, clusterName, err)
 	}
 
 	// If RoleBinding exists, check if it's correct
 	if roleBinding != nil {
-		labelCorrect := roleBinding.Labels != nil && roleBinding.Labels[grbOwnerLabel] == grbName
-		contentCorrect := rbac.IsRoleBindingContentSame(roleBinding, &rbacv1.RoleBinding{
-			Subjects: []rbacv1.Subject{subject},
-			RoleRef:  roleRef,
-		})
+		labelCorrect := roleBinding.Labels != nil && roleBinding.Labels[grbOwnerLabel] == desired.Labels[grbOwnerLabel]
+		contentCorrect := rbac.IsRoleBindingContentSame(roleBinding, desired)
 
 		if labelCorrect && contentCorrect {
 			roleBindingUIDs.Insert(roleBinding.GetUID())
@@ -727,26 +710,15 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(cl
 		}
 
 		// RoleBinding is incorrect, delete it so we can recreate. RoleRef is immutable.
-		if err := rbac.DeleteNamespacedResource(ns, roleBindingName, roleBindingClient); err != nil {
-			return fmt.Errorf("couldn't delete incorrect RoleBinding %s in namespace %s in cluster %s: %w", roleBindingName, ns, clusterName, err)
+		if err := rbac.DeleteNamespacedResource(ns, desired.Name, roleBindingClient); err != nil {
+			return fmt.Errorf("couldn't delete incorrect RoleBinding %s in namespace %s in cluster %s: %w", desired.Name, ns, clusterName, err)
 		}
 	}
 
 	// Create the RoleBinding
-	newRoleBinding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleBindingName,
-			Namespace: ns,
-			Labels: map[string]string{
-				grbOwnerLabel: grbName,
-			},
-		},
-		Subjects: []rbacv1.Subject{subject},
-		RoleRef:  roleRef,
-	}
-	createdRoleBinding, err := roleBindingClient.Create(newRoleBinding)
+	createdRoleBinding, err := roleBindingClient.Create(desired)
 	if err != nil {
-		return fmt.Errorf("couldn't create RoleBinding %s in namespace %s in cluster %s: %w", roleBindingName, ns, clusterName, err)
+		return fmt.Errorf("couldn't create RoleBinding %s in namespace %s in cluster %s: %w", desired.Name, ns, clusterName, err)
 	}
 	roleBindingUIDs.Insert(createdRoleBinding.UID)
 
