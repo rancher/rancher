@@ -122,6 +122,7 @@ jobs:
         env:
           INTEGRATION_TEST_PACKAGES: ${{ matrix.packages }}
           INTEGRATION_TEST_RUN: ${{ matrix.run }}
+          CATTLE_K3S_VERSION: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
           RANCHER_CHART: /tmp/rancher-chart.tgz
         run: ./scripts/gha/tests
       - name: Upload Rancher + K3s logs if tests failed
