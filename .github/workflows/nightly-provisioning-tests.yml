@@ -1,9 +1,5 @@
 name: Nightly Provisioning Tests
 on:
-  schedule:
-    # Runs every weekday at 05:00 UTC
-    # (1 AM EST, 10PM PST, 7AM CEST)
-    - cron: '0 5 * * 1-5'
   workflow_dispatch:
 
 permissions:
@@ -91,6 +87,8 @@ jobs:
       contents: read
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
+    with:
+      EXPLICIT_SCOPES: "nightly"
 
   # Publish provisioning results into this run's job summary (and a check run).
   # The nightly is schedule/dispatch only, so it runs in this workflows context with the

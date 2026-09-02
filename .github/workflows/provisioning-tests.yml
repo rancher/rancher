@@ -1,6 +1,12 @@
 name: Provisioning tests
+
 on:
   workflow_call:
+    inputs:
+      EXPLICIT_SCOPES:
+        required: false
+        type: string
+
 permissions: {}
 jobs:
   # setup-matrix dynamically builds the test matrix from the change set using the
@@ -27,13 +33,14 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EXPLICIT_SCOPES: ${{ inputs.EXPLICIT_SCOPES }}
         run: |
           set -eo pipefail
 
           # On a PR, diff against the base (target) SHA 
           if [ "$EVENT_NAME" = "pull_request" ]; then
             export DIFF_BASE="$BASE_SHA"
-          else
+          elif [ -z "$EXPLICIT_SCOPES" ]; then
             export ALL=1
           fi
 
