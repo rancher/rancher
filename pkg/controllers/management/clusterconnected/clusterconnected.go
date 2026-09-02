@@ -8,8 +8,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	managementcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/condition"
@@ -20,6 +18,23 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// Connected reports one fact and one fact only: the cluster's agent currently has a live tunnel
+// session, so Rancher can reach the cluster. It says nothing about how the cluster was created,
+// whether its API is healthy, or whether any particular lifecycle step is allowed to proceed.
+//
+// Keep it that way. This condition has twice been overloaded with something else and both times
+// it deadlocked provisioning:
+//
+//   - It was computed from the steve aggregation session, which only exists to serve the
+//     Dashboard and comes up after the agent tunnel. See hasSession.
+//   - It was forced false while a cluster was pre-bootstrapping, to hold back provisioning. But
+//     PreBootstrapped is set by a downstream controller (managementuser/secret), downstream
+//     controllers are started by usercontrollers, and usercontrollers waits on Connected — so
+//     nothing could ever set PreBootstrapped. That gating now lives on
+//     RKEControlPlane.Status.AgentConnected, which is the thing provisioning actually reads.
+//
+// If you need "connected, and also X", write "Connected.IsTrue(c) && X" at the consumer that
+// needs X, rather than folding X in here for every consumer.
 var (
 	Connected = condition.Cond("Connected")
 )
@@ -147,14 +162,6 @@ func (c *checker) promoteCluster(clusterName string) error {
 		return nil
 	}
 
-	// RKE2: wait to mark the agent connected until the cluster is pre-bootstrapped. Mirrors
-	// the same carve-out in checkCluster.
-	if capr.PreBootstrap(cluster) &&
-		cluster.Annotations[imported.AdministratedAnnotation] == "true" &&
-		cluster.Name != "local" {
-		return nil
-	}
-
 	logrus.Debugf("[clusterConnectedCondition] promoting cluster %v to connected on tunnel connect", clusterName)
 	return c.updateClusterConnectedCondition(cluster, true)
 }
@@ -230,15 +237,6 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 		return nil
 	} else if !hasSession && Connected.IsFalse(cluster) && v3.ClusterConditionReady.GetReason(cluster) == "Disconnected" {
 		return nil
-	}
-
-	// RKE2: wait to update the connected condition until it is pre-bootstrapped
-	if capr.PreBootstrap(cluster) &&
-		cluster.Annotations[imported.AdministratedAnnotation] == "true" &&
-		cluster.Name != "local" {
-		// overriding it to be disconnected until bootstrapping is done
-		logrus.Debugf("[pre-bootstrap][%v] Waiting for cluster to be pre-bootstrapped - not marking agent connected", cluster.Name)
-		return c.updateClusterConnectedCondition(cluster, false)
 	}
 
 	return c.updateClusterConnectedCondition(cluster, hasSession)

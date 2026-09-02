@@ -5,7 +5,12 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -126,4 +131,46 @@ func TestIsClusterSessionKey(t *testing.T) {
 			assert.Equal(t, tt.want, isClusterSessionKey(tt.clientKey))
 		})
 	}
+}
+
+// TestCheckClusterDoesNotSuppressPreBootstrap covers the deadlock this condition used to cause.
+//
+// checkCluster used to force Connected false for any pre-bootstrapping cluster, to stop
+// provisioning advancing. But PreBootstrapped is set by managementuser/secret, a downstream
+// controller, downstream controllers are started by usercontrollers, and usercontrollers waits on
+// Connected — so PreBootstrapped could never be set and the cluster hung until the test timed out.
+//
+// Connected must now simply report the tunnel. The pre-bootstrap rule lives on
+// RKEControlPlane.Status.AgentConnected instead.
+func TestCheckClusterDoesNotSuppressPreBootstrap(t *testing.T) {
+	features.ProvisioningPreBootstrap.Set(true)
+	t.Cleanup(func() { features.ProvisioningPreBootstrap.Set(false) })
+
+	// A v2prov cluster mid-pre-bootstrap: administrated, and with no PreBootstrapped condition,
+	// which is exactly the state capr.PreBootstrap reports true for.
+	cluster := &v3.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Name:        "c-m-vksz879q",
+		Annotations: map[string]string{"provisioning.cattle.io/administrated": "true"},
+	}}
+	require.True(t, capr.PreBootstrap(cluster), "test setup: cluster should be pre-bootstrapping")
+
+	ctrl := gomock.NewController(t)
+	clusters := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
+	clusters.EXPECT().Get(cluster.Name, gomock.Any()).Return(cluster.DeepCopy(), nil)
+
+	var got *v3.Cluster
+	clusters.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(c *v3.Cluster) (*v3.Cluster, error) {
+		got = c
+		return c, nil
+	})
+
+	c := &checker{
+		clusters:     clusters,
+		tunnelServer: &fakeSessions{present: map[string]bool{cluster.Name: true}},
+	}
+
+	require.NoError(t, c.checkCluster(cluster))
+	require.NotNil(t, got, "checkCluster must write the condition")
+	assert.True(t, Connected.IsTrue(got),
+		"a pre-bootstrapping cluster whose agent is connected must be reported as connected")
 }
