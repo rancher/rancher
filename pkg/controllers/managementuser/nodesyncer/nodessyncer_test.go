@@ -1,11 +1,86 @@
 package nodesyncer
 
 import (
+	"errors"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+type MockClusterLister struct {
+	mock.Mock
+}
+
+func (m *MockClusterLister) Get(namespace, name string) (*v3.Cluster, error) {
+	args := m.Called(namespace, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*v3.Cluster), args.Error(1)
+}
+
+func (m *MockClusterLister) List(namespace string, selector labels.Selector) (ret []*v3.Cluster, err error) {
+	args := m.Called(namespace, selector)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*v3.Cluster), args.Error(1)
+}
+
+func TestReconcileAll_ClusterStatusEdgeCases(t *testing.T) {
+	notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "cluster", Resource: "clusters"}, "c-testc")
+	genericErr := errors.New("api connection timeout")
+	testClusterNS := "ds-cluster"
+
+	testCases := []struct {
+		name             string
+		clusterNamespace string
+		setupMock        func(m *MockClusterLister)
+		expectedErr      error
+	}{
+		{
+			name:             "Cluster is not found, should return nil gracefully",
+			clusterNamespace: testClusterNS,
+			setupMock: func(m *MockClusterLister) {
+				m.On("Get", "", testClusterNS).Return(nil, notFoundErr)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:             "Generic error occurs during restoration check, should bubble up error",
+			clusterNamespace: testClusterNS,
+			setupMock: func(m *MockClusterLister) {
+				m.On("Get", "", testClusterNS).Return(nil, genericErr)
+			},
+			expectedErr: genericErr,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockClusterLister := new(MockClusterLister)
+			defer mockClusterLister.AssertExpectations(t)
+			tc.setupMock(mockClusterLister)
+
+			syncer := nodesSyncer{
+				clusterNamespace: tc.clusterNamespace,
+				clusterLister:    mockClusterLister,
+			}
+
+			err := syncer.reconcileAll()
+			if tc.expectedErr != nil {
+				assert.ErrorIs(t, err, tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
 
 func TestDetermineNodeRole(t *testing.T) {
 	var tests = []struct {
