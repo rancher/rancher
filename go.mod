@@ -170,10 +170,10 @@ require (
 	k8s.io/kubernetes v1.36.4
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
 	oras.land/oras-go/v2 v2.6.2
-	sigs.k8s.io/aws-iam-authenticator v0.6.17
-	sigs.k8s.io/cluster-api v1.13.2
+	sigs.k8s.io/aws-iam-authenticator v0.7.19
+	sigs.k8s.io/cluster-api v1.14.0
 	sigs.k8s.io/controller-runtime v0.24.1
-	sigs.k8s.io/structured-merge-diff/v4 v4.6.0
+	sigs.k8s.io/structured-merge-diff/v4 v4.7.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
