@@ -113,12 +113,6 @@ jobs:
           echo "${K3D_BIN_HASH_AMD64}  k3d" | shasum -a 256 --check
           sudo mv k3d /usr/local/bin
           sudo chmod +x /usr/local/bin/k3d
-      - name: KDM data
-        env:
-          CATTLE_KDM_BRANCH: ${{ steps.env.outputs.CATTLE_KDM_BRANCH }}
-        run: |
-          mkdir -p bin
-          curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > bin/data.json
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
