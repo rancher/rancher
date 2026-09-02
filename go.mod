@@ -303,7 +303,7 @@ require (
 	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.56.0 // indirect
+	modernc.org/sqlite v1.57.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )
 
@@ -432,3 +432,6 @@ require (
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 )
+
+// TODO: drop this and bump steve once rancher/steve#1293 has merged.
+replace github.com/rancher/steve => github.com/rohitsuse/steve v0.0.0-20260902191028-62bda73b8e0a
