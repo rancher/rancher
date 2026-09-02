@@ -2,7 +2,7 @@ module github.com/rancher/rancher/gotools/mockgen
 
 go 1.26.0
 
-toolchain go1.26.6
+toolchain go1.27.0
 
 tool go.uber.org/mock/mockgen
 
