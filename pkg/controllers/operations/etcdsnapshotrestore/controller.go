@@ -67,10 +67,33 @@ const (
 	// correspond to a machine in the cluster.
 	PostRestoreNodeCleanupStepHookLabelPrefix = "post-restore-node-cleanup.step.hook.operation.cattle.io/"
 
-	// RestartClusterStepHookLabelPrefix gates the final restart pass, after node cleanup. This
-	// removes the temporary server-URL override and lets each node return to its normal
-	// reconciliation.
+	// RestartClusterStepHookLabelPrefix gates the final restart pass, after node cleanup. This removes the temporary
+	// server-URL override and lets each node return to its normal reconciliation.
 	RestartClusterStepHookLabelPrefix = "restart-cluster.step.hook.operation.cattle.io/"
+
+	// preflightInstructionName is the name of the Preflight step's instruction, and therefore the key its output is
+	// saved under on the machine-plan secret.
+	preflightInstructionName = "preflight"
+
+	// TokenHashCommandFormat is the shell command the Preflight step runs on every etcd node to hash the server token
+	// persisted on disk, so it can be compared against the hash the distro stamped on the snapshot.
+	// The single format argument is the distro data directory, where the token file is persisted.
+	//
+	// It has to reproduce in a shell what the distro's do which respects colons as part of the password, treating
+	// everything after "server:" as the password.
+	//
+	// So two anchored, non-greedy substitutions recover the password: the first drops the `K10<CA-hash>::` prefix, the
+	// second drops the `server:` username. `[^:]*` cannot cross a colon, which is what makes them non-greedy; a greedy
+	// `.*:` would strip through the *last* colon. This also respects passwords ending in a colon.
+	//
+	// Whitespace is only trimmed at the edges, matching the bytes.TrimSpace the distro applies when it
+	// reads the same file; deleting all whitespace would corrupt a password that contains a space.
+	//
+	// The missing/empty guards are not incidental. Every element of the derivation is a pipeline, so without them a
+	// missing token file leaves the shell exiting 0 having printed sha256 of the empty string which is a valid hash.
+	//
+	// Exported so e2e tests can derive the same value the check derives.
+	TokenHashCommandFormat = `f=%[1]s/server/token; [ -s "$f" ] || { echo "server token file $f not found or empty" >&2; exit 1; }; p=$(head -n 1 "$f" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^K10[^:]*:://' -e 's/^[^:]*://'); [ -n "$p" ] || { echo "no server token password found in $f" >&2; exit 1; }; printf '%%s' "$p" | sha256sum | cut -c1-12`
 
 	// idempotencyKey is the top-level key used to scope idempotency tracking for this controller.
 	// It is also used by the cleanup instruction issued during shutdown to clear prior tracking.
@@ -80,10 +103,11 @@ const (
 	// helper scripts the controller writes to nodes during the restore.
 	etcdRestoreBinSubdir = "etcd-restore/bin"
 
+	// waitForPodListScriptName is the name of the script file containing the instruction to list pods in all namespaces.
 	waitForPodListScriptName = "wait_for_pod_list.sh"
 
-	nodeCleanupScriptName = "clean_up_nodes.sh"
-
+	// waitForPodListScript is the bash script for listing pods in all namespaces.
+	// Although the script itself accepts a template to execute, it is only used for listing pods.
 	waitForPodListScript = `#!/bin/sh
 
 i=0
@@ -98,6 +122,11 @@ done
 exit 1
 `
 
+	// nodeCleanupScriptName is the name of the script file containing the instruction to clean up nodes no longer
+	// present after restoring.
+	nodeCleanupScriptName = "clean_up_nodes.sh"
+
+	// nodeCleanupScript is the bash script for cleaning up nodes no longer present after restoring.
 	nodeCleanupScript = `#!/bin/sh
 
 if [ -z "$KUBECTL" ]; then
@@ -152,8 +181,7 @@ rm "$NODENAMESFILE"
 
 type handler struct {
 	etcdsnapshotrestores operationcontrollers.ETCDSnapshotRestoreController
-
-	etcdsnapshots rkecontrollers.ETCDSnapshotController
+	etcdsnapshots        rkecontrollers.ETCDSnapshotController
 
 	beacons     plancontrollers.BeaconClient
 	beaconCache plancontrollers.BeaconCache
@@ -161,11 +189,11 @@ type handler struct {
 	secrets     corecontrollers.SecretClient
 	secretCache corecontrollers.SecretCache
 
-	store *plan.Store
-
 	dynamic *dynamic.Controller
 
 	clients *wrangler.CAPIContext
+
+	store *plan.Store
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
@@ -177,8 +205,8 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		secrets:              clients.Core.Secret(),
 		secretCache:          clients.Core.Secret().Cache(),
 		dynamic:              clients.Dynamic,
-		store:                plan.NewStore(clients.Core.Secret()),
 		clients:              clients,
+		store:                plan.NewStore(clients.Core.Secret()),
 	}
 
 	operationcontrollers.RegisterETCDSnapshotRestoreStatusHandler(ctx, clients.Operation.ETCDSnapshotRestore(), "", "etcd-snapshot-restore-handler", h.OnChange)
@@ -592,7 +620,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 }
 
 func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
-	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling shutdown", s.op.Namespace, s.op.Name)
+	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
 
 	delegated, err := h.handleHook(s, PreflightStepHookLabelPrefix)
 	if err != nil {
@@ -625,52 +653,86 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 	concurrency := len(secrets)
 	results := make([]plan.PlanStatus, 0, concurrency)
 
-	for _, secret := range secrets {
-		nodePlan := &plan.Plan{
-			OneTimeInstructions: []plan.OneTimeInstruction{
-				{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "preflight",
-						Command: "/bin/sh",
-						Args: []string{
-							"-c",
+	snapshotName := s.op.Spec.Args.Name
+	snapshot, err := h.etcdsnapshots.Get(s.adapter.EtcdSnapshotNamespace(), snapshotName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: could not find associated etcdsnapshot.rke.cattle.io %s/%s, assuming snapshot file", s.op.Namespace, s.op.Name, s.adapter.EtcdSnapshotNamespace(), snapshotName)
+		snapshot = nil
+	} else if err != nil {
+		return status, err
+	}
 
-							fmt.Sprintf(`grep -rE -q '^[[:space:]]*[\x27\x22 ]?token[\x27\x22 ]?[[:space:]]*:[[:space:]]*[\x27\x22 ]*[^[:space:]\x27\x22]+' %s %s/ 2>/dev/null || (exit 1)`,
-								s.adapter.ConfigFile(secret),
-								s.adapter.ConfigDirectory(secret),
-							),
-						},
-					},
-				},
-			},
-		}
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
-		if err != nil {
-			return status, err
-		}
+	hash := ""
+	if snapshot != nil && snapshot.Annotations != nil && snapshot.Annotations[capr.SnapshotTokenHashAnnotation] != "" {
+		hash = snapshot.Annotations[capr.SnapshotTokenHashAnnotation]
+	}
 
-		results = append(results, *planStatus)
+	if hash == "" {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: could not find snapshot token hash in snapshot %s/%s, skipping preflight step", s.op.Namespace, s.op.Name, s.adapter.EtcdSnapshotNamespace(), snapshotName)
+	} else {
+		for _, secret := range secrets {
+			planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildPreflightPlan(s, secret), opEnv), 1, 1)
+			if err != nil {
+				return status, err
+			}
 
-		if planStatus.Failure() {
-			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check failed for %s/%s",
-				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+			results = append(results, *planStatus)
 
-			status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+			if planStatus.Failure() {
+				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check failed for %s/%s",
+					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			opv1alpha1.CanceledCondition.True(&status)
-			opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-			opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
+				status.SetPhase(opv1alpha1.OperationPhaseCanceled)
 
-			return status, nil
-		}
+				opv1alpha1.CanceledCondition.True(&status)
+				opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+				opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
 
-		if planStatus.Waiting() {
-			logrus.Debugf("[etcdsnapshotrestore] %s/%s: waiting for preflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+				return status, nil
+			}
 
-			concurrency--
-			if concurrency <= 0 {
-				break
+			// The token hash can only be validated once the node has applied the plan and reported its
+			// output, so a waiting node is skipped entirely until a later reconcile.
+			if planStatus.Waiting() {
+				logrus.Debugf("[etcdsnapshotrestore] %s/%s: waiting for preflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+				concurrency--
+				if concurrency <= 0 {
+					break
+				}
+
+				continue
+			}
+
+			output, err := plan.ReadAppliedOutput(secret)
+			if err != nil {
+				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: could not read preflight check output for %s/%s",
+					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+				status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+				opv1alpha1.FailedCondition.True(&status)
+				opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+				opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("could not read preflight check output for %s/%s", secret.Namespace, secret.Name))
+
+				return status, nil
+			}
+
+			// The instruction pipes through cut, so the saved output carries a trailing newline which the annotation
+			// does not.
+			if b, ok := output[preflightInstructionName]; ok && strings.TrimSpace(string(b)) != hash {
+				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check output for %s/%s does not match snapshot token hash",
+					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
+
+				status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+				opv1alpha1.FailedCondition.True(&status)
+				opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+				opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
+
+				return status, nil
 			}
 		}
 	}
@@ -724,64 +786,10 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 	concurrency := len(secrets)
 	results := make([]plan.PlanStatus, 0, concurrency)
 
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
+
 	for _, secret := range secrets {
-		provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
-		// Clear any prior idempotency tracking under the restore key before starting; subsequent
-		// reconciles see the cleanup already applied and skip it.
-		instructions := []plan.OneTimeInstruction{
-			ops.GenerateIdempotencyCleanupInstruction(provisioningDir, idempotencyKey),
-			{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    "shutdown",
-					Command: "/bin/sh",
-					Env: []string{
-						fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), s.adapter.DistroDataDirectory(secret)),
-					},
-					Args: []string{
-						"-c",
-						fmt.Sprintf("if [ -z $(command -v %[1]s) ] && [ -z $(command -v %[2]s) ]; then echo %[1]s does not appear to be installed; exit 0; else %[2]s; fi",
-							s.adapter.RuntimeCommand(),
-							s.adapter.RuntimeCommand()+"-killall.sh"),
-					},
-				},
-			},
-		}
-
-		if secret.Labels[capr.EtcdRoleLabel] == "true" {
-			instructions = append(instructions, plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    "create-etcd-tombstone",
-					Command: "touch",
-					Args:    []string{path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd/tombstone")},
-				},
-			})
-		}
-
-		if secret.Labels[capr.EtcdRoleLabel] == "true" || secret.Labels[capr.ControlPlaneRoleLabel] == "true" {
-			instructions = append(instructions,
-				plan.OneTimeInstruction{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "remove-tls-directory",
-						Command: "rm",
-						Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/tls")},
-					},
-				},
-				plan.OneTimeInstruction{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "remove-cred-directory",
-						Command: "rm",
-						Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/cred")},
-					},
-				},
-			)
-		}
-
-		nodePlan := &plan.Plan{
-			Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
-			OneTimeInstructions: instructions,
-		}
-
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildShutdownPlan(s, secret), opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -861,7 +869,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, err
 	} else if snapshot != nil && snapshot.SnapshotFile.S3 == nil {
 		// Prefer the snapshot's stamped MachineLifecycleNameLabel (used by CAPRKE2 where the
-		// owner ref is a mgmt v3 Node but plan secrets are labelled with the CAPI Machine's
+		// owner ref is a mgmt v3 Node but plan secrets are labeled with the CAPI Machine's
 		// name). Fall back to OwnerReferences[0].Name for v2prov/imported paths that predate the
 		// label.
 		machineName := snapshot.Labels[planv1alpha1.MachineLifecycleNameLabel]
@@ -913,6 +921,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	value := s.idempotencyValue()
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
 	args := []string{
 		"server",
@@ -957,7 +966,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		},
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1087,6 +1096,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 
 	provisioningDir := s.adapter.ProvisioningDataDirectory(etcdSecret)
 	value := s.idempotencyValue()
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 	waitScriptPath := etcdRestoreScriptPath(s, etcdSecret, waitForPodListScriptName)
 
 	instructions := []plan.OneTimeInstruction{
@@ -1156,7 +1166,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			},
 		}
 
-		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(etcdSecret, ops.WithOperationEnv(etcdNodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1190,7 +1200,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		})
 	}
 
-	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, 1, -1)
+	planStatus, err := h.store.AssignPlan(controlPlaneSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1260,6 +1270,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	// The two restart phases must use distinct values; otherwise the second phase would skip the
 	// restart as already-reconciled.
 	value := s.idempotencyValue()
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 	if nextStep != "" {
 		value = value + "/initial"
 	} else {
@@ -1346,7 +1357,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 			}
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1400,6 +1411,86 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	opv1alpha1.SucceededCondition.Message(&status, "Operation completed successfully")
 
 	return status, nil
+}
+
+// buildPreflightPlan assembles the plan which hashes the server token the node currently has on
+// disk, so the Preflight step can compare it against the hash stamped on the snapshot being restored.
+//
+// The instruction is deliberately not wrapped with ops.ConvertToIdempotentInstruction like the
+// instructions of every other step: the idempotent script gates on the agent's attempt number and, on
+// an attempt it considers already reconciled, prints a message instead of running the command. With
+// SaveOutput that message would land in the applied output in place of the hash. A check must run on
+// every attempt, so it relies on the operation environment for plan uniqueness instead.
+func buildPreflightPlan(s *scope, secret *corev1.Secret) *plan.Plan {
+	return &plan.Plan{
+		OneTimeInstructions: []plan.OneTimeInstruction{
+			{
+				SaveOutput: true,
+				CommonInstruction: plan.CommonInstruction{
+					Name:    preflightInstructionName,
+					Command: "/bin/sh",
+					Args: []string{
+						"-c",
+						fmt.Sprintf(TokenHashCommandFormat, s.adapter.DistroDataDirectory(secret)),
+					},
+				},
+			},
+		},
+	}
+}
+
+// buildShutdownPlan assembles the plan which stops the distro on a node ahead of the restore: it
+// clears any idempotency tracking left by a previous attempt, runs the distro's killall script, and
+// on etcd and control-plane nodes lays down the etcd tombstone and removes the TLS directory.
+func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	// Clear any prior idempotency tracking under the restore key before starting; subsequent
+	// reconciles see the cleanup already applied and skip it.
+	instructions := []plan.OneTimeInstruction{
+		ops.GenerateIdempotencyCleanupInstruction(provisioningDir, idempotencyKey),
+		{
+			CommonInstruction: plan.CommonInstruction{
+				Name:    "shutdown",
+				Command: "/bin/sh",
+				Env: []string{
+					fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), s.adapter.DistroDataDirectory(secret)),
+				},
+				Args: []string{
+					"-c",
+					fmt.Sprintf("if [ -z $(command -v %[1]s) ] && [ -z $(command -v %[2]s) ]; then echo %[1]s does not appear to be installed; exit 0; else %[2]s; fi",
+						s.adapter.RuntimeCommand(),
+						s.adapter.RuntimeCommand()+"-killall.sh"),
+				},
+			},
+		},
+	}
+
+	if secret.Labels[capr.EtcdRoleLabel] == "true" {
+		instructions = append(instructions, plan.OneTimeInstruction{
+			CommonInstruction: plan.CommonInstruction{
+				Name:    "create-etcd-tombstone",
+				Command: "touch",
+				Args:    []string{path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd/tombstone")},
+			},
+		})
+	}
+
+	if secret.Labels[capr.EtcdRoleLabel] == "true" || secret.Labels[capr.ControlPlaneRoleLabel] == "true" {
+		instructions = append(instructions,
+			plan.OneTimeInstruction{
+				CommonInstruction: plan.CommonInstruction{
+					Name:    "remove-tls-directory",
+					Command: "rm",
+					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/tls")},
+				},
+			},
+		)
+	}
+
+	return &plan.Plan{
+		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
+		OneTimeInstructions: instructions,
+	}
 }
 
 // buildPostRestoreNodeCleanupPlan assembles the plan that runs the node-cleanup script on the init
@@ -1517,7 +1608,9 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	planStatus, err := h.store.AssignPlan(initSecret, nodePlan, 1, -1)
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
+
+	planStatus, err := h.store.AssignPlan(initSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}

@@ -599,26 +599,16 @@ func (p *Planner) generateEtcdRestoreNodeCleanupFilesAndInstruction(controlPlane
 	}, instructions
 }
 
-func generateRemoveTLSAndCredDirInstructions(controlPlane *rkev1.RKEControlPlane) []plan.OneTimeInstruction {
-	return []plan.OneTimeInstruction{
-		{
-			CommonInstruction: planapi.CommonInstruction{
-				Name:    "remove-tls-directory",
-				Command: "rm",
-				Args: []string{
-					"-rf",
-					path.Join(capr.GetDistroDataDir(controlPlane), "server/tls"),
-				},
-			},
-		},
-		{
-			CommonInstruction: planapi.CommonInstruction{
-				Name:    "remove-cred-directory",
-				Command: "rm",
-				Args: []string{
-					"-rf",
-					path.Join(capr.GetDistroDataDir(controlPlane), "server/cred"),
-				},
+// generateRemoveTLSDirInstruction returns an instruction for removing the server/tls directory within the distro's
+// data directory.
+func generateRemoveTLSDirInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
+	return plan.OneTimeInstruction{
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "remove-tls-directory",
+			Command: "rm",
+			Args: []string{
+				"-rf",
+				path.Join(capr.GetDistroDataDir(controlPlane), "server/tls"),
 			},
 		},
 	}
@@ -692,7 +682,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
 		}
 		if roleOr(isEtcd, isControlPlane)(server) {
-			stopPlan.Instructions = append(stopPlan.Instructions, generateRemoveTLSAndCredDirInstructions(controlPlane)...)
+			stopPlan.Instructions = append(stopPlan.Instructions, generateRemoveTLSDirInstruction(controlPlane))
 		}
 		if !p.equalities.DeepEqual(server.Plan.Plan, stopPlan) {
 			if err := p.store.UpdatePlan(server, stopPlan, joinedServer, 0, 0); err != nil {

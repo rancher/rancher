@@ -464,10 +464,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	return status, nil
 }
 
-// reconcilePreflight is responsible for determining if an etcd snapshot taken on this node may be restored.
-// It will grep for the `token` key in both the config file and directory (e.g., /etc/rancher/rke2/config.yaml &
-// /etc/rancher/rke2/config.yaml.d).
-// It will validate both json and yaml formatted config files.
+// reconcilePreflight does not currently run any plans, but exists to ensure that the cluster has a sufficient amount of
+// etcd nodes to run the operation on.
 func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Debugf("[etcdsnapshotsave] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
 
@@ -481,7 +479,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSav
 		return status, nil
 	}
 
-	secrets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
+	_, err = plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithSorter(plan.DefaultSorter()).
 		WithFilter(ops.IsEtcd).
 		WithValidator(plan.AtLeast(1, "")).
@@ -496,67 +494,6 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSav
 		opv1alpha1.CanceledCondition.True(&status)
 		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
 		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
-		return status, nil
-	}
-
-	concurrency := len(secrets)
-	results := make([]plan.PlanStatus, 0, concurrency)
-
-	for _, secret := range secrets {
-		nodePlan := &plan.Plan{
-			OneTimeInstructions: []plan.OneTimeInstruction{
-				{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "preflight",
-						Command: "/bin/sh",
-						Args: []string{
-							"-c",
-							fmt.Sprintf(`grep -rE -q '^[[:space:]]*[\x27\x22 ]?token[\x27\x22 ]?[[:space:]]*:[[:space:]]*[\x27\x22 ]*[^[:space:]\x27\x22]+' %s %s/ 2>/dev/null || (exit 1)`,
-								s.adapter.ConfigFile(secret),
-								s.adapter.ConfigDirectory(secret),
-							),
-						},
-					},
-				},
-			},
-		}
-
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
-		if err != nil {
-			return status, err
-		}
-
-		results = append(results, *planStatus)
-
-		if planStatus.Failure() {
-			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: preflight check failed for %s/%s",
-				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
-
-			status.SetPhase(opv1alpha1.OperationPhaseCanceled)
-
-			opv1alpha1.CanceledCondition.True(&status)
-			opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-			opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
-
-			return status, nil
-		}
-
-		if planStatus.Waiting() {
-			logrus.Debugf("[etcdsnapshotsave] %s/%s: waiting for preflight check for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
-
-			concurrency--
-			if concurrency <= 0 {
-				break
-			}
-		}
-	}
-
-	if concurrency < len(secrets) {
-		msg := plan.Message(results)
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
-		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: %s", status.Step, msg))
-
 		return status, nil
 	}
 
@@ -613,6 +550,8 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	concurrency := len(secrets)
 	results := make([]plan.PlanStatus, 0, concurrency)
 
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
+
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
@@ -641,7 +580,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -726,6 +665,8 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	concurrency := 1
 	results := make([]plan.PlanStatus, 0, concurrency)
 
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
+
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
@@ -748,7 +689,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, nodePlan, 1, -1)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
