@@ -210,6 +210,12 @@ if ! mountpoint -q "$ETCD_DIR"; then
     || echo "WARNING: tmpfs mount failed; k3s etcd using disk"
 fi
 
+# configure containerd to use a volatile overlayfs to see see if we can reduce disk pressure
+mkdir -p /var/lib/rancher/k3s/agent/etc/containerd/
+CONTAINERD_CONFIG="e3sgdGVtcGxhdGUgImJhc2UiIC4gfX0KCltwbHVnaW5zLiJpby5jb250YWluZXJkLnNuYXBzaG90dGVyLnYxLm92ZXJsYXlmcyJdCiAgbW91bnRfb3B0aW9ucyA9IFsidm9sYXRpbGUiXQ=="
+echo "${CONTAINERD_CONFIG}" | base64 -d > /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl
+cat /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl
+
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
