@@ -86,6 +86,9 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
 
+# pkg/jailer expects /etc/nsswitch.conf; SLES 16 only ships it under /usr/etc.
+RUN cp /usr/etc/nsswitch.conf /etc/nsswitch.conf
+
 RUN useradd rancher && \
     groupadd jail-accessors && \
     usermod -aG jail-accessors rancher && \
