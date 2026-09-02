@@ -423,3 +423,45 @@ func TestSettingEnvPatternEquivalence(t *testing.T) {
 		})
 	}
 }
+
+func TestUICSPPolicyValue(t *testing.T) {
+	original := UICSPPolicy.Get()
+	t.Cleanup(func() {
+		require.NoError(t, UICSPPolicy.Set(original))
+	})
+
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{
+			name:  "a policy is served as configured",
+			value: "base-uri 'self'",
+			want:  "base-uri 'self'",
+		},
+		{
+			name:  "the sentinel disables the header",
+			value: "none",
+			want:  "",
+		},
+		{
+			name:  "the sentinel is matched regardless of case or padding",
+			value: "  None  ",
+			want:  "",
+		},
+		{
+			// 'none' is only a sentinel on its own: quoted, it is a source.
+			name:  "a quoted none is a policy, not the sentinel",
+			value: "object-src 'none'",
+			want:  "object-src 'none'",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.NoError(t, UICSPPolicy.Set(test.value))
+			assert.Equal(t, test.want, UICSPPolicyValue())
+		})
+	}
+}

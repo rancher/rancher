@@ -14,6 +14,7 @@ import (
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	steveui "github.com/rancher/steve/pkg/ui"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -332,6 +333,9 @@ var (
 	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
 	UICustomLinks = NewSetting("ui-custom-links", "")
 
+	// UICSPPolicy is the Content-Security-Policy served with the UI. Set it to override or extend the default policy, or to "none" to send no header at all.
+	UICSPPolicy = NewSetting("ui-csp-policy", steveui.DefaultCSPPolicy)
+
 	// UIDashboardPath path within Rancher Manager where the dashboard files are found.
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 
@@ -467,6 +471,18 @@ func FullShellImage() string {
 // FullSCCOperatorImage returns the full private registry name of the rancher shell image.
 func FullSCCOperatorImage() string {
 	return PrefixPrivateRegistry(SCCOperatorImage.Get())
+}
+
+// UICSPPolicyValue returns the Content-Security-Policy to serve with the UI. A
+// setting falls back to its default when its value is empty, so "none" rather
+// than an empty value is what turns the header off.
+func UICSPPolicyValue() string {
+	value := UICSPPolicy.Get()
+	if strings.EqualFold(strings.TrimSpace(value), "none") {
+		return ""
+	}
+
+	return value
 }
 
 // PrefixPrivateRegistry prefixes the given image name with the stored private registry path.
