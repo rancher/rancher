@@ -14,6 +14,7 @@ import (
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	steveui "github.com/rancher/steve/pkg/ui"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -331,6 +332,9 @@ var (
 
 	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
 	UICustomLinks = NewSetting("ui-custom-links", "")
+
+	// UICSPPolicy is the Content-Security-Policy served with the UI. Set it to override or extend the default policy, or to an empty value to send no header at all. It is not exposed in the UI: a policy that breaks the dashboard would otherwise leave no way to correct it.
+	UICSPPolicy = NewSetting("ui-csp-policy", steveui.DefaultCSPPolicy)
 
 	// UIDashboardPath path within Rancher Manager where the dashboard files are found.
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
