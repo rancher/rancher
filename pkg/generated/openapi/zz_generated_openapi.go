@@ -277,7 +277,7 @@ func schema_pkg_apis_extcattleio_v1_Kubeconfig(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Kubeconfig allows creating v1.Config kubeconfig files for interacting with Rancher and clusters managed by Rancher.",
+				Description: "Kubeconfig allows creating v1.Config kubeconfig files for interacting with Rancher and clusters managed by Rancher.\n\nName generation: the server always assigns a name with the \"kubeconfig-\" prefix. Any metadata.name or metadata.generateName supplied by the client is silently ignored — it is not rejected, but it has no effect.\n\nToken requirement: Create must be called by a Rancher user authenticated with a Rancher token — a UI session token or a user-created API token both work; the derived kubeconfig tokens are minted against the authenticating token. Requests authenticated by other means (for example, a service account) return Forbidden (403).\n\nValue availability: status.value is populated only in the Create response. It is empty on all subsequent Get or List reads. Clients must capture the value from the Create response; it cannot be retrieved again.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -466,12 +466,17 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigStatus(ref common.ReferenceCallbac
 					},
 					"summary": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Summary of the Kubeconfig status. Can be \"Complete\" or \"Error\".",
+							Description: "Summary of the Kubeconfig status. Can be \"Pending\", \"Complete\", or \"Error\".",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"tokens": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Tokens is a list of Kubeconfig tokens.",
 							Type:        []string{"array"},
