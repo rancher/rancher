@@ -28,7 +28,8 @@ FROM registry.suse.com/bci/golang:1.26.6
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
 ENV CATTLE_MACHINE_VERSION=v1.37
-ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.0-rc2+k3s1
+
 ENV HELM_UNITTEST_VERSION=1.1.0
 # k3d ci version
 ENV K3D_VERSION=v5.9.0
@@ -54,7 +55,7 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
     fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.4-k3s1 \
+COPY --from=rancher/k3s:v1.37.0-rc2-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
