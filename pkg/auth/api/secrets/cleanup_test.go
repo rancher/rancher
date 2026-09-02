@@ -197,68 +197,75 @@ func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.S
 	return secretController
 }
 
-func TestCleanupClientSecretsOKTAConfig(t *testing.T) {
-	config := &v3.AuthConfig{
-		Type:       client.OKTAConfigType,
-		ObjectMeta: metav1.ObjectMeta{Name: "okta"},
-		Enabled:    true,
-	}
-
-	secretName1 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "spkey")
-	secretName2 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "serviceaccountpassword")
-	oauthSecretName := "user123-secret"
-
-	initialStore := map[string]*corev1.Secret{}
-	ctrl := gomock.NewController(t)
-	secrets := getSecretControllerMock(ctrl, initialStore)
-
-	_, err := secrets.Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName1,
-			Namespace: common.SecretsNamespace,
+func TestCleanupClientSecretsWithLDAPConfig(t *testing.T) {
+	for _, config := range []*v3.AuthConfig{
+		&v3.AuthConfig{
+			Type:       client.OKTAConfigType,
+			ObjectMeta: metav1.ObjectMeta{Name: "okta"},
+			Enabled:    true,
 		},
-	})
-	assert.NoError(t, err)
-
-	_, err = secrets.Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName2,
-			Namespace: common.SecretsNamespace,
+		&v3.AuthConfig{
+			Type:       client.ADFSConfigType,
+			ObjectMeta: metav1.ObjectMeta{Name: "adfs"},
+			Enabled:    true,
 		},
-	})
-	assert.NoError(t, err)
+	} {
+		secretName1 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "spkey")
+		secretName2 := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), "serviceaccountpassword")
+		oauthSecretName := "user123-secret"
 
-	_, err = secrets.Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      oauthSecretName,
-			Namespace: tokens.SecretNamespace,
-		},
-		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			config.Name: []byte("my user token"),
-		},
-	})
-	assert.NoError(t, err)
+		initialStore := map[string]*corev1.Secret{}
+		ctrl := gomock.NewController(t)
+		secrets := getSecretControllerMock(ctrl, initialStore)
 
-	s, err := secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
-	assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName1)
+		_, err := secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName1,
+				Namespace: common.SecretsNamespace,
+			},
+		})
+		assert.NoError(t, err)
 
-	s, err = secrets.Get(common.SecretsNamespace, secretName2, metav1.GetOptions{})
-	assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName2)
+		_, err = secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName2,
+				Namespace: common.SecretsNamespace,
+			},
+		})
+		assert.NoError(t, err)
 
-	s, err = secrets.Get(tokens.SecretNamespace, oauthSecretName, metav1.GetOptions{})
-	assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", oauthSecretName)
+		_, err = secrets.Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      oauthSecretName,
+				Namespace: tokens.SecretNamespace,
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				config.Name: []byte("my user token"),
+			},
+		})
+		assert.NoError(t, err)
 
-	err = CleanupClientSecrets(secrets, config)
-	assert.NoError(t, err)
-
-	t.Run("Cleanup deletes provider secrets", func(t *testing.T) {
-		s, err = secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
-		assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName1)
-		assert.Nil(t, s, "expected the secret to be nil")
+		s, err := secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
+		assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName1)
 
 		s, err = secrets.Get(common.SecretsNamespace, secretName2, metav1.GetOptions{})
-		assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName2)
-		assert.Nil(t, s, "expected the secret to be nil")
-	})
+		assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName2)
+
+		s, err = secrets.Get(tokens.SecretNamespace, oauthSecretName, metav1.GetOptions{})
+		assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", oauthSecretName)
+
+		err = CleanupClientSecrets(secrets, config)
+		assert.NoError(t, err)
+
+		t.Run("Cleanup deletes provider secrets", func(t *testing.T) {
+			s, err = secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
+			assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName1)
+			assert.Nil(t, s, "expected the secret to be nil")
+
+			s, err = secrets.Get(common.SecretsNamespace, secretName2, metav1.GetOptions{})
+			assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName2)
+			assert.Nil(t, s, "expected the secret to be nil")
+		})
+	}
 }

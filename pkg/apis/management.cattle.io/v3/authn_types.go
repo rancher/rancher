@@ -20,6 +20,10 @@ const (
 	// AuthConfigOKTAPasswordMigrated is applied when an Okta password has been
 	// moved to a Secret.
 	AuthConfigOKTAPasswordMigrated condition.Cond = "OktaPasswordMigrated"
+
+	// AuthConfigADFSPasswordMigrated is applied when an Adfs password has been
+	// moved to a Secret.
+	AuthConfigADFSPasswordMigrated condition.Cond = "AdfsPasswordMigrated"
 )
 
 // +genclient
@@ -704,7 +708,8 @@ type PingConfig struct {
 }
 
 type ADFSConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
+	SamlConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type KeyCloakConfig struct {

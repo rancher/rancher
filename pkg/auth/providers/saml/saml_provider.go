@@ -554,13 +554,18 @@ func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.O
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
+	case ADFSName:
+		fullConfig = &apiv3.ADFSConfig{
+			SamlConfig:     samlConfig,
+			OpenLdapConfig: ldapConfig.LdapFields,
+		}
 	}
 
 	return fullConfig, nil
 }
 
 func (s *Provider) hasLdapGroupSearch() bool {
-	return ShibbolethName == s.name || OKTAName == s.name
+	return ShibbolethName == s.name || OKTAName == s.name || ADFSName == s.name
 }
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {

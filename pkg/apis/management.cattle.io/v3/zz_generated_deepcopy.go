@@ -38,6 +38,7 @@ import (
 func (in *ADFSConfig) DeepCopyInto(out *ADFSConfig) {
 	*out = *in
 	in.SamlConfig.DeepCopyInto(&out.SamlConfig)
+	in.OpenLdapConfig.DeepCopyInto(&out.OpenLdapConfig)
 	return
 }
 
