@@ -521,9 +521,9 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 
 		// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
 		apimgmtv3.ClusterConditionUpdated.Unknown(cluster)
-		updatedCluster, err := p.Clusters.UpdateStatus(cluster)
-		if err != nil {
-			return cluster, fmt.Errorf("[reconcileCluster] Failed to update cluster [%s]: %v", cluster.Name, err)
+		updatedCluster, err2 := p.Clusters.UpdateStatus(cluster)
+		if err2 != nil {
+			return cluster, fmt.Errorf("[reconcileCluster] Failed to update cluster [%s]: %v", cluster.Name, err2)
 		}
 		cluster = updatedCluster
 
