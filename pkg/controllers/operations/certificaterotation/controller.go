@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -527,50 +528,61 @@ func operationEnv(op *opv1alpha1.CertificateRotation, step opv1alpha1.Certificat
 	}
 }
 
-// servicesApply reports whether at least one of the requested services applies to the node described by secret.
-func servicesApply(requested []string, secret *corev1.Secret) bool {
+// servicesForNode narrows a cluster-wide service request down to the services that apply to the
+// node described by secret. A request can be valid across the whole cluster while spanning
+// multiple node roles — for example "etcd" and "scheduler" together — so each server must only be
+// told to rotate the services it actually owns.
+//
+// An empty requested slice already means "rotate every service the runtime supports" as far as
+// the runtime command is concerned, so it is returned unchanged rather than expanded into
+// adapter.DistroServices(secret).
+func servicesForNode(adapter ops.Adapter, requested []string, secret *corev1.Secret) []string {
+	if len(requested) == 0 {
+		return nil
+	}
+
+	available := adapter.DistroServices(secret)
+	var nodeServices []string
+	for _, service := range requested {
+		if slices.Contains(available, service) {
+			nodeServices = append(nodeServices, service)
+		}
+	}
+	return nodeServices
+}
+
+// servicesApply reports whether at least one of the requested services is available from the
+// distro on the node described by secret. An empty request means "rotate every supported
+// certificate" and therefore applies to every node.
+func servicesApply(adapter ops.Adapter, requested []string, secret *corev1.Secret) bool {
 	if len(requested) == 0 {
 		return true
 	}
-	relevant := map[string]struct{}{}
-	if ops.IsWorker(secret) {
-		// Workers restart their runtime agent when any of these shared runtime
-		// certificates are rotated, so they can reconnect to the server.
-		relevant["rke2-server"] = struct{}{}
-		relevant["k3s-server"] = struct{}{}
-		relevant["api-server"] = struct{}{}
-		relevant["kubelet"] = struct{}{}
-		relevant["kube-proxy"] = struct{}{}
-		relevant["auth-proxy"] = struct{}{}
+	return len(servicesForNode(adapter, requested, secret)) > 0
+}
+
+// unsupportedServices returns the requested services that no target node's distro provides.
+// A service belonging to the other distro — k3s-server on an RKE2 cluster, for example — can
+// never be rotated, so the operation must reject it instead of quietly selecting no targets.
+func unsupportedServices(adapter ops.Adapter, requested []string, targets []*corev1.Secret) []string {
+	if len(requested) == 0 {
+		return nil
 	}
-	if ops.IsControlPlane(secret) {
-		relevant["rke2-server"] = struct{}{}
-		relevant["k3s-server"] = struct{}{}
-		relevant["api-server"] = struct{}{}
-		relevant["kubelet"] = struct{}{}
-		relevant["kube-proxy"] = struct{}{}
-		relevant["auth-proxy"] = struct{}{}
-		relevant["controller-manager"] = struct{}{}
-		relevant["scheduler"] = struct{}{}
-		relevant["rke2-controller"] = struct{}{}
-		relevant["k3s-controller"] = struct{}{}
-		relevant["admin"] = struct{}{}
-		relevant["cloud-controller"] = struct{}{}
-		relevant["supervisor"] = struct{}{}
-	}
-	if ops.IsEtcd(secret) {
-		relevant["etcd"] = struct{}{}
-		relevant["kubelet"] = struct{}{}
-		relevant["k3s-server"] = struct{}{}
-		relevant["rke2-server"] = struct{}{}
-		relevant["supervisor"] = struct{}{}
-	}
-	for _, s := range requested {
-		if _, ok := relevant[s]; ok {
-			return true
+
+	supported := map[string]struct{}{}
+	for _, secret := range targets {
+		for _, service := range adapter.DistroServices(secret) {
+			supported[service] = struct{}{}
 		}
 	}
-	return false
+
+	var unsupported []string
+	for _, service := range requested {
+		if _, ok := supported[service]; !ok {
+			unsupported = append(unsupported, service)
+		}
+	}
+	return unsupported
 }
 
 // serviceRequested reports whether service filtering includes the named service.
@@ -655,13 +667,13 @@ func renderCertificateRotationComponentProbes(s *scope, secret *corev1.Secret, p
 }
 
 // componentCertificateCleanupInstructions builds default certificate/key cleanup
-// instructions for controller-manager and scheduler on one node.
-func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret) ([]plan.OneTimeInstruction, error) {
+// instructions for controller-manager and scheduler on one node. services must already be
+// narrowed to the ones that apply to secret's node.
+func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, services []string) ([]plan.OneTimeInstruction, error) {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	operationID := string(s.op.UID)
 	runtime := s.adapter.RuntimeCommand()
 	dataDir := s.adapter.DistroDataDirectory(secret)
-	services := s.op.Spec.Args.Services
 
 	controllerManagerSettings, err := s.adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
 	if err != nil {
@@ -792,13 +804,10 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		return status, err
 	}
 
-	// Collect all registered machine-plan secrets in the collector's safe role order.
-	// The service filter removes nodes that cannot run any requested service; keeping
-	// it in the collector ensures sorting and empty-target handling use the same set.
-	targets, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
-		WithFilter(func(secret *corev1.Secret) bool {
-			return servicesApply(s.op.Spec.Args.Services, secret)
-		}).
+	// Collect every registered machine-plan secret in the collector's safe role order. The
+	// requested-service filter runs afterwards so the whole node set is available to decide
+	// which services the cluster's distro can actually rotate.
+	candidates, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithSorter(plan.DefaultSorter()).
 		Collect()
 	if plan.IsTransient(err) {
@@ -807,6 +816,31 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		logrus.Errorf("[certificaterotation] %s/%s: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
+	}
+
+	if len(candidates) == 0 {
+		logrus.Errorf("[certificaterotation] %s/%s: no eligible machine-plan secrets found", s.op.Namespace, s.op.Name)
+		markFailed(&status, opv1alpha1.PlanFailedReason, "no eligible machine-plan secrets found")
+		return status, nil
+	}
+
+	// A service no node's distro exposes can never be rotated. Reject the request here, before
+	// any node receives a plan, instead of returning an error that would retry forever.
+	requested := s.op.Spec.Args.Services
+	if unsupported := unsupportedServices(s.adapter, requested, candidates); len(unsupported) > 0 {
+		logrus.Errorf("[certificaterotation] %s/%s: requested services are not available on this %s cluster: %s",
+			s.op.Namespace, s.op.Name, s.adapter.RuntimeCommand(), strings.Join(unsupported, ", "))
+		markFailed(&status, opv1alpha1.PreflightCheckFailedReason,
+			fmt.Sprintf("requested services are not available on this %s cluster: %s", s.adapter.RuntimeCommand(), strings.Join(unsupported, ", ")))
+		return status, nil
+	}
+
+	// Keep only the nodes whose distro exposes at least one requested service.
+	targets := make([]*corev1.Secret, 0, len(candidates))
+	for _, secret := range candidates {
+		if servicesApply(s.adapter, requested, secret) {
+			targets = append(targets, secret)
+		}
 	}
 
 	if len(targets) == 0 {
@@ -833,6 +867,9 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 		runtime := s.adapter.RuntimeCommand()
 		runtimeService := s.adapter.RuntimeService(secret)
+		// A request can be valid across the cluster while spanning multiple node roles, so
+		// each server must only be told to rotate the services that apply to it.
+		nodeServices := servicesForNode(s.adapter, requested, secret)
 
 		var nodePlan plan.Plan
 
@@ -845,10 +882,10 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			oneTime := certificateRotationStopInstructions(provisioningDir, string(s.op.UID), runtimeService, env)
 			// Keep stop and rotate as separate idempotent instructions. A retry can
 			// resume safely without rerunning an instruction already applied by the agent.
-			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, s.op.Spec.Args.Services, env)...)
+			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, nodeServices, env)...)
 
 			if ops.IsControlPlane(secret) {
-				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret)
+				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret, nodeServices)
 				if err != nil {
 					return status, err
 				}

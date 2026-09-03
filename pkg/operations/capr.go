@@ -202,6 +202,12 @@ func (a *CAPRAdapter) RuntimeService(secret *corev1.Secret) string {
 	return a.RuntimeCommand() + "-agent"
 }
 
+// DistroServices returns the distro service identifiers this cluster's runtime exposes on the
+// node represented by secret.
+func (a *CAPRAdapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
 // componentTLSSettingsFromRenderedConfig extracts scheduler/controller-manager
 // TLS settings from a rendered CAPR config map.
 func componentTLSSettingsFromRenderedConfig(config map[string]any, component string) ComponentTLSSettings {

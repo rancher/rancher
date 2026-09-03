@@ -60,6 +60,10 @@ func (a *stubAdapter) RuntimeService(_ *corev1.Secret) string {
 	return "rke2-server"
 }
 
+func (a *stubAdapter) DistroServices(secret *corev1.Secret) []string {
+	return ops.DistroServices(a.RuntimeCommand(), secret)
+}
+
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return map[string]rkeplan.Probe{}, nil
 }

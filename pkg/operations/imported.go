@@ -291,6 +291,12 @@ func (a *ImportedAdapter) RuntimeService(secret *corev1.Secret) string {
 	return a.RuntimeCommand() + "-agent"
 }
 
+// DistroServices returns the distro service identifiers this cluster's runtime exposes on the
+// node represented by secret.
+func (a *ImportedAdapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
 // managementNodeForSecret resolves the machine-plan Secret -> lifecycle labels ->
 // management Node cache lookup chain. Returns (nil, nil) when the secret carries no
 // lifecycle labels.

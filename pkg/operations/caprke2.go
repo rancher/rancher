@@ -213,6 +213,11 @@ func (a *CAPRKE2Adapter) RuntimeService(secret *corev1.Secret) string {
 	return a.RuntimeCommand() + "-agent"
 }
 
+// DistroServices returns the RKE2 service identifiers exposed on the node represented by secret.
+func (a *CAPRKE2Adapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
 // extraArgsFor returns the ExtraArgs slice for the named control-plane component, or nil when
 // the component is unset on the RKE2ControlPlane spec. The result is passed into
 // renderSecureProbe (which accepts `any`) to drive --secure-port / --tls-cert-file / --cert-dir

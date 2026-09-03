@@ -8,10 +8,13 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	ops "github.com/rancher/rancher/pkg/operations"
 	"github.com/rancher/rancher/pkg/plan"
+	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // stubAdapter is a minimal ops.Adapter implementation for testing component
@@ -57,6 +60,9 @@ func (a *stubAdapter) RuntimeService(secret *corev1.Secret) string {
 		return a.ServerUnit()
 	}
 	return a.runtime + "-agent"
+}
+func (a *stubAdapter) DistroServices(secret *corev1.Secret) []string {
+	return ops.DistroServices(a.runtime, secret)
 }
 func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string { return "" }
@@ -151,16 +157,11 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						UID: "operation",
 					},
-					Spec: opv1alpha1.CertificateRotationSpec{
-						Args: opv1alpha1.CertificateRotationArgs{
-							Services: tt.services,
-						},
-					},
 				},
 				adapter: adapter,
 			}
 
-			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{})
+			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, tt.services)
 			assert.NoError(t, err)
 			assert.Len(t, instructions, len(tt.expected))
 			for i, instruction := range instructions {
@@ -187,7 +188,7 @@ func TestComponentCertificateCleanupInstructions_AdapterError(t *testing.T) {
 		},
 	}
 
-	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{})
+	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, nil)
 	assert.Nil(t, instructions)
 	assert.EqualError(t, err, "settings failed")
 }
@@ -302,6 +303,7 @@ func TestServicesApply(t *testing.T) {
 	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
 	etcd := certificateRotationSecret(map[string]string{capr.EtcdRoleLabel: "true"})
 	worker := certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"})
+	adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
 
 	tests := []struct {
 		name     string
@@ -322,11 +324,201 @@ func TestServicesApply(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, servicesApply(tt.services, tt.secret))
+			assert.Equal(t, tt.want, servicesApply(adapter, tt.services, tt.secret))
 		})
 	}
 }
 
+func TestServicesForNode_NarrowsRequestPerNodeRole(t *testing.T) {
+	t.Parallel()
+
+	etcd := certificateRotationSecret(map[string]string{capr.EtcdRoleLabel: "true"})
+	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+	adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
+
+	requested := []string{"etcd", "scheduler"}
+
+	// A request spanning both roles must be narrowed separately for each node: the etcd
+	// node only receives "etcd", the control-plane node only receives "scheduler".
+	assert.Equal(t, []string{"etcd"}, servicesForNode(adapter, requested, etcd))
+	assert.Equal(t, []string{"scheduler"}, servicesForNode(adapter, requested, controlPlane))
+}
+
+func TestServicesForNode_EmptyRequestStaysEmpty(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+	adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
+
+	// An empty request already means "rotate everything the runtime supports" to the
+	// runtime command, so it must not be expanded into the node's full DistroServices list.
+	assert.Nil(t, servicesForNode(adapter, nil, controlPlane))
+}
+
+// --- DistroServices ---------------------------------------------------------------------------
+
+func TestDistroServices_RuntimeSpecificNamesDoNotCross(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+
+	rke2 := ops.DistroServices(capr.RuntimeRKE2, controlPlane)
+	assert.Contains(t, rke2, "rke2-server")
+	assert.Contains(t, rke2, "rke2-controller")
+	assert.NotContains(t, rke2, "k3s-server", "RKE2 nodes must not expose K3s-specific service names")
+	assert.NotContains(t, rke2, "k3s-controller", "RKE2 nodes must not expose K3s-specific service names")
+
+	k3s := ops.DistroServices(capr.RuntimeK3S, controlPlane)
+	assert.Contains(t, k3s, "k3s-server")
+	assert.Contains(t, k3s, "k3s-controller")
+	assert.NotContains(t, k3s, "rke2-server", "K3s nodes must not expose RKE2-specific service names")
+	assert.NotContains(t, k3s, "rke2-controller", "K3s nodes must not expose RKE2-specific service names")
+}
+
+func TestDistroServices_RoleSpecificAvailability(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+	etcd := certificateRotationSecret(map[string]string{capr.EtcdRoleLabel: "true"})
+	worker := certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"})
+
+	// Worker-only nodes never own control-plane or etcd services.
+	workerServices := ops.DistroServices(capr.RuntimeRKE2, worker)
+	assert.Contains(t, workerServices, "rke2-server")
+	assert.NotContains(t, workerServices, "scheduler")
+	assert.NotContains(t, workerServices, "etcd")
+
+	// Control-plane nodes own the API server components but not etcd.
+	controlPlaneServices := ops.DistroServices(capr.RuntimeRKE2, controlPlane)
+	assert.Contains(t, controlPlaneServices, "scheduler")
+	assert.Contains(t, controlPlaneServices, "controller-manager")
+	assert.NotContains(t, controlPlaneServices, "etcd")
+
+	// Etcd nodes own etcd but not the API server components.
+	etcdServices := ops.DistroServices(capr.RuntimeRKE2, etcd)
+	assert.Contains(t, etcdServices, "etcd")
+	assert.NotContains(t, etcdServices, "scheduler")
+}
+
+// --- unsupportedServices ---------------------------------------------------------------------
+
+func TestUnsupportedServices_RequestingRKE2ServiceOnK3sClusterFails(t *testing.T) {
+	t.Parallel()
+
+	adapter := &stubAdapter{runtime: capr.RuntimeK3S}
+	targets := []*corev1.Secret{
+		certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}),
+		certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"}),
+	}
+
+	unsupported := unsupportedServices(adapter, []string{"rke2-server"}, targets)
+	assert.Equal(t, []string{"rke2-server"}, unsupported)
+}
+
+func TestUnsupportedServices_RequestingK3sServiceOnRKE2ClusterFails(t *testing.T) {
+	t.Parallel()
+
+	adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
+	targets := []*corev1.Secret{
+		certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}),
+		certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"}),
+	}
+
+	unsupported := unsupportedServices(adapter, []string{"k3s-server"}, targets)
+	assert.Equal(t, []string{"k3s-server"}, unsupported)
+}
+
+func TestUnsupportedServices_EmptyServicesRetainsAllServiceBehavior(t *testing.T) {
+	t.Parallel()
+
+	adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
+	targets := []*corev1.Secret{
+		certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"}),
+	}
+
+	assert.Empty(t, unsupportedServices(adapter, nil, targets))
+}
+
+func TestUnsupportedServices_SupportedServiceOnSomeTargetPasses(t *testing.T) {
+	t.Parallel()
+
+	adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
+	targets := []*corev1.Secret{
+		certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}),
+		certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"}),
+	}
+
+	// "scheduler" is only exposed by the control-plane target, but it is exposed by at
+	// least one target, so the request as a whole is valid.
+	assert.Empty(t, unsupportedServices(adapter, []string{"scheduler"}, targets))
+}
+
 func certificateRotationSecret(labels map[string]string) *corev1.Secret {
 	return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Labels: labels}}
+}
+
+// --- reconcileRotate preflight -----------------------------------------------------------------
+
+func TestReconcileRotate_UnsupportedServiceFailsBeforePlanAssignment(t *testing.T) {
+	t.Parallel()
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetName("test")
+
+	controlPlaneSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cp-1",
+			Namespace: "fleet-default",
+			UID:       "cp-1-uid",
+			Labels: map[string]string{
+				capr.ClusterNameLabel:      "test",
+				capr.ControlPlaneRoleLabel: "true",
+			},
+		},
+		Type: plan.SecretTypeMachinePlan,
+	}
+
+	ctrl := gomock.NewController(t)
+	secrets := ctrlfake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secrets.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(ns string, opts metav1.ListOptions) (*corev1.SecretList, error) {
+		sel, err := labels.Parse(opts.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
+		if controlPlaneSecret.Namespace != ns || !sel.Matches(labels.Set(controlPlaneSecret.Labels)) {
+			return &corev1.SecretList{}, nil
+		}
+		return &corev1.SecretList{Items: []corev1.Secret{*controlPlaneSecret}}, nil
+	}).AnyTimes()
+
+	// h.store is deliberately left nil. Preflight must fail and return before reaching
+	// AssignPlan, so an accidental call into the nil store fails the test immediately
+	// rather than silently succeeding.
+	h := &handler{secrets: secrets}
+
+	op := &opv1alpha1.CertificateRotation{
+		ObjectMeta: metav1.ObjectMeta{UID: "operation"},
+		Spec: opv1alpha1.CertificateRotationSpec{
+			Args: opv1alpha1.CertificateRotationArgs{
+				Services: []string{"rke2-server"},
+			},
+		},
+	}
+
+	s := &scope{
+		op:         op,
+		namespace:  "fleet-default",
+		clusterObj: cluster,
+		adapter:    &stubAdapter{runtime: capr.RuntimeK3S},
+	}
+
+	status := opv1alpha1.CertificateRotationStatus{}
+	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
+	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
+
+	got, err := h.reconcileRotate(s, status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseFailed, got.Phase)
+	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.FailedCondition.GetReason(&got))
+	assert.Contains(t, opv1alpha1.FailedCondition.GetMessage(&got), "rke2-server")
 }
