@@ -3275,13 +3275,37 @@ func (s *steveAPITestSuite) extensionAPIRequest(t require.TestingT, client *http
 	return resp.StatusCode, data
 }
 
-// describeKubeconfig fetches a kubeconfig by name and lists the collection, so
-// a failing delete or update says whether the object was still there.
-func (s *steveAPITestSuite) describeKubeconfig(t require.TestingT, client *http.Client, name string) string {
-	getCode, getBody := s.extensionAPIRequest(t, client, http.MethodGet, "/v1/ext.cattle.io.kubeconfig/"+name, nil)
-	listCode, listBody := s.extensionAPIRequest(t, client, http.MethodGet, "/v1/ext.cattle.io.kubeconfig", nil)
+// tokenNamespace is where the kubeconfig store keeps the ConfigMaps backing
+// kubeconfigs and the Secrets backing their tokens.
+const tokenNamespace = "cattle-tokens"
 
-	return fmt.Sprintf("get %s: %d %s\nlist: %d %s", name, getCode, getBody, listCode, listBody)
+// describeKubeconfig reports what the server knows about a kubeconfig, so a
+// failing delete or update says whether the object was still there.
+//
+// The kubeconfig store answers a get with no options and a list out of its
+// ConfigMap cache, so those two alone can't tell a deleted object apart from
+// one the cache hasn't caught up with. The backing ConfigMap and the token
+// Secrets that own it are read as well: Steve serves those by id from the API
+// server, and their labels and owner references say which of the two it is.
+func (s *steveAPITestSuite) describeKubeconfig(t require.TestingT, client *http.Client, name string) string {
+	probes := []struct {
+		what string
+		path string
+	}{
+		{"get kubeconfig " + name, "/v1/ext.cattle.io.kubeconfig/" + name},
+		{"list kubeconfigs", "/v1/ext.cattle.io.kubeconfig"},
+		{"get backing configmap " + name, "/v1/configmaps/" + tokenNamespace + "/" + name},
+		{"list configmaps in " + tokenNamespace, "/v1/configmaps/" + tokenNamespace},
+		{"list secrets in " + tokenNamespace, "/v1/secrets/" + tokenNamespace},
+	}
+
+	var out strings.Builder
+	for _, probe := range probes {
+		code, body := s.extensionAPIRequest(t, client, http.MethodGet, probe.path, nil)
+		fmt.Fprintf(&out, "%s: %d %s\n", probe.what, code, body)
+	}
+
+	return out.String()
 }
 
 func retryRequest(fn func() error) error {
