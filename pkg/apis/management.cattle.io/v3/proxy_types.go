@@ -27,7 +27,7 @@ type ProxyEndpointSpec struct {
 	Routes []ProxyEndpointRoute `json:"routes,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!(has(self.caBundle) && self.caBundle != ” && self.insecureSkipTLSVerify)",message="caBundle cannot be set when insecureSkipTLSVerify is true"
+// +kubebuilder:validation:XValidation:rule="!(has(self.caBundle) && size(self.caBundle) > 0 && self.insecureSkipTLSVerify)",message="caBundle cannot be set when insecureSkipTLSVerify is true"
 type ProxyEndpointRoute struct {
 	// Domain is the domain to be added to the proxy allowlist.
 	// Absolute domain names (e.g., example.com) and wildcard patterns are supported.
