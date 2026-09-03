@@ -34,31 +34,31 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// CRMigrationController interface for managing CRMigration resources.
-type CRMigrationController interface {
-	generic.NonNamespacedControllerInterface[*v3.CRMigration, *v3.CRMigrationList]
+// MigrationController interface for managing Migration resources.
+type MigrationController interface {
+	generic.NonNamespacedControllerInterface[*v3.Migration, *v3.MigrationList]
 }
 
-// CRMigrationClient interface for managing CRMigration resources in Kubernetes.
-type CRMigrationClient interface {
-	generic.NonNamespacedClientInterface[*v3.CRMigration, *v3.CRMigrationList]
+// MigrationClient interface for managing Migration resources in Kubernetes.
+type MigrationClient interface {
+	generic.NonNamespacedClientInterface[*v3.Migration, *v3.MigrationList]
 }
 
-// CRMigrationCache interface for retrieving CRMigration resources in memory.
-type CRMigrationCache interface {
-	generic.NonNamespacedCacheInterface[*v3.CRMigration]
+// MigrationCache interface for retrieving Migration resources in memory.
+type MigrationCache interface {
+	generic.NonNamespacedCacheInterface[*v3.Migration]
 }
 
-// CRMigrationStatusHandler is executed for every added or modified CRMigration. Should return the new status to be updated
-type CRMigrationStatusHandler func(obj *v3.CRMigration, status v3.CRMigrationStatus) (v3.CRMigrationStatus, error)
+// MigrationStatusHandler is executed for every added or modified Migration. Should return the new status to be updated
+type MigrationStatusHandler func(obj *v3.Migration, status v3.MigrationStatus) (v3.MigrationStatus, error)
 
-// CRMigrationGeneratingHandler is the top-level handler that is executed for every CRMigration event. It extends CRMigrationStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type CRMigrationGeneratingHandler func(obj *v3.CRMigration, status v3.CRMigrationStatus) ([]runtime.Object, v3.CRMigrationStatus, error)
+// MigrationGeneratingHandler is the top-level handler that is executed for every Migration event. It extends MigrationStatusHandler by a returning a slice of child objects to be passed to apply.Apply
+type MigrationGeneratingHandler func(obj *v3.Migration, status v3.MigrationStatus) ([]runtime.Object, v3.MigrationStatus, error)
 
-// RegisterCRMigrationStatusHandler configures a CRMigrationController to execute a CRMigrationStatusHandler for every events observed.
+// RegisterMigrationStatusHandler configures a MigrationController to execute a MigrationStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
-func RegisterCRMigrationStatusHandler(ctx context.Context, controller CRMigrationController, condition condition.Cond, name string, handler CRMigrationStatusHandler) {
-	statusHandler := &cRMigrationStatusHandler{
+func RegisterMigrationStatusHandler(ctx context.Context, controller MigrationController, condition condition.Cond, name string, handler MigrationStatusHandler) {
+	statusHandler := &migrationStatusHandler{
 		client:    controller,
 		condition: condition,
 		handler:   handler,
@@ -66,31 +66,31 @@ func RegisterCRMigrationStatusHandler(ctx context.Context, controller CRMigratio
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterCRMigrationGeneratingHandler configures a CRMigrationController to execute a CRMigrationGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// RegisterMigrationGeneratingHandler configures a MigrationController to execute a MigrationGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
-func RegisterCRMigrationGeneratingHandler(ctx context.Context, controller CRMigrationController, apply apply.Apply,
-	condition condition.Cond, name string, handler CRMigrationGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
-	statusHandler := &cRMigrationGeneratingHandler{
-		CRMigrationGeneratingHandler: handler,
-		apply:                        apply,
-		name:                         name,
-		gvk:                          controller.GroupVersionKind(),
+func RegisterMigrationGeneratingHandler(ctx context.Context, controller MigrationController, apply apply.Apply,
+	condition condition.Cond, name string, handler MigrationGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
+	statusHandler := &migrationGeneratingHandler{
+		MigrationGeneratingHandler: handler,
+		apply:                      apply,
+		name:                       name,
+		gvk:                        controller.GroupVersionKind(),
 	}
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
 	controller.OnChange(ctx, name, statusHandler.Remove)
-	RegisterCRMigrationStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
+	RegisterMigrationStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
-type cRMigrationStatusHandler struct {
-	client    CRMigrationClient
+type migrationStatusHandler struct {
+	client    MigrationClient
 	condition condition.Cond
-	handler   CRMigrationStatusHandler
+	handler   MigrationStatusHandler
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *cRMigrationStatusHandler) sync(key string, obj *v3.CRMigration) (*v3.CRMigration, error) {
+func (a *migrationStatusHandler) sync(key string, obj *v3.Migration) (*v3.Migration, error) {
 	if obj == nil {
 		return obj, nil
 	}
@@ -129,8 +129,8 @@ func (a *cRMigrationStatusHandler) sync(key string, obj *v3.CRMigration) (*v3.CR
 	return obj, err
 }
 
-type cRMigrationGeneratingHandler struct {
-	CRMigrationGeneratingHandler
+type migrationGeneratingHandler struct {
+	MigrationGeneratingHandler
 	apply apply.Apply
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
@@ -139,12 +139,12 @@ type cRMigrationGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *cRMigrationGeneratingHandler) Remove(key string, obj *v3.CRMigration) (*v3.CRMigration, error) {
+func (a *migrationGeneratingHandler) Remove(key string, obj *v3.Migration) (*v3.Migration, error) {
 	if obj != nil {
 		return obj, nil
 	}
 
-	obj = &v3.CRMigration{}
+	obj = &v3.Migration{}
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
@@ -158,13 +158,13 @@ func (a *cRMigrationGeneratingHandler) Remove(key string, obj *v3.CRMigration) (
 		ApplyObjects()
 }
 
-// Handle executes the configured CRMigrationGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *cRMigrationGeneratingHandler) Handle(obj *v3.CRMigration, status v3.CRMigrationStatus) (v3.CRMigrationStatus, error) {
+// Handle executes the configured MigrationGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
+func (a *migrationGeneratingHandler) Handle(obj *v3.Migration, status v3.MigrationStatus) (v3.MigrationStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.CRMigrationGeneratingHandler(obj, status)
+	objs, newStatus, err := a.MigrationGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
@@ -185,7 +185,7 @@ func (a *cRMigrationGeneratingHandler) Handle(obj *v3.CRMigration, status v3.CRM
 
 // isNewResourceVersion detects if a specific resource version was already successfully processed.
 // Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *cRMigrationGeneratingHandler) isNewResourceVersion(obj *v3.CRMigration) bool {
+func (a *migrationGeneratingHandler) isNewResourceVersion(obj *v3.Migration) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
 	}
@@ -198,7 +198,7 @@ func (a *cRMigrationGeneratingHandler) isNewResourceVersion(obj *v3.CRMigration)
 
 // storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
 // Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *cRMigrationGeneratingHandler) storeResourceVersion(obj *v3.CRMigration) {
+func (a *migrationGeneratingHandler) storeResourceVersion(obj *v3.Migration) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

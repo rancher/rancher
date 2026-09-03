@@ -1,23 +1,38 @@
 package v3
 
 import (
+	"unicode/utf8"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CRMigrationSummary describes the overall state of a migration or a single
+// MigrationSummary describes the overall state of a migration or a single
 // migration run.
-type CRMigrationSummary string
+type MigrationSummary string
 
 const (
-	// CRMigrationSummaryComplete indicates the migration has completed.
-	CRMigrationSummaryComplete CRMigrationSummary = "Complete"
-	// CRMigrationSummaryInProgress indicates the migration is underway.
-	CRMigrationSummaryInProgress CRMigrationSummary = "In Progress"
-	// CRMigrationSummaryError indicates an error occurred during the migration.
-	CRMigrationSummaryError CRMigrationSummary = "Error"
-	// CRMigrationSummaryNotRun indicates the migration has not been run and is
-	// not scheduled to start.
-	CRMigrationSummaryNotRun CRMigrationSummary = "Not Run"
+	// MigrationSummaryComplete indicates the migration has completed.
+	MigrationSummaryComplete MigrationSummary = "Complete"
+	// MigrationSummaryInProgress indicates the migration is underway.
+	MigrationSummaryInProgress MigrationSummary = "In Progress"
+	// MigrationSummaryError indicates an error occurred during the migration.
+	MigrationSummaryError MigrationSummary = "Error"
+	// MigrationSummaryPending indicates the migration is pending and has not yet started.
+	MigrationSummaryPending MigrationSummary = "Pending"
+	// MigrationSummaryRunning indicates the migration is currently running.
+	MigrationSummaryRunning MigrationSummary = "Running"
+	// MigrationSummaryInterrupted indicates the migration was interrupted before completion.
+	MigrationSummaryInterrupted MigrationSummary = "Interrupted"
+)
+
+// MigrationCondition is the condition types for a migration.
+type MigrationCondition string
+
+const (
+	// MigrationFailed indicates the migration has failed.
+	MigrationFailed MigrationCondition = "Failed"
+	// MigrationComplete indicates the migration has completed successfully.
+	MigrationComplete MigrationCondition = "Complete"
 )
 
 const (
@@ -29,6 +44,53 @@ const (
 	MaxMigrationErrors = 100
 )
 
+const (
+	// MaxMigrationErrorTypeLength bounds MigrationError.Type.
+	MaxMigrationErrorTypeLength = 128
+	// MaxMigrationErrorReasonLength bounds MigrationError.Reason.
+	MaxMigrationErrorReasonLength = 512
+	// MaxMigrationErrorMessageLength bounds MigrationError.Message.
+	MaxMigrationErrorMessageLength = 1024
+)
+
+// Truncate clamps the error's fields to the lengths allowed by the CRD schema.
+// The API server rejects writes that exceed them, so callers must call this
+// before recording an error.
+func (e *MigrationError) Truncate() {
+	e.Type = truncateRunes(e.Type, MaxMigrationErrorTypeLength)
+	e.Reason = truncateRunes(e.Reason, MaxMigrationErrorReasonLength)
+	e.Message = truncateRunes(e.Message, MaxMigrationErrorMessageLength)
+}
+
+func truncateRunes(s string, max int) string {
+	if utf8.RuneCountInString(s) <= max {
+		return s
+	}
+	const ellipsis = "…"
+	return string([]rune(s)[:max-1]) + ellipsis
+}
+
+// AppendError records err against the run. MigrationsFailed is always
+// incremented; Errors retains at most MaxMigrationErrors entries, keeping the
+// earliest failures since later ones are usually cascades.
+func (r *MigrationRun) AppendError(e MigrationError) {
+	r.MigrationsFailed++
+	if len(r.Errors) >= MaxMigrationErrors {
+		return
+	}
+	e.Truncate()
+	r.Errors = append(r.Errors, e)
+}
+
+// PrependRun records a completed run, keeping MigrationRuns ordered most
+// recent first and bounded to MaxMigrationRuns.
+func (s *MigrationStatus) PrependRun(run MigrationRun) {
+	s.MigrationRuns = append([]MigrationRun{run}, s.MigrationRuns...)
+	if len(s.MigrationRuns) > MaxMigrationRuns {
+		s.MigrationRuns = s.MigrationRuns[:MaxMigrationRuns]
+	}
+}
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -37,10 +99,10 @@ const (
 // +kubebuilder:printcolumn:name="Summary",type="string",JSONPath=".status.summary"
 // +kubebuilder:printcolumn:name="Resources Migrated",type="integer",JSONPath=".status.totalResourcesMigrated"
 
-// CRMigration is the source of truth for a single Rancher custom resource
+// Migration is the source of truth for a single Rancher custom resource
 // migration. It tracks the configuration of the migration, a history of every
 // time the migration was run, and the current status of the migration.
-type CRMigration struct {
+type Migration struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
@@ -48,15 +110,15 @@ type CRMigration struct {
 
 	// Spec is the specification of the desired configuration for the migration.
 	// +optional
-	Spec CRMigrationSpec `json:"spec,omitempty"`
+	Spec MigrationSpec `json:"spec,omitempty"`
 
 	// Status is the most recently observed status of the migration.
 	// +optional
-	Status CRMigrationStatus `json:"status,omitempty"`
+	Status MigrationStatus `json:"status,omitempty"`
 }
 
-// CRMigrationSpec is the specification of a CRMigration.
-type CRMigrationSpec struct {
+// MigrationSpec is the specification of a Migration.
+type MigrationSpec struct {
 	// Description is a human readable description of what is being migrated and why.
 	// +optional
 	Description string `json:"description,omitempty"`
@@ -110,7 +172,7 @@ type MigrationRun struct {
 	// Summary is the end result of the migration run.
 	// +optional
 	// +kubebuilder:validation:Enum=Complete;"In Progress";Error;"Not Run"
-	Summary CRMigrationSummary `json:"summary,omitempty"`
+	Summary MigrationSummary `json:"summary,omitempty"`
 
 	// MigrationsPerformedSuccessfully is the number of migrations successfully
 	// completed during this run.
@@ -135,22 +197,26 @@ type MigrationRun struct {
 
 // MigrationError describes a single error that occurred during a migration run.
 type MigrationError struct {
-	// Type is the type of error.
+	// Type is a programmatic identifier for the error, in CamelCase.
 	// +optional
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:Pattern=`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`
 	Type string `json:"type,omitempty"`
 
-	// Reason is a more detailed explanation of the issue.
+	// Reason is a short human readable explanation of the issue.
 	// +optional
+	// +kubebuilder:validation:MaxLength=512
 	Reason string `json:"reason,omitempty"`
 
-	// Message is the full error message. Developers should take care not to log
-	// sensitive data such as secrets, tokens, or passwords here.
+	// Message is the error message, truncated to fit. Developers must not
+	// include sensitive data such as secrets, tokens, or passwords.
 	// +optional
+	// +kubebuilder:validation:MaxLength=1024
 	Message string `json:"message,omitempty"`
 }
 
-// CRMigrationStatus is the most recently observed status of a CRMigration.
-type CRMigrationStatus struct {
+// MigrationStatus is the most recently observed status of a Migration.
+type MigrationStatus struct {
 	// LastUpdateTime is when the status was last updated.
 	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
@@ -158,10 +224,10 @@ type CRMigrationStatus struct {
 	// Summary is the state of the whole migration.
 	// +optional
 	// +kubebuilder:validation:Enum=Complete;"In Progress";Error;"Not Run"
-	Summary CRMigrationSummary `json:"summary,omitempty"`
+	Summary MigrationSummary `json:"summary,omitempty"`
 
 	// TotalResourcesMigrated is the number of resources that have been migrated.
-	// It should be the sum of all migrationRuns.migrationsPerformedSuccessfully.
+	// It should be the sum of all migrationHistories.migrationsPerformedSuccessfully.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	TotalResourcesMigrated int `json:"totalResourcesMigrated"`
@@ -185,7 +251,7 @@ type CRMigrationStatus struct {
 	ObservedRunRequestID string `json:"observedRunRequestID,omitempty"`
 
 	// Conditions represent the latest available observations of the migration's
-	// state.
+	// state. Use MigrationCondition as the type for the condition.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge

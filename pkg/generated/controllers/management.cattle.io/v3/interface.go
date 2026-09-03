@@ -37,7 +37,6 @@ type Interface interface {
 	AuthProvider() AuthProviderController
 	AuthToken() AuthTokenController
 	AzureADProvider() AzureADProviderController
-	CRMigration() CRMigrationController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
 	ClusterProxyConfig() ClusterProxyConfigController
@@ -60,6 +59,7 @@ type Interface interface {
 	KontainerDriver() KontainerDriverController
 	LocalProvider() LocalProviderController
 	ManagedChart() ManagedChartController
+	Migration() MigrationController
 	Node() NodeController
 	NodeDriver() NodeDriverController
 	OIDCClient() OIDCClientController
@@ -114,10 +114,6 @@ func (v *version) AuthToken() AuthTokenController {
 
 func (v *version) AzureADProvider() AzureADProviderController {
 	return generic.NewNonNamespacedController[*v3.AzureADProvider, *v3.AzureADProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADProvider"}, "azureadproviders", v.controllerFactory)
-}
-
-func (v *version) CRMigration() CRMigrationController {
-	return generic.NewNonNamespacedController[*v3.CRMigration, *v3.CRMigrationList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CRMigration"}, "crmigrations", v.controllerFactory)
 }
 
 func (v *version) CloudCredential() CloudCredentialController {
@@ -206,6 +202,10 @@ func (v *version) LocalProvider() LocalProviderController {
 
 func (v *version) ManagedChart() ManagedChartController {
 	return generic.NewController[*v3.ManagedChart, *v3.ManagedChartList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, v.controllerFactory)
+}
+
+func (v *version) Migration() MigrationController {
+	return generic.NewNonNamespacedController[*v3.Migration, *v3.MigrationList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Migration"}, "migrations", v.controllerFactory)
 }
 
 func (v *version) Node() NodeController {

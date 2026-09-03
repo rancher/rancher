@@ -128,23 +128,6 @@ func NewAzureADProvider(namespace, name string, obj AzureADProvider) *AzureADPro
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// CRMigrationList is a list of CRMigration resources
-type CRMigrationList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []CRMigration `json:"items"`
-}
-
-func NewCRMigration(namespace, name string, obj CRMigration) *CRMigration {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CRMigration").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // CloudCredentialList is a list of CloudCredential resources
 type CloudCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -512,6 +495,23 @@ type ManagedChartList struct {
 
 func NewManagedChart(namespace, name string, obj ManagedChart) *ManagedChart {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ManagedChart").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MigrationList is a list of Migration resources
+type MigrationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []Migration `json:"items"`
+}
+
+func NewMigration(namespace, name string, obj Migration) *Migration {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Migration").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

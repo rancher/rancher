@@ -34,7 +34,6 @@ var (
 	AuthProviderResourceName                              = "authproviders"
 	AuthTokenResourceName                                 = "authtokens"
 	AzureADProviderResourceName                           = "azureadproviders"
-	CRMigrationResourceName                               = "crmigrations"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
 	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
@@ -57,6 +56,7 @@ var (
 	KontainerDriverResourceName                           = "kontainerdrivers"
 	LocalProviderResourceName                             = "localproviders"
 	ManagedChartResourceName                              = "managedcharts"
+	MigrationResourceName                                 = "migrations"
 	NodeResourceName                                      = "nodes"
 	NodeDriverResourceName                                = "nodedrivers"
 	OIDCClientResourceName                                = "oidcclients"
@@ -112,8 +112,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AuthTokenList{},
 		&AzureADProvider{},
 		&AzureADProviderList{},
-		&CRMigration{},
-		&CRMigrationList{},
 		&CloudCredential{},
 		&CloudCredentialList{},
 		&Cluster{},
@@ -158,6 +156,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LocalProviderList{},
 		&ManagedChart{},
 		&ManagedChartList{},
+		&Migration{},
+		&MigrationList{},
 		&Node{},
 		&NodeList{},
 		&NodeDriver{},
