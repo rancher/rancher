@@ -38,7 +38,7 @@ var (
 		"docker.io/rancher/mirrored-coredns-coredns": struct{}{},
 	}
 
-	k3sVersion = regexp.MustCompile(`^v\d+\.\d+\.\d+\+k3s\d+$`)
+	k3sVersion = regexp.MustCompile(`^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\+k3s\d+$`)
 
 	fetcher = fetch
 )
