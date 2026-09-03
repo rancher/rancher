@@ -259,12 +259,38 @@ func TestReconcileGlobalRole(t *testing.T) {
 			},
 		},
 		{
-			name: "stale-named ClusterRole is deleted and the correct one is created",
+			name: "stale primary ClusterRole is deleted and the correct one is created",
 			setupControllers: func(c controllers) {
 				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  false,
+			condition: reducedCondition{
+				reason: ClusterRoleExists,
+				status: metav1.ConditionTrue,
+			},
+		},
+		{
+			name: "Fleet backing ClusterRoles are excluded from primary ClusterRole cleanup",
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().List(gomock.Any()).DoAndReturn(func(options metav1.ListOptions) (*rbacv1.ClusterRoleList, error) {
+					selector, err := labels.Parse(options.LabelSelector)
+					require.NoError(t, err)
+					assert.True(t, selector.Matches(labels.Set{
+						grOwnerLabel:    defaultGR.Name,
+						globalRoleLabel: "true",
+					}), "selector must match when globalRoleLabel is present")
+
+					assert.False(t, selector.Matches(labels.Set{
+						grOwnerLabel:       defaultGR.Name,
+						"some-other-label": "true",
+					}), "selector must not match without globalRoleLabel")
+					return &rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readPodCR.DeepCopy()}}, nil
+				})
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  false,
