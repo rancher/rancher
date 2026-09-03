@@ -19,7 +19,10 @@ on:
         description: 'Patterns to exclude from failure detection (URL encode special chars: %2C for comma, %27 for single quote)'
         required: false
         default: 'Failed to save: Unable to reserve cache with key docker.io,Failed to restore: "/usr/bin/tar" failed with error: The process,echo "Error: Failed to load image from tarball!",H4sIAAAAAAAA'
-
+      provisioning_test_scope:
+        description: 'The desired scope (basic, operations, prebootstrap, imported, full) that should be run when executing the provisioning tests. An empty value is interpreted as "full".'
+        required: false
+        default: 'full'
 permissions:
   contents: write
   pull-requests: write
@@ -79,10 +82,22 @@ jobs:
       - name: Create and push empty commit
         env:
           BRANCH: ${{ steps.branch-setup.outputs.branch }}
+          PROVISIONING_TEST_SCOPE: ${{ inputs.provisioning_test_scope }}
+          SCOPES_CONFIG: .github/scripts/provisioning-test-scopes.yaml
         run: |
-          touch trigger_ci
-          git add trigger_ci
-          git commit -m "Add trigger_ci file for CI testing"
+          # identify the correct trigger file to create based on the requested provisioning scope
+          scope="${PROVISIONING_TEST_SCOPE:-full}"
+          [ "$scope" = "full" ] && paths_expr='.full' || paths_expr=".scopes.$scope.file-paths"
+          trigger_file="trigger-${scope}-ci"
+          expected_trigger_path="^${trigger_file}$"
+          if ! yq -r "${paths_expr}[] | (.path // .)" "$SCOPES_CONFIG" | grep -Fxq -- "$expected_trigger_path"; then
+            echo "Invalid or misconfigured scope '$scope' (no '$expected_trigger_path' entry in $SCOPES_CONFIG). Valid scopes: $(yq -r '.scopes | keys | join(" ")' "$SCOPES_CONFIG") full" >&2
+            exit 1
+          fi
+
+          touch "$trigger_file"
+          git add "$trigger_file"
+          git commit -m "Add ${trigger_file} file for CI testing"
           git push origin "$BRANCH"
 
       - name: Create draft PR
