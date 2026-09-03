@@ -644,6 +644,21 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 			wantAnnotation: getCRBName("test-grb"),
 		},
 		{
+			name: "Fleet ClusterRoleBindings are excluded from primary ClusterRoleBinding cleanup",
+			setupControllers: func(c controllers) {
+				c.crbCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					assert.False(t, selector.Matches(labels.Set{
+						grbOwnerLabel: wrangler.SafeConcatName(testGRB.Name),
+					}), "Fleet ClusterRoleBindings must be excluded from primary ClusterRoleBinding cleanup")
+					return []*rbacv1.ClusterRoleBinding{expectedCRB.DeepCopy()}, nil
+				})
+				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(expectedCRB.DeepCopy(), nil)
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: getCRBName("test-grb"),
+		},
+		{
 			name: "stale-named ClusterRoleBinding already gone is not an error",
 			setupControllers: func(c controllers) {
 				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{staleNamedCRB.DeepCopy()}, nil)
