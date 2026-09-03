@@ -191,7 +191,7 @@ type MigrationRun struct {
 
 	// Errors is a list of all errors that occurred during this migration run.
 	// +optional
-	// +kubebuilder:validation:MaxItems=100
+	// +kubebuilder:validation:MaxItems=10
 	Errors []MigrationError `json:"errors,omitempty"`
 }
 

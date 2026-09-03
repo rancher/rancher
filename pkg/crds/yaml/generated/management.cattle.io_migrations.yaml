@@ -193,7 +193,7 @@ spec:
                             pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                             type: string
                         type: object
-                      maxItems: 100
+                      maxItems: 10
                       type: array
                     migrationEndTime:
                       description: MigrationEndTime is when this migration run was
