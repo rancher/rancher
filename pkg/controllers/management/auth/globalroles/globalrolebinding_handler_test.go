@@ -494,7 +494,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "create new clusterRoleBinding",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).Return(nil, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(nil, nil)
 				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(&expectedCRB, nil)
 			},
@@ -505,7 +505,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "clusterRoleBinding creation fails",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).Return(nil, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(nil, nil)
 				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(nil, fmt.Errorf("server unavailable"))
 			},
@@ -516,7 +516,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 			name: "clusterRoleBinding already exists no update needed",
 			setupControllers: func(c controllers) {
 				existingCRB := expectedCRB.DeepCopy()
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{existingCRB}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*existingCRB}}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(existingCRB, nil)
 			},
 			inputObject:    testGRB.DeepCopy(),
@@ -534,7 +534,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 						APIGroup: rbacv1.GroupName,
 					},
 				}
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{existingCRB}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*existingCRB}}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(existingCRB, nil)
 				updatedCRB := expectedCRB.DeepCopy()
 				c.crbController.EXPECT().Update(updatedCRB).Return(updatedCRB, nil)
@@ -550,7 +550,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 					Name: "old-role",
 					Kind: clusterRoleKind,
 				}
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{existingCRB}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*existingCRB}}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(existingCRB, nil)
 				c.crbController.EXPECT().Delete(existingCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(expectedCRB.DeepCopy(), nil)
@@ -573,7 +573,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 					Name: "old-role",
 					Kind: clusterRoleKind,
 				}
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{existingCRB}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*existingCRB}}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(existingCRB, nil)
 				c.crbController.EXPECT().Delete(existingCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(expectedCRB.DeepCopy(), nil)
@@ -589,7 +589,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 					Name: "old-role",
 					Kind: clusterRoleKind,
 				}
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{existingCRB}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*existingCRB}}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(existingCRB, nil)
 				c.crbController.EXPECT().Delete(existingCRB.Name, &metav1.DeleteOptions{}).Return(fmt.Errorf("server unavailable"))
 			},
@@ -604,7 +604,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 					Name: "old-role",
 					Kind: clusterRoleKind,
 				}
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{existingCRB}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*existingCRB}}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(existingCRB, nil)
 				c.crbController.EXPECT().Delete(existingCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(nil, fmt.Errorf("server unavailable"))
@@ -623,7 +623,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 						APIGroup: rbacv1.GroupName,
 					},
 				}
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{existingCRB}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*existingCRB}}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(existingCRB, nil)
 				updatedCRB := expectedCRB.DeepCopy()
 				c.crbController.EXPECT().Update(updatedCRB).Return(nil, fmt.Errorf("server unavailable"))
@@ -634,7 +634,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "stale-named ClusterRoleBinding is deleted and the correct one is created",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{staleNamedCRB.DeepCopy()}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*staleNamedCRB.DeepCopy()}}, nil)
 				c.crbController.EXPECT().Delete(staleNamedCRB.Name, &metav1.DeleteOptions{}).Return(nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(nil, nil)
 				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(expectedCRB.DeepCopy(), nil)
@@ -646,11 +646,19 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "Fleet ClusterRoleBindings are excluded from primary ClusterRoleBinding cleanup",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+				c.crbController.EXPECT().List(gomock.Any()).DoAndReturn(func(options metav1.ListOptions) (*rbacv1.ClusterRoleBindingList, error) {
+					selector, err := labels.Parse(options.LabelSelector)
+					require.NoError(t, err)
+					assert.True(t, selector.Matches(labels.Set{
+						grbOwnerLabel: testGRB.Name,
+						"authz.management.cattle.io/globalrolebinding": "true",
+					}), "selector must match when globalRoleBindingLabel is present")
+
 					assert.False(t, selector.Matches(labels.Set{
-						grbOwnerLabel: wrangler.SafeConcatName(testGRB.Name),
-					}), "Fleet ClusterRoleBindings must be excluded from primary ClusterRoleBinding cleanup")
-					return []*rbacv1.ClusterRoleBinding{expectedCRB.DeepCopy()}, nil
+						grbOwnerLabel:      testGRB.Name,
+						"some-other-label": "true",
+					}), "selector must not match without globalRoleBindingLabel")
+					return &rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*expectedCRB.DeepCopy()}}, nil
 				})
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(expectedCRB.DeepCopy(), nil)
 			},
@@ -661,7 +669,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "stale-named ClusterRoleBinding already gone is not an error",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{staleNamedCRB.DeepCopy()}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*staleNamedCRB.DeepCopy()}}, nil)
 				c.crbController.EXPECT().Delete(staleNamedCRB.Name, &metav1.DeleteOptions{}).Return(apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}, staleNamedCRB.Name))
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(nil, nil)
 				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(expectedCRB.DeepCopy(), nil)
@@ -673,7 +681,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "deleting a stale-named ClusterRoleBinding fails",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRoleBinding{staleNamedCRB.DeepCopy()}, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{*staleNamedCRB.DeepCopy()}}, nil)
 				c.crbController.EXPECT().Delete(staleNamedCRB.Name, &metav1.DeleteOptions{}).Return(fmt.Errorf("server unavailable"))
 			},
 			inputObject: testGRB.DeepCopy(),
@@ -682,7 +690,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "listing ClusterRoleBindings fails",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).Return(nil, fmt.Errorf("server unavailable"))
+				c.crbController.EXPECT().List(gomock.Any()).Return(nil, fmt.Errorf("server unavailable"))
 			},
 			inputObject: testGRB.DeepCopy(),
 			wantError:   true,
@@ -690,7 +698,7 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 		{
 			name: "group principal binding",
 			setupControllers: func(c controllers) {
-				c.crbCache.EXPECT().List(gomock.Any()).Return(nil, nil)
+				c.crbController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.crbCache.EXPECT().Get(getCRBName("test-grb")).Return(nil, nil)
 				groupCRB := expectedCRB.DeepCopy()
 				groupCRB.Subjects = []rbacv1.Subject{
@@ -1350,12 +1358,12 @@ func Test_globalRoleBindingLifecycle_Create(t *testing.T) {
 		// reconcileGlobalRoleBinding: List existing ClusterRoleBindings owned by this GRB, then check if the
 		// correctly-named one already exists
 		crbLister := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding](ctrl)
-		crbLister.EXPECT().List(gomock.Any()).Return(nil, nil)
 		crbLister.EXPECT().Get(gomock.Any()).Return(nil, apierrors.NewNotFound(rbacv1.Resource("clusterrolebinding"), "test"))
 
 		// reconcileGlobalRoleBinding: Create a ClusterRoleBinding to bind the user to the GlobalRole's ClusterRole
 		// This grants the user global-level permissions (e.g., cluster management, global resource access)
 		crbClient := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+		crbClient.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 		crbClient.EXPECT().Create(gomock.Any()).Return(&rbacv1.ClusterRoleBinding{}, nil)
 
 		// reconcileNamespacedRoleBindings: Look up namespaces referenced in the GlobalRole's NamespacedRules

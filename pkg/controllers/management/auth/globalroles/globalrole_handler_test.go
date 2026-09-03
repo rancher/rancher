@@ -151,7 +151,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 
 	type controllers struct {
 		crController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
-		crLister     *fake.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]
 	}
 	notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "clusterRole")
 	tests := []struct {
@@ -165,7 +164,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "no changes to clusterRole",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{readPodCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readPodCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
@@ -178,7 +177,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "clusterRole is updated",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{readConfigCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readConfigCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
 				c.crController.EXPECT().Update(gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
 			},
@@ -192,7 +191,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "update clusterRole fails",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{readConfigCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readConfigCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
 				c.crController.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("error"))
 			},
@@ -206,7 +205,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "create clusterRole fails",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return(nil, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{}, nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("error"))
 			},
@@ -220,7 +219,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "clusterRole is created",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return(nil, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{}, nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
@@ -235,7 +234,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "missing grOwnerLabel in clusterRole triggers update",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{missingLabelCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*missingLabelCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(missingLabelCR.DeepCopy(), nil)
 				c.crController.EXPECT().Update(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
@@ -249,7 +248,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "missing OwnerReference in clusterRole triggers update",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{missingOwnerRefCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*missingOwnerRefCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(missingOwnerRefCR.DeepCopy(), nil)
 				c.crController.EXPECT().Update(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
@@ -261,9 +260,9 @@ func TestReconcileGlobalRole(t *testing.T) {
 			},
 		},
 		{
-			name: "stale primary ClusterRole is deleted while Fleet backing ClusterRoles are retained",
+			name: "stale primary ClusterRole is deleted and the correct one is created",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{staleNamedCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
@@ -278,11 +277,19 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "Fleet backing ClusterRoles are excluded from primary ClusterRole cleanup",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).DoAndReturn(func(selector labels.Selector) ([]*rbacv1.ClusterRole, error) {
+				c.crController.EXPECT().List(gomock.Any()).DoAndReturn(func(options metav1.ListOptions) (*rbacv1.ClusterRoleList, error) {
+					selector, err := labels.Parse(options.LabelSelector)
+					require.NoError(t, err)
+					assert.True(t, selector.Matches(labels.Set{
+						grOwnerLabel:    defaultGR.Name,
+						globalRoleLabel: "true",
+					}), "selector must match when globalRoleLabel is present")
+
 					assert.False(t, selector.Matches(labels.Set{
-						grOwnerLabel: defaultGR.Name,
-					}), "Fleet backing ClusterRoles must be excluded from primary ClusterRole cleanup")
-					return []*rbacv1.ClusterRole{readPodCR.DeepCopy()}, nil
+						grOwnerLabel:       defaultGR.Name,
+						"some-other-label": "true",
+					}), "selector must not match without globalRoleLabel")
+					return &rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readPodCR.DeepCopy()}}, nil
 				})
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
@@ -296,7 +303,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "stale-named ClusterRole already gone is not an error",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{staleNamedCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(notFoundErr)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
@@ -311,7 +318,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "deleting a stale-named ClusterRole fails",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return([]*rbacv1.ClusterRole{staleNamedCR.DeepCopy()}, nil)
+				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(fmt.Errorf("error"))
 			},
 			globalRole: defaultGR.DeepCopy(),
@@ -324,7 +331,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "listing ClusterRoles fails",
 			setupControllers: func(c controllers) {
-				c.crLister.EXPECT().List(gomock.Any()).Return(nil, fmt.Errorf("error"))
+				c.crController.EXPECT().List(gomock.Any()).Return(nil, fmt.Errorf("error"))
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  true,
@@ -340,7 +347,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			controllers := controllers{
 				crController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
-				crLister:     fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl),
 			}
 			if test.setupControllers != nil {
 				test.setupControllers(controllers)
@@ -348,7 +354,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 
 			grLifecycle := globalRoleLifecycle{
 				crClient: controllers.crController,
-				crLister: controllers.crLister,
 				status:   status.NewStatus(),
 			}
 			localConditions := []metav1.Condition{}

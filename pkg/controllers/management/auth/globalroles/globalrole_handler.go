@@ -58,7 +58,6 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 		clusters:                management.Wrangler.Mgmt.Cluster(),
 		clusterManager:          clusterManager,
 		crClient:                management.Wrangler.RBAC.ClusterRole(),
-		crLister:                management.Wrangler.RBAC.ClusterRole().Cache(),
 		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
 		rLister:                 management.Wrangler.RBAC.Role().Cache(),
 		rClient:                 management.Wrangler.RBAC.Role(),
@@ -74,7 +73,6 @@ type globalRoleLifecycle struct {
 	clusters                mgmtv3.ClusterClient
 	clusterManager          *clustermanager.Manager
 	crClient                wrbacv1.ClusterRoleClient
-	crLister                wrbacv1.ClusterRoleCache
 	nsCache                 wcorev1.NamespaceCache
 	rLister                 wrbacv1.RoleCache
 	rClient                 wrbacv1.RoleClient
@@ -170,7 +168,9 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 		Rules: globalRole.Rules,
 	}
 
-	clusterRoles, err := gr.crLister.List(labels.SelectorFromSet(grLabels))
+	clusterRoles, err := gr.crClient.List(metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(grLabels).String(),
+	})
 	if err != nil {
 		err = fmt.Errorf("couldn't list ClusterRoles for globalRole %v: %w", globalRole.Name, err)
 		gr.status.AddCondition(localConditions, condition, FailedToReconcileClusterRole, err)
@@ -178,7 +178,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 	}
 
 	// Delete any ClusterRoles that were created for this GlobalRole but have the wrong name.
-	for _, clusterRole := range clusterRoles {
+	for _, clusterRole := range clusterRoles.Items {
 		if clusterRole.Name != crName {
 			if err := rbac.DeleteResource(clusterRole.Name, gr.crClient); err != nil {
 				err = fmt.Errorf("couldn't delete ClusterRole %v for globalRole %v: %w", clusterRole.Name, globalRole.Name, err)
