@@ -68,6 +68,15 @@ spec:
                     description: Name specifies the name of the ETCD snapshot file.
                     type: string
                 type: object
+              cancel:
+                default: false
+                description: |-
+                  Cancel requests the operation to stop permanently. Unlike Paused, it is terminal and cannot be unset.
+                  Recover by deleting and recreating the operation. If both Paused and Cancel are true, Cancel wins.
+                type: boolean
+                x-kubernetes-validations:
+                - message: cancel cannot be unset once true
+                  rule: self || !oldSelf
               clusterRef:
                 description: ClusterRef is a reference to the Cluster this operation
                   is associated with.
