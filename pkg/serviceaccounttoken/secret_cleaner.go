@@ -26,10 +26,10 @@ const (
 )
 
 var (
-	// How long do we wait before the first secret cleanup run.
-	cleanCycleDelay time.Duration = time.Second * 5
+	// How long do we wait before the first secret cleanup run?
+	cleanCycleDelay = time.Second * 5
 	// How often do we clean secrets?
-	cleanCycleTime time.Duration = time.Minute * 1
+	cleanCycleTime = time.Minute * 1
 
 	// How many secrets are fetched at a time?
 	// Not all secrets are removed from this list.
@@ -45,7 +45,7 @@ type serviceAccountsCache interface {
 	AddIndexer(indexName string, indexer generic.Indexer[*corev1.ServiceAccount])
 }
 
-// StartServiceAccountSecretCleaner starts a background process to cleanup old
+// StartServiceAccountSecretCleaner starts a background process to clean up old
 // service accounts secrets.
 //
 // This should only be started in the leader pod.
@@ -131,7 +131,7 @@ func CleanServiceAccountSecrets(ctx context.Context, secrets clientcorev1.Secret
 	return deletionErr
 }
 
-func findServiceAccountForSecret(ctx context.Context, secretRef types.NamespacedName, serviceAccounts serviceAccountsCache) (*corev1.ServiceAccount, error) {
+func findServiceAccountForSecret(_ context.Context, secretRef types.NamespacedName, serviceAccounts serviceAccountsCache) (*corev1.ServiceAccount, error) {
 	secretAnnotation := secretRef.String()
 	serviceAccountList, err := serviceAccounts.GetByIndex(serviceAccountSecretRefIndex, secretAnnotation)
 	if err != nil {
@@ -177,7 +177,7 @@ func loadSecretQueue(secrets secretsCache) (*queue[types.NamespacedName], error)
 	return q, nil
 }
 
-// setupServiceAccountsCache must be called early on to setup the correct
+// setupServiceAccountsCache must be called early on to set up the correct
 // indexing on service accounts.
 func setupServiceAccountsCache(cache serviceAccountsCache) {
 	cache.AddIndexer(serviceAccountSecretRefIndex, func(s *corev1.ServiceAccount) ([]string, error) {
