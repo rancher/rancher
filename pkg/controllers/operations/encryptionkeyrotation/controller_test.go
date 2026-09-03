@@ -95,7 +95,7 @@ func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string {
 func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/config.yaml.d"
 }
-func (a *stubAdapter) CertificateRotationComponentTLSSettings(_ *corev1.Secret, _ string) (ops.ComponentTLSSettings, error) {
+func (a *stubAdapter) ComponentTLSSettings(_ *corev1.Secret, _ string) (ops.ComponentTLSSettings, error) {
 	return ops.ComponentTLSSettings{}, nil
 }
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }

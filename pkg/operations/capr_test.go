@@ -107,14 +107,14 @@ func TestCAPRAdapter_RuntimeService(t *testing.T) {
 	}
 }
 
-func TestCAPRAdapter_CertificateRotationComponentTLSSettings_RenderConfigError(t *testing.T) {
+func TestCAPRAdapter_ComponentTLSSettings_RenderConfigError(t *testing.T) {
 	t.Parallel()
 
 	adapter := &CAPRAdapter{
 		controlPlane: &rkev1.RKEControlPlane{},
 	}
 
-	_, err := adapter.CertificateRotationComponentTLSSettings(&corev1.Secret{}, KubeControllerManagerProbeName)
+	_, err := adapter.ComponentTLSSettings(&corev1.Secret{}, KubeControllerManagerProbeName)
 	assert.Error(t, err)
 }
 
@@ -533,9 +533,9 @@ func TestFilterField(t *testing.T) {
 	}
 }
 
-// --- CertificateRotationComponentTLSSettings ------------------------------------------------
+// --- ComponentTLSSettings ------------------------------------------------
 
-func TestCAPRAdapter_CertificateRotationComponentTLSSettings(t *testing.T) {
+func TestCAPRAdapter_ComponentTLSSettings(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

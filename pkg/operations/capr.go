@@ -255,9 +255,9 @@ func componentTLSSettingsFromRenderedConfig(config map[string]any, component str
 	return settings
 }
 
-// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
-// TLS settings from the rendered per-machine runtime config.
-func (a *CAPRAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings from the
+// rendered per-machine runtime config.
+func (a *CAPRAdapter) ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
 	config, err := a.renderConfig(secret)
 	if err != nil {
 		return ComponentTLSSettings{}, err

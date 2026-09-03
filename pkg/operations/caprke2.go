@@ -241,9 +241,9 @@ func (a *CAPRKE2Adapter) extraArgsFor(component string) []string {
 	return nil
 }
 
-// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
-// TLS settings from CAPRKE2 control-plane extra args.
-func (a *CAPRKE2Adapter) CertificateRotationComponentTLSSettings(_ *corev1.Secret, component string) (ComponentTLSSettings, error) {
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings from CAPRKE2
+// control-plane extra args.
+func (a *CAPRKE2Adapter) ComponentTLSSettings(_ *corev1.Secret, component string) (ComponentTLSSettings, error) {
 	args := a.extraArgsFor(component)
 	if args == nil {
 		return ComponentTLSSettings{}, nil

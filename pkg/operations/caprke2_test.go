@@ -34,9 +34,9 @@ func TestCAPRKE2Adapter_RuntimeService(t *testing.T) {
 	}
 }
 
-// --- CertificateRotationComponentTLSSettings ------------------------------------------------
+// --- ComponentTLSSettings ------------------------------------------------
 
-func TestCAPRKE2Adapter_CertificateRotationComponentTLSSettings(t *testing.T) {
+func TestCAPRKE2Adapter_ComponentTLSSettings(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -190,7 +190,7 @@ func TestCAPRKE2Adapter_CertificateRotationComponentTLSSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.adapter.CertificateRotationComponentTLSSettings(nil, tt.component)
+			got, err := tt.adapter.ComponentTLSSettings(nil, tt.component)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 

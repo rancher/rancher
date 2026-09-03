@@ -3,8 +3,6 @@ package certificaterotation
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -598,74 +596,6 @@ func serviceRequested(requested []string, service string) bool {
 	return false
 }
 
-// renderCertificateRotationComponentProbes applies certificate-rotation-specific
-// controller-manager and scheduler settings after the adapter has rendered its
-// normal probe set. This keeps the shared probe behavior unchanged for other
-// operations while allowing this operation to use explicit component TLS paths
-// and secure ports from the target node's effective configuration.
-func renderCertificateRotationComponentProbes(s *scope, secret *corev1.Secret, probes map[string]plan.Probe) (map[string]plan.Probe, error) {
-	if !ops.IsControlPlane(secret) {
-		return probes, nil
-	}
-
-	components := []struct {
-		name           string
-		defaultPort    string
-		defaultCertDir string
-		defaultCert    string
-	}{
-		{
-			name:           ops.KubeControllerManagerProbeName,
-			defaultPort:    ops.DefaultKubeControllerManagerPort,
-			defaultCertDir: ops.DefaultKubeControllerManagerCertDir,
-			defaultCert:    ops.DefaultKubeControllerManagerCert,
-		},
-		{
-			name:           ops.KubeSchedulerProbeName,
-			defaultPort:    ops.DefaultKubeSchedulerPort,
-			defaultCertDir: ops.DefaultKubeSchedulerCertDir,
-			defaultCert:    ops.DefaultKubeSchedulerCert,
-		},
-	}
-
-	for _, component := range components {
-		probe, ok := probes[component.name]
-		if !ok {
-			return probes, fmt.Errorf("certificate rotation probe %q is missing for %s/%s", component.name, secret.Namespace, secret.Name)
-		}
-
-		settings, err := s.adapter.CertificateRotationComponentTLSSettings(secret, component.name)
-		if err != nil {
-			return probes, err
-		}
-
-		certPath := settings.TLSCertFile
-		if certPath == "" {
-			certPath = path.Join(s.adapter.DistroDataDirectory(secret), component.defaultCertDir, component.defaultCert)
-		}
-		port := settings.SecurePort
-		if port == "" {
-			port = component.defaultPort
-		}
-
-		parsedURL, err := url.Parse(probe.HTTPGetAction.URL)
-		if err != nil {
-			return probes, fmt.Errorf("parse %s probe URL for %s/%s: %w", component.name, secret.Namespace, secret.Name, err)
-		}
-		host := parsedURL.Hostname()
-		if host == "" {
-			return probes, fmt.Errorf("%s probe URL has no host for %s/%s", component.name, secret.Namespace, secret.Name)
-		}
-
-		probe.HTTPGetAction.CACert = certPath
-		parsedURL.Host = net.JoinHostPort(host, port)
-		probe.HTTPGetAction.URL = parsedURL.String()
-		probes[component.name] = probe
-	}
-
-	return probes, nil
-}
-
 // componentCertificateCleanupInstructions builds default certificate/key cleanup
 // instructions for controller-manager and scheduler on one node. services must already be
 // narrowed to the ones that apply to secret's node.
@@ -675,11 +605,11 @@ func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, se
 	runtime := s.adapter.RuntimeCommand()
 	dataDir := s.adapter.DistroDataDirectory(secret)
 
-	controllerManagerSettings, err := s.adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
+	controllerManagerSettings, err := s.adapter.ComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
 	if err != nil {
 		return nil, err
 	}
-	schedulerSettings, err := s.adapter.CertificateRotationComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
+	schedulerSettings, err := s.adapter.ComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
 	if err != nil {
 		return nil, err
 	}
@@ -857,10 +787,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		// Plans are processed serially. Returning while one plan is waiting ensures
 		// the next node is not disrupted until this node has applied and passed probes.
 		probes, err := s.adapter.RenderProbes(secret, true)
-		if err != nil {
-			return status, err
-		}
-		probes, err = renderCertificateRotationComponentProbes(s, secret, probes)
 		if err != nil {
 			return status, err
 		}

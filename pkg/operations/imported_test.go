@@ -490,7 +490,7 @@ func TestImportedAdapter_ComponentTLSSettingsFromNodeArgs(t *testing.T) {
 	}
 }
 
-// --- CertificateRotationComponentTLSSettings error handling --------------------------------
+// --- ComponentTLSSettings error handling --------------------------------
 
 // fakeRESTMapper is a minimal RESTMapper implementation for testing
 type fakeRESTMapper struct {
@@ -505,7 +505,7 @@ func (f *fakeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 	}, nil
 }
 
-func TestImportedAdapter_CertificateRotationComponentTLSSettings_NodeNotFound(t *testing.T) {
+func TestImportedAdapter_ComponentTLSSettings_NodeNotFound(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -540,13 +540,13 @@ func TestImportedAdapter_CertificateRotationComponentTLSSettings_NodeNotFound(t 
 		},
 	}
 
-	_, err := adapter.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+	_, err := adapter.ComponentTLSSettings(secret, KubeControllerManagerProbeName)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to find")
 	assert.Contains(t, err.Error(), "c-mine/node-a")
 }
 
-func TestImportedAdapter_CertificateRotationComponentTLSSettings_MalformedJSON(t *testing.T) {
+func TestImportedAdapter_ComponentTLSSettings_MalformedJSON(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -592,13 +592,13 @@ func TestImportedAdapter_CertificateRotationComponentTLSSettings_MalformedJSON(t
 		},
 	}
 
-	_, err := adapter.CertificateRotationComponentTLSSettings(secret, KubeSchedulerProbeName)
+	_, err := adapter.ComponentTLSSettings(secret, KubeSchedulerProbeName)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to parse")
 	assert.Contains(t, err.Error(), "rke2.io/node-args")
 }
 
-func TestImportedAdapter_CertificateRotationComponentTLSSettings_IgnoresMalformedNodeEnv(t *testing.T) {
+func TestImportedAdapter_ComponentTLSSettings_IgnoresMalformedNodeEnv(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -645,12 +645,79 @@ func TestImportedAdapter_CertificateRotationComponentTLSSettings_IgnoresMalforme
 		},
 	}
 
-	settings, err := adapter.CertificateRotationComponentTLSSettings(secret, KubeControllerManagerProbeName)
+	settings, err := adapter.ComponentTLSSettings(secret, KubeControllerManagerProbeName)
 	assert.NoError(t, err)
 	assert.Equal(t, ComponentTLSSettings{}, settings)
 
 	dataDir := adapter.DistroDataDirectory(secret)
 	assert.Equal(t, defaultRKE2DataDirectory, dataDir)
+}
+
+// --- RenderProbes ------------------------------------------------------
+
+func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "c-mine",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "node-a",
+				capr.ControlPlaneRoleLabel:              "true",
+			},
+		},
+	}
+
+	node := &mgmtv3.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "node-a",
+			Namespace: "c-mine",
+		},
+		Status: mgmtv3.NodeStatus{
+			NodeAnnotations: map[string]string{
+				// A custom secure-port and TLS cert for controller-manager; scheduler only
+				// overrides its secure-port and keeps the default cert path.
+				rke2NodeArgsAnnotation: `["--kube-controller-manager-arg","secure-port=10261",` +
+					`"--kube-controller-manager-arg","tls-cert-file=/custom/kcm.crt",` +
+					`"--kube-scheduler-arg","secure-port=10262"]`,
+			},
+		},
+	}
+
+	// RenderProbes reads node args twice: once via DistroDataDirectory, once to compute the
+	// effective component TLS settings for the probes.
+	nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil).Times(2)
+
+	stubMgmt := &stubMgmtInterface{nodeCache: nodeCache}
+	adapter := &ImportedAdapter{
+		cluster: &mgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+			Status:     mgmtv3.ClusterStatus{Provider: "rke2"},
+		},
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt:       stubMgmt,
+				RESTMapper: &fakeRESTMapper{},
+			},
+		},
+	}
+
+	probes, err := adapter.RenderProbes(secret, false)
+	assert.NoError(t, err)
+
+	kcm := probes[KubeControllerManagerProbeName]
+	assert.Equal(t, "https://127.0.0.1:10261/healthz", kcm.HTTPGetAction.URL)
+	assert.Equal(t, "/custom/kcm.crt", kcm.HTTPGetAction.CACert)
+
+	scheduler := probes[KubeSchedulerProbeName]
+	assert.Equal(t, "https://127.0.0.1:10262/healthz", scheduler.HTTPGetAction.URL)
+	assert.Equal(t, "/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt", scheduler.HTTPGetAction.CACert)
 }
 
 // --- importedDistroDataDirectory tests --------------------------------

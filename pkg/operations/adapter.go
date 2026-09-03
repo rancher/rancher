@@ -206,9 +206,11 @@ type Adapter interface {
 	// supervisor probe to fail.
 	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
 
-	// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
-	// TLS argument settings for the node represented by secret.
-	CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error)
+	// ComponentTLSSettings returns the effective scheduler/controller-manager TLS argument
+	// settings configured for the node represented by secret. Callers can use these settings to
+	// match component probes to their configured certificate and secure port, and to avoid
+	// clobbering an explicitly configured TLS pair during cleanup.
+	ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error)
 
 	// KubectlPath returns the path to the kubectl binary on the host relative to the machine-plan secret.
 	KubectlPath(secret *corev1.Secret) string

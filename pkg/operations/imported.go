@@ -518,14 +518,29 @@ func componentTLSSettingsFromNodeArgs(args []string, component string) Component
 	return settings
 }
 
-// CertificateRotationComponentTLSSettings returns scheduler/controller-manager
-// TLS settings parsed from the imported node's effective runtime arguments.
-func (a *ImportedAdapter) CertificateRotationComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings parsed from the
+// imported node's effective runtime arguments.
+func (a *ImportedAdapter) ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
 	args, err := a.nodeArgs(secret)
 	if err != nil {
 		return ComponentTLSSettings{}, err
 	}
 	return componentTLSSettingsFromNodeArgs(args, component), nil
+}
+
+// renderSecureProbeFromSettings applies TLS certificate and secure-port settings parsed from an
+// imported node's runtime arguments. RenderProbes reads node args once and reuses the parsed
+// settings for both component probes.
+func renderSecureProbeFromSettings(settings ComponentTLSSettings, probe plan.Probe, dataDir, loopbackAddress, defaultSecurePort, defaultCertDir, defaultCert string) (plan.Probe, error) {
+	securePort := settings.SecurePort
+	if securePort == "" {
+		securePort = defaultSecurePort
+	}
+	tlsCert := settings.TLSCertFile
+	if tlsCert == "" {
+		tlsCert = path.Join(dataDir, defaultCertDir, defaultCert)
+	}
+	return ReplaceCACertAndPortForProbes(probe, tlsCert, loopbackAddress, securePort)
 }
 
 func (a *ImportedAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -583,13 +598,23 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	probes = InsertDataDirForProbes(dataDir, probes)
 
 	if IsControlPlane(secret) {
-		kcmProbe, err := renderSecureProbe("", probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		// Use the node's actual configured TLS cert and secure-port for these probes; a
+		// probe built from defaults alone can fail even when the component is healthy if
+		// the user configured either setting explicitly.
+		args, err := a.nodeArgs(secret)
+		if err != nil {
+			return probes, err
+		}
+
+		kcmSettings := componentTLSSettingsFromNodeArgs(args, KubeControllerManagerProbeName)
+		kcmProbe, err := renderSecureProbeFromSettings(kcmSettings, probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
-		ksProbe, err := renderSecureProbe("", probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksSettings := componentTLSSettingsFromNodeArgs(args, KubeSchedulerProbeName)
+		ksProbe, err := renderSecureProbeFromSettings(ksSettings, probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return probes, err
 		}
