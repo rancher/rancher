@@ -43,6 +43,12 @@ const (
 	hostRegex    = "[A-Za-z0-9-]+"
 	CSP          = "Content-Security-Policy"
 	XContentType = "X-Content-Type-Options"
+
+	MatchScoreExcellent = 3
+	MatchScoreGood      = 2
+	MatchScoreFair      = 1
+	MatchScorePoor      = 0
+	MatchScoreLowest    = -1
 )
 
 var (
@@ -412,50 +418,74 @@ func isOverlyBroad(pattern string) bool {
 	return targetLabel == "*" || targetLabel == "%"
 }
 
-// findMatchingRoute returns the first ProxyEndpointRoute whose domain pattern matches host,
-// or nil if no match is found. It uses the same wildcard/regex logic as isAllowed.
+// findMatchingRoute returns the most-specific ProxyEndpointRoute whose domain pattern matches host,
+// or nil if no match is found.
+//
+// Specificity order:
+// 1. exact domain match
+// 2. single-segment wildcard (%) pattern match
+// 3. prefix wildcard (*) pattern match
+//
+// Within the same class, the longer pattern wins.
 func (p *proxy) findMatchingRoute(host string) *mgmt.ProxyEndpointRoute {
 	endpoints, err := p.proxyEndpointCache.List(labels.Everything())
 	if err != nil {
 		logrus.Debugf("httpproxy: failed to list ProxyEndpoints for route lookup: %v", err)
 		return nil
 	}
+	var best *mgmt.ProxyEndpointRoute
+	bestScore := MatchScoreLowest
+	bestPatternLen := -1
 	for _, ep := range endpoints {
 		for i := range ep.Spec.Routes {
 			route := &ep.Spec.Routes[i]
-			if routeMatchesHost(route.Domain, host) {
-				return route
+			score, matches := routeMatchScore(route.Domain, host)
+			if !matches {
+				continue
+			}
+			if score > bestScore || (score == bestScore && len(route.Domain) > bestPatternLen) {
+				best = route
+				bestScore = score
+				bestPatternLen = len(route.Domain)
 			}
 		}
 	}
-	return nil
+	return best
 }
 
 // routeMatchesHost reports whether the domain pattern from a ProxyEndpointRoute matches host,
 // using the same rules as proxy.isAllowed.
 func routeMatchesHost(pattern, host string) bool {
+	_, matches := routeMatchScore(pattern, host)
+	return matches
+}
+
+// routeMatchScore returns a specificity score and whether pattern matches host.
+// Higher score means higher specificity.
+func routeMatchScore(pattern, host string) (int, bool) {
 	if pattern == host {
-		return true
+		return MatchScoreExcellent, true
 	}
 	if isOverlyBroad(pattern) {
-		return false
+		return MatchScorePoor, false
 	}
 	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(host, pattern[1:]) {
-		return true
+		return MatchScoreFair, true
 	}
 	if strings.Contains(pattern, ".%.") || strings.HasPrefix(pattern, "%.") {
-		return constructRegex(pattern).MatchString(host)
+		if constructRegex(pattern).MatchString(host) {
+			return MatchScoreGood, true
+		}
 	}
-	return false
+	return MatchScorePoor, false
 }
 
 // applyRouteInjection fetches the credential identified by credID in cAuth, then applies the
 // injection pattern defined on the matching ProxyEndpoint route to the outgoing request.
 func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt.ProxyEndpointRoute) error {
-	params := getRequestParams(cAuth)
-	credID := params["credID"]
+	credID := credentialIDFromCattleAuth(cAuth)
 	if credID == "" {
-		return fmt.Errorf("server-defined injection requires credID in %s header", CattleAuth)
+		return fmt.Errorf("server-defined injection requires credID (credential ID) in %s header", CattleAuth)
 	}
 	secretData, err := getCredential(credID, p.secretGetter(req, cAuth))
 	if err != nil {
