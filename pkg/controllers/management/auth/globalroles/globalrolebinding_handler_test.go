@@ -13,6 +13,7 @@ import (
 	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -2363,6 +2364,28 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 					return nil, nil
 				}
 				c.crbClient.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					return expectedCRB.DeepCopy(), nil
+				}
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: getCRBName("test-grb"),
+		},
+		{
+			name: "Fleet ClusterRoleBindings are excluded from primary ClusterRoleBinding cleanup",
+			setupControllers: func(t *testing.T, c controllers) {
+				c.crbLister.ListFunc = func(_ string, selector labels.Selector) ([]*rbacv1.ClusterRoleBinding, error) {
+					assert.True(t, selector.Matches(labels.Set{
+						grbOwnerLabel: testGRB.Name,
+						"authz.management.cattle.io/globalrolebinding": "true",
+					}))
+					assert.False(t, selector.Matches(labels.Set{
+						grbOwnerLabel:      testGRB.Name,
+						"some-other-label": "true",
+					}))
+					return []*rbacv1.ClusterRoleBinding{expectedCRB.DeepCopy()}, nil
+				}
+				c.crbLister.GetFunc = func(_ string, _ string) (*rbacv1.ClusterRoleBinding, error) {
 					return expectedCRB.DeepCopy(), nil
 				}
 			},
