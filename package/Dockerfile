@@ -86,6 +86,9 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
 
+# pkg/jailer expects /etc/nsswitch.conf; SLES 16 only ships it under /usr/etc.
+RUN cp /usr/etc/nsswitch.conf /etc/nsswitch.conf
+
 RUN useradd rancher && \
     groupadd jail-accessors && \
     usermod -aG jail-accessors rancher && \
@@ -124,9 +127,9 @@ ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.2.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.6
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=7db00430a1c047e6627681446a99219815156e971043ba7a22a083d69fafe44a
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=e536ded30af40bdfa53a1010e39dfe2f72f5add499b564b9516c1385ee3a98c5
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.8
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=8e4e87db069757755e19e205af4ed21dec086021191fe18c455761b3a92db2c6
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=17b1cec9a47a58f7404af4470c5ab1af1d8529905d6cc0f3ff3ed3a1c3981328
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
 ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.4
 ENV CATTLE_WINS_AGENT_CHECKSUM=a85b7ed9e088c1564c3b861b31f548e3166cff1fe4400b58fbab0534d6a4dd82
@@ -138,10 +141,10 @@ ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.15.0
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=e68913abef52f99b1aee3ccbfafdf49025859d921e89ec99af2244f876e99da0
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=c9f9b1a0237cd02179edc8f4f0922302994d08932d14e8c327bb1fdc632a2e87
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=2deaab5392ca8b24e52438be75fc1414db0bbb674c6e623e6d1fd86f227afc2a
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.0
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=447be6461274884ed24ee72f4552d7ea57fc1e28b24481e9608b47c70e3009eb
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=15d325159155135e3bd060c32475a7bb911e4ecc3270d233aa59f85236fa837c
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=8dbf0013663a08c31d31e8ebff4d94a6ac8fc6e986091356c23bd3ea165e7e01
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -191,7 +194,7 @@ RUN case "${ARCH}" in \
 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.3-k3s1 \
+COPY --from=rancher/k3s:v1.36.4-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \

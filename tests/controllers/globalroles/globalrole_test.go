@@ -88,7 +88,9 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 	s.managementContext, err = scaledContext.NewManagementContext()
 	assert.NoError(s.T(), err)
 
-	// Register controller
+	// Register controller. The indexers shared with the downstream controllers are registered
+	// separately on every replica, and the enqueuers wired by Register depend on them.
+	globalroles.RegisterWranglerIndexers(s.managementContext.Wrangler.Mgmt.GlobalRoleBinding().Cache())
 	globalroles.Register(s.ctx, s.managementContext, clusterManager)
 
 	// Start controllers

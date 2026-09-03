@@ -2,15 +2,16 @@ package provider
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/labels"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"testing"
 )
 
 func TestMiddleware(t *testing.T) {
@@ -112,10 +113,8 @@ func TestMiddleware(t *testing.T) {
 				"Referrer-Policy":              []string{"strict-origin-when-cross-origin"},
 				"Strict-Transport-Security":    []string{"max-age=31536000"},
 				"Access-Control-Allow-Methods": []string{"GET, POST"},
-				"Content-Type":                 []string{"application/json"},
 			},
-			expectedCallNext: false,
-			expectedBody:     `{"error":"server_error","error_description":"no OIDCClients configured"}`,
+			expectedCallNext: true,
 		},
 	}
 
