@@ -5,8 +5,34 @@ import (
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 )
+
+// --- RuntimeService ---------------------------------------------------------------------------
+
+func TestCAPRKE2Adapter_RuntimeService(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		secret *corev1.Secret
+		want   string
+	}{
+		{"control-plane", newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}), "rke2-server"},
+		{"etcd", newSecret(map[string]string{capr.EtcdRoleLabel: "true"}), "rke2-server"},
+		{"worker-only", newSecret(map[string]string{capr.WorkerRoleLabel: "true"}), "rke2-agent"},
+	}
+
+	a := &CAPRKE2Adapter{}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := a.RuntimeService(tc.secret)
+			assert.Equal(t, tc.want, got, "RuntimeService mismatch for %s", tc.name)
+		})
+	}
+}
 
 // --- CertificateRotationComponentTLSSettings ------------------------------------------------
 

@@ -174,6 +174,11 @@ type Adapter interface {
 	// ServerUnit returns the systemd unit name for a distro server node.
 	ServerUnit() string
 
+	// RuntimeService returns the runtime service to restart on the node represented by secret:
+	// the server service on control-plane/etcd nodes, or the runtime agent service on worker-only
+	// nodes.
+	RuntimeService(secret *corev1.Secret) string
+
 	// DistroDataDirectory returns the path to the RKE2/K3s data-dir on the host machine.
 	DistroDataDirectory(secret *corev1.Secret) string
 

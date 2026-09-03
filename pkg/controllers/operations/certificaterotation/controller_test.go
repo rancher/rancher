@@ -52,8 +52,14 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) { retu
 func (a *stubAdapter) WaitForRegister() (bool, error)                     { return true, nil }
 func (a *stubAdapter) PauseCluster(bool) error                            { return nil }
 func (a *stubAdapter) ServerUnit() string                                 { return a.runtime }
-func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string                 { return "" }
-func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string            { return "" }
+func (a *stubAdapter) RuntimeService(secret *corev1.Secret) string {
+	if ops.IsControlPlane(secret) || ops.IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.runtime + "-agent"
+}
+func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string      { return "" }
+func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string { return "" }
 func (a *stubAdapter) RenderProbes(*corev1.Secret, bool) (map[string]plan.Probe, error) {
 	return map[string]plan.Probe{}, nil
 }

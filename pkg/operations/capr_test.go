@@ -76,6 +76,37 @@ func TestCAPRAdapter_ServerUnit(t *testing.T) {
 	}
 }
 
+func TestCAPRAdapter_RuntimeService(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		k8sVersion string
+		secret     *corev1.Secret
+		want       string
+	}{
+		{"rke2 control-plane", "v1.28.5+rke2r1", newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}), "rke2-server"},
+		{"rke2 etcd", "v1.28.5+rke2r1", newSecret(map[string]string{capr.EtcdRoleLabel: "true"}), "rke2-server"},
+		{"rke2 worker-only", "v1.28.5+rke2r1", newSecret(map[string]string{capr.WorkerRoleLabel: "true"}), "rke2-agent"},
+		{"k3s control-plane", "v1.28.5+k3s1", newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}), "k3s"},
+		{"k3s worker-only", "v1.28.5+k3s1", newSecret(map[string]string{capr.WorkerRoleLabel: "true"}), "k3s-agent"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &CAPRAdapter{
+				controlPlane: &rkev1.RKEControlPlane{
+					Spec: rkev1.RKEControlPlaneSpec{
+						KubernetesVersion: tc.k8sVersion,
+					},
+				},
+			}
+			got := a.RuntimeService(tc.secret)
+			assert.Equal(t, tc.want, got, "RuntimeService mismatch for %s", tc.name)
+		})
+	}
+}
+
 func TestCAPRAdapter_CertificateRotationComponentTLSSettings_RenderConfigError(t *testing.T) {
 	t.Parallel()
 

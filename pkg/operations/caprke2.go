@@ -204,6 +204,15 @@ func (a *CAPRKE2Adapter) ServerUnit() string {
 	return "rke2-server"
 }
 
+// RuntimeService returns the systemd unit responsible for RKE2 on the node represented by
+// secret: ServerUnit on control-plane/etcd nodes, or the RKE2 agent unit on worker-only nodes.
+func (a *CAPRKE2Adapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.RuntimeCommand() + "-agent"
+}
+
 // extraArgsFor returns the ExtraArgs slice for the named control-plane component, or nil when
 // the component is unset on the RKE2ControlPlane spec. The result is passed into
 // renderSecureProbe (which accepts `any`) to drive --secure-port / --tls-cert-file / --cert-dir

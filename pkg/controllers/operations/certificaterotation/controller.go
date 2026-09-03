@@ -527,11 +527,6 @@ func operationEnv(op *opv1alpha1.CertificateRotation, step opv1alpha1.Certificat
 	}
 }
 
-// runtimeAgentUnit returns the expected agent unit name for a given runtime command.
-func runtimeAgentUnit(runtime string) string {
-	return runtime + "-agent"
-}
-
 // servicesApply reports whether at least one of the requested services applies to the node described by secret.
 func servicesApply(requested []string, secret *corev1.Secret) bool {
 	if len(requested) == 0 {
@@ -837,7 +832,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		}
 
 		runtime := s.adapter.RuntimeCommand()
-		serverUnit := s.adapter.ServerUnit()
+		runtimeService := s.adapter.RuntimeService(secret)
 
 		var nodePlan plan.Plan
 
@@ -847,7 +842,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 			dataDir := s.adapter.DistroDataDirectory(secret)
 			files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
-			oneTime := certificateRotationStopInstructions(provisioningDir, string(s.op.UID), serverUnit, env)
+			oneTime := certificateRotationStopInstructions(provisioningDir, string(s.op.UID), runtimeService, env)
 			// Keep stop and rotate as separate idempotent instructions. A retry can
 			// resume safely without rerunning an instruction already applied by the agent.
 			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, s.op.Spec.Args.Services, env)...)
@@ -868,7 +863,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 			// Restarting the server activates the rotated certificates and lets the
 			// probes verify that its local control-plane components recovered.
-			oneTime = append(oneTime, linuxIdempotentRestartInstructions(provisioningDir, "certificate-rotation", string(s.op.UID), serverUnit)...)
+			oneTime = append(oneTime, linuxIdempotentRestartInstructions(provisioningDir, "certificate-rotation", string(s.op.UID), runtimeService)...)
 
 			nodePlan = plan.Plan{
 				Files:               files,
@@ -878,7 +873,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		} else {
 			// Workers do not rotate server certificates, but their runtime agent must
 			// restart so it reconnects using the updated cluster certificates.
-			agentUnit := runtimeAgentUnit(runtime)
 			if ops.IsWindows(secret) {
 				// Windows uses a service restart instruction rather than Linux systemctl.
 				files := []plan.File{windowsIdempotentScriptFile()}
@@ -891,7 +885,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			} else {
 				provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 				files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
-				oneTime := linuxIdempotentRestartInstructions(provisioningDir, "certificate-rotation", string(s.op.UID), agentUnit)
+				oneTime := linuxIdempotentRestartInstructions(provisioningDir, "certificate-rotation", string(s.op.UID), runtimeService)
 				nodePlan = plan.Plan{
 					Files:               files,
 					OneTimeInstructions: oneTime,

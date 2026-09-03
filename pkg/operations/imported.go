@@ -281,6 +281,16 @@ func (a *ImportedAdapter) ServerUnit() string {
 	return capr.RuntimeK3S
 }
 
+// RuntimeService returns the systemd unit responsible for the runtime on the node represented
+// by secret: ServerUnit on control-plane/etcd nodes, or the runtime agent unit on worker-only
+// nodes.
+func (a *ImportedAdapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.RuntimeCommand() + "-agent"
+}
+
 // managementNodeForSecret resolves the machine-plan Secret -> lifecycle labels ->
 // management Node cache lookup chain. Returns (nil, nil) when the secret carries no
 // lifecycle labels.

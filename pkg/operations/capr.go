@@ -192,6 +192,16 @@ func (a *CAPRAdapter) ServerUnit() string {
 	return "k3s"
 }
 
+// RuntimeService returns the systemd unit responsible for the runtime on the node represented
+// by secret: ServerUnit on control-plane/etcd nodes, or the runtime agent unit on worker-only
+// nodes.
+func (a *CAPRAdapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.RuntimeCommand() + "-agent"
+}
+
 // componentTLSSettingsFromRenderedConfig extracts scheduler/controller-manager
 // TLS settings from a rendered CAPR config map.
 func componentTLSSettingsFromRenderedConfig(config map[string]any, component string) ComponentTLSSettings {

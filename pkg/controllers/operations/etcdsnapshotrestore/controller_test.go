@@ -47,6 +47,7 @@ func (a *stubAdapter) RuntimeCommand() string                            { retur
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string       { return a.dataDir }
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
 func (a *stubAdapter) ServerUnit() string                                { return a.serverUnit }
+func (a *stubAdapter) RuntimeService(_ *corev1.Secret) string            { return a.serverUnit }
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return map[string]rkeplan.Probe{}, nil
 }

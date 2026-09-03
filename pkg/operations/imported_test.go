@@ -76,6 +76,37 @@ func TestImportedAdapter_ServerUnit(t *testing.T) {
 	}
 }
 
+func TestImportedAdapter_RuntimeService(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		provider string
+		secret   *corev1.Secret
+		want     string
+	}{
+		{"rke2 control-plane", "rke2", &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{capr.ControlPlaneRoleLabel: "true"}}}, "rke2-server"},
+		{"rke2 etcd", "rke2", &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{capr.EtcdRoleLabel: "true"}}}, "rke2-server"},
+		{"rke2 worker-only", "rke2", &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{capr.WorkerRoleLabel: "true"}}}, "rke2-agent"},
+		{"k3s control-plane", "k3s", &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{capr.ControlPlaneRoleLabel: "true"}}}, "k3s"},
+		{"k3s worker-only", "k3s", &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{capr.WorkerRoleLabel: "true"}}}, "k3s-agent"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &ImportedAdapter{
+				cluster: &mgmtv3.Cluster{
+					Status: mgmtv3.ClusterStatus{
+						Provider: tc.provider,
+					},
+				},
+			}
+			got := a.RuntimeService(tc.secret)
+			assert.Equal(t, tc.want, got, "RuntimeService mismatch for %s", tc.name)
+		})
+	}
+}
+
 // --- WaitForRegister ------------------------------------------------------------------------
 
 func newImportedMachinePlanSecret(name, machineName string) *corev1.Secret {
