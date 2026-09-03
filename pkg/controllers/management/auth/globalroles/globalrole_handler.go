@@ -167,7 +167,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 	}
 
 	clusterRoles, err := gr.crClient.List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", grOwnerLabel, globalRole.Name),
+		LabelSelector: fmt.Sprintf("%s=%s,%s=true", grOwnerLabel, globalRole.Name, globalRoleLabel),
 	})
 	if err != nil {
 		err = fmt.Errorf("couldn't list ClusterRoles for globalRole %v: %w", globalRole.Name, err)
