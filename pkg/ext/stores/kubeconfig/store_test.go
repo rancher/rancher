@@ -3640,6 +3640,182 @@ func TestStoreDelete(t *testing.T) {
 		assert.Contains(t, err.Error(), "the object has been modified", "error must include the standard optimistic-lock message")
 		assert.Contains(t, err.Error(), "already revoked", "error must mention that tokens are already revoked")
 	})
+	t.Run("configmap already garbage-collected after token deletion reports success", func(t *testing.T) {
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["token-gone"]`
+		cm.OwnerReferences = append(cm.OwnerReferences, metav1.OwnerReference{
+			APIVersion: "v1",
+			Kind:       "Secret",
+			Name:       "token-gone",
+			UID:        uuid.NewUUID(),
+		})
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Delete(namespace, cm.Name, gomock.Any()).Return(
+			apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, cm.Name),
+		).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      &fakeTokenStore{},
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		kc, convErr := store.fromConfigMap(cm)
+		require.NoError(t, convErr)
+		obj, deleted, err := store.delete(context.Background(), kc, cm, nil, &metav1.DeleteOptions{})
+		require.NoError(t, err, "the garbage collector deleting the configmap must not surface as an error")
+		assert.True(t, deleted)
+		assert.Equal(t, kc, obj)
+	})
+	t.Run("configmap garbage-collected through a legacy token owner reports success", func(t *testing.T) {
+		// Kubeconfigs created before the migration to ext tokens are owned by a
+		// v3 Token, which the garbage collector follows just as well.
+		cm := configMap.DeepCopy()
+		tokenName := cm.OwnerReferences[0].Name
+		require.Equal(t, "Token", cm.OwnerReferences[0].Kind, "fixture must carry the legacy Token owner reference")
+		cm.Data[StatusTokensField] = `["` + tokenName + `"]`
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Delete(namespace, cm.Name, gomock.Any()).Return(
+			apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, cm.Name),
+		).Times(1)
+
+		// A token that exists only as a v3 Token is not found in the ext store,
+		// which is what sends the delete down the v3 fallback.
+		extTokenStore := &fakeTokenStore{deleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+			return apierrors.NewNotFound(gvr.GroupResource(), name)
+		}}
+		v3TokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+		v3TokenClient.EXPECT().Delete(tokenName, gomock.Any()).Return(nil).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      extTokenStore,
+			v3Tokens:        v3TokenClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		kc, convErr := store.fromConfigMap(cm)
+		require.NoError(t, convErr)
+		_, deleted, err := store.delete(context.Background(), kc, cm, nil, &metav1.DeleteOptions{})
+		require.NoError(t, err)
+		assert.True(t, deleted)
+	})
+	t.Run("configmap owned by an unrelated token reports not found", func(t *testing.T) {
+		// The owner is of the right kind but names a token this call did not
+		// delete, so it cannot have been collected on this call's account.
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["token-mine"]`
+		require.NotEqual(t, "token-mine", cm.OwnerReferences[0].Name)
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Delete(namespace, cm.Name, gomock.Any()).Return(
+			apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, cm.Name),
+		).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      &fakeTokenStore{},
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		kc, convErr := store.fromConfigMap(cm)
+		require.NoError(t, convErr)
+		_, _, err := store.delete(context.Background(), kc, cm, nil, &metav1.DeleteOptions{})
+		require.Error(t, err)
+		assert.True(t, apierrors.IsNotFound(err), "must be NotFound, got %v", err)
+	})
+	t.Run("configmap missing without a token owner reports not found", func(t *testing.T) {
+		// A kubeconfig that lists tokens but records no owner for them, because
+		// the owner reference could not be read when it was created, has nothing
+		// the garbage collector can act on. A missing ConfigMap there is
+		// somebody else's delete, not this one's.
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["token-unowned"]`
+		cm.OwnerReferences = nil
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Delete(namespace, cm.Name, gomock.Any()).Return(
+			apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, cm.Name),
+		).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      &fakeTokenStore{},
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		kc, convErr := store.fromConfigMap(cm)
+		require.NoError(t, convErr)
+		_, _, err := store.delete(context.Background(), kc, cm, nil, &metav1.DeleteOptions{})
+		require.Error(t, err)
+		assert.True(t, apierrors.IsNotFound(err), "must be NotFound, got %v", err)
+	})
+	t.Run("dry-run delete of a missing configmap reports not found", func(t *testing.T) {
+		// A dry run deletes no tokens, so nothing can have been collected and
+		// the success shortcut must not apply.
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["token-dry"]`
+		cm.OwnerReferences = append(cm.OwnerReferences, metav1.OwnerReference{
+			APIVersion: "v1",
+			Kind:       "Secret",
+			Name:       "token-dry",
+			UID:        uuid.NewUUID(),
+		})
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Delete(namespace, cm.Name, gomock.Any()).Return(
+			apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, cm.Name),
+		).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      &fakeTokenStore{},
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		kc, convErr := store.fromConfigMap(cm)
+		require.NoError(t, convErr)
+		_, _, err := store.delete(context.Background(), kc, cm, nil, &metav1.DeleteOptions{
+			DryRun: []string{metav1.DryRunAll},
+		})
+		require.Error(t, err)
+		assert.True(t, apierrors.IsNotFound(err), "must be NotFound, got %v", err)
+	})
+	t.Run("configmap missing without token deletion reports not found", func(t *testing.T) {
+		cm := configMap.DeepCopy()
+		require.NotContains(t, cm.Data, StatusTokensField, "fixture must list no tokens")
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Delete(namespace, cm.Name, gomock.Any()).Return(
+			apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, cm.Name),
+		).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      &fakeTokenStore{},
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		kc, convErr := store.fromConfigMap(cm)
+		require.NoError(t, convErr)
+		_, _, err := store.delete(context.Background(), kc, cm, nil, &metav1.DeleteOptions{})
+		require.Error(t, err, "a kubeconfig with no tokens has no owner to be collected by")
+		assert.True(t, apierrors.IsNotFound(err), "must be NotFound, got %v", err)
+	})
 	t.Run("user can't delete other user's kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
@@ -3871,6 +4047,46 @@ func TestStoreDeleteCollection(t *testing.T) {
 		assert.Equal(t, kubeconfigID2, list.Items[0].Name)
 	})
 
+	t.Run("reports an item garbage-collected after its tokens were deleted", func(t *testing.T) {
+		deleteOptions := &metav1.DeleteOptions{}
+		listOptions := &metainternalversion.ListOptions{}
+
+		cm := configMap.DeepCopy()
+		cm.Data[StatusTokensField] = `["token-collected"]`
+		cm.OwnerReferences = append(cm.OwnerReferences, metav1.OwnerReference{
+			APIVersion: "v1",
+			Kind:       "Secret",
+			Name:       "token-collected",
+			UID:        uuid.NewUUID(),
+		})
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().List(namespace, gomock.Any()).Return(&corev1.ConfigMapList{
+			ListMeta: metav1.ListMeta{ResourceVersion: "2"},
+			Items:    []corev1.ConfigMap{*cm},
+		}, nil).Times(1)
+		configMapClient.EXPECT().Delete(namespace, kubeconfigID, gomock.Any()).Return(
+			apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, kubeconfigID),
+		).Times(1)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			tokenStore:      &fakeTokenStore{},
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		ctx := userContext(adminID, "")
+
+		obj, err := store.DeleteCollection(ctx, nil, deleteOptions, listOptions)
+		require.NoError(t, err)
+		require.IsType(t, &ext.KubeconfigList{}, obj)
+		list := obj.(*ext.KubeconfigList)
+		require.Len(t, list.Items, 1, "this call deleted the kubeconfig, so it belongs in the result")
+		assert.Equal(t, kubeconfigID, list.Items[0].Name)
+	})
+
 	t.Run("surfaces genuine error unchanged", func(t *testing.T) {
 		deleteOptions := &metav1.DeleteOptions{}
 		listOptions := &metainternalversion.ListOptions{}
@@ -4021,6 +4237,16 @@ func TestPrintKubeconfig(t *testing.T) {
 		assert.Equal(t, kubeconfig.Labels[UserIDLabel], row.Cells[5].(string))
 		assert.Equal(t, "c-m-tbgzfbgf,c-m-bxn2p7w6", row.Cells[6].(string))
 		assert.Equal(t, kubeconfig.Spec.Description, row.Cells[7].(string))
+	})
+	t.Run("owner reference for an unlisted token is not counted", func(t *testing.T) {
+		kubeconfig := kubeconfig.DeepCopy()
+		kubeconfig.OwnerReferences[0].Name = "kubeconfig-u-w7drcnotmine"
+
+		rows, err := printKubeconfig(kubeconfig, printers.GenerateOptions{})
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, "0/2", rows[0].Cells[2].(string),
+			"the count must agree with what delete treats as an owner")
 	})
 	t.Run("missing age and status", func(t *testing.T) {
 		kubeconfig := kubeconfig.DeepCopy()
