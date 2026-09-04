@@ -53,7 +53,7 @@ func GetAndVerifyDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*
 		return err
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify downstream clientset: %v", err)
+		return nil, fmt.Errorf("failed to verify downstream clientset: %w", err)
 	}
 
 	return clientset, nil

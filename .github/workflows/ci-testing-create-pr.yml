@@ -117,7 +117,7 @@ jobs:
           echo "This PR is for CI testing purposes only and can be ignored." > pr_body.txt
           echo "" >> pr_body.txt
           echo "MAX_CI_ATTEMPTS: \`$MAX_ATTEMPTS\`" >> pr_body.txt
-          echo "PROVISIONING_TESTS_SCOPE: \`$PROVISIONING_TEST_SCOPE\`" >> pr_body.txt
+          echo "PROVISIONING_TESTS_SCOPE: \`$PROVISIONING_TESTS_SCOPE\`" >> pr_body.txt
 
           if [[ -n "$INCLUDE_PATTERNS" ]]; then
             echo "INCLUDE_PATTERNS: \`$INCLUDE_PATTERNS\`" >> pr_body.txt
