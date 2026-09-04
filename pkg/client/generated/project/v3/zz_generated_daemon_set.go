@@ -21,6 +21,7 @@ const (
 	DaemonSetFieldDaemonSetStatus               = "daemonSetStatus"
 	DaemonSetFieldEnableServiceLinks            = "enableServiceLinks"
 	DaemonSetFieldEphemeralContainers           = "ephemeralContainers"
+	DaemonSetFieldEvictionResponders            = "evictionResponders"
 	DaemonSetFieldFSGroupChangePolicy           = "fsGroupChangePolicy"
 	DaemonSetFieldFsgid                         = "fsgid"
 	DaemonSetFieldGids                          = "gids"
@@ -92,6 +93,7 @@ type DaemonSet struct {
 	DaemonSetStatus               *DaemonSetStatus               `json:"daemonSetStatus,omitempty" yaml:"daemonSetStatus,omitempty"`
 	EnableServiceLinks            *bool                          `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	EphemeralContainers           []EphemeralContainer           `json:"ephemeralContainers,omitempty" yaml:"ephemeralContainers,omitempty"`
+	EvictionResponders            []EvictionResponder            `json:"evictionResponders,omitempty" yaml:"evictionResponders,omitempty"`
 	FSGroupChangePolicy           string                         `json:"fsGroupChangePolicy,omitempty" yaml:"fsGroupChangePolicy,omitempty"`
 	Fsgid                         *int64                         `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                        `json:"gids,omitempty" yaml:"gids,omitempty"`

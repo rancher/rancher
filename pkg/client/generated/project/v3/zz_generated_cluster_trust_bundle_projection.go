@@ -7,6 +7,7 @@ const (
 	ClusterTrustBundleProjectionFieldOptional      = "optional"
 	ClusterTrustBundleProjectionFieldPath          = "path"
 	ClusterTrustBundleProjectionFieldSignerName    = "signerName"
+	ClusterTrustBundleProjectionFieldUser          = "user"
 )
 
 type ClusterTrustBundleProjection struct {
@@ -15,4 +16,5 @@ type ClusterTrustBundleProjection struct {
 	Optional      *bool          `json:"optional,omitempty" yaml:"optional,omitempty"`
 	Path          string         `json:"path,omitempty" yaml:"path,omitempty"`
 	SignerName    string         `json:"signerName,omitempty" yaml:"signerName,omitempty"`
+	User          *int64         `json:"user,omitempty" yaml:"user,omitempty"`
 }

@@ -3,12 +3,14 @@ package client
 const (
 	NodeAllocatableResourceClaimStatusType                   = "nodeAllocatableResourceClaimStatus"
 	NodeAllocatableResourceClaimStatusFieldContainers        = "containers"
+	NodeAllocatableResourceClaimStatusFieldMapping           = "mapping"
+	NodeAllocatableResourceClaimStatusFieldOverhead          = "overhead"
 	NodeAllocatableResourceClaimStatusFieldResourceClaimName = "resourceClaimName"
-	NodeAllocatableResourceClaimStatusFieldResources         = "resources"
 )
 
 type NodeAllocatableResourceClaimStatus struct {
-	Containers        []string          `json:"containers,omitempty" yaml:"containers,omitempty"`
-	ResourceClaimName string            `json:"resourceClaimName,omitempty" yaml:"resourceClaimName,omitempty"`
-	Resources         map[string]string `json:"resources,omitempty" yaml:"resources,omitempty"`
+	Containers        []string                           `json:"containers,omitempty" yaml:"containers,omitempty"`
+	Mapping           []NodeAllocatableMappedResources   `json:"mapping,omitempty" yaml:"mapping,omitempty"`
+	Overhead          []NodeAllocatableOverheadResources `json:"overhead,omitempty" yaml:"overhead,omitempty"`
+	ResourceClaimName string                             `json:"resourceClaimName,omitempty" yaml:"resourceClaimName,omitempty"`
 }
