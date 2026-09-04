@@ -4077,7 +4077,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := userContext(adminID, "")
+		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{Name: adminID})
 
 		obj, err := store.DeleteCollection(ctx, nil, deleteOptions, listOptions)
 		require.NoError(t, err)
