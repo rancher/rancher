@@ -836,7 +836,7 @@ func Test_Provisioning_SetB_Single_Node_All_Roles_Drain(t *testing.T) {
 	}, 10*time.Minute, 10*time.Second, "cluster did not return to Ready after rollout")
 }
 
-func Test_Provisioning_SetA_Single_Node_Drain_Unhealthy_Replacement(t *testing.T) {
+func Test_Provisioning_SetB_Single_Node_Drain_Unhealthy_Replacement(t *testing.T) {
 	if capr.GetRuntime(defaults.SomeK8sVersion) != capr.RuntimeRKE2 {
 		t.Skip("this test injects an RKE2 control-plane probe failure")
 	}
