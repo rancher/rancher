@@ -431,7 +431,29 @@ if [ -z "${V2PROV_TEST_PARALLELISM}" ]; then
 fi
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -run "${V2PROV_TEST_RUN_REGEX}" -v -failfast -timeout 60m -p 3 -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
+
+# `go test -v` buffers each package's output and only releases it once that
+# package finishes, in package-list order. With 7 packages and `-p 3`
+# nothing reaches the log until the whole run is over.
+# `-json` is exempt from that buffering. The raw events are still stored in out.json
+# (and  the JUnit conversion uses `-parser gojson`), and they're rendered
+# back into the plaintext that `go test -v` produces for the live log and out.txt.
+#
+# The jq filter:
+#   -j            no extra newline; .Output already carries its own
+#   --unbuffered  flush every event instead of writing 64KB blocks
+#   try/catch     pass a line that isn't a JSON event through verbatim, so one
+#                 stray line can never swallow the rest of the run
+#   build-output  compiler errors arrive under this action, not "output"
+render_test_json() {
+  jq -j -R --unbuffered \
+    '. as $line | try ($line | fromjson | select(.Action == "output" or .Action == "build-output") | .Output) catch ($line + "\n")'
+}
+
+go test -run "${V2PROV_TEST_RUN_REGEX}" -json -failfast -timeout 60m -p 3 -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... 2>&1 \
+  | tee /tmp/out.json \
+  | render_test_json \
+  | tee /tmp/out.txt || {
      dump_rancher_logs
      exit 1
 }
