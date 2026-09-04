@@ -25,6 +25,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
@@ -67,6 +68,23 @@ var commonAuthorizer = authorizer.AuthorizerFunc(func(ctx context.Context, a aut
 		return authorizer.DecisionDeny, "", nil
 	}
 })
+
+// allowAllAuthorizer lets every request through, for tests that are about
+// something other than authorization.
+var allowAllAuthorizer = authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionAllow, "", nil
+})
+
+// userContext returns a request context for the named user. A non-empty tokenID
+// is attached as the token the request was authenticated with.
+func userContext(name, tokenID string) context.Context {
+	info := &k8suser.DefaultInfo{Name: name}
+	if tokenID != "" {
+		info.Extra = map[string][]string{common.ExtraRequestTokenID: {tokenID}}
+	}
+
+	return request.WithUser(context.Background(), info)
+}
 
 type fakeTokenManager struct {
 	sharedTokenKeys  []string
@@ -474,11 +492,33 @@ func TestStoreCreate(t *testing.T) {
 	options := &metav1.CreateOptions{}
 	tokenManager := &fakeTokenManager{}
 
-	t.Run("user creates a kubeconfig", func(t *testing.T) {
-		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
+	// newStore builds a store on the fixtures above, with authorization allowing
+	// everything. The three arguments are what the subtests below vary most; each
+	// opts function gets to change anything else.
+	newStore := func(configMapClient v1.ConfigMapClient, tokenStore tokenFetcher, tokenMgr tokenCreator, opts ...func(*Store)) *Store {
+		store := &Store{
+			mcmEnabled:          true,
+			authorizer:          allowAllAuthorizer,
+			nsCache:             nsCache,
+			configMapClient:     configMapClient,
+			userCache:           userCache,
+			tokenStore:          tokenStore,
+			clusterCache:        clusterCache,
+			nodeCache:           nodeCache,
+			tokenMgr:            tokenMgr,
+			getCACert:           func() string { return rancherCACert },
+			getDefaultTTL:       getDefaultTTL,
+			getServerURL:        getServerURL,
+			shouldGenerateToken: shouldGenerateToken,
+		}
+		for _, opt := range opts {
+			opt(store)
+		}
 
+		return store
+	}
+
+	t.Run("user creates a kubeconfig", func(t *testing.T) {
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -503,28 +543,9 @@ func TestStoreCreate(t *testing.T) {
 			return tokenManager.generate(token)
 		}
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          authorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager)
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -660,12 +681,7 @@ func TestStoreCreate(t *testing.T) {
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Description: "Test Kubeconfig",
@@ -746,12 +762,7 @@ func TestStoreCreate(t *testing.T) {
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(adminID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -831,10 +842,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
 	t.Run("token generation disabled", func(t *testing.T) {
-		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -852,7 +859,7 @@ func TestStoreCreate(t *testing.T) {
 
 		store := &Store{
 			mcmEnabled:          true,
-			authorizer:          authorizer,
+			authorizer:          allowAllAuthorizer,
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
@@ -866,12 +873,7 @@ func TestStoreCreate(t *testing.T) {
 			shouldGenerateToken: func() bool { return false },
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -905,7 +907,7 @@ func TestStoreCreate(t *testing.T) {
 		assert.Contains(t, downstream2Exec.Args, "--cluster="+downstream2)
 	})
 	t.Run("all clusters specified", func(t *testing.T) {
-		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+		clusterAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 			switch a.GetResource() {
 			case v3.ClusterResourceName:
 				if a.GetName() == downstream1 {
@@ -938,7 +940,7 @@ func TestStoreCreate(t *testing.T) {
 
 		store := &Store{
 			mcmEnabled:          true,
-			authorizer:          authorizer,
+			authorizer:          clusterAuthorizer,
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
@@ -951,12 +953,7 @@ func TestStoreCreate(t *testing.T) {
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:    []string{"*"},
@@ -1025,10 +1022,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
 	t.Run("MCM disabled", func(t *testing.T) {
-		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1047,7 +1040,7 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			authorizer:          authorizer,
+			authorizer:          allowAllAuthorizer,
 			nsCache:             nsCache,
 			configMapClient:     configMapClient,
 			userCache:           userCache,
@@ -1060,12 +1053,7 @@ func TestStoreCreate(t *testing.T) {
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters: []string{"local"},
@@ -1139,9 +1127,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:   tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminSA,
-		})
+		ctx := userContext(adminSA, "")
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -1163,9 +1149,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:   tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -1187,12 +1171,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenMgr:   tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {"non-existent"},
-			},
-			Name: userID,
-		})
+		ctx := userContext(userID, "non-existent")
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -1217,12 +1196,7 @@ func TestStoreCreate(t *testing.T) {
 			},
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 
 		obj, err := store.Create(ctx, &ext.Kubeconfig{}, nil, options)
 		require.Error(t, err)
@@ -1240,12 +1214,7 @@ func TestStoreCreate(t *testing.T) {
 			getDefaultTTL: getDefaultTTL,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-			Name: userID,
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -1269,12 +1238,7 @@ func TestStoreCreate(t *testing.T) {
 			getDefaultTTL: getDefaultTTL,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-			Name: userID,
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:       []string{downstream1, downstream2},
@@ -1298,12 +1262,7 @@ func TestStoreCreate(t *testing.T) {
 			getDefaultTTL: getDefaultTTL,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				IncludeDefaultEntry: ptr.To(false),
@@ -1317,10 +1276,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.ErrorContains(t, err, "at least one cluster is required when includeDefaultEntry is false")
 	})
 	t.Run("exclude default entry with non-ACE clusters", func(t *testing.T) {
-		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1336,28 +1291,9 @@ func TestStoreCreate(t *testing.T) {
 
 		tokenManager := &fakeTokenManager{}
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager)
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:            []string{downstream1},
@@ -1393,10 +1329,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
 	t.Run("exclude default entry with ACE-only clusters", func(t *testing.T) {
-		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1412,28 +1344,9 @@ func TestStoreCreate(t *testing.T) {
 
 		tokenManager := &fakeTokenManager{}
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager)
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:            []string{downstream2},
@@ -1460,10 +1373,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream2-cp", config.CurrentContext)
 	})
 	t.Run("select first ready control plane node as current context", func(t *testing.T) {
-		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1529,28 +1438,9 @@ func TestStoreCreate(t *testing.T) {
 			},
 		}, nil).Times(1)
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager, func(s *Store) { s.nodeCache = nodeCache })
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
@@ -1571,10 +1461,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream2-cp2", config.CurrentContext)
 	})
 	t.Run("fall back to proxy context when all control plane nodes are not ready", func(t *testing.T) {
-		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1640,28 +1526,9 @@ func TestStoreCreate(t *testing.T) {
 			},
 		}, nil).Times(1)
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager, func(s *Store) { s.nodeCache = nodeCache })
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
@@ -1684,10 +1551,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.Contains(t, config.Contexts, "downstream2-cp2")
 	})
 	t.Run("exclude default entry with mixed clusters", func(t *testing.T) {
-		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1703,28 +1566,9 @@ func TestStoreCreate(t *testing.T) {
 
 		tokenManager := &fakeTokenManager{}
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager)
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:            []string{downstream1, downstream2},
@@ -1753,10 +1597,6 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
 	t.Run("include default entry explicitly", func(t *testing.T) {
-		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
@@ -1772,28 +1612,9 @@ func TestStoreCreate(t *testing.T) {
 
 		tokenManager := &fakeTokenManager{}
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager)
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters:            []string{downstream1},
@@ -1845,12 +1666,7 @@ func TestStoreCreate(t *testing.T) {
 			shouldGenerateToken: shouldGenerateToken,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(adminID, authTokenID)
 
 		obj, err := store.Create(ctx, &ext.Kubeconfig{}, nil, &metav1.CreateOptions{})
 		require.NoError(t, err)
@@ -1872,37 +1688,14 @@ func TestStoreCreate(t *testing.T) {
 		// mapBackingError must be applied to the configMapClient.Create call so
 		// that a quota-exceeded or webhook-rejected Forbidden reaches the client
 		// as 403, not wrapped as a 500 InternalError.
-		allowAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-			return authorizer.DecisionAllow, "", nil
-		})
-
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Create(gomock.Any()).Return(nil,
 			apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "", errors.New("quota exceeded")),
 		).Times(1)
 
-		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
-		}
+		store := newStore(configMapClient, tokenStore, tokenManager)
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {authTokenID},
-			},
-		})
+		ctx := userContext(userID, authTokenID)
 		kubeconfig := &ext.Kubeconfig{
 			Spec: ext.KubeconfigSpec{
 				Clusters: []string{downstream1},
@@ -1915,6 +1708,403 @@ func TestStoreCreate(t *testing.T) {
 		assert.True(t, apierrors.IsForbidden(err), "backing Forbidden must surface as 403, got %v", err)
 		assert.False(t, apierrors.IsInternalError(err), "must not be wrapped as InternalError, got %v", err)
 	})
+	t.Run("completion write retries when the backing configmap changed concurrently", func(t *testing.T) {
+		// Create is a two-phase write and the client never sees the
+		// resourceVersion of the first phase, so a conflict on the second one
+		// has to be sorted out here instead of failing the request. Anything
+		// that adds labels to ConfigMaps outside of Rancher sets this off - the
+		// k3k kubelet copying them between the host cluster and the virtual one,
+		// for example - and the labels it added have to survive the retry.
+		const foreignLabel = "objectset.rio.cattle.io/owner-name"
+
+		var stored *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			stored = obj.DeepCopy()
+			stored.Name = names.SimpleNameGenerator.GenerateName(obj.GenerateName)
+			stored.ResourceVersion = "1"
+			response := stored.DeepCopy()
+
+			// The other writer gets in right after the response was sent, so
+			// the store is left holding an out-of-date resourceVersion.
+			stored.ResourceVersion = "2"
+			stored.Labels[foreignLabel] = "virtual"
+
+			return response, nil
+		}).Times(1)
+
+		var updates int
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			updates++
+			if obj.ResourceVersion != stored.ResourceVersion {
+				return nil, apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, obj.Name,
+					errors.New("the object has been modified; please apply your changes to the latest version and try again"))
+			}
+			stored = obj.DeepCopy()
+			return stored.DeepCopy(), nil
+		}).Times(2)
+
+		var gets int
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(_, name string, _ metav1.GetOptions) (*corev1.ConfigMap, error) {
+			gets++
+			assert.Equal(t, stored.Name, name)
+			return stored.DeepCopy(), nil
+		}).Times(1)
+
+		store := newStore(configMapClient, tokenStore, &fakeTokenManager{})
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{Clusters: []string{downstream1}},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		assert.Equal(t, 2, updates, "the conflicting update must be retried")
+		assert.Equal(t, 1, gets, "the retry must re-read the configmap")
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+		assert.NotEmpty(t, created.Status.Value)
+		require.Len(t, created.Status.Tokens, 1)
+
+		require.NotNil(t, stored)
+		assert.Equal(t, "virtual", stored.Labels[foreignLabel], "the concurrent writer's label must survive the retry")
+		assert.Equal(t, KindLabelValue, stored.Labels[KindLabel])
+		assert.Equal(t, userID, stored.Labels[UserIDLabel])
+		assert.NotEmpty(t, stored.Annotations[UIDAnnotation])
+		assert.Equal(t, StatusSummaryComplete, stored.Data[StatusSummaryField])
+		tokensValue, err := json.Marshal(created.Status.Tokens)
+		require.NoError(t, err)
+		assert.Equal(t, string(tokensValue), stored.Data[StatusTokensField])
+	})
+	t.Run("completion write that keeps conflicting reports a conflict and revokes the tokens", func(t *testing.T) {
+		// Once the retries run out the client gets an error, and nothing points
+		// at the tokens that were created: their IDs never reached the
+		// ConfigMap, so deleting the kubeconfig later won't delete them. Both
+		// the tokens and the unfinished record have to go.
+		var configMapName string
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			created := obj.DeepCopy()
+			created.Name = names.SimpleNameGenerator.GenerateName(obj.GenerateName)
+			created.ResourceVersion = "1"
+			configMapName = created.Name
+			return created, nil
+		}).Times(1)
+
+		var updates int
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			updates++
+			return nil, apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, obj.Name,
+				errors.New("the object has been modified; please apply your changes to the latest version and try again"))
+		}).AnyTimes()
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(_, name string, _ metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            name,
+					Namespace:       namespace,
+					ResourceVersion: strconv.Itoa(updates + 1),
+					Labels:          map[string]string{KindLabel: KindLabelValue},
+				},
+			}, nil
+		}).AnyTimes()
+
+		var deletedConfigMaps []string
+		configMapClient.EXPECT().Delete(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(_, name string, _ *metav1.DeleteOptions) error {
+			deletedConfigMaps = append(deletedConfigMaps, name)
+			return nil
+		}).Times(1)
+
+		var deletedTokens []string
+		deletingTokenStore := &fakeTokenStore{
+			fetchFunc: tokenStore.fetchFunc,
+			deleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+				deletedTokens = append(deletedTokens, name)
+				return nil
+			},
+		}
+
+		var createdTokens []string
+		tokenManager := &fakeTokenManager{}
+		tokenManager.createTokenFunc = func(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+			created, err := tokenManager.generate(token)
+			if err != nil {
+				return nil, err
+			}
+			createdTokens = append(createdTokens, created.Name)
+			return created, nil
+		}
+
+		store := newStore(configMapClient, deletingTokenStore, tokenManager)
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{Clusters: []string{downstream1, downstream2}},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsConflict(err), "an unresolvable conflict must surface as 409, got %v", err)
+		assert.False(t, apierrors.IsInternalError(err), "must not be wrapped as InternalError, got %v", err)
+
+		assert.Greater(t, updates, 1, "the conflicting update must be retried")
+		require.Len(t, createdTokens, 2)
+		assert.Equal(t, createdTokens, deletedTokens, "the issued tokens must be revoked")
+		assert.Equal(t, []string{configMapName}, deletedConfigMaps, "the incomplete record must be removed")
+	})
+	t.Run("completion write rejected outright reports the backing error and revokes the tokens", func(t *testing.T) {
+		// A rejection that isn't a conflict - a quota or a webhook, say - is not
+		// retried. It has to reach the client with its own status code rather
+		// than as a 500, and it leaves behind the same unfinished record to
+		// clean up.
+		var configMapName string
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			created := obj.DeepCopy()
+			created.Name = names.SimpleNameGenerator.GenerateName(obj.GenerateName)
+			created.ResourceVersion = "1"
+			configMapName = created.Name
+			return created, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).Return(nil,
+			apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "", errors.New("quota exceeded")),
+		).Times(1) // A rejection that isn't a conflict must not be retried.
+
+		var deletedConfigMaps []string
+		configMapClient.EXPECT().Delete(namespace, gomock.Any(), gomock.Any()).DoAndReturn(func(_, name string, _ *metav1.DeleteOptions) error {
+			deletedConfigMaps = append(deletedConfigMaps, name)
+			return nil
+		}).Times(1)
+
+		var deletedTokens []string
+		deletingTokenStore := &fakeTokenStore{
+			fetchFunc: tokenStore.fetchFunc,
+			deleteFunc: func(name string, _ *metav1.DeleteOptions) error {
+				deletedTokens = append(deletedTokens, name)
+				return nil
+			},
+		}
+
+		var createdTokens []string
+		tokenManager := &fakeTokenManager{}
+		tokenManager.createTokenFunc = func(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+			created, err := tokenManager.generate(token)
+			if err != nil {
+				return nil, err
+			}
+			createdTokens = append(createdTokens, created.Name)
+			return created, nil
+		}
+
+		store := newStore(configMapClient, deletingTokenStore, tokenManager)
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{Clusters: []string{downstream1}},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err), "the backing Forbidden must surface as 403, got %v", err)
+		assert.False(t, apierrors.IsInternalError(err), "must not be wrapped as InternalError, got %v", err)
+
+		require.Len(t, createdTokens, 1)
+		assert.Equal(t, createdTokens, deletedTokens, "the issued tokens must be revoked")
+		assert.Equal(t, []string{configMapName}, deletedConfigMaps, "the incomplete record must be removed")
+	})
+	t.Run("a token is recorded even when the rest of the create fails", func(t *testing.T) {
+		// Everything that can delete a token - the stored record and the
+		// cleanup of a failed create - works off the list of token IDs, so a
+		// token has to be added to that list as soon as it exists. Here the
+		// owner reference lookup that comes right after creating it fails.
+		var stored *corev1.ConfigMap
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			stored = obj.DeepCopy()
+			stored.Name = names.SimpleNameGenerator.GenerateName(obj.GenerateName)
+			stored.ResourceVersion = "1"
+			return stored.DeepCopy(), nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			stored = obj.DeepCopy()
+			return stored.DeepCopy(), nil
+		}).Times(1)
+		// The record is saved, so there is nothing to clean up: a Delete here
+		// would be an unexpected call and fail the test.
+
+		failingTokenStore := &fakeTokenStore{
+			fetchFunc: tokenStore.fetchFunc,
+			getSecretFunc: func(name string, _ *metav1.GetOptions, _ bool) (*corev1.Secret, error) {
+				return nil, apierrors.NewInternalError(errors.New("etcd unavailable"))
+			},
+		}
+
+		var createdTokens []string
+		tokenManager := &fakeTokenManager{}
+		tokenManager.createTokenFunc = func(ctx context.Context, token *ext.Token, userInfo k8suser.Info) (*ext.Token, error) {
+			created, err := tokenManager.generate(token)
+			if err != nil {
+				return nil, err
+			}
+			createdTokens = append(createdTokens, created.Name)
+			return created, nil
+		}
+
+		store := newStore(configMapClient, failingTokenStore, tokenManager)
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{Clusters: []string{downstream1}},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+
+		require.Len(t, createdTokens, 1)
+		require.NotNil(t, stored)
+		assert.Equal(t, StatusSummaryError, stored.Data[StatusSummaryField])
+		tokensValue, err := json.Marshal(createdTokens)
+		require.NoError(t, err)
+		assert.Equal(t, string(tokensValue), stored.Data[StatusTokensField],
+			"the token must be recorded so deleting the kubeconfig still revokes it")
+	})
+}
+
+func TestMergeConfigMap(t *testing.T) {
+	t.Parallel()
+
+	secretRef := func(name string, uid types.UID) metav1.OwnerReference {
+		return metav1.OwnerReference{APIVersion: "v1", Kind: "Secret", Name: name, UID: uid}
+	}
+
+	tests := []struct {
+		name    string
+		latest  *corev1.ConfigMap
+		desired *corev1.ConfigMap
+		want    *corev1.ConfigMap
+	}{
+		{
+			name: "keeps the latest resourceVersion and the metadata of other writers",
+			latest: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "kubeconfig-abcde",
+					Namespace:       namespace,
+					ResourceVersion: "2",
+					Labels:          map[string]string{KindLabel: KindLabelValue, "foreign": "kept"},
+					Annotations:     map[string]string{UIDAnnotation: "uid", "foreign": "kept"},
+				},
+				Data: map[string]string{StatusSummaryField: StatusSummaryPending},
+			},
+			desired: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "kubeconfig-abcde",
+					Namespace:       namespace,
+					ResourceVersion: "1",
+					Labels:          map[string]string{KindLabel: KindLabelValue, UserIDLabel: "u-abcde"},
+					Annotations:     map[string]string{UIDAnnotation: "uid"},
+				},
+				Data: map[string]string{StatusSummaryField: StatusSummaryComplete, TTLField: "0"},
+			},
+			want: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "kubeconfig-abcde",
+					Namespace:       namespace,
+					ResourceVersion: "2",
+					Labels:          map[string]string{KindLabel: KindLabelValue, UserIDLabel: "u-abcde", "foreign": "kept"},
+					Annotations:     map[string]string{UIDAnnotation: "uid", "foreign": "kept"},
+				},
+				Data: map[string]string{StatusSummaryField: StatusSummaryComplete, TTLField: "0"},
+			},
+		},
+		{
+			name: "drops data keys the store no longer owns",
+			latest: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"},
+				Data:       map[string]string{StatusSummaryField: StatusSummaryPending, "stale": "value"},
+			},
+			desired: &corev1.ConfigMap{
+				Data: map[string]string{StatusSummaryField: StatusSummaryComplete},
+			},
+			want: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"},
+				Data:       map[string]string{StatusSummaryField: StatusSummaryComplete},
+			},
+		},
+		{
+			name:   "populates metadata maps the latest version doesn't have",
+			latest: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+			desired: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{KindLabel: KindLabelValue},
+					Annotations: map[string]string{UIDAnnotation: "uid"},
+				},
+			},
+			want: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					Labels:          map[string]string{KindLabel: KindLabelValue},
+					Annotations:     map[string]string{UIDAnnotation: "uid"},
+				},
+			},
+		},
+		{
+			name: "adds the token owner references without dropping the existing ones",
+			latest: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					OwnerReferences: []metav1.OwnerReference{secretRef("other", "uid-other")},
+				},
+			},
+			desired: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{secretRef("token-a", "uid-a")},
+				},
+			},
+			want: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					OwnerReferences: []metav1.OwnerReference{secretRef("other", "uid-other"), secretRef("token-a", "uid-a")},
+				},
+			},
+		},
+		{
+			name: "an owner reference present on both sides is not duplicated",
+			latest: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					OwnerReferences: []metav1.OwnerReference{secretRef("stale-name", "uid-a")},
+				},
+			},
+			desired: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: []metav1.OwnerReference{secretRef("token-a", "uid-a")},
+				},
+			},
+			want: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "2",
+					OwnerReferences: []metav1.OwnerReference{secretRef("token-a", "uid-a")},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			latest := test.latest.DeepCopy()
+			merged := mergeConfigMap(latest, test.desired)
+
+			assert.Equal(t, test.want, merged)
+			assert.Equal(t, test.latest, latest, "the latest version must not be mutated")
+		})
+	}
 }
 
 func generateCAKeyAndCert() (*ecdsa.PrivateKey, string, error) {
@@ -2147,12 +2337,7 @@ func TestStoreGet(t *testing.T) {
 
 	tokenManager := &fakeTokenManager{}
 
-	ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-		Name: userID,
-		Extra: map[string][]string{
-			common.ExtraRequestTokenID: {authTokenID},
-		},
-	})
+	ctx := userContext(userID, authTokenID)
 
 	t.Run("admin gets kubeconfig", func(t *testing.T) {
 		store := &Store{
@@ -2162,12 +2347,7 @@ func TestStoreGet(t *testing.T) {
 			tokenMgr:       tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-			Extra: map[string][]string{
-				common.ExtraRequestTokenID: {"token-8wrqh"},
-			},
-		})
+		ctx := userContext(adminID, "token-8wrqh")
 
 		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{})
 		require.NoError(t, err)
@@ -2388,9 +2568,7 @@ func TestStoreList(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-		})
+		ctx := userContext(adminID, "")
 
 		obj, err := store.List(ctx, &metainternalversion.ListOptions{})
 		require.NoError(t, err)
@@ -2414,9 +2592,7 @@ func TestStoreList(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID1,
-		})
+		ctx := userContext(userID1, "")
 
 		obj, err := store.List(ctx, &metainternalversion.ListOptions{})
 		require.NoError(t, err)
@@ -2507,9 +2683,7 @@ func TestStoreWatch(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-		})
+		ctx := userContext(adminID, "")
 
 		watcher, err := store.Watch(ctx, &metainternalversion.ListOptions{})
 		require.NoError(t, err)
@@ -2673,9 +2847,7 @@ func TestStoreWatch(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 
 		watcher, err := store.Watch(ctx, &metainternalversion.ListOptions{})
 		require.NoError(t, err)
@@ -2791,9 +2963,7 @@ func TestStoreUpdate(t *testing.T) {
 			return nil
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-		})
+		ctx := userContext(adminID, "")
 
 		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
 		assert.NoError(t, err)
@@ -2859,9 +3029,7 @@ func TestStoreUpdate(t *testing.T) {
 			return nil
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID, // Kubeconfig owner.
-		})
+		ctx := userContext(userID, "") // Kubeconfig owner.
 
 		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
 		assert.NoError(t, err)
@@ -2907,9 +3075,7 @@ func TestStoreUpdate(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "not-an-owner",
-		})
+		ctx := userContext("not-an-owner", "")
 
 		options := &metav1.UpdateOptions{}
 
@@ -2940,9 +3106,7 @@ func TestStoreUpdate(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 
 		options := &metav1.UpdateOptions{}
 
@@ -2971,9 +3135,7 @@ func TestStoreUpdate(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 
 		options := &metav1.UpdateOptions{}
 
@@ -3004,9 +3166,7 @@ func TestStoreUpdate(t *testing.T) {
 
 		updateValidation := func(ctx context.Context, obj, old runtime.Object) error { return nil }
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 
 		options := &metav1.UpdateOptions{}
 
@@ -3082,9 +3242,7 @@ func TestStoreUpdate(t *testing.T) {
 			return nil
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID, // Kubeconfig owner.
-		})
+		ctx := userContext(userID, "") // Kubeconfig owner.
 
 		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
 		assert.NoError(t, err)
@@ -3125,9 +3283,7 @@ func TestStoreUpdate(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 
 		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
 		require.NoError(t, err)
@@ -3158,9 +3314,7 @@ func TestStoreUpdate(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 
 		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
 		require.NoError(t, err)
@@ -3190,9 +3344,7 @@ func TestStoreUpdate(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: userID,
-		})
+		ctx := userContext(userID, "")
 
 		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
 		require.NoError(t, err)
@@ -3234,9 +3386,7 @@ func TestStoreUpdate(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-		})
+		ctx := userContext(adminID, "")
 
 		kc, err := store.fromConfigMap(oldConfigMap)
 		require.NoError(t, err)
@@ -3490,9 +3640,7 @@ func TestStoreDelete(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-		})
+		ctx := userContext(adminID, "")
 
 		obj, _, err := store.Delete(ctx, kubeconfigID, deleteValidation, deleteOptions)
 		require.NoError(t, err)
@@ -3653,9 +3801,7 @@ func TestStoreDelete(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: "not-an-owner",
-		})
+		ctx := userContext("not-an-owner", "")
 
 		obj, _, err := store.Delete(ctx, kubeconfigID, nil, &metav1.DeleteOptions{})
 		require.Error(t, err)
@@ -3695,7 +3841,7 @@ func TestStoreDelete(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{Name: adminID})
+		ctx := userContext(adminID, "")
 
 		_, _, err := store.Delete(ctx, kubeconfigID, nil, &metav1.DeleteOptions{
 			DryRun: []string{metav1.DryRunAll},
@@ -3816,9 +3962,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
-			Name: adminID,
-		})
+		ctx := userContext(adminID, "")
 
 		obj, err := store.DeleteCollection(ctx, deleteValidation, deleteOptions, listOptions)
 		require.NoError(t, err)
@@ -3861,7 +4005,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{Name: adminID})
+		ctx := userContext(adminID, "")
 
 		obj, err := store.DeleteCollection(ctx, nil, deleteOptions, listOptions)
 		require.NoError(t, err)
@@ -3894,7 +4038,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{Name: adminID})
+		ctx := userContext(adminID, "")
 
 		_, err := store.DeleteCollection(ctx, nil, deleteOptions, listOptions)
 		require.Error(t, err)
@@ -3927,7 +4071,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{Name: adminID})
+		ctx := userContext(adminID, "")
 
 		_, err := store.DeleteCollection(ctx, deleteValidation, &metav1.DeleteOptions{}, &metainternalversion.ListOptions{})
 		require.Error(t, err)
@@ -3963,7 +4107,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 			tokenMgr:        tokenManager,
 		}
 
-		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{Name: adminID})
+		ctx := userContext(adminID, "")
 
 		_, err := store.DeleteCollection(ctx, nil, &metav1.DeleteOptions{
 			DryRun: []string{metav1.DryRunAll},
