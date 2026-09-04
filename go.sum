@@ -110,6 +110,8 @@ github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYW
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
+github.com/aruiz14/shepherd v0.0.0-20260904123007-01db57e70542 h1:pHqNWtT6g2w2T9WkrmZ4P+q3ac2ulMkCDGOzI+EknXo=
+github.com/aruiz14/shepherd v0.0.0-20260904123007-01db57e70542/go.mod h1:OxexRIlEGlPaWS9YeFVfYD5ANH/8Yqb+hMyPuUiCp2o=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
 github.com/aws/aws-sdk-go v1.55.8 h1:JRmEUbU52aJQZ2AjX4q4Wu7t4uZjOu71uyNmaWlUkJQ=
@@ -663,8 +665,6 @@ github.com/rancher/remotedialer-proxy v0.9.0-rc.2 h1:xM+ko4RaqtjfGFS8l7n2hn4XFQy
 github.com/rancher/remotedialer-proxy v0.9.0-rc.2/go.mod h1:tUvcbs5xQgIGVUWSWpdTp9kubmOIKCA+D3DTYaPv8fM=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20260824145520-00de4a01fb4d h1:F6yRcp5IrkabzVlPYm6IAMGuhBx4msWNIT7MUbQYG1M=
-github.com/rancher/shepherd v0.0.0-20260824145520-00de4a01fb4d/go.mod h1:OxexRIlEGlPaWS9YeFVfYD5ANH/8Yqb+hMyPuUiCp2o=
 github.com/rancher/steve v0.10.3 h1:kh1Th67PF7RIbcGKJmIsH+Qj5h20yptMYRcamwXanzA=
 github.com/rancher/steve v0.10.3/go.mod h1:mlpeyygX/5T2s1RdS4IAJ8IAIanRQLnZnP3u2vUof4U=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822 h1:PS5UzNmlTMeBhm0Df48pHjiy5MWkHzqHDr4On7kYpDc=
