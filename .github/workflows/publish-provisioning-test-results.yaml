@@ -9,7 +9,7 @@ permissions: {}
 jobs:
   publish-provisioning-test-results:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base@sha256:b03880998771ffd522e8808bc01a31098378f82e7c4552273e336de3742109f0 # 15.7
+    container: registry.suse.com/bci/bci-base@sha256:22592302cdeee8b700f97cabbbee880dd99966d30874f70b7a7dbe57ff8c6bdd # 15.7
     if: >-
       (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure') &&
       github.event.workflow_run.head_repository.full_name == github.repository
