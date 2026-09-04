@@ -1,15 +1,13 @@
 #!/bin/bash
 set -ex
 
-echo Starting rancher server in container
-
-source $(dirname $0)/../version
-cd scripts
-source ./package-env
-cd ..
-
+echo Starting rancher server in k3d cluster
 
 cd $(dirname $0)/../..
+
+source scripts/version
+source scripts/package-env
+
 
 if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
   LOGFLAG=$1
@@ -18,9 +16,14 @@ fi
 rm -rf build/testdata
 mkdir -p build/testdata
 cd build/testdata
-export KUBECONFIG=
+
+: ${KUBECONFIG?KUBECONFIG environment variable must be set}
+: ${CATTLE_K3S_VERSION?CATTLE_K3S_VERSION environment variable must be set}
+
+# Setup environment variables
 export CATTLE_DEV_MODE=yes
-export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}')"
+HOST_IP=$(ip route get 8.8.8.8 | awk '{print $7}')
+export CATTLE_SERVER_URL="https://${HOST_IP}.sslip.io:8443"
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 if [ -n "$CATTLE_FEATURES" ]; then
   export CATTLE_FEATURES="$CATTLE_FEATURES,harvester=false"
@@ -28,5 +31,42 @@ else
   export CATTLE_FEATURES="harvester=false"
 fi
 
-mkdir -p /etc/rancher/k3s/
-docker run -d --name rancher-server -v /etc/rancher/k3s:/etc/rancher/k3s --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD=$CATTLE_BOOTSTRAP_PASSWORD -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE
+k3d cluster create rancher-server \
+  --api-port 6443 \
+  -p "8080:80@loadbalancer" \
+  -p "8443:443@loadbalancer" \
+  --image "rancher/k3s:${CATTLE_K3S_VERSION//+/-}" \
+  --k3s-arg "--disable=servicelb@server:*" \
+  --k3s-arg "--disable=metrics-server@server:*" \
+  --k3s-arg "--disable=local-storage@server:*" \
+  --wait
+
+# Deploy cert-manager and wait for its rollout
+CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.15.3"}
+kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
+kubectl rollout status -n cert-manager deploy --timeout=150s
+
+# RANCHER_CHART is the path to the already packaged chart, recovered from a previous "build-chart" step
+if [ -z "${RANCHER_CHART:-}" ]; then
+  # Build the local Rancher chart
+  (cd ../.. && ./scripts/chart/build chart)
+  RANCHER_CHART=../chart/rancher
+fi
+
+# Rancher server and agent images are loaded from previous build steps and now imported directly into the cluster.
+# The chart and server image already references them, respectively, so there is no need to override them using helm values.
+k3d image import $IMAGE $CATTLE_AGENT_IMAGE -c rancher-server
+
+helm upgrade --install rancher ${RANCHER_CHART} \
+  --namespace cattle-system \
+  --create-namespace \
+  --set hostname="${HOST_IP}.sslip.io" \
+  --set bootstrapPassword="$CATTLE_BOOTSTRAP_PASSWORD" \
+  --set extraEnv[0].name=CATTLE_DEV_MODE \
+  --set extraEnv[0].value="$CATTLE_DEV_MODE" \
+  --set extraEnv[1].name=CATTLE_SERVER_URL \
+  --set extraEnv[1].value="$CATTLE_SERVER_URL" \
+  --set extraEnv[2].name=CATTLE_FEATURES \
+  --set extraEnv[2].value="$CATTLE_FEATURES" \
+  --set replicas=1 \
+  --wait

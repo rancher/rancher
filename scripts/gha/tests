@@ -1,14 +1,12 @@
 #!/bin/bash
 set -e
 
-GOBIN=${GOBIN-"go"}
-
 cleanup()
 {
     EXIT=$?
     set +ex
-    echo Stopping and removing rancher server container
-    docker rm -f rancher-server
+    echo Stopping and removing rancher server cluster
+    k3d cluster delete rancher-server
     return $EXIT
 }
 
@@ -44,11 +42,6 @@ export CATTLE_AGENT_IMAGE="${REGISTRY}rancher/rancher-agent:${AGENT_TAG}"
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
-eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2}')"
-eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2}')"
-eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2}')"
-eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2}')"
-
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Get the last release for $DIST, which is usually the latest version or an experimental version.
 # Previously this would use channels, but channels no longer reflect the latest version since
@@ -65,33 +58,28 @@ export CATTLE_CHART_DEFAULT_URL=https://github.com/rancher/charts
 fi
 
 echo Starting rancher server for test
-touch /tmp/rancher.log
 
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+export KUBECONFIG=$(pwd)/build/testdata/k3s.yaml
 
-mkdir -p /var/lib/rancher/$DIST/agent/images
-grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
-grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
-mkdir -p /usr/share/rancher/ui-dashboard/assets
-curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-amd64
-curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -o /usr/share/rancher/ui-dashboard/assets/rancher-system-agent-arm64
-curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui-dashboard/assets/system-agent-uninstall.sh
+LOGS_DIR=$PWD/build/logs
+mkdir -p "$LOGS_DIR"
 
 dump_rancher_logs()
 {
-  echo "Dumping Rancher + K3s container logs to /tmp/rancher.log and /tmp/k3s.log"
+  echo "Dumping Rancher + K3s container logs to rancher.log and k3s.log"
   # Best-effort: this runs under `set -e`, so don't let a missing container/log
   # abort the caller or leave the workflow's artifact upload step empty-handed.
-  docker logs rancher-server &> /tmp/rancher.log || echo "failed to fetch rancher-server logs" >> /tmp/rancher.log
-  docker cp rancher-server:/var/lib/rancher/k3s.log /tmp/k3s.log || echo "failed to fetch k3s.log from rancher-server" > /tmp/k3s.log
-  # Written while running under sudo; make readable so the CI workflow can upload them as an artifact.
-  chmod 644 /tmp/rancher.log /tmp/k3s.log 2>/dev/null || true
+  kubectl --kubeconfig "$KUBECONFIG" logs -n cattle-system -l app=rancher --tail=-1 &> "${LOGS_DIR}/rancher.log" || echo "failed to fetch rancher logs" >> "${LOGS_DIR}/rancher.log"
+  docker logs k3d-rancher-server-server-0 &> "${LOGS_DIR}/k3s.log" || echo "failed to fetch k3s.log" > "${LOGS_DIR}/k3s.log"
 }
 
 export -f dump_rancher_logs
 
 ./scripts/gha/run 2>&1
 trap cleanup exit
+
+CATTLE_RANCHER_HOST="$(kubectl -n cattle-system get ingress rancher -o jsonpath='{.spec.rules[0].host}'):8443"
+export CATTLE_RANCHER_HOST
 
 # Build integrationsetup and compile the integration test binaries in the
 # background while we wait for Rancher's deployments to roll out below, keeping
@@ -106,12 +94,12 @@ echo "Building integrationsetup + pre-compiling integration test binaries in the
 (
   set -e
   mkdir -p tests/v2/integration/bin
-  CGO_ENABLED=0 $GOBIN build -tags containers_image_openpgp,integrationsetup \
+  CGO_ENABLED=0 go build -tags containers_image_openpgp,integrationsetup \
     -o tests/v2/integration/bin/integrationsetup ./tests/v2/integration/setup
-  for pkg in $($GOBIN list $INTEGRATION_TEST_PACKAGES); do
-    $GOBIN test -c -o /dev/null "$pkg"
+  for pkg in $(go list $INTEGRATION_TEST_PACKAGES); do
+    go test -c -o /dev/null "$pkg"
   done
-) >/tmp/precompile.log 2>&1 &
+) > "${LOGS_DIR}/precompile.log" 2>&1 &
 PRECOMPILE_PID=$!
 
 echo "Waiting for K3s kubeconfig to be generated"
@@ -119,18 +107,9 @@ echo "Waiting for K3s kubeconfig to be generated"
   --timeout 300 `# Time out after 300 seconds (5 min)` \
   --sleep 5 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
-  --message "/etc/rancher/k3s/k3s.yaml did not exist after {{elapsed}} seconds" `# Print this progress message` \
+  --message "$KUBECONFIG did not exist after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why K3s did not start` \
-  "stat /etc/rancher/k3s/k3s.yaml &>/dev/null"
-
-echo "Waiting up to 5 minutes for the api-extension deployment"
-./scripts/retry \
-  --timeout 300 `# Time out after 300 seconds (5 min)` \
-  --sleep 2 `# Sleep for 2 seconds in between attempts` \
-  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
-  --message "api-extension was not available after {{elapsed}} seconds" `# Print this progress message` \
-  --exit-command "dump_rancher_logs" `# Dump logs to find out why api-extension did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/api-extension &>/dev/null"
+  "stat $KUBECONFIG &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
@@ -139,7 +118,7 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why webhook did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
+  "kubectl rollout status -n cattle-system deploy/rancher-webhook &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-turtles deployment"
 ./scripts/retry \
@@ -148,8 +127,8 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-turtles was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why turtles did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-turtles-system &>/dev/null \
-    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
+  "kubectl get ns cattle-turtles-system &>/dev/null \
+    && kubectl rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
@@ -159,7 +138,7 @@ export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by inte
 # real error.
 if [ -n "${PRECOMPILE_PID:-}" ]; then
   echo "Waiting for background integrationsetup build + test compilation to finish"
-  wait "$PRECOMPILE_PID" || { echo "background build/compilation reported an error:"; cat /tmp/precompile.log || true; }
+  wait "$PRECOMPILE_PID" || { echo "background build/compilation reported an error:"; cat "${LOGS_DIR}/precompile.log" || true; }
 fi
 ./tests/v2/integration/bin/integrationsetup || {
   dump_rancher_logs
@@ -171,9 +150,8 @@ integration_test_args=(-v -failfast -timeout 30m -p 1)
 if [ -n "$INTEGRATION_TEST_RUN" ]; then
   integration_test_args+=(-run "$INTEGRATION_TEST_RUN")
 fi
-$GOBIN test "${integration_test_args[@]}" $INTEGRATION_TEST_PACKAGES || {
+
+go test "${integration_test_args[@]}" $INTEGRATION_TEST_PACKAGES || {
   dump_rancher_logs
   exit 1
 }
-
-tail -f /tmp/rancher-test.log &

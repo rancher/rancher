@@ -69,16 +69,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Configure Docker for cgroupfs
-        run: |
-          echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
       - name: Setup Environment Variables
         uses: ./.github/actions/setup-tag-env
       - id: env
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
-      - name: Download Docker images artifact
+      - name: Download Docker images and chart artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: "/tmp"
@@ -117,12 +113,6 @@ jobs:
           echo "${K3D_BIN_HASH_AMD64}  k3d" | shasum -a 256 --check
           sudo mv k3d /usr/local/bin
           sudo chmod +x /usr/local/bin/k3d
-      - name: KDM data
-        env:
-          CATTLE_KDM_BRANCH: ${{ steps.env.outputs.CATTLE_KDM_BRANCH }}
-        run: |
-          mkdir -p bin
-          curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > bin/data.json
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -132,7 +122,9 @@ jobs:
         env:
           INTEGRATION_TEST_PACKAGES: ${{ matrix.packages }}
           INTEGRATION_TEST_RUN: ${{ matrix.run }}
-        run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
+          CATTLE_K3S_VERSION: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
+          RANCHER_CHART: /tmp/rancher-chart.tgz
+        run: ./scripts/gha/tests
       - name: Upload Rancher + K3s logs if tests failed
         if: failure()
         continue-on-error: true
@@ -140,8 +132,8 @@ jobs:
         with:
           name: "Rancher + K3s logs (${{ matrix.shard }})"
           path: |
-            /tmp/rancher.log
-            /tmp/k3s.log
+            build/logs/rancher.log
+            build/logs/tmp/k3s.log
           if-no-files-found: ignore
           retention-days: 7
   # Aggregates the shard matrix into the single stable check
