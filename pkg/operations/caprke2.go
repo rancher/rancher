@@ -3,6 +3,7 @@ package operations
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
@@ -203,6 +204,20 @@ func (a *CAPRKE2Adapter) ServerUnit() string {
 	return "rke2-server"
 }
 
+// RuntimeService returns the systemd unit responsible for RKE2 on the node represented by
+// secret: ServerUnit on control-plane/etcd nodes, or the RKE2 agent unit on worker-only nodes.
+func (a *CAPRKE2Adapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.RuntimeCommand() + "-agent"
+}
+
+// DistroServices returns the RKE2 service identifiers exposed on the node represented by secret.
+func (a *CAPRKE2Adapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
 // extraArgsFor returns the ExtraArgs slice for the named control-plane component, or nil when
 // the component is unset on the RKE2ControlPlane spec. The result is passed into
 // renderSecureProbe (which accepts `any`) to drive --secure-port / --tls-cert-file / --cert-dir
@@ -224,6 +239,32 @@ func (a *CAPRKE2Adapter) extraArgsFor(component string) []string {
 		}
 	}
 	return nil
+}
+
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings from CAPRKE2
+// control-plane extra args.
+func (a *CAPRKE2Adapter) ComponentTLSSettings(_ *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	args := a.extraArgsFor(component)
+	if args == nil {
+		return ComponentTLSSettings{}, nil
+	}
+
+	var settings ComponentTLSSettings
+	for _, arg := range args {
+		key, value, ok := strings.Cut(arg, "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case TLSPrivateKeyFile:
+			settings.TLSPrivateKeyFile = value
+		}
+	}
+	return settings, nil
 }
 
 // RenderProbes renders the per-role probe set for a machine-plan secret. Mirrors the structure of

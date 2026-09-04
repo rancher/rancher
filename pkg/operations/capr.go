@@ -192,6 +192,79 @@ func (a *CAPRAdapter) ServerUnit() string {
 	return "k3s"
 }
 
+// RuntimeService returns the systemd unit responsible for the runtime on the node represented
+// by secret: ServerUnit on control-plane/etcd nodes, or the runtime agent unit on worker-only
+// nodes.
+func (a *CAPRAdapter) RuntimeService(secret *corev1.Secret) string {
+	if IsControlPlane(secret) || IsEtcd(secret) {
+		return a.ServerUnit()
+	}
+	return a.RuntimeCommand() + "-agent"
+}
+
+// DistroServices returns the distro service identifiers this cluster's runtime exposes on the
+// node represented by secret.
+func (a *CAPRAdapter) DistroServices(secret *corev1.Secret) []string {
+	return DistroServices(a.RuntimeCommand(), secret)
+}
+
+// componentTLSSettingsFromRenderedConfig extracts scheduler/controller-manager
+// TLS settings from a rendered CAPR config map.
+func componentTLSSettingsFromRenderedConfig(config map[string]any, component string) ComponentTLSSettings {
+	var arg any
+	switch component {
+	case KubeControllerManagerProbeName:
+		arg = config[KubeControllerManagerArg]
+	case KubeSchedulerProbeName:
+		arg = config[KubeSchedulerArg]
+	default:
+		return ComponentTLSSettings{}
+	}
+
+	// Parse the rendered config value which can be string, []string, or []any
+	var keyValueArgs []string
+	switch v := arg.(type) {
+	case []any:
+		keyValueArgs = make([]string, len(v))
+		for i, item := range v {
+			keyValueArgs[i] = fmt.Sprintf("%v", item)
+		}
+	case []string:
+		keyValueArgs = v
+	case string:
+		keyValueArgs = []string{v}
+	default:
+		return ComponentTLSSettings{}
+	}
+
+	var settings ComponentTLSSettings
+	for _, argument := range keyValueArgs {
+		key, value, ok := strings.Cut(argument, "=")
+		if !ok {
+			continue
+		}
+		switch key {
+		case SecurePortArgument:
+			settings.SecurePort = value
+		case TLSCertFileArgument:
+			settings.TLSCertFile = value
+		case TLSPrivateKeyFile:
+			settings.TLSPrivateKeyFile = value
+		}
+	}
+	return settings
+}
+
+// ComponentTLSSettings returns scheduler/controller-manager TLS settings from the
+// rendered per-machine runtime config.
+func (a *CAPRAdapter) ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error) {
+	config, err := a.renderConfig(secret)
+	if err != nil {
+		return ComponentTLSSettings{}, err
+	}
+	return componentTLSSettingsFromRenderedConfig(config, component), nil
+}
+
 // RenderProbes renders the probes for a given machine-plan secret based on its role.
 // If the cluster is using a custom data directory or secure probes, this information is extracted from the cluster object and rendered in.
 func (a *CAPRAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (map[string]plan.Probe, error) {
@@ -487,6 +560,16 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 		cni == "calico+multus"
 }
 
+// convertInterfaceSliceToStringSlice converts an interface slice to strings.
+// Used by getArgValue for processing unstructured config data.
+func convertInterfaceSliceToStringSlice(input []any) []string {
+	stringArr := make([]string, 0, len(input))
+	for _, v := range input {
+		stringArr = append(stringArr, fmt.Sprintf("%v", v))
+	}
+	return stringArr
+}
+
 // getArgValue will search the passed in interface (arg) for a key that matches the searchArg. If a match is found, it
 // returns the value of the argument, otherwise it returns an empty string.
 func getArgValue(arg any, searchArg string, delim string) string {
@@ -521,16 +604,6 @@ func splitArgKeyVal(val string, delim string) (string, string) {
 		return splitSubArg[0], splitSubArg[1]
 	}
 	return "", ""
-}
-
-// convertInterfaceSliceToStringSlice converts an input interface slice to a string slice by iterating through the
-// interface slice and converting each entry to a string using Sprintf.
-func convertInterfaceSliceToStringSlice(input []any) []string {
-	var stringArr []string
-	for _, v := range input {
-		stringArr = append(stringArr, fmt.Sprintf("%v", v))
-	}
-	return stringArr
 }
 
 func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {

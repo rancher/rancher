@@ -76,6 +76,48 @@ func TestCAPRAdapter_ServerUnit(t *testing.T) {
 	}
 }
 
+func TestCAPRAdapter_RuntimeService(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		k8sVersion string
+		secret     *corev1.Secret
+		want       string
+	}{
+		{"rke2 control-plane", "v1.28.5+rke2r1", newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}), "rke2-server"},
+		{"rke2 etcd", "v1.28.5+rke2r1", newSecret(map[string]string{capr.EtcdRoleLabel: "true"}), "rke2-server"},
+		{"rke2 worker-only", "v1.28.5+rke2r1", newSecret(map[string]string{capr.WorkerRoleLabel: "true"}), "rke2-agent"},
+		{"k3s control-plane", "v1.28.5+k3s1", newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}), "k3s"},
+		{"k3s worker-only", "v1.28.5+k3s1", newSecret(map[string]string{capr.WorkerRoleLabel: "true"}), "k3s-agent"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &CAPRAdapter{
+				controlPlane: &rkev1.RKEControlPlane{
+					Spec: rkev1.RKEControlPlaneSpec{
+						KubernetesVersion: tc.k8sVersion,
+					},
+				},
+			}
+			got := a.RuntimeService(tc.secret)
+			assert.Equal(t, tc.want, got, "RuntimeService mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestCAPRAdapter_ComponentTLSSettings_RenderConfigError(t *testing.T) {
+	t.Parallel()
+
+	adapter := &CAPRAdapter{
+		controlPlane: &rkev1.RKEControlPlane{},
+	}
+
+	_, err := adapter.ComponentTLSSettings(&corev1.Secret{}, KubeControllerManagerProbeName)
+	assert.Error(t, err)
+}
+
 // --- WaitForRegister ------------------------------------------------------------------------
 
 func newMachinePlanSecret(name, machineName string) *corev1.Secret {
@@ -86,11 +128,11 @@ func newMachinePlanSecret(name, machineName string) *corev1.Secret {
 			UID:       types.UID(name + "-uid"),
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "cluster.x-k8s.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
-				planv1alpha1.MachineLifecycleKindLabel: "Machine",
-				planv1alpha1.MachineLifecycleNameLabel: machineName,
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  machineName,
 			},
 		},
 		Type: capr.SecretTypeMachinePlan,
@@ -240,8 +282,8 @@ func TestCAPRAdapter_WaitForRegister_MissingMachineNameLabel(t *testing.T) {
 			Namespace: "fleet-default",
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				// No MachineNameLabel
 			},
 		},
@@ -487,6 +529,97 @@ func TestFilterField(t *testing.T) {
 			if tc.wantOK {
 				assert.Equal(t, tc.wantVal, gotVal, "value mismatch")
 			}
+		})
+	}
+}
+
+// --- ComponentTLSSettings ------------------------------------------------
+
+func TestCAPRAdapter_ComponentTLSSettings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		config    map[string]any
+		component string
+		want      ComponentTLSSettings
+	}{
+		{
+			name: "scheduler with []any config",
+			config: map[string]any{
+				KubeSchedulerArg: []any{
+					"secure-port=10262",
+					"tls-cert-file=/custom/ks.crt",
+					"tls-private-key-file=/custom/ks.key",
+				},
+			},
+			component: KubeSchedulerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10262",
+				TLSCertFile:       "/custom/ks.crt",
+				TLSPrivateKeyFile: "/custom/ks.key",
+			},
+		},
+		{
+			name: "controller-manager with []string config",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{
+					"secure-port=10261",
+					"tls-cert-file=/custom/kcm.crt",
+					"tls-private-key-file=/custom/kcm.key",
+				},
+			},
+			component: KubeControllerManagerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10261",
+				TLSCertFile:       "/custom/kcm.crt",
+				TLSPrivateKeyFile: "/custom/kcm.key",
+			},
+		},
+		{
+			name: "string config value",
+			config: map[string]any{
+				KubeSchedulerArg: "secure-port=10262",
+			},
+			component: KubeSchedulerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10262"},
+		},
+		{
+			name: "cert-dir is ignored",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{
+					"cert-dir=/custom",
+					"secure-port=10261",
+				},
+			},
+			component: KubeControllerManagerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10261"},
+		},
+		{
+			name: "unknown component returns empty",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{"secure-port=10261"},
+			},
+			component: "unknown-component",
+		},
+		{
+			name:      "missing config key returns empty",
+			config:    map[string]any{},
+			component: KubeSchedulerProbeName,
+		},
+		{
+			name: "nil config value returns empty",
+			config: map[string]any{
+				KubeSchedulerArg: nil,
+			},
+			component: KubeSchedulerProbeName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := componentTLSSettingsFromRenderedConfig(tt.config, tt.component)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

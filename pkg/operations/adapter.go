@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -18,6 +20,7 @@ const (
 	SecurePortArgument  = "secure-port"
 	CertDirArgument     = "cert-dir"
 	TLSCertFileArgument = "tls-cert-file"
+	TLSPrivateKeyFile   = "tls-private-key-file"
 
 	ETCDProbeName                  = "etcd"
 	KubeAPIServerProbeName         = "kube-apiserver"
@@ -41,6 +44,19 @@ const (
 
 	OperationLeaderAnnotation = "rke.cattle.io/operation-leader"
 )
+
+// ComponentTLSSettings captures the TLS-related runtime arguments used by the
+// scheduler and controller-manager secure probes and certificate cleanup logic.
+type ComponentTLSSettings struct {
+	SecurePort        string
+	TLSCertFile       string
+	TLSPrivateKeyFile string
+}
+
+// HasCompleteTLSConfig reports whether both cert and key paths are explicitly configured.
+func (s ComponentTLSSettings) HasCompleteTLSConfig() bool {
+	return s.TLSCertFile != "" && s.TLSPrivateKeyFile != ""
+}
 
 var (
 	AllProbes = map[string]plan.Probe{
@@ -160,6 +176,19 @@ type Adapter interface {
 	// ServerUnit returns the systemd unit name for a distro server node.
 	ServerUnit() string
 
+	// RuntimeService returns the runtime service to restart on the node represented by secret:
+	// the server service on control-plane/etcd nodes, or the runtime agent service on worker-only
+	// nodes.
+	RuntimeService(secret *corev1.Secret) string
+
+	// DistroServices returns the logical RKE2/K3s service identifiers that make this node
+	// participate in supported Day2 runtime work. These are not a list of every physical host
+	// service: on worker nodes, a server-related identifier means the worker's runtime agent must
+	// restart after the related server-side rotation, not that the server itself runs there. The
+	// result depends on the runtime (RKE2 or K3s) and on the node's worker, control-plane, and
+	// etcd roles.
+	DistroServices(secret *corev1.Secret) []string
+
 	// DistroDataDirectory returns the path to the RKE2/K3s data-dir on the host machine.
 	DistroDataDirectory(secret *corev1.Secret) string
 
@@ -176,6 +205,12 @@ type Adapter interface {
 	// Some operations may cause the controlplane to become temporarily unavailable, which will render the etcd plane's
 	// supervisor probe to fail.
 	RenderProbes(plan *corev1.Secret, supervisor bool) (map[string]plan.Probe, error)
+
+	// ComponentTLSSettings returns the effective scheduler/controller-manager TLS argument
+	// settings configured for the node represented by secret. Callers can use these settings to
+	// match component probes to their configured certificate and secure port, and to avoid
+	// clobbering an explicitly configured TLS pair during cleanup.
+	ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error)
 
 	// KubectlPath returns the path to the kubectl binary on the host relative to the machine-plan secret.
 	KubectlPath(secret *corev1.Secret) string
@@ -198,6 +233,51 @@ type Adapter interface {
 	LoopbackAddress(secret *corev1.Secret) string
 
 	ToS3ArgsEnvAndFiles(secret *corev1.Secret) ([]string, []string, []plan.File)
+}
+
+// DistroServices returns the logical RKE2/K3s service identifiers that make the node described by
+// secret participate in supported Day2 runtime work for the given runtime. Every Adapter delegates
+// here: service availability is a property of the installed distro and the node's roles, not of
+// how the cluster is managed. These identifiers are not a list of every physical host service: on
+// worker nodes, a server-related identifier means the worker's runtime agent must restart after
+// the related server-side certificate rotation, not that the server itself runs there.
+//
+// The role groupings are the ones certificate rotation already applies — workers restart their
+// agent for the shared runtime certificates, control-plane nodes own the API server components,
+// and etcd nodes own etcd. Only the server and controller identifiers are runtime-specific, so an
+// RKE2 node never reports a K3s service name and a K3s node never reports an RKE2 one.
+func DistroServices(runtime string, secret *corev1.Secret) []string {
+	serverService, controllerService := capr.RuntimeK3S+"-server", capr.RuntimeK3S+"-controller"
+	if runtime == capr.RuntimeRKE2 {
+		serverService, controllerService = capr.RuntimeRKE2+"-server", capr.RuntimeRKE2+"-controller"
+	}
+
+	available := map[string]struct{}{}
+	add := func(services ...string) {
+		for _, service := range services {
+			available[service] = struct{}{}
+		}
+	}
+
+	if IsWorker(secret) {
+		// Workers restart their runtime agent when any of these shared runtime
+		// certificates are rotated, so they can reconnect to the server.
+		add(serverService, "api-server", "kubelet", "kube-proxy", "auth-proxy")
+	}
+	if IsControlPlane(secret) {
+		add(serverService, controllerService, "api-server", "kubelet", "kube-proxy", "auth-proxy",
+			"controller-manager", "scheduler", "admin", "cloud-controller", "supervisor")
+	}
+	if IsEtcd(secret) {
+		add(serverService, "etcd", "kubelet", "supervisor")
+	}
+
+	services := make([]string, 0, len(available))
+	for service := range available {
+		services = append(services, service)
+	}
+	sort.Strings(services)
+	return services
 }
 
 // NewAdapter returns an Adapter for the given cluster object.
