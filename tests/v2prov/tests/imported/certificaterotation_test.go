@@ -165,6 +165,63 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t
 	assertCertificateMetadataUnchanged(t, before, after, nonEtcdPaths)
 }
 
+// Test_Imported_Operation_SetD_ImportedCertificateRotation_Mixed_Role_Service_Argument
+// validates that a request spanning etcd and control-plane services succeeds on a role-separated
+// imported cluster. Each server receives only the services that apply to its own role.
+func Test_Imported_Operation_SetD_ImportedCertificateRotation_Mixed_Role_Service_Argument(t *testing.T) {
+	cs, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	// Setup: one etcd-only node, one control-plane-only node, and one worker-only node.
+	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-mixed-role-service-argument", []cluster.ImportedNodePool{
+		{ETCD: true, Quantity: 1},
+		{ControlPlane: true, Quantity: 1},
+		{Worker: true, Quantity: 1},
+	})
+
+	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
+	expectedNodes := []string{"imported-init-0", "imported-node-1", "imported-node-2"}
+	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, expectedNodes)
+
+	// Before-rotation evidence is collected only for the certificates selected on each role.
+	dataDir := fmt.Sprintf("/var/lib/rancher/%s", runtimeName)
+	etcdPaths := []string{
+		path.Join(dataDir, "server/tls/etcd/server-client.crt"),
+		path.Join(dataDir, "server/tls/etcd/peer-server-client.crt"),
+	}
+	schedulerPaths := []string{
+		path.Join(dataDir, "server/tls/kube-scheduler/kube-scheduler.crt"),
+	}
+	etcdPodNames := []string{fx.pods[0].Name}
+	controlPlanePodNames := []string{fx.pods[1].Name}
+	beforeEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdPaths)
+	beforeScheduler := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, schedulerPaths)
+
+	// The request is valid across the cluster, but no individual node owns both services.
+	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationServices("etcd", "scheduler"))
+	assert.Equal(t, []string{"etcd", "scheduler"}, op.Spec.Args.Services)
+	assertCertificateRotationSucceeded(t, op)
+
+	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
+	op = WaitForCertificateRotationSucceeded(t, cs, op, beaconNS, beaconName)
+	assertCertificateRotationSucceeded(t, op)
+
+	// Recovery proves both role-specific plans completed without sending a node an unsupported service.
+	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
+	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, expectedNodes)
+	assertDownstreamAPIUsableAfterRotation(t, fx)
+
+	// Final assertions: etcd certificates rotated on the etcd node and the scheduler certificate
+	// rotated on the control-plane node.
+	afterEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdPaths)
+	afterScheduler := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, schedulerPaths)
+	assertNodeCertificateRotationMetadata(t, beforeEtcd, afterEtcd, etcdPaths)
+	assertNodeCertificateRotationMetadata(t, beforeScheduler, afterScheduler, schedulerPaths)
+}
+
 // Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args validates that when the
 // kube-controller-manager/kube-scheduler serve on a custom TLS cert/key pair (via RKE2 node
 // args), CertificateRotation reads those node args, preserves the custom TLS pair, and rotates
