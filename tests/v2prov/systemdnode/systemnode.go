@@ -39,6 +39,25 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 			"disable": `INVOCATION_ID=
 `},
 	}
+
+	containerdConfig := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    namespace,
+			GenerateName: "test-node-containerd-config-",
+		},
+		Data: map[string]string{
+			"containerd-template": `{{ template "base" . }}
+
+[plugins."io.containerd.snapshotter.v1.overlayfs"]
+  mount_options = ["volatile"]`,
+		},
+	}
+
+	containerdConfig, err = clients.Core.ConfigMap().Create(containerdConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	cmConfigure, err = clients.Core.ConfigMap().Create(cmConfigure)
 	if err != nil {
 		return nil, err
@@ -68,6 +87,16 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 						ConfigMap: &corev1.ConfigMapVolumeSource{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: cmConfigure.Name,
+							},
+						},
+					},
+				},
+				{
+					Name: "containerd",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: containerdConfig.Name,
 							},
 						},
 					},
@@ -112,6 +141,16 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 						Name:      "systemd",
 						MountPath: "/etc/default/k3s-agent",
 						SubPath:   "disable",
+					},
+					{
+						Name:      "containerd",
+						MountPath: "/var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl",
+						SubPath:   "containerd-template",
+					},
+					{
+						Name:      "containerd",
+						MountPath: "/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.tmpl",
+						SubPath:   "containerd-template",
 					},
 				},
 			}},
@@ -179,7 +218,32 @@ func New(clients *clients.Clients, namespace, script string, labels map[string]s
 		Name:       pod.Name,
 		UID:        pod.UID,
 	}}
-
 	_, err = clients.Core.ConfigMap().Update(cm)
-	return pod, err
+	if err != nil {
+		return nil, err
+	}
+
+	cmConfigure.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Name:       pod.Name,
+		UID:        pod.UID,
+	}}
+	_, err = clients.Core.ConfigMap().Update(cmConfigure)
+	if err != nil {
+		return nil, err
+	}
+
+	containerdConfig.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Name:       pod.Name,
+		UID:        pod.UID,
+	}}
+	_, err = clients.Core.ConfigMap().Update(containerdConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return pod, nil
 }

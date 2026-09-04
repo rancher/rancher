@@ -86,6 +86,12 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 	// We have to set invocation disabling on the rancher-system-agent because it runs rke2/k3s server on restore and this has cgroup issues
 	podConfig.Object["userdata"] = `#cloud-config
 write_files:
+- content: e3sgdGVtcGxhdGUgImJhc2UiIC4gfX0KCltwbHVnaW5zLiJpby5jb250YWluZXJkLnNuYXBzaG90dGVyLnYxLm92ZXJsYXlmcyJdCiAgbW91bnRfb3B0aW9ucyA9IFsidm9sYXRpbGUiXQ==
+  path: /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl
+  encoding: b64
+- content: e3sgdGVtcGxhdGUgImJhc2UiIC4gfX0KCltwbHVnaW5zLiJpby5jb250YWluZXJkLnNuYXBzaG90dGVyLnYxLm92ZXJsYXlmcyJdCiAgbW91bnRfb3B0aW9ucyA9IFsidm9sYXRpbGUiXQ==
+  path: /var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.tmpl
+  encoding: b64
 - content: |
     INVOCATION_ID=
   path: /etc/default/rke2-server
