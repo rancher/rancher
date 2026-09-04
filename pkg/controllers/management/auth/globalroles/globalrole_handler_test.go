@@ -8,12 +8,14 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -259,12 +261,38 @@ func TestReconcileGlobalRole(t *testing.T) {
 			},
 		},
 		{
-			name: "stale-named ClusterRole is deleted and the correct one is created",
+			name: "stale primary ClusterRole is deleted and the correct one is created",
 			setupControllers: func(c controllers) {
 				c.crController.EXPECT().List(gomock.Any()).Return(&rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*staleNamedCR.DeepCopy()}}, nil)
 				c.crController.EXPECT().Delete(staleNamedCR.Name, &metav1.DeleteOptions{}).Return(nil)
 				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, notFoundErr)
 				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  false,
+			condition: reducedCondition{
+				reason: ClusterRoleExists,
+				status: metav1.ConditionTrue,
+			},
+		},
+		{
+			name: "Fleet backing ClusterRoles are excluded from primary ClusterRole cleanup",
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().List(gomock.Any()).DoAndReturn(func(options metav1.ListOptions) (*rbacv1.ClusterRoleList, error) {
+					selector, err := labels.Parse(options.LabelSelector)
+					require.NoError(t, err)
+					assert.True(t, selector.Matches(labels.Set{
+						grOwnerLabel:    defaultGR.Name,
+						globalRoleLabel: "true",
+					}), "selector must match when globalRoleLabel is present")
+
+					assert.False(t, selector.Matches(labels.Set{
+						grOwnerLabel:       defaultGR.Name,
+						"some-other-label": "true",
+					}), "selector must not match without globalRoleLabel")
+					return &rbacv1.ClusterRoleList{Items: []rbacv1.ClusterRole{*readPodCR.DeepCopy()}}, nil
+				})
+				c.crController.EXPECT().Get(gomock.Any(), gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  false,
