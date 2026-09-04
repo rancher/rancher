@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -924,6 +925,29 @@ func (s *Store) secretOwnerRef(tokenName string) (metav1.OwnerReference, error) 
 	}, nil
 }
 
+// isTokenOwnerRef reports whether the owner reference names one of the given
+// tokens and is of a kind that backs a kubeconfig token: the Secret behind an
+// ext token, or a v3 Token recorded before the migration to ext tokens. The
+// garbage collector resolves both, so it deletes the ConfigMap once such an
+// owner is gone. An ext token's backing Secret is named after the token, and a
+// v3 Token owner reference names the token itself, so a token ID and its owner
+// reference name are the same string.
+func isTokenOwnerRef(ref metav1.OwnerReference, tokenIDs []string) bool {
+	isTokenKind := (ref.APIVersion == "v1" && ref.Kind == "Secret") ||
+		(ref.APIVersion == "management.cattle.io/v3" && ref.Kind == "Token")
+	return isTokenKind && slices.Contains(tokenIDs, ref.Name)
+}
+
+// ownedByToken reports whether one of the given tokens owns the ConfigMap.
+func ownedByToken(configMap *corev1.ConfigMap, tokenIDs []string) bool {
+	for _, ref := range configMap.OwnerReferences {
+		if isTokenOwnerRef(ref, tokenIDs) {
+			return true
+		}
+	}
+	return false
+}
+
 // getConfigMap retrieves a ConfigMap by name, optionally using the cache.
 func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache bool) (*corev1.ConfigMap, error) {
 	var (
@@ -1260,8 +1284,7 @@ func printKubeconfig(kubeconfig *ext.Kubeconfig, options printers.GenerateOption
 
 	var ownedTokenCount int
 	for _, ref := range kubeconfig.OwnerReferences {
-		if (ref.Kind == "Secret" && ref.APIVersion == "v1") ||
-			(ref.Kind == "Token" && ref.APIVersion == "management.cattle.io/v3") {
+		if isTokenOwnerRef(ref, kubeconfig.Status.Tokens) {
 			ownedTokenCount++
 		}
 	}
@@ -1501,6 +1524,12 @@ func (s *Store) delete(
 	err := s.configMapClient.Delete(namespace, configMap.Name, options)
 	if err != nil {
 		mapped := mapBackingError(err, configMap.Name)
+		if apierrors.IsNotFound(mapped) && tokensDeleteAttempted && ownedByToken(configMap, kubeconfig.Status.Tokens) {
+			// Deleting the tokens above also lets the garbage collector remove the
+			// ConfigMap they own. If it did so before this call, the kubeconfig is
+			// already gone and the delete has succeeded.
+			return kubeconfig, true, nil
+		}
 		if apierrors.IsConflict(mapped) && tokensDeleteAttempted {
 			return nil, false, apierrors.NewConflict(gvr.GroupResource(), configMap.Name,
 				fmt.Errorf("%s; this attempt has already revoked the kubeconfig's tokens and the delete should be retried to remove the record", genericregistry.OptimisticLockErrorMsg))
