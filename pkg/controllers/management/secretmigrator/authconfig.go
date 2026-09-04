@@ -39,6 +39,10 @@ func (h *handler) syncAuthConfig(_ string, authConfig *apimgmtv3.AuthConfig) (ru
 		return h.migrateAuthConfigPasswordToSecret(authConfig,
 			apimgmtv3.AuthConfigOKTAPasswordMigrated,
 			h.migrateOKTASecrets)
+	case client.ADFSConfigType:
+		return h.migrateAuthConfigPasswordToSecret(authConfig,
+			apimgmtv3.AuthConfigADFSPasswordMigrated,
+			h.migrateADFSSecrets)
 	default:
 		return h.migrateAuthConfig(authConfig)
 	}
@@ -200,6 +204,44 @@ func (h *handler) migrateOKTASecrets(unstructuredConfig runtime.Unstructured) (r
 	oktaConfig.OpenLdapConfig.ServiceAccountPassword = fullSecretName
 
 	return oktaConfig, nil
+}
+
+// migrateADFSSecrets effects the migration of secrets for the ADFS provider.
+func (h *handler) migrateADFSSecrets(unstructuredConfig runtime.Unstructured) (runtime.Object, error) {
+	adfsConfig := &apimgmtv3.ADFSConfig{}
+	err := common.Decode(unstructuredConfig.UnstructuredContent(), adfsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode ADFSConfig: %w", err)
+	}
+
+	if adfsConfig.OpenLdapConfig.ServiceAccountPassword == "" {
+		// OpenLDAP is not configured, so nothing else is needed
+		return adfsConfig, nil
+	}
+	secretName := fmt.Sprintf("%s-%s", strings.ToLower(adfsConfig.Type), serviceAccountPasswordFieldName)
+	lowercaseFieldName := strings.ToLower(serviceAccountPasswordFieldName)
+
+	// cannot use createOrUpdateSecretForCredential because the credential is saved in the secret with a key of
+	// "credential", but our AuthProviders look for "serviceaccountpassword"
+	_, err = h.migrator.createOrUpdateSecret(
+		secretName,
+		namespace.GlobalNamespace,
+		map[string]string{
+			lowercaseFieldName: adfsConfig.OpenLdapConfig.ServiceAccountPassword,
+		},
+		nil,
+		adfsConfig,
+		authConfigKind,
+		lowercaseFieldName)
+	if err != nil {
+		return nil, err
+	}
+
+	lowerType := strings.ToLower(adfsConfig.Type)
+	fullSecretName := common.GetFullSecretName(lowerType, serviceAccountPasswordFieldName)
+	adfsConfig.OpenLdapConfig.ServiceAccountPassword = fullSecretName
+
+	return adfsConfig, nil
 }
 
 func setUnstructuredStatus(unstructured runtime.Unstructured, key condition.Cond, value corev1.ConditionStatus) (runtime.Unstructured, error) {

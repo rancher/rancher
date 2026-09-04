@@ -30,6 +30,7 @@ const (
 	ShibbolethName = "shibboleth"
 	ObjectClass    = "objectClass"
 	OKTAName       = "okta"
+	ADFSName       = "adfs"
 )
 
 // An ErrorNotConfigured indicates that the requested LDAP operation
@@ -53,6 +54,7 @@ var (
 		OpenLdapName:   "",
 		ShibbolethName: client.ShibbolethConfigFieldOpenLdapConfig,
 		OKTAName:       client.OKTAConfigFieldOpenLdapConfig,
+		ADFSName:       client.ADFSConfigFieldOpenLdapConfig,
 	}
 )
 
