@@ -36,6 +36,9 @@ k3d cluster create rancher-server \
   -p "8080:80@loadbalancer" \
   -p "8443:443@loadbalancer" \
   --image "rancher/k3s:${CATTLE_K3S_VERSION//+/-}" \
+  --k3s-arg "--disable=servicelb@server:*" \
+  --k3s-arg "--disable=metrics-server@server:*" \
+  --k3s-arg "--disable=local-storage@server:*" \
   --wait
 
 # Deploy cert-manager and wait for its rollout
