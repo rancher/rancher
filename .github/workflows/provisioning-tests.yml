@@ -1,44 +1,93 @@
 name: Provisioning tests
+
 on:
   workflow_call:
+    inputs:
+      EXPLICIT_SCOPES:
+        required: false
+        type: string
+
 permissions: {}
 jobs:
+  # setup-matrix dynamically builds the test matrix from the change set using the
+  # precompiled scopes list (.github/scripts/provisioning-test-scopes.yaml).
+  # On pull_request only the scopes with changed paths run.
+  # Every other event runs the full matrix
+  setup-matrix:
+    name: Build Test Matrix
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      run: ${{ steps.build.outputs.run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build matrix
+        id: build
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EXPLICIT_SCOPES: ${{ inputs.EXPLICIT_SCOPES }}
+        run: |
+          set -eo pipefail
+
+          # On a PR, diff against the base (target) SHA 
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            export DIFF_BASE="$BASE_SHA"
+          elif [ -z "$EXPLICIT_SCOPES" ]; then
+            export ALL=1
+          fi
+
+          MATRIX="$(bash .github/scripts/resolve-provisioning-matrix.sh)"
+
+          # Expect compact {"include":[...]} JSON on a single line, bail otherwise.
+          if ! echo "$MATRIX" | jq -e 'has("include") and (.include | type == "array")' >/dev/null; then
+            echo "error: unexpected matrix output: $MATRIX" >&2
+            exit 1
+          fi
+
+          # If the returned matrix is empty, the test job below is skipped outright.
+          COUNT="$(echo "$MATRIX" | jq '.include | length')"
+
+          # Sanity cap against accidental fan-out
+          if [ "$COUNT" -gt 16 ]; then
+            echo "error: too many matrix entries ($COUNT)" >&2
+            exit 1
+          fi
+
+          if [ "$COUNT" -gt 0 ]; then RUN=true; else RUN=false; fi
+
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
+          echo "event=$EVENT_NAME, entries=$COUNT, run=$RUN"
+          echo "$MATRIX" | jq .
+
   provisioning_tests:
+    needs: [setup-matrix]
+    if: ${{ needs.setup-matrix.outputs.run == 'true' }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_.*$"
-          CATTLE_FEATURES: "imported-day-2-ops=true"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetA_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetB_.*$"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_Operation_SetD_.*$"
-          CATTLE_FEATURES: "imported-day-2-ops=true"
-        - V2PROV_TEST_DIST: "rke2"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
-          CATTLE_FEATURES: "provisioningprebootstrap=true"
-        - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "^Test_PreBootstrap_.*$"
-          CATTLE_FEATURES: "provisioningprebootstrap=true"
+      matrix: ${{ fromJSON(needs.setup-matrix.outputs.matrix) }}
     name: Provisioning tests
     runs-on:
       - runs-on
       - spot=false
-      - runner=16cpu-linux-x64
+      - runner=${{ matrix.V2PROV_TEST_CPUS }}cpu-linux-x64
       - run-id=${{ github.run_id }}
+      - disk=large
     env:
       # The registry-cache pod exposes a host port, so use the Docker bridge IP from the runner.
       REGISTRY: "172.17.0.2:5000"
       DRONE_BUILD_EVENT: "${{ github.event_name }}"
       V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
+      V2PROV_TEST_PARALLELISM: "${{ matrix.V2PROV_TEST_PARALLELISM }}"
       V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
       CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
       TAG: ${{ github.sha }}-head
@@ -49,7 +98,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: testdata
@@ -60,7 +109,7 @@ jobs:
           sudo systemctl restart docker
           sudo docker info
       - name: Download Docker images artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: "/tmp"
           merge-multiple: true
@@ -101,26 +150,54 @@ jobs:
           mv ./build/out.txt "/tmp/report-${V2PROV_TEST_DIST}-${TESTSUITE}.txt"
       - name: Upload Plain Text Test Results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: "Test Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
           path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*"
       - name: Upload logdump artifact if we had some tests failures
         if: failure()
-        uses: rancherlabs/cowboy@61de86d99456805424f9af0dadfcf362413cd745
+        uses: rancherlabs/cowboy@61de86d99456805424f9af0dadfcf362413cd745 # v0.0.2
         with:
           log-file-path: provtest_output.txt
           artifact-retention-days: 7
           artifact-name: "Parsed Failure Log Dump (${{ matrix.V2PROV_TEST_DIST }}, ${{ steps.test_output.outputs.suite }})"
 
+  # provisioning_tests_summary prints a friendly summary of what tests ran. It's true purpose
+  # is to act as an anchor, giving us a single check that forwards the results of the dynamic matrix
+  # which we can use as a 'required check'
+  provisioning_tests_summary:
+    if: always()
+    name: Provisioning Tests Summary
+    needs: [setup-matrix, provisioning_tests]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    env:
+      SETUP_MATRIX_RESULT: ${{ needs.setup-matrix.result }}
+      PROVISIONING_TESTS_RESULT: ${{ needs.provisioning_tests.result }}
+    steps:
+      - name: Generate provisioning tests summary
+        shell: bash
+        run: |
+          echo "Provisioning Test Summary"
+          echo "--------------------------------"        
+          if [[ "${SETUP_MATRIX_RESULT}" != "success" && "${SETUP_MATRIX_RESULT}" != "skipped" ]]; then
+            echo "Failed to setup test matrix."
+            exit 1
+          fi
+          
+          if [[ "${PROVISIONING_TESTS_RESULT}" != "success" && "${PROVISIONING_TESTS_RESULT}" != "skipped" ]]; then
+            echo "Some provisioning tests failed. Please check the logs for details."
+            exit 1
+          fi
+
   convert-to-xml:
     name: Convert test report to xml
     needs: [provisioning_tests]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     steps:
       - name: Fetch plaintext test output
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           merge-multiple: true
           path: /tmp/test-results/
@@ -128,10 +205,10 @@ jobs:
         run: |
           for file in $(ls /tmp/test-results/report-*.txt); do
              echo "Processing $file..."
-             go run github.com/jstemmer/go-junit-report/v2@latest < $file > $(sed 's/txt/xml/g' <<<$file)
+             go run github.com/jstemmer/go-junit-report/v2@14d61e6e75e3f3c74551d757ad936e8e88014464 < $file > $(sed 's/txt/xml/g' <<<$file)
           done
       - name: Upload XML Test Results
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: XML Results
           path: "/tmp/test-results/report-*.xml"
@@ -139,10 +216,10 @@ jobs:
   event-file:
     name: Upload event file
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     steps:
       - name: Upload GH Event File
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Event File
           path: ${{ github.event_path }}

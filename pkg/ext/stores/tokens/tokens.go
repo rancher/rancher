@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
@@ -48,7 +49,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 const (
@@ -124,6 +125,12 @@ type SystemStore struct {
 	hasher          hashHandler         // access to generation and hashing of secret values
 	auth            authHandler         // access to user retrieval from context
 	tableConverter  rest.TableConvertor // custom column formatting
+}
+
+type JsonPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
 }
 
 // NewFromWrangler is a convenience function for creating a token store.
@@ -456,6 +463,7 @@ func (t *Store) Get(
 	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
 	token.Status.BearerToken = ""
+	token.Status.Hash = ""
 
 	return token, nil
 }
@@ -660,7 +668,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// discarded and written over. No checks are made, no errors are thrown.
 	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, err
 	}
 
 	rtPrincipal := requestToken.GetUserPrincipal()
@@ -785,6 +793,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
+// Delete is the core deletion method to remove a single named token
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	err := t.secretClient.Delete(TokenNamespace, name, options)
 	if err == nil {
@@ -797,6 +806,24 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	}
 
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
+}
+
+// DeleteCollection is an internal bulk deletion method for use by other parts of Rancher.
+func (t *SystemStore) DeleteCollection(options *metav1.ListOptions) error {
+	localOptions, err := ListOptionMerge(true, "", options)
+	if err != nil {
+		return apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
+	}
+
+	// Deliberately using client instead of the cache as the latter may not be yet synced/populated.
+	if err := t.secretClient.DeleteCollection(TokenNamespace, metav1.DeleteOptions{}, localOptions); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return apierrors.NewInternalError(fmt.Errorf("failed to delete tokens: %w", err))
+	}
+
+	return nil
 }
 
 // Get retrieves the named ext token, without permission checking
@@ -941,6 +968,7 @@ func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, option
 
 		// Filtering for users is done already, see above where the options are set up and/or merged.
 		token.Status.Current = token.Name == authTokenID
+		token.Status.Hash = ""
 		tokens = append(tokens, *token)
 	}
 
@@ -993,9 +1021,9 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	// Regular users are not allowed to extend the TTL.
 	if !fullPermission {
-		ttl, err := clampMaxTTL(token.Spec.TTL)
+		ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
 		if err != nil {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to clamp token time-to-live: %w", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("failed to ingest token time-to-live: %w", err))
 		}
 		token.Spec.TTL = ttl
 		if ttlGreater(ttl, oldToken.Spec.TTL) {
@@ -1013,6 +1041,10 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to convert token for storage: %w", err))
 	}
+
+	// The stored hash was carried through toSecret above; never return it to
+	// the client.
+	token.Status.Hash = ""
 
 	// Abort, user does not wish to actually change anything.
 	if dryRun {
@@ -1032,7 +1064,27 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	newToken.Status.Current = newToken.Name == authTokenID
 	newToken.Status.Value = ""
+	newToken.Status.Hash = ""
 	return newToken, nil
+}
+
+// AddLabel adds a custom label to the named ext token. This is done directly on
+// the secret.
+func (t *SystemStore) AddLabel(name, key, value string) error {
+	// Due to the presence of `SecretKindLabel` in the labels we can be
+	// sure that the secret has labels, simplifying patch construction.
+
+	escapedKey := strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
+	patch, err := json.Marshal([]JsonPatch{{
+		Op:    "add",
+		Path:  "/metadata/labels/" + escapedKey,
+		Value: value,
+	}})
+	if err != nil {
+		return err
+	}
+	_, err = t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	return err
 }
 
 // UpdateLastUsedAt patches the last-used-at information of the token.
@@ -1040,11 +1092,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastUsedAt,
 		Value: nowEncoded,
@@ -1062,11 +1110,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.Token, error) {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldLastActivitySeen,
 		Value: nowEncoded,
@@ -1092,11 +1136,7 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.T
 // Called by refreshAttributes.
 func (t *SystemStore) Disable(name string) error {
 	// Operate directly on the backend secret holding the token
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal([]JsonPatch{{
 		Op:    "replace",
 		Path:  "/data/" + FieldEnabled,
 		Value: base64.StdEncoding.EncodeToString([]byte("false")),
@@ -1206,6 +1246,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					// ListOptionMerge above) takes care of only
 					// asking for owned tokens
 					token.Status.Current = token.Name == authTokenID
+					token.Status.Hash = ""
 					obj = token
 				default: // watch.Error
 					obj = event.Object
@@ -1332,23 +1373,30 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 		if err == nil {
 			return ext, nil
 		}
-		return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
+		return nil, fmt.Errorf("unable to fetch token %q: %w", tokenID, err)
 	}
 
 	// checking for a v3 Token first, as it is the currently more common
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
 	// cache.
-	if v3token, err := t.v3TokenClient.Get(tokenID); err == nil {
+	v3token, errV3 := t.v3TokenClient.Get(tokenID)
+	if errV3 == nil {
 		return v3token, nil
+	}
+	if !apierrors.IsNotFound(errV3) {
+		// report transient/internal v3 errors
+		// as we cannot be sure about resource state
+		return nil, errV3
 	}
 
 	// not a v3 Token, now check for ext token
-	if ext, err := t.Get(tokenID, "", &metav1.GetOptions{}); err == nil {
+	ext, errExt := t.Get(tokenID, "", &metav1.GetOptions{})
+	if errExt == nil {
 		return ext, nil
 	}
 
-	return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	return nil, fmt.Errorf("unable to fetch token %q: %w", tokenID, errExt)
 }
 
 // timeHandler is a helper interface hiding the details of timestamp generation from
@@ -1502,45 +1550,34 @@ func SessionID(ctx context.Context) (string, error) {
 // requests a filter for a different user than itself.
 func ListOptionMerge(fullAccess bool, userName string, options *metav1.ListOptions) (metav1.ListOptions, error) {
 	var localOptions metav1.ListOptions
+	empty := metav1.ListOptions{}
 
 	// for admins we do not impose any additional restrictions over the requested
 	if fullAccess {
+		if options == nil {
+			return empty, nil
+		}
 		return *options, nil
 	}
 
-	// for non-admins we additionally filter the result for their own tokens
-	userIDSelector := labels.Set(map[string]string{
-		UserIDLabel: userName,
-	})
-	empty := metav1.ListOptions{}
-	if options == nil || *options == empty {
-		// No external filter to contend with, just set the internal filter.
-		localOptions = metav1.ListOptions{
-			LabelSelector: userIDSelector.AsSelector().String(),
-		}
-	} else {
-		// We have to contend with an external filter, and merge ours into it.
+	// For non-admins the effective selector always constrains the owner label
+	// to the requesting user. Parse the caller's selector (if any) and AND the
+	// owner requirement onto it. A selector that already pins the owner label to
+	// a different value then holds two conflicting equality requirements and is
+	// unsatisfiable, so it matches nothing.
+	if options != nil {
 		localOptions = *options
-		callerSelector, err := labels.ConvertSelectorToLabelsMap(localOptions.LabelSelector)
-		if err != nil {
-			return localOptions, err
-		}
-		if callerSelector.Has(UserIDLabel) {
-			// The external filter does filter for a user, possible conflict.
-			if callerSelector[UserIDLabel] != userName {
-				// It asks for a user other than the current.
-				// We can bail now, with an empty result, as
-				// nothing can match.
-				return localOptions, nil
-			}
-			// It asks for the current user, same as the internal
-			// filter would do.  We can pass the options as is.
-		} else {
-			// The external filter has nothing about the user.
-			// We can simply add the internal filter.
-			localOptions.LabelSelector = labels.Merge(callerSelector, userIDSelector).AsSelector().String()
-		}
 	}
+
+	selector, err := labels.Parse(localOptions.LabelSelector)
+	if err != nil {
+		return empty, err
+	}
+	ownerReq, err := labels.NewRequirement(UserIDLabel, selection.Equals, []string{userName})
+	if err != nil {
+		return empty, err
+	}
+	localOptions.LabelSelector = selector.Add(*ownerReq).String()
 
 	return localOptions, nil
 }
@@ -1585,7 +1622,7 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	// spec values
 	// injects default on creation and update
-	ttl, err := clampMaxTTL(token.Spec.TTL)
+	ttl, err := IngestTTL(token.Spec.TTL, settings.AuthTokenMaxTTLMinutes, settings.AuthTokenDefaultTTLMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -1736,62 +1773,79 @@ func setExpired(token *ext.Token) error {
 	return nil
 }
 
-func clampMaxTTL(ttl int64) (int64, error) {
-	max, err := maxTTL()
+// IngestTTL returns the input ttl (milliseconds) with requests for defaults
+// resolved, and further limited to the maximum allowed, as per the given
+// settings.
+func IngestTTL(ttl int64, maxSetting, defaultSetting settings.Setting) (int64, error) {
+	maxValue, err := ParseTTLToMilliseconds(maxSetting)
+	if err != nil {
+		return 0, err
+	}
+	if maxValue < 1 {
+		maxValue = -1 // "0" means no max — use the real "never expires" value.
+	}
+	defaultValue, err := ParseTTLToMilliseconds(defaultSetting)
 	if err != nil {
 		return 0, err
 	}
 
-	// decision table
-	// max | ttl         | note                                        | result
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// < 1 | < 0         | max, ttl = +inf, no clamp                   | ttl
-	// < 1 | = 0         | max = +inf = default, ttl default requested | -1 = +inf
-	// < 1 | > 0         | max = +inf, ttl is regular, less than max   | ttl
-	// --- + ----------- + ------------------------------------------- + ----------------
-	// > 0 | < 0         | ttl = +inf, clamp to max                    | max
-	// > 0 | = 0         | ttl default requested, this is max          | max
-	// > 0 | > 0, <= max | less than max                               | ttl
-	// > 0 | > max       | clamp to max                                | max
+	// We fall back to the maximum when the default value requests a default itself
+	defaultValue = DefaultTTL(defaultValue, maxValue)
 
-	if max < 1 {
-		if ttl == 0 {
-			return -1, nil
-		}
-		return ttl, nil
-	}
-	if ttl > max || ttl <= 0 {
-		return max, nil
-	}
-	return ttl, nil
+	// Then resolve a default request in the input and clamp
+	return ClampToMaxTTL(DefaultTTL(ttl, defaultValue), maxValue), nil
 }
 
-// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
-// See also pkg/auth/tokens/manager.go
-func ParseTokenTTL(ttl string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vm", ttl)
-	dur, err := time.ParseDuration(durString)
+// ParseTTLToMilliseconds retrieves a ttl setting (in minutes) and returns it as milliseconds
+func ParseTTLToMilliseconds(ttlSetting settings.Setting) (int64, error) {
+	ttl, err := ParseTTLToDuration(ttlSetting.Get())
 	if err != nil {
-		return 0, fmt.Errorf("error parsing token ttl: %v", err)
+		return 0, fmt.Errorf("failed to process setting '%s': %w", ttlSetting.Name, err)
+	}
+	return ttl.Milliseconds(), nil
+}
+
+// ParseTTLToDuration parses an integer representing minutes as a string and returns it as a duration.
+func ParseTTLToDuration(ttl string) (time.Duration, error) {
+	dur, err := time.ParseDuration(fmt.Sprintf("%vm", ttl))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing ttl minutes: %w", err)
 	}
 	return dur, nil
 }
 
-func maxTTL() (int64, error) {
-	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
-
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
+// DefaultTTL returns the default ttl, if such was requested by the input
+// (`value == 0`), or else the input as is.
+func DefaultTTL(ttl, defaultValue int64) int64 {
+	if ttl == 0 {
+		return defaultValue
 	}
+	return ttl
+}
 
-	return maxTTL.Milliseconds(), nil
+// ClampToMaxTTL ensures that the returned ttl is smaller than the specified
+// maximum. In other words, it returns the minimum of the 2 inputs, taking into
+// account the special encoding of `infinity` (`value < 0`) for both max and
+// ttl. The function assumes that `ttl` is not `0`, i.e. that a request for the
+// default has been resolved already.
+func ClampToMaxTTL(ttl, max int64) int64 {
+	if max < 1 {
+		// maximum is infinity, ttl is always smaller or equal
+		return ttl
+	}
+	if ttl < 0 {
+		// ttl asked for infinity, but max is finite — cap it at max.
+		return max
+	}
+	// for a finite maximum we can do a simple
+	return min(ttl, max)
 }
 
 // ttlGreater compares the two TTL a and b. It returns true if a is greater than b.
 // Important special cases for TTL:
 // Any value < 0 represents +infinity.
 // A value > 0 is that many milliseconds.
-// The default of `0` cannot arrive here. `clampMaxTTL` resolved that already.
+// The default of `0` cannot arrive here. `IngestTTL` resolved that already.
 func ttlGreater(a, b int64) bool {
 	// Decision table
 	//

@@ -815,7 +815,7 @@ func (s *SCIMServer) addGroupMember(provider, principalName, displayName string,
 		return fmt.Errorf("failed to get user %s: %w", member.Value, err)
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, attrNeedsCreate, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get user attributes for %s: %w", user.Name, err)
 	}
@@ -842,9 +842,13 @@ func (s *SCIMServer) addGroupMember(provider, principalName, displayName string,
 	})
 
 	attr.GroupPrincipals[provider] = v3.Principals{Items: principals}
-	_, err = s.userAttributes.Update(attr)
+	if attrNeedsCreate {
+		_, err = s.userAttributes.Create(attr)
+	} else {
+		_, err = s.userAttributes.Update(attr)
+	}
 	if err != nil {
-		return fmt.Errorf("failed to update user attributes for %s: %w", user.Name, err)
+		return fmt.Errorf("failed to save user attributes for %s: %w", user.Name, err)
 	}
 
 	return nil
@@ -852,7 +856,7 @@ func (s *SCIMServer) addGroupMember(provider, principalName, displayName string,
 
 // updateGroupMemberDisplayName updates the DisplayName on a member's group principal if it is stale.
 func (s *SCIMServer) updateGroupMemberDisplayName(provider, principalName, displayName, memberID string) error {
-	attr, err := s.userAttributeCache.Get(memberID)
+	attr, _, err := s.userMGR.EnsureAndGetUserAttribute(memberID)
 	if err != nil {
 		return fmt.Errorf("failed to get user attributes for %s: %w", memberID, err)
 	}
@@ -889,7 +893,7 @@ func (s *SCIMServer) removeGroupMember(provider, principalName, value string) er
 		return fmt.Errorf("failed to get user %s: %w", value, err)
 	}
 
-	attr, err := s.userAttributeCache.Get(user.Name)
+	attr, _, err := s.userMGR.EnsureAndGetUserAttribute(user.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get user attributes for %s: %w", user.Name, err)
 	}

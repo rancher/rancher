@@ -33,13 +33,14 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	p := &CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
 			OpenIDCProvider: baseoidc.OpenIDCProvider{
-				Name:        Name,
-				Type:        client.CognitoConfigType,
-				CTX:         ctx,
-				AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-				Secrets:     mgmtCtx.Wrangler.Core.Secret(),
-				UserMGR:     userMGR,
-				TokenMgr:    tokenMgr,
+				Name:         Name,
+				Type:         client.CognitoConfigType,
+				CTX:          ctx,
+				AuthConfigs:  mgmtCtx.Management.AuthConfigs(""),
+				Secrets:      mgmtCtx.Wrangler.Core.Secret(),
+				UserMGR:      userMGR,
+				TokenMgr:     tokenMgr,
+				UserSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 			},
 		},
 	}

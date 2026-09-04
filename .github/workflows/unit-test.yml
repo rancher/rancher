@@ -15,17 +15,17 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5.6.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: 'go.mod'
 
       # https://github.com/golang/go/issues/75031
       - name: Set toolchain version
-        run: go env -w GOTOOLCHAIN=go1.26.4+auto
+        run: go env -w GOTOOLCHAIN=go1.26.6+auto
 
       - name: Run unit tests
         run: go test -cover -tags=test ./pkg/...

@@ -13,7 +13,7 @@ import (
 
 // decodeYAML reads YAML data from input and decodes it into target
 func decodeYAML(input io.Reader, target interface{}) error {
-	data, err := io.ReadAll(input)
+	data, err := io.ReadAll(&io.LimitedReader{R: input, N: 5 * 1024 * 1024})
 	if err != nil {
 		return err
 	}
@@ -66,13 +66,13 @@ func InfoFromTarball(input io.Reader) (*types.ChartInfo, error) {
 				return nil, err
 			}
 		case "app-readme.md":
-			bytes, err := io.ReadAll(tarball)
+			bytes, err := io.ReadAll(&io.LimitedReader{R: tarball, N: 1 * 1024 * 1024})
 			if err != nil {
 				return nil, err
 			}
 			result.APPReadme = string(bytes)
 		case "readme.md":
-			bytes, err := io.ReadAll(tarball)
+			bytes, err := io.ReadAll(&io.LimitedReader{R: tarball, N: 1 * 1024 * 1024})
 			if err != nil {
 				return nil, err
 			}

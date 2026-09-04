@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/channelserver/pkg/model"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/rancher/wrangler/v3/pkg/schemas"
@@ -84,8 +85,12 @@ func newMachinePlanSecret(name, machineName string) *corev1.Secret {
 			Namespace: "fleet-default",
 			UID:       types.UID(name + "-uid"),
 			Labels: map[string]string{
-				capr.ClusterNameLabel: "c-mine",
-				capr.MachineNameLabel: machineName,
+				planv1alpha1.ClusterLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel: "Machine",
+				planv1alpha1.MachineLifecycleNameLabel: machineName,
 			},
 		},
 		Type: capr.SecretTypeMachinePlan,
@@ -234,7 +239,9 @@ func TestCAPRAdapter_WaitForRegister_MissingMachineNameLabel(t *testing.T) {
 			Name:      "secret-a",
 			Namespace: "fleet-default",
 			Labels: map[string]string{
-				capr.ClusterNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
 				// No MachineNameLabel
 			},
 		},
@@ -482,17 +489,4 @@ func TestFilterField(t *testing.T) {
 			}
 		})
 	}
-}
-
-// --- filterConfigData -----------------------------------------------------------------------
-
-func TestFilterConfigData(t *testing.T) {
-	t.Parallel()
-
-	// This is a shallow integration test — filterConfigData calls GetKDMReleaseData which
-	// requires a fully-wired context. We'll verify the basic flow: recognized keys are kept,
-	// unrecognized keys are deleted. Deep KDM fetching is out of scope for a unit test.
-
-	// Skipping for now since GetKDMReleaseData is a global lookup that needs a real cluster
-	// setup. The core logic (filterField) is already tested above.
 }

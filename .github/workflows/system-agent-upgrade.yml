@@ -32,7 +32,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
 
       - name: Create App Token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
@@ -40,7 +40,8 @@ jobs:
           permission-pull-requests: write
 
       - name: Check out repository code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        # zizmor: ignore[artipacked] -- this job must retain the App token for its authenticated branch push.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ steps.app-token.outputs.token }}
       - name: Update system agent in files
@@ -71,7 +72,7 @@ jobs:
       - name: Create Pull Request
         if: ${{ steps.changes.outputs.changes_exist == 'true' }}
         id: cpr
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           SOURCE_BRANCH: ${{ steps.branch.outputs.branch }}
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

@@ -21,7 +21,6 @@ import (
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,9 +48,6 @@ const (
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
 	rtByInheritedRTsIndex            = "authz.cluster.cattle.io/rts-by-inherited-rts"
-
-	grbByNamespaceEnqueuer = "enqueue-grbs-by-namespace"
-	grByNamespaceEnqueuer  = "enqueue-grs-by-namespace"
 
 	rolesCircularSoftLimit = 100
 	rolesCircularHardLimit = 500
@@ -166,13 +162,20 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	}
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
 
-	// Register GlobalRole and GlobalRoleBinding Enqueuers
-	grEnqueuer := globalRoleEnqueuer{
-		grbLister: management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
-		grLister:  management.Wrangler.Mgmt.GlobalRole().Cache(),
-	}
-	relatedresource.WatchClusterScoped(ctx, grbByNamespaceEnqueuer, grEnqueuer.namespaceEnqueueGRBs, management.Wrangler.Mgmt.GlobalRoleBinding(), workload.Corew.Namespace())
-	relatedresource.WatchClusterScoped(ctx, grByNamespaceEnqueuer, grEnqueuer.namespaceEnqueueGRs, management.Wrangler.Mgmt.GlobalRole(), workload.Corew.Namespace())
+	// Re-evaluate a namespace's InitialRolesPopulated condition when the project RBAC it waits for
+	// appears: PRTB-owned RoleBindings (project-member access) and project-namespace ClusterRoles.
+	// ClusterRoleBindings don't have a similar watch, but will be caught by the 5 second retry timer in the InitialRolesPopulated condition handler.
+	relatedresource.WatchClusterScoped(ctx, "enqueue-namespace-by-rolebinding", roleBindingEnqueueNamespace, workload.Corew.Namespace(), workload.RBACw.RoleBinding())
+	relatedresource.WatchClusterScoped(ctx, "enqueue-namespace-by-clusterrole", clusterRoleEnqueueNamespace, workload.Corew.Namespace(), workload.RBACw.ClusterRole())
+
+	// Create the Roles and RoleBindings that GlobalRoles with InheritedNamespacedRules define for
+	// namespaces created after the GlobalRole. The GlobalRole and GlobalRoleBinding controllers run
+	// on the leader replica and cannot be enqueued from here: this namespace watch runs on the
+	// replica that owns the cluster, which in HA is usually a different pod, so the resources are
+	// reconciled for this cluster directly.
+	RegisterInheritedNamespacedRulesHandler(ctx, workload.Corew.Namespace(),
+		management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.GlobalRoleBinding(),
+		workload.RBACw.Role(), workload.RBACw.RoleBinding(), workload.ClusterName)
 
 	// Register roletemplate-aggregation controllers
 	if err := roletemplates.Register(ctx, workload); err != nil {
@@ -222,7 +225,7 @@ type manager struct {
 	rbLister            wrbacv1.RoleBindingCache
 	roleBindings        wrbacv1.RoleBindingClient
 	nsLister            corew.NamespaceCache
-	namespaces          corew.NamespaceClient
+	namespaces          corew.NamespaceController
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
 	userLister          v3.UserLister
@@ -652,57 +655,4 @@ func rtbByClusterAndUserNotDeleting(obj any) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{idx}, nil
-}
-
-type globalRoleEnqueuer struct {
-	grbLister mgmtv3.GlobalRoleBindingCache
-	grLister  mgmtv3.GlobalRoleCache
-}
-
-// namespaceEnqueueGRBs enqueues GRBs that reference the changed namespace in their inherited namespaced rules.
-func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if obj == nil {
-		return nil, nil
-	}
-	ns, ok := obj.(*corev1.Namespace)
-	if !ok {
-		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grbByNamespaceEnqueuer)
-	}
-
-	grs, err := g.grLister.GetByIndex(pkgrbac.GRDownstreamNSIndex, ns.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list GlobalRoles for namespace %s: %w", ns.Name, err)
-	}
-	var keys []relatedresource.Key
-	for _, gr := range grs {
-		grbs, err := g.grbLister.GetByIndex("mgmt-auth-grb-gr-idex", gr.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list GlobalRoleBindings for GlobalRole %s: %w", gr.Name, err)
-		}
-		for _, grb := range grbs {
-			keys = append(keys, relatedresource.Key{Name: grb.Name})
-		}
-	}
-	return keys, nil
-}
-
-// namespaceEnqueueGRs enqueues GRs that reference the changed namespace in their inherited namespaced rules.
-func (g *globalRoleEnqueuer) namespaceEnqueueGRs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if obj == nil {
-		return nil, nil
-	}
-	ns, ok := obj.(*corev1.Namespace)
-	if !ok {
-		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grByNamespaceEnqueuer)
-	}
-
-	grs, err := g.grLister.GetByIndex(pkgrbac.GRDownstreamNSIndex, ns.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list GlobalRoles for namespace %s: %w", ns.Name, err)
-	}
-	var keys []relatedresource.Key
-	for _, gr := range grs {
-		keys = append(keys, relatedresource.Key{Name: gr.Name})
-	}
-	return keys, nil
 }

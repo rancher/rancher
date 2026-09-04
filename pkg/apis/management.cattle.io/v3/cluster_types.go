@@ -110,6 +110,8 @@ type ClusterSpecBase struct {
 	DesiredAuthImage                                     string                          `json:"desiredAuthImage"`
 	AgentImageOverride                                   string                          `json:"agentImageOverride"`
 	AgentEnvVars                                         []v1.EnvVar                     `json:"agentEnvVars,omitempty"`
+	DesiredAssetsImage                                   string                          `json:"desiredAssetsImage"`
+	AssetsImageOverride                                  string                          `json:"assetsImageOverride"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                          `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                          `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	DockerRootDir                                        string                          `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
@@ -189,6 +191,7 @@ type ClusterStatus struct {
 	Driver                     string                    `json:"driver"`
 	Provider                   string                    `json:"provider"`
 	AgentImage                 string                    `json:"agentImage"`
+	AssetsImage                string                    `json:"assetsImage"`
 	AppliedAgentEnvVars        []v1.EnvVar               `json:"appliedAgentEnvVars,omitempty"`
 	AgentFeatures              map[string]bool           `json:"agentFeatures,omitempty"`
 	AuthImage                  string                    `json:"authImage"`
@@ -323,9 +326,9 @@ func (c *ClusterRegistrationToken) ObjClusterName() string {
 
 type ClusterRegistrationTokenSpec struct {
 	ClusterName string `json:"clusterName" norman:"required,type=reference[cluster]"`
-	// TTL is the duration in seconds before the token expires and is rotated. Zero disables TTL-based rotation.
+	// TTL is the duration in minutes before the token expires and is rotated. Zero disables TTL-based rotation.
 	TTL *int64 `json:"ttl,omitempty"`
-	// GracePeriod is the duration in seconds during which both the old and new tokens remain valid after
+	// GracePeriod is the duration in minutes during which both the old and new tokens remain valid after
 	// rotation, allowing cluster agents time to restart and pick up the new credential.
 	GracePeriod *int64 `json:"gracePeriod,omitempty"`
 }

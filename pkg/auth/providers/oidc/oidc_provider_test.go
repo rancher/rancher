@@ -20,11 +20,15 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestValidateACR(t *testing.T) {
@@ -61,7 +65,7 @@ func TestValidateACR(t *testing.T) {
 
 func TestParseACRFromAccessToken(t *testing.T) {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	suffix := base64.URLEncoding.EncodeToString([]byte(`{}`))
+	suffix := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
 	validClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
 	invalidBase64Claims := "invalid_base64_claims"
 	noAcrClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"1234567890"}`))
@@ -106,6 +110,115 @@ func TestParseACRFromAccessToken(t *testing.T) {
 			if (err != nil) != tt.wantError {
 				t.Errorf("expected error: %v, got error: %v", tt.wantError, err)
 			}
+		})
+	}
+}
+
+func TestClaimInfoUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		in          string
+		initial     *ClaimInfo
+		want        ClaimInfo
+		expectError bool
+	}{
+		"groups as array": {
+			in:   `{"sub":"u1","groups":["a","b"]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{"a", "b"}},
+		},
+		"groups as single string": {
+			in:   `{"sub":"u1","groups":"only"}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{"only"}},
+		},
+		"groups as empty string yields nil slice": {
+			in:   `{"sub":"u1","groups":""}`,
+			want: ClaimInfo{Subject: "u1"},
+		},
+		"groups as null yields nil slice": {
+			in:   `{"sub":"u1","groups":null}`,
+			want: ClaimInfo{Subject: "u1"},
+		},
+		"groups as empty array yields empty slice": {
+			in:   `{"sub":"u1","groups":[]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{}},
+		},
+		"groups array with empty string entry drops the empty entry": {
+			in:   `{"sub":"u1","groups":["a",""]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{"a"}},
+		},
+		"groups array of only empty strings yields empty slice": {
+			in:   `{"sub":"u1","groups":["",""]}`,
+			want: ClaimInfo{Subject: "u1", Groups: []string{}},
+		},
+		"groups missing leaves existing value untouched": {
+			in:      `{"sub":"u1"}`,
+			initial: &ClaimInfo{Groups: []string{"previously", "set"}},
+			want:    ClaimInfo{Subject: "u1", Groups: []string{"previously", "set"}},
+		},
+		"groups present replaces existing value": {
+			in:      `{"sub":"u1","groups":"new"}`,
+			initial: &ClaimInfo{Groups: []string{"old"}},
+			want:    ClaimInfo{Subject: "u1", Groups: []string{"new"}},
+		},
+		"full_group_path as single string": {
+			in:   `{"sub":"u1","full_group_path":"/team/lead"}`,
+			want: ClaimInfo{Subject: "u1", FullGroupPath: []string{"/team/lead"}},
+		},
+		"full_group_path as array": {
+			in:   `{"sub":"u1","full_group_path":["/a","/b"]}`,
+			want: ClaimInfo{Subject: "u1", FullGroupPath: []string{"/a", "/b"}},
+		},
+		"roles as single string": {
+			in:   `{"sub":"u1","roles":"admin"}`,
+			want: ClaimInfo{Subject: "u1", Roles: []string{"admin"}},
+		},
+		"roles as array": {
+			in:   `{"sub":"u1","roles":["admin","viewer"]}`,
+			want: ClaimInfo{Subject: "u1", Roles: []string{"admin", "viewer"}},
+		},
+		"all string-or-array fields together": {
+			in: `{
+				"sub":"u1",
+				"name":"User One",
+				"email":"u1@example.com",
+				"groups":"g",
+				"full_group_path":"/g",
+				"roles":"r"
+			}`,
+			want: ClaimInfo{
+				Subject:       "u1",
+				Name:          "User One",
+				Email:         "u1@example.com",
+				Groups:        []string{"g"},
+				FullGroupPath: []string{"/g"},
+				Roles:         []string{"r"},
+			},
+		},
+		"groups as number is rejected": {
+			in:          `{"sub":"u1","groups":42}`,
+			expectError: true,
+		},
+		"invalid json is rejected": {
+			in:          `{"sub":`,
+			expectError: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := ClaimInfo{}
+			if tt.initial != nil {
+				got = *tt.initial
+			}
+			err := json.Unmarshal([]byte(tt.in), &got)
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -253,6 +366,196 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			expectedClaimInfo: &ClaimInfo{
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 				Groups:  []string{"group1", "group2"},
+			},
+		},
+		"get single group with GroupsClaim as string in ID token": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "role"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":  "test",
+					"exp":  time.Now().Add(5 * time.Minute).Unix(),
+					"iss":  "http://localhost:" + port,
+					"role": "RANCHER_ADMIN",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"RANCHER_ADMIN"},
+			},
+		},
+		"get single group with GroupsClaim as string in UserInfo": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "role"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud": "test",
+					"exp": time.Now().Add(5 * time.Minute).Unix(),
+					"iss": "http://localhost:" + port,
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"role": "RANCHER_ADMIN"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"RANCHER_ADMIN"},
+			},
+		},
+		"null GroupsClaim in UserInfo preserves ID token groups": {
+			config: func(port string) *apiv3.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.GroupsClaim = "role"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":  "test",
+					"exp":  time.Now().Add(5 * time.Minute).Unix(),
+					"iss":  "http://localhost:" + port,
+					"role": []string{"FROM_ID_TOKEN"},
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				"role": null
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"FROM_ID_TOKEN"},
+			},
+		},
+		"get single group from standard groups claim as string": {
+			config: func(port string) *apiv3.OIDCConfig {
+				return newOIDCConfig(port)
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":    "test",
+					"exp":    time.Now().Add(5 * time.Minute).Unix(),
+					"iss":    "http://localhost:" + port,
+					"groups": "only-group",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				require.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute),
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"only-group"},
 			},
 		},
 		"error - invalid certificate": {
@@ -1426,4 +1729,128 @@ func TestCookieSecurityAttributes(t *testing.T) {
 			assert.Equal(t, http.SameSiteLaxMode, got.SameSite, "SameSite must be Lax")
 		})
 	}
+}
+
+func TestSearchPrincipals(t *testing.T) {
+	t.Parallel()
+
+	users := []*apiv3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+			DisplayName:  "Test UserOne",
+			PrincipalIDs: []string{"oidc_user://sub-0001", "local://u-oidc1"},
+		},
+	}
+
+	provider := &OpenIDCProvider{
+		Name: Name,
+		UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+				return users, nil
+			},
+		}),
+	}
+
+	tests := []struct {
+		name          string
+		searchValue   string
+		principalType string
+		expected      []apiv3.Principal
+	}{
+		{
+			name:          "known user is returned before the principal built from the search value",
+			searchValue:   "testu",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:        "an empty principal type searches for users",
+			searchValue: "testu",
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:          "searching the subject returns a single principal",
+			searchValue:   "sub-0001",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
+					DisplayName:   "sub-0001",
+					LoginName:     "sub-0001",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:          "group search does not resolve users",
+			searchValue:   "testu",
+			principalType: GroupType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_group://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := provider.SearchPrincipals(test.searchValue, test.principalType, &apiv3.Token{})
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
+	t.Parallel()
+
+	provider := &OpenIDCProvider{Name: Name}
+
+	result, err := provider.SearchPrincipals("testu", UserType, &apiv3.Token{})
+	require.NoError(t, err)
+	assert.Equal(t, []apiv3.Principal{
+		{
+			ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
+			DisplayName:   "testu",
+			LoginName:     "testu",
+			PrincipalType: UserType,
+			Provider:      Name,
+		},
+	}, result)
 }

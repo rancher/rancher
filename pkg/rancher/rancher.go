@@ -222,6 +222,14 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, fmt.Errorf("failed to create CRDs: %w", err)
 	}
 
+	// Disable the linode node driver (if unused) and remove its DynamicSchema
+	// objects and generated CRDs before any informers start.
+	if features.MCM.Enabled() && features.ProvisioningV2.Enabled() {
+		if err := disableUnusedLinodeNodeDriver(wranglerContext); err != nil {
+			return nil, fmt.Errorf("failed to reconcile linode node driver: %w", err)
+		}
+	}
+
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
 		logrus.Info("fleet can't be turned off when MCM is enabled. Turning on fleet feature")
 		if err := features.SetFeature(wranglerContext.Mgmt.Feature(), features.Fleet.Name(), true); err != nil {
@@ -229,35 +237,28 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
-	if features.Auth.Enabled() {
-		sc, err := config.NewScaledContext(*restConfig, nil)
-		if err != nil {
-			return nil, err
-		}
+	sc, err := config.NewScaledContext(*restConfig, nil)
+	if err != nil {
+		return nil, err
+	}
 
-		sc.Wrangler = wranglerContext
+	sc.Wrangler = wranglerContext
 
-		sc.UserManager, err = common.NewUserManagerNoBindings(wranglerContext)
-		if err != nil {
-			return nil, err
-		}
+	sc.UserManager, err = common.NewUserManagerNoBindings(wranglerContext)
+	if err != nil {
+		return nil, err
+	}
 
-		sc.ClientGetter, err = normanStoreProxy.NewClientGetterFromConfig(*restConfig)
-		if err != nil {
-			return nil, err
-		}
+	sc.ClientGetter, err = normanStoreProxy.NewClientGetterFromConfig(*restConfig)
+	if err != nil {
+		return nil, err
+	}
 
-		tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
+	tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
 
-		authServer, err = auth.NewServer(ctx, wranglerContext, sc, tokenAuthenticator)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		authServer, err = auth.NewAlwaysAdmin()
-		if err != nil {
-			return nil, err
-		}
+	authServer, err = auth.NewServer(ctx, wranglerContext, sc, tokenAuthenticator)
+	if err != nil {
+		return nil, err
 	}
 
 	if !features.Turtles.Enabled() {
@@ -296,9 +297,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Controllers:     steveControllers,
 		AccessSetLookup: wranglerContext.ASL,
 		AuthMiddleware:  steveauth.ExistingContext,
-		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache(), wranglerContext.Core.Secret().Cache()),
+		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Core.Secret().Cache()),
 		ClusterRegistry: opts.ClusterRegistry,
-		SQLCache:        features.UISQLCache.Enabled(),
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
 			GCInterval:  gcInterval,
 			GCKeepCount: gcKeepCount,
@@ -493,7 +493,17 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return errors.New("dashboard.Register() failed: " + err.Error())
 		}
 
-		return runMigrations(r.Wrangler)
+		if err := runMigrations(r.Wrangler); err != nil {
+			return err
+		}
+
+		if err := r.Wrangler.StartFactoryWithTransaction(ctx, func(ctx context.Context) error {
+			dashboard.RegisterPostMigration(ctx, r.Wrangler)
+			return nil
+		}); err != nil {
+			return errors.New("dashboard.RegisterPostMigration() failed: " + err.Error())
+		}
+		return nil
 	})
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::DefferedCAPIRegistration", func(ctx context.Context) error {
@@ -786,12 +796,22 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 	return nil
 }
 
+// effectiveWebhookVersion will return the resolved webhook version similar to `settingsProvider`
+// This is a thin stop-gap for resolving the version before the providers are ready to use.
+func effectiveWebhookVersion() string {
+	v := os.Getenv(settings.GetEnvKey(settings.RancherWebhookVersion.Name))
+	if v == "" {
+		v = settings.RancherWebhookVersion.Get()
+	}
+	return v
+}
+
 // bumpRancherServiceVersion bumps the version of rancher-webhook if it is detected that the version is less than
 // v0.2.2-alpha1. This is because the version of rancher-webhook less than v0.2.2-alpha1 does not support Kubernetes v1.22+
 // This should only be called when Rancher is run in a Docker container because the Kubernetes version and Rancher version
 // are bumped at the same time. In a Kubernetes cluster, usually the Rancher version is bumped when the cluster is upgraded.
 func bumpRancherWebhookIfNecessary(ctx context.Context, restConfig *rest.Config) error {
-	v := os.Getenv("CATTLE_RANCHER_WEBHOOK_VERSION")
+	v := effectiveWebhookVersion()
 	webhookVersionParts := strings.Split(v, "+up")
 	if len(webhookVersionParts) != 2 {
 		return nil

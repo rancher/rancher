@@ -198,6 +198,23 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 		sp.AuthnNameIDFormat = saml.UnspecifiedNameIDFormat
 	}
 
+	if name == GenericSAMLName {
+		nameIDFormat, err := mapNameIDFormat(configToSet.NameIDFormat)
+		if err != nil {
+			return fmt.Errorf("SAML: %w", err)
+		}
+		sp.AuthnNameIDFormat = nameIDFormat
+
+		signatureMethod, err := mapSignatureMethod(configToSet.SignatureMethod)
+		if err != nil {
+			return fmt.Errorf("SAML: %w", err)
+		}
+		sp.SignatureMethod = signatureMethod
+
+		sp.AllowIDPInitiated = configToSet.AllowIdpInitiated
+		sp.ForceAuthn = configToSet.ForceAuthn
+	}
+
 	provider.serviceProvider = &sp
 
 	cookieStore := ClientCookies{
@@ -238,6 +255,11 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 		setRouteHandler("ShibbolethSLO", provider.ServeHTTP)
 		setRouteHandler("ShibbolethSLOGet", provider.ServeHTTP)
 		setRouteHandler("ShibbolethMetadata", provider.ServeHTTP)
+	case GenericSAMLName:
+		setRouteHandler("GenericSAMLACS", provider.ServeHTTP)
+		setRouteHandler("GenericSAMLSLO", provider.ServeHTTP)
+		setRouteHandler("GenericSAMLSLOGet", provider.ServeHTTP)
+		setRouteHandler("GenericSAMLMetadata", provider.ServeHTTP)
 	}
 
 	log.Debugf("SAML [InitializeSamlServiceProvider]: /v1-saml handlers for %s on root %p active", name, root)
@@ -280,6 +302,11 @@ func AuthHandler() http.Handler {
 	root.HandleFunc("POST /v1-saml/shibboleth/saml/slo", getRouteHandler("ShibbolethSLO"))
 	root.HandleFunc("GET /v1-saml/shibboleth/saml/slo", getRouteHandler("ShibbolethSLOGet"))
 	root.HandleFunc("GET /v1-saml/shibboleth/saml/metadata", getRouteHandler("ShibbolethMetadata"))
+
+	root.HandleFunc("POST /v1-saml/genericsaml/saml/acs", getRouteHandler("GenericSAMLACS"))
+	root.HandleFunc("POST /v1-saml/genericsaml/saml/slo", getRouteHandler("GenericSAMLSLO"))
+	root.HandleFunc("GET /v1-saml/genericsaml/saml/slo", getRouteHandler("GenericSAMLSLOGet"))
+	root.HandleFunc("GET /v1-saml/genericsaml/saml/metadata", getRouteHandler("GenericSAMLMetadata"))
 
 	log.Debugf("SAML [AuthHandler]: /v1-saml routes made, mux is %p", root)
 	return root
@@ -426,7 +453,14 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	if assertion.Conditions != nil && !assertion.Conditions.NotOnOrAfter.IsZero() {
 		assertionExpiry = assertion.Conditions.NotOnOrAfter
 	}
-	if s.assertionCache.seen(assertion.ID, assertionExpiry) {
+	seen, err := s.assertionStore.seen(assertion.ID, assertionExpiry)
+	if err != nil {
+		log.Errorf("SAML: failed to lookup assertion ID %q: %v", assertion.ID, err)
+		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+		return
+	}
+
+	if seen {
 		log.Errorf("SAML: Rejected previous assertion ID %q", assertion.ID)
 		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
@@ -708,41 +742,7 @@ func checkAssertionTimeConditions(now time.Time, conditions *saml.Conditions) er
 	return nil
 }
 
-// assertionCache tracks recently seen SAML assertion IDs to prevent replay attacks.
-type assertionCache struct {
-	mu      sync.Mutex
-	entries map[string]time.Time // assertion ID -> expiry time
-}
-
-func newAssertionCache() *assertionCache {
-	return &assertionCache{
-		entries: make(map[string]time.Time),
-	}
-}
-
-// seen returns true if the assertion ID was seen before.
-//
-// If not seen, it records the ID with its expiry time and returns false.
-// Expired entries are evicted lazily on each call.
-func (c *assertionCache) seen(id string, expiry time.Time) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.evict()
-	if _, ok := c.entries[id]; ok {
-		return true
-	}
-	c.entries[id] = expiry
-	return false
-}
-
-// evict removes expired entries.
-//
-// Must be called with c.mu held.
-func (c *assertionCache) evict() {
-	now := time.Now()
-	for id, exp := range c.entries {
-		if now.After(exp) {
-			delete(c.entries, id)
-		}
-	}
+type assertionStore interface {
+	// seen returns true if the assertion ID was seen before.
+	seen(id string, expiry time.Time) (bool, error)
 }

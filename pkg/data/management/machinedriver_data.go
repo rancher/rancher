@@ -3,8 +3,6 @@ package management
 import (
 	"fmt"
 	"maps"
-	"os"
-	"os/exec"
 	"reflect"
 	"runtime"
 	"strings"
@@ -184,17 +182,24 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := AddHarvesterMachineDriver(management); err != nil {
 		return err
 	}
-	linodeBuiltin := true
-	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
-		linodeBuiltin = isCommandAvailable("docker-machine-driver-linode")
-	}
-	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.16/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
+
+	linodeDriverURL := fmt.Sprintf(
+		"https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.16/docker-machine-driver-linode_linux-%s.zip",
+		runtime.GOARCH,
+	)
 	linodeDriverChecksum := "d9c3b8c389a022b0e5c5e8912496c18a673fa74bb52ec6ab51c0a93e0f4de06d"
 	if runtime.GOARCH == "arm64" {
-		// overwrite arm driver version here
 		linodeDriverChecksum = "1a8336f66bffc2186f5fb77642f509b9370f177397ee71f1a8cb522e5979dbec"
 	}
-	if err := addMachineDriver(Linodedriver, linodeDriverURL, "", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, nil, management); err != nil {
+	// The linode docker-machine driver binary is no longer shipped inside the
+	// rancher image; it is downloaded from upstream on first activation.
+	//
+	// createActive=false: fresh installations land with the driver inactive.
+	// updateActive=nil:   the "disable if unused" decision is made once per
+	//   Rancher installation by disableUnusedLinodeNodeDriver, which runs early
+	//   in rancher.New() before informers start. After that the admin's choice
+	//   is preserved across restarts.
+	if err := addMachineDriver(Linodedriver, linodeDriverURL, "", linodeDriverChecksum, []string{"api.linode.com"}, false, false, false, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OCIDriver, "https://github.com/rancher-plugins/rancher-machine-driver-oci/releases/download/v1.3.0/docker-machine-driver-oci-linux", "", "0a1afa6a0af85ecf3d77cc554960e36e1be5fd12b22b0155717b9289669e4021", []string{"*.oraclecloud.com"}, false, false, false, nil, management); err != nil {
@@ -236,10 +241,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 
 func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	harvesterDriverVersion := "v1.0.6"
+	harvesterDriverVersion := "v1.0.8"
 	harvesterDriverChecksums := map[string]string{
-		"amd64": "7db00430a1c047e6627681446a99219815156e971043ba7a22a083d69fafe44a",
-		"arm64": "e536ded30af40bdfa53a1010e39dfe2f72f5add499b564b9516c1385ee3a98c5",
+		"amd64": "8e4e87db069757755e19e205af4ed21dec086021191fe18c455761b3a92db2c6",
+		"arm64": "17b1cec9a47a58f7404af4470c5ab1af1d8529905d6cc0f3ff3ed3a1c3981328",
 	}
 
 	harvesterDriverURL := fmt.Sprintf("https://github.com/harvester/docker-machine-driver-harvester/releases/download/%s/docker-machine-driver-harvester-%s.tar.gz",
@@ -387,8 +392,4 @@ func deleteMachineDriver(name, urlPrefix string, ndClient normanv3.NodeDriverInt
 	if err := ndClient.Delete(name, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		logrus.Warnf("Error deleting node driver %s: %v", name, err)
 	}
-}
-
-func isCommandAvailable(name string) bool {
-	return exec.Command("command", "-v", name).Run() == nil
 }

@@ -52,11 +52,18 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	scaledContext.Wrangler.Mgmt.Cluster().OnChange(ctx, "user-controllers-controller", u.sync)
 
 	go func() {
+		// temporary measure to recover user controllers not able to successfully start
+		// TODO: find a better way to implement retries for Manager.Start()
+		const fallbackReconcilePeriod = 30 * time.Second
+		fallbackTimer := time.NewTimer(fallbackReconcilePeriod)
+		defer fallbackTimer.Stop()
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-u.forcedResync():
+			case <-fallbackTimer.C:
 			}
 
 			backoff := wait.Backoff{
@@ -73,6 +80,9 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 			}); err != nil {
 				logrus.Errorf("Giving up reconciling cluster ownership after %d attempts", backoff.Steps)
 			}
+
+			// Unlike a ticker, we don't need it to run at a fixed rate, just ensure it's executed at least once every X seconds.
+			fallbackTimer.Reset(fallbackReconcilePeriod)
 		}
 	}()
 }

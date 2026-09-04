@@ -9,8 +9,8 @@ import (
 
 	"github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/settings"
+	steveclient "github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/podimpersonation"
-	"github.com/rancher/steve/pkg/stores/proxy"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +24,7 @@ import (
 type shell struct {
 	namespace       string
 	impersonator    *podimpersonation.PodImpersonation
-	cg              proxy.ClientGetter
+	cg              steveclient.ClientGetter
 	clusterRegistry string
 }
 

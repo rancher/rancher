@@ -323,19 +323,19 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
-	if status, err = p.createEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
+	if status, err = p.createEtcdSnapshot(cp, status, capiCluster, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
 
-	if status, err = p.restoreEtcdSnapshot(cp, status, clusterSecretTokens, plan, currentVersion); err != nil {
+	if status, err = p.restoreEtcdSnapshot(cp, status, capiCluster, clusterSecretTokens, plan, currentVersion); err != nil {
 		return status, err
 	}
 
-	if status, err = p.rotateCertificates(cp, status, clusterSecretTokens, plan); err != nil {
+	if status, err = p.rotateCertificates(cp, status, capiCluster, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
 
-	if status, err = p.rotateEncryptionKeys(cp, status, clusterSecretTokens, plan, releaseData); err != nil {
+	if status, err = p.rotateEncryptionKeys(cp, status, capiCluster, clusterSecretTokens, plan, releaseData); err != nil {
 		return status, err
 	}
 
@@ -354,12 +354,12 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, errWaiting("rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.")
 	}
 
-	return p.fullReconcile(cp, status, clusterSecretTokens, plan, false)
+	return p.fullReconcile(cp, status, capiCluster, clusterSecretTokens, plan, false)
 }
 
-func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, clusterSecretTokens plan.Secret, plan *plan.Plan, ignoreDrainAndConcurrency bool) (rkev1.RKEControlPlaneStatus, error) {
+func (p *Planner) fullReconcile(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, cluster *capi.Cluster, clusterSecretTokens plan.Secret, plan *plan.Plan, ignoreDrainAndConcurrency bool) (rkev1.RKEControlPlaneStatus, error) {
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
-	joinServer, err := p.electInitNode(cp, plan, true)
+	joinServer, err := p.electInitNode(controlPlane, plan, true)
 	if err != nil {
 		return status, err
 	}
@@ -371,14 +371,14 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	)
 
 	if !ignoreDrainAndConcurrency {
-		controlPlaneDrainOptions = cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions
-		workerDrainOptions = cp.Spec.UpgradeStrategy.WorkerDrainOptions
-		controlPlaneConcurrency = cp.Spec.UpgradeStrategy.ControlPlaneConcurrency
-		workerConcurrency = cp.Spec.UpgradeStrategy.WorkerConcurrency
+		controlPlaneDrainOptions = controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions
+		workerDrainOptions = controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions
+		controlPlaneConcurrency = controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency
+		workerConcurrency = controlPlane.Spec.UpgradeStrategy.WorkerConcurrency
 	}
 
 	// select all etcd and then filter to just initNodes so that unavailable count is correct
-	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting, "1", "", controlPlaneDrainOptions, -1, 1)
+	err = p.reconcile(controlPlane, cluster, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting, "1", "", controlPlaneDrainOptions, -1, 1)
 	capr.Bootstrapped.True(&status)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
@@ -386,7 +386,7 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	if joinServer == "" {
-		_, joinServer, _, err = p.findInitNode(cp, plan)
+		_, joinServer, _, err = p.findInitNode(controlPlane, plan)
 		if err != nil {
 			return status, err
 		} else if joinServer == "" && firstIgnoreError != nil {
@@ -397,14 +397,14 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	// Process all nodes that have the etcd role and are NOT an init node or deleting. Only process 1 node at a time.
-	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting, "1", joinServer, controlPlaneDrainOptions, -1, 1)
+	err = p.reconcile(controlPlane, cluster, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting, "1", joinServer, controlPlaneDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
 	}
 
 	// Process all nodes that have the controlplane role and are NOT an init node or deleting.
-	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting, controlPlaneConcurrency, joinServer, controlPlaneDrainOptions, -1, 1)
+	err = p.reconcile(controlPlane, cluster, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting, controlPlaneConcurrency, joinServer, controlPlaneDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -421,7 +421,7 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	// Process all nodes that are ONLY linux worker nodes.
-	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyLinuxWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 1)
+	err = p.reconcile(controlPlane, cluster, clusterSecretTokens, plan, false, workerTier, isOnlyLinuxWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -430,7 +430,7 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	// Process all nodes that are ONLY windows worker nodes.
 	// We attempt the plan 5 times before marking it as failed
 	// to allow transient errors to potentially resolve.
-	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWindowsWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 5)
+	err = p.reconcile(controlPlane, cluster, clusterSecretTokens, plan, false, workerTier, isOnlyWindowsWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 5)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -847,7 +847,7 @@ type reconcilable struct {
 	minorChange bool
 }
 
-func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool, tierName string,
+func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool, tierName string,
 	include, exclude roleFilter, maxUnavailable, forcedJoinURL string, drainOptions rkev1.DrainOptions, maxFailures, failureThreshold int) error {
 	var (
 		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
@@ -869,7 +869,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		}
 
 		logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - rendering desired plan for machine %s/%s with join URL: (%s)", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, joinURL)
-		plan, joinedURL, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinURL)
+		plan, joinedURL, err := p.desiredPlan(controlPlane, cluster, tokensSecret, entry, joinURL)
 		if err != nil {
 			return err
 		}
@@ -1046,7 +1046,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 // generatePlanWithConfigFiles will generate a node plan with the corresponding config files for the entry in question.
 // Notably, it will discard the existing nodePlan in the given entry. It returns the new node plan, the config that was
 // rendered, the rendered join server ("-" in the case that the plan is generated for an init node), and an error (if one exists).
-func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string, renderS3 bool) (plan.NodePlan, map[string]interface{}, string, error) {
+func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, tokensSecret plan.Secret, entry *planEntry, joinServer string, renderS3 bool) (plan.NodePlan, map[string]interface{}, string, error) {
 	var (
 		reg      registries
 		nodePlan plan.NodePlan
@@ -1063,7 +1063,7 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 			config       map[string]interface{}
 		)
 
-		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, entry, tokensSecret, joinServer, reg, renderS3)
+		nodePlan, config, joinedServer, err = p.addConfigFile(nodePlan, controlPlane, cluster, entry, tokensSecret, joinServer, reg, renderS3)
 		if err != nil {
 			return nodePlan, config, joinedServer, err
 		}
@@ -1106,8 +1106,8 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 	return plan.NodePlan{}, map[string]interface{}{}, "", nil
 }
 
-func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
-	nodePlan, config, joinedTo, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
+func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, cluster *capi.Cluster, tokensSecret plan.Secret, entry *planEntry, joinServer string) (plan.NodePlan, string, error) {
+	nodePlan, config, joinedTo, err := p.generatePlanWithConfigFiles(controlPlane, cluster, tokensSecret, entry, joinServer, true)
 	if err != nil {
 		return nodePlan, joinedTo, err
 	}

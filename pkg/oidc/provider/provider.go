@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
 	"github.com/rancher/rancher/pkg/oidc/provider/session"
@@ -48,7 +49,7 @@ func OIDCClientIDIndexFunc(obj interface{}) ([]string, error) {
 	return []string{o.Status.ClientID}, nil
 }
 
-func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenClient wrangmgmtv3.TokenClient, userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, secretCache corecontrollers.SecretCache, secretClient corecontrollers.SecretClient, oidcClientCache wrangmgmtv3.OIDCClientCache, oidcClientController wrangmgmtv3.OIDCClientController, namespaceClient corecontrollers.NamespaceClient) (Provider, error) {
+func NewProvider(ctx context.Context, extTokenStore *exttokenstore.SystemStore, tokenCache wrangmgmtv3.TokenCache, tokenClient wrangmgmtv3.TokenClient, userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, secretCache corecontrollers.SecretCache, secretClient corecontrollers.SecretClient, oidcClientCache wrangmgmtv3.OIDCClientCache, oidcClientController wrangmgmtv3.OIDCClientController, namespaceClient corecontrollers.NamespaceClient) (Provider, error) {
 	sessionStorage := session.NewSecretSessionStore(ctx, secretCache, secretClient, maxTime)
 	jwks, err := newJWKSHandler(secretCache, secretClient)
 	if err != nil {
@@ -74,8 +75,8 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 
 	return Provider{
 		jwksHandler:     jwks,
-		authHandler:     newAuthorizeHandler(tokenCache, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
-		tokenHandler:    newTokenHandler(tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
+		authHandler:     newAuthorizeHandler(extTokenStore, userLister, sessionStorage, &randomstring.Generator{}, oidcClientCache),
+		tokenHandler:    newTokenHandler(extTokenStore, tokenCache, userLister, userAttributeLister, sessionStorage, jwks, oidcClientCache, oidcClientController, secretCache, tokenClient),
 		userInfoHandler: newUserInfoHandler(userLister, userAttributeLister, jwks),
 	}, nil
 }
@@ -94,7 +95,7 @@ func ensureNamespaceWithRetry(ctx context.Context, namespaceClient corecontrolle
 	})
 }
 
-// middleware adds security headers, and returns not found if there aren't any OIDCClients
+// middleware adds security and CORS headers.
 func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -102,16 +103,12 @@ func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+
 		oidcClients, err := p.authHandler.oidcClientCache.List(labels.Everything())
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to list OIDCCLients", http.StatusInternalServerError, w)
 			return
 		}
-		if len(oidcClients) == 0 {
-			oidcerror.WriteError(oidcerror.ServerError, "no OIDCClients configured", http.StatusInternalServerError, w)
-			return
-		}
-
 		for _, oidcClient := range oidcClients {
 			for _, redirectURI := range oidcClient.Spec.RedirectURIs {
 				url, err := url.Parse(redirectURI)

@@ -1,25 +1,49 @@
-name: Retry failed jobs once
+name: Retry failed jobs
 
 on:
-  workflow_run: # zizmor: ignore[dangerous-triggers] -- guarded by head_repository.full_name == github.repository
+  workflow_run: # zizmor: ignore[dangerous-triggers] -- only calls rerun-failed-jobs API, does not run untrusted code
     workflows:
       - "Build Pull Request"
       - "Push to release branches"
+      - "Nightly Provisioning Tests"
     types: [completed]
-
-permissions:
-  actions: write
 
 jobs:
   retry:
-    # Only retry once, only on failure, and only for PR/release push runs.
+    # Only retry once, only on failure.
+    # For PRs, allow forks because CI runs live in this repository.
+    # For push workflows, restrict to this repository.
     if: >-
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.run_attempt == 1 &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
       (github.event.workflow_run.event == 'pull_request' ||
-       github.event.workflow_run.event == 'push')
+       (github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Rerun failed jobs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${{ github.repository }}/actions/runs/$RUN_ID/rerun-failed-jobs"
+
+  retry-nightly:
+    # We execute the nightly provisioning tests 3 times
+    # to avoid false alarms from flaky tests. This should
+    # be removed or shortened once the tests are more stable.
+    if: >-
+      github.event.workflow_run.name == 'Nightly Provisioning Tests' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'schedule' &&
+      github.event.workflow_run.run_attempt < 3
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Rerun failed jobs
         env:

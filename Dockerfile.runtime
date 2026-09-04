@@ -23,18 +23,18 @@
 #   - rancher-machine
 #   - Python 3.11 + tox (for validation/integration test suites)
 
-FROM registry.suse.com/bci/golang:1.26
+FROM registry.suse.com/bci/golang:1.26.6
 
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher144
-ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.2
+ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
 ENV HELM_UNITTEST_VERSION=1.1.0
 # k3d ci version
-ENV K3D_VERSION=v5.7.1
+ENV K3D_VERSION=v5.9.0
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.15
+ENV CATTLE_KDM_BRANCH=dev-v2.16
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
@@ -54,7 +54,7 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
     fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.1-k3s1 \
+COPY --from=rancher/k3s:v1.36.4-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \

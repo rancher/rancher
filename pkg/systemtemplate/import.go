@@ -40,6 +40,7 @@ type clusterAgentContext struct {
 	AgentImage           string
 	AgentEnvVars         string
 	AuthImage            string
+	AssetsImage          string
 	TokenKey             string
 	Token                string
 	URL                  string
@@ -145,6 +146,7 @@ func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 type TemplateOps struct {
 	AgentImage     string
 	AuthImage      string
+	AssetsImage    string
 	Namespace      string
 	Token          string
 	URL            string
@@ -164,6 +166,10 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 	if ops.AuthImage == "fixed" {
 		ops.AuthImage = settings.AuthImage.Get()
+	}
+
+	if ops.AssetsImage == "fixed" {
+		ops.AssetsImage = settings.AssetsImage.Get()
 	}
 
 	var registryURL string
@@ -273,6 +279,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		AgentImage:                 ops.AgentImage,
 		AgentEnvVars:               agentEnvVars,
 		AuthImage:                  ops.AuthImage,
+		AssetsImage:                ops.AssetsImage,
 		TokenKey:                   tokenKey,
 		Token:                      base64.StdEncoding.EncodeToString([]byte(ops.Token)),
 		URL:                        base64.StdEncoding.EncodeToString([]byte(ops.URL)),
@@ -310,7 +317,16 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	enableMSUC := false
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		// the case of imported RKE2/K3s cluster
-		enableMSUC = importedclusterversionmanagement.Enabled(cluster) && features.ManagedSystemUpgradeController.Enabled()
+		if features.ManagedSystemUpgradeController.Enabled() {
+			if importedclusterversionmanagement.Enabled(cluster) {
+				enableMSUC = true
+			} else if cluster.Labels != nil {
+				if _, ok := cluster.Labels["cluster-api.cattle.io/owned"]; ok {
+					// install for CAPRKE2
+					enableMSUC = true
+				}
+			}
+		}
 	}
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
 		(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
@@ -325,7 +341,6 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.RKE2.Name():                           false,
 		features.ProvisioningV2.Name():                 false,
 		features.Turtles.Name():                        false,
-		features.UISQLCache.Name():                     features.UISQLCache.Enabled(),
 		features.ProvisioningPreBootstrap.Name():       capr.PreBootstrap(cluster),
 		features.ManagedSystemUpgradeController.Name(): enableMSUC,
 	}
@@ -339,6 +354,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 	err := SystemTemplate(buf, &TemplateOps{
 		AgentImage:     GetDesiredAgentImage(cluster),
 		AuthImage:      GetDesiredAuthImage(cluster),
+		AssetsImage:    GetDesiredAssetsImage(cluster),
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            settings.ServerURL.Get(),
@@ -400,6 +416,19 @@ func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
 	return desiredAuth
+}
+
+func GetDesiredAssetsImage(cluster *apimgmtv3.Cluster) string {
+	logrus.Tracef("clusterDeploy: getting desired charts image for [%s]", cluster.Name)
+	desiredCharts := cluster.Spec.DesiredAssetsImage
+	if cluster.Spec.AssetsImageOverride != "" {
+		desiredCharts = cluster.Spec.AssetsImageOverride
+	}
+	if desiredCharts == "" || desiredCharts == "fixed" {
+		desiredCharts = image.ResolveWithCluster(settings.AssetsImage.Get(), cluster)
+	}
+	logrus.Tracef("clusterDeploy: desiredCharts is [%s] for cluster [%s]", desiredCharts, cluster.Name)
+	return desiredCharts
 }
 
 func toYAML(v interface{}) string {

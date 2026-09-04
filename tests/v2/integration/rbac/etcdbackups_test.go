@@ -1,17 +1,11 @@
 package integration
 
 import (
-	"context"
 	"time"
 
-	extrbac "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/extensions/users"
-	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
-	"github.com/rancher/shepherd/pkg/api/scheme"
-	namegen "github.com/rancher/shepherd/pkg/namegenerator"
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
+	authzv1 "k8s.io/api/authorization/v1"
 )
 
 const (
@@ -19,81 +13,56 @@ const (
 )
 
 // TestBackupsManageRole asserts that binding a user to the "backups-manage"
-// ClusterRoleTemplate on the local cluster results in a Kubernetes Role in the
-// "local" namespace that grants access to "etcdbackups" resources.
+// ClusterRoleTemplate on the local cluster results in the user having access
+// to "etcdbackups" resources.
 func (p *RTBTestSuite) TestBackupsManageRole() {
 	client := p.newSubSession()
 
-	enabled := true
-	pw := password.GenerateUserPassword("testpass-")
-	restrictedUser, err := users.CreateUserWithRole(client, &management.User{
-		Username: namegen.AppendRandomString("restricted-"),
-		Password: pw,
-		Name:     "restricted",
-		Enabled:  &enabled,
-	}, "user-base")
-	p.Require().NoError(err)
+	restrictedUser := p.createUser(client, "restricted", "user-base")
 
-	crtb, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+	_, err := client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
 		ClusterID:      p.downstreamClusterID,
 		RoleTemplateID: backupsManageRole,
 		UserID:         restrictedUser.ID,
 	})
 	p.Require().NoError(err)
 
-	// Wait for the CRTB to have UserPrincipalID populated.
-	p.Require().Eventually(func() bool {
-		c, err := client.Management.ClusterRoleTemplateBinding.ByID(crtb.ID)
-		if err != nil {
-			return false
-		}
-		return c.UserPrincipalID != ""
-	}, 2*time.Minute, 2*time.Second, "timed out waiting for CRTB UserPrincipalID")
-
-	// Get the Kubernetes Role "backups-manage" in the "local" namespace and
-	// verify it grants access to "etcdbackups" resources.
-	dynamicClient, err := client.GetDownStreamClusterClient(p.downstreamClusterID)
+	restrictedClient, err := client.AsUser(restrictedUser)
 	p.Require().NoError(err)
 
-	var role *rbacv1.Role
-	p.Require().Eventually(func() bool {
-		unstructuredRole, err := dynamicClient.Resource(extrbac.RoleGroupVersionResource).
-			Namespace(p.downstreamClusterID).
-			Get(context.Background(), backupsManageRole, metav1.GetOptions{})
-		if err != nil {
-			return false
-		}
-		role = &rbacv1.Role{}
-		return scheme.Scheme.Convert(unstructuredRole, role, unstructuredRole.GroupVersionKind()) == nil
-	}, 2*time.Minute, 2*time.Second, "timed out waiting for backups-manage Role to exist in local namespace")
-
-	p.Require().NotNil(role)
-	p.Require().NotEmpty(role.Rules, "expected backups-manage role to have at least one rule")
-
-	found := false
-	for _, rule := range role.Rules {
-		for _, resource := range rule.Resources {
-			if resource == "etcdbackups" {
-				found = true
-				break
-			}
-		}
-	}
-	p.True(found, "expected 'etcdbackups' in backups-manage role resources")
+	// Wait until RBAC has propagated and the user can actually list etcdbackups in
+	// the cluster namespace. Management-plane resources for the local cluster live
+	// in the namespace that matches the cluster ID (i.e. "local").
+	err = extauthz.WaitForAllowed(restrictedClient, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Namespace: p.downstreamClusterID,
+			Verb:      "list",
+			Group:     "management.cattle.io",
+			Resource:  "etcdbackups",
+		},
+	})
+	p.Require().NoError(err, "expected restricted user bound to backups-manage to be able to list etcdbackups")
 }
 
-// TestStandardUsersCannotAccessBackups asserts that the built-in "user" global
-// role does not grant access to "etcdbackups" resources in any of its rules.
+// TestStandardUsersCannotAccessBackups asserts that a user with only the
+// built-in "user" global role cannot access "etcdbackups" resources.
 func (p *RTBTestSuite) TestStandardUsersCannotAccessBackups() {
 	client := p.newSubSession()
 
-	userRole, err := client.Management.GlobalRole.ByID("user")
+	standardUser := p.createUser(client, "standard-user", "user")
+
+	standardClient, err := client.AsUser(standardUser)
 	p.Require().NoError(err)
 
-	for _, rule := range userRole.Rules {
-		for _, resource := range rule.Resources {
-			p.NotEqual("etcdbackups", resource,
-				"standard 'user' global role should not grant access to etcdbackups")
-		}
-	}
+	// Wait long enough for any RBAC to sync, then assert denial.
+	p.Require().Eventually(func() bool {
+		allowed, err := checkAccessAllowed(standardClient, p.downstreamClusterID, &authzv1.ResourceAttributes{
+			Namespace: p.downstreamClusterID,
+			Verb:      "list",
+			Group:     "management.cattle.io",
+			Resource:  "etcdbackups",
+		})
+		// Keep retrying only on transport errors; a clean false result is our target.
+		return err == nil && !allowed
+	}, 2*time.Minute, 2*time.Second, "standard 'user' global role should not grant access to etcdbackups")
 }

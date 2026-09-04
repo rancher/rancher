@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
 	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
@@ -42,18 +41,20 @@ const (
 )
 
 var (
-	tokenIndex = "tokenIndex"
+	tokenIndex    = "tokenIndex"
+	crtTokenIndex = "crtTokenIndex"
 )
 
 type RKE2ConfigServer struct {
-	clusterTokenCache        mgmtcontroller.ClusterRegistrationTokenCache
 	clusterTokens            mgmtcontroller.ClusterRegistrationTokenController
+	mgmtClusterCache         mgmtcontroller.ClusterCache
 	serviceAccountsCache     corecontrollers.ServiceAccountCache
 	serviceAccounts          corecontrollers.ServiceAccountClient
 	secretsCache             corecontrollers.SecretCache
 	secrets                  corecontrollers.SecretController
 	machineCache             capicontrollers.MachineCache
 	machines                 capicontrollers.MachineClient
+	capiClusterCache         capicontrollers.ClusterCache
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
 	k8s                      kubernetes.Interface
@@ -70,30 +71,17 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		return nil, nil
 	})
 
-	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(tokenIndex,
-		func(obj *v3.ClusterRegistrationToken) ([]string, error) {
-			current, previous, err := crt.GetTokensFromSecret(clients.Core.Secret().Cache(), obj)
-			if err != nil {
-				logrus.Warnf("failed to resolve CRT token for %s/%s: %v", obj.Namespace, obj.Name, err)
-				return nil, nil
-			}
-			if current == "" {
-				return nil, nil
-			}
-			tokens := []string{current}
-			if previous != "" {
-				tokens = append(tokens, previous)
-			}
-			return tokens, nil
-		})
+	clients.Core.Secret().Cache().AddIndexer(crtTokenIndex, func(obj *corev1.Secret) ([]string, error) {
+		return crt.SecretTokenIndexValues(obj), nil
+	})
 
 	configSrv := &RKE2ConfigServer{
 		serviceAccountsCache:     clients.Core.ServiceAccount().Cache(),
 		serviceAccounts:          clients.Core.ServiceAccount(),
 		secretsCache:             clients.Core.Secret().Cache(),
 		secrets:                  clients.Core.Secret(),
-		clusterTokenCache:        clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:            clients.Mgmt.ClusterRegistrationToken(),
+		mgmtClusterCache:         clients.Mgmt.Cluster().Cache(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
 		k8s:                      clients.K8s,
@@ -107,17 +95,17 @@ func (r *RKE2ConfigServer) DeferCAPIResources(clients *wrangler.Context) {
 	clients.DeferredCAPIRegistration.DeferFunc(func(clients *wrangler.CAPIContext) {
 		r.machineCache = clients.CAPI.Machine().Cache()
 		r.machines = clients.CAPI.Machine()
+		r.capiClusterCache = clients.CAPI.Cluster().Cache()
 		r.capiAvailable = true
-		logrus.Debug("[rke2configserver] Initialized CAPI clients after deferred func execution")
+		logrus.Info("[rke2configserver] Initialized CAPI clients after deferred func execution")
 	})
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	// todo(jhyde): only CAPI available if not imported
 	if !r.capiAvailable {
-		logrus.Debug("[rke2configserver] CAPI not ready yet")
-		rw.WriteHeader(http.StatusServiceUnavailable)
+		logrus.Warn("[rke2configserver] CAPI not ready yet")
 		rw.Header().Set("Retry-After", "5")
+		http.Error(rw, "CAPI not ready yet", http.StatusServiceUnavailable)
 		return
 	}
 

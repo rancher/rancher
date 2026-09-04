@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -24,6 +25,11 @@ const (
 	// RoleTemplate enqueues the referencing PRTBs/CRTBs on the same workqueue the handlers run on.
 	prtbRoleTemplateEnqueuer = "aggregation-prtb-roletemplate-enqueuer"
 	crtbRoleTemplateEnqueuer = "aggregation-crtb-roletemplate-enqueuer"
+
+	// Namespace-side enqueuer that re-triggers the PRTB handler when a namespace in a project
+	// changes. reconcileBindings creates the per-namespace RoleBindings by iterating the project's
+	// namespaces, so a namespace created after its PRTB would otherwise never receive a binding.
+	prtbNamespaceEnqueuer = "aggregation-prtb-namespace-enqueuer"
 )
 
 func Register(ctx context.Context, workload *config.UserContext) error {
@@ -57,6 +63,8 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 		management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), management.Wrangler.Mgmt.RoleTemplate())
 	relatedresource.Watch(ctx, crtbRoleTemplateEnqueuer, enqueuer.enqueueCRTBs,
 		management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), management.Wrangler.Mgmt.RoleTemplate())
+	relatedresource.Watch(ctx, prtbNamespaceEnqueuer, enqueuer.enqueuePRTBsForNamespace,
+		management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), workload.Corew.Namespace())
 
 	return nil
 }
@@ -78,6 +86,29 @@ func (e *roleTemplateEnqueuer) enqueuePRTBs(_, name string, obj runtime.Object) 
 	prtbs, err := e.prtbCache.GetByIndex(rbac.PRTBByClusterAndRoleTemplateNameIndex, rbac.RoleTemplateClusterIndexKey(e.clusterName, name))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ProjectRoleTemplateBindings for roletemplate %s: %w", name, err)
+	}
+	var keys []relatedresource.Key
+	for _, prtb := range prtbs {
+		keys = append(keys, relatedresource.Key{Namespace: prtb.Namespace, Name: prtb.Name})
+	}
+	return keys, nil
+}
+
+// enqueuePRTBsForNamespace enqueues every PRTB in the changed namespace's project so their
+// per-namespace RoleBindings are reconciled. Without this, a namespace created after its PRTB never
+// receives a binding, because reconcileBindings only runs on PRTB and RoleTemplate changes.
+func (e *roleTemplateEnqueuer) enqueuePRTBsForNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok || ns == nil {
+		return nil, nil
+	}
+	projectID := ns.Annotations[projectIDAnnotation]
+	if projectID == "" {
+		return nil, nil
+	}
+	prtbs, err := e.prtbCache.GetByIndex(rbac.PRTBByProjectNameIndex, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ProjectRoleTemplateBindings for project %s: %w", projectID, err)
 	}
 	var keys []relatedresource.Key
 	for _, prtb := range prtbs {

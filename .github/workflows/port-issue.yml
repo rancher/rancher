@@ -55,8 +55,13 @@ jobs:
         run: |
           declare -a additional_cmd
           BODY=$(mktemp)
-          ORIGINAL_ISSUE=$(gh issue view -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --json title,body,assignees)
+          ORIGINAL_ISSUE=$(gh issue view -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --json title,body,assignees,issueType)
           ORIGINAL_TITLE=$(echo "${ORIGINAL_ISSUE}" | jq -r .title)
+          ORIGINAL_TYPE=$(echo "${ORIGINAL_ISSUE}" | jq -r '.issueType.name // empty')
+          if [ -n "$ORIGINAL_TYPE" ]; then
+              additional_cmd+=("--type")
+              additional_cmd+=("${ORIGINAL_TYPE}")
+          fi
           TYPE=$(echo "${COMMENT_BODY}" | awk '{ print $1 }' | sed -e 's_/__')
           MILESTONE=$(echo "${COMMENT_BODY}" | awk '{ print $2 }')
           NEW_TITLE="[${TYPE}] ${ORIGINAL_TITLE}"
@@ -108,4 +113,99 @@ jobs:
               echo "${ORIGINAL_ISSUE}" | jq -r '.body[0:65536]' >> $BODY
               NEW_ISSUE=$(gh issue create -R "${GITHUB_REPOSITORY}" --title "${NEW_TITLE}" --body-file "${BODY}" -m "${MILESTONE}" "${additional_cmd[@]}")
               echo "Port issue created: ${NEW_ISSUE}" >> $GITHUB_STEP_SUMMARY
+
+              # Copy top-level GitHub Issue Fields (e.g. Priority, Effort, Start date,
+              # Target date) from the original issue to the newly created one. These
+              # are org-level custom fields defined at the organization level and are
+              # distinct from labels, milestones, and Project v2 field values.
+              # The API is currently in private preview and requires the
+              # `GraphQL-Features: issue_fields` header.
+              NEW_ISSUE_NUMBER=$(echo "${NEW_ISSUE}" | awk -F/ '{ print $NF }')
+              REPO_OWNER="${GITHUB_REPOSITORY%/*}"
+              REPO_NAME="${GITHUB_REPOSITORY#*/}"
+
+              ORIGINAL_FIELD_VALUES=$(gh api graphql \
+                  -H "GraphQL-Features: issue_fields" \
+                  -f query='query($owner: String!, $repo: String!, $number: Int!) {
+                    repository(owner: $owner, name: $repo) {
+                      issue(number: $number) {
+                        issueFieldValues(first: 50) {
+                          nodes {
+                            __typename
+                            ... on IssueFieldSingleSelectValue {
+                              value
+                              field { ... on IssueFieldSingleSelect { id options { id name } } }
+                            }
+                            ... on IssueFieldDateValue {
+                              value
+                              field { ... on IssueFieldDate { id } }
+                            }
+                            ... on IssueFieldTextValue {
+                              value
+                              field { ... on IssueFieldText { id } }
+                            }
+                            ... on IssueFieldNumberValue {
+                              value
+                              field { ... on IssueFieldNumber { id } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }' \
+                  -f owner="${REPO_OWNER}" \
+                  -f repo="${REPO_NAME}" \
+                  -F number="${ORIGINAL_ISSUE_NUMBER}" \
+                  --jq '.data.repository.issue.issueFieldValues.nodes' 2>/dev/null || echo "[]")
+
+              NEW_ISSUE_ID=$(gh api graphql \
+                  -f query='query($owner: String!, $repo: String!, $number: Int!) {
+                    repository(owner: $owner, name: $repo) {
+                      issue(number: $number) { id }
+                    }
+                  }' \
+                  -f owner="${REPO_OWNER}" \
+                  -f repo="${REPO_NAME}" \
+                  -F number="${NEW_ISSUE_NUMBER}" \
+                  --jq '.data.repository.issue.id')
+
+              # Build the issueFields array for a single setIssueFieldValue mutation.
+              # For single-select fields the API needs the option's id, not its name,
+              # so we resolve it from the field's options list included in the query.
+              ISSUE_FIELDS_JSON=$(echo "${ORIGINAL_FIELD_VALUES}" | jq -c '
+                  [ .[]
+                    | . as $v
+                    | ($v.field.id // empty) as $fid
+                    | select($fid != "")
+                    | if $v.__typename == "IssueFieldSingleSelectValue" then
+                          ( ($v.field.options // []) | map(select(.name == $v.value)) | .[0].id // empty ) as $oid
+                          | select($oid != "")
+                          | {fieldId: $fid, singleSelectOptionId: $oid}
+                      elif $v.__typename == "IssueFieldDateValue" and ($v.value // "") != "" then
+                          {fieldId: $fid, dateValue: $v.value}
+                      elif $v.__typename == "IssueFieldTextValue" and ($v.value // "") != "" then
+                          {fieldId: $fid, textValue: $v.value}
+                      elif $v.__typename == "IssueFieldNumberValue" and ($v.value != null) then
+                          {fieldId: $fid, numberValue: $v.value}
+                      else empty end
+                  ]')
+
+              if [ -n "$NEW_ISSUE_ID" ] && [ -n "$ISSUE_FIELDS_JSON" ] && [ "$ISSUE_FIELDS_JSON" != "[]" ]; then
+                  MUTATION_PAYLOAD=$(jq -n \
+                      --arg issueId "$NEW_ISSUE_ID" \
+                      --argjson issueFields "$ISSUE_FIELDS_JSON" \
+                      '{
+                          query: "mutation($issueId: ID!, $issueFields: [IssueFieldCreateOrUpdateInput!]!) { setIssueFieldValue(input: {issueId: $issueId, issueFields: $issueFields}) { issue { id } } }",
+                          variables: { issueId: $issueId, issueFields: $issueFields }
+                      }')
+                  if echo "$MUTATION_PAYLOAD" | gh api graphql \
+                          -H "GraphQL-Features: issue_fields" \
+                          --input - > /dev/null 2>&1; then
+                      echo "Copied issue field values: ${ISSUE_FIELDS_JSON}" >> $GITHUB_STEP_SUMMARY
+                  else
+                      echo "Failed to copy issue field values (${ISSUE_FIELDS_JSON}) to new issue" >> $GITHUB_STEP_SUMMARY
+                  fi
+              else
+                  echo "No issue field values to copy"
+              fi
           fi

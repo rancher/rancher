@@ -3,6 +3,7 @@ package provider
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/http"
@@ -10,13 +11,16 @@ import (
 	"strings"
 	"testing"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -154,6 +158,91 @@ func TestJWKSEndpoint(t *testing.T) {
 			assert.JSONEq(t, test.expectedBody, strings.TrimSpace(rec.Body.String()))
 		})
 	}
+}
+
+func TestJWKSEndpointHeaders(t *testing.T) {
+	const redirectURI = "https://client.example/callback"
+	ctrl := gomock.NewController(t)
+	oidcClientCache := fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl)
+	oidcClientCache.EXPECT().List(labels.Everything()).Return([]*v3.OIDCClient{
+		{
+			Spec: v3.OIDCClientSpec{
+				RedirectURIs: []string{redirectURI},
+			},
+		},
+	}, nil)
+	provider := newJWKSRouteTestProvider(ctrl, oidcClientCache)
+	mux := http.NewServeMux()
+	provider.RegisterOIDCProviderHandles(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "https://client.example/oidc/.well-known/jwks.json", nil))
+
+	assertJWKSResponse(t, rec)
+	assert.Equal(t, http.Header{
+		"Access-Control-Allow-Methods": []string{"GET, POST"},
+		"Access-Control-Allow-Origin":  []string{redirectURI},
+		"Content-Type":                 []string{"application/json"},
+		"Referrer-Policy":              []string{"strict-origin-when-cross-origin"},
+		"Strict-Transport-Security":    []string{"max-age=31536000"},
+		"X-Content-Type-Options":       []string{"nosniff"},
+		"X-Frame-Options":              []string{"SAMEORIGIN"},
+	}, rec.Header())
+}
+
+func TestJWKSEndpointWithoutOIDCClients(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	oidcClientCache := fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl)
+	oidcClientCache.EXPECT().List(labels.Everything()).Return(nil, nil)
+	provider := newJWKSRouteTestProvider(ctrl, oidcClientCache)
+	mux := http.NewServeMux()
+	provider.RegisterOIDCProviderHandles(mux)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/oidc/.well-known/jwks.json", nil))
+
+	assertJWKSResponse(t, rec)
+	assert.Equal(t, http.Header{
+		// Does not contain Access-Control-Allow-Origin header because there are no OIDC clients configured.
+		"Access-Control-Allow-Methods": []string{"GET, POST"},
+		"Content-Type":                 []string{"application/json"},
+		"Referrer-Policy":              []string{"strict-origin-when-cross-origin"},
+		"Strict-Transport-Security":    []string{"max-age=31536000"},
+		"X-Content-Type-Options":       []string{"nosniff"},
+		"X-Frame-Options":              []string{"SAMEORIGIN"},
+	}, rec.Header())
+}
+
+func newJWKSRouteTestProvider(ctrl *gomock.Controller, oidcClientCache *fake.MockNonNamespacedCacheInterface[*v3.OIDCClient]) Provider {
+	secretCache := fake.NewMockCacheInterface[*v1.Secret](ctrl)
+	secretCache.EXPECT().Get(keySecretNamespace, keySecretName).Return(&v1.Secret{
+		Data: map[string][]byte{
+			"key.pub": []byte(publicKey),
+		},
+	}, nil)
+
+	return Provider{
+		jwksHandler: &jwksHandler{secretCache: secretCache},
+		authHandler: &authorizeHandler{
+			oidcClientCache: oidcClientCache,
+		},
+	}
+}
+
+func assertJWKSResponse(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	var response JWKS
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&response))
+	require.Len(t, response.Keys, 1)
+	assert.Equal(t, "RSA", response.Keys[0].Kty)
+	assert.Equal(t, "sig", response.Keys[0].Use)
+	assert.Equal(t, "key", response.Keys[0].Kid)
+	assert.NotEmpty(t, response.Keys[0].N)
+	assert.Equal(t, "AQAB", response.Keys[0].E)
 }
 
 func TestGetSigningKey(t *testing.T) {

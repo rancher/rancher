@@ -22,6 +22,16 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; the
   sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
 fi
 
+echo "Total system resources: $(nproc) CPUs, $(free -m | awk '/^Mem:/{print $2}')MB RAM"
+
+vmstat 5 > /tmp/c &
+CPU_PID=$!
+
+# Poll memory usage every 5 seconds and write to /tmp/m.
+# This is used to calculate min/max/avg memory usage at the end of the test run.
+( while true; do free -m | awk '/^Mem:/{print $3}'; sleep 5; done ) > /tmp/m &
+MEM_PID=$!
+
 cleanup()
 {
     EXIT=$?
@@ -33,12 +43,25 @@ cleanup()
       kill $PID
       wait $PID
     fi
+
+    kill $CPU_PID $MEM_PID 2>/dev/null
+    # Print out min, max, and average CPU and RAM usage during the test run.
+    awk 'NR>3{c=100-$15; s+=c; n++; m=n==1||c<m?c:m; x=c>x?c:x} END{if(n) printf "\nCPU Min: %d%% | Max: %d%% | Avg: %.1f%%\n", m, x, s/n}' /tmp/c
+    awk '{s+=$1; n++; m=n==1||$1<m?$1:m; x=$1>x?$1:x} END{if(n) printf "RAM Min: %dMB | Max: %dMB | Avg: %.1fMB\n", m, x, s/n}' /tmp/m
+    rm -f /tmp/c /tmp/m
+
     return $EXIT
 }
 
 cd $(dirname $0)/..
 
 TB_ORG=rancher
+
+# Only k3s/rke2 are valid distros.
+if [ -n "${V2PROV_TEST_DIST}" ] && [ "${V2PROV_TEST_DIST}" != "k3s" ] && [ "${V2PROV_TEST_DIST}" != "rke2" ]; then
+  echo "error: V2PROV_TEST_DIST must be k3s or rke2, got: ${V2PROV_TEST_DIST}" >&2
+  exit 1
+fi
 
 if [ -z "${V2PROV_TEST_DIST}" ] || [ "${V2PROV_TEST_DIST}" = "k3s" ]; then
   V2PROV_TEST_DIST=k3s
@@ -52,7 +75,11 @@ if [ -z "${V2PROV_TEST_RUN_REGEX}" ]; then
   V2PROV_TEST_RUN_REGEX="^Test_(General|Provisioning|Fleet)_.*$"
 fi
 
-RUNARG="-run ${V2PROV_TEST_RUN_REGEX}"
+# Restrict to regex characters so the value can't smuggle extra `go test` flags.
+if ! printf '%s' "${V2PROV_TEST_RUN_REGEX}" | grep -qE '^[A-Za-z0-9_()|.^$*]+$'; then
+  echo "error: invalid characters in V2PROV_TEST_RUN_REGEX: ${V2PROV_TEST_RUN_REGEX}" >&2
+  exit 1
+fi
 
 export DIST=${V2PROV_TEST_DIST}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
@@ -95,12 +122,6 @@ eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX' package/Dockerfile | awk
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_VERSION' package/Dockerfile | awk '{print "export " $2}')"
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE' package/Dockerfile | awk '{print "export " $2}')"
 
-export CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_REMOTEDIALER_PROXY_VERSION=$(grep -m1 'remoteDialerProxyVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_RANCHER_TURTLES_VERSION=$(grep -m1 'turtlesVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
-
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Only resolve SOME_K8S_VERSION if it's empty - KDM-driven runs may set it upstream.
 # Prime context:
@@ -127,7 +148,7 @@ fi
 
 # Fallback: use the latest release for this $DIST from KDM data.json
 if [ -z "${SOME_K8S_VERSION}" ]; then
-  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.15/data/data.json | jq -r ".$DIST.releases[-1].version")
+  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.16/data/data.json | jq -r ".$DIST.releases[-1].version")
   echo "Resolved ${DIST} to latest version ${SOME_K8S_VERSION}"
 fi
 
@@ -139,6 +160,15 @@ fi
 
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
 touch /tmp/rancher.log
+
+# Point the local k3s etcd database to ram to avoid disk pressure
+ETCD_DIR=/var/lib/rancher/k3s/server/db
+if ! mountpoint -q "$ETCD_DIR"; then
+  mkdir -p "$ETCD_DIR"
+  mount -t tmpfs -o size=${V2PROV_ETCD_TMPFS_SIZE:-2g} tmpfs "$ETCD_DIR" \
+    && echo "Mounted tmpfs over $ETCD_DIR" \
+    || echo "WARNING: tmpfs mount failed; k3s etcd using disk"
+fi
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
 grep PodTestImage ./tests/v2prov/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
@@ -246,6 +276,20 @@ trap cleanup exit
 echo "Waiting for Rancher to be healthy"
 ./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
 
+# Compile the provisioning test binaries in the background while we wait for
+# Rancher's deployments to roll out below, keeping the cold `go build`/module
+# download off the critical path. `go test -c` compiles each package's test
+# binary (including its _test.go files) without running anything, so nothing
+# reaches Rancher during the wait.
+echo "Pre-compiling provisioning test binaries in the background"
+(
+  set -e
+  for pkg in $(go list ./tests/v2prov/tests/...); do
+    go test -c -o /dev/null "$pkg"
+  done
+) >/tmp/precompile.log 2>&1 &
+PRECOMPILE_PID=$!
+
 # The remotedialer-proxy is pulled in by the api-extension deployment
 echo "Waiting up to 5 minutes for the api-extension deployment"
 ./scripts/retry \
@@ -290,10 +334,22 @@ if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then
   ( push_cattle_agent_image & )
 fi
 
-echo Running provisioning-tests $RUNARG
+echo Running provisioning-tests: "${V2PROV_TEST_RUN_REGEX}"
+
+# Wait for the background compilation to finish. It usually completed during the
+# waits above. On failure we log but don't abort: `go test` below will recompile
+# and surface the real error.
+if [ -n "${PRECOMPILE_PID:-}" ]; then
+  echo "Waiting for background test compilation to finish"
+  wait "$PRECOMPILE_PID" || { echo "background test compilation reported an error:"; cat /tmp/precompile.log || true; }
+fi
+
+if [ -z "${V2PROV_TEST_PARALLELISM}" ]; then
+  V2PROV_TEST_PARALLELISM=1
+fi
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
+go test -run "${V2PROV_TEST_RUN_REGEX}" -v -failfast -timeout 60m -p 3 -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... 2>&1 | tee /tmp/out.txt || {
      dump_rancher_logs
      exit 1
 }

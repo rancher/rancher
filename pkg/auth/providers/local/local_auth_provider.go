@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
@@ -21,9 +20,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/text/runes"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -50,16 +46,33 @@ type Provider struct {
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, _ user.Manager) common.AuthProvider {
-	informer := mgmtCtx.Management.Users("").Controller().Informer()
-	indexers := map[string]cache.IndexFunc{userNameIndex: userNameIndexer, userSearchIndex: userSearchIndexer}
-	_ = informer.AddIndexers(indexers)
+	return NewProvider(
+		mgmtCtx.Management.Users("").Controller().Informer(),
+		mgmtCtx.Management.Users("").Controller().Lister(),
+		pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
+	)
+}
 
-	l := &Provider{
+// NewProvider returns a Provider backed by informer's user cache. It registers
+// the indexers the provider's lookups need, so it has to be called before the
+// informer starts.
+//
+// A registration failure is ignored on purpose. Configure runs more than once
+// per startup, since providers.Configure is called from both the principals
+// handler and the RTB store, and AddIndexers reports a conflict for names
+// already registered on the shared informer, so the second call always fails
+// with nothing wrong.
+func NewProvider(informer cache.SharedIndexInformer, userLister v3.UserLister, pwdVerifier PasswordVerifier) *Provider {
+	_ = informer.AddIndexers(cache.Indexers{
+		userNameIndex:   userNameIndexer,
+		userSearchIndex: userSearchIndexer,
+	})
+
+	return &Provider{
+		userLister:  userLister,
 		userIndexer: informer.GetIndexer(),
-		userLister:  mgmtCtx.Management.Users("").Controller().Lister(),
-		pwdVerifier: pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
+		pwdVerifier: pwdVerifier,
 	}
-	return l
 }
 
 func (l *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
@@ -135,20 +148,15 @@ func (l *Provider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, inpu
 }
 
 // isLocalUser reports whether a User resource represents a user that can log
-// in locally. A user is considered local if it has a local login username or a
-// local:// principal ID. SCIM-provisioned users and users created purely as a
-// side effect of external authentication (e.g. SAML/Okta) lack both and must
-// not surface in local principal search results.
+// in locally. A user is local if it has a local login username, or if its only
+// principal is a local:// one. External-auth users (SAML, OAuth, SCIM) always
+// carry an external provider principal such as okta_user://<uid> in addition to
+// the self-referential local://<uid> that the user lifecycle controller appends
+// to every user, so they have more than one principal and are excluded — they
+// must not surface in local principal search results.
 func isLocalUser(user *apiv3.User) bool {
-	if user.Username != "" {
-		return true
-	}
-	for _, p := range user.PrincipalIDs {
-		if strings.HasPrefix(p, Name+"://") {
-			return true
-		}
-	}
-	return false
+	return user.Username != "" ||
+		(len(user.PrincipalIDs) == 1 && strings.HasPrefix(user.PrincipalIDs[0], Name+"://"))
 }
 
 func getLocalPrincipalID(user *apiv3.User) string {
@@ -179,22 +187,18 @@ func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 	return []apiv3.Principal{}, nil
 }
 
+// SearchPrincipals returns a local principal for every user matching searchKey
+// that can log in locally. Only user principals are returned; the local provider
+// does not own any groups.
+//
+// Results are not deduplicated against the principals other providers returned
+// for the same search. Every user here can log in locally, and a binding on an
+// external principal grants nothing when the user logs in locally, so the local
+// principal is never redundant. Users that cannot log in locally are left out by
+// isLocalUser instead.
 func (l *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	return l.SearchPrincipalsDedupe(searchKey, principalType, token, nil)
-}
-
-// SearchPrincipalsDedupe performs principal search, and deduplicates the
-// results against the supplied list (that should have come from other non-local
-// auth providers) to avoid duplicate search results. Only user principals are
-// returned; the local provider does not own any groups.
-func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token accessor.TokenAccessor, principalsFromOtherProviders []apiv3.Principal) ([]apiv3.Principal, error) {
 	if principalType == "group" {
 		return nil, nil
-	}
-
-	fromOtherProviders := map[string]bool{}
-	for _, p := range principalsFromOtherProviders {
-		fromOtherProviders[p.Name] = true
 	}
 
 	queryKey := strings.ToLower(searchKey)
@@ -213,16 +217,11 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 	}
 
 	var principals []apiv3.Principal
-User:
 	for _, user := range matched {
 		if !isLocalUser(user) {
 			continue
 		}
-		for _, p := range user.PrincipalIDs {
-			if fromOtherProviders[p] {
-				continue User
-			}
-		}
+
 		principalID := getLocalPrincipalID(user)
 		principals = append(principals, l.toPrincipal("user", user.DisplayName, user.Username, principalID, token))
 	}
@@ -275,7 +274,7 @@ func (l *Provider) listAllUsers(searchKey string) ([]*apiv3.User, error) {
 
 	var matched []*apiv3.User
 	for _, user := range allUsers {
-		if !userMatchesSearchKey(user, searchKey) {
+		if !common.UserMatchesSearchKey(user, searchKey) {
 			continue
 		}
 		matched = append(matched, user)
@@ -343,7 +342,7 @@ func userSearchIndexer(obj any) ([]string, error) {
 func indexField(field string, maxIndex int) []string {
 	var fieldIndexes []string
 	for i := 2; i <= maxIndex; i++ {
-		simplified := []rune(simplifyString(field))
+		simplified := []rune(common.SimplifyString(field))
 
 		// This calculates the string to be indexed after it has been
 		// simplified because it may now be shorter than it was when maxIndex
@@ -389,37 +388,4 @@ func (l *Provider) IsDisabledProvider() (bool, error) {
 // CleanupResources deletes resources associated with the local auth provider.
 func (l *Provider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
-}
-
-func userMatchesSearchKey(user *apiv3.User, searchKey string) bool {
-	normalizedDisplayName := strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName)))
-	normalizedSearchKey := strings.ToLower(normalizeWhitespace(simplifyString(searchKey)))
-
-	return (strings.HasPrefix(user.ObjectMeta.Name, searchKey) ||
-		strings.Contains(strings.ToLower(normalizeWhitespace(user.Username)), normalizedSearchKey) ||
-		strings.Contains(normalizedDisplayName, normalizedSearchKey))
-}
-
-func normalizeWhitespace(s string) string {
-	return strings.Join(strings.Fields(s), "")
-}
-
-// simplifyString transforms unicode characters in the string by replacing
-// the characters.
-//
-// The set of characters that is replaced (unicode.Mn) is here
-//
-//	https://www.compart.com/en/unicode/category/Mn
-func simplifyString(s string) string {
-	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-	result, _, err := transform.String(t, s)
-
-	// This shouldn't really happen, as the rune transformer is very forgiving
-	// and bad things get changed to �
-	if err != nil {
-		logrus.Errorf("failed to simplify string %q: %s", s, err)
-		return s
-	}
-
-	return result
 }

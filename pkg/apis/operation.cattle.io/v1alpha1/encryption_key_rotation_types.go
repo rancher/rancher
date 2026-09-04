@@ -35,6 +35,22 @@ type EncryptionKeyRotationStatus struct {
 	Step EncryptionKeyRotationStep `json:"step,omitempty"`
 }
 
+func (s *EncryptionKeyRotationStatus) SetPhase(phase OperationPhase) {
+	if s.Phase == phase {
+		return
+	}
+	s.Phase = phase
+	s.LastUpdated = metav1.Now()
+}
+
+func (s *EncryptionKeyRotationStatus) SetStep(step EncryptionKeyRotationStep) {
+	if s.Step == step {
+		return
+	}
+	s.Step = step
+	s.LastUpdated = metav1.Now()
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true

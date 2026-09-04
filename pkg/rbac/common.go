@@ -58,13 +58,23 @@ const (
 	// the RoleTemplate across all clusters.
 	PRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/prtb-by-cluster-and-roletemplate-name"
 	CRTBByClusterAndRoleTemplateNameIndex = "auth.management.cattle.io/crtb-by-cluster-and-roletemplate-name"
-	CrbGlobalRoleAnnotation               = "authz.cluster.cattle.io/globalrole"
-	CrbGlobalRoleBindingAnnotation        = "authz.cluster.cattle.io/globalrolebinding"
-	CrbAdminGlobalRoleCheckedAnnotation   = "authz.cluster.cattle.io/admin-globalrole-checked"
-	AggregationManagementFeatureLabel     = "management.cattle.io/roletemplate-aggregation-mgmt"
-	AggregationFeatureLabel               = "management.cattle.io/roletemplate-aggregation"
+	// PRTBByProjectNameIndex keys PRTBs by their ProjectName (<cluster-id>:<project-id>), which
+	// matches the field.cattle.io/projectId annotation on namespaces. Used by the aggregation
+	// namespace enqueuer to reconcile the PRTBs of a project when one of its namespaces changes.
+	PRTBByProjectNameIndex              = "auth.management.cattle.io/prtb-by-project-name"
+	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
+	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
+	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
+	AggregationManagementFeatureLabel   = "management.cattle.io/roletemplate-aggregation-mgmt"
+	AggregationFeatureLabel             = "management.cattle.io/roletemplate-aggregation"
 	// GRDownstreamNSIndex is the cache index name for looking up GlobalRoles by the namespaces in InheritedNamespacedRules.
 	GRDownstreamNSIndex = "mgmt-auth-gr-downstream-ns-index"
+	// GRBGlobalRoleIndex is the cache index name for looking up GlobalRoleBindings by the GlobalRole they reference.
+	GRBGlobalRoleIndex = "mgmt-auth-grb-gr-idex"
+	// GrOwnerLabel marks resources created for a GlobalRole with the SafeConcatName of the owning GlobalRole.
+	GrOwnerLabel = "authz.management.cattle.io/gr-owner"
+	// GrbOwnerLabel marks resources created for a GlobalRoleBinding with the SafeConcatName of the owning GlobalRoleBinding.
+	GrbOwnerLabel = "authz.management.cattle.io/grb-owner"
 )
 
 // BuildSubjectFromRTB This function will generate

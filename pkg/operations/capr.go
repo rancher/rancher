@@ -7,10 +7,11 @@ import (
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
-	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
@@ -19,37 +20,105 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
-
-func init() {
-	RegisterAdapter(rkev1.SchemeGroupVersion.WithKind("RKEControlPlane"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
-		controlPlane, err := clients.RKE.RKEControlPlane().Cache().Get(unstructured.GetNamespace(), unstructured.GetName())
-		if err != nil {
-			return nil, err
-		}
-		return &CAPRAdapter{
-			controlPlane: controlPlane,
-			clients:      clients,
-		}, nil
-	})
-	RegisterAdapter(provv1.SchemeGroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, unstructured *unstructured.Unstructured) (Adapter, error) {
-		controlPlane, err := clients.RKE.RKEControlPlane().Cache().Get(unstructured.GetNamespace(), unstructured.GetName())
-		if err != nil {
-			return nil, err
-		}
-		return &CAPRAdapter{
-			controlPlane: controlPlane,
-			clients:      clients,
-		}, nil
-	})
-}
 
 // CAPRAdapter is an implementation of the Adapter interface for CAPR clusters.
 type CAPRAdapter struct {
+	cluster      *capi.Cluster
 	controlPlane *rkev1.RKEControlPlane
 	clients      *wrangler.CAPIContext
+}
+
+// BeaconRef returns the CAPI cluster's location — for v2prov/CAPR the RKEControlPlane, provv1
+// Cluster, CAPI Cluster, and beacon all share (controlPlane.Namespace, controlPlane.Name).
+func (a *CAPRAdapter) BeaconRef() (string, string) {
+	return a.controlPlane.Namespace, a.controlPlane.Name
+}
+
+// EtcdSnapshotNamespace returns the RKEControlPlane namespace — the same namespace hosts the
+// provv1.Cluster and its etcd-snapshot CRs.
+func (a *CAPRAdapter) EtcdSnapshotNamespace() string {
+	return a.controlPlane.Namespace
+}
+
+func (a *CAPRAdapter) ClusterObject() (*unstructured.Unstructured, error) {
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(a.controlPlane)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) (args []string, env []string, files []plan.File) {
+	return nil, nil, nil
+}
+
+func (a *CAPRAdapter) LoopbackAddress(_ *corev1.Secret) string {
+	loopbackAddress := capr.GetLoopbackAddress(a.controlPlane)
+
+	if utils.IsPlainIPV6(loopbackAddress) {
+		loopbackAddress = fmt.Sprintf("[%s]", loopbackAddress)
+	}
+
+	return loopbackAddress
+}
+
+func (a *CAPRAdapter) ConfigFile(_ *corev1.Secret) string {
+	return fmt.Sprintf("/etc/rancher/%s/config.yaml", a.RuntimeCommand())
+}
+
+func (a *CAPRAdapter) ConfigDirectory(_ *corev1.Secret) string {
+	return fmt.Sprintf("/etc/rancher/%s/config.yaml.d", a.RuntimeCommand())
+}
+
+func (a *CAPRAdapter) GetServerURL(secret *corev1.Secret) string {
+	if secret == nil {
+		return ""
+	}
+
+	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
+		return ""
+	}
+
+	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret, secret.Namespace, a.clients.RESTMapper)
+	if err != nil {
+		logrus.Errorf("error getting reference for machine lifecycle labels: %v", err)
+		return ""
+	}
+
+	machine, err := a.clients.CAPI.Machine().Cache().Get(ref.Namespace, ref.Name)
+	if err != nil {
+		logrus.Errorf("error getting machine %s for machine lifecycle: %v", ref.Name, err)
+		return ""
+	}
+
+	if len(machine.Status.Addresses) == 0 {
+		return ""
+	}
+
+	var address string
+
+	for _, addr := range machine.Status.Addresses {
+		if addr.Type == capi.MachineExternalIP && address == "" {
+			address = addr.Address
+		} else if addr.Type == capi.MachineInternalIP {
+			address = addr.Address
+		}
+	}
+
+	return address
+}
+
+func (a *CAPRAdapter) GetSupervisorPort(_ *corev1.Secret) string {
+	if a.RuntimeCommand() == "rke2" {
+		return "9345"
+	}
+	return "6443"
 }
 
 // WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
@@ -91,7 +160,7 @@ func (a *CAPRAdapter) WaitForRegister() (bool, error) {
 			return false, nil
 		}
 
-		machineName, exists := secret.Labels[capr.MachineNameLabel]
+		machineName, exists := secret.Labels[planv1alpha1.MachineLifecycleNameLabel]
 
 		// If the label is missing, or it maps to a machine name we haven't seen/already matched
 		if !exists || !expectedMachines[machineName] {

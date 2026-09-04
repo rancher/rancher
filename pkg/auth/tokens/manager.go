@@ -101,16 +101,18 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return apiv3.Token{}, "", http.StatusUnauthorized, err
 	}
 
-	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	tokenTTL, err := exttokenstore.IngestTTL(int64(jsonInput.TTLMillis),
+		settings.AuthTokenMaxTTLMinutes,
+		settings.AuthTokenDefaultTTLMinutes)
 	if err != nil {
-		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating max-ttl %v", err)
+		return apiv3.Token{}, "", http.StatusInternalServerError, fmt.Errorf("error validating ttl against default and max: %w", err)
 	}
 
 	var unhashedTokenKey string
 	derivedToken := &apiv3.Token{
 		UserPrincipal: token.GetUserPrincipal(),
 		IsDerived:     true,
-		TTLMillis:     tokenTTL.Milliseconds(),
+		TTLMillis:     tokenTTL,
 		UserID:        token.GetUserID(),
 		AuthProvider:  token.GetAuthProvider(),
 		ProviderInfo:  token.GetProviderInfo(),
@@ -158,6 +160,13 @@ func (m *Manager) updateToken(token *apiv3.Token) (*apiv3.Token, error) {
 
 func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
+
+	if tokenName == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("bad auth token, no name present")
+	}
+	if tokenKey == "" {
+		return nil, http.StatusBadRequest, fmt.Errorf("bad auth token, no key present")
+	}
 
 	// Support ext tokens
 	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
@@ -775,47 +784,18 @@ func (m *Manager) GetKubeconfigToken(clusterName, tokenName, description, kind, 
 	return token, createdTokenValue, nil
 }
 
-// ClampToMaxTTL will return the duration of the provided TTL or the duration of settings.AuthTokenMaxTTLMinutes whichever is smaller.
-func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
-	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
-	}
-	if maxTTL == 0 {
-		return ttl, nil
-	}
-	if ttl == 0 {
-		return maxTTL, nil
-	}
-	// return min(ttl, maxTTL)
-	if ttl <= maxTTL {
-		return ttl, nil
-	}
-	return maxTTL, nil
-}
-
-// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
-// See also pkg/ext/stores/tokens/tokens.go
-func ParseTokenTTL(ttl string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vm", ttl)
-	dur, err := time.ParseDuration(durString)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing token ttl: %v", err)
-	}
-	return dur, nil
-}
-
-// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for kubeconfig tokens
+// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for
+// kubeconfig tokens, in milliseconds, and clamped to the associated max.
 func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
-	defaultTokenTTL, err := exttokenstore.ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
+	ttlMillis, err := exttokenstore.IngestTTL(0, settings.KubeconfigMaxTokenTTLMinutes, settings.KubeconfigDefaultTokenTTLMinutes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
+		return nil, err
 	}
+	return &ttlMillis, nil
+}
 
-	tokenTTL, err := ClampToMaxTTL(defaultTokenTTL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate token ttl: %w", err)
-	}
-	ttlMilli := tokenTTL.Milliseconds()
-	return &ttlMilli, nil
+// GetKubeconfigMaxTokenTTLInMilliSeconds will return the maximum TTL for
+// kubeconfig tokens, in milliseconds
+func GetKubeconfigMaxTokenTTLInMilliSeconds() (int64, error) {
+	return exttokenstore.ParseTTLToMilliseconds(settings.KubeconfigMaxTokenTTLMinutes)
 }

@@ -11,7 +11,6 @@ import (
 	caprplanner "github.com/rancher/rancher/pkg/capr/planner"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/condition"
@@ -114,22 +113,14 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 		return status, err
 	}
 
-	if beacon.Labels == nil {
+	if beacon.Status.Owner == "" {
 		beacon = beacon.DeepCopy()
-		beacon.Labels = map[string]string{}
-		beacon.Labels[planv1alpha1.BeaconOwnerLabel] = PlannerOwnerKey
-		beacon, err = h.beacons.Update(beacon)
+		beacon.Status.Owner = PlannerOwnerKey
+		beacon, err = h.beacons.UpdateStatus(beacon)
 		if err != nil {
 			return status, err
 		}
-	} else if owner, ok := beacon.Labels[planv1alpha1.BeaconOwnerLabel]; !ok || owner == "" {
-		beacon = beacon.DeepCopy()
-		beacon.Labels[planv1alpha1.BeaconOwnerLabel] = PlannerOwnerKey
-		beacon, err = h.beacons.Update(beacon)
-		if err != nil {
-			return status, err
-		}
-	} else if owner != PlannerOwnerKey {
+	} else if beacon.Status.Owner != PlannerOwnerKey {
 		logrus.Debugf("[planner] rkecluster %s/%s: waiting to acquire beacon", cp.Namespace, cp.Name)
 		h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
 		return status, nil
@@ -198,8 +189,8 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
 
 	beacon = beacon.DeepCopy()
-	delete(beacon.Labels, planv1alpha1.BeaconOwnerLabel)
-	_, err = h.beacons.Update(beacon)
+	beacon.Status.Owner = ""
+	_, err = h.beacons.UpdateStatus(beacon)
 	if err != nil {
 		return status, err
 	}

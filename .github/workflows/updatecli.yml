@@ -6,6 +6,10 @@ on:
     - cron: '0 12 * * *'
   workflow_dispatch:
     inputs:
+      tag:
+        description: 'Optional Rancher Machine tag; used only by the machine update.'
+        required: false
+        type: string
       target:
         description: 'Select which updatecli workflow to run or `all` to run all updates.'
         required: true
@@ -16,6 +20,7 @@ on:
           - 'k3s'
           - 'k8s'
           - 'harvester-docker-machine'
+          - 'machine'
           - 'wins-system-agent'
 
 permissions:
@@ -30,13 +35,14 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        # zizmor: ignore[artipacked] -- this job must retain checkout credentials for authenticated branch cleanup pushes.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install updatecli
-        uses: updatecli/updatecli-action@4b17f4ea784de29f71f85f9bc4955402ba1ae53c # v2.100.0
+        uses: updatecli/updatecli-action@41b9c8d707830a9daebaeaa84c1b62d60b779564 # v3.6.0
 
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
 
@@ -69,7 +75,7 @@ jobs:
             secret/data/github/org/rancher/github/renovate-rancher privateKey | PRIVATE_KEY
 
       - name: Create App token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
@@ -81,6 +87,7 @@ jobs:
         env:
           UPDATECLI_GITHUB_ACTOR: ${{ github.actor }}
           UPDATECLI_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          MACHINE_RELEASE_TAG: ${{ inputs.tag }}
         run: |
           # Never use '--debug' or 'manifest show' options, because they will
           # leak the GH token.

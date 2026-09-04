@@ -1,16 +1,20 @@
 package genericoidc
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
@@ -372,4 +376,157 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 			assert.Equal(t, test.expected, result)
 		})
 	}
+}
+
+func TestGenOIDCProviderSearchPrincipalsResolvesKnownUsers(t *testing.T) {
+	t.Parallel()
+
+	users := []*apiv3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+			DisplayName:  "Test UserOne",
+			PrincipalIDs: []string{"genericoidc_user://sub-0001", "local://u-oidc1"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta1"},
+			DisplayName:  "Test UserFromOkta",
+			PrincipalIDs: []string{"okta_user://abc-uuid-1", "local://u-okta1"},
+		},
+	}
+
+	g := &GenOIDCProvider{
+		oidc.OpenIDCProvider{
+			Name: Name,
+			Type: client.GenericOIDCConfigType,
+			UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+				ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+					return users, nil
+				},
+			}),
+		},
+	}
+
+	tests := []struct {
+		name          string
+		searchValue   string
+		principalType string
+		expected      []apiv3.Principal
+	}{
+		{
+			name:          "known user is returned with its real subject",
+			searchValue:   "testu",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:        "known user is returned alongside the group principal",
+			searchValue: "testu",
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://sub-0001"},
+					DisplayName:   "Test UserOne",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://testu"},
+					DisplayName:   "testu",
+					LoginName:     "testu",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://testu"},
+					DisplayName:   "testu",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:          "searching the subject returns a single principal",
+			searchValue:   "sub-0001",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://sub-0001"},
+					DisplayName:   "sub-0001",
+					LoginName:     "sub-0001",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:          "users of another provider are not returned",
+			searchValue:   "UserFromOkta",
+			principalType: UserType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://UserFromOkta"},
+					DisplayName:   "UserFromOkta",
+					LoginName:     "UserFromOkta",
+					PrincipalType: UserType,
+					Provider:      Name,
+				},
+			},
+		},
+		{
+			name:          "group search does not resolve users",
+			searchValue:   "testu",
+			principalType: GroupType,
+			expected: []apiv3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://testu"},
+					DisplayName:   "testu",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &apiv3.Token{})
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestGenOIDCProviderSearchPrincipalsUserSearchError(t *testing.T) {
+	t.Parallel()
+
+	g := &GenOIDCProvider{
+		oidc.OpenIDCProvider{
+			Name: Name,
+			Type: client.GenericOIDCConfigType,
+			UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
+				ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+					return nil, errors.New("cache is not synced")
+				},
+			}),
+		},
+	}
+
+	got, err := g.SearchPrincipals("testu", UserType, &apiv3.Token{})
+	assert.ErrorContains(t, err, "cache is not synced")
+	assert.Nil(t, got)
 }

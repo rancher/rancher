@@ -5,12 +5,16 @@
 
 Rancher is an open source container management platform built for organizations that deploy containers in production. Rancher makes it easy to run Kubernetes everywhere, meet IT requirements, and empower DevOps teams.
 
+<a href="https://aws.amazon.com/marketplace/pp/prodview-yrzugbpzuukww" target="_blank" rel="noopener noreferrer">
+  <img src="available-in-marketplace_white_bg.webp" alt="SUSE Rancher for EKS available in AWS marketplace" width="15%" />
+</a>
+
 ## Stable Release
 
-<!-- stable v2.14.3 DO NOT REMOVE THIS LINE -->
-* v2.14.3 - `rancher/rancher:v2.14.3` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.14.3).
+<!-- stable v2.15.1 DO NOT REMOVE THIS LINE -->
+* v2.15.1 - `rancher/rancher:v2.15.1` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.15.1).
   
-To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
+To get automated notifications of our latest release, you can watch the announcements category in our [forums](https://forums.suse.com/c/announcements/12), or subscribe to the RSS feed `https://forums.suse.com/c/announcements/12.rss`.
 
 ## Quick Start
 
@@ -20,18 +24,18 @@ Open your browser to https://localhost
 
 ## Installation
 
-See [Installing/Upgrading Rancher](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-and-upgrade) for all installation options.
+See [Installing/Upgrading Rancher]([https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade]) for all installation options.
 
 ### Minimum Requirements
 
 * Operating Systems
   * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
 * Hardware & Software
-  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-requirements) for hardware and software requirements.
+  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements) for hardware and software requirements.
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [Rancher Documentation](https://ranchermanager.docs.rancher.com/v2.8).
+To learn more about using Rancher, please refer to our [Rancher Documentation](https://ranchermanager.docs.rancher.com/).
 
 ## Source Code
 
@@ -52,7 +56,7 @@ For security issues, please first check our [security policy](https://github.com
 
 # License
 
-Copyright (c) 2014-2025 [SUSE](http://rancher.com)
+Copyright (c) 2014-2026 [SUSE](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -77,29 +77,36 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 	// User creates a namespace in the project.
 	ns := p.createNamespace(testUser, p.projectName(project))
 
-	// Verify user can list pods in the namespace (proves basic access).
-	dynamicClient, err := testUser.GetDownStreamClusterClient(p.downstreamClusterID)
+	// Verify user can list pods in the namespace (proves basic access). The per-namespace bindings
+	// are created asynchronously by the roletemplate controllers, so wait for the permission to
+	// propagate rather than checking once.
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:      "list",
+			Resource:  "pods",
+			Group:     "",
+			Namespace: ns.Name,
+		},
+	})
 	p.Require().NoError(err)
 
-	podGVR := corev1.SchemeGroupVersion.WithResource("pods")
-	_, err = dynamicClient.Resource(podGVR).Namespace(ns.Name).List(context.TODO(), metav1.ListOptions{})
-	p.Require().NoError(err)
-
-	// Verify user has both 'project-owner' and 'admin' role bindings in the namespace.
-	rbs, err := extrbac.ListRoleBindings(client, p.downstreamClusterID, ns.Name, metav1.ListOptions{})
-	p.Require().NoError(err)
-
-	rbRoles := []string{}
-	for _, rb := range rbs.Items {
-		for _, subject := range rb.Subjects {
-			if subject.Name == user.ID {
-				rbRoles = append(rbRoles, rb.RoleRef.Name)
+	// Verify the user has a project-owner RoleBinding in the namespace. The RoleRef name depends on
+	// the RBAC model ("project-owner" in the legacy model, "project-owner-aggregator" when the
+	// aggregated-roletemplates feature is enabled), so match by prefix and wait for it to appear.
+	p.Require().Eventually(func() bool {
+		rbs, err := extrbac.ListRoleBindings(client, p.downstreamClusterID, ns.Name, metav1.ListOptions{})
+		if err != nil {
+			return false
+		}
+		for _, rb := range rbs.Items {
+			for _, subject := range rb.Subjects {
+				if subject.Name == user.ID && strings.HasPrefix(rb.RoleRef.Name, "project-owner") {
+					return true
+				}
 			}
 		}
-	}
-
-	p.Require().Contains(rbRoles, "project-owner", "expected project-owner role binding for user")
-	p.Require().Contains(rbRoles, "admin", "expected admin role binding for user")
+		return false
+	}, 2*time.Minute, 2*time.Second, "expected a project-owner role binding for the user")
 
 	// Verify user can create deployments (extensions group) in the namespace.
 	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{

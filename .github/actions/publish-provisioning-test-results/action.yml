@@ -1,0 +1,94 @@
+name: Publish Provisioning Test Results
+description: > 
+  Generates a github action run summary and an optional PR comment using the 
+  output artifacts of the provisioning test suite. This action expects the 
+  caller to convert the test artifacts to an XML format compatible with junit-report,
+  and to export its event file as an artifact. The 'rancher/publish-unit-test-result-action'
+  will translate the XML artifacts into a Run summary, and uses the event file to find the PR 
+  it should comment on. As this action must perform privileged actions (PR comments),
+  it must not be directly invoked by callers which assume non-origin contexts 
+  (e.g. PRs from forks, see publish-provisioning-test-results.yaml as an example).
+
+inputs:
+  commit:
+    description: Commit SHA the results belong to.
+    required: true
+  event-name:
+    description: Originating event name (e.g. pull_request, schedule).
+    required: true
+  create-comment:
+    description: >-
+      Controls when a comment is added on the PR with the test results. Only applicable for
+      pull_request events, ignored for schedule/dispatch events. Requires that
+      the event file be downloaded from the triggering workflow run and the run-id of 
+      the triggering workflow run be provided (run-id=<workflow_run.id>).
+      Allowed options are: 'off', 'always', 'changes', 'failures'. Defaults to 'always'.
+    required: false
+    default: "always"
+  run-id:
+    description: >-
+      The run ID to download artifacts from.
+    required: true
+    default: ""
+  check-name:
+    description: Name of the check run / summary section.
+    required: false
+    default: Provisioning Tests Results
+  test-results-path:
+    description: Directory to download reports into.
+    required: false
+    default: /tmp/test-results
+
+runs:
+  using: composite
+  steps:
+    - name: Install Python deps
+      shell: bash
+      run: |
+        zypper --non-interactive install python313 python313-pip python313-virtualenv which
+        # set python as the default python (essentially just a symlink)
+        update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1
+
+    - name: mkdir test-results
+      shell: bash
+      env:
+        TEST_RESULTS_PATH: ${{ inputs.test-results-path }}
+      run: mkdir -p "$TEST_RESULTS_PATH"
+
+    - name: Download XML test reports
+      id: xml_reports
+      # don't error the whole job if the artifact is not there
+      continue-on-error: true
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        run-id: ${{ inputs.run-id }}
+        # needed per https://github.com/orgs/community/discussions/106300#discussioncomment-8369881
+        github-token: ${{ github.token }}
+        merge-multiple: true
+        path: ${{ inputs.test-results-path }}
+        name: "XML Results"
+
+    - name: Download the event file
+      id: event_file
+      if: steps.xml_reports.outcome == 'success'
+      continue-on-error: true
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        run-id: ${{ inputs.run-id }}
+        github-token: ${{ github.token }}
+        merge-multiple: true
+        path: ${{ inputs.test-results-path }}
+        name: "Event File"
+
+    - name: Publish test results
+      if: >-
+        steps.xml_reports.outcome == 'success' && (steps.event_file.outcome == 'success' || steps.event_file.outcome == 'skipped')
+      uses: rancher/publish-unit-test-result-action/linux@2c5c7685c1698e015459f9a9bfa49f0888800df5
+      with:
+        check_name: ${{ inputs.check-name }}
+        comment_mode: ${{ inputs.create-comment }}
+        commit: ${{ inputs.commit }}
+        event_name: ${{ inputs.event-name }}
+        # Providing an event_file indicates to the action that a comment should be generated on the associated PR
+        event_file: "${{ inputs.test-results-path }}/event.json"
+        files: "${{ inputs.test-results-path }}/*.xml"

@@ -180,17 +180,9 @@ func AgentDeploymentCustomizationChanged(cluster *v3.Cluster) bool {
 		return affinitiesDiffer || tolerationsDiffer || resourcesDiffer
 	}
 
-	if specCustomization.AppendTolerations != nil && statusCustomization.AppendTolerations != nil {
-		tolerationsDiffer = !reflect.DeepEqual(specCustomization.AppendTolerations, statusCustomization.AppendTolerations)
-	}
-
-	if specCustomization.OverrideAffinity != nil && statusCustomization.OverrideAffinity != nil {
-		affinitiesDiffer = !reflect.DeepEqual(specCustomization.OverrideAffinity, statusCustomization.OverrideAffinity)
-	}
-
-	if specCustomization.OverrideResourceRequirements != nil && statusCustomization.OverrideResourceRequirements != nil {
-		resourcesDiffer = !reflect.DeepEqual(specCustomization.OverrideResourceRequirements, statusCustomization.OverrideResourceRequirements)
-	}
+	tolerationsDiffer = !reflect.DeepEqual(specCustomization.AppendTolerations, statusCustomization.AppendTolerations)
+	affinitiesDiffer = !reflect.DeepEqual(specCustomization.OverrideAffinity, statusCustomization.OverrideAffinity)
+	resourcesDiffer = !reflect.DeepEqual(specCustomization.OverrideResourceRequirements, statusCustomization.OverrideResourceRequirements)
 
 	return affinitiesDiffer || tolerationsDiffer || resourcesDiffer
 }

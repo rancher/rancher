@@ -81,6 +81,7 @@ func NewPodConfig(clients *clients.Clients, namespace string) (*corev1.ObjectRef
 	podConfig.SetNamespace(namespace)
 	podConfig.SetGenerateName("pod-config-")
 	podConfig.Object["image"] = defaults.PodTestImage
+	podConfig.Object["etcdTmpfs"] = "512Mi"
 	// We are providing custom userdata to force K3s/RKE2 to use the cgroupfs cgroup driver, rather than systemd
 	// We have to set invocation disabling on the rancher-system-agent because it runs rke2/k3s server on restore and this has cgroup issues
 	podConfig.Object["userdata"] = `#cloud-config
