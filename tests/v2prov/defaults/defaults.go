@@ -38,8 +38,8 @@ var (
 	// ensures that minor delays in the creation of RBAC resources don't fail
 	// tests, while also minimizing wait time.
 	DownstreamClientsetRetry = wait.Backoff{
-		Steps:    10,
-		Duration: 1 * time.Second,
+		Steps:    30,
+		Duration: 3 * time.Second,
 		Factor:   1.0,
 		Jitter:   0.1,
 	}
