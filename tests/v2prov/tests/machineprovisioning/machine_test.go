@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	errgroup2 "golang.org/x/sync/errgroup"
@@ -188,7 +189,10 @@ func Test_Provisioning_SetA_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.
 	}
 
 	// wait for all nodes to be ready
-	err = retry.OnError(defaults.DownstreamRetry, func(error) bool { return true }, func() error {
+	err = retry.OnError(defaults.DownstreamRetry, func(err error) bool {
+		logrus.Warnf("failed to get downstream nodes for cluster '%s', will retry: %v", c.Name, err)
+		return true
+	}, func() error {
 		nodes, err := kc.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return err
