@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -223,7 +224,10 @@ func deployLoadPods(t *testing.T, kc *kubernetes.Clientset) {
 		},
 	}
 
-	err := retry.OnError(defaults.DownstreamRetry, func(error) bool { return true }, func() error {
+	err := retry.OnError(defaults.DownstreamRetry, func(err error) bool {
+		logrus.Warnf("[deployLoadPods] failed to get '%s' deployment in default workspace, will retry: %v", deploy.Name, err)
+		return true
+	}, func() error {
 		_, err := kc.AppsV1().Deployments("default").Create(context.TODO(), deploy, metav1.CreateOptions{})
 		return err
 	})
