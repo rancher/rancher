@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi/settings"
@@ -9,8 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -42,15 +43,17 @@ func GetAndVerifyDownstreamClientset(clients *clients.Clients, c *v1.Cluster) (*
 	if err != nil {
 		return nil, err
 	}
-	// Try to continuously get the kubernetes default service
-	err = retry.OnError(defaults.DownstreamRetry, func(err error) bool {
-		return !apierrors.IsForbidden(err)
+
+	// Try to continuously get the default kubernetes service
+	err = retry.OnError(defaults.DownstreamClientsetRetry, func(err error) bool {
+		logrus.Warnf("[GetAndVerifyDownstreamClientset] failed to get the default kubernetes service, will retry: %v", err)
+		return true
 	}, func() error {
 		_, err = clientset.CoreV1().Services(corev1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to verify downstream clientset: %v", err)
 	}
 
 	return clientset, nil

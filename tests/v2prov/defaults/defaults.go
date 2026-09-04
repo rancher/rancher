@@ -33,4 +33,14 @@ var (
 		Factor:   1.0,
 		Jitter:   0.1,
 	}
+	// DownstreamClientsetRetry is a wait.Backoff dedicated to getting
+	// the downstream kubernetes clientset. The increased frequency
+	// ensures that minor delays in the creation of RBAC resources don't fail
+	// tests, while also minimizing wait time.
+	DownstreamClientsetRetry = wait.Backoff{
+		Steps:    10,
+		Duration: 1 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}
 )
