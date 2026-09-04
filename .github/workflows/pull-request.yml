@@ -37,7 +37,7 @@ jobs:
         uses: ./.github/actions/rancher-chart/build
   # Tests only consume the linux/amd64 images, so the amd64 builds gate tests
   # while the arm64 builds run as separate, non-gating jobs below.
-  build-server-amd64:
+  build-images-amd64:
     # On the critical path with a CPU-bound Go compile, so use 8cpu to shorten
     # the build head; arm64 is off the critical path and stays on 4cpu.
     runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -52,25 +52,10 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
-  build-agent-amd64:
-    # 8cpu for the same reason as build-server-amd64.
-    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    env:
-      ARCH: x64
-      OS: linux
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: ./.github/actions/build-images
   # arm64 builds validate that the images compile for arm64. Nothing downstream
   # depends on them, so they run in parallel, off the critical path.
-  build-server-arm64:
+  build-images-arm64:
     runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
     env:
       ARCH: arm64
@@ -83,21 +68,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
-  build-agent-arm64:
-    runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
-    env:
-      ARCH: arm64
-      OS: linux
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: ./.github/actions/build-images
   build-installer:
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
@@ -125,10 +96,10 @@ jobs:
   integration-tests:
     permissions:
       contents: read
-    needs: [build-server-amd64, build-agent-amd64]
+    needs: [build-chart, build-images-amd64]
     uses: ./.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
       contents: read
-    needs: [build-server-amd64, build-agent-amd64]
+    needs: [build-images-amd64]
     uses: ./.github/workflows/provisioning-tests.yml

@@ -479,6 +479,10 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
 ENTRYPOINT ["entrypoint.sh"]
 
 
+FROM server AS demo
+# Will iterate later
+
+
 # Main stage using bci-micro as the base image.
 FROM final AS agent
 
