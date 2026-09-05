@@ -78,7 +78,13 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 		return status, nil
 	}
 
-	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster)
+	// A pre-bootstrapping cluster's agent does connect, but provisioning must not treat it as
+	// connected until the pre-bootstrap flow has finished. This used to be done by forcing the
+	// Connected condition itself to false, which deadlocked: the downstream controller that sets
+	// PreBootstrapped is only started once the cluster counts as connected. Gating here instead
+	// keeps Connected an honest statement about the tunnel and confines the pre-bootstrap rule to
+	// the field provisioning actually reads.
+	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster) && !capr.PreBootstrap(cluster)
 	return status, nil
 }
 

@@ -117,7 +117,11 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 		}
 		return cluster, err
 	}
-	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
+	// Pre-bootstrapping clusters connect, but the system agent must not be managed until that
+	// flow has completed. This used to fall out of Connected being forced false during
+	// pre-bootstrap; Connected is now an honest statement about the agent tunnel, so the
+	// pre-bootstrap rule is stated here explicitly.
+	if !clusterconnected.Connected.IsTrue(mgmtCluster) || capr.PreBootstrap(mgmtCluster) {
 		return cluster, nil
 	}
 
@@ -513,7 +517,11 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 		}
 		return cluster, err
 	}
-	if !clusterconnected.Connected.IsTrue(mgmtCluster) {
+	// Pre-bootstrapping clusters connect, but the system agent must not be managed until that
+	// flow has completed. This used to fall out of Connected being forced false during
+	// pre-bootstrap; Connected is now an honest statement about the agent tunnel, so the
+	// pre-bootstrap rule is stated here explicitly.
+	if !clusterconnected.Connected.IsTrue(mgmtCluster) || capr.PreBootstrap(mgmtCluster) {
 		return cluster, nil
 	}
 
