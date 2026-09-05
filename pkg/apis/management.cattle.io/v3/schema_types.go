@@ -135,6 +135,31 @@ type DynamicSchemaSpec struct {
 	// field.
 	// +optional
 	DynamicSchemaVersion string `json:"dynamicSchemaVersion,omitempty"`
+
+	// PublicFields lists which fields in ResourceFields are considered
+	// non-sensitive and can be safely returned on read operations. For
+	// credential config schemas (e.g. "amazonec2credentialconfig"), these
+	// are the fields whose values will be included in
+	// CloudCredential.Status.PublicData. Fields not listed here are treated
+	// as private/sensitive by default.
+	//
+	// Populated by Rancher from node driver annotations when credential
+	// config DynamicSchemas are created or updated.
+	// +listType=set
+	// +optional
+	PublicFields []string `json:"publicFields,omitempty"`
+
+	// PrivateFields lists which fields in ResourceFields are considered
+	// sensitive and must never be returned on read operations. For
+	// credential config schemas, these correspond to secrets, tokens, and
+	// passwords. The UI can use this list to mask or hide fields
+	// appropriately.
+	//
+	// Populated by Rancher from node driver annotations when credential
+	// config DynamicSchemas are created or updated.
+	// +listType=set
+	// +optional
+	PrivateFields []string `json:"privateFields,omitempty"`
 }
 
 type DynamicSchemaStatus struct {
