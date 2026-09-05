@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/capr"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -17,7 +18,9 @@ import (
 )
 
 const (
-	SelectorLabel = "workload.user.cattle.io/workloadselector"
+	SelectorLabel        = "workload.user.cattle.io/workloadselector"
+	WorkloadIDAnnotation = "workload.user.cattle.io/workload-id-full"
+	MaxLabelValueLength  = 63
 )
 
 type AggregateStore struct {
@@ -141,8 +144,23 @@ func store(registries map[string]projectclient.RegistryCredential, domainToCreds
 	}
 }
 
-func resolveWorkloadID(schemaID string, data map[string]interface{}) string {
-	return fmt.Sprintf("%s-%s-%s", schemaID, data["namespaceId"], data["name"])
+// resolveWorkloadID generates a workload selector label value that respects
+// Kubernetes' 63-character limit. Returns the label value and optionally the
+// full workload ID if truncation occurred (for annotation storage).
+func resolveWorkloadID(schemaID string, namespaceID string, name string) (labelValue string, fullID string) {
+	// Full format: deployment-namespace-name
+	fullID = fmt.Sprintf("%s-%s-%s", schemaID, namespaceID, name)
+
+	// Use SafeConcatName for consistent truncation + hash behavior across Rancher
+	labelValue = capr.SafeConcatName(MaxLabelValueLength, schemaID, namespaceID, name)
+
+	// If SafeConcatName truncated/hashed the value, return fullID for annotation
+	if labelValue != fullID {
+		return labelValue, fullID
+	}
+
+	// No truncation needed, don't store annotation
+	return labelValue, ""
 }
 
 func (a *AggregateStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
