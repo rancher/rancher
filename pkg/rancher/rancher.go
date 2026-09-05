@@ -388,20 +388,21 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
 			auditLogMiddleware),
-		Handler: responsewriter.Chain{
-			auth.SetXAPICattleAuthHeader,
-			responsewriter.ContentTypeOptions,
-			responsewriter.NoCache,
-			websocket.NewWebsocketHandler,
-			proxy.RewriteLocalCluster,
-			clusterProxy,
-			aggregationMiddleware,
-			additionalAPIPreMCM,
-			wranglerContext.MultiClusterManager.Middleware,
-			authServer.Management,
-			additionalAPI,
-			requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
-		}.Handler(steve),
+		Handler: newHandlerChain(chainHandlers{
+			setAuthHeader:       auth.SetXAPICattleAuthHeader,
+			contentTypeOptions:  responsewriter.ContentTypeOptions,
+			noCache:             responsewriter.NoCache,
+			websocket:           websocket.NewWebsocketHandler,
+			rewriteLocalCluster: proxy.RewriteLocalCluster,
+			clusterProxy:        clusterProxy,
+			aggregation:         aggregationMiddleware,
+			preMCM:              additionalAPIPreMCM,
+			mcm:                 wranglerContext.MultiClusterManager.Middleware,
+			authServer:          authServer.Management,
+			additionalAPI:       additionalAPI,
+			requireAuthed:       requests.NewRequireAuthenticatedFilter("/v1/", "/v1/management.cattle.io.setting"),
+			steve:               steve,
+		}),
 		Wrangler:                       wranglerContext,
 		Steve:                          steve,
 		auditLog:                       auditLogWriter,
@@ -411,6 +412,42 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		aggregationRegistrationTimeout: opts.AggregationRegistrationTimeout,
 		kubeAggregationReadyChan:       kubeAggregationReadyChan,
 	}, nil
+}
+
+// chainHandlers are the middlewares and the terminal handler making up the
+// server's request chain, in the order they are applied. Each middleware sees a
+// request before the ones below it and hands off what it does not serve itself.
+type chainHandlers struct {
+	setAuthHeader       func(http.Handler) http.Handler
+	contentTypeOptions  func(http.Handler) http.Handler
+	noCache             func(http.Handler) http.Handler
+	websocket           func(http.Handler) http.Handler
+	rewriteLocalCluster func(http.Handler) http.Handler
+	clusterProxy        func(http.Handler) http.Handler
+	aggregation         func(http.Handler) http.Handler
+	preMCM              func(http.Handler) http.Handler
+	mcm                 func(http.Handler) http.Handler
+	authServer          func(http.Handler) http.Handler
+	additionalAPI       func(http.Handler) http.Handler
+	requireAuthed       func(http.Handler) http.Handler
+	steve               http.Handler
+}
+
+func newHandlerChain(h chainHandlers) http.Handler {
+	return responsewriter.Chain{
+		h.setAuthHeader,
+		h.contentTypeOptions,
+		h.noCache,
+		h.websocket,
+		h.rewriteLocalCluster,
+		h.clusterProxy,
+		h.aggregation,
+		h.preMCM,
+		h.mcm,
+		h.authServer,
+		h.additionalAPI,
+		h.requireAuthed,
+	}.Handler(h.steve)
 }
 
 // settings aren't initialized yet so we need to use the regular client.
