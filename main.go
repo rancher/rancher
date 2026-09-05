@@ -179,6 +179,12 @@ func main() {
 			Usage:       "Configuration for rancher namespace labels and annotations",
 			Destination: &config.RancherNamespaceOptions,
 		},
+		cli.StringFlag{
+			Name:        "registry-override",
+			EnvVar:      "RANCHER_REGISTRY_OVERRIDE",
+			Usage:       "Override the default registry used for system chart installs.",
+			Destination: &config.ClusterRegistry,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
