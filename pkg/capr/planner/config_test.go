@@ -5,16 +5,22 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/data/management"
+	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestPrimaryAddressFamily(t *testing.T) {
@@ -786,4 +792,207 @@ func buildExtractConfigGzipPayload(t *testing.T, payload []byte) string {
 	}
 
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+// controlPlaneWithClusterSpec builds an RKEControlPlane carrying the given chart
+// values inside the cluster spec annotation, the way rkeControlPlane() does.
+func controlPlaneWithClusterSpec(t *testing.T, chartValues map[string]interface{}) *rkev1.RKEControlPlane {
+	t.Helper()
+
+	encoded, err := snapshotutil.CompressInterface(&provv1.ClusterSpec{
+		RKEConfig: &provv1.RKEConfig{
+			ClusterConfiguration: rkev1.ClusterConfiguration{
+				ChartValues: rkev1.GenericMap{Data: chartValues},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to encode cluster spec: %v", err)
+	}
+
+	return &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-cluster",
+			Namespace:   "fleet-default",
+			Annotations: map[string]string{capr.ClusterSpecAnnotation: encoded},
+		},
+	}
+}
+
+func TestChartValues(t *testing.T) {
+	withStructuredValues := controlPlaneWithClusterSpec(t, map[string]interface{}{
+		"rke2-coredns": map[string]interface{}{"replicas": 2},
+	})
+	withStructuredValues.Spec.ChartValues = rkev1.GenericMap{
+		Data: map[string]interface{}{
+			"rke2-coredns": map[string]interface{}{"replicas": 1},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		controlPlane *rkev1.RKEControlPlane
+		expected     map[string]interface{}
+		expectErr    bool
+	}{
+		{
+			name:         "no chart values at all",
+			controlPlane: &rkev1.RKEControlPlane{},
+			expected:     nil,
+		},
+		{
+			name:         "prefers the annotation over the structured field",
+			controlPlane: withStructuredValues,
+			expected: map[string]interface{}{
+				"rke2-coredns": map[string]interface{}{"replicas": float64(2)},
+			},
+		},
+		{
+			// The null is what the structured field cannot carry across the
+			// merge patch. Reading it back out of the annotation is the fix.
+			name: "preserves a nested explicit null",
+			controlPlane: controlPlaneWithClusterSpec(t, map[string]interface{}{
+				"rke2-coredns": map[string]interface{}{
+					"resources": map[string]interface{}{
+						"limits": map[string]interface{}{"cpu": nil, "memory": "130Mi"},
+					},
+				},
+			}),
+			expected: map[string]interface{}{
+				"rke2-coredns": map[string]interface{}{
+					"resources": map[string]interface{}{
+						"limits": map[string]interface{}{
+							"cpu":    nil,
+							"memory": "130Mi",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "falls back to the structured field when the annotation is absent",
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{
+					ClusterConfiguration: rkev1.ClusterConfiguration{
+						ChartValues: rkev1.GenericMap{
+							Data: map[string]interface{}{
+								"rke2-canal": map[string]interface{}{"mtu": 1450},
+							},
+						},
+					},
+				},
+			},
+			// float64 rather than int: GenericMap.DeepCopyInto round trips through
+			// convert.ToObj, which marshals and unmarshals as JSON. Both branches of
+			// chartValues therefore yield the same numeric type.
+			expected: map[string]interface{}{
+				"rke2-canal": map[string]interface{}{"mtu": float64(1450)},
+			},
+		},
+		{
+			name: "an annotation without an rkeConfig yields no values",
+			controlPlane: func() *rkev1.RKEControlPlane {
+				encoded, err := snapshotutil.CompressInterface(&provv1.ClusterSpec{})
+				if err != nil {
+					t.Fatalf("failed to encode cluster spec: %v", err)
+				}
+				return &rkev1.RKEControlPlane{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{capr.ClusterSpecAnnotation: encoded},
+					},
+				}
+			}(),
+			expected: nil,
+		},
+		{
+			// A corrupt annotation is surfaced rather than silently falling back
+			// to the structured field, which would reintroduce the silent loss
+			// this change exists to fix.
+			name: "a malformed annotation returns an error",
+			controlPlane: &rkev1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{capr.ClusterSpecAnnotation: "not-base64-gzip"},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			values, err := chartValues(tt.controlPlane)
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, values)
+		})
+	}
+}
+
+// TestChartValuesNullIsRenderedIntoValuesContent asserts that an explicit null
+// carried in the cluster spec annotation reaches the generated HelmChartConfig.
+func TestChartValuesNullIsRenderedIntoValuesContent(t *testing.T) {
+	controlPlane := controlPlaneWithClusterSpec(t, map[string]interface{}{
+		"rke2-coredns": map[string]interface{}{
+			"resources": map[string]interface{}{
+				"limits": map[string]interface{}{"cpu": nil, "memory": "130Mi"},
+			},
+		},
+	})
+	controlPlane.Spec.ManagementClusterName = "c-m-abcde"
+
+	values, err := chartValues(controlPlane)
+	assert.NoError(t, err)
+
+	valuesMap := convert.ToMapInterface(values["rke2-coredns"])
+	data.PutValue(valuesMap, controlPlane.Spec.ManagementClusterName, "global", "cattle", "clusterId")
+
+	rendered, err := json.Marshal(valuesMap)
+	assert.NoError(t, err)
+	assert.JSONEq(t,
+		`{"global":{"cattle":{"clusterId":"c-m-abcde"}},"resources":{"limits":{"cpu":null,"memory":"130Mi"}}}`,
+		string(rendered))
+}
+
+// TestChartValuesDoesNotMutateControlPlane guards both paths: addVSphereCharts
+// writes into the returned map, which must not be the informer cache's copy.
+func TestChartValuesDoesNotMutateControlPlane(t *testing.T) {
+	t.Run("fallback path", func(t *testing.T) {
+		controlPlane := &rkev1.RKEControlPlane{
+			Spec: rkev1.RKEControlPlaneSpec{
+				ClusterConfiguration: rkev1.ClusterConfiguration{
+					ChartValues: rkev1.GenericMap{
+						Data: map[string]interface{}{
+							"rke2-canal": map[string]interface{}{"mtu": 1450},
+						},
+					},
+				},
+			},
+		}
+
+		values, err := chartValues(controlPlane)
+		assert.NoError(t, err)
+
+		values["rancher-vsphere-csi"] = map[string]interface{}{}
+		assert.NotContains(t, controlPlane.Spec.ChartValues.Data, "rancher-vsphere-csi",
+			"chartValues must return a copy, not the control plane's live map")
+	})
+
+	t.Run("annotation path", func(t *testing.T) {
+		controlPlane := controlPlaneWithClusterSpec(t, map[string]interface{}{
+			"rke2-canal": map[string]interface{}{"mtu": 1450},
+		})
+
+		values, err := chartValues(controlPlane)
+		assert.NoError(t, err)
+		values["rancher-vsphere-csi"] = map[string]interface{}{}
+
+		// Decoding again must not see the mutation.
+		fresh, err := chartValues(controlPlane)
+		assert.NoError(t, err)
+		assert.NotContains(t, fresh, "rancher-vsphere-csi",
+			"chartValues must decode a fresh map on every call")
+	})
 }

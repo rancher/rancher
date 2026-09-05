@@ -24,6 +24,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
@@ -287,20 +288,61 @@ func isVSphereProvider(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (b
 	return data["cloud-provider-name"] == "rancher-vsphere", nil
 }
 
-func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (map[string]interface{}, error) {
-	if isVSphere, err := isVSphereProvider(controlPlane, entry); err != nil {
-		return nil, err
-	} else if isVSphere && controlPlane.Spec.ChartValues.Data["rancher-vsphere-csi"] == nil {
-		// ensure we have this chart config so that the global.cattle.clusterId is set
-		newData := controlPlane.Spec.ChartValues.DeepCopy()
-		if newData.Data == nil {
-			newData.Data = map[string]interface{}{}
-		}
-		newData.Data["rancher-vsphere-csi"] = map[string]interface{}{}
-		return newData.Data, nil
+// chartValues returns the Helm chart values to render into HelmChartConfig
+// manifests, read from the cluster spec annotation rather than from
+// spec.chartValues.
+//
+// Wrangler applies an update to an existing RKEControlPlane as an RFC 7386 merge
+// patch, because rke.cattle.io/v1 is a CRD and so is not registered in the
+// client-go scheme. In such a patch a null member means "remove this key", not
+// "set this key to null". An explicit null -- the documented way to drop a chart
+// default -- is therefore inexpressible in spec.chartValues and is silently lost
+// between the Cluster and the RKEControlPlane. The annotation holds the same
+// values inside an opaque gzip+base64 string of the whole cluster spec, and a
+// merge patch replaces a string atomically, so nulls survive it.
+//
+// spec.chartValues is used as a fallback only when the annotation is absent,
+// which covers control planes not yet reconciled by a Rancher carrying this
+// change.
+func chartValues(controlPlane *rkev1.RKEControlPlane) (map[string]interface{}, error) {
+	encodedSpec := controlPlane.Annotations[capr.ClusterSpecAnnotation]
+	if encodedSpec == "" {
+		return controlPlane.Spec.ChartValues.DeepCopy().Data, nil
 	}
 
-	return controlPlane.Spec.ChartValues.Data, nil
+	// DecompressClusterSpec unmarshals into a freshly allocated ClusterSpec, so
+	// the map returned here is never the informer cache's copy and is safe for
+	// addVSphereCharts to write into.
+	clusterSpec, err := snapshotutil.DecompressClusterSpec(encodedSpec)
+	if err != nil {
+		return nil, fmt.Errorf("controlplane %s/%s: error decoding the %s annotation: %w",
+			controlPlane.Namespace, controlPlane.Name, capr.ClusterSpecAnnotation, err)
+	}
+	if clusterSpec.RKEConfig == nil {
+		return nil, nil
+	}
+
+	return clusterSpec.RKEConfig.ChartValues.Data, nil
+}
+
+func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (map[string]interface{}, error) {
+	values, err := chartValues(controlPlane)
+	if err != nil {
+		return nil, err
+	}
+	isVSphere, err := isVSphereProvider(controlPlane, entry)
+	if err != nil {
+		return nil, err
+	}
+	if isVSphere && values["rancher-vsphere-csi"] == nil {
+		// ensure we have this chart config so that the global.cattle.clusterId is set
+		if values == nil {
+			values = map[string]interface{}{}
+		}
+		values["rancher-vsphere-csi"] = map[string]interface{}{}
+	}
+
+	return values, nil
 }
 
 type helmChartConfig struct {
