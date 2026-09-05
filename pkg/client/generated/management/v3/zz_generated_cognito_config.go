@@ -4,6 +4,7 @@ const (
 	CognitoConfigType                           = "cognitoConfig"
 	CognitoConfigFieldAccessMode                = "accessMode"
 	CognitoConfigFieldAcrValue                  = "acrValue"
+	CognitoConfigFieldAdminEndpoint             = "adminEndpoint"
 	CognitoConfigFieldAllowedPrincipalIDs       = "allowedPrincipalIds"
 	CognitoConfigFieldAnnotations               = "annotations"
 	CognitoConfigFieldAuthEndpoint              = "authEndpoint"
@@ -43,6 +44,7 @@ const (
 type CognitoConfig struct {
 	AccessMode                string            `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
 	AcrValue                  string            `json:"acrValue,omitempty" yaml:"acrValue,omitempty"`
+	AdminEndpoint             string            `json:"adminEndpoint,omitempty" yaml:"adminEndpoint,omitempty"`
 	AllowedPrincipalIDs       []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations               map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AuthEndpoint              string            `json:"authEndpoint,omitempty" yaml:"authEndpoint,omitempty"`
