@@ -44,8 +44,8 @@ func TestConfiguredProviderContainsLdapProvider(t *testing.T) {
 			// just enough scaffolding to run the Configure function.
 			ctx := t.Context()
 			mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
-			mgmtCtx.RunContext = ctx
 			require.NoError(t, err, "Failed to create NewScaledContext")
+			mgmtCtx.RunContext = ctx
 
 			// Create the dummy wrangler context
 			wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{})
