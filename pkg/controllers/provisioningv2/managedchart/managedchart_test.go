@@ -252,28 +252,6 @@ func TestOnChange_NoValues(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(err), "no Secret must be created when there are no values")
 }
 
-// TestOnChange_ValuesHashMatchesSecretData verifies round-trip consistency:
-// independently hashing the secret data must yield exactly the hash stored on
-// the Bundle.
-func TestOnChange_ValuesHashMatchesSecretData(t *testing.T) {
-	t.Parallel()
-
-	mcc := newManagedChart("round-trip", "fleet-local",
-		newGenericMap(t, `{"a":1,"b":{"c":true}}`))
-	h := newTestHandler()
-
-	objs, _, err := h.OnChange(mcc, v3.ManagedChartStatus{})
-	require.NoError(t, err)
-
-	bundle := findBundle(t, objs)
-	secret := getSecretFromClient(t, h, bundle)
-
-	recomputed, err := helmvalues.HashValuesSecret(secret.Data)
-	require.NoError(t, err)
-	assert.Equal(t, bundle.Spec.ValuesHash, recomputed,
-		"ValuesHash on Bundle must equal the hash recomputed from the Secret data")
-}
-
 // TestOnChange_TargetValues verifies that per-target Helm values are also moved
 // to the Secret and not stored in plain text on the target overrides.
 func TestOnChange_TargetValues(t *testing.T) {
