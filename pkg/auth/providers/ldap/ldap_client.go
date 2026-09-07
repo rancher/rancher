@@ -489,9 +489,9 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 					externalID = userLoginValues[0] // only support first
 				}
 			} else {
-				groupDNValues := ldap.GetAttributeValuesByName(entry.Attributes, config.GroupDNAttribute)
-				if len(groupDNValues) > 0 {
-					externalID = groupDNValues[0] // only support first
+				groupSearchValues := ldap.GetAttributeValuesByName(entry.Attributes, config.GroupSearchAttribute)
+				if len(groupSearchValues) > 0 {
+					externalID = groupSearchValues[0] // only support first
 				}
 			}
 		}
