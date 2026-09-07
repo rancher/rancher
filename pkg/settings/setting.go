@@ -24,6 +24,31 @@ const (
 	DefaultMaxUIPluginFileSizeInBytes = 30 * 1024 * 1024 // 30MB
 	AgentTLSModeStrict                = "strict"
 	AgentTLSModeSystemStore           = "system-store"
+
+	// defaultCSPPolicy is the Content-Security-Policy served with the UI. Every
+	// source the dashboard needs is same-origin: UI extensions are proxied
+	// through /v1/uiplugins, downstream clusters and monitoring through
+	// /k8s/clusters, and branding images are stored as data URLs.
+	//
+	// 'strict-dynamic' lets the dashboard's extension loader inject plugin
+	// scripts without the policy having to name every operator-configured
+	// endpoint. 'unsafe-eval' is deliberately absent so that report-only mode
+	// says whether any dependency still needs it, and style-src keeps
+	// 'unsafe-inline' until the dashboard stops building stylesheets with
+	// innerHTML.
+	defaultCSPPolicy = "default-src 'self'; " +
+		"script-src 'nonce-{nonce}' 'strict-dynamic'; " +
+		"style-src 'self' 'unsafe-inline'; " +
+		"img-src 'self' data: blob:; " +
+		"font-src 'self' data:; " +
+		"connect-src 'self'; " +
+		"frame-src 'self'; " +
+		"worker-src 'none'; " +
+		"object-src 'none'; " +
+		"base-uri 'self'; " +
+		"form-action 'self'; " +
+		"frame-ancestors 'self'; " +
+		"report-uri /v1/csp-report"
 )
 
 var (
@@ -331,6 +356,12 @@ var (
 
 	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
 	UICustomLinks = NewSetting("ui-custom-links", "")
+
+	// UICSPMode controls how ui-csp-policy is delivered: 'report-only' to have browsers report violations without blocking them, 'enforce' to block them, or 'off' to send no header.
+	UICSPMode = NewSetting("ui-csp-mode", "report-only")
+
+	// UICSPPolicy is the Content-Security-Policy served with the UI. The literal {nonce} is replaced with a per-request nonce, which is also added to every inline script and style in the index file. An empty value disables the header.
+	UICSPPolicy = NewSetting("ui-csp-policy", defaultCSPPolicy)
 
 	// UIDashboardPath path within Rancher Manager where the dashboard files are found.
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")

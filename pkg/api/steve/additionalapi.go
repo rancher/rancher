@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
+	"github.com/rancher/rancher/pkg/api/steve/csp"
 	"github.com/rancher/rancher/pkg/api/steve/github"
 	"github.com/rancher/rancher/pkg/api/steve/health"
 	"github.com/rancher/rancher/pkg/api/steve/projects"
@@ -66,6 +67,10 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 	}
 	mux.Handle("/v1/github/{path...}", githubHandler)
 	mux.Handle("/v3/connect", Tunnel(config))
+
+	// Browsers report violations from the login page, so this cannot require
+	// authentication.
+	csp.Register(mux)
 
 	health.Register(mux)
 

@@ -22,5 +22,7 @@ func newHandler(
 		Path:                pathSetting,
 		ReleaseSetting:      settings.IsRelease,
 		APIUIVersionSetting: settings.APIUIVersion.Get,
+		CSPPolicy:           settings.UICSPPolicy.Get,
+		CSPMode:             settings.UICSPMode.Get,
 	})
 }
