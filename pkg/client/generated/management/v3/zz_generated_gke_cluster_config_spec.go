@@ -25,6 +25,7 @@ const (
 	GKEClusterConfigSpecFieldPrivateClusterConfig           = "privateClusterConfig"
 	GKEClusterConfigSpecFieldProjectID                      = "projectID"
 	GKEClusterConfigSpecFieldRegion                         = "region"
+	GKEClusterConfigSpecFieldReleaseChannel                 = "releaseChannel"
 	GKEClusterConfigSpecFieldSubnetwork                     = "subnetwork"
 	GKEClusterConfigSpecFieldZone                           = "zone"
 )
@@ -53,6 +54,7 @@ type GKEClusterConfigSpec struct {
 	PrivateClusterConfig           *GKEPrivateClusterConfig           `json:"privateClusterConfig,omitempty" yaml:"privateClusterConfig,omitempty"`
 	ProjectID                      string                             `json:"projectID,omitempty" yaml:"projectID,omitempty"`
 	Region                         string                             `json:"region,omitempty" yaml:"region,omitempty"`
+	ReleaseChannel                 *string                            `json:"releaseChannel,omitempty" yaml:"releaseChannel,omitempty"`
 	Subnetwork                     *string                            `json:"subnetwork,omitempty" yaml:"subnetwork,omitempty"`
 	Zone                           string                             `json:"zone,omitempty" yaml:"zone,omitempty"`
 }
