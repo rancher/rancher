@@ -149,6 +149,10 @@ func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secr
 	}
 
 	secret = secret.DeepCopy()
+	// writing to a nil annotation map would cause a panic, so we need to ensure it exists first.
+	if secret.Annotations == nil {
+		secret.Annotations = make(map[string]string)
+	}
 	secret.Annotations[harvesterCloudCredentialTokenChecksumAnnotation] = checksum
 	secret, err = c.secretClient.Update(secret)
 	if err != nil {
