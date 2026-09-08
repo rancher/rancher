@@ -35,11 +35,11 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.14.5
-	github.com/rancher/ali-operator v1.14.4
-	github.com/rancher/eks-operator v1.14.5
+	github.com/rancher/aks-operator v1.14.6-rc.1
+	github.com/rancher/ali-operator v1.14.5-rc.1
+	github.com/rancher/eks-operator v1.14.6-rc.1
 	github.com/rancher/fleet/pkg/apis v0.15.5
-	github.com/rancher/gke-operator v1.14.5
+	github.com/rancher/gke-operator v1.14.7-rc.1
 	github.com/rancher/norman v0.8.8
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/wrangler/v3 v3.6.0
@@ -85,12 +85,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
