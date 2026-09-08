@@ -33,6 +33,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	namespacecontroller "github.com/rancher/rancher/pkg/controllers/namespace"
 	"github.com/rancher/rancher/pkg/controllers/nodedriver"
 	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
@@ -457,6 +458,10 @@ func (r *Rancher) Start(ctx context.Context) error {
 	}
 
 	namespacecontroller.Register(ctx, r.Wrangler)
+
+	// Registered on every pod, not just the leader: a tunnel connect only fires its
+	// callback on the pod the agent happened to reach.
+	clusterconnected.RegisterTunnelHook(ctx, r.Wrangler)
 
 	userManager, err := common.NewUserManagerNoBindings(r.Wrangler)
 	if err != nil {

@@ -80,13 +80,21 @@ func addRepos(wrangler *wrangler.Context) error {
 		return err
 	}
 
-	if err := addRepo(
-		wrangler,
-		"rancher-partner-charts",
-		settings.PartnerChartDefaultURL.Get(),
-		settings.PartnerChartDefaultBranch.Get(),
-	); err != nil {
-		return err
+	// Not created in a downstream cluster agent. Nothing in Rancher reads this repo — it exists
+	// so the UI can browse partner charts, and the UI talks to the management cluster, never to a
+	// downstream agent's catalog. The agent installs only rancher-webhook and
+	// system-upgrade-controller, and systemcharts ignores every repo except rancher-charts. In the
+	// agent this would otherwise be a git clone competing for network and CPU with the repo that
+	// is actually on the critical path, on a cold node, while a cluster is still provisioning.
+	if !features.MCMAgent.Enabled() {
+		if err := addRepo(
+			wrangler,
+			"rancher-partner-charts",
+			settings.PartnerChartDefaultURL.Get(),
+			settings.PartnerChartDefaultBranch.Get(),
+		); err != nil {
+			return err
+		}
 	}
 
 	if features.RKE2.Enabled() {
