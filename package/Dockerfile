@@ -42,7 +42,7 @@ COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-      catatonit curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
+      catatonit curl util-linux ca-certificates ca-certificates-mozilla findutils xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
 
 
 FROM chroot-builder AS chroot-builder-server
