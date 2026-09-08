@@ -434,7 +434,11 @@ func (a arguments) Values(name string) []string {
 // importedDistroDataDirectory returns the data directory for an imported cluster
 // using runtime-specific precedence rules.
 func importedDistroDataDirectory(runtime string, args []string, env map[string]string) string {
-	// Environment variables take precedence over command-line arguments.
+	// Command-line arguments override the runtime environment fallback.
+	if dataDir := newArguments(args).Last("--data-dir", "-d"); dataDir != "" {
+		return dataDir
+	}
+
 	if runtime == capr.RuntimeRKE2 {
 		if dir := env["RKE2_DATA_DIR"]; dir != "" {
 			return dir
@@ -443,11 +447,6 @@ func importedDistroDataDirectory(runtime string, args []string, env map[string]s
 		if dir := env["K3S_DATA_DIR"]; dir != "" {
 			return dir
 		}
-	}
-
-	// Check for explicit data directory in command-line arguments.
-	if dataDir := newArguments(args).Last("--data-dir", "-d"); dataDir != "" {
-		return dataDir
 	}
 
 	// Fall back to runtime default.
@@ -483,6 +482,10 @@ func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
 	}
 
 	return importedDistroDataDirectory(runtime, args, env)
+}
+
+func (a *ImportedAdapter) DistroManifestPaths(secret *corev1.Secret) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
 }
 
 // componentTLSSettingsFromNodeArgs extracts scheduler/controller-manager
@@ -568,11 +571,6 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 	if !(And(IsEtcd, Not(IsControlPlane))(secret) && runtime == capr.RuntimeK3S) {
 		// k3s doesn't run the kubelet on etcd only nodes
 		probeNames = append(probeNames, KubeletProbeName)
-	}
-
-	// Add Calico probe for imported RKE2 nodes that are not etcd-only and not Windows.
-	if runtime == capr.RuntimeRKE2 && !And(IsEtcd, Not(IsControlPlane))(secret) && !IsWindows(secret) {
-		probeNames = append(probeNames, CalicoProbeName)
 	}
 
 	for _, probeName := range probeNames {

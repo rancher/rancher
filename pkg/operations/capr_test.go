@@ -76,6 +76,60 @@ func TestCAPRAdapter_ServerUnit(t *testing.T) {
 	}
 }
 
+func TestDistroManifestPaths(t *testing.T) {
+	t.Parallel()
+
+	rke2 := DistroManifestPaths(capr.RuntimeRKE2, "/custom/rke2")
+	assert.Equal(t, "/custom/rke2/agent/pod-manifests", rke2.StaticPodManifestDirectory)
+	assert.Equal(t, "/custom/rke2/server/manifests", rke2.GeneratedManifestDirectory)
+	assert.Equal(t, []string{"rke2-*.yaml"}, rke2.GeneratedManifestPatterns)
+
+	assert.Equal(t, ManifestPaths{}, DistroManifestPaths(capr.RuntimeK3S, "/custom/k3s"))
+}
+
+func TestDistroServices_RuntimeSpecificNamesDoNotCross(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+
+	rke2 := DistroServices(capr.RuntimeRKE2, controlPlane)
+	assert.Contains(t, rke2, "rke2-server")
+	assert.Contains(t, rke2, "rke2-controller")
+	assert.NotContains(t, rke2, "k3s-server", "RKE2 nodes must not expose K3s-specific service names")
+	assert.NotContains(t, rke2, "k3s-controller", "RKE2 nodes must not expose K3s-specific service names")
+
+	k3s := DistroServices(capr.RuntimeK3S, controlPlane)
+	assert.Contains(t, k3s, "k3s-server")
+	assert.Contains(t, k3s, "k3s-controller")
+	assert.NotContains(t, k3s, "rke2-server", "K3s nodes must not expose RKE2-specific service names")
+	assert.NotContains(t, k3s, "rke2-controller", "K3s nodes must not expose RKE2-specific service names")
+}
+
+func TestDistroServices_RoleSpecificAvailability(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+	etcd := newSecret(map[string]string{capr.EtcdRoleLabel: "true"})
+	worker := newSecret(map[string]string{capr.WorkerRoleLabel: "true"})
+
+	// Worker-only nodes never own control-plane or etcd services.
+	workerServices := DistroServices(capr.RuntimeRKE2, worker)
+	assert.Contains(t, workerServices, "rke2-server")
+	assert.NotContains(t, workerServices, "scheduler")
+	assert.NotContains(t, workerServices, "etcd")
+
+	// Control-plane nodes own the API server components but not etcd.
+	controlPlaneServices := DistroServices(capr.RuntimeRKE2, controlPlane)
+	assert.Contains(t, controlPlaneServices, "scheduler")
+	assert.Contains(t, controlPlaneServices, "controller-manager")
+	assert.NotContains(t, controlPlaneServices, "etcd")
+
+	// Etcd nodes own etcd but not the API server components.
+	etcdServices := DistroServices(capr.RuntimeRKE2, etcd)
+	assert.Contains(t, etcdServices, "etcd")
+	assert.NotContains(t, etcdServices, "scheduler")
+}
+
 func TestCAPRAdapter_RuntimeService(t *testing.T) {
 	t.Parallel()
 

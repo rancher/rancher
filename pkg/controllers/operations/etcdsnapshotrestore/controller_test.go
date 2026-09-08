@@ -40,11 +40,14 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (a *stubAdapter) BeaconRef() (string, string)                       { return "test-namespace", "test-cluster" }
-func (a *stubAdapter) WaitForRegister() (bool, error)                    { return a.waitForRegisterOK, nil }
-func (a *stubAdapter) PauseCluster(_ bool) error                         { return nil }
-func (a *stubAdapter) RuntimeCommand() string                            { return a.runtimeCommand }
-func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string       { return a.dataDir }
+func (a *stubAdapter) BeaconRef() (string, string)                 { return "test-namespace", "test-cluster" }
+func (a *stubAdapter) WaitForRegister() (bool, error)              { return a.waitForRegisterOK, nil }
+func (a *stubAdapter) PauseCluster(_ bool) error                   { return nil }
+func (a *stubAdapter) RuntimeCommand() string                      { return a.runtimeCommand }
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string { return a.dataDir }
+func (a *stubAdapter) DistroManifestPaths(_ *corev1.Secret) ops.ManifestPaths {
+	return ops.ManifestPaths{}
+}
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
 func (a *stubAdapter) ServerUnit() string                                { return a.serverUnit }
 func (a *stubAdapter) RuntimeService(_ *corev1.Secret) string            { return a.serverUnit }

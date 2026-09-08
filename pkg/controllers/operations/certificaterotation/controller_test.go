@@ -8,6 +8,8 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	ops "github.com/rancher/rancher/pkg/operations"
 	"github.com/rancher/rancher/pkg/plan"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -15,6 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // stubAdapter is a minimal ops.Adapter implementation for testing component
@@ -26,12 +30,16 @@ type stubAdapter struct {
 	controllerManager ops.ComponentTLSSettings
 	scheduler         ops.ComponentTLSSettings
 	settingsErr       error
+	pauseCalls        []bool
 }
 
 func (a *stubAdapter) RuntimeCommand() string                      { return a.runtime }
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string { return a.dataDir }
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 	return a.provisioningDir
+}
+func (a *stubAdapter) DistroManifestPaths(secret *corev1.Secret) ops.ManifestPaths {
+	return ops.DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
 }
 func (a *stubAdapter) ComponentTLSSettings(_ *corev1.Secret, component string) (ops.ComponentTLSSettings, error) {
 	if a.settingsErr != nil {
@@ -53,8 +61,11 @@ func (a *stubAdapter) BeaconRef() (string, string)                        { retu
 func (a *stubAdapter) EtcdSnapshotNamespace() string                      { return "" }
 func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) { return nil, nil }
 func (a *stubAdapter) WaitForRegister() (bool, error)                     { return true, nil }
-func (a *stubAdapter) PauseCluster(bool) error                            { return nil }
-func (a *stubAdapter) ServerUnit() string                                 { return a.runtime }
+func (a *stubAdapter) PauseCluster(paused bool) error {
+	a.pauseCalls = append(a.pauseCalls, paused)
+	return nil
+}
+func (a *stubAdapter) ServerUnit() string { return a.runtime }
 func (a *stubAdapter) RuntimeService(secret *corev1.Secret) string {
 	if ops.IsControlPlane(secret) || ops.IsEtcd(secret) {
 		return a.ServerUnit()
@@ -79,6 +90,104 @@ func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "" }
 func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
 func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
 	return nil, nil, nil
+}
+
+type fakeBeaconClient struct {
+	plancontrollers.BeaconClient
+
+	statusUpdates []*planv1alpha1.Beacon
+}
+
+func (f *fakeBeaconClient) UpdateStatus(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
+	f.statusUpdates = append(f.statusUpdates, beacon.DeepCopy())
+	return beacon, nil
+}
+
+type fakeDynamic struct {
+	enqueues int
+}
+
+func (f *fakeDynamic) Get(schema.GroupVersionKind, string, string) (runtime.Object, error) {
+	return nil, nil
+}
+
+func (f *fakeDynamic) Enqueue(schema.GroupVersionKind, string, string) error {
+	f.enqueues++
+	return nil
+}
+
+func terminalScope(ownerKey string, adapter *stubAdapter) *scope {
+	cluster := &unstructured.Unstructured{}
+	cluster.SetAPIVersion("provisioning.cattle.io/v1")
+	cluster.SetKind("Cluster")
+	return &scope{
+		ownerKey: ownerKey,
+		op:       &opv1alpha1.CertificateRotation{ObjectMeta: metav1.ObjectMeta{Name: "rotation", Namespace: "fleet-default"}},
+		beacon: &planv1alpha1.Beacon{
+			Status: planv1alpha1.BeaconStatus{Active: true, Owner: ownerKey},
+		},
+		clusterObj: cluster,
+		adapter:    adapter,
+	}
+}
+
+func TestTerminalHandler_OwningOperationUnpausesAndReleasesBeacon(t *testing.T) {
+	t.Parallel()
+
+	for _, terminal := range []struct {
+		name         string
+		handler      func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error)
+		wantEnqueues int
+	}{
+		{"canceled", (*handler).handleCanceled, 0},
+		{"failed", (*handler).handleFailed, 0},
+		{"succeeded", (*handler).handleSucceeded, 1},
+	} {
+		t.Run(terminal.name, func(t *testing.T) {
+			adapter := &stubAdapter{}
+			beacons := &fakeBeaconClient{}
+			dynamic := &fakeDynamic{}
+			h := &handler{beacons: beacons, dynamic: dynamic}
+			s := terminalScope("certificate-rotation/fleet-default/rotation", adapter)
+
+			_, err := terminal.handler(h, s, opv1alpha1.CertificateRotationStatus{})
+			assert.NoError(t, err)
+			assert.Equal(t, []bool{false}, adapter.pauseCalls)
+			if assert.Len(t, beacons.statusUpdates, 1) {
+				assert.Empty(t, beacons.statusUpdates[0].Status.Owner)
+				assert.False(t, beacons.statusUpdates[0].Status.Active)
+			}
+			assert.Equal(t, terminal.wantEnqueues, dynamic.enqueues)
+		})
+	}
+}
+
+func TestTerminalHandler_NonOwnerDoesNotUnpauseOrReleaseBeacon(t *testing.T) {
+	t.Parallel()
+
+	for _, terminal := range []struct {
+		name    string
+		handler func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error)
+	}{
+		{"canceled", (*handler).handleCanceled},
+		{"failed", (*handler).handleFailed},
+		{"succeeded", (*handler).handleSucceeded},
+	} {
+		t.Run(terminal.name, func(t *testing.T) {
+			adapter := &stubAdapter{}
+			beacons := &fakeBeaconClient{}
+			dynamic := &fakeDynamic{}
+			h := &handler{beacons: beacons, dynamic: dynamic}
+			s := terminalScope("certificate-rotation/fleet-default/rotation", adapter)
+			s.beacon.Status.Owner = "certificate-rotation/fleet-default/newer-rotation"
+
+			_, err := terminal.handler(h, s, opv1alpha1.CertificateRotationStatus{})
+			assert.NoError(t, err)
+			assert.Empty(t, adapter.pauseCalls)
+			assert.Empty(t, beacons.statusUpdates)
+			assert.Zero(t, dynamic.enqueues)
+		})
+	}
 }
 
 func TestComponentCertificateCleanupInstructions(t *testing.T) {
@@ -161,7 +270,7 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 				adapter: adapter,
 			}
 
-			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, tt.services)
+			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, tt.services, adapter.DistroManifestPaths(&corev1.Secret{}))
 			assert.NoError(t, err)
 			assert.Len(t, instructions, len(tt.expected))
 			for i, instruction := range instructions {
@@ -188,7 +297,7 @@ func TestComponentCertificateCleanupInstructions_AdapterError(t *testing.T) {
 		},
 	}
 
-	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, nil)
+	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, nil, s.adapter.DistroManifestPaths(&corev1.Secret{}))
 	assert.Nil(t, instructions)
 	assert.EqualError(t, err, "settings failed")
 }
@@ -240,11 +349,11 @@ func TestCertificateRotationRuntimeInstructions_CustomDataDirNoServices(t *testi
 	assert.NotContains(t, args, "-s")
 }
 
-func TestRKE2ManifestRemovalInstructions_DataDirWithSpacesIsNotInterpolated(t *testing.T) {
+func TestManifestRemovalInstructions_DataDirWithSpacesIsNotInterpolated(t *testing.T) {
 	t.Parallel()
 
 	dataDir := "/var/lib/rancher/testing/certificate rotation"
-	instructions := rke2ManifestRemovalInstructions("/var/lib/rancher/capr", "operation", dataDir)
+	instructions := manifestRemovalInstructions("/var/lib/rancher/capr", "operation", ops.DistroManifestPaths(capr.RuntimeRKE2, dataDir))
 	assert.Len(t, instructions, 1)
 
 	instr := instructions[0]
@@ -319,51 +428,6 @@ func TestServicesForNode_EmptyRequestStaysEmpty(t *testing.T) {
 	// An empty request already means "rotate everything the runtime supports" to the
 	// runtime command, so it must not be expanded into the node's full DistroServices list.
 	assert.Nil(t, servicesForNode(adapter, nil, controlPlane))
-}
-
-// --- DistroServices ---------------------------------------------------------------------------
-
-func TestDistroServices_RuntimeSpecificNamesDoNotCross(t *testing.T) {
-	t.Parallel()
-
-	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
-
-	rke2 := ops.DistroServices(capr.RuntimeRKE2, controlPlane)
-	assert.Contains(t, rke2, "rke2-server")
-	assert.Contains(t, rke2, "rke2-controller")
-	assert.NotContains(t, rke2, "k3s-server", "RKE2 nodes must not expose K3s-specific service names")
-	assert.NotContains(t, rke2, "k3s-controller", "RKE2 nodes must not expose K3s-specific service names")
-
-	k3s := ops.DistroServices(capr.RuntimeK3S, controlPlane)
-	assert.Contains(t, k3s, "k3s-server")
-	assert.Contains(t, k3s, "k3s-controller")
-	assert.NotContains(t, k3s, "rke2-server", "K3s nodes must not expose RKE2-specific service names")
-	assert.NotContains(t, k3s, "rke2-controller", "K3s nodes must not expose RKE2-specific service names")
-}
-
-func TestDistroServices_RoleSpecificAvailability(t *testing.T) {
-	t.Parallel()
-
-	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
-	etcd := certificateRotationSecret(map[string]string{capr.EtcdRoleLabel: "true"})
-	worker := certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"})
-
-	// Worker-only nodes never own control-plane or etcd services.
-	workerServices := ops.DistroServices(capr.RuntimeRKE2, worker)
-	assert.Contains(t, workerServices, "rke2-server")
-	assert.NotContains(t, workerServices, "scheduler")
-	assert.NotContains(t, workerServices, "etcd")
-
-	// Control-plane nodes own the API server components but not etcd.
-	controlPlaneServices := ops.DistroServices(capr.RuntimeRKE2, controlPlane)
-	assert.Contains(t, controlPlaneServices, "scheduler")
-	assert.Contains(t, controlPlaneServices, "controller-manager")
-	assert.NotContains(t, controlPlaneServices, "etcd")
-
-	// Etcd nodes own etcd but not the API server components.
-	etcdServices := ops.DistroServices(capr.RuntimeRKE2, etcd)
-	assert.Contains(t, etcdServices, "etcd")
-	assert.NotContains(t, etcdServices, "scheduler")
 }
 
 // --- unsupportedServices ---------------------------------------------------------------------

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
-	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	"github.com/rancher/rancher/pkg/plan"
@@ -334,7 +333,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 	return status, nil
 }
 
-// handleCanceled clears pause state and releases beacon ownership.
+// handleCanceled runs canceled hooks, releases this operation's beacon participation, and
+// unpauses the cluster only when this operation still owns the beacon.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
 
@@ -348,12 +348,14 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotation
 		return status, nil
 	}
 
-	if err := s.adapter.PauseCluster(false); err != nil {
-		return status, err
-	}
-
 	ownerKey := s.ownerKey
-	if plan.IsOwningBeaconHolder(s.beacon, ownerKey) || plan.IsInDelegateChain(s.beacon, ownerKey) {
+	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
+	if owning {
+		if err := s.adapter.PauseCluster(false); err != nil {
+			return status, err
+		}
+	}
+	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
 		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
 			return status, err
 		}
@@ -361,7 +363,8 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotation
 	return status, nil
 }
 
-// handleFailed runs failed hooks, unpauses the cluster, and releases the beacon.
+// handleFailed runs failed hooks, releases this operation's beacon participation, and
+// unpauses the cluster only when this operation still owns the beacon.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
@@ -375,12 +378,14 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationSt
 		return status, nil
 	}
 
-	if err := s.adapter.PauseCluster(false); err != nil {
-		return status, err
-	}
-
 	ownerKey := s.ownerKey
-	if plan.IsOwningBeaconHolder(s.beacon, ownerKey) || plan.IsInDelegateChain(s.beacon, ownerKey) {
+	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
+	if owning {
+		if err := s.adapter.PauseCluster(false); err != nil {
+			return status, err
+		}
+	}
+	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
 		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
 			return status, err
 		}
@@ -388,7 +393,8 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationSt
 	return status, nil
 }
 
-// handleSucceeded runs succeeded hooks, unpauses the cluster, and releases the beacon.
+// handleSucceeded runs succeeded hooks, releases this operation's beacon participation, and
+// unpauses the cluster only when this operation still owns the beacon.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
@@ -402,12 +408,13 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.CertificateRotatio
 		return status, nil
 	}
 
-	if err := s.adapter.PauseCluster(false); err != nil {
-		return status, err
-	}
-
 	ownerKey := s.ownerKey
 	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
+	if owning {
+		if err := s.adapter.PauseCluster(false); err != nil {
+			return status, err
+		}
+	}
 	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
 		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
 			return status, err
@@ -599,10 +606,9 @@ func serviceRequested(requested []string, service string) bool {
 // componentCertificateCleanupInstructions builds default certificate/key cleanup
 // instructions for controller-manager and scheduler on one node. services must already be
 // narrowed to the ones that apply to secret's node.
-func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, services []string) ([]plan.OneTimeInstruction, error) {
+func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, services []string, manifestPaths ops.ManifestPaths) ([]plan.OneTimeInstruction, error) {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	operationID := string(s.op.UID)
-	runtime := s.adapter.RuntimeCommand()
 	dataDir := s.adapter.DistroDataDirectory(secret)
 
 	controllerManagerSettings, err := s.adapter.ComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
@@ -659,11 +665,11 @@ func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, se
 			ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rm-"+component.service+"-key", operationID, "rm", []string{"-f", keyPath}, nil),
 		)
 
-		if runtime == capr.RuntimeRKE2 {
-			// RKE2 regenerates the static-pod manifest when it is absent. Removing it
-			// makes the restarted server use the newly generated component certificate.
+		if manifestPaths.StaticPodManifestDirectory != "" {
+			// The runtime regenerates the static-pod manifest when it is absent. Removing
+			// it makes the restarted server use the newly generated component certificate.
 			instructions = append(instructions,
-				ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rm-"+component.service+"-spm", operationID, "rm", []string{"-f", path.Join(dataDir, "agent/pod-manifests", component.manifest)}, nil),
+				ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rm-"+component.service+"-spm", operationID, "rm", []string{"-f", path.Join(manifestPaths.StaticPodManifestDirectory, component.manifest)}, nil),
 			)
 		}
 	}
@@ -692,14 +698,17 @@ func certificateRotationRuntimeInstructions(provisioningDir, operationID, runtim
 	}
 }
 
-// rke2ManifestRemovalInstructions removes generated RKE2 manifests so the server recreates
+// manifestRemovalInstructions removes runtime-owned generated manifests so the server recreates
 // them using the rotated certificates when it starts again.
-func rke2ManifestRemovalInstructions(provisioningDir, operationID, dataDir string) []plan.OneTimeInstruction {
-	manifestDir := path.Join(dataDir, "server", "manifests")
-	return []plan.OneTimeInstruction{
-		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", operationID, "/bin/sh",
-			[]string{"-c", `rm -f -- "$1"/rke2-*.yaml`, "--", manifestDir}, nil),
+func manifestRemovalInstructions(provisioningDir, operationID string, manifestPaths ops.ManifestPaths) []plan.OneTimeInstruction {
+	instructions := make([]plan.OneTimeInstruction, 0, len(manifestPaths.GeneratedManifestPatterns))
+	for _, pattern := range manifestPaths.GeneratedManifestPatterns {
+		instructions = append(instructions,
+			ops.IdempotentInstruction(provisioningDir, "certificate-rotation/manifest-removal", operationID, "/bin/sh",
+				[]string{"-c", `rm -f -- "$1"/` + pattern, "--", manifestPaths.GeneratedManifestDirectory}, nil),
+		)
 	}
+	return instructions
 }
 
 // linuxIdempotentRestartInstructions resets a failed systemd unit when needed, then restarts it.
@@ -804,6 +813,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			// before rotating them, then restart it after all required cleanup.
 			provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 			dataDir := s.adapter.DistroDataDirectory(secret)
+			manifestPaths := s.adapter.DistroManifestPaths(secret)
 			files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
 			oneTime := certificateRotationStopInstructions(provisioningDir, string(s.op.UID), runtimeService, env)
 			// Keep stop and rotate as separate idempotent instructions. A retry can
@@ -811,17 +821,17 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, nodeServices, env)...)
 
 			if ops.IsControlPlane(secret) {
-				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret, nodeServices)
+				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret, nodeServices, manifestPaths)
 				if err != nil {
 					return status, err
 				}
 				oneTime = append(oneTime, cleanupInstructions...)
 			}
 
-			if runtime == capr.RuntimeRKE2 {
-				// RKE2 regenerates its generated manifests during server startup. Remove
-				// them only after rotation so replacement manifests refer to rotated files.
-				oneTime = append(oneTime, rke2ManifestRemovalInstructions(provisioningDir, string(s.op.UID), dataDir)...)
+			if manifestPaths.GeneratedManifestDirectory != "" {
+				// Remove generated manifests only after rotation so replacements refer to
+				// rotated files when the runtime starts.
+				oneTime = append(oneTime, manifestRemovalInstructions(provisioningDir, string(s.op.UID), manifestPaths)...)
 			}
 
 			// Restarting the server activates the rotated certificates and lets the

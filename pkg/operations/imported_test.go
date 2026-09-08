@@ -710,6 +710,7 @@ func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *test
 
 	probes, err := adapter.RenderProbes(secret, false)
 	assert.NoError(t, err)
+	assert.NotContains(t, probes, CalicoProbeName)
 
 	kcm := probes[KubeControllerManagerProbeName]
 	assert.Equal(t, "https://127.0.0.1:10261/healthz", kcm.HTTPGetAction.URL)
@@ -733,18 +734,18 @@ func TestImportedDistroDataDirectory(t *testing.T) {
 		want    string
 	}{
 		{
-			name:    "RKE2_DATA_DIR env overrides args",
+			name:    "RKE2 args override env",
 			runtime: capr.RuntimeRKE2,
 			args:    []string{"--data-dir", "/custom/from/args"},
 			env:     map[string]string{"RKE2_DATA_DIR": "/custom/from/env"},
-			want:    "/custom/from/env",
+			want:    "/custom/from/args",
 		},
 		{
-			name:    "K3S_DATA_DIR env overrides args",
+			name:    "K3S args override env",
 			runtime: capr.RuntimeK3S,
 			args:    []string{"-d=/custom/from/args"},
 			env:     map[string]string{"K3S_DATA_DIR": "/custom/from/env"},
-			want:    "/custom/from/env",
+			want:    "/custom/from/args",
 		},
 		{
 			name:    "last data-dir argument wins across aliases",
@@ -756,6 +757,18 @@ func TestImportedDistroDataDirectory(t *testing.T) {
 			name:    "RKE2 defaults correctly when no config provided",
 			runtime: capr.RuntimeRKE2,
 			want:    "/var/lib/rancher/rke2",
+		},
+		{
+			name:    "RKE2 environment fallback",
+			runtime: capr.RuntimeRKE2,
+			env:     map[string]string{"RKE2_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/env",
+		},
+		{
+			name:    "K3S environment fallback",
+			runtime: capr.RuntimeK3S,
+			env:     map[string]string{"K3S_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/env",
 		},
 		{
 			name:    "K3s defaults correctly when no config provided",

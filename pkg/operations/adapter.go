@@ -53,6 +53,13 @@ type ComponentTLSSettings struct {
 	TLSPrivateKeyFile string
 }
 
+// ManifestPaths identifies runtime-owned static and generated manifest locations.
+type ManifestPaths struct {
+	StaticPodManifestDirectory string
+	GeneratedManifestDirectory string
+	GeneratedManifestPatterns  []string
+}
+
 // HasCompleteTLSConfig reports whether both cert and key paths are explicitly configured.
 func (s ComponentTLSSettings) HasCompleteTLSConfig() bool {
 	return s.TLSCertFile != "" && s.TLSPrivateKeyFile != ""
@@ -181,8 +188,8 @@ type Adapter interface {
 	// nodes.
 	RuntimeService(secret *corev1.Secret) string
 
-	// DistroServices returns the logical RKE2/K3s service identifiers that make this node
-	// participate in supported Day2 runtime work. These are not a list of every physical host
+	// DistroServices returns the logical RKE2/K3s certificate-rotation service identifiers
+	// available on this node. These are not a list of every physical host
 	// service: on worker nodes, a server-related identifier means the worker's runtime agent must
 	// restart after the related server-side rotation, not that the server itself runs there. The
 	// result depends on the runtime (RKE2 or K3s) and on the node's worker, control-plane, and
@@ -191,6 +198,9 @@ type Adapter interface {
 
 	// DistroDataDirectory returns the path to the RKE2/K3s data-dir on the host machine.
 	DistroDataDirectory(secret *corev1.Secret) string
+
+	// DistroManifestPaths returns runtime-owned manifest locations for the node.
+	DistroManifestPaths(secret *corev1.Secret) ManifestPaths
 
 	// ProvisioningDataDirectory returns the path to the data directory used for operations.
 	// Scripts created for commands are typically stored here.
@@ -235,10 +245,10 @@ type Adapter interface {
 	ToS3ArgsEnvAndFiles(secret *corev1.Secret) ([]string, []string, []plan.File)
 }
 
-// DistroServices returns the logical RKE2/K3s service identifiers that make the node described by
-// secret participate in supported Day2 runtime work for the given runtime. Every Adapter delegates
-// here: service availability is a property of the installed distro and the node's roles, not of
-// how the cluster is managed. These identifiers are not a list of every physical host service: on
+// DistroServices returns the logical RKE2/K3s certificate-rotation service identifiers available
+// to the node described by secret for the given runtime. Every Adapter delegates here: service
+// availability is a property of the installed distro and the node's roles, not of how the cluster
+// is managed. These identifiers are not a list of every physical host service: on
 // worker nodes, a server-related identifier means the worker's runtime agent must restart after
 // the related server-side certificate rotation, not that the server itself runs there.
 //
@@ -278,6 +288,19 @@ func DistroServices(runtime string, secret *corev1.Secret) []string {
 	}
 	sort.Strings(services)
 	return services
+}
+
+// DistroManifestPaths returns runtime-owned manifest locations for a resolved
+// runtime data directory.
+func DistroManifestPaths(runtime, dataDir string) ManifestPaths {
+	if runtime != capr.RuntimeRKE2 {
+		return ManifestPaths{}
+	}
+	return ManifestPaths{
+		StaticPodManifestDirectory: path.Join(dataDir, "agent", "pod-manifests"),
+		GeneratedManifestDirectory: path.Join(dataDir, "server", "manifests"),
+		GeneratedManifestPatterns:  []string{"rke2-*.yaml"},
+	}
 }
 
 // NewAdapter returns an Adapter for the given cluster object.

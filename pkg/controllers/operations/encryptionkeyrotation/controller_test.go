@@ -48,6 +48,9 @@ func (a *stubAdapter) RuntimeCommand() string {
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string {
 	return "/var/lib/rancher/rke2"
 }
+func (a *stubAdapter) DistroManifestPaths(_ *corev1.Secret) ops.ManifestPaths {
+	return ops.ManifestPaths{}
+}
 
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 	return "/var/lib/rancher/capr"

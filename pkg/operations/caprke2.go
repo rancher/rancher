@@ -477,6 +477,10 @@ func (a *CAPRKE2Adapter) DistroDataDirectory(secret *corev1.Secret) string {
 	return path.Join("/var/lib/rancher", capr.RuntimeRKE2)
 }
 
+func (a *CAPRKE2Adapter) DistroManifestPaths(secret *corev1.Secret) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
+}
+
 // bootstrapDataDir resolves Secret → CAPI Machine → RKE2Config → AgentConfig.DataDir. Returns
 // the empty string on any miss; callers should fall back to the runtime default.
 func (a *CAPRKE2Adapter) bootstrapDataDir(secret *corev1.Secret) string {

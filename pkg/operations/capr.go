@@ -610,6 +610,10 @@ func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {
 	return capr.GetDistroDataDir(a.controlPlane)
 }
 
+func (a *CAPRAdapter) DistroManifestPaths(secret *corev1.Secret) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
+}
+
 func (a *CAPRAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 	return capr.GetProvisioningDataDir(&a.controlPlane.Spec.ClusterConfiguration)
 }
