@@ -124,7 +124,14 @@ jobs:
           INTEGRATION_TEST_RUN: ${{ matrix.run }}
           CATTLE_K3S_VERSION: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
           RANCHER_CHART: /tmp/rancher-chart.tgz
-        run: ./scripts/gha/tests
+        run: |
+          IP="$(ip route get 8.8.8.8 | awk '{print $7}')"
+
+          # Minimize external DNS resolutions to make test suite faster
+          echo "${IP} ${IP}.sslip.io" | sudo tee -a /etc/hosts
+
+          export CATTLE_RANCHER_HOST="${IP}.sslip.io:8443"
+          ./scripts/gha/tests
       - name: Upload Rancher + K3s logs if tests failed
         if: failure()
         continue-on-error: true
