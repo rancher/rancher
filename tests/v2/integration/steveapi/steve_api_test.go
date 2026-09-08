@@ -382,13 +382,8 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerCreateRequests() {
 
 	for _, test := range tests {
 		s.T().Run(test.name, func(t *testing.T) {
-			resp, err := client.Post(
-				fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path),
-				"application/json",
-				test.body,
-			)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedCode, resp.StatusCode)
+			code, body := s.extensionAPIRequest(t, client, http.MethodPost, test.path, test.body)
+			assert.Equalf(t, test.expectedCode, code, "response body: %s", body)
 		})
 	}
 }
@@ -424,10 +419,12 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerUpdateRequests() {
 		},
 		{
 			name: "update non-existant kubeconfig",
-			path: "/v1/ext.cattle.io/kubeconfig/does-not-exist",
+			path: "/v1/ext.cattle.io.kubeconfig/does-not-exist",
+			// Steve takes the target name from the body, not the URL, so this
+			// has to name the missing object too.
 			kubeconfig: extv1.Kubeconfig{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:            kubeconfig.Name,
+					Name:            "does-not-exist",
 					ResourceVersion: kubeconfig.ResourceVersion,
 				},
 				Spec: extv1.KubeconfigSpec{
@@ -446,12 +443,10 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerUpdateRequests() {
 			data, err := json.Marshal(test.kubeconfig)
 			require.NoError(t, err)
 
-			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path), bytes.NewBuffer(data))
-			require.NoError(t, err)
-
-			resp, err := client.Do(req)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedCode, resp.StatusCode)
+			code, body := s.extensionAPIRequest(t, client, http.MethodPut, test.path, bytes.NewBuffer(data))
+			if !assert.Equalf(t, test.expectedCode, code, "response body: %s", body) {
+				t.Log(s.describeKubeconfig(t, client, kubeconfig.Name))
+			}
 		})
 	}
 }
@@ -474,19 +469,17 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerDeleteRequests() {
 		},
 		{
 			name:         "delete non-existant kubeconfig",
-			path:         "/v1/ext.cattle.io/kubeconfig/does-not-exist",
+			path:         "/v1/ext.cattle.io.kubeconfig/does-not-exist",
 			expectedCode: http.StatusNotFound,
 		},
 	}
 
 	for _, test := range tests {
 		s.T().Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path), nil)
-			require.NoError(t, err)
-
-			resp, err := client.Do(req)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedCode, resp.StatusCode)
+			code, body := s.extensionAPIRequest(t, client, http.MethodDelete, test.path, nil)
+			if !assert.Equalf(t, test.expectedCode, code, "response body: %s", body) {
+				t.Log(s.describeKubeconfig(t, client, kubeconfig.Name))
+			}
 		})
 	}
 }
@@ -3238,12 +3231,7 @@ func (s *steveAPITestSuite) createKubeconfig(client *http.Client) *extv1.Kubecon
 		require.NoError(s.T(), err)
 	}
 
-	kubeconfig := &extv1.Kubeconfig{}
-
-	resp, err := client.Post(
-		fmt.Sprintf("https://%s/v1/ext.cattle.io.kubeconfig", s.client.WranglerContext.RESTConfig.Host),
-		"application/json",
-		strings.NewReader(`
+	code, body := s.extensionAPIRequest(s.T(), client, http.MethodPost, "/v1/ext.cattle.io.kubeconfig", strings.NewReader(`
 		{
 			"apiVersion": "ext.cattle.io/v1",
 			"kind": "kubeconfig",
@@ -3256,16 +3244,68 @@ func (s *steveAPITestSuite) createKubeconfig(client *http.Client) *extv1.Kubecon
 				"description": "kubeconfig for testing new kubeconfigs",
 				"ttl": 100
 			}
-		}`),
-	)
-	require.NoError(s.T(), err)
+		}`))
+	require.Equalf(s.T(), http.StatusCreated, code, "creating kubeconfig, response body: %s", body)
 
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(s.T(), err)
-
-	require.NoError(s.T(), json.Unmarshal(body, kubeconfig))
+	kubeconfig := &extv1.Kubeconfig{}
+	require.NoErrorf(s.T(), json.Unmarshal(body, kubeconfig), "unmarshaling created kubeconfig, response body: %s", body)
+	require.NotEmptyf(s.T(), kubeconfig.Name, "created kubeconfig has no name, response body: %s", body)
 
 	return kubeconfig
+}
+
+// extensionAPIRequest sends a request to the extension API server and returns
+// the status code along with the response body, so callers can report what the
+// server actually said when an assertion fails.
+func (s *steveAPITestSuite) extensionAPIRequest(t require.TestingT, client *http.Client, method, path string, body io.Reader) (int, []byte) {
+	req, err := http.NewRequest(method, fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, path), body)
+	require.NoError(t, err)
+
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp.StatusCode, data
+}
+
+// tokenNamespace is where the kubeconfig store keeps the ConfigMaps backing
+// kubeconfigs and the Secrets backing their tokens.
+const tokenNamespace = "cattle-tokens"
+
+// describeKubeconfig reports what the server knows about a kubeconfig, so a
+// failing delete or update says whether the object was still there.
+//
+// The kubeconfig store answers a get with no options and a list out of its
+// ConfigMap cache, so those two alone can't tell a deleted object apart from
+// one the cache hasn't caught up with. The backing ConfigMap and the token
+// Secrets that own it are read as well: Steve serves those by id from the API
+// server, and their labels and owner references say which of the two it is.
+func (s *steveAPITestSuite) describeKubeconfig(t require.TestingT, client *http.Client, name string) string {
+	probes := []struct {
+		what string
+		path string
+	}{
+		{"get kubeconfig " + name, "/v1/ext.cattle.io.kubeconfig/" + name},
+		{"list kubeconfigs", "/v1/ext.cattle.io.kubeconfig"},
+		{"get backing configmap " + name, "/v1/configmaps/" + tokenNamespace + "/" + name},
+		{"list configmaps in " + tokenNamespace, "/v1/configmaps/" + tokenNamespace},
+		{"list secrets in " + tokenNamespace, "/v1/secrets/" + tokenNamespace},
+	}
+
+	var out strings.Builder
+	for _, probe := range probes {
+		code, body := s.extensionAPIRequest(t, client, http.MethodGet, probe.path, nil)
+		fmt.Fprintf(&out, "%s: %d %s\n", probe.what, code, body)
+	}
+
+	return out.String()
 }
 
 func retryRequest(fn func() error) error {
