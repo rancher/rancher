@@ -3,12 +3,12 @@ package kubeconfig
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	registry "k8s.io/apiserver/pkg/registry/generic/registry"
 )
 
@@ -48,17 +48,24 @@ func mapBackingError(err error, resource string) error {
 		return rebuilt
 	case apierrors.IsInvalid(err):
 		logrus.Warnf("kubeconfig: invalid backing object for kubeconfig %s: %v", resource, err)
-		var errs field.ErrorList
-		if details := statusDetails(err); details != nil {
+		rebuilt := apierrors.NewInvalid(schema.GroupKind{Group: gvr.Group, Kind: Kind}, resource, nil)
+		if details := statusDetails(err); details != nil && len(details.Causes) > 0 {
+			// Causes are copied as-is: their messages are already rendered by
+			// the backing store, and an admission denial carries a cause with no
+			// Type or Field, which field.Error would render as an "unhandled
+			// error code" placeholder.
+			rebuilt.ErrStatus.Details.Causes = details.Causes
+			messages := make([]string, 0, len(details.Causes))
 			for _, c := range details.Causes {
-				errs = append(errs, &field.Error{
-					Type:   field.ErrorType(c.Type),
-					Field:  c.Field,
-					Detail: c.Message,
-				})
+				if c.Field != "" {
+					messages = append(messages, c.Field+": "+c.Message)
+				} else {
+					messages = append(messages, c.Message)
+				}
 			}
+			rebuilt.ErrStatus.Message += ": " + strings.Join(messages, ", ")
 		}
-		return apierrors.NewInvalid(schema.GroupKind{Group: gvr.Group, Kind: Kind}, resource, errs)
+		return rebuilt
 	case apierrors.IsBadRequest(err):
 		logrus.Warnf("kubeconfig: bad request on backing object for kubeconfig %s: %v", resource, err)
 		return apierrors.NewBadRequest(fmt.Sprintf("invalid request for kubeconfig %s", resource))

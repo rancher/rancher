@@ -1129,7 +1129,8 @@ func ownedByToken(configMap *corev1.ConfigMap, tokenIDs []string) bool {
 	return false
 }
 
-// getConfigMap retrieves a ConfigMap by name, optionally using the cache.
+// getConfigMap retrieves a ConfigMap by name, optionally using the cache. Any
+// error is an [apierrors.APIStatus] scoped to the Kubeconfig resource.
 func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache bool) (*corev1.ConfigMap, error) {
 	var (
 		configMap *corev1.ConfigMap
@@ -1142,10 +1143,7 @@ func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache b
 		configMap, err = s.configMapClient.Get(namespace, name, *options)
 	}
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-		}
-		return nil, fmt.Errorf("error getting configmap %s: %w", name, err)
+		return nil, mapBackingError(err, name)
 	}
 
 	if configMap.Labels[KindLabel] != KindLabelValue {
@@ -1751,7 +1749,9 @@ func (s *Store) Update(
 
 	newObj, err := objInfo.UpdatedObject(ctx, oldKubeconfig)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object for kubeconfig %s: %v", name, err))
+		// For a PATCH the apiserver applies the patch and runs admission in
+		// here, so the error may already carry a client-facing status code.
+		return nil, false, apiStatusOrInternalError(err)
 	}
 
 	newKubeconfig, ok := newObj.(*ext.Kubeconfig)

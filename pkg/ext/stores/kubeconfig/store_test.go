@@ -2471,6 +2471,31 @@ func TestStoreGet(t *testing.T) {
 		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
 		assert.Equal(t, "non-existing", statusErr.Status().Details.Name)
 	})
+
+	t.Run("backing forbidden keeps its status code and names the kubeconfig", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).Return(nil,
+			apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, kubeconfigID, errors.New("denied")))
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{ResourceVersion: "1"})
+		require.Error(t, err)
+		require.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err), "backing 403 must stay 403, got %v", err)
+		assert.NotContains(t, err.Error(), "configmap")
+
+		statusErr, ok := err.(*apierrors.StatusError)
+		require.True(t, ok)
+		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
+		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
+		assert.Equal(t, kubeconfigID, statusErr.Status().Details.Name)
+	})
 }
 
 func TestStoreList(t *testing.T) {
@@ -3447,6 +3472,48 @@ func TestStoreUpdate(t *testing.T) {
 		assert.Equal(t, 1, updatedCount, "expected exactly one Updated condition, got %d", updatedCount)
 		assert.True(t, ts2.After(ts1.Time), "Updated condition LastTransitionTime must advance on each update (ts1=%v ts2=%v)", ts1, ts2)
 	})
+	t.Run("backing forbidden on get keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).Return(nil,
+			apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, kubeconfigID, errors.New("denied")))
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
+		require.NoError(t, err)
+		objInfo := &fakeUpdatedObjectInfo{obj: oldKubeconfig.DeepCopy()}
+
+		obj, isCreated, err := store.Update(userContext(userID, ""), kubeconfigID, objInfo, nil, nil, false, &metav1.UpdateOptions{})
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, isCreated)
+		assert.True(t, apierrors.IsForbidden(err), "backing 403 must stay 403, got %v", err)
+		assert.NotContains(t, err.Error(), "configmap")
+	})
+	t.Run("status error from updated object keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).Return(oldConfigMap.DeepCopy(), nil)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		objInfo := &fakeUpdatedObjectInfo{err: apierrors.NewBadRequest("malformed patch")}
+
+		obj, isCreated, err := store.Update(userContext(userID, ""), kubeconfigID, objInfo, nil, nil, false, &metav1.UpdateOptions{})
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, isCreated)
+		assert.True(t, apierrors.IsBadRequest(err), "patch 400 must stay 400, got %v", err)
+	})
 }
 
 func TestMapBackingError(t *testing.T) {
@@ -3546,6 +3613,21 @@ func TestMapBackingError(t *testing.T) {
 	assert.Equal(t, "kc-1", invalidDetails.Name)
 	require.NotEmpty(t, invalidDetails.Causes, "field-level causes must be preserved")
 	assert.Equal(t, "data.foo", invalidDetails.Causes[0].Field)
+
+	// A ValidatingAdmissionPolicy denial is an Invalid error whose single cause
+	// has no Type and no Field. The cause message must reach the client as
+	// written, not as apimachinery's "unhandled error code" placeholder.
+	denial := "ValidatingAdmissionPolicy 'block-delete' with binding 'block-delete' denied request: blocked"
+	admissionDenied := apierrors.NewInvalid(schema.GroupKind{Group: "core", Kind: "ConfigMap"}, "cc-x", nil)
+	admissionDenied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: denial}}
+	gotDenied := mapBackingError(admissionDenied, "kc-1")
+	require.True(t, apierrors.IsInvalid(gotDenied), "admission denial must remain Invalid")
+	deniedStatus, ok := gotDenied.(apierrors.APIStatus)
+	require.True(t, ok)
+	assert.Contains(t, deniedStatus.Status().Message, denial)
+	assert.NotContains(t, deniedStatus.Status().Message, "unhandled error code")
+	require.Len(t, deniedStatus.Status().Details.Causes, 1)
+	assert.Equal(t, denial, deniedStatus.Status().Details.Causes[0].Message)
 
 	// R4-F2: wrapped status errors must be classified and have their details extracted
 	// the same as unwrapped ones; the Is* predicates see through wrapping, so statusDetails
