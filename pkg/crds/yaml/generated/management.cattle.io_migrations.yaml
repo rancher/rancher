@@ -222,7 +222,9 @@ spec:
                       - Complete
                       - In Progress
                       - Error
-                      - Not Run
+                      - Pending
+                      - Running
+                      - Interrupted
                       type: string
                     version:
                       description: Version is the version of Rancher in which the
@@ -256,7 +258,9 @@ spec:
                 - Complete
                 - In Progress
                 - Error
-                - Not Run
+                - Pending
+                - Running
+                - Interrupted
                 type: string
               totalResourcesMigrated:
                 description: |-

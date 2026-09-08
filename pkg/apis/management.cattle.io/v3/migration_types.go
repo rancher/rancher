@@ -171,7 +171,7 @@ type MigrationRun struct {
 
 	// Summary is the end result of the migration run.
 	// +optional
-	// +kubebuilder:validation:Enum=Complete;"In Progress";Error;"Not Run"
+	// +kubebuilder:validation:Enum=Complete;"In Progress";Error;Pending;Running;Interrupted
 	Summary MigrationSummary `json:"summary,omitempty"`
 
 	// MigrationsPerformedSuccessfully is the number of migrations successfully
@@ -223,7 +223,7 @@ type MigrationStatus struct {
 
 	// Summary is the state of the whole migration.
 	// +optional
-	// +kubebuilder:validation:Enum=Complete;"In Progress";Error;"Not Run"
+	// +kubebuilder:validation:Enum=Complete;"In Progress";Error;Pending;Running;Interrupted
 	Summary MigrationSummary `json:"summary,omitempty"`
 
 	// TotalResourcesMigrated is the number of resources that have been migrated.
