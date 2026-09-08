@@ -99,7 +99,7 @@ require (
 	github.com/k3s-io/api v0.1.4
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
-	github.com/microsoft/kiota-abstractions-go v1.10.0
+	github.com/microsoft/kiota-abstractions-go v1.10.1
 	github.com/microsoftgraph/msgraph-sdk-go v1.101.0
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.4.1
 	github.com/mitchellh/mapstructure v1.5.0
