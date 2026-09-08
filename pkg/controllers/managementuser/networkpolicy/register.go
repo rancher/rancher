@@ -11,7 +11,7 @@ import (
 
 // Register initializes the controllers and registers
 func Register(ctx context.Context, cluster *config.UserContext) {
-	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+	starter := cluster.DeferredStartAsync(ctx, func(ctx context.Context) error {
 		registerDeferred(ctx, cluster)
 		return nil
 	})
