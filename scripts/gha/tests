@@ -35,6 +35,8 @@ export TB_ORG=${TB_ORG}
 export CATTLE_CHART_DEFAULT_URL=${CATTLE_CHART_DEFAULT_URL}
 REGISTRY=${REGISTRY/-""}
 
+: ${CATTLE_RANCHER_HOST?CATTLE_RANCHER_HOST environment variable must be set}
+
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
@@ -77,9 +79,6 @@ export -f dump_rancher_logs
 
 ./scripts/gha/run 2>&1
 trap cleanup exit
-
-CATTLE_RANCHER_HOST="$(kubectl -n cattle-system get ingress rancher -o jsonpath='{.spec.rules[0].host}'):8443"
-export CATTLE_RANCHER_HOST
 
 # Build integrationsetup and compile the integration test binaries in the
 # background while we wait for Rancher's deployments to roll out below, keeping
