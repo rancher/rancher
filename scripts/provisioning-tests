@@ -367,10 +367,11 @@ render_test_json() {
     '. as $line | try ($line | fromjson | select(.Action == "output" or .Action == "build-output") | .Output) catch ($line + "\n")'
 }
 
-go test -run "${V2PROV_TEST_RUN_REGEX}" -json -failfast -timeout 60m -p 3 -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... 2>&1 \
+go test -run "${V2PROV_TEST_RUN_REGEX}" -json -v -failfast -timeout 60m -p 3 -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... \
+  2> >(tee -a /tmp/out.txt >&2) \
   | tee /tmp/out.json \
   | render_test_json \
-  | tee /tmp/out.txt || {
+  | tee -a /tmp/out.txt || {
      dump_rancher_logs
      exit 1
 }

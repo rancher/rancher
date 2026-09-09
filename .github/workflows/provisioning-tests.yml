@@ -202,7 +202,7 @@ jobs:
   convert-to-xml:
     name: Convert test report to xml
     needs: [provisioning_tests]
-    if: ${{ needs.provisioning_tests.result != 'skipped' }}
+    if: always()
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     steps:
