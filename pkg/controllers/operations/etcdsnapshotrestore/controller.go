@@ -326,7 +326,7 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		adapter:    a,
 	}
 
-	if op.Spec.Cancel && ops.IsTerminal(op.Status.Phase) {
+	if op.Spec.Cancel && !ops.IsTerminal(status.Phase) {
 		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
 
 		opv1alpha1.CanceledCondition.True(&status)
