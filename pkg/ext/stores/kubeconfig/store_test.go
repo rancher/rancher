@@ -1989,6 +1989,26 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, string(tokensValue), stored.Data[StatusTokensField],
 			"the token must be recorded so deleting the kubeconfig still revokes it")
 	})
+	t.Run("wrapped status error from create validation keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		store := newStore(configMapClient, tokenStore, tokenManager)
+
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:       []string{downstream1},
+				CurrentContext: downstream1,
+			},
+		}
+		createValidation := func(ctx context.Context, obj runtime.Object) error {
+			return fmt.Errorf("admission: %w", apierrors.NewForbidden(gvr.GroupResource(), "", errors.New("denied")))
+		}
+
+		obj, err := store.Create(userContext(userID, authTokenID), kubeconfig, createValidation, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+	})
+
 }
 
 func TestMergeConfigMap(t *testing.T) {
@@ -2470,6 +2490,31 @@ func TestStoreGet(t *testing.T) {
 		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
 		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
 		assert.Equal(t, "non-existing", statusErr.Status().Details.Name)
+	})
+
+	t.Run("backing forbidden keeps its status code and names the kubeconfig", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).Return(nil,
+			apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, kubeconfigID, errors.New("denied")))
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{ResourceVersion: "1"})
+		require.Error(t, err)
+		require.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err), "backing 403 must stay 403, got %v", err)
+		assert.NotContains(t, err.Error(), "configmap")
+
+		statusErr, ok := err.(*apierrors.StatusError)
+		require.True(t, ok)
+		assert.Equal(t, gvr.Group, statusErr.Status().Details.Group)
+		assert.Equal(t, ext.KubeconfigResourceName, statusErr.Status().Details.Kind)
+		assert.Equal(t, kubeconfigID, statusErr.Status().Details.Name)
 	})
 }
 
@@ -3447,6 +3492,100 @@ func TestStoreUpdate(t *testing.T) {
 		assert.Equal(t, 1, updatedCount, "expected exactly one Updated condition, got %d", updatedCount)
 		assert.True(t, ts2.After(ts1.Time), "Updated condition LastTransitionTime must advance on each update (ts1=%v ts2=%v)", ts1, ts2)
 	})
+	t.Run("backing forbidden on get keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).Return(nil,
+			apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, kubeconfigID, errors.New("denied")))
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
+		require.NoError(t, err)
+		objInfo := &fakeUpdatedObjectInfo{obj: oldKubeconfig.DeepCopy()}
+
+		obj, isCreated, err := store.Update(userContext(userID, ""), kubeconfigID, objInfo, nil, nil, false, &metav1.UpdateOptions{})
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, isCreated)
+		assert.True(t, apierrors.IsForbidden(err), "backing 403 must stay 403, got %v", err)
+		assert.NotContains(t, err.Error(), "configmap")
+	})
+	t.Run("status error from updated object keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).Return(oldConfigMap.DeepCopy(), nil)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		objInfo := &fakeUpdatedObjectInfo{err: apierrors.NewBadRequest("malformed patch")}
+
+		obj, isCreated, err := store.Update(userContext(userID, ""), kubeconfigID, objInfo, nil, nil, false, &metav1.UpdateOptions{})
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, isCreated)
+		assert.True(t, apierrors.IsBadRequest(err), "patch 400 must stay 400, got %v", err)
+	})
+	t.Run("wrapped status error from update validation keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).Return(oldConfigMap.DeepCopy(), nil)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		oldKubeconfig, err := store.fromConfigMap(oldConfigMap)
+		require.NoError(t, err)
+		update := oldKubeconfig.DeepCopy()
+		update.Spec.Description = "updated"
+		updateValidation := func(ctx context.Context, obj, old runtime.Object) error {
+			return fmt.Errorf("admission: %w", apierrors.NewForbidden(gvr.GroupResource(), kubeconfigID, errors.New("denied")))
+		}
+
+		obj, _, err := store.Update(userContext(userID, ""), kubeconfigID, &fakeUpdatedObjectInfo{obj: update}, nil, updateValidation, false, &metav1.UpdateOptions{})
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+	})
+
+}
+
+func TestAPIStatusOrInternalError(t *testing.T) {
+	t.Parallel()
+
+	bad := apierrors.NewBadRequest("malformed")
+	assert.Same(t, bad, apiStatusOrInternalError(bad))
+
+	// A wrapped status error must come back unwrapped: the apiserver derives
+	// the HTTP code with a type switch and would treat the wrapper as a 500.
+	got := apiStatusOrInternalError(fmt.Errorf("validation: %w", bad))
+	assert.True(t, apierrors.IsBadRequest(got), "wrapped 400 must stay 400, got %v", got)
+	assert.IsType(t, &apierrors.StatusError{}, got)
+
+	// Any APIStatus implementation counts, not only *StatusError, since the
+	// apiserver matches on the interface.
+	custom := &customStatusError{code: 409}
+	assert.Same(t, custom, apiStatusOrInternalError(fmt.Errorf("wrapped: %w", custom)))
+
+	assert.True(t, apierrors.IsInternalError(apiStatusOrInternalError(errors.New("boom"))))
+}
+
+type customStatusError struct{ code int32 }
+
+func (e *customStatusError) Error() string { return "custom" }
+func (e *customStatusError) Status() metav1.Status {
+	return metav1.Status{Status: metav1.StatusFailure, Code: e.code, Reason: metav1.StatusReasonConflict}
 }
 
 func TestMapBackingError(t *testing.T) {
@@ -3525,6 +3664,7 @@ func TestMapBackingError(t *testing.T) {
 	require.NotNil(t, forbiddenDetails)
 	require.NotEmpty(t, forbiddenDetails.Causes, "field-level causes must be preserved")
 	assert.Equal(t, "spec.cpu", forbiddenDetails.Causes[0].Field)
+	assert.Contains(t, forbiddenStatus.Status().Message, "spec.cpu: cpu quota exceeded", "cause text must reach the message")
 
 	// F4: Invalid backing error with field-level causes must propagate non-empty
 	// Details.Causes and the error must be re-scoped to the Kubeconfig GroupKind.
@@ -3546,6 +3686,21 @@ func TestMapBackingError(t *testing.T) {
 	assert.Equal(t, "kc-1", invalidDetails.Name)
 	require.NotEmpty(t, invalidDetails.Causes, "field-level causes must be preserved")
 	assert.Equal(t, "data.foo", invalidDetails.Causes[0].Field)
+
+	// A ValidatingAdmissionPolicy denial is an Invalid error whose single cause
+	// has no Type and no Field. The cause message must reach the client as
+	// written, not as apimachinery's "unhandled error code" placeholder.
+	denial := "ValidatingAdmissionPolicy 'block-delete' with binding 'block-delete' denied request: blocked"
+	admissionDenied := apierrors.NewInvalid(schema.GroupKind{Group: "core", Kind: "ConfigMap"}, "cc-x", nil)
+	admissionDenied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: denial}}
+	gotDenied := mapBackingError(admissionDenied, "kc-1")
+	require.True(t, apierrors.IsInvalid(gotDenied), "admission denial must remain Invalid")
+	deniedStatus, ok := gotDenied.(apierrors.APIStatus)
+	require.True(t, ok)
+	assert.Contains(t, deniedStatus.Status().Message, denial)
+	assert.NotContains(t, deniedStatus.Status().Message, "unhandled error code")
+	require.Len(t, deniedStatus.Status().Details.Causes, 1)
+	assert.Equal(t, denial, deniedStatus.Status().Details.Causes[0].Message)
 
 	// R4-F2: wrapped status errors must be classified and have their details extracted
 	// the same as unwrapped ones; the Is* predicates see through wrapping, so statusDetails
@@ -4041,6 +4196,26 @@ func TestStoreDelete(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{metav1.DryRunAll}, tokenDryRun, "token store must receive DryRun")
 	})
+	t.Run("wrapped status error from delete validation keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, gomock.Any(), gomock.Any()).Return(configMap.DeepCopy(), nil)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			return fmt.Errorf("admission: %w", apierrors.NewConflict(gvr.GroupResource(), kubeconfigID, errors.New("busy")))
+		}
+
+		obj, _, err := store.Delete(userContext(adminID, ""), kubeconfigID, deleteValidation, &metav1.DeleteOptions{})
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsConflict(err), "wrapped 409 must stay 409, got %v", err)
+	})
+
 }
 
 func TestStoreDeleteCollection(t *testing.T) {
@@ -4347,6 +4522,29 @@ func TestStoreDeleteCollection(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{metav1.DryRunAll}, tokenDryRun, "token store must receive DryRun")
 	})
+	t.Run("wrapped status error from delete validation keeps its status code", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().List(namespace, gomock.Any()).Return(&corev1.ConfigMapList{
+			ListMeta: metav1.ListMeta{ResourceVersion: "1"},
+			Items:    []corev1.ConfigMap{*configMap.DeepCopy()},
+		}, nil)
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			return fmt.Errorf("admission: %w", apierrors.NewConflict(gvr.GroupResource(), kubeconfigID, errors.New("busy")))
+		}
+
+		obj, err := store.DeleteCollection(userContext(adminID, ""), deleteValidation, &metav1.DeleteOptions{}, &metainternalversion.ListOptions{})
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsConflict(err), "wrapped 409 must stay 409, got %v", err)
+	})
+
 }
 
 func TestPrintKubeconfig(t *testing.T) {
