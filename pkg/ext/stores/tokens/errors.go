@@ -84,12 +84,14 @@ func mapBackingError(err error, resource string) error {
 	}
 }
 
-// apiStatusOrInternalError returns err unchanged when it already carries an
-// APIStatus (so a deliberate 4xx keeps its code) and wraps anything else as an
-// InternalError.
+// apiStatusOrInternalError returns the status error carried by err, unwrapped,
+// so a deliberate 4xx keeps its code, and wraps anything else as an
+// InternalError. Unwrapping matters: the apiserver derives the HTTP code with a
+// type switch and would report a wrapped status error as a 500.
 func apiStatusOrInternalError(err error) error {
-	if _, ok := err.(apierrors.APIStatus); ok {
-		return err
+	var statusErr *apierrors.StatusError
+	if errors.As(err, &statusErr) {
+		return statusErr
 	}
 	return apierrors.NewInternalError(err)
 }

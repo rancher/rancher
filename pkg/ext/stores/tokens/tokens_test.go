@@ -2491,6 +2491,21 @@ func TestSystemStoreDelete(t *testing.T) {
 	}
 }
 
+func TestAPIStatusOrInternalError(t *testing.T) {
+	t.Parallel()
+
+	bad := apierrors.NewBadRequest("malformed")
+	assert.Same(t, bad, apiStatusOrInternalError(bad))
+
+	// A wrapped status error must come back unwrapped: the apiserver derives
+	// the HTTP code with a type switch and would treat the wrapper as a 500.
+	got := apiStatusOrInternalError(fmt.Errorf("validation: %w", bad))
+	assert.True(t, apierrors.IsBadRequest(got), "wrapped 400 must stay 400, got %v", got)
+	assert.IsType(t, &apierrors.StatusError{}, got)
+
+	assert.True(t, apierrors.IsInternalError(apiStatusOrInternalError(errors.New("boom"))))
+}
+
 func TestSystemStoreAddLabel(t *testing.T) {
 	t.Run("add label", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
