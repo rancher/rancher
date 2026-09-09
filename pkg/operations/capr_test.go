@@ -112,7 +112,9 @@ func TestDistroServices_RoleSpecificAvailability(t *testing.T) {
 	etcd := newSecret(map[string]string{capr.EtcdRoleLabel: "true"})
 	worker := newSecret(map[string]string{capr.WorkerRoleLabel: "true"})
 
-	// Worker-only nodes never own control-plane or etcd services.
+	// Worker-only nodes never run control-plane or etcd services. rke2-server is a logical
+	// certificate-rotation identifier here: it makes the worker restart its runtime agent after
+	// server certificates change; it does not mean an RKE2 server runs on the worker.
 	workerServices := DistroServices(capr.RuntimeRKE2, worker)
 	assert.Contains(t, workerServices, "rke2-server")
 	assert.NotContains(t, workerServices, "scheduler")
@@ -589,7 +591,7 @@ func TestFilterField(t *testing.T) {
 
 // --- ComponentTLSSettings ------------------------------------------------
 
-func TestCAPRAdapter_ComponentTLSSettings(t *testing.T) {
+func TestComponentTLSSettingsFromRenderedConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

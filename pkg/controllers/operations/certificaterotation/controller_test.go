@@ -14,6 +14,7 @@ import (
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -340,23 +341,30 @@ func TestWindowsIdempotentRestartInstructions_UsesPassedRuntime(t *testing.T) {
 	t.Parallel()
 
 	instructions := windowsIdempotentRestartInstructions("certificate-rotation/restart", "operation", capr.RuntimeK3S)
-	assert.Len(t, instructions, 1)
+	require.Len(t, instructions, 1)
 
 	instr := instructions[0]
 	assert.Equal(t, "powershell.exe", instr.Command)
-	assert.Contains(t, instr.Args, windowsIdempotentScriptPath)
-	assert.Contains(t, instr.Args, windowsIdempotencyRoot)
-	assert.Contains(t, instr.Args, "restart-service")
-	assert.Contains(t, instr.Args, capr.RuntimeK3S)
+	assert.Equal(t, []string{
+		windowsIdempotentScriptPath,
+		"certificate-rotation/restart-restart",
+		plan.PlanHash([]byte("operation")),
+		plan.PlanHash([]byte("restart-service")),
+		"restart-service",
+		windowsIdempotencyRoot,
+		capr.RuntimeK3S,
+	}, instr.Args)
 
 	// Same inputs must always produce the same idempotency name, so a retry recognizes an
 	// already-applied instruction instead of re-running it.
 	again := windowsIdempotentRestartInstructions("certificate-rotation/restart", "operation", capr.RuntimeK3S)
+	require.Len(t, again, 1)
 	assert.Equal(t, instr.Name, again[0].Name)
 
 	// A different value (operation UID) must produce a different idempotency name, so a new
 	// operation's plan is not mistaken for one already applied.
 	other := windowsIdempotentRestartInstructions("certificate-rotation/restart", "other-operation", capr.RuntimeK3S)
+	require.Len(t, other, 1)
 	assert.NotEqual(t, instr.Name, other[0].Name)
 }
 

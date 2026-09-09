@@ -195,10 +195,14 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Mixed_Role_Service
 	schedulerPaths := []string{
 		path.Join(dataDir, "server/tls/kube-scheduler/kube-scheduler.crt"),
 	}
+	adminCertificatePath := path.Join(dataDir, "server/tls/client-admin.crt")
 	etcdPodNames := []string{fx.pods[0].Name}
 	controlPlanePodNames := []string{fx.pods[1].Name}
 	beforeEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdPaths)
 	beforeScheduler := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, schedulerPaths)
+	beforeUnchangedControlPlane := map[string]certificateMetadata{
+		adminCertificatePath: collectCertificateMetadataFromPod(t, cs, fx, controlPlanePodNames[0], adminCertificatePath),
+	}
 
 	// The request is valid across the cluster, but no individual node owns both services.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationServices("etcd", "scheduler"))
@@ -209,7 +213,8 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Mixed_Role_Service
 	op = WaitForCertificateRotationSucceeded(t, cs, op, beaconNS, beaconName)
 	assertCertificateRotationSucceeded(t, op)
 
-	// Recovery proves both role-specific plans completed without sending a node an unsupported service.
+	// Recovery proves the rotated cluster returned to service. The certificate checks below prove
+	// the requested service filtering.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, expectedNodes)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
@@ -218,8 +223,12 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Mixed_Role_Service
 	// rotated on the control-plane node.
 	afterEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdPaths)
 	afterScheduler := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, schedulerPaths)
+	afterUnchangedControlPlane := map[string]certificateMetadata{
+		adminCertificatePath: collectCertificateMetadataFromPod(t, cs, fx, controlPlanePodNames[0], adminCertificatePath),
+	}
 	assertNodeCertificateRotationMetadata(t, beforeEtcd, afterEtcd, etcdPaths)
 	assertNodeCertificateRotationMetadata(t, beforeScheduler, afterScheduler, schedulerPaths)
+	assertCertificateMetadataUnchanged(t, beforeUnchangedControlPlane, afterUnchangedControlPlane, []string{adminCertificatePath})
 }
 
 // Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args validates that when the
