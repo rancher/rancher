@@ -1,11 +1,14 @@
 package operations
 
 import (
+	"encoding/base64"
 	"fmt"
 	"path"
+	"strings"
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -21,6 +24,11 @@ import (
 	"k8s.io/utils/ptr"
 	capiv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+// CAPRKE2EndpointCAPath is where the CAPRKE2 bootstrap provider writes the S3 endpoint CA it
+// resolves from EndpointCASecret. Operations render the same path so their s3-endpoint-ca argument
+// points at the file that is already on the node.
+const CAPRKE2EndpointCAPath = "/etc/rancher/rke2/etcd-s3-ca.crt"
 
 // CAPRKE2Adapter implements the Adapter interface for clusters provisioned via the upstream
 // cluster-api-provider-rke2 (CAPRKE2) project — i.e. a CAPI `Cluster` whose `controlPlaneRef`
@@ -73,13 +81,114 @@ func (a *CAPRKE2Adapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{Object: ustr}, nil
 }
 
-// ToS3ArgsEnvAndFiles returns the S3 args/env/files that should be appended to an etcd-snapshot
-// save operation for this cluster. CAPRKE2 does not yet model S3 snapshot configuration on the
-// RKE2ControlPlane in a form that the operations controllers consume, so this is a no-op for now
-// — matching CAPRAdapter's current TODO state (see pkg/operations/capr.go:58-61). When CAPRKE2
-// gains a typed S3 backup config, port the equivalent of CAPRAdapter.ToS3ArgsEnvAndFiles here.
-func (a *CAPRKE2Adapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
-	return nil, nil, nil
+// ETCDSnapshotS3 returns the location half of the RKE2ControlPlane's etcd S3 backup config.
+//
+// CAPRKE2 keeps the access key, secret key, and endpoint CA in secrets referenced from the backup
+// config rather than in a Rancher cloud credential, and those references cannot be expressed in
+// the shared ETCDSnapshotS3 type. They are resolved in ToS3ArgsEnvAndFiles instead, so a caller
+// which only needs to know *where* snapshots go can use this, and a caller which needs to reach
+// the bucket must go through ToS3ArgsEnvAndFiles.
+func (a *CAPRKE2Adapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	s3 := a.etcdBackupS3()
+	if s3 == nil {
+		return nil
+	}
+
+	return &rkev1.ETCDSnapshotS3{
+		Endpoint: s3.Endpoint,
+		Bucket:   s3.Bucket,
+		Region:   s3.Region,
+		Folder:   s3.Folder,
+		// CAPRKE2 inverts the flag: verification is opt-in, and the zero value skips it.
+		SkipSSLVerify: !s3.EnforceSSLVerify,
+	}
+}
+
+// ToS3ArgsEnvAndFiles renders the S3 args/env/files for the location described by s3, falling back
+// to the control plane's own backup config. Unlike CAPR and imported clusters there is no cloud
+// credential to resolve: the access key and secret key come from the secret named by
+// S3CredentialSecret (empty when the cluster relies on IAM authentication instead), and the
+// endpoint CA from the secret named by EndpointCASecret, rendered to the path CAPRKE2 itself uses
+// so the argument matches the file the bootstrap provider already wrote.
+func (a *CAPRKE2Adapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	clusterS3 := a.ETCDSnapshotS3()
+	if s3 == nil {
+		s3 = clusterS3
+	}
+	if !S3Enabled(s3) {
+		return nil, nil, nil, nil
+	}
+
+	target := &S3Target{
+		Bucket:        s3.Bucket,
+		Endpoint:      s3.Endpoint,
+		Region:        s3.Region,
+		Folder:        s3.Folder,
+		SkipSSLVerify: s3.SkipSSLVerify,
+		Retention:     s3.Retention,
+	}
+
+	if clusterS3 != nil {
+		if target.Bucket == "" {
+			target.Bucket = clusterS3.Bucket
+		}
+		if target.Endpoint == "" {
+			target.Endpoint = clusterS3.Endpoint
+		}
+		if target.Region == "" {
+			target.Region = clusterS3.Region
+		}
+		if target.Folder == "" {
+			target.Folder = clusterS3.Folder
+		}
+	}
+
+	backup := a.etcdBackupS3()
+
+	if backup != nil && backup.S3CredentialSecret != nil {
+		secret, err := a.secretForReference(backup.S3CredentialSecret)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to lookup s3 credential secret for cluster %s/%s: %w", a.cluster.Namespace, a.cluster.Name, err)
+		}
+		target.AccessKey = string(secret.Data["aws_access_key_id"])
+		target.SecretKey = string(secret.Data["aws_secret_access_key"])
+	}
+
+	switch {
+	case backup != nil && backup.EndpointCASecret != nil:
+		secret, err := a.secretForReference(backup.EndpointCASecret)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to lookup s3 endpoint CA secret for cluster %s/%s: %w", a.cluster.Namespace, a.cluster.Name, err)
+		}
+		ca, ok := secret.Data["ca.pem"]
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("s3 endpoint CA secret %s/%s for cluster %s/%s is missing the ca.pem key", secret.Namespace, secret.Name, a.cluster.Namespace, a.cluster.Name)
+		}
+		target.EndpointCAPath = CAPRKE2EndpointCAPath
+		target.EndpointCAContent = base64.StdEncoding.EncodeToString(ca)
+	case strings.HasSuffix(s3.EndpointCA, ".crt"), strings.HasSuffix(s3.EndpointCA, ".pem"):
+		// The snapshot recorded the path of a CA placed on the node outside of CAPRKE2's control.
+		// Reference it, but leave the file to whoever put it there.
+		target.EndpointCAPath = s3.EndpointCA
+	}
+
+	args, env, files := RenderS3(target, prefix, secretKeyInEnv)
+	return args, env, files, nil
+}
+
+// etcdBackupS3 returns the RKE2ControlPlane's etcd S3 backup config, if any.
+func (a *CAPRKE2Adapter) etcdBackupS3() *controlplanev1beta2.EtcdS3 {
+	return a.controlPlane.Spec.ServerConfig.Etcd.BackupConfig.S3
+}
+
+// secretForReference resolves an object reference to a secret, defaulting an empty namespace to
+// the CAPI cluster's namespace.
+func (a *CAPRKE2Adapter) secretForReference(ref *corev1.ObjectReference) (*corev1.Secret, error) {
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = a.cluster.Namespace
+	}
+	return a.clients.Core.Secret().Cache().Get(namespace, ref.Name)
 }
 
 // LoopbackAddress returns the loopback host used when constructing probes. CAPRKE2 has no

@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/alibaba"
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
+	cfg "github.com/rancher/rancher/pkg/controllers/management/config"
 	"github.com/rancher/rancher/pkg/controllers/management/eks"
 	"github.com/rancher/rancher/pkg/controllers/management/feature"
 	"github.com/rancher/rancher/pkg/controllers/management/gke"
@@ -32,6 +33,14 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 		if err := authprovisioningv2.Register(ctx, wranglerContext, management); err != nil {
 			return err
 		}
+
+		// Imported distro config delivery goes through the same ops.Adapter and machine-plan
+		// machinery as the day-2 operation controllers, so it registers alongside them once the
+		// CAPI clients are available.
+		wranglerContext.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
+			cfg.Register(ctx, clients)
+			return nil
+		})
 	}
 
 	if features.OIDCProvider.Enabled() {
