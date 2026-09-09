@@ -24,17 +24,3 @@ func TestParseCACertificates_WithEmptyString_ReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "CA bundle must contain at least one CERTIFICATE PEM block")
 	assert.Nil(t, pool)
 }
-
-func TestBuildTransportWithCABundle_WithInvalidCA_ReturnsError(t *testing.T) {
-	transport, err := buildTransportWithCABundle(testInvalidPEM)
-	require.Error(t, err)
-	assert.Nil(t, transport)
-	assert.Contains(t, err.Error(), "failed to parse CA certificates")
-}
-
-func TestBuildTransportWithCABundle_WithEmptyCABundle_ReturnsError(t *testing.T) {
-	transport, err := buildTransportWithCABundle("")
-	require.Error(t, err)
-	assert.Nil(t, transport)
-	assert.Contains(t, err.Error(), "failed to parse CA certificates")
-}

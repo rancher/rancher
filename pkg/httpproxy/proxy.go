@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -138,6 +139,7 @@ func (p *proxy) proxy(req *http.Request) error {
 	}
 
 	destURL, err := url.Parse(destPath)
+	// logrus.Infof("QQQ: proxying request to destURL %s, host %s", destURL, req.Host)
 	if err != nil {
 		return err
 	}
@@ -176,17 +178,23 @@ func (p *proxy) proxy(req *http.Request) error {
 
 	if auth != "" { // non-empty AuthHeader is noop
 		req.Header.Set(AuthHeader, auth)
+		// logrus.Infof("QQQ: auth is set to %s", auth)
 	} else if cAuth != "" {
 		// If a known signer mode is specified by the client, use it directly.
+		// logrus.Infof("QQQ: cattle auth is set to %s", cAuth)
 		signer := newSigner(cAuth)
 		if signer != nil {
+			// logrus.Infof("QQQ: signer is set to non-null thing")
 			return signer.sign(req, p.secretGetter(req, cAuth), cAuth)
+
 		}
 		// No client-specified mode: check whether the matching ProxyEndpoint route
 		// defines a server-side injection pattern. This allows extension authors to
 		// control how credentials are applied without requiring the client to know
 		// the injection details.
 		if route := p.findMatchingRoute(destURLHostname); route != nil && route.CredentialInjection != nil {
+			// logrus.Infof("QQQ: found route domain %q, skip-verify %v, caBundle %q", route.Domain, route.InsecureSkipTLSVerify, route.CABundle)
+			decodeCABundleIfPossible(route)
 			return p.applyRouteInjection(req, cAuth, route)
 		}
 		req.Header.Set(AuthHeader, cAuth)
@@ -194,13 +202,29 @@ func (p *proxy) proxy(req *http.Request) error {
 
 	replaceCookies(req)
 
+	// logrus.Infof("QQQ: finished proxying request to %s", req.Host)
 	return nil
+}
+
+func decodeCABundleIfPossible(route *mgmt.ProxyEndpointRoute) {
+	if route.CABundle == "" {
+		return
+	}
+	possible, err := base64.StdEncoding.DecodeString(route.CABundle)
+	if err != nil {
+		// logrus.Infof("QQQ: trying to base64-decode %q => %v", route.CABundle, err)
+		return
+	}
+
+	// logrus.Infof("QQQ: replacing cabundle %q with %q", string(possible), route.CABundle)
+	route.CABundle = string(possible)
 }
 
 // applyRouteInjection fetches the credential identified by credID in cAuth, then applies the
 // injection pattern defined on the matching ProxyEndpoint route to the outgoing request.
 func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt.ProxyEndpointRoute) error {
 	credID := credentialIDFromCattleAuth(cAuth)
+	// logrus.Infof("QQQ: applyRouteInjection: credID: %q", credID)
 	if credID == "" {
 		return fmt.Errorf("server-defined injection requires credID (credential ID) in %s header", CattleAuth)
 	}
@@ -208,6 +232,7 @@ func (p *proxy) applyRouteInjection(req *http.Request, cAuth string, route *mgmt
 	if err != nil {
 		return fmt.Errorf("failed to retrieve credential for route injection: %w", err)
 	}
+	// logrus.Infof("QQQ: applyRouteInjection: secretData: %v", secretData)
 	return applyInjectionSpec(req, route.CredentialInjection, secretData)
 }
 
@@ -221,6 +246,7 @@ func (p *proxy) checkAccessToV3ClusterWithID(req *http.Request, user user.Info, 
 		Name:            clusterID,
 		ResourceRequest: true,
 	})
+	// logrus.Infof("QQQ: checkAccessToV3Cluster: decision: %v, err: %v", decision, err)
 
 	return decision, err
 }
@@ -392,15 +418,26 @@ type perRouteTLSTransport struct {
 }
 
 func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// logrus.Infof("QQQ: >> RoundTrip: req: %s", req.URL)
 	route := t.proxy.findMatchingRoute(req.URL.Hostname())
 
-	// If the route explicitly disables TLS verification, use the insecure transport
-	if route != nil && route.InsecureSkipTLSVerify {
-		return t.proxy.insecureTransport.RoundTrip(req)
+	if route == nil {
+		// logrus.Infof("QQQ: RoundTrip: route is nil -- can this work?")
+		// Use the default transport for standard certificate verification
+		return http.DefaultTransport.RoundTrip(req)
 	}
 
+	// If the route explicitly disables TLS verification, use the insecure transport
+	if route.InsecureSkipTLSVerify {
+		// logrus.Infof("QQQ: RoundTrip: route %q has InsecureSkipTLSVerify enabled, using insecure transport", route.Domain)
+		return t.proxy.insecureTransport.RoundTrip(req)
+	}
+	// logrus.Infof("QQQ: RoundTrip: route has InsecureSkipTLSVerify disabled")
+
 	// If the route has custom certificate settings, build a transport for it
-	if route != nil && (route.CABundle != "" || route.ServerName != "" || route.TLSVerificationOptions != nil) {
+	if route.CABundle != "" || route.ServerName != "" || route.TLSVerificationOptions != nil {
+		// logrus.Infof("QQQ: RoundTrip: route.CABundle: %q, route.ServerName: %q, route.TLSVerificationOptions: %s", route.CABundle, route.ServerName, route.TLSVerificationOptions)
+		decodeCABundleIfPossible(route)
 		transport, err := buildTransportForRoute(route, req.URL.Hostname())
 		if err != nil {
 			logrus.Warnf("httpproxy: failed to build transport for route: %v", err)
@@ -411,6 +448,7 @@ func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 
 	// Use the default transport for standard certificate verification
+	// logrus.Infof("QQQ: RoundTrip: using http.DefaultTransport.RoundTrip")
 	return http.DefaultTransport.RoundTrip(req)
 }
 
@@ -465,24 +503,6 @@ func buildTransportForRoute(route *mgmt.ProxyEndpointRoute, requestHostname stri
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = tlsConfig
-
-	return transport, nil
-}
-
-// buildTransportWithCABundle creates an HTTP transport that trusts the provided CA certificates.
-// The caBundle should be PEM-encoded certificates.
-func buildTransportWithCABundle(caBundle string) (*http.Transport, error) {
-	// Parse the CA certificates from PEM
-	caCertPool, err := parseCACertificates(caBundle)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CA certificates: %w", err)
-	}
-
-	// Clone the default transport and update its TLS config
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{
-		RootCAs: caCertPool,
-	}
 
 	return transport, nil
 }
@@ -558,12 +578,7 @@ func parseCACertificates(caBundle string) (*x509.CertPool, error) {
 		return nil, err
 	}
 
-	// Start with the system's root CAs
-	caCertPool, err := x509.SystemCertPool()
-	if err != nil {
-		logrus.Debugf("httpproxy: failed to get system cert pool, using empty pool instead: %v", err)
-		caCertPool = x509.NewCertPool()
-	}
+	caCertPool := x509.NewCertPool()
 
 	// Add the provided CA certificates to the pool
 	if !caCertPool.AppendCertsFromPEM([]byte(caBundle)) {
@@ -630,17 +645,20 @@ func validateCABundleSecurity(caBundle string) error {
 	if len(caBundle) > maxCABundleBytes {
 		return fmt.Errorf("CA bundle exceeds maximum size of %d bytes", maxCABundleBytes)
 	}
+	// logrus.Infof("QQQ: >> validateCABundleSecurity: caBundle <\n%s\n>", caBundle)
 
 	remaining := []byte(caBundle)
 	foundCertificate := false
 
 	for len(remaining) > 0 {
 		if len(bytes.TrimSpace(remaining)) == 0 {
+			// logrus.Infof("QQQ: validateCABundleSecurity: parsed the whole CA bundle")
 			break
 		}
 
 		block, rest := pem.Decode(remaining)
 		if block == nil {
+			// logrus.Infof("QQQ: validateCABundleSecurity: can't work with <\n%q\n>", string(remaining))
 			return fmt.Errorf("failed to parse CA bundle PEM data")
 		}
 

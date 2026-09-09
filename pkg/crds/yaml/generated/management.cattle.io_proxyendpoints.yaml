@@ -205,7 +205,8 @@ spec:
                   x-kubernetes-validations:
                   - message: caBundle cannot be set when insecureSkipTLSVerify is
                       true
-                    rule: '!(has(self.caBundle) && size(self.caBundle) > 0 && self.insecureSkipTLSVerify)'
+                    rule: '!(has(self.caBundle) && size(self.caBundle) > 0 && has(self.insecureSkipTLSVerify)
+                      && self.insecureSkipTLSVerify)'
                 type: array
             required:
             - routes
