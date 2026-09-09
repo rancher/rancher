@@ -279,8 +279,8 @@ func (s *Store) Create(
 
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, err
+			if statusErr := asAPIStatus(err); statusErr != nil {
+				return nil, statusErr
 			}
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("create validation failed for kubeconfig: %s", err))
 		}
@@ -1542,8 +1542,8 @@ func (s *Store) DeleteCollection(
 		}
 		if deleteValidation != nil {
 			if err := deleteValidation(ctx, kubeconfig); err != nil {
-				if _, ok := err.(apierrors.APIStatus); ok {
-					return nil, err
+				if statusErr := asAPIStatus(err); statusErr != nil {
+					return nil, statusErr
 				}
 				return nil, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
 			}
@@ -1652,8 +1652,8 @@ func (s *Store) delete(
 	if deleteValidation != nil {
 		err := deleteValidation(ctx, kubeconfig)
 		if err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, false, err
+			if statusErr := asAPIStatus(err); statusErr != nil {
+				return nil, false, statusErr
 			}
 			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
 		}
@@ -1771,8 +1771,8 @@ func (s *Store) Update(
 	if updateValidation != nil {
 		err = updateValidation(ctx, newKubeconfig, oldKubeconfig)
 		if err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, false, err
+			if statusErr := asAPIStatus(err); statusErr != nil {
+				return nil, false, statusErr
 			}
 			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("update validation for kubeconfig %s failed: %s", name, err))
 		}
