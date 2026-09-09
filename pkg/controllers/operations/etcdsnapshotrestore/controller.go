@@ -326,6 +326,16 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 		adapter:    a,
 	}
 
+	if op.Spec.Cancel && status.Phase != opv1alpha1.OperationPhaseCanceled {
+		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Message(&status, "operation cancelled")
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.CanceledReason)
+
+		return status, nil
+	}
+
 	switch status.Phase {
 	case opv1alpha1.OperationPhasePending:
 		return h.handlePending(s, status)
