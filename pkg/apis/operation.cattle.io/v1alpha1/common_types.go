@@ -20,7 +20,7 @@ type OperationSpec struct {
 	Paused bool `json:"paused,omitempty"`
 
 	// Cancel requests the operation to stop permanently. Unlike Paused, it is terminal and cannot be unset.
-	// Recover by deleting and recreating the operation. If both Paused and Cancel are true, Cancel wins.
+	// Recover by deleting and recreating the operation.
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:XValidation:rule="self || !oldSelf",message="cancel cannot be unset once true"
 	// +optional

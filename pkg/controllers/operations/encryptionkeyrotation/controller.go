@@ -209,11 +209,11 @@ func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 		adapter:    adapter,
 	}
 
-	if op.Spec.Cancel && status.Phase != opv1alpha1.OperationPhaseCanceled {
+	if op.Spec.Cancel && ops.IsTerminal(op.Status.Phase) {
 		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
 
 		opv1alpha1.CanceledCondition.True(&status)
-		opv1alpha1.CanceledCondition.Message(&status, "operation cancelled")
+		opv1alpha1.CanceledCondition.Message(&status, "Operation canceled")
 		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.CanceledReason)
 
 		return status, nil
@@ -948,6 +948,16 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 		opv1alpha1.SucceededCondition.False(&status)
 		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.NotSuccessfulReason)
 		opv1alpha1.SucceededCondition.Message(&status, "Operation failed")
+	} else if status.Phase == opv1alpha1.OperationPhaseCanceled {
+		opv1alpha1.PendingCondition.False(&status)
+		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.CanceledReason)
+		opv1alpha1.PendingCondition.Message(&status, "Operation canceled")
+		opv1alpha1.InProgressCondition.False(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.CanceledReason)
+		opv1alpha1.InProgressCondition.Message(&status, "Operation canceled")
+		opv1alpha1.SucceededCondition.False(&status)
+		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.CanceledReason)
+		opv1alpha1.SucceededCondition.Message(&status, "Operation canceled")
 	}
 
 	return status
