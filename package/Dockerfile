@@ -39,6 +39,10 @@ RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/
 FROM registry.suse.com/bci/bci-base:16.0 AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
+
+# Assert that builder matches the target OS version
+RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ]
+
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
