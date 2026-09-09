@@ -141,19 +141,28 @@ jobs:
         run: |
           set -eo pipefail
           ./scripts/container-run provisioning-tests | tee provtest_output.txt
-      - name: Move plaintext test results for upload
+      - name: Move test results for upload
         if: always()
         id: test_output
         run: |
           export TESTSUITE="$(echo "${V2PROV_TEST_RUN_REGEX}" | sed 's/Test//' | tr -d '()|_^.*$')"
           echo "suite=${TESTSUITE}" >> $GITHUB_OUTPUT
-          mv ./build/out.txt "/tmp/report-${V2PROV_TEST_DIST}-${TESTSUITE}.txt"
-      - name: Upload Plain Text Test Results
+          # out.txt is the plaintext `go test -v` rendering, out.json is the raw
+          # `go test -json` event stream, which is what the JUnit conversion parses.
+          for ext in txt json; do
+            if [ -f "./build/out.${ext}" ]; then
+              mv "./build/out.${ext}" "/tmp/report-${V2PROV_TEST_DIST}-${TESTSUITE}.${ext}"
+            else
+              echo "warning: ./build/out.${ext} not found"
+            fi
+          done
+      - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: "Test Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
           path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*"
+          if-no-files-found: warn
       - name: Upload logdump artifact if we had some tests failures
         if: failure()
         uses: rancherlabs/cowboy@61de86d99456805424f9af0dadfcf362413cd745 # v0.0.2
@@ -193,25 +202,31 @@ jobs:
   convert-to-xml:
     name: Convert test report to xml
     needs: [provisioning_tests]
+    if: ${{ needs.provisioning_tests.result != 'skipped' }}
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
     steps:
-      - name: Fetch plaintext test output
+      - name: Fetch test output
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
+          # Only pull the artifacts we need to convert
+          pattern: "Test Results *"
           merge-multiple: true
           path: /tmp/test-results/
       - name: Convert test results to XML
         run: |
-          for file in $(ls /tmp/test-results/report-*.txt); do
-             echo "Processing $file..."
-             go run github.com/jstemmer/go-junit-report/v2@14d61e6e75e3f3c74551d757ad936e8e88014464 < $file > $(sed 's/txt/xml/g' <<<$file)
+          set -eo pipefail
+          # Parse the raw `go test -json` stream rather than the plaintext report.
+          for file in /tmp/test-results/report-*.json; do
+            [ -f "$file" ] || continue
+            go run github.com/jstemmer/go-junit-report/v2@14d61e6e75e3f3c74551d757ad936e8e88014464 -parser gojson < "$file" > "${file%.json}.xml"
           done
       - name: Upload XML Test Results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: XML Results
           path: "/tmp/test-results/report-*.xml"
+          if-no-files-found: warn
 
   event-file:
     name: Upload event file
