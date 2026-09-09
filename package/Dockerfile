@@ -36,13 +36,17 @@ FROM registry.suse.com/bci/bci-micro:16.0 AS final
 RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.7 AS chroot-builder
+FROM registry.suse.com/bci/bci-base:16.0 AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
+
+# Assert that builder matches the target OS version
+RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ]
+
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-      catatonit curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
+      catatonit curl util-linux ca-certificates ca-certificates-mozilla findutils xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
 
 
 FROM chroot-builder AS chroot-builder-server
@@ -54,7 +58,7 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
-      jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
