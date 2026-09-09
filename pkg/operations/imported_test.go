@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"encoding/json"
 	"testing"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -649,8 +650,260 @@ func TestImportedAdapter_ComponentTLSSettings_IgnoresMalformedNodeEnv(t *testing
 	assert.NoError(t, err)
 	assert.Equal(t, ComponentTLSSettings{}, settings)
 
-	dataDir := adapter.DistroDataDirectory(secret)
-	assert.Equal(t, defaultRKE2DataDirectory, dataDir)
+	dataDir, err := adapter.DistroDataDirectory(secret)
+	assert.Error(t, err)
+	assert.Empty(t, dataDir)
+}
+
+func TestImportedAdapter_DistroDataDirectory_ReturnsMalformedConfigurationErrors(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		args string
+		env  string
+	}{
+		{"malformed args", `{invalid-json`, ``},
+		{"malformed env", `[]`, `{invalid-json`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Name: "machine-plan", Namespace: "c-mine",
+				Labels: map[string]string{
+					planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+					planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+					planv1alpha1.MachineLifecycleNameLabel:  "node-a",
+				},
+			}}
+			node := &mgmtv3.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "node-a", Namespace: "c-mine"},
+				Status: mgmtv3.NodeStatus{NodeAnnotations: map[string]string{
+					rke2NodeArgsAnnotation: tt.args,
+					rke2NodeEnvAnnotation:  tt.env,
+				}},
+			}
+			nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil)
+
+			adapter := &ImportedAdapter{
+				cluster: &mgmtv3.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+					Status:     mgmtv3.ClusterStatus{Provider: capr.RuntimeRKE2},
+				},
+				clients: &wrangler.CAPIContext{
+					Context: &wrangler.Context{
+						Mgmt:       &stubMgmtInterface{nodeCache: nodeCache},
+						RESTMapper: &fakeRESTMapper{},
+					},
+				},
+			}
+
+			dataDir, err := adapter.DistroDataDirectory(secret)
+			assert.Error(t, err)
+			assert.Empty(t, dataDir)
+		})
+	}
+}
+
+func TestImportedAdapter_DistroDataDirectory_NoLifecycleLabels(t *testing.T) {
+	t.Parallel()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "c-mine",
+		},
+	}
+
+	adapter := &ImportedAdapter{
+		cluster: &mgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+			Status:     mgmtv3.ClusterStatus{Provider: capr.RuntimeRKE2},
+		},
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				RESTMapper: &fakeRESTMapper{},
+			},
+		},
+	}
+
+	// No lifecycle labels means managementNodeForSecret can't resolve a management Node, so
+	// there is no way to know whether a custom data directory was configured. The default
+	// directory must not be guessed in that case.
+	dataDir, err := adapter.DistroDataDirectory(secret)
+	assert.Error(t, err)
+	assert.Empty(t, dataDir)
+}
+
+func TestImportedAdapter_DistroDataDirectory_UsesArgsWhenNodeEnvIsMalformed(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "c-mine",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "node-a",
+			},
+		},
+	}
+	node := &mgmtv3.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-a", Namespace: "c-mine"},
+		Status: mgmtv3.NodeStatus{
+			NodeAnnotations: map[string]string{
+				rke2NodeArgsAnnotation: `["--data-dir","/custom/from/args"]`,
+				rke2NodeEnvAnnotation:  `{invalid-json`,
+			},
+		},
+	}
+	nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil)
+
+	adapter := &ImportedAdapter{
+		cluster: &mgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+			Status:     mgmtv3.ClusterStatus{Provider: capr.RuntimeRKE2},
+		},
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt:       &stubMgmtInterface{nodeCache: nodeCache},
+				RESTMapper: &fakeRESTMapper{},
+			},
+		},
+	}
+
+	// A malformed environment annotation is irrelevant once CLI args already resolve the
+	// effective data directory, since RKE2/K3s CLI arguments always outrank the environment.
+	dataDir, err := adapter.DistroDataDirectory(secret)
+	assert.NoError(t, err)
+	assert.Equal(t, "/custom/from/args", dataDir)
+}
+
+func TestImportedAdapter_DistroDataDirectory(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		runtime string
+		args    []string
+		env     map[string]string
+		want    string
+	}{
+		{
+			name:    "RKE2 args override env",
+			runtime: capr.RuntimeRKE2,
+			args:    []string{"--data-dir", "/custom/from/args"},
+			env:     map[string]string{"RKE2_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/args",
+		},
+		{
+			name:    "K3S args override env",
+			runtime: capr.RuntimeK3S,
+			args:    []string{"-d=/custom/from/args"},
+			env:     map[string]string{"K3S_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/args",
+		},
+		{
+			name:    "last data-dir argument wins across aliases",
+			runtime: capr.RuntimeRKE2,
+			args:    []string{"--data-dir", "/first", "-d", "/second", "--data-dir=/third"},
+			want:    "/third",
+		},
+		{
+			name:    "RKE2 defaults without configuration",
+			runtime: capr.RuntimeRKE2,
+			want:    defaultRKE2DataDirectory,
+		},
+		{
+			name:    "RKE2 environment fallback",
+			runtime: capr.RuntimeRKE2,
+			env:     map[string]string{"RKE2_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/env",
+		},
+		{
+			name:    "K3S environment fallback",
+			runtime: capr.RuntimeK3S,
+			env:     map[string]string{"K3S_DATA_DIR": "/custom/from/env"},
+			want:    "/custom/from/env",
+		},
+		{
+			name:    "K3S defaults without configuration",
+			runtime: capr.RuntimeK3S,
+			want:    defaultK3sDataDirectory,
+		},
+		{
+			name:    "RKE2 environment does not affect K3S",
+			runtime: capr.RuntimeK3S,
+			env:     map[string]string{"RKE2_DATA_DIR": "/should/be/ignored"},
+			want:    defaultK3sDataDirectory,
+		},
+		{
+			name:    "K3S environment does not affect RKE2",
+			runtime: capr.RuntimeRKE2,
+			env:     map[string]string{"K3S_DATA_DIR": "/should/be/ignored"},
+			want:    defaultRKE2DataDirectory,
+		},
+		{
+			name:    "empty environment value is ignored",
+			runtime: capr.RuntimeRKE2,
+			env:     map[string]string{"RKE2_DATA_DIR": ""},
+			want:    defaultRKE2DataDirectory,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+			annotations := map[string]string{}
+			argsAnnotation, envAnnotation := rke2NodeArgsAnnotation, rke2NodeEnvAnnotation
+			if tt.runtime == capr.RuntimeK3S {
+				argsAnnotation, envAnnotation = k3sNodeArgsAnnotation, k3sNodeEnvAnnotation
+			}
+			if tt.args != nil {
+				encoded, err := json.Marshal(tt.args)
+				assert.NoError(t, err)
+				annotations[argsAnnotation] = string(encoded)
+			}
+			if tt.env != nil {
+				encoded, err := json.Marshal(tt.env)
+				assert.NoError(t, err)
+				annotations[envAnnotation] = string(encoded)
+			}
+
+			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Name: "machine-plan", Namespace: "c-mine",
+				Labels: map[string]string{
+					planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+					planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+					planv1alpha1.MachineLifecycleNameLabel:  "node-a",
+				},
+			}}
+			nodeCache.EXPECT().Get("c-mine", "node-a").Return(&mgmtv3.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "node-a", Namespace: "c-mine"},
+				Status:     mgmtv3.NodeStatus{NodeAnnotations: annotations},
+			}, nil)
+
+			adapter := &ImportedAdapter{
+				cluster: &mgmtv3.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+					Status:     mgmtv3.ClusterStatus{Provider: tt.runtime},
+				},
+				clients: &wrangler.CAPIContext{
+					Context: &wrangler.Context{
+						Mgmt:       &stubMgmtInterface{nodeCache: nodeCache},
+						RESTMapper: &fakeRESTMapper{},
+					},
+				},
+			}
+
+			dataDir, err := adapter.DistroDataDirectory(secret)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, dataDir)
+		})
+	}
 }
 
 // --- RenderProbes ------------------------------------------------------
@@ -721,89 +974,6 @@ func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *test
 	assert.Equal(t, "/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt", scheduler.HTTPGetAction.CACert)
 }
 
-// --- importedDistroDataDirectory tests --------------------------------
-
-func TestImportedDistroDataDirectory(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		runtime string
-		args    []string
-		env     map[string]string
-		want    string
-	}{
-		{
-			name:    "RKE2 args override env",
-			runtime: capr.RuntimeRKE2,
-			args:    []string{"--data-dir", "/custom/from/args"},
-			env:     map[string]string{"RKE2_DATA_DIR": "/custom/from/env"},
-			want:    "/custom/from/args",
-		},
-		{
-			name:    "K3S args override env",
-			runtime: capr.RuntimeK3S,
-			args:    []string{"-d=/custom/from/args"},
-			env:     map[string]string{"K3S_DATA_DIR": "/custom/from/env"},
-			want:    "/custom/from/args",
-		},
-		{
-			name:    "last data-dir argument wins across aliases",
-			runtime: capr.RuntimeRKE2,
-			args:    []string{"--data-dir", "/first", "-d", "/second", "--data-dir=/third"},
-			want:    "/third",
-		},
-		{
-			name:    "RKE2 defaults correctly when no config provided",
-			runtime: capr.RuntimeRKE2,
-			want:    "/var/lib/rancher/rke2",
-		},
-		{
-			name:    "RKE2 environment fallback",
-			runtime: capr.RuntimeRKE2,
-			env:     map[string]string{"RKE2_DATA_DIR": "/custom/from/env"},
-			want:    "/custom/from/env",
-		},
-		{
-			name:    "K3S environment fallback",
-			runtime: capr.RuntimeK3S,
-			env:     map[string]string{"K3S_DATA_DIR": "/custom/from/env"},
-			want:    "/custom/from/env",
-		},
-		{
-			name:    "K3s defaults correctly when no config provided",
-			runtime: capr.RuntimeK3S,
-			want:    "/var/lib/rancher/k3s",
-		},
-		{
-			name:    "RKE2 env var does not affect K3s",
-			runtime: capr.RuntimeK3S,
-			env:     map[string]string{"RKE2_DATA_DIR": "/should/be/ignored"},
-			want:    "/var/lib/rancher/k3s",
-		},
-		{
-			name:    "K3S env var does not affect RKE2",
-			runtime: capr.RuntimeRKE2,
-			env:     map[string]string{"K3S_DATA_DIR": "/should/be/ignored"},
-			want:    "/var/lib/rancher/rke2",
-		},
-		{
-			name:    "empty env var is ignored",
-			runtime: capr.RuntimeRKE2,
-			args:    []string{"--data-dir", "/custom"},
-			env:     map[string]string{"RKE2_DATA_DIR": ""},
-			want:    "/custom",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := importedDistroDataDirectory(tt.runtime, tt.args, tt.env)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 // --- arguments tests --------------------------------
 
 func TestArgumentsLast(t *testing.T) {
@@ -859,7 +1029,7 @@ func TestArgumentsLast(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.value, newArguments(tt.args).Last(tt.names...))
+			assert.Equal(t, tt.value, arguments(tt.args).Last(tt.names...))
 		})
 	}
 }
@@ -867,7 +1037,7 @@ func TestArgumentsLast(t *testing.T) {
 func TestArgumentsValues(t *testing.T) {
 	t.Parallel()
 
-	args := newArguments([]string{
+	args := arguments([]string{
 		"--kube-scheduler-arg", "secure-port=10262",
 		"--kube-scheduler-arg=tls-cert-file=/custom/scheduler.crt",
 		"--kube-controller-manager-arg", "secure-port=10261",

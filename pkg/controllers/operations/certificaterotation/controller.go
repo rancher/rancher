@@ -348,15 +348,14 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotation
 		return status, nil
 	}
 
-	ownerKey := s.ownerKey
-	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
 	if owning {
 		if err := s.adapter.PauseCluster(false); err != nil {
 			return status, err
 		}
 	}
-	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
+	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -378,15 +377,14 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationSt
 		return status, nil
 	}
 
-	ownerKey := s.ownerKey
-	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
 	if owning {
 		if err := s.adapter.PauseCluster(false); err != nil {
 			return status, err
 		}
 	}
-	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
+	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -408,15 +406,14 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.CertificateRotatio
 		return status, nil
 	}
 
-	ownerKey := s.ownerKey
-	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
 	if owning {
 		if err := s.adapter.PauseCluster(false); err != nil {
 			return status, err
 		}
 	}
-	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
+	if owning || plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if err := plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey); err != nil {
 			return status, err
 		}
 	}
@@ -523,14 +520,12 @@ func markFailed(status *opv1alpha1.CertificateRotationStatus, reason, condMsg st
 	opv1alpha1.FailedCondition.Message(status, condMsg)
 }
 
-// operationEnv returns env vars that tie plan content to the operation UID and
-// current step. This keeps rotate plans distinct so system-agent reruns them instead
-// of reusing stale applied output.
-func operationEnv(op *opv1alpha1.CertificateRotation, step opv1alpha1.CertificateRotationStep) []string {
-	return []string{
-		fmt.Sprintf("CERTIFICATE_ROTATION_OPERATION_UID=%s", op.UID),
-		fmt.Sprintf("CERTIFICATE_ROTATION_STEP=%s", step),
-	}
+// rotationTarget pairs a selected machine-plan secret with the requested services already
+// narrowed to the ones that apply to its node, so reconcileRotate computes that narrowing once
+// per node instead of once for selection and again for plan building.
+type rotationTarget struct {
+	secret       *corev1.Secret
+	nodeServices []string
 }
 
 // servicesForNode narrows a cluster-wide service request down to the services that apply to the
@@ -554,16 +549,6 @@ func servicesForNode(adapter ops.Adapter, requested []string, secret *corev1.Sec
 		}
 	}
 	return nodeServices
-}
-
-// servicesApply reports whether at least one of the requested services is available from the
-// distro on the node described by secret. An empty request means "rotate every supported
-// certificate" and therefore applies to every node.
-func servicesApply(adapter ops.Adapter, requested []string, secret *corev1.Secret) bool {
-	if len(requested) == 0 {
-		return true
-	}
-	return len(servicesForNode(adapter, requested, secret)) > 0
 }
 
 // unsupportedServices returns the requested services that no target node's distro provides.
@@ -590,69 +575,52 @@ func unsupportedServices(adapter ops.Adapter, requested []string, targets []*cor
 	return unsupported
 }
 
-// serviceRequested reports whether service filtering includes the named service.
-func serviceRequested(requested []string, service string) bool {
-	if len(requested) == 0 {
-		return true
-	}
-	for _, requestedService := range requested {
-		if requestedService == service {
-			return true
-		}
-	}
-	return false
-}
-
 // componentCertificateCleanupInstructions builds default certificate/key cleanup
 // instructions for controller-manager and scheduler on one node. services must already be
 // narrowed to the ones that apply to secret's node.
-func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, services []string, manifestPaths ops.ManifestPaths) ([]plan.OneTimeInstruction, error) {
+func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, services []string, dataDir string, manifestPaths ops.ManifestPaths) ([]plan.OneTimeInstruction, error) {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	operationID := string(s.op.UID)
-	dataDir := s.adapter.DistroDataDirectory(secret)
-
-	controllerManagerSettings, err := s.adapter.ComponentTLSSettings(secret, ops.KubeControllerManagerProbeName)
-	if err != nil {
-		return nil, err
-	}
-	schedulerSettings, err := s.adapter.ComponentTLSSettings(secret, ops.KubeSchedulerProbeName)
-	if err != nil {
-		return nil, err
-	}
 
 	components := []struct {
 		service        string
+		probeName      string
 		certificate    string
 		certificateDir string
 		manifest       string
-		settings       ops.ComponentTLSSettings
 	}{
 		{
 			service:        "controller-manager",
+			probeName:      ops.KubeControllerManagerProbeName,
 			certificate:    ops.DefaultKubeControllerManagerCert,
 			certificateDir: ops.DefaultKubeControllerManagerCertDir,
 			manifest:       "kube-controller-manager.yaml",
-			settings:       controllerManagerSettings,
 		},
 		{
 			service:        "scheduler",
+			probeName:      ops.KubeSchedulerProbeName,
 			certificate:    ops.DefaultKubeSchedulerCert,
 			certificateDir: ops.DefaultKubeSchedulerCertDir,
 			manifest:       "kube-scheduler.yaml",
-			settings:       schedulerSettings,
 		},
 	}
 
 	instructions := []plan.OneTimeInstruction{}
 	for _, component := range components {
 		// A service-filtered operation must not restart or remove certificates for
-		// components that were not selected by the caller.
-		if !serviceRequested(services, component.service) {
+		// components that were not selected by the caller. Check this before reading the
+		// component's TLS settings, since an unselected component's settings are irrelevant.
+		if len(services) > 0 && !slices.Contains(services, component.service) {
 			continue
+		}
+
+		settings, err := s.adapter.ComponentTLSSettings(secret, component.probeName)
+		if err != nil {
+			return nil, err
 		}
 		// An explicit TLS pair is the component's active serving certificate. The
 		// default generated paths are not used in that configuration.
-		if component.settings.HasCompleteTLSConfig() {
+		if settings.HasCompleteTLSConfig() {
 			continue
 		}
 
@@ -677,24 +645,22 @@ func componentCertificateCleanupInstructions(s *scope, secret *corev1.Secret, se
 	return instructions, nil
 }
 
-// certificateRotationStopInstructions stops the runtime server before its certificates are
-// changed. Keeping this as a discrete idempotent action makes retries safe.
-func certificateRotationStopInstructions(provisioningDir, operationID, serverUnit string, env []string) []plan.OneTimeInstruction {
-	return []plan.OneTimeInstruction{
-		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/stop", operationID, "systemctl", []string{"stop", serverUnit}, env),
-	}
-}
-
 // certificateRotationRuntimeInstructions invokes the runtime's certificate rotation command.
-// An empty services slice deliberately rotates every service supported by the runtime.
-func certificateRotationRuntimeInstructions(provisioningDir, operationID, runtime, dataDir string, services []string, env []string) []plan.OneTimeInstruction {
+// An empty services slice deliberately rotates every service supported by the runtime. This
+// helper takes scope directly because it needs several scope-derived values (provisioning
+// directory, operation UID, runtime command) alongside the node-specific arguments.
+func certificateRotationRuntimeInstructions(s *scope, secret *corev1.Secret, dataDir string, services []string) []plan.OneTimeInstruction {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	operationID := string(s.op.UID)
+	runtimeCommand := s.adapter.RuntimeCommand()
+
 	args := []string{"certificate", "rotate", "--data-dir", dataDir}
 	for _, service := range services {
 		args = append(args, "-s", service)
 	}
 
 	return []plan.OneTimeInstruction{
-		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rotate", operationID, runtime, args, env),
+		ops.IdempotentInstruction(provisioningDir, "certificate-rotation/rotate", operationID, runtimeCommand, args, nil),
 	}
 }
 
@@ -774,12 +740,16 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		return status, nil
 	}
 
-	// Keep only the nodes whose distro exposes at least one requested service.
-	targets := make([]*corev1.Secret, 0, len(candidates))
+	// Narrow the requested services to each candidate's own node once, keeping only the nodes
+	// that have at least one applicable service. An empty request applies to every node and
+	// keeps the "rotate everything" runtime behavior via a nil per-node service slice.
+	targets := make([]rotationTarget, 0, len(candidates))
 	for _, secret := range candidates {
-		if servicesApply(s.adapter, requested, secret) {
-			targets = append(targets, secret)
+		nodeServices := servicesForNode(s.adapter, requested, secret)
+		if len(requested) > 0 && len(nodeServices) == 0 {
+			continue
 		}
+		targets = append(targets, rotationTarget{secret: secret, nodeServices: nodeServices})
 	}
 
 	if len(targets) == 0 {
@@ -788,11 +758,21 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		return status, nil
 	}
 
-	// Pass the operation identity to runtime instructions so their execution is
-	// associated with this rotation attempt and step.
-	env := operationEnv(s.op, status.Step)
+	// Tie plan content to this operation and step so the system-agent reruns rotated plans
+	// instead of reusing stale applied output. Applied only when a plan is assigned, below.
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
-	for _, secret := range targets {
+	for _, target := range targets {
+		secret := target.secret
+
+		var dataDir string
+		if ops.IsControlPlane(secret) || ops.IsEtcd(secret) {
+			dataDir, err = s.adapter.DistroDataDirectory(secret)
+			if err != nil {
+				return status, err
+			}
+		}
+
 		// Plans are processed serially. Returning while one plan is waiting ensures
 		// the next node is not disrupted until this node has applied and passed probes.
 		probes, err := s.adapter.RenderProbes(secret, true)
@@ -802,9 +782,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 		runtime := s.adapter.RuntimeCommand()
 		runtimeService := s.adapter.RuntimeService(secret)
-		// A request can be valid across the cluster while spanning multiple node roles, so
-		// each server must only be told to rotate the services that apply to it.
-		nodeServices := servicesForNode(s.adapter, requested, secret)
 
 		var nodePlan plan.Plan
 
@@ -812,16 +789,17 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 			// Server nodes own control-plane or etcd certificates. Stop the server
 			// before rotating them, then restart it after all required cleanup.
 			provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
-			dataDir := s.adapter.DistroDataDirectory(secret)
-			manifestPaths := s.adapter.DistroManifestPaths(secret)
+			manifestPaths := s.adapter.DistroManifestPaths(dataDir)
 			files := []plan.File{ops.IdempotentScriptFile(provisioningDir)}
-			oneTime := certificateRotationStopInstructions(provisioningDir, string(s.op.UID), runtimeService, env)
 			// Keep stop and rotate as separate idempotent instructions. A retry can
 			// resume safely without rerunning an instruction already applied by the agent.
-			oneTime = append(oneTime, certificateRotationRuntimeInstructions(provisioningDir, string(s.op.UID), runtime, dataDir, nodeServices, env)...)
+			oneTime := []plan.OneTimeInstruction{
+				ops.IdempotentInstruction(provisioningDir, "certificate-rotation/stop", string(s.op.UID), "systemctl", []string{"stop", runtimeService}, nil),
+			}
+			oneTime = append(oneTime, certificateRotationRuntimeInstructions(s, secret, dataDir, target.nodeServices)...)
 
 			if ops.IsControlPlane(secret) {
-				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret, nodeServices, manifestPaths)
+				cleanupInstructions, err := componentCertificateCleanupInstructions(s, secret, target.nodeServices, dataDir, manifestPaths)
 				if err != nil {
 					return status, err
 				}
@@ -869,7 +847,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 		// AssignPlan updates this machine-plan secret and returns the agent's latest
 		// applied status for the same plan. A later reconcile continues from that status.
-		planStatus, err := h.store.AssignPlan(secret, &nodePlan, 0, 0)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(&nodePlan, opEnv), 0, 0)
 		if err != nil {
 			return status, err
 		}

@@ -1,7 +1,9 @@
 package certificaterotation
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
@@ -30,18 +32,23 @@ type stubAdapter struct {
 	controllerManager ops.ComponentTLSSettings
 	scheduler         ops.ComponentTLSSettings
 	settingsErr       error
+	settingsCalls     []string
+	dataDirErr        error
 	pauseCalls        []bool
 }
 
-func (a *stubAdapter) RuntimeCommand() string                      { return a.runtime }
-func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string { return a.dataDir }
+func (a *stubAdapter) RuntimeCommand() string { return a.runtime }
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return a.dataDir, a.dataDirErr
+}
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 	return a.provisioningDir
 }
-func (a *stubAdapter) DistroManifestPaths(secret *corev1.Secret) ops.ManifestPaths {
-	return ops.DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
+func (a *stubAdapter) DistroManifestPaths(dataDir string) ops.ManifestPaths {
+	return ops.DistroManifestPaths(a.RuntimeCommand(), dataDir)
 }
 func (a *stubAdapter) ComponentTLSSettings(_ *corev1.Secret, component string) (ops.ComponentTLSSettings, error) {
+	a.settingsCalls = append(a.settingsCalls, component)
 	if a.settingsErr != nil {
 		return ops.ComponentTLSSettings{}, a.settingsErr
 	}
@@ -80,7 +87,9 @@ func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string { return "" }
 func (a *stubAdapter) RenderProbes(*corev1.Secret, bool) (map[string]plan.Probe, error) {
 	return map[string]plan.Probe{}, nil
 }
-func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return "" }
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) (string, error) {
+	return "", nil
+}
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return "" }
 func (a *stubAdapter) FindOrElectLeader(string, ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
@@ -270,7 +279,7 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 				adapter: adapter,
 			}
 
-			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, tt.services, adapter.DistroManifestPaths(&corev1.Secret{}))
+			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, tt.services, adapter.dataDir, adapter.DistroManifestPaths(adapter.dataDir))
 			assert.NoError(t, err)
 			assert.Len(t, instructions, len(tt.expected))
 			for i, instruction := range instructions {
@@ -297,9 +306,34 @@ func TestComponentCertificateCleanupInstructions_AdapterError(t *testing.T) {
 		},
 	}
 
-	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, nil, s.adapter.DistroManifestPaths(&corev1.Secret{}))
+	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, nil, "/var/lib/rancher/rke2", s.adapter.DistroManifestPaths("/var/lib/rancher/rke2"))
 	assert.Nil(t, instructions)
 	assert.EqualError(t, err, "settings failed")
+}
+
+func TestComponentCertificateCleanupInstructions_SkipsUnselectedComponentBeforeReadingSettings(t *testing.T) {
+	t.Parallel()
+
+	adapter := &stubAdapter{
+		runtime:         capr.RuntimeRKE2,
+		dataDir:         "/var/lib/rancher/rke2",
+		provisioningDir: "/var/lib/rancher/capr",
+		settingsErr:     errors.New("settings failed"),
+	}
+	s := &scope{
+		op: &opv1alpha1.CertificateRotation{
+			ObjectMeta: metav1.ObjectMeta{UID: "operation"},
+		},
+		adapter: adapter,
+	}
+
+	// Only "etcd" is requested, so neither controller-manager nor scheduler is selected.
+	// Their TLS settings must never be fetched — otherwise the configured settingsErr would
+	// surface here even though neither component is relevant to this request.
+	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, []string{"etcd"}, adapter.dataDir, adapter.DistroManifestPaths(adapter.dataDir))
+	assert.NoError(t, err)
+	assert.Empty(t, instructions)
+	assert.Empty(t, adapter.settingsCalls)
 }
 
 func TestWindowsIdempotentRestartInstructions_UsesPassedRuntime(t *testing.T) {
@@ -307,15 +341,41 @@ func TestWindowsIdempotentRestartInstructions_UsesPassedRuntime(t *testing.T) {
 
 	instructions := windowsIdempotentRestartInstructions("certificate-rotation/restart", "operation", capr.RuntimeK3S)
 	assert.Len(t, instructions, 1)
-	assert.Contains(t, instructions[0].Args, capr.RuntimeK3S)
+
+	instr := instructions[0]
+	assert.Equal(t, "powershell.exe", instr.Command)
+	assert.Contains(t, instr.Args, windowsIdempotentScriptPath)
+	assert.Contains(t, instr.Args, windowsIdempotencyRoot)
+	assert.Contains(t, instr.Args, "restart-service")
+	assert.Contains(t, instr.Args, capr.RuntimeK3S)
+
+	// Same inputs must always produce the same idempotency name, so a retry recognizes an
+	// already-applied instruction instead of re-running it.
+	again := windowsIdempotentRestartInstructions("certificate-rotation/restart", "operation", capr.RuntimeK3S)
+	assert.Equal(t, instr.Name, again[0].Name)
+
+	// A different value (operation UID) must produce a different idempotency name, so a new
+	// operation's plan is not mistaken for one already applied.
+	other := windowsIdempotentRestartInstructions("certificate-rotation/restart", "other-operation", capr.RuntimeK3S)
+	assert.NotEqual(t, instr.Name, other[0].Name)
 }
 
 func TestCertificateRotationRuntimeInstructions_CustomDataDirWithServices(t *testing.T) {
 	t.Parallel()
 
+	s := &scope{
+		op: &opv1alpha1.CertificateRotation{
+			ObjectMeta: metav1.ObjectMeta{UID: "operation"},
+		},
+		adapter: &stubAdapter{
+			runtime:         capr.RuntimeRKE2,
+			provisioningDir: "/var/lib/rancher/capr",
+		},
+	}
+	secret := &corev1.Secret{}
+
 	instructions := certificateRotationRuntimeInstructions(
-		"/var/lib/rancher/capr", "operation", capr.RuntimeRKE2, "/custom/data-dir",
-		[]string{"etcd", "api-server"}, nil)
+		s, secret, "/custom/data-dir", []string{"etcd", "api-server"})
 	assert.Len(t, instructions, 1)
 
 	args := instructions[0].Args
@@ -334,9 +394,19 @@ func TestCertificateRotationRuntimeInstructions_CustomDataDirWithServices(t *tes
 func TestCertificateRotationRuntimeInstructions_CustomDataDirNoServices(t *testing.T) {
 	t.Parallel()
 
+	s := &scope{
+		op: &opv1alpha1.CertificateRotation{
+			ObjectMeta: metav1.ObjectMeta{UID: "operation"},
+		},
+		adapter: &stubAdapter{
+			runtime:         capr.RuntimeRKE2,
+			provisioningDir: "/var/lib/rancher/capr",
+		},
+	}
+	secret := &corev1.Secret{}
+
 	instructions := certificateRotationRuntimeInstructions(
-		"/var/lib/rancher/capr", "operation", capr.RuntimeRKE2, "/custom/data-dir",
-		nil, nil)
+		s, secret, "/custom/data-dir", nil)
 	assert.Len(t, instructions, 1)
 
 	args := instructions[0].Args
@@ -369,38 +439,6 @@ func TestManifestRemovalInstructions_DataDirWithSpacesIsNotInterpolated(t *testi
 
 	for _, arg := range args[:len(args)-1] {
 		assert.NotContains(t, arg, dataDir, "shell script/command arguments must not embed the data directory")
-	}
-}
-
-func TestServicesApply(t *testing.T) {
-	t.Parallel()
-
-	controlPlane := certificateRotationSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
-	etcd := certificateRotationSecret(map[string]string{capr.EtcdRoleLabel: "true"})
-	worker := certificateRotationSecret(map[string]string{capr.WorkerRoleLabel: "true"})
-	adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
-
-	tests := []struct {
-		name     string
-		services []string
-		secret   *corev1.Secret
-		want     bool
-	}{
-		{name: "all services includes every node", secret: worker, want: true},
-		{name: "scheduler selects control plane", services: []string{"scheduler"}, secret: controlPlane, want: true},
-		{name: "scheduler excludes worker", services: []string{"scheduler"}, secret: worker},
-		{name: "etcd selects etcd", services: []string{"etcd"}, secret: etcd, want: true},
-		{name: "etcd excludes worker", services: []string{"etcd"}, secret: worker},
-		{name: "supervisor selects control plane", services: []string{"supervisor"}, secret: controlPlane, want: true},
-		{name: "supervisor selects etcd", services: []string{"supervisor"}, secret: etcd, want: true},
-		{name: "supervisor excludes worker", services: []string{"supervisor"}, secret: worker},
-		{name: "kubelet selects worker", services: []string{"kubelet"}, secret: worker, want: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, servicesApply(adapter, tt.services, tt.secret))
-		})
 	}
 }
 
@@ -551,4 +589,118 @@ func TestReconcileRotate_UnsupportedServiceFailsBeforePlanAssignment(t *testing.
 	assert.Equal(t, opv1alpha1.OperationPhaseFailed, got.Phase)
 	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.FailedCondition.GetReason(&got))
 	assert.Contains(t, opv1alpha1.FailedCondition.GetMessage(&got), "rke2-server")
+}
+
+func TestReconcileRotate_DataDirectoryErrorReturnsBeforePlanAssignment(t *testing.T) {
+	t.Parallel()
+
+	dataDirErr := errors.New("data directory unavailable")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cp-1", Namespace: "fleet-default",
+			Labels: map[string]string{
+				capr.ClusterNameLabel:      "test",
+				capr.ControlPlaneRoleLabel: "true",
+			},
+		},
+		Type: plan.SecretTypeMachinePlan,
+	}
+	ctrl := gomock.NewController(t)
+	secrets := ctrlfake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secrets.EXPECT().List(gomock.Any(), gomock.Any()).Return(&corev1.SecretList{Items: []corev1.Secret{*secret}}, nil)
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetName("test")
+	h := &handler{secrets: secrets}
+	status := opv1alpha1.CertificateRotationStatus{}
+	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
+	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
+
+	got, err := h.reconcileRotate(&scope{
+		op: &opv1alpha1.CertificateRotation{
+			ObjectMeta: metav1.ObjectMeta{UID: "operation"},
+		},
+		namespace:  "fleet-default",
+		clusterObj: cluster,
+		adapter: &stubAdapter{
+			runtime:    capr.RuntimeRKE2,
+			dataDirErr: dataDirErr,
+		},
+	}, status)
+	assert.ErrorIs(t, err, dataDirErr)
+	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, got.Phase)
+}
+
+func TestReconcileRotate_AssignedPlanCarriesOperationEnvOnce(t *testing.T) {
+	t.Parallel()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cp-1",
+			Namespace: "fleet-default",
+			UID:       "cp-1-uid",
+			Labels: map[string]string{
+				capr.ClusterNameLabel:      "test",
+				capr.ControlPlaneRoleLabel: "true",
+			},
+		},
+		Type: plan.SecretTypeMachinePlan,
+	}
+
+	ctrl := gomock.NewController(t)
+	secrets := ctrlfake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secrets.EXPECT().List(gomock.Any(), gomock.Any()).Return(&corev1.SecretList{Items: []corev1.Secret{*secret}}, nil)
+
+	var assigned *corev1.Secret
+	secrets.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+		assigned = s
+		return s, nil
+	})
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetName("test")
+
+	h := &handler{secrets: secrets, store: plan.NewStore(secrets)}
+
+	op := &opv1alpha1.CertificateRotation{
+		ObjectMeta: metav1.ObjectMeta{UID: "operation-uid"},
+	}
+
+	status := opv1alpha1.CertificateRotationStatus{}
+	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
+	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
+
+	s := &scope{
+		op:         op,
+		namespace:  "fleet-default",
+		clusterObj: cluster,
+		adapter: &stubAdapter{
+			runtime:         capr.RuntimeRKE2,
+			dataDir:         "/var/lib/rancher/rke2",
+			provisioningDir: "/var/lib/rancher/capr",
+		},
+	}
+
+	got, err := h.reconcileRotate(s, status)
+	assert.NoError(t, err)
+	assert.NotEqual(t, opv1alpha1.OperationPhaseFailed, got.Phase)
+
+	if !assert.NotNil(t, assigned, "AssignPlan must have been called") {
+		return
+	}
+
+	var assignedPlan plan.Plan
+	assert.NoError(t, json.Unmarshal(assigned.Data["plan"], &assignedPlan))
+	assert.NotEmpty(t, assignedPlan.OneTimeInstructions)
+
+	wantEnv := fmt.Sprintf("CERTIFICATE_ROTATION_OPERATION_UID=%s", op.UID)
+	for _, instr := range assignedPlan.OneTimeInstructions {
+		count := 0
+		for _, e := range instr.Env {
+			if e == wantEnv {
+				count++
+			}
+		}
+		assert.Equal(t, 1, count, "instruction %q must carry the operation env exactly once", instr.Name)
+	}
 }

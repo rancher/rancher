@@ -45,10 +45,10 @@ func (a *stubAdapter) RuntimeCommand() string {
 	return "rke2"
 }
 
-func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string {
-	return "/var/lib/rancher/rke2"
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return "/var/lib/rancher/rke2", nil
 }
-func (a *stubAdapter) DistroManifestPaths(_ *corev1.Secret) ops.ManifestPaths {
+func (a *stubAdapter) DistroManifestPaths(_ string) ops.ManifestPaths {
 	return ops.ManifestPaths{}
 }
 
@@ -71,8 +71,8 @@ func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan
 	return map[string]rkeplan.Probe{}, nil
 }
 
-func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string {
-	return "/var/lib/rancher/rke2/bin/kubectl"
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) (string, error) {
+	return "/var/lib/rancher/rke2/bin/kubectl", nil
 }
 
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string {

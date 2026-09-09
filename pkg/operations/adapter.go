@@ -197,10 +197,10 @@ type Adapter interface {
 	DistroServices(secret *corev1.Secret) []string
 
 	// DistroDataDirectory returns the path to the RKE2/K3s data-dir on the host machine.
-	DistroDataDirectory(secret *corev1.Secret) string
+	DistroDataDirectory(secret *corev1.Secret) (string, error)
 
-	// DistroManifestPaths returns runtime-owned manifest locations for the node.
-	DistroManifestPaths(secret *corev1.Secret) ManifestPaths
+	// DistroManifestPaths returns runtime-owned manifest locations for dataDir.
+	DistroManifestPaths(dataDir string) ManifestPaths
 
 	// ProvisioningDataDirectory returns the path to the data directory used for operations.
 	// Scripts created for commands are typically stored here.
@@ -223,7 +223,7 @@ type Adapter interface {
 	ComponentTLSSettings(secret *corev1.Secret, component string) (ComponentTLSSettings, error)
 
 	// KubectlPath returns the path to the kubectl binary on the host relative to the machine-plan secret.
-	KubectlPath(secret *corev1.Secret) string
+	KubectlPath(secret *corev1.Secret) (string, error)
 
 	// KubeconfigPath returns the path to the kubeconfig file on the host relative to the machine-plan secret.
 	KubeconfigPath(secret *corev1.Secret) string

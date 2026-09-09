@@ -606,23 +606,27 @@ func splitArgKeyVal(val string, delim string) (string, string) {
 	return "", ""
 }
 
-func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) string {
-	return capr.GetDistroDataDir(a.controlPlane)
+func (a *CAPRAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return capr.GetDistroDataDir(a.controlPlane), nil
 }
 
-func (a *CAPRAdapter) DistroManifestPaths(secret *corev1.Secret) ManifestPaths {
-	return DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
+func (a *CAPRAdapter) DistroManifestPaths(dataDir string) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), dataDir)
 }
 
 func (a *CAPRAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 	return capr.GetProvisioningDataDir(&a.controlPlane.Spec.ClusterConfiguration)
 }
 
-func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) string {
+func (a *CAPRAdapter) KubectlPath(secret *corev1.Secret) (string, error) {
 	if a.RuntimeCommand() == "k3s" {
-		return "/usr/local/bin/kubectl"
+		return "/usr/local/bin/kubectl", nil
 	}
-	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dataDir, "bin", "kubectl"), nil
 }
 
 func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {

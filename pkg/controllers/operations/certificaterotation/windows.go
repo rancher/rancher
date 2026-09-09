@@ -66,46 +66,41 @@ if ($currentAttempt -ne $env:CATTLE_AGENT_ATTEMPT_NUMBER) {
 }
 `
 
-// windowsIdempotentActionScriptPath returns the on-node script path.
-func windowsIdempotentActionScriptPath() string {
-	return windowsIdempotentScriptPath
-}
-
 // windowsIdempotentScriptFile returns the embedded idempotent helper script.
 func windowsIdempotentScriptFile() plan.File {
 	return plan.File{
 		Content: base64.StdEncoding.EncodeToString([]byte(windowsIdempotentActionScript)),
-		Path:    windowsIdempotentActionScriptPath(),
+		Path:    windowsIdempotentScriptPath,
 		Dynamic: true,
 		Minor:   true,
 	}
 }
 
-// windowsIdempotentInstruction creates a one-time instruction that runs the Windows idempotent action script.
-func windowsIdempotentInstruction(identifier, value, command string, args []string, env []string) plan.OneTimeInstruction {
+// windowsIdempotentRestartInstructions builds an idempotent restart instruction for a Windows
+// service, running the embedded idempotent action script via powershell.exe.
+func windowsIdempotentRestartInstructions(identifier, value, service string) []plan.OneTimeInstruction {
+	identifier += "-restart"
+	command := "restart-service"
+	args := []string{service}
+
 	hashedCommand := plan.PlanHash([]byte(command))
 	hashedValue := plan.PlanHash([]byte(value))
 
-	return plan.OneTimeInstruction{
-		CommonInstruction: plan.CommonInstruction{
-			Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
-			Command: "powershell.exe",
-			Args: append([]string{
-				windowsIdempotentActionScriptPath(),
-				strings.ToLower(identifier),
-				hashedValue,
-				hashedCommand,
-				command,
-				windowsIdempotencyRoot,
-			}, args...),
-			Env: env,
-		},
-	}
-}
-
-// windowsIdempotentRestartInstructions builds idempotent restart instructions for a Windows service.
-func windowsIdempotentRestartInstructions(identifier, value, service string) []plan.OneTimeInstruction {
 	return []plan.OneTimeInstruction{
-		windowsIdempotentInstruction(identifier+"-restart", value, "restart-service", []string{service}, []string{}),
+		{
+			CommonInstruction: plan.CommonInstruction{
+				Name:    fmt.Sprintf("idempotent-%s-%s-%s", identifier, hashedValue, hashedCommand),
+				Command: "powershell.exe",
+				Args: append([]string{
+					windowsIdempotentScriptPath,
+					strings.ToLower(identifier),
+					hashedValue,
+					hashedCommand,
+					command,
+					windowsIdempotencyRoot,
+				}, args...),
+				Env: []string{},
+			},
+		},
 	}
 }

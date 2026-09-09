@@ -1,13 +1,20 @@
 package operations
 
 import (
+	"errors"
 	"testing"
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
 	"github.com/rancher/rancher/pkg/capr"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/wrangler"
+	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // --- RuntimeService ---------------------------------------------------------------------------
@@ -261,4 +268,76 @@ func TestCAPRKE2Adapter_extraArgsFor(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// --- DistroDataDirectory ---------------------------------------------------------------------
+
+func TestCAPRKE2Adapter_DistroDataDirectory_MachineLookupFailure(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+	machineCache.EXPECT().Get("fleet-default", "machine-a").Return(nil, errors.New("boom"))
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "fleet-default",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "machine-a",
+			},
+		},
+	}
+
+	adapter := &CAPRKE2Adapter{
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				RESTMapper: &fakeRESTMapper{},
+			},
+			CAPI: &stubCAPIInterface{machineCache: machineCache},
+		},
+	}
+
+	dir, err := adapter.DistroDataDirectory(secret)
+	assert.Error(t, err)
+	assert.Empty(t, dir)
+	assert.NotEqual(t, "/var/lib/rancher/rke2", dir)
+}
+
+func TestCAPRKE2Adapter_DistroDataDirectory_IncompleteBootstrapConfigRef(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+	machineCache.EXPECT().Get("fleet-default", "machine-a").Return(&capi.Machine{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine-a", Namespace: "fleet-default"},
+	}, nil)
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "fleet-default",
+			Labels: map[string]string{
+				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  "machine-a",
+			},
+		},
+	}
+
+	adapter := &CAPRKE2Adapter{
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				RESTMapper: &fakeRESTMapper{},
+			},
+			CAPI: &stubCAPIInterface{machineCache: machineCache},
+		},
+	}
+
+	dir, err := adapter.DistroDataDirectory(secret)
+	assert.Error(t, err)
+	assert.Empty(t, dir)
+	assert.NotEqual(t, "/var/lib/rancher/rke2", dir)
 }

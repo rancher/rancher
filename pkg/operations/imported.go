@@ -379,14 +379,9 @@ func (a *ImportedAdapter) nodeArgs(secret *corev1.Secret) ([]string, error) {
 	return nodeArgsForRuntime(node, a.RuntimeCommand())
 }
 
-// arguments is an ordered command-line argument list. It is a lightweight view
-// over the supplied slice; newArguments does not copy the values.
+// arguments is an ordered command-line argument list. It is a lightweight view over the
+// supplied slice — converting a []string to arguments does not copy the values.
 type arguments []string
-
-// newArguments creates an arguments view for querying command-line options.
-func newArguments(args []string) arguments {
-	return arguments(args)
-}
 
 // Last returns the last non-empty value supplied for any exact option name, or
 // an empty string when none has a value. It accepts both split (--option value)
@@ -431,61 +426,44 @@ func (a arguments) Values(name string) []string {
 	return values
 }
 
-// importedDistroDataDirectory returns the data directory for an imported cluster
-// using runtime-specific precedence rules.
-func importedDistroDataDirectory(runtime string, args []string, env map[string]string) string {
-	// Command-line arguments override the runtime environment fallback.
-	if dataDir := newArguments(args).Last("--data-dir", "-d"); dataDir != "" {
-		return dataDir
-	}
-
-	if runtime == capr.RuntimeRKE2 {
-		if dir := env["RKE2_DATA_DIR"]; dir != "" {
-			return dir
-		}
-	} else if runtime == capr.RuntimeK3S {
-		if dir := env["K3S_DATA_DIR"]; dir != "" {
-			return dir
-		}
-	}
-
-	// Fall back to runtime default.
-	if runtime == capr.RuntimeRKE2 {
-		return defaultRKE2DataDirectory
-	}
-	return defaultK3sDataDirectory
-}
-
-func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) string {
+func (a *ImportedAdapter) DistroDataDirectory(secret *corev1.Secret) (string, error) {
 	runtime := a.RuntimeCommand()
-	defaultDir := defaultRKE2DataDirectory
-	if runtime == capr.RuntimeK3S {
-		defaultDir = defaultK3sDataDirectory
-	}
 
 	node, err := a.managementNodeForSecret(secret)
 	if err != nil {
-		logrus.Debugf("[imported adapter] unable to read node configuration for %s/%s, using default data directory: %v", secret.Namespace, secret.Name, err)
-		return defaultDir
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
+	}
+	if node == nil {
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: no management node found", secret.Namespace, secret.Name)
 	}
 
 	args, err := nodeArgsForRuntime(node, runtime)
 	if err != nil {
-		logrus.Debugf("[imported adapter] unable to parse node args for %s/%s, using default data directory: %v", secret.Namespace, secret.Name, err)
-		return defaultDir
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
+	}
+	if dataDir := arguments(args).Last("--data-dir", "-d"); dataDir != "" {
+		return dataDir, nil
 	}
 
 	env, err := nodeEnvForRuntime(node, runtime)
 	if err != nil {
-		logrus.Debugf("[imported adapter] unable to parse node env for %s/%s, using default data directory: %v", secret.Namespace, secret.Name, err)
-		return defaultDir
+		return "", fmt.Errorf("resolving data directory for machine-plan secret %s/%s: %w", secret.Namespace, secret.Name, err)
 	}
 
-	return importedDistroDataDirectory(runtime, args, env)
+	if runtime == capr.RuntimeRKE2 {
+		if dataDir := env["RKE2_DATA_DIR"]; dataDir != "" {
+			return dataDir, nil
+		}
+		return defaultRKE2DataDirectory, nil
+	}
+	if dataDir := env["K3S_DATA_DIR"]; dataDir != "" {
+		return dataDir, nil
+	}
+	return defaultK3sDataDirectory, nil
 }
 
-func (a *ImportedAdapter) DistroManifestPaths(secret *corev1.Secret) ManifestPaths {
-	return DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
+func (a *ImportedAdapter) DistroManifestPaths(dataDir string) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), dataDir)
 }
 
 // componentTLSSettingsFromNodeArgs extracts scheduler/controller-manager
@@ -501,7 +479,7 @@ func componentTLSSettingsFromNodeArgs(args []string, component string) Component
 		return ComponentTLSSettings{}
 	}
 
-	innerArgs := newArguments(args).Values(outer)
+	innerArgs := arguments(args).Values(outer)
 
 	var settings ComponentTLSSettings
 	for _, arg := range innerArgs {
@@ -533,15 +511,16 @@ func (a *ImportedAdapter) ComponentTLSSettings(secret *corev1.Secret, component 
 
 // renderSecureProbeFromSettings applies TLS certificate and secure-port settings parsed from an
 // imported node's runtime arguments. RenderProbes reads node args once and reuses the parsed
-// settings for both component probes.
-func renderSecureProbeFromSettings(settings ComponentTLSSettings, probe plan.Probe, dataDir, loopbackAddress, defaultSecurePort, defaultCertDir, defaultCert string) (plan.Probe, error) {
+// settings for both component probes. fallbackCertPath is used only when settings has no
+// explicit TLS cert file configured.
+func renderSecureProbeFromSettings(settings ComponentTLSSettings, probe plan.Probe, loopbackAddress, defaultSecurePort, fallbackCertPath string) (plan.Probe, error) {
 	securePort := settings.SecurePort
 	if securePort == "" {
 		securePort = defaultSecurePort
 	}
 	tlsCert := settings.TLSCertFile
 	if tlsCert == "" {
-		tlsCert = path.Join(dataDir, defaultCertDir, defaultCert)
+		tlsCert = fallbackCertPath
 	}
 	return ReplaceCACertAndPortForProbes(probe, tlsCert, loopbackAddress, securePort)
 }
@@ -577,7 +556,10 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		probes[probeName] = AllProbes[probeName]
 	}
 
-	dataDir := a.DistroDataDirectory(secret)
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
 
 	// only support ipv4, need to implement per-node extraction mechanism
 	loopbackAddress := "127.0.0.1"
@@ -604,15 +586,17 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 			return probes, err
 		}
 
+		kcmFallbackCertPath := path.Join(dataDir, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		kcmSettings := componentTLSSettingsFromNodeArgs(args, KubeControllerManagerProbeName)
-		kcmProbe, err := renderSecureProbeFromSettings(kcmSettings, probes[KubeControllerManagerProbeName], dataDir, loopbackAddress, DefaultKubeControllerManagerPort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmProbe, err := renderSecureProbeFromSettings(kcmSettings, probes[KubeControllerManagerProbeName], loopbackAddress, DefaultKubeControllerManagerPort, kcmFallbackCertPath)
 		if err != nil {
 			return probes, err
 		}
 		probes[KubeControllerManagerProbeName] = kcmProbe
 
+		ksFallbackCertPath := path.Join(dataDir, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		ksSettings := componentTLSSettingsFromNodeArgs(args, KubeSchedulerProbeName)
-		ksProbe, err := renderSecureProbeFromSettings(ksSettings, probes[KubeSchedulerProbeName], dataDir, loopbackAddress, DefaultKubeSchedulerPort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbeFromSettings(ksSettings, probes[KubeSchedulerProbeName], loopbackAddress, DefaultKubeSchedulerPort, ksFallbackCertPath)
 		if err != nil {
 			return probes, err
 		}
@@ -707,11 +691,15 @@ func (a *ImportedAdapter) FindOrElectLeader(operation string, filter Filter) (*c
 	return nil, nil
 }
 
-func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) string {
+func (a *ImportedAdapter) KubectlPath(secret *corev1.Secret) (string, error) {
 	if a.RuntimeCommand() == capr.RuntimeK3S {
-		return "/usr/local/bin/kubectl"
+		return "/usr/local/bin/kubectl", nil
 	}
-	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dataDir, "bin", "kubectl"), nil
 }
 
 func (a *ImportedAdapter) KubeconfigPath(_ *corev1.Secret) string {

@@ -300,7 +300,10 @@ func (a *CAPRKE2Adapter) RenderProbes(secret *corev1.Secret, supervisor bool) (m
 		probes[probeName] = AllProbes[probeName]
 	}
 
-	dataDir := a.DistroDataDirectory(secret)
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
 	loopbackAddress := a.LoopbackAddress(secret)
 
 	// Supervisor probe has a multi-arg URL format; build separately so the standard format
@@ -466,58 +469,56 @@ func (a *CAPRKE2Adapter) clearLeaderAnnotation(secret *corev1.Secret, operation 
 //  2. Read the Machine's bootstrap configRef to find the bootstrap RKE2Config object.
 //  3. Read `RKE2Config.Spec.AgentConfig.DataDir`.
 //
-// If any step fails (machine still bootstrapping, configRef not yet populated, etc.) we log and
-// fall back to the runtime default `/var/lib/rancher/rke2`. The interface signature doesn't
-// allow returning an error, and returning the default is the only safe behaviour for callers
-// that may invoke this method during reconciles where the cluster is still settling.
-func (a *CAPRKE2Adapter) DistroDataDirectory(secret *corev1.Secret) string {
-	if dir := a.bootstrapDataDir(secret); dir != "" {
-		return dir
+// If any step fails, this returns an error so the caller can retry later rather than guessing a
+// path. Only once the lookup succeeds and AgentConfig.DataDir is empty do we return the runtime
+// default `/var/lib/rancher/rke2`.
+func (a *CAPRKE2Adapter) DistroDataDirectory(secret *corev1.Secret) (string, error) {
+	dir, err := a.bootstrapDataDir(secret)
+	if err != nil {
+		return "", fmt.Errorf("resolving bootstrap data directory: %w", err)
 	}
-	return path.Join("/var/lib/rancher", capr.RuntimeRKE2)
+	if dir != "" {
+		return dir, nil
+	}
+	return path.Join("/var/lib/rancher", capr.RuntimeRKE2), nil
 }
 
-func (a *CAPRKE2Adapter) DistroManifestPaths(secret *corev1.Secret) ManifestPaths {
-	return DistroManifestPaths(a.RuntimeCommand(), a.DistroDataDirectory(secret))
+func (a *CAPRKE2Adapter) DistroManifestPaths(dataDir string) ManifestPaths {
+	return DistroManifestPaths(a.RuntimeCommand(), dataDir)
 }
 
-// bootstrapDataDir resolves Secret → CAPI Machine → RKE2Config → AgentConfig.DataDir. Returns
-// the empty string on any miss; callers should fall back to the runtime default.
-func (a *CAPRKE2Adapter) bootstrapDataDir(secret *corev1.Secret) string {
+// bootstrapDataDir resolves Secret → CAPI Machine → RKE2Config → AgentConfig.DataDir. An empty
+// string is only ever returned alongside a nil error once the RKE2Config was actually read and
+// its AgentConfig.DataDir was empty. Any failure to resolve or read the configuration — including
+// a machine with no complete bootstrap ConfigRef yet — is returned as an error so the caller
+// retries later instead of treating an unresolved configuration as "no custom data dir".
+func (a *CAPRKE2Adapter) bootstrapDataDir(secret *corev1.Secret) (string, error) {
 	if secret == nil {
-		return ""
+		return "", fmt.Errorf("secret is nil")
 	}
 	if !planv1alpha1.HasMachineLifecycleLabels(secret) {
-		return ""
+		return "", fmt.Errorf("secret %s/%s has no machine lifecycle labels", secret.Namespace, secret.Name)
 	}
 	ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(secret, secret.Namespace, a.clients.RESTMapper)
 	if err != nil {
-		logrus.Errorf("[caprke2] error resolving machine lifecycle labels on secret %s/%s: %v", secret.Namespace, secret.Name, err)
-		return ""
+		return "", fmt.Errorf("resolving machine lifecycle labels on secret %s/%s: %w", secret.Namespace, secret.Name, err)
 	}
 
 	machine, err := a.clients.CAPI.Machine().Cache().Get(ref.Namespace, ref.Name)
 	if err != nil {
-		// During early bootstrap the machine may not yet exist in cache; suppress NotFound
-		// from logs so cold-start reconciles aren't noisy.
-		if !apierrors.IsNotFound(err) {
-			logrus.Errorf("[caprke2] error fetching CAPI Machine %s/%s: %v", ref.Namespace, ref.Name, err)
-		}
-		return ""
+		return "", fmt.Errorf("fetching CAPI Machine %s/%s: %w", ref.Namespace, ref.Name, err)
 	}
 
 	configRef := machine.Spec.Bootstrap.ConfigRef
 	if configRef.Name == "" || configRef.Kind == "" || configRef.APIGroup == "" {
-		// Machine has not been linked to a bootstrap object yet.
-		return ""
+		return "", fmt.Errorf("machine %s/%s has an incomplete or missing bootstrap ConfigRef", machine.Namespace, machine.Name)
 	}
 	// CAPRKE2's bootstrap kind is "RKE2Config" under bootstrap.cluster.x-k8s.io. If a future
-	// CAPI version returns a different kind for this machine, bail out — we cannot know how to
-	// read DataDir from an arbitrary bootstrap object.
+	// CAPI version returns a different kind for this machine, we cannot know how to read
+	// DataDir from an arbitrary bootstrap object.
 	if configRef.APIGroup != bootstrapv1beta2.GroupVersion.Group || configRef.Kind != "RKE2Config" {
-		logrus.Debugf("[caprke2] machine %s/%s bootstrap configRef is %s/%s (not RKE2Config), falling back to default data-dir",
+		return "", fmt.Errorf("machine %s/%s bootstrap configRef is %s/%s (not RKE2Config)",
 			machine.Namespace, machine.Name, configRef.APIGroup, configRef.Kind)
-		return ""
 	}
 
 	// The bootstrap RKE2Config is namespaced; ContractVersionedObjectReference omits namespace
@@ -525,22 +526,17 @@ func (a *CAPRKE2Adapter) bootstrapDataDir(secret *corev1.Secret) string {
 	gvk := bootstrapv1beta2.GroupVersion.WithKind("RKE2Config")
 	obj, err := a.clients.Dynamic.Get(gvk, machine.Namespace, configRef.Name)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			logrus.Errorf("[caprke2] error fetching bootstrap RKE2Config %s/%s: %v", machine.Namespace, configRef.Name, err)
-		}
-		return ""
+		return "", fmt.Errorf("fetching bootstrap RKE2Config %s/%s: %w", machine.Namespace, configRef.Name, err)
 	}
 	ustr, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		logrus.Errorf("[caprke2] expected *unstructured.Unstructured for RKE2Config %s/%s, got %T", machine.Namespace, configRef.Name, obj)
-		return ""
+		return "", fmt.Errorf("expected *unstructured.Unstructured for RKE2Config %s/%s, got %T", machine.Namespace, configRef.Name, obj)
 	}
 	rke2Config := &bootstrapv1beta2.RKE2Config{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(ustr.Object, rke2Config); err != nil {
-		logrus.Errorf("[caprke2] converting RKE2Config %s/%s from unstructured: %v", machine.Namespace, configRef.Name, err)
-		return ""
+		return "", fmt.Errorf("converting RKE2Config %s/%s from unstructured: %w", machine.Namespace, configRef.Name, err)
 	}
-	return rke2Config.Spec.AgentConfig.DataDir
+	return rke2Config.Spec.AgentConfig.DataDir, nil
 }
 
 // ProvisioningDataDirectory returns the per-operation data directory. CAPRKE2 has no field for
@@ -551,8 +547,12 @@ func (a *CAPRKE2Adapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 
 // KubectlPath returns the kubectl binary path for this cluster's runtime — RKE2 ships kubectl
 // under the data-dir's bin/ subdirectory.
-func (a *CAPRKE2Adapter) KubectlPath(secret *corev1.Secret) string {
-	return path.Join(a.DistroDataDirectory(secret), "bin", "kubectl")
+func (a *CAPRKE2Adapter) KubectlPath(secret *corev1.Secret) (string, error) {
+	dataDir, err := a.DistroDataDirectory(secret)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dataDir, "bin", "kubectl"), nil
 }
 
 // KubeconfigPath returns the on-host admin kubeconfig path.

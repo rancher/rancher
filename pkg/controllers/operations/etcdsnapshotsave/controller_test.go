@@ -51,8 +51,10 @@ func (a *stubAdapter) WaitForRegister() (bool, error) {
 }
 func (a *stubAdapter) PauseCluster(_ bool) error                   { return nil }
 func (a *stubAdapter) RuntimeCommand() string                      { return a.runtimeCommand }
-func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string { return a.dataDir }
-func (a *stubAdapter) DistroManifestPaths(_ *corev1.Secret) ops.ManifestPaths {
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return a.dataDir, nil
+}
+func (a *stubAdapter) DistroManifestPaths(_ string) ops.ManifestPaths {
 	return ops.ManifestPaths{}
 }
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
@@ -64,7 +66,9 @@ func (a *stubAdapter) DistroServices(secret *corev1.Secret) []string {
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return map[string]rkeplan.Probe{}, nil
 }
-func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectlPath }
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) (string, error) {
+	return a.kubectlPath, nil
+}
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
