@@ -349,8 +349,7 @@ func (t *Store) DeleteCollection(
 			if apierrors.IsNotFound(err) {
 				continue
 			}
-			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
-				secret.Name, err))
+			return nil, apiStatusOrInternalError(err)
 		}
 
 		list.Items = append(list.Items, *token)
@@ -563,18 +562,9 @@ func (t *Store) Update(
 		return nil, false, err
 	}
 
-	oldSecret, err := t.secretCache.Get(TokenNamespace, name)
+	oldSecret, err := t.GetSecret(name, nil, true)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Rethrow the NotFound error with the correct group and resource information.
-			return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
-		}
-		return nil, false, fmt.Errorf("error getting secret for token %s: %w", name, err)
-	}
-
-	// validate that secret is indeed holding an ext token
-	if oldSecret.Labels[SecretKindLabel] != SecretKindLabelValue {
-		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
 	oldToken, err := fromSecret(oldSecret)
@@ -585,7 +575,9 @@ func (t *Store) Update(
 
 	newObj, err := objInfo.UpdatedObject(ctx, oldToken)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object: %w", err))
+		// For a PATCH the apiserver applies the patch and runs admission in
+		// here, so the error may already carry a client-facing status code.
+		return nil, false, apiStatusOrInternalError(err)
 	}
 
 	newToken, ok := newObj.(*ext.Token)
@@ -762,11 +754,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	newSecret, err := t.secretClient.Create(secret)
 	if err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			// note: should not be possible due to the forced use of generateName
-			return nil, err
-		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to store token: %w", err))
+		return nil, mapBackingError(err, GeneratePrefix)
 	}
 
 	// Read changes back to return what was truly created, not what we thought we created
@@ -793,19 +781,10 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
-// Delete is the core deletion method to remove a single named token
+// Delete is the core deletion method to remove a single named token. Any
+// error is an [apierrors.APIStatus] scoped to the Token resource.
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
-	err := t.secretClient.Delete(TokenNamespace, name, options)
-	if err == nil {
-		return nil
-	}
-	if apierrors.IsNotFound(err) {
-		// Convert not found for secret to not found for token
-		// Returned to match k8s behaviour for resource deletion
-		return apierrors.NewNotFound(GVR.GroupResource(), name)
-	}
-
-	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
+	return mapBackingError(t.secretClient.Delete(TokenNamespace, name, options), name)
 }
 
 // DeleteCollection is an internal bulk deletion method for use by other parts of Rancher.
@@ -850,7 +829,8 @@ func (t *SystemStore) Get(name, authTokenID string, options *metav1.GetOptions) 
 	return token, nil
 }
 
-// GetSecret retrieves the backing secret for an ext token, optionally using the cache.
+// GetSecret retrieves the backing secret for an ext token, optionally using the
+// cache. Any error is an [apierrors.APIStatus] scoped to the Token resource.
 func (t *SystemStore) GetSecret(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
 	var err error
 	var currentSecret *corev1.Secret
@@ -861,10 +841,7 @@ func (t *SystemStore) GetSecret(name string, options *metav1.GetOptions, useCach
 		currentSecret, err = t.secretClient.Get(TokenNamespace, name, *options)
 	}
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
-		}
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", name, err))
+		return nil, mapBackingError(err, name)
 	}
 
 	if currentSecret.Labels[SecretKindLabel] != SecretKindLabelValue {
@@ -1053,7 +1030,7 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 
 	newSecret, err := t.secretClient.Update(secret)
 	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to save updated token: %w", err))
+		return nil, mapBackingError(err, token.Name)
 	}
 
 	// Read changes back to return what was truly saved, not what we thought we saved
