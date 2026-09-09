@@ -3,12 +3,12 @@ package kubeconfig
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	registry "k8s.io/apiserver/pkg/registry/generic/registry"
 )
 
@@ -44,21 +44,21 @@ func mapBackingError(err error, resource string) error {
 		rebuilt := apierrors.NewForbidden(gvr.GroupResource(), resource, errors.New("backing store denied the request"))
 		if details := statusDetails(err); details != nil && len(details.Causes) > 0 {
 			rebuilt.ErrStatus.Details.Causes = details.Causes
+			rebuilt.ErrStatus.Message += ": " + causeMessages(details.Causes)
 		}
 		return rebuilt
 	case apierrors.IsInvalid(err):
 		logrus.Warnf("kubeconfig: invalid backing object for kubeconfig %s: %v", resource, err)
-		var errs field.ErrorList
-		if details := statusDetails(err); details != nil {
-			for _, c := range details.Causes {
-				errs = append(errs, &field.Error{
-					Type:   field.ErrorType(c.Type),
-					Field:  c.Field,
-					Detail: c.Message,
-				})
-			}
+		rebuilt := apierrors.NewInvalid(schema.GroupKind{Group: gvr.Group, Kind: Kind}, resource, nil)
+		if details := statusDetails(err); details != nil && len(details.Causes) > 0 {
+			// Causes are copied as-is: their messages are already rendered by
+			// the backing store, and an admission denial carries a cause with no
+			// Type or Field, which field.Error would render as an "unhandled
+			// error code" placeholder.
+			rebuilt.ErrStatus.Details.Causes = details.Causes
+			rebuilt.ErrStatus.Message += ": " + causeMessages(details.Causes)
 		}
-		return apierrors.NewInvalid(schema.GroupKind{Group: gvr.Group, Kind: Kind}, resource, errs)
+		return rebuilt
 	case apierrors.IsBadRequest(err):
 		logrus.Warnf("kubeconfig: bad request on backing object for kubeconfig %s: %v", resource, err)
 		return apierrors.NewBadRequest(fmt.Sprintf("invalid request for kubeconfig %s", resource))
@@ -78,12 +78,53 @@ func mapBackingError(err error, resource string) error {
 	}
 }
 
-// apiStatusOrInternalError returns err unchanged when it already carries an
-// APIStatus (so a deliberate 4xx keeps its code) and wraps anything else as an
-// InternalError.
+// asAPIStatus returns the status error carried anywhere in err's chain,
+// unwrapped, or nil when there is none. Unwrapping matters: the apiserver
+// derives the HTTP code with a type switch and would report a wrapped status
+// error as a 500.
+func asAPIStatus(err error) error {
+	var status apierrors.APIStatus
+	if !errors.As(err, &status) {
+		return nil
+	}
+	if statusErr, ok := status.(error); ok {
+		return statusErr
+	}
+	return nil
+}
+
+// apiStatusOrInternalError returns the status error carried by err so a
+// deliberate 4xx keeps its code, and wraps anything else as an InternalError.
 func apiStatusOrInternalError(err error) error {
-	if _, ok := err.(apierrors.APIStatus); ok {
-		return err
+	if statusErr := asAPIStatus(err); statusErr != nil {
+		return statusErr
 	}
 	return apierrors.NewInternalError(err)
+}
+
+// validationError returns the status error carried by err, unwrapped, so an
+// admission decision keeps its code, and otherwise reports a plain validation
+// failure for the verb as a 400. The name is left out when not yet known.
+func validationError(err error, verb, name string) error {
+	if statusErr := asAPIStatus(err); statusErr != nil {
+		return statusErr
+	}
+	if name == "" {
+		return apierrors.NewBadRequest(fmt.Sprintf("%s validation failed for kubeconfig: %s", verb, err))
+	}
+	return apierrors.NewBadRequest(fmt.Sprintf("%s validation for kubeconfig %s failed: %s", verb, name, err))
+}
+
+// causeMessages renders status causes for a message, prefixing each with its
+// field when it has one.
+func causeMessages(causes []metav1.StatusCause) string {
+	messages := make([]string, 0, len(causes))
+	for _, c := range causes {
+		if c.Field != "" {
+			messages = append(messages, c.Field+": "+c.Message)
+		} else {
+			messages = append(messages, c.Message)
+		}
+	}
+	return strings.Join(messages, ", ")
 }
