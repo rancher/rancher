@@ -1390,6 +1390,14 @@ func mockOIDCServer(listener net.Listener, resp oidcResponses) *http.Server {
 		w.Write([]byte(resp.user))
 	})
 	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		// The authorization_code grant has no scope parameter (RFC 6749,
+		// section 4.1.3). Reject it like RFC-strict providers do.
+		if r.FormValue("scope") != "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error":"invalid_scope"}`))
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp.token)
 	})
