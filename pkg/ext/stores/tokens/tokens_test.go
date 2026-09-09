@@ -500,6 +500,74 @@ func TestStoreUpdate(t *testing.T) {
 	})
 }
 
+func TestStoreValidationCallbackErrors(t *testing.T) {
+	t.Parallel()
+
+	wrappedForbidden := fmt.Errorf("admission: %w", apierrors.NewForbidden(GVR.GroupResource(), "bogus", errors.New("denied")))
+
+	newStore := func(t *testing.T, cachedSecret *corev1.Secret) *Store {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, true, true, nil).AnyTimes()
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		if cachedSecret != nil {
+			// Update reads through the cache, Delete bypasses it.
+			scache.EXPECT().Get(TokenNamespace, "bogus").Return(cachedSecret, nil).AnyTimes()
+			secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).Return(cachedSecret, nil).AnyTimes()
+		}
+		return New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
+	}
+
+	t.Run("create keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, nil)
+		validation := func(ctx context.Context, obj runtime.Object) error { return wrappedForbidden }
+
+		_, err := store.Create(context.TODO(), properToken.DeepCopy(), validation, &metav1.CreateOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+
+	t.Run("create turns a plain error into a bad request", func(t *testing.T) {
+		store := newStore(t, nil)
+		validation := func(ctx context.Context, obj runtime.Object) error { return errors.New("nope") }
+
+		_, err := store.Create(context.TODO(), properToken.DeepCopy(), validation, &metav1.CreateOptions{})
+		assert.True(t, apierrors.IsBadRequest(err), "plain validation error must be 400, got %v", err)
+	})
+
+	t.Run("delete keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj runtime.Object) error { return wrappedForbidden }
+
+		_, _, err := store.Delete(context.TODO(), "bogus", validation, &metav1.DeleteOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+
+	t.Run("delete turns a plain error into a bad request", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj runtime.Object) error { return errors.New("nope") }
+
+		_, _, err := store.Delete(context.TODO(), "bogus", validation, &metav1.DeleteOptions{})
+		assert.True(t, apierrors.IsBadRequest(err), "plain validation error must be 400, got %v", err)
+	})
+
+	t.Run("update keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj, old runtime.Object) error { return wrappedForbidden }
+
+		_, _, err := store.Update(context.TODO(), "bogus", &fakeUpdatedObjectInfo{obj: properToken.DeepCopy()}, nil, validation, false, &metav1.UpdateOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+}
+
 func TestStoreDelete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the

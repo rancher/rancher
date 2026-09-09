@@ -287,9 +287,11 @@ func (t *Store) Create(
 	createValidation rest.ValidateObjectFunc,
 	options *metav1.CreateOptions) (runtime.Object, error) {
 	if createValidation != nil {
-		err := createValidation(ctx, obj)
-		if err != nil {
-			return obj, err
+		if err := createValidation(ctx, obj); err != nil {
+			if statusErr := asAPIStatus(err); statusErr != nil {
+				return nil, statusErr
+			}
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("error validating create: %s", err))
 		}
 	}
 
@@ -401,9 +403,11 @@ func (t *Store) deleteCore(
 
 	// ensure that deletion is possible
 	if deleteValidation != nil {
-		err := deleteValidation(ctx, token)
-		if err != nil {
-			return nil, false, err
+		if err := deleteValidation(ctx, token); err != nil {
+			if statusErr := asAPIStatus(err); statusErr != nil {
+				return nil, false, statusErr
+			}
+			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating delete: %s", err))
 		}
 	}
 
@@ -586,8 +590,10 @@ func (t *Store) Update(
 	}
 
 	if updateValidation != nil {
-		err = updateValidation(ctx, newObj, oldToken)
-		if err != nil {
+		if err := updateValidation(ctx, newObj, oldToken); err != nil {
+			if statusErr := asAPIStatus(err); statusErr != nil {
+				return nil, false, statusErr
+			}
 			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
 		}
 	}
