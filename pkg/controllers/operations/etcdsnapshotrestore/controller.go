@@ -188,6 +188,12 @@ done < "$TMPALLNODES"
 rm "$TMPALLNODES"
 rm "$NODENAMESFILE"
 `
+
+	// RestoreModeResolutionFailureReason is surfaced when the desired restore mode fails to be resolved.
+	RestoreModeResolutionFailureReason = "RestoreModeResolutionFailed"
+
+	// RestoreModeApplyFailureReason is surfaced when the desired restore mode changes fail to be applied.
+	RestoreModeApplyFailureReason = "RestoreModeApplyFailed"
 )
 
 type handler struct {
@@ -862,7 +868,7 @@ func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCD
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.FailedReason)
+		opv1alpha1.FailedCondition.Reason(&status, RestoreModeResolutionFailureReason)
 		opv1alpha1.FailedCondition.Message(&status, reason)
 
 		return status, nil
@@ -878,7 +884,7 @@ func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCD
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
 		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.FailedReason)
+		opv1alpha1.FailedCondition.Reason(&status, RestoreModeApplyFailureReason)
 		opv1alpha1.FailedCondition.Message(&status, reason)
 
 		return status, nil
@@ -1806,7 +1812,14 @@ func buildRestorePlan(s *scope, secret *corev1.Secret, snapshot *rkev1.ETCDSnaps
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
 	} else {
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
-		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
+		// The snapshot records where it was written but never how to authenticate, so the adapter
+		// merges it with the cluster's own S3 configuration. The secret key is passed in the
+		// environment to keep it out of the restore command line.
+		s3Args, s3Env, s3Files, err := s.adapter.ToS3ArgsEnvAndFiles(secret, snapshot.SnapshotFile.S3, "etcd-", true)
+		if err != nil {
+			return nil, err
+		}
+
 		args = append(args, s3Args...)
 		env = append(env, s3Env...)
 		files = append(files, s3Files...)

@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/restoremode"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
@@ -165,12 +166,12 @@ func assertSnapshotOffersMode(t *testing.T, snapshot *rkev1.ETCDSnapshot, mode s
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneLocal verifies that a `none` restore from
 // a machine-local snapshot rolls etcd back and leaves the cluster's configuration alone.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneLocal(t *testing.T) {
-	runImportedRestoreModeTest(t, "rm-none-local", rkev1.RestoreRKEConfigNone, snapshotStorageLocal)
+	runImportedRestoreModeTest(t, "rm-none-local", rkev1.RestoreRKEConfigNone, snapshotbackpopulate.Local)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3 is the S3 counterpart.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3(t *testing.T) {
-	runImportedRestoreModeTest(t, "rm-none-s3", rkev1.RestoreRKEConfigNone, snapshotStorageS3)
+	runImportedRestoreModeTest(t, "rm-none-s3", rkev1.RestoreRKEConfigNone, snapshotbackpopulate.S3)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocal verifies the downgrade
@@ -181,24 +182,24 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3(t *testing.T) {
 // version before `--cluster-reset`, because a newer server cannot reset onto etcd data written by an
 // older one.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocal(t *testing.T) {
-	runImportedRestoreModeTest(t, "rm-kv-local", rkev1.RestoreRKEConfigKubernetesVersion, snapshotStorageLocal)
+	runImportedRestoreModeTest(t, "rm-kv-local", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.Local)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionS3 is the S3 counterpart.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionS3(t *testing.T) {
-	runImportedRestoreModeTest(t, "rm-kv-s3", rkev1.RestoreRKEConfigKubernetesVersion, snapshotStorageS3)
+	runImportedRestoreModeTest(t, "rm-kv-s3", rkev1.RestoreRKEConfigKubernetesVersion, snapshotbackpopulate.S3)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllLocal verifies that `all` restores the rest
 // of the captured configuration too, not just the Kubernetes version — here, the cluster agent's
 // deployment customization, which the other two modes must leave at its post-snapshot value.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllLocal(t *testing.T) {
-	runImportedRestoreModeTest(t, "rm-all-local", rkev1.RestoreRKEConfigAll, snapshotStorageLocal)
+	runImportedRestoreModeTest(t, "rm-all-local", rkev1.RestoreRKEConfigAll, snapshotbackpopulate.Local)
 }
 
 // Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3 is the S3 counterpart.
 func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3(t *testing.T) {
-	runImportedRestoreModeTest(t, "rm-all-s3", rkev1.RestoreRKEConfigAll, snapshotStorageS3)
+	runImportedRestoreModeTest(t, "rm-all-s3", rkev1.RestoreRKEConfigAll, snapshotbackpopulate.S3)
 }
 
 // The two configuration values every case in the matrix moves, so that each mode can be pinned by
@@ -212,7 +213,7 @@ const (
 // change the agent customization, restore selecting mode, then assert what that mode is supposed to
 // have restored — plus, in every case, that etcd itself rolled back, that no node was replaced, and
 // that the cluster came out healthy.
-func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage snapshotStorage) {
+func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage snapshotbackpopulate.Storage) {
 	t.Helper()
 
 	requireTwoVersions(t)
@@ -361,7 +362,7 @@ func waitForReportedGitVersion(t *testing.T, clients *clients.Clients, name, ver
 // durable enough here because an imported cluster upgrades in place and keeps its nodes. For
 // snapshotStorageS3 an object store is stood up and the distro is pointed at it; the snapshot is then
 // written locally *and* uploaded, and the test restores from the uploaded copy.
-func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayName string, storage snapshotStorage) *importedClusterFixture {
+func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayName string, storage snapshotbackpopulate.Storage) *importedClusterFixture {
 	t.Helper()
 
 	pools := []cluster.ImportedNodePool{
@@ -370,7 +371,7 @@ func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayN
 		{Worker: true, Quantity: 1},
 	}
 
-	if storage == snapshotStorageLocal {
+	if storage == snapshotbackpopulate.Local {
 		return setUpImportedClusterAtVersion(t, cs, displayName, pools, previousK8sVersion)
 	}
 
