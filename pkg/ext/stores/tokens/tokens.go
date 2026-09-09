@@ -288,10 +288,7 @@ func (t *Store) Create(
 	options *metav1.CreateOptions) (runtime.Object, error) {
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
-			if statusErr := asAPIStatus(err); statusErr != nil {
-				return nil, statusErr
-			}
-			return nil, apierrors.NewBadRequest(fmt.Sprintf("error validating create: %s", err))
+			return nil, validationError(err, "create")
 		}
 	}
 
@@ -404,10 +401,7 @@ func (t *Store) deleteCore(
 	// ensure that deletion is possible
 	if deleteValidation != nil {
 		if err := deleteValidation(ctx, token); err != nil {
-			if statusErr := asAPIStatus(err); statusErr != nil {
-				return nil, false, statusErr
-			}
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating delete: %s", err))
+			return nil, false, validationError(err, "delete")
 		}
 	}
 
@@ -591,10 +585,7 @@ func (t *Store) Update(
 
 	if updateValidation != nil {
 		if err := updateValidation(ctx, newObj, oldToken); err != nil {
-			if statusErr := asAPIStatus(err); statusErr != nil {
-				return nil, false, statusErr
-			}
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("error validating update: %s", err))
+			return nil, false, validationError(err, "update")
 		}
 	}
 

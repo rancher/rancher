@@ -101,6 +101,16 @@ func apiStatusOrInternalError(err error) error {
 	return apierrors.NewInternalError(err)
 }
 
+// validationError returns the status error carried by err, unwrapped, so an
+// admission decision keeps its code, and otherwise reports a plain validation
+// failure for the verb as a 400.
+func validationError(err error, verb string) error {
+	if statusErr := asAPIStatus(err); statusErr != nil {
+		return statusErr
+	}
+	return apierrors.NewBadRequest(fmt.Sprintf("error validating %s: %s", verb, err))
+}
+
 // causeMessages renders status causes for a message, prefixing each with its
 // field when it has one.
 func causeMessages(causes []metav1.StatusCause) string {
