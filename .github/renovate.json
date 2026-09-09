@@ -11,6 +11,9 @@
   "ignoreDeps": [
     "go.qase.io/client"
   ],
+  "extends": [
+    "github>rancher/renovate-config//default#main"
+  ],
   "prHourlyLimit": 6,
   "prConcurrentLimit": 20,
   "packageRules": [
