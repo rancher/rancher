@@ -2503,7 +2503,35 @@ func TestAPIStatusOrInternalError(t *testing.T) {
 	assert.True(t, apierrors.IsBadRequest(got), "wrapped 400 must stay 400, got %v", got)
 	assert.IsType(t, &apierrors.StatusError{}, got)
 
+	// Any APIStatus implementation counts, not only *StatusError, since the
+	// apiserver matches on the interface.
+	custom := &customStatusError{code: 409}
+	assert.Same(t, custom, apiStatusOrInternalError(fmt.Errorf("wrapped: %w", custom)))
+
 	assert.True(t, apierrors.IsInternalError(apiStatusOrInternalError(errors.New("boom"))))
+}
+
+type customStatusError struct{ code int32 }
+
+func (e *customStatusError) Error() string { return "custom" }
+func (e *customStatusError) Status() metav1.Status {
+	return metav1.Status{Status: metav1.StatusFailure, Code: e.code, Reason: metav1.StatusReasonConflict}
+}
+
+func TestMapBackingErrorForbiddenCauseReachesMessage(t *testing.T) {
+	t.Parallel()
+
+	denied := apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("denied"))
+	denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+
+	got := mapBackingError(denied, "bogus")
+	require.True(t, apierrors.IsForbidden(got))
+	assert.Contains(t, got.Error(), admissionDenialMessage)
+	assert.NotContains(t, got.Error(), "secret")
+	status, ok := got.(apierrors.APIStatus)
+	require.True(t, ok)
+	require.Len(t, status.Status().Details.Causes, 1)
+	assert.Equal(t, admissionDenialMessage, status.Status().Details.Causes[0].Message)
 }
 
 func TestSystemStoreAddLabel(t *testing.T) {

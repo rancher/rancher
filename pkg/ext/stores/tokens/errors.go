@@ -43,6 +43,7 @@ func mapBackingError(err error, resource string) error {
 		rebuilt := apierrors.NewForbidden(GVR.GroupResource(), resource, errors.New("backing store denied the request"))
 		if details := statusDetails(err); details != nil && len(details.Causes) > 0 {
 			rebuilt.ErrStatus.Details.Causes = details.Causes
+			rebuilt.ErrStatus.Message += ": " + causeMessages(details.Causes)
 		}
 		return rebuilt
 	case apierrors.IsInvalid(err):
@@ -54,15 +55,7 @@ func mapBackingError(err error, resource string) error {
 			// Type or Field, which field.Error would render as an "unhandled
 			// error code" placeholder.
 			rebuilt.ErrStatus.Details.Causes = details.Causes
-			messages := make([]string, 0, len(details.Causes))
-			for _, c := range details.Causes {
-				if c.Field != "" {
-					messages = append(messages, c.Field+": "+c.Message)
-				} else {
-					messages = append(messages, c.Message)
-				}
-			}
-			rebuilt.ErrStatus.Message += ": " + strings.Join(messages, ", ")
+			rebuilt.ErrStatus.Message += ": " + causeMessages(details.Causes)
 		}
 		return rebuilt
 	case apierrors.IsBadRequest(err):
@@ -84,14 +77,40 @@ func mapBackingError(err error, resource string) error {
 	}
 }
 
-// apiStatusOrInternalError returns the status error carried by err, unwrapped,
-// so a deliberate 4xx keeps its code, and wraps anything else as an
-// InternalError. Unwrapping matters: the apiserver derives the HTTP code with a
-// type switch and would report a wrapped status error as a 500.
+// asAPIStatus returns the status error carried anywhere in err's chain,
+// unwrapped, or nil when there is none. Unwrapping matters: the apiserver
+// derives the HTTP code with a type switch and would report a wrapped status
+// error as a 500.
+func asAPIStatus(err error) error {
+	var status apierrors.APIStatus
+	if !errors.As(err, &status) {
+		return nil
+	}
+	if statusErr, ok := status.(error); ok {
+		return statusErr
+	}
+	return nil
+}
+
+// apiStatusOrInternalError returns the status error carried by err so a
+// deliberate 4xx keeps its code, and wraps anything else as an InternalError.
 func apiStatusOrInternalError(err error) error {
-	var statusErr *apierrors.StatusError
-	if errors.As(err, &statusErr) {
+	if statusErr := asAPIStatus(err); statusErr != nil {
 		return statusErr
 	}
 	return apierrors.NewInternalError(err)
+}
+
+// causeMessages renders status causes for a message, prefixing each with its
+// field when it has one.
+func causeMessages(causes []metav1.StatusCause) string {
+	messages := make([]string, 0, len(causes))
+	for _, c := range causes {
+		if c.Field != "" {
+			messages = append(messages, c.Field+": "+c.Message)
+		} else {
+			messages = append(messages, c.Message)
+		}
+	}
+	return strings.Join(messages, ", ")
 }
