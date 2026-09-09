@@ -102,6 +102,19 @@ func apiStatusOrInternalError(err error) error {
 	return apierrors.NewInternalError(err)
 }
 
+// validationError returns the status error carried by err, unwrapped, so an
+// admission decision keeps its code, and otherwise reports a plain validation
+// failure for the verb as a 400. The name is left out when not yet known.
+func validationError(err error, verb, name string) error {
+	if statusErr := asAPIStatus(err); statusErr != nil {
+		return statusErr
+	}
+	if name == "" {
+		return apierrors.NewBadRequest(fmt.Sprintf("%s validation failed for kubeconfig: %s", verb, err))
+	}
+	return apierrors.NewBadRequest(fmt.Sprintf("%s validation for kubeconfig %s failed: %s", verb, name, err))
+}
+
 // causeMessages renders status causes for a message, prefixing each with its
 // field when it has one.
 func causeMessages(causes []metav1.StatusCause) string {
