@@ -72,8 +72,8 @@ github.com/rancher/eks-operator v1.15.0 h1:WmLH18voppGEPuRDNuU3/RfMGTtz6/el0Vc0p
 github.com/rancher/eks-operator v1.15.0/go.mod h1:o7SLLfvPn6ElI7v7mj7ufhYOGofAMKEfKTqOi48OXAs=
 github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1 h1:rtjAwj6YNSo6570OHDQIRoj78KNwi4WEUOF2mZ8sdj4=
 github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1/go.mod h1:aXKyYDfC0a6pmsgwt3Lqd2F+wMYZNpewhyo/RgE3I+0=
-github.com/rancher/gke-operator v1.15.0 h1:YF2RbtLDK9Qc5F/6q9nqK17fgeWupgG0adkitFGy62M=
-github.com/rancher/gke-operator v1.15.0/go.mod h1:ovlfH4eCw0ilMGmOyC6wzhgcEc5uzSD8Z6KEYOXvzes=
+github.com/rancher/gke-operator v1.15.2 h1:Y05xmvLpcqU5m1ySEtrnkmrryITWo1SZG+ljCPNtxBg=
+github.com/rancher/gke-operator v1.15.2/go.mod h1:DzNiLN8zed0GZbLUThYeNOoCmO2+dpPloPN8O38VJJ0=
 github.com/rancher/lasso v0.2.9 h1:5Xk9Qid+YDOLpa6s5xalcSR0cA5BMbgWcaOZ8kdNU7k=
 github.com/rancher/lasso v0.2.9/go.mod h1:PMtxoVahRQvhEAi1HVOfyLDe1CrtGwTqOtkPVjSSkns=
 github.com/rancher/norman v0.10.0 h1:vBIp5gNHelyS64IAs6FONPUfv0VTYWiMSrEbDS2l+hM=
