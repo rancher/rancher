@@ -17,7 +17,6 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
 	k3scontrollers "github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io/v1"
-	jsonpath "github.com/rancher/jsonpath/pkg"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -30,6 +29,7 @@ import (
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/restoremode"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -52,8 +52,6 @@ const (
 	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
 	// SnapshotFileNameAnnotationKey is the annotation key used to store the snapshot file resource name.
 	SnapshotFileNameAnnotationKey = "etcdsnapshot.rke.io/snapshot-file-name"
-	// RestoreModeOptionsAnnotation is the annotation key used to store the available restore modes.
-	RestoreModeOptionsAnnotation = "etcdsnapshot.rke.io/restore-mode-options"
 )
 
 type Storage string
@@ -401,7 +399,7 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstru
 	}
 
 	if payload := downstream.Spec.Metadata[rkev1.SnapshotMetadataRestoreModesKey]; payload != "" {
-		modes, err := restoreModesFromMetadata(payload, downstream.Spec.Metadata[rkev1.SnapshotMetadataResourcesKey], logPrefix)
+		modes, err := restoreModesFromMetadata(downstream.Spec.Metadata, logPrefix)
 		if err != nil {
 			logrus.Warnf("%s: downstream snapshot %s/%s contains an unusable '%s' metadata payload: %v. Setting restore mode to 'none'",
 				logPrefix, downstream.Namespace, downstream.Name, rkev1.SnapshotMetadataRestoreModesKey, err)
@@ -416,17 +414,15 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstru
 // restoreModesFromMetadata parses the restoreModes payload and returns the modes whose selector
 // resolves against the resources payload. 'none' is always included: restoring without applying any
 // configuration is possible for every snapshot, whether or not the payload declares it.
-func restoreModesFromMetadata(restoreModesPayload, resourcesPayload, logPrefix string) ([]string, error) {
-	selectors := map[string]string{}
-	if err := json.Unmarshal([]byte(restoreModesPayload), &selectors); err != nil {
-		return nil, fmt.Errorf("parsing %q: %w", rkev1.SnapshotMetadataRestoreModesKey, err)
+func restoreModesFromMetadata(metadata map[string]string, logPrefix string) ([]string, error) {
+	selectors, err := restoremode.Modes(metadata)
+	if err != nil {
+		return nil, err
 	}
 
-	resources := map[string]any{}
-	if resourcesPayload != "" {
-		if err := snapshotutil.DecompressInterface(resourcesPayload, &resources); err != nil {
-			return nil, fmt.Errorf("decoding %q: %w", rkev1.SnapshotMetadataResourcesKey, err)
-		}
+	resources, err := restoremode.Resources(metadata)
+	if err != nil {
+		return nil, err
 	}
 
 	available := []string{rkev1.RestoreRKEConfigNone}
@@ -435,13 +431,13 @@ func restoreModesFromMetadata(restoreModesPayload, resourcesPayload, logPrefix s
 			continue
 		}
 
-		resolves, err := selectorResolves(selector, resources)
+		matches, err := restoremode.Resolve(selector, resources)
 		if err != nil {
 			logrus.Warnf("%s: restore mode %q has an unparsable selector %q: %v, the mode will be unavailable",
 				logPrefix, mode, selector, err)
 			continue
 		}
-		if !resolves {
+		if len(matches) == 0 {
 			logrus.Warnf("%s: restore mode %q selector %q does not resolve against the published resources, the mode will be unavailable",
 				logPrefix, mode, selector)
 			continue
@@ -465,88 +461,6 @@ func restoreModesFromMetadata(restoreModesPayload, resourcesPayload, logPrefix s
 	})
 
 	return available, nil
-}
-
-// selectorResolves reports whether selector picks out at least one populated value in resources. An
-// empty selector restores nothing, so it always resolves; the wildcard resolves as long as anything
-// was published.
-func selectorResolves(selector string, resources map[string]any) (bool, error) {
-	switch selector {
-	case "":
-		return true, nil
-	case rkev1.RestoreModeSelectorWildcard:
-		return len(resources) > 0, nil
-	}
-
-	// The selectors address resources by resource type, e.g.
-	// $['cluster.provisioning.cattle.io']['spec']['kubernetesVersion']. Only rancher/jsonpath
-	// handles a bracket-quoted key containing dots; client-go's jsonpath splits it on the dots.
-	path, err := jsonpath.Parse(selector)
-	if err != nil {
-		return false, err
-	}
-
-	return matchesPopulatedInMap(path, jsonpath.PathBuilder{}.WithRootNode(), resources), nil
-}
-
-// matchesPopulatedInMap and matchesPopulatedInSlice walk obj depth-first looking for a value that
-// path matches and that is populated. rancher/jsonpath only exposes matching against a concrete
-// path, so the walk mirrors the one its Set implementation performs.
-func matchesPopulatedInMap(path *jsonpath.JSONPath, at jsonpath.PathBuilder, obj map[string]any) bool {
-	for k, v := range obj {
-		here := at.WithChildNode(k)
-
-		if path.Matches(here.Build()) && isPopulated(v) {
-			return true
-		}
-
-		if matchesPopulatedIn(path, here, v) {
-			return true
-		}
-	}
-	return false
-}
-
-func matchesPopulatedInSlice(path *jsonpath.JSONPath, at jsonpath.PathBuilder, obj []any) bool {
-	for i, v := range obj {
-		here := at.WithIndexNode(uint(i), obj)
-
-		if path.Matches(here.Build()) && isPopulated(v) {
-			return true
-		}
-
-		if matchesPopulatedIn(path, here, v) {
-			return true
-		}
-	}
-	return false
-}
-
-func matchesPopulatedIn(path *jsonpath.JSONPath, at jsonpath.PathBuilder, v any) bool {
-	switch v := v.(type) {
-	case map[string]any:
-		return matchesPopulatedInMap(path, at, v)
-	case []any:
-		return matchesPopulatedInSlice(path, at, v)
-	}
-	return false
-}
-
-// isPopulated reports whether v carries a value worth restoring. A field that round-tripped through
-// JSON as null, an empty string, or an empty container tells us nothing was captured for it, so the
-// mode that would restore it is not offered.
-func isPopulated(v any) bool {
-	switch v := v.(type) {
-	case nil:
-		return false
-	case string:
-		return v != ""
-	case map[string]any:
-		return len(v) > 0
-	case []any:
-		return len(v) > 0
-	}
-	return true
 }
 
 // restoreModesFromClusterSpec is the pre-extra-metadata behaviour: derive the available modes from
@@ -642,7 +556,7 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 		upstream.Annotations = map[string]string{}
 	}
 
-	upstream.Annotations[RestoreModeOptionsAnnotation] = getRestoreModesAnnotation(downstream, cluster)
+	upstream.Annotations[capr.RestoreModeOptionsAnnotation] = getRestoreModesAnnotation(downstream, cluster)
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
 	upstream.Annotations[SnapshotFileNameAnnotationKey] = downstream.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name

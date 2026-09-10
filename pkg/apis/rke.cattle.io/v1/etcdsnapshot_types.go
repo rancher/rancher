@@ -20,6 +20,13 @@ const (
 	// RestoreModeSelectorWildcard is the restore mode selector meaning "every published field".
 	RestoreModeSelectorWildcard = "*"
 
+	// Resource keys the objects in the resources payload are published under, one per cluster type.
+	// A restore mode selector's first segment is one of these, which is also what identifies the
+	// object a restore writes back to.
+	SnapshotResourceMgmtCluster      = "cluster.management.cattle.io"
+	SnapshotResourceProvCluster      = "cluster.provisioning.cattle.io"
+	SnapshotResourceRKE2ControlPlane = "rke2controlplane.controlplane.cluster.x-k8s.io"
+
 	RestoreRKEConfigNone              = "none"
 	RestoreRKEConfigKubernetesVersion = "kubernetesVersion"
 	RestoreRKEConfigAll               = "all"
