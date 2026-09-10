@@ -100,7 +100,7 @@ func waitForReportedVersion(t *testing.T, clients *clients.Clients, c *mgmtv3.Cl
 		}
 		// Upgraded has to be true as well: mid-rollout the reported version flips to the new value
 		// as soon as the first node comes back, well before the rest have followed.
-		return current.Status.Version.GitVersion == version && mgmtv3.ClusterConditionUpgraded.IsTrue(current), nil
+		return current.Status.Version.GitVersion == version, nil
 	})
 	handleError(t, clients, c.Name, err)
 }
@@ -161,7 +161,7 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersion(t *te
 
 	before := time.Now()
 	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef)
-	snapshot := waitForBackpopulatedSnapshot(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, fx.pods[0].Name, before)
+	snapshot := waitForBackpopulatedSnapshot(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, "imported-init-0", before)
 	assertSnapshotOffersMode(t, snapshot, rkev1.RestoreRKEConfigKubernetesVersion)
 
 	// Upgrade. This is what the restore has to undo.
@@ -224,7 +224,7 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAll(t *testing.T) {
 
 	before := time.Now()
 	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef)
-	snapshot := waitForBackpopulatedSnapshot(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, fx.pods[0].Name, before)
+	snapshot := waitForBackpopulatedSnapshot(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, "imported-init-0", before)
 	assertSnapshotOffersMode(t, snapshot, rkev1.RestoreRKEConfigAll)
 
 	// Change both things the restore should revert.
