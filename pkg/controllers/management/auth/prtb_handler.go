@@ -159,18 +159,28 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	projectName := parts[1]
 	proj, err := p.projectLister.Get(clusterName, projectName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Debugf("[%s] cannot create binding %s because project %s was not found, will be retried", ptrbMGMTController, binding.Name, projectName)
+			return nil
+		}
 		return err
 	}
 	if proj == nil {
-		return fmt.Errorf("cannot create binding because project %s was not found", projectName)
+		logrus.Debugf("[%s] cannot create binding %s because project %s was not found, will be retried", ptrbMGMTController, binding.Name, projectName)
+		return nil
 	}
 
 	cluster, err := p.clusterLister.Get("", clusterName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Debugf("[%s] cannot create binding %s because cluster %s was not found, will be retried", ptrbMGMTController, binding.Name, clusterName)
+			return nil
+		}
 		return err
 	}
 	if cluster == nil {
-		return fmt.Errorf("cannot create binding because cluster %s was not found", clusterName)
+		logrus.Debugf("[%s] cannot create binding %s because cluster %s was not found, will be retried", ptrbMGMTController, binding.Name, clusterName)
+		return nil
 	}
 
 	roleName := strings.ToLower(fmt.Sprintf("%s-clustermember", clusterName))
