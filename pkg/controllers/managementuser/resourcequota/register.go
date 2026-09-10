@@ -15,7 +15,7 @@ const (
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
-	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+	starter := cluster.DeferredStartAsync(ctx, func(ctx context.Context) error {
 		return registerDeferred(ctx, cluster)
 	})
 

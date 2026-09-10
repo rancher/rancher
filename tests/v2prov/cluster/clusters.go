@@ -379,6 +379,8 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		}
 	}()
 
+	logrus.Infof("Waiting for cluster %s to be deleted...", c.Name)
+
 	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		c = obj.(*provisioningv1api.Cluster)
 		return !c.DeletionTimestamp.IsZero(), nil
@@ -432,6 +434,7 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		return nil, fmt.Errorf("cluster not cleaned up: %w", err)
 	}
 
+	logrus.Infof("Cluster %s was successfully deleted", c.Name)
 	return c, nil
 }
 
@@ -551,6 +554,93 @@ func ExecOnPod(clients *clients.Clients, namespace, podName string, cmd ...strin
 	return stdout.String(), nil
 }
 
+func getPodPods(clients *clients.Clients, distro, namespace, name string) (string, error) {
+	var cmd string
+	var arg []string
+	switch distro {
+	case "rke2":
+		cmd = "/var/lib/rancher/rke2/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/rke2/rke2.yaml", "get", "pods", "-A"}
+	case "k3s":
+		cmd = "/var/lib/rancher/k3s/data/current/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/k3s/k3s.yaml", "get", "pods", "-A"}
+	default:
+		return "", fmt.Errorf("unsupported distro: %s", distro)
+	}
+
+	out, err := ExecOnPod(clients, namespace, name, arg...)
+	if err != nil {
+		return "", err
+	}
+
+	return out, nil
+}
+
+func getDownstreamClusterAgentDeployment(clients *clients.Clients, distro, namespace, name string) (string, error) {
+	var cmd string
+	var arg []string
+	switch distro {
+	case "rke2":
+		cmd = "/var/lib/rancher/rke2/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/rke2/rke2.yaml", "get", "deployment", "-n", "cattle-system", "cattle-cluster-agent", "-o", "yaml"}
+	case "k3s":
+		cmd = "/var/lib/rancher/k3s/data/current/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/k3s/k3s.yaml", "get", "deployment", "-n", "cattle-system", "cattle-cluster-agent", "-o", "yaml"}
+	default:
+		return "", fmt.Errorf("unsupported distro: %s", distro)
+	}
+
+	out, err := ExecOnPod(clients, namespace, name, arg...)
+	if err != nil {
+		return "", err
+	}
+
+	return out, nil
+}
+
+func getDownstreamNamespaceevents(clients *clients.Clients, distro, namespace, name string) (string, error) {
+	var cmd string
+	var arg []string
+	switch distro {
+	case "rke2":
+		cmd = "/var/lib/rancher/rke2/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/rke2/rke2.yaml", "get", "events", "-n", "cattle-system"}
+	case "k3s":
+		cmd = "/var/lib/rancher/k3s/data/current/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/k3s/k3s.yaml", "get", "events", "-n", "cattle-system"}
+	default:
+		return "", fmt.Errorf("unsupported distro: %s", distro)
+	}
+
+	out, err := ExecOnPod(clients, namespace, name, arg...)
+	if err != nil {
+		return "", err
+	}
+
+	return out, nil
+}
+func getDownstreamClusterAgentLogs(clients *clients.Clients, distro, namespace, name string) (string, error) {
+	var cmd string
+	var arg []string
+	switch distro {
+	case "rke2":
+		cmd = "/var/lib/rancher/rke2/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/rke2/rke2.yaml", "logs", "-n", "cattle-system", "deployment/cattle-cluster-agent"}
+	case "k3s":
+		cmd = "/var/lib/rancher/k3s/data/current/bin/kubectl"
+		arg = []string{cmd, "--kubeconfig", "/etc/rancher/k3s/k3s.yaml", "logs", "-n", "cattle-system", "deployment/cattle-cluster-agent"}
+	default:
+		return "", fmt.Errorf("unsupported distro: %s", distro)
+	}
+
+	out, err := ExecOnPod(clients, namespace, name, arg...)
+	if err != nil {
+		return "", err
+	}
+
+	return out, nil
+}
+
 // getPodLogs gathers the logs from the specified pod in a manner similar to `kubectl logs`
 func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string, error) {
 	plr := clients.K8s.CoreV1().Pods(podNamespace).GetLogs(podName, &corev1.PodLogOptions{})
@@ -637,7 +727,13 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	var rkeBootstraps []*rkev1.RKEBootstrap
 	var infraMachines []*unstructured.Unstructured
 	var podLogs = make(map[string]map[string]string)
-
+	var podPods = make(map[string]map[string]string)
+	distro := ""
+	if strings.Contains(c.Spec.KubernetesVersion, "rke2") {
+		distro = "rke2"
+	} else {
+		distro = "k3s"
+	}
 	machines, newErr := Machines(clients, c)
 	if newErr != nil {
 		logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, newErr)
@@ -659,6 +755,7 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 					// In the case of a podMachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 					podName := strings.ReplaceAll(im.GetName(), ".", "-")
 					podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)
+					podPods[podName] = populateDownstreamPodInfo(clients, distro, im.GetNamespace(), podName)
 				}
 			}
 		}
@@ -672,6 +769,7 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	} else {
 		for _, pod := range customPods.Items {
 			podLogs[pod.Name] = populatePodLogs(clients, newControlPlane, pod.Namespace, pod.Name)
+			podPods[pod.Name] = populateDownstreamPodInfo(clients, distro, pod.Namespace, pod.Name)
 		}
 	}
 
@@ -740,8 +838,43 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		"infraCluster":          infraCluster,
 		"infraMachines":         infraMachines,
 		"podLogs":               podLogs,
+		"podPods":               podPods,
 		"snapshots":             snapshots,
 	})
+}
+
+func populateDownstreamPodInfo(clients *clients.Clients, distro, podNamespace, podName string) map[string]string {
+	output := make(map[string]string)
+
+	allPods, err := getPodPods(clients, distro, podNamespace, podName)
+	if err != nil {
+		logrus.Errorf("failed to list pods: %v", err)
+	} else {
+		output["pods"] = allPods
+	}
+
+	agentDeployment, err := getDownstreamClusterAgentDeployment(clients, distro, podNamespace, podName)
+	if err != nil {
+		logrus.Errorf("failed to get agent deployment: %v", err)
+	} else {
+		output["agentDeployment"] = agentDeployment
+	}
+
+	events, err := getDownstreamNamespaceevents(clients, distro, podNamespace, podName)
+	if err != nil {
+		logrus.Errorf("failed to get events: %v", err)
+	} else {
+		output["events"] = events
+	}
+
+	logs, err := getDownstreamClusterAgentLogs(clients, distro, podNamespace, podName)
+	if err != nil {
+		logrus.Errorf("failed to get agent logs: %v", err)
+	} else {
+		output["agentLogs"] = logs
+	}
+
+	return output
 }
 
 // populatePodLogs creates a map[string]string of logs that correspond to the pod in question. If the pod is an RKE2 pod, it also collects the kubelet logs from the pod filesystem.
