@@ -225,7 +225,7 @@ func deployLoadPods(t *testing.T, kc *kubernetes.Clientset) {
 	}
 
 	err := retry.OnError(defaults.DownstreamRetry, func(err error) bool {
-		logrus.Warnf("[deployLoadPods] failed to get '%s' deployment in default workspace, will retry: %v", deploy.Name, err)
+		logrus.Warnf("[deployLoadPods] failed to create '%s' deployment in default workspace, will retry: %v", deploy.Name, err)
 		return true
 	}, func() error {
 		_, err := kc.AppsV1().Deployments("default").Create(context.TODO(), deploy, metav1.CreateOptions{})
