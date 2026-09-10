@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
@@ -52,6 +53,39 @@ func (a *CAPRAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	}
 
 	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+// RestoreTarget returns the provv1.Cluster for the provisioning-cluster resource key. That, not the
+// RKEControlPlane ClusterObject returns, is where a restored configuration has to be written:
+// provisioningcluster/template.go regenerates the RKEControlPlane from the provv1.Cluster on every
+// reconcile, so a write to the controlplane would be reverted. The provv1.Cluster, RKEControlPlane,
+// CAPI Cluster and beacon all share (namespace, name) for CAPR — see BeaconRef.
+func (a *CAPRAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceProvCluster {
+		return nil, nil
+	}
+
+	cluster, err := a.clients.Provisioning.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+func (a *CAPRAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	cluster := &provv1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return fmt.Errorf("converting provisioning cluster %s/%s from unstructured: %w", obj.GetNamespace(), obj.GetName(), err)
+	}
+
+	_, err := a.clients.Provisioning.Cluster().Update(cluster)
+	return err
 }
 
 func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) (args []string, env []string, files []plan.File) {

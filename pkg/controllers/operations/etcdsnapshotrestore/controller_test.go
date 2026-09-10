@@ -9,15 +9,37 @@ import (
 	"testing"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/restoremode"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+// stubSnapshotClient serves a single ETCDSnapshot to the restore-mode code paths. Only Get is
+// exercised; every other method of the generated client panics so an unexpected call is loud.
+type stubSnapshotClient struct {
+	rkecontrollers.ETCDSnapshotController
+
+	snapshot *rkev1.ETCDSnapshot
+	notFound bool
+}
+
+func (c *stubSnapshotClient) Get(_, name string, _ metav1.GetOptions) (*rkev1.ETCDSnapshot, error) {
+	if c.notFound {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "rke.cattle.io", Resource: "etcdsnapshots"}, name)
+	}
+	return c.snapshot, nil
+}
 
 // stubAdapter is a minimal ops.Adapter implementation for testing plan construction.
 // Methods unrelated to the test return zero values.
@@ -29,6 +51,14 @@ type stubAdapter struct {
 	kubeconfigPath    string
 	serverUnit        string
 	waitForRegisterOK bool
+
+	// restoreTargets are the objects RestoreTarget serves, keyed by resource key. A key that is
+	// absent yields (nil, nil), i.e. this cluster type has no counterpart for it.
+	restoreTargets    map[string]*unstructured.Unstructured
+	restoreTargetErr  error
+	updatedTargets    []*unstructured.Unstructured
+	updateRestoreErr  error
+	restoreTargetKeys []string
 }
 
 func (a *stubAdapter) EtcdSnapshotNamespace() string {
@@ -38,6 +68,33 @@ func (a *stubAdapter) EtcdSnapshotNamespace() string {
 func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+func (a *stubAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	a.restoreTargetKeys = append(a.restoreTargetKeys, resourceKey)
+	if a.restoreTargetErr != nil {
+		return nil, a.restoreTargetErr
+	}
+	target, ok := a.restoreTargets[resourceKey]
+	if !ok {
+		return nil, nil
+	}
+	return target.DeepCopy(), nil
+}
+
+func (a *stubAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	if a.updateRestoreErr != nil {
+		return a.updateRestoreErr
+	}
+	a.updatedTargets = append(a.updatedTargets, obj)
+	// Reflect the write back so a subsequent RestoreTarget serves it, the way a real cache would
+	// once the update lands. That is what lets a test drive the step to completion.
+	for key, target := range a.restoreTargets {
+		if target.GetKind() == obj.GetKind() && target.GetName() == obj.GetName() {
+			a.restoreTargets[key] = obj
+		}
+	}
+	return nil
 }
 
 func (a *stubAdapter) BeaconRef() (string, string)                       { return "test-namespace", "test-cluster" }
@@ -402,5 +459,529 @@ func TestAssignedPlansAreOperationScoped(t *testing.T) {
 				t.Error("plans for one operation must serialize identically across reconciles")
 			}
 		})
+	}
+}
+
+// provClusterTarget returns an unstructured provisioning cluster for the stub adapter to serve as
+// the restore target, holding the pre-restore configuration.
+func provClusterTarget() *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "provisioning.cattle.io/v1",
+		"kind":       "Cluster",
+		"metadata": map[string]any{
+			"name":      "test-cluster",
+			"namespace": "fleet-default",
+		},
+		"spec": map[string]any{
+			"kubernetesVersion": "v1.34.1+rke2r1",
+			"rkeConfig": map[string]any{
+				"additionalManifest": "# current",
+			},
+		},
+	}}
+}
+
+// snapshotWithModes builds an upstream snapshot carrying an extra-metadata payload: resources plus a
+// restoreModes map, encoded the way snapshotextrametadata and snapshotbackpopulate do.
+func snapshotWithModes(t *testing.T, modes map[string]string, resources map[string]any, availableModes string) *rkev1.ETCDSnapshot {
+	t.Helper()
+
+	metadata := map[string]string{}
+
+	if modes != nil {
+		payload, err := json.Marshal(modes)
+		if err != nil {
+			t.Fatalf("marshalling restoreModes: %v", err)
+		}
+		metadata[rkev1.SnapshotMetadataRestoreModesKey] = string(payload)
+	}
+
+	if resources != nil {
+		payload, err := snapshotutil.CompressInterface(resources)
+		if err != nil {
+			t.Fatalf("compressing resources: %v", err)
+		}
+		metadata[rkev1.SnapshotMetadataResourcesKey] = payload
+	}
+
+	envelope, err := json.Marshal(metadata)
+	if err != nil {
+		t.Fatalf("marshalling metadata: %v", err)
+	}
+
+	snapshot := &rkev1.ETCDSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "snapshot-1",
+			Namespace:   "fleet-default",
+			Annotations: map[string]string{},
+		},
+	}
+	snapshot.SnapshotFile.Metadata = base64.StdEncoding.EncodeToString(envelope)
+	if availableModes != "" {
+		snapshot.Annotations[capr.RestoreModeOptionsAnnotation] = availableModes
+	}
+	return snapshot
+}
+
+// restoredResources is the resources payload for a snapshot taken when the cluster ran an older
+// Kubernetes version and a different additional manifest.
+func restoredResources() map[string]any {
+	return map[string]any{
+		rkev1.SnapshotResourceProvCluster: map[string]any{
+			"metadata": map[string]any{"name": "test-cluster"},
+			"spec": map[string]any{
+				"kubernetesVersion": "v1.33.0+rke2r1",
+				"rkeConfig": map[string]any{
+					"additionalManifest": "# restored",
+				},
+				// Not in restoremode.WritablePaths: a downstream must not be able to rewrite it.
+				"cloudCredentialSecretName": "cattle-global-data:cc-attacker",
+			},
+		},
+	}
+}
+
+func kubernetesVersionSelector() string {
+	return restoremode.Match{
+		ResourceKey: rkev1.SnapshotResourceProvCluster,
+		Path:        []string{"spec", "kubernetesVersion"},
+	}.String()
+}
+
+func TestRestoresClusterConfig(t *testing.T) {
+	for _, mode := range []string{"", rkev1.RestoreRKEConfigNone} {
+		if restoresClusterConfig(mode) {
+			t.Errorf("mode %q should not restore cluster configuration", mode)
+		}
+	}
+	for _, mode := range []string{rkev1.RestoreRKEConfigKubernetesVersion, rkev1.RestoreRKEConfigAll, "customMode"} {
+		if !restoresClusterConfig(mode) {
+			t.Errorf("mode %q should restore cluster configuration", mode)
+		}
+	}
+}
+
+func TestValidateRestoreMode(t *testing.T) {
+	offered := snapshotWithModes(t, nil, nil, "none,kubernetesVersion,all")
+
+	tests := []struct {
+		name     string
+		mode     string
+		snapshot *rkev1.ETCDSnapshot
+		ok       bool
+		contains string
+	}{
+		{name: "empty mode needs no snapshot", mode: "", snapshot: nil, ok: true},
+		{name: "none needs no snapshot", mode: rkev1.RestoreRKEConfigNone, snapshot: nil, ok: true},
+		{
+			name:     "a mode with no snapshot CR is rejected",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			snapshot: nil,
+			contains: "requires an etcdsnapshot.rke.cattle.io resource",
+		},
+		{name: "an offered mode is accepted", mode: rkev1.RestoreRKEConfigAll, snapshot: offered, ok: true},
+		{
+			name:     "a mode the snapshot does not offer is rejected",
+			mode:     "customMode",
+			snapshot: offered,
+			contains: `restore mode "customMode" is not available`,
+		},
+		{
+			name:     "no annotation means no mode is offered",
+			mode:     rkev1.RestoreRKEConfigAll,
+			snapshot: snapshotWithModes(t, nil, nil, ""),
+			contains: "is not available",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reason, ok := validateRestoreMode(tt.mode, "snapshot-1", tt.snapshot)
+			if ok != tt.ok {
+				t.Fatalf("ok = %v, want %v (reason: %s)", ok, tt.ok, reason)
+			}
+			if tt.ok {
+				if reason != "" {
+					t.Errorf("expected no reason, got %q", reason)
+				}
+				return
+			}
+			if !strings.Contains(reason, tt.contains) {
+				t.Errorf("reason %q does not contain %q", reason, tt.contains)
+			}
+		})
+	}
+}
+
+// resolveScope builds a scope whose op requests mode, with adapter serving the given restore
+// targets.
+func resolveScope(mode string, adapter *stubAdapter) *scope {
+	s := newTestScope(adapter, types.UID("uid-1"))
+	s.op.Spec.Args.Name = "snapshot-1"
+	s.op.Spec.Args.RestoreMode = mode
+	return s
+}
+
+func TestResolveRestoreMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		mode     string
+		modes    map[string]string
+		res      map[string]any
+		expected []string
+		contains string
+	}{
+		{
+			name:     "kubernetesVersion resolves to the captured version",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			modes:    map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			res:      restoredResources(),
+			expected: []string{"spec.kubernetesVersion"},
+		},
+		{
+			name:  "all expands to every writable field that was captured",
+			mode:  rkev1.RestoreRKEConfigAll,
+			modes: map[string]string{rkev1.RestoreRKEConfigAll: rkev1.RestoreModeSelectorWildcard},
+			res:   restoredResources(),
+			// cloudCredentialSecretName is captured but not writable, so it is dropped.
+			expected: []string{"spec.kubernetesVersion", "spec.rkeConfig.additionalManifest"},
+		},
+		{
+			name:     "a mode the payload does not declare is rejected",
+			mode:     "customMode",
+			modes:    map[string]string{rkev1.RestoreRKEConfigAll: rkev1.RestoreModeSelectorWildcard},
+			res:      restoredResources(),
+			contains: `does not declare restore mode "customMode"`,
+		},
+		{
+			name:     "a selector naming only non-writable fields is rejected",
+			mode:     "credentials",
+			modes:    map[string]string{"credentials": restoremode.Match{ResourceKey: rkev1.SnapshotResourceProvCluster, Path: []string{"spec", "cloudCredentialSecretName"}}.String()},
+			res:      restoredResources(),
+			contains: "selects no field that Rancher restores",
+		},
+		{
+			name:     "an unparsable selector is rejected",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			modes:    map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: "spec.kubernetesVersion"},
+			res:      restoredResources(),
+			contains: "unusable selector",
+		},
+		{
+			name:     "a selector that resolves to nothing is rejected",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			modes:    map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			res:      map[string]any{},
+			contains: "selects no field that Rancher restores",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot := snapshotWithModes(t, tt.modes, tt.res, "none,"+tt.mode)
+			h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+
+			matches, reason, err := h.resolveRestoreMode(resolveScope(tt.mode, defaultAdapter()), tt.mode)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.contains != "" {
+				if !strings.Contains(reason, tt.contains) {
+					t.Fatalf("reason %q does not contain %q", reason, tt.contains)
+				}
+				return
+			}
+			if reason != "" {
+				t.Fatalf("unexpected reason: %s", reason)
+			}
+
+			var got []string
+			for _, m := range matches {
+				got = append(got, strings.Join(m.Path, "."))
+			}
+			assertSameStrings(t, tt.expected, got)
+		})
+	}
+
+	t.Run("a missing snapshot CR is rejected", func(t *testing.T) {
+		h := &handler{etcdsnapshots: &stubSnapshotClient{notFound: true}}
+
+		_, reason, err := h.resolveRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, defaultAdapter()), rkev1.RestoreRKEConfigAll)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(reason, "requires an etcdsnapshot.rke.cattle.io resource") {
+			t.Errorf("unexpected reason: %s", reason)
+		}
+	})
+
+	t.Run("a snapshot with no metadata is rejected", func(t *testing.T) {
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: &rkev1.ETCDSnapshot{
+			ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1", Namespace: "fleet-default"},
+		}}}
+
+		_, reason, err := h.resolveRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, defaultAdapter()), rkev1.RestoreRKEConfigAll)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(reason, "reading metadata") {
+			t.Errorf("unexpected reason: %s", reason)
+		}
+	})
+}
+
+func TestApplyRestoreMode(t *testing.T) {
+	versionMatch := restoremode.Match{
+		ResourceKey: rkev1.SnapshotResourceProvCluster,
+		Path:        []string{"spec", "kubernetesVersion"},
+		Value:       "v1.33.0+rke2r1",
+	}
+
+	t.Run("writes the selected field onto the restore target", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: provClusterTarget(),
+		}
+		h := &handler{}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), []restoremode.Match{versionMatch})
+		if err != nil || reason != "" {
+			t.Fatalf("err = %v, reason = %s", err, reason)
+		}
+		if !applied {
+			t.Fatal("expected the restore to be applied")
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(adapter.updatedTargets))
+		}
+
+		got, found, err := unstructured.NestedString(adapter.updatedTargets[0].Object, "spec", "kubernetesVersion")
+		if err != nil || !found {
+			t.Fatalf("kubernetesVersion not set: found=%v err=%v", found, err)
+		}
+		if got != "v1.33.0+rke2r1" {
+			t.Errorf("kubernetesVersion = %q, want the captured value", got)
+		}
+
+		// Fields the mode did not select are untouched.
+		manifest, _, _ := unstructured.NestedString(adapter.updatedTargets[0].Object, "spec", "rkeConfig", "additionalManifest")
+		if manifest != "# current" {
+			t.Errorf("additionalManifest = %q, want it left alone", manifest)
+		}
+	})
+
+	t.Run("does not write when the field already holds the captured value", func(t *testing.T) {
+		target := provClusterTarget()
+		if err := unstructured.SetNestedField(target.Object, "v1.33.0+rke2r1", "spec", "kubernetesVersion"); err != nil {
+			t.Fatal(err)
+		}
+
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: target,
+		}
+		h := &handler{}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), []restoremode.Match{versionMatch})
+		if err != nil || reason != "" {
+			t.Fatalf("err = %v, reason = %s", err, reason)
+		}
+		if applied {
+			t.Error("expected no update when the value already matches")
+		}
+		if len(adapter.updatedTargets) != 0 {
+			t.Errorf("expected 0 updates, got %d", len(adapter.updatedTargets))
+		}
+	})
+
+	t.Run("a cluster with no counterpart for the resource key is rejected", func(t *testing.T) {
+		// An imported cluster: ImportedAdapter.RestoreTarget always returns (nil, nil), because
+		// nothing upstream holds a configuration to restore.
+		adapter := defaultAdapter()
+		h := &handler{}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), []restoremode.Match{versionMatch})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if applied {
+			t.Error("expected nothing to be applied")
+		}
+		if !strings.Contains(reason, "which this cluster has no counterpart for") {
+			t.Errorf("unexpected reason: %s", reason)
+		}
+	})
+
+	t.Run("propagates a restore target error", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargetErr = fmt.Errorf("boom")
+		h := &handler{}
+
+		if _, _, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, adapter), []restoremode.Match{versionMatch}); err == nil {
+			t.Error("expected the error to propagate")
+		}
+	})
+
+	t.Run("propagates an update error", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: provClusterTarget(),
+		}
+		adapter.updateRestoreErr = fmt.Errorf("boom")
+		h := &handler{}
+
+		if _, _, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, adapter), []restoremode.Match{versionMatch}); err == nil {
+			t.Error("expected the error to propagate")
+		}
+	})
+}
+
+func TestReconcileRestoreClusterConfig(t *testing.T) {
+	t.Run("a mode restoring nothing advances straight to shutdown", func(t *testing.T) {
+		adapter := defaultAdapter()
+		h := &handler{}
+		s := resolveScope(rkev1.RestoreRKEConfigNone, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
+		}
+		if len(adapter.restoreTargetKeys) != 0 {
+			t.Errorf("expected no restore target lookups, got %v", adapter.restoreTargetKeys)
+		}
+	})
+
+	t.Run("applies the mode then advances on the next reconcile", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: provClusterTarget(),
+		}
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		s := resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter)
+
+		// First pass writes and stays in the step, because the caches this reconcile read are now
+		// stale.
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig {
+			t.Errorf("step = %q, want to stay in RestoreClusterConfig", status.Step)
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(adapter.updatedTargets))
+		}
+
+		// Second pass sees the applied value and advances without writing again.
+		status, err = h.reconcileRestoreClusterConfig(s, status)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Errorf("expected no second update, got %d", len(adapter.updatedTargets))
+		}
+	})
+
+	t.Run("cancels when the mode cannot be resolved", func(t *testing.T) {
+		adapter := defaultAdapter()
+		h := &handler{etcdsnapshots: &stubSnapshotClient{notFound: true}}
+		s := resolveScope(rkev1.RestoreRKEConfigAll, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Phase != opv1alpha1.OperationPhaseCanceled {
+			t.Errorf("phase = %q, want Canceled", status.Phase)
+		}
+	})
+
+	t.Run("cancels rather than silently restoring nothing", func(t *testing.T) {
+		// The mode resolves, but this cluster type has no object to write it to. Degrading to a
+		// plain etcd restore would give the user something they did not ask for.
+		adapter := defaultAdapter()
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		s := resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Phase != opv1alpha1.OperationPhaseCanceled {
+			t.Errorf("phase = %q, want Canceled", status.Phase)
+		}
+	})
+
+}
+
+// TestStepHookPrefixForCoversEveryStep guards the wiring a new step needs: a step missing from
+// stepHookPrefixFor silently loses its lifecycle hook, and handleInProgress's beacon-loss handling
+// consults the prefix to tell an intentional delegation from a genuine loss.
+func TestStepHookPrefixForCoversEveryStep(t *testing.T) {
+	t.Parallel()
+
+	steps := []opv1alpha1.ETCDSnapshotRestoreStep{
+		opv1alpha1.ETCDSnapshotRestoreStepPreflight,
+		opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		opv1alpha1.ETCDSnapshotRestoreStepShutdown,
+		opv1alpha1.ETCDSnapshotRestoreStepRestore,
+		opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,
+		opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster,
+		opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup,
+		opv1alpha1.ETCDSnapshotRestoreStepRestartCluster,
+	}
+
+	seen := map[string]opv1alpha1.ETCDSnapshotRestoreStep{}
+	for _, step := range steps {
+		prefix := stepHookPrefixFor(step)
+		if prefix == "" {
+			t.Errorf("step %q has no hook prefix", step)
+			continue
+		}
+		if other, ok := seen[prefix]; ok {
+			t.Errorf("steps %q and %q share hook prefix %q", step, other, prefix)
+		}
+		seen[prefix] = step
+	}
+}
+
+func assertSameStrings(t *testing.T, want, got []string) {
+	t.Helper()
+
+	if len(want) != len(got) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	remaining := map[string]int{}
+	for _, w := range want {
+		remaining[w]++
+	}
+	for _, g := range got {
+		remaining[g]--
+	}
+	for k, count := range remaining {
+		if count != 0 {
+			t.Fatalf("got %v, want %v (mismatch on %q)", got, want, k)
+		}
 	}
 }

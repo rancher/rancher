@@ -146,6 +146,20 @@ type Adapter interface {
 	// will create an operation for the management cluster object, but the true object is the CAPI cluster.
 	ClusterObject() (*unstructured.Unstructured, error)
 
+	// RestoreTarget returns the live object that resourceKey addresses for this cluster type, where
+	// resourceKey is one of the keys an etcd snapshot's `resources` metadata is published under
+	// (e.g. "cluster.provisioning.cattle.io"). Returns (nil, nil) when this cluster type has no
+	// such object, which makes any restore mode selecting it unavailable.
+	//
+	// This is deliberately not ClusterObject: the object whose configuration a restore writes back
+	// is not the one the operation controllers plan against. For v2prov it is the provv1.Cluster,
+	// because the provisioner regenerates the RKEControlPlane from it; for CAPRKE2 it is the
+	// RKE2ControlPlane, which the CAPI Cluster ClusterObject returns does not carry.
+	RestoreTarget(resourceKey string) (*unstructured.Unstructured, error)
+
+	// UpdateRestoreTarget persists modifications made to an object returned by RestoreTarget.
+	UpdateRestoreTarget(obj *unstructured.Unstructured) error
+
 	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
 	// all expected nodes.
 	WaitForRegister() (bool, error)

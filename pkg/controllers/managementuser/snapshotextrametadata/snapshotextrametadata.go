@@ -38,9 +38,9 @@ const (
 
 	// Resource keys addressing the objects published in the resources section. Restore mode
 	// selectors are rooted at this section, so a selector's first segment is one of these keys.
-	mgmtClusterKey      = "cluster.management.cattle.io"
-	provClusterKey      = "cluster.provisioning.cattle.io"
-	rke2ControlPlaneKey = "rke2controlplane.controlplane.cluster.x-k8s.io"
+	mgmtClusterKey      = rkev1.SnapshotResourceMgmtCluster
+	provClusterKey      = rkev1.SnapshotResourceProvCluster
+	rke2ControlPlaneKey = rkev1.SnapshotResourceRKE2ControlPlane
 
 	// administratedAnnotation marks a mgmt v3 Cluster shell whose real configuration lives on a
 	// provisioning cluster. Matches the check in pkg/operations/imported.go.

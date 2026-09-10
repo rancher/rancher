@@ -6,6 +6,7 @@ import (
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -71,6 +72,34 @@ func (a *CAPRKE2Adapter) ClusterObject() (*unstructured.Unstructured, error) {
 	}
 
 	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+// RestoreTarget returns the RKE2ControlPlane for its resource key. ClusterObject returns the CAPI
+// Cluster, which carries none of the cluster's configuration — the RKE2ControlPlane holds the
+// Kubernetes version and server config a restore writes back. Fetched dynamically because CAPRKE2's
+// CRDs only exist once turtles is enabled, so there is no generated typed cache for them.
+func (a *CAPRKE2Adapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceRKE2ControlPlane {
+		return nil, nil
+	}
+
+	obj, err := a.clients.Dynamic.Get(controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlane"), a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("expected *unstructured.Unstructured for RKE2ControlPlane %s/%s, got %T",
+			a.controlPlane.Namespace, a.controlPlane.Name, obj)
+	}
+
+	return ustr, nil
+}
+
+func (a *CAPRKE2Adapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	_, err := a.clients.Dynamic.Update(obj)
+	return err
 }
 
 // ToS3ArgsEnvAndFiles returns the S3 args/env/files that should be appended to an etcd-snapshot

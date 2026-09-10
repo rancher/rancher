@@ -134,6 +134,19 @@ func (a *ImportedAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{Object: ustr}, nil
 }
 
+// RestoreTarget always returns (nil, nil): nothing upstream provisions a true imported cluster, so
+// there is no object holding a configuration to restore. The mgmt v3 Cluster looks like a candidate
+// but is not one — clusterprovisioner writes its spec.rke2Config/spec.k3sConfig *from* the version
+// the cluster reports, so a restored value would be overwritten on the next reconcile. Imported
+// clusters therefore support the "none" restore mode only.
+func (a *ImportedAdapter) RestoreTarget(_ string) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (a *ImportedAdapter) UpdateRestoreTarget(_ *unstructured.Unstructured) error {
+	return fmt.Errorf("imported clusters have no restorable cluster configuration")
+}
+
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
 	return "127.0.0.1"
 }

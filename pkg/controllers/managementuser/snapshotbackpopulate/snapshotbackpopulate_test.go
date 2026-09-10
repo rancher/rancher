@@ -723,7 +723,7 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 					DoAndReturn(func(created *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
 						annotations := created.GetAnnotations()
 						require.NotNil(t, annotations)
-						assert.Equal(t, tc.expectedAnnotation, annotations[RestoreModeOptionsAnnotation], "Annotation should be set correctly")
+						assert.Equal(t, tc.expectedAnnotation, annotations[capr.RestoreModeOptionsAnnotation], "Annotation should be set correctly")
 
 						assert.Equal(t, "successful", created.SnapshotFile.Status, "Status should be successful because ReadyToUse is true")
 
@@ -1250,7 +1250,10 @@ func TestGetRestoreModesAnnotationFromExtraMetadata(t *testing.T) {
 			expected: "none,kubernetesVersion,all",
 		},
 		{
-			name: "kubernetesVersion selector points at a field that was not captured",
+			// Nothing restorable was captured, so neither kubernetesVersion nor the wildcard "all"
+			// resolves: restoremode.Resolve expands the wildcard over restoremode.WritablePaths, so
+			// "all" is offered only when a field it would actually write was captured.
+			name: "nothing restorable was captured",
 			metadata: map[string]string{
 				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
 				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
@@ -1259,7 +1262,7 @@ func TestGetRestoreModesAnnotationFromExtraMetadata(t *testing.T) {
 					},
 				}),
 			},
-			expected: "none,all",
+			expected: "none",
 		},
 		{
 			name: "kubernetesVersion selector resolves to an empty value",
@@ -1268,6 +1271,22 @@ func TestGetRestoreModesAnnotationFromExtraMetadata(t *testing.T) {
 				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
 					provClusterResourceKey: map[string]any{
 						"spec": map[string]any{"kubernetesVersion": ""},
+					},
+				}),
+			},
+			expected: "none",
+		},
+		{
+			// kubernetesVersion was not captured but another writable field was, so "all" stands on
+			// its own.
+			name: "only a field other than kubernetesVersion was captured",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataRestoreModesKey: marshalRestoreModes(t, allModes),
+				rkev1.SnapshotMetadataResourcesKey: compressResources(t, map[string]any{
+					provClusterResourceKey: map[string]any{
+						"spec": map[string]any{
+							"rkeConfig": map[string]any{"additionalManifest": "# manifest"},
+						},
 					},
 				}),
 			},
@@ -1390,71 +1409,4 @@ func TestGetRestoreModesAnnotationFromExtraMetadata(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestSelectorResolves(t *testing.T) {
-	t.Parallel()
-
-	resources := map[string]any{
-		provClusterResourceKey: map[string]any{
-			"spec": map[string]any{
-				"kubernetesVersion": "v1.34.1+rke2r1",
-				"emptyString":       "",
-				"emptyMap":          map[string]any{},
-				"emptyList":         []any{},
-				"null":              nil,
-				"machinePools": []any{
-					map[string]any{"name": "pool1"},
-				},
-			},
-		},
-	}
-
-	tests := []struct {
-		name     string
-		selector string
-		resolves bool
-		wantErr  bool
-	}{
-		{name: "empty selector always resolves", selector: "", resolves: true},
-		{name: "wildcard resolves against a populated payload", selector: rkev1.RestoreModeSelectorWildcard, resolves: true},
-		{name: "bracket notation through a dotted resource key", selector: "$['" + provClusterResourceKey + "']['spec']['kubernetesVersion']", resolves: true},
-		{name: "resource key alone", selector: "$['" + provClusterResourceKey + "']", resolves: true},
-		{name: "dot notation after a dotted resource key", selector: "$['" + provClusterResourceKey + "'].spec.kubernetesVersion", resolves: true},
-		// Why snapshotextrametadata.selector bracket-quotes every segment rather than just the
-		// resource key: rancher/jsonpath rejects digits in dot-notation identifiers, so a dotted
-		// "rke2Config" is unparsable.
-		{name: "dot notation identifier containing a digit", selector: "$['cluster.management.cattle.io'].spec.rke2Config.kubernetesVersion", wantErr: true},
-		{name: "missing field", selector: "$['" + provClusterResourceKey + "']['spec']['missing']", resolves: false},
-		{name: "missing resource", selector: "$['cluster.management.cattle.io']['spec']['rke2Config']", resolves: false},
-		{name: "empty string field", selector: "$['" + provClusterResourceKey + "']['spec']['emptyString']", resolves: false},
-		{name: "empty map field", selector: "$['" + provClusterResourceKey + "']['spec']['emptyMap']", resolves: false},
-		{name: "empty list field", selector: "$['" + provClusterResourceKey + "']['spec']['emptyList']", resolves: false},
-		{name: "null field", selector: "$['" + provClusterResourceKey + "']['spec']['null']", resolves: false},
-		{name: "indexed list element", selector: "$['" + provClusterResourceKey + "']['spec']['machinePools'][0]['name']", resolves: true},
-		{name: "recursive descent", selector: "$..kubernetesVersion", resolves: true},
-		{name: "selector without a root identifier", selector: "spec.kubernetesVersion", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			resolves, err := selectorResolves(tt.selector, resources)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.resolves, resolves)
-		})
-	}
-
-	t.Run("wildcard does not resolve against an empty payload", func(t *testing.T) {
-		t.Parallel()
-
-		resolves, err := selectorResolves(rkev1.RestoreModeSelectorWildcard, map[string]any{})
-		require.NoError(t, err)
-		assert.False(t, resolves)
-	})
 }
