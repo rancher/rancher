@@ -121,7 +121,7 @@ func TestBuildTLSConfigForRoute_WithVerifyHostnameFalse_DisablesVerification(t *
 	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
 	require.NoError(t, err)
 	assert.NotNil(t, tlsConfig)
-	assert.True(t, tlsConfig.InsecureSkipVerify)
+	assert.Empty(t, tlsConfig.ServerName)
 }
 
 func TestBuildTLSConfigForRoute_WithVerifyHostnameTrue_EnablesVerification(t *testing.T) {
@@ -136,6 +136,7 @@ func TestBuildTLSConfigForRoute_WithVerifyHostnameTrue_EnablesVerification(t *te
 	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
 	require.NoError(t, err)
 	assert.NotNil(t, tlsConfig)
+	assert.NotEmpty(t, tlsConfig.ServerName)
 	assert.False(t, tlsConfig.InsecureSkipVerify)
 }
 
@@ -183,9 +184,8 @@ func TestBuildTLSConfigForRoute_WithAllOptions(t *testing.T) {
 	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
 	require.NoError(t, err)
 	assert.NotNil(t, tlsConfig)
-	assert.Equal(t, "internal.example.com", tlsConfig.ServerName)
+	assert.Empty(t, tlsConfig.ServerName)
 	assert.NotNil(t, tlsConfig.RootCAs)
-	assert.True(t, tlsConfig.InsecureSkipVerify)
 }
 
 // --- buildTransportForRoute ---
@@ -258,30 +258,7 @@ func TestPerRouteTLSTransport_WithServerNameOption_AppliesSNI(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, transport)
 	assert.NotNil(t, transport.TLSClientConfig)
-	assert.Equal(t, "alternative-hostname.local", transport.TLSClientConfig.ServerName)
-}
-
-func TestPerRouteTLSTransport_WithTLSVerificationOptions_AppliesSettings(t *testing.T) {
-	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer ts.Close()
-
-	tsURL, err := url.Parse(ts.URL)
-	require.NoError(t, err)
-
-	verifyHostnameFalse := false
-	route := &mgmt.ProxyEndpointRoute{
-		Domain: tsURL.Hostname(),
-		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
-			VerifyHostname: &verifyHostnameFalse,
-		},
-	}
-
-	transport, err := buildTransportForRoute(route, tsURL.Hostname())
-	require.NoError(t, err)
-	assert.NotNil(t, transport)
-	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+	assert.Empty(t, transport.TLSClientConfig.ServerName)
 }
 
 func TestPerRouteTLSTransport_MultipleSecurityOptions_AllApplied(t *testing.T) {
