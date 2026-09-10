@@ -39,6 +39,14 @@ func TestK3sImages(t *testing.T) {
 			err: "general network failure",
 		},
 		{
+			name:    "valid prerelease version",
+			version: "v1.37.0-rc2+k3s1",
+			fetcher: func(s string) (io.ReadCloser, error) {
+				return io.NopCloser(strings.NewReader("")), nil
+			},
+			want: []string{},
+		},
+		{
 			name:    "valid version: empty fetch",
 			version: "v1.2.3+k3s0",
 			fetcher: func(s string) (io.ReadCloser, error) {

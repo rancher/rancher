@@ -528,7 +528,7 @@ func ensureInternalCertSANs(secrets corev1controllers.SecretController, clusterI
 	}
 
 	// If the clusterIP is already recorded in the SAN annotations, nothing to do.
-	if !factory.NeedsUpdate(0, secret, clusterIP) {
+	if !(&factory.TLS{}).NeedsUpdate(0, secret, clusterIP) {
 		return nil
 	}
 
