@@ -71,9 +71,9 @@ func addLocalCluster(embedded bool, clusters mgmtcontrollers.ClusterClient, name
 		}
 	}
 
-	// The "local" namespace is the cluster namespace of the local cluster: it holds the
-	// namespaced management.cattle.io resources that belong to it. No namespace is created when the multi-cluster-management-agent feature is enabled.
-	// since its the Downstream cluster, creating the "local" namespace is unnecessary.
+	// The "local" namespace is the cluster namespace of the local cluster and holds its
+	// namespaced management.cattle.io resources. A downstream cluster (MCMAgent enabled)
+	// does not need this namespace.
 	if features.MCMAgent.Enabled() {
 		return nil
 	}
