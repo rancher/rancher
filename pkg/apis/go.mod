@@ -9,9 +9,7 @@ replace (
 	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260902103845-8111ed396886
 	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e1194d9
 	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb
-	github.com/rancher/lasso => github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7
 	github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
-	github.com/rancher/wrangler/v3 => github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545
 )
 
 replace (
@@ -53,7 +51,7 @@ require (
 	github.com/rancher/gke-operator v1.15.0
 	github.com/rancher/norman v0.10.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
-	github.com/rancher/wrangler/v3 v3.7.1
+	github.com/rancher/wrangler/v3 v3.8.0-rc.1
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
 	k8s.io/api v0.37.0
@@ -94,7 +92,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.0 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
-	github.com/rancher/lasso v0.2.9 // indirect
+	github.com/rancher/lasso v0.2.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
