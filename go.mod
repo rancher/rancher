@@ -119,7 +119,7 @@ require (
 	github.com/rancher/apiserver v0.9.9
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.0
-	github.com/rancher/dynamiclistener v0.9.1
+	github.com/rancher/dynamiclistener v0.9.3
 	github.com/rancher/eks-operator v1.15.2-rc.1
 	github.com/rancher/fleet/pkg/apis v0.16.1
 	github.com/rancher/gke-operator v1.15.3-rc.1
@@ -135,12 +135,12 @@ require (
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.8.0
 	github.com/rancher/shepherd v0.0.0-20260610155525-6d926c75d49a
-	github.com/rancher/steve v0.9.21
+	github.com/rancher/steve v0.9.22
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
 	github.com/rancher/wrangler/v3 v3.7.1
 	github.com/robfig/cron v1.2.0
-	github.com/sirupsen/logrus v1.9.4
-	github.com/stretchr/testify v1.11.1
+	github.com/sirupsen/logrus v1.10.2
+	github.com/stretchr/testify v1.12.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.17
 	github.com/vmware/govmomi v0.42.0
@@ -289,7 +289,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
