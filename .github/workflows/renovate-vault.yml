@@ -38,7 +38,7 @@ on:
         type: string
 
   schedule:
-    - cron: '30 4,6 * * 1-5'
+    - cron: '30 6 * * 1-5'
 
 permissions: {}
 
@@ -48,7 +48,7 @@ jobs:
       contents: read
       id-token: write # Required for Vault OIDC authentication.
     # https://github.com/rancher/renovate-config/releases
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@481512bc69c6d1eb0b14781b854ee3b588233c25 # Grant Renovate status permission
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@b20e059a3642b4f6add6f9db276349daca5ea54e # v1.0.10
     # Note: github.event.inputs.<name> with '||' fallbacks is used across all inputs
     # so that scheduled cron runs (where github.event.inputs is null) safely default.
     with:
