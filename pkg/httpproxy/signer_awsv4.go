@@ -33,10 +33,8 @@ var requiredHeadersForAws = map[string]bool{"host": true,
 	"x-amz-user-agent":     true}
 
 func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error {
-	// logrus.Infof("QQQ: >> awsv4 signing request for %s", req.URL.String())
 	_, secret, err := getAuthData(auth, secrets, []string{"credID"})
 	if err != nil {
-		// logrus.Infof("QQQ: awsv4.sign: error getting auth data for awsv4 signing: %v", err)
 		return err
 	}
 	service, region := a.getServiceAndRegion(req.URL.Host)
@@ -65,7 +63,6 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 	req.Header = newHeader
 	err = awsSigner.SignHTTP(req.Context(), credentialProvider.Value, req, payloadHash, service, region, time.Now())
 	if err != nil {
-		// logrus.Infof("QQQ: awsv4: error signing request: %v", err)
 		return err
 	}
 
