@@ -7,6 +7,19 @@ import (
 const (
 	SnapshotMetadataClusterSpecKey = "provisioning-cluster-spec"
 
+	// SnapshotMetadataResourcesKey holds the objects a snapshot can be restored from, as a
+	// base64/gzip encoded map of resource type to object.
+	SnapshotMetadataResourcesKey = "resources"
+
+	// SnapshotMetadataRestoreModesKey holds the restore modes a snapshot offers, as a JSON map of
+	// mode name to a selector rooted at the resources payload. The selector identifies the fields
+	// the mode restores; an empty selector restores nothing and RestoreModeSelectorWildcard
+	// restores everything.
+	SnapshotMetadataRestoreModesKey = "restoreModes"
+
+	// RestoreModeSelectorWildcard is the restore mode selector meaning "every published field".
+	RestoreModeSelectorWildcard = "*"
+
 	RestoreRKEConfigNone              = "none"
 	RestoreRKEConfigKubernetesVersion = "kubernetesVersion"
 	RestoreRKEConfigAll               = "all"

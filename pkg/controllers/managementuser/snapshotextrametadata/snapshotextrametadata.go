@@ -13,6 +13,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
@@ -32,8 +33,8 @@ import (
 const (
 	configMapName = "rke2-etcd-snapshot-extra-metadata"
 
-	resourcesKey    = "resources"
-	restoreModesKey = "restoreModes"
+	resourcesKey    = rkev1.SnapshotMetadataResourcesKey
+	restoreModesKey = rkev1.SnapshotMetadataRestoreModesKey
 
 	// Resource keys addressing the objects published in the resources section. Restore mode
 	// selectors are rooted at this section, so a selector's first segment is one of these keys.
@@ -165,6 +166,10 @@ type adapter interface {
 	// resources returns every object to publish for this cluster.
 	resources() ([]resource, error)
 
+	// configMapName returns the name of the configMap in the kube-system namespace storing the
+	// snapshot's extra metadata.
+	configMapName() string
+
 	// kubernetesVersionSelector returns the selector, rooted at the resources section, for the
 	// field the kubernetesVersion restore mode restores.
 	kubernetesVersionSelector() string
@@ -259,8 +264,19 @@ func (a *importedAdapter) resources() ([]resource, error) {
 	return []resource{{key: mgmtClusterKey, obj: a.cluster}}, nil
 }
 
+func (a *importedAdapter) configMapName() string {
+	distro := "rke2"
+	if strings.Contains(a.cluster.Status.Version.String(), "k3s") {
+		distro = "k3s"
+	}
+	return fmt.Sprintf("%s-etcd-snapshot-extra-metadata", distro)
+}
+
 func (a *importedAdapter) kubernetesVersionSelector() string {
-	return selector(mgmtClusterKey, "spec", "rke2Config", "kubernetesVersion")
+	if strings.Contains(a.cluster.Status.Version.String(), "rke2") {
+		return selector(mgmtClusterKey, "spec", "rke2Config", "kubernetesVersion")
+	}
+	return selector(mgmtClusterKey, "spec", "k3sConfig", "kubernetesVersion")
 }
 
 // provisioningAdapter handles a v2prov cluster. The provisioning Cluster holds the authoritative
@@ -271,6 +287,13 @@ type provisioningAdapter struct {
 
 func (a *provisioningAdapter) resources() ([]resource, error) {
 	return []resource{{key: provClusterKey, obj: a.cluster}}, nil
+}
+
+func (a *provisioningAdapter) configMapName() string {
+	if strings.Contains(a.cluster.Spec.KubernetesVersion, "rke2") {
+		return "rke2-etcd-snapshot-extra-metadata"
+	}
+	return "k3s-etcd-snapshot-extra-metadata"
 }
 
 func (a *provisioningAdapter) kubernetesVersionSelector() string {
@@ -287,14 +310,25 @@ func (a *caprke2Adapter) resources() ([]resource, error) {
 	return []resource{{key: rke2ControlPlaneKey, obj: a.controlPlane}}, nil
 }
 
+func (a *caprke2Adapter) configMapName() string {
+	return "rke2-etcd-snapshot-extra-metadata"
+}
+
 func (a *caprke2Adapter) kubernetesVersionSelector() string {
 	return selector(rke2ControlPlaneKey, "spec", "version")
 }
 
-// selector renders a JSONPath into the resources section. The resource key is bracket-quoted
-// because it contains dots.
+// selector renders a JSONPath into the resources section. Every segment is bracket-quoted, not just
+// the dotted resource key: rancher/jsonpath is the only parser in the tree that handles a
+// bracket-quoted key containing dots, and it rejects digits in dot-notation identifiers, which rules
+// out segments like "rke2Config".
 func selector(key string, fields ...string) string {
-	return fmt.Sprintf("$['%s'].%s", key, strings.Join(fields, "."))
+	var b strings.Builder
+	b.WriteString("$")
+	for _, segment := range append([]string{key}, fields...) {
+		fmt.Fprintf(&b, "['%s']", segment)
+	}
+	return b.String()
 }
 
 // renderData builds the data of the etcd snapshot extra metadata ConfigMap. RKE2/K3s copy every key
@@ -323,9 +357,9 @@ func renderData(a adapter) (map[string]string, error) {
 	}
 
 	restoreModes := map[string]any{
-		"all":               "*",
-		"kubernetesVersion": a.kubernetesVersionSelector(),
-		"none":              "",
+		rkev1.RestoreRKEConfigAll:               rkev1.RestoreModeSelectorWildcard,
+		rkev1.RestoreRKEConfigKubernetesVersion: a.kubernetesVersionSelector(),
+		rkev1.RestoreRKEConfigNone:              "",
 	}
 
 	out, err := json.Marshal(restoreModes)
