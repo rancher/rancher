@@ -205,6 +205,57 @@ func TestCreate(t *testing.T) {
 			wantErr:    "password cannot be the same as the username",
 		},
 		{
+			desc: "same user cannot reuse current password",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     oldPassword,
+				},
+			},
+			ctx:        request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			pwdUpdater: pwdUpdater,
+			userCache:  userCache,
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "", nil
+			}),
+			wantErr: "new password must not be the same as the current password",
+		},
+		{
+			desc: "same user with mustChangePassword cannot reuse current password",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     oldPassword,
+				},
+			},
+			ctx:        request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			pwdUpdater: pwdUpdater,
+			userCache:  userWithMustChangePasswordCache,
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "", nil
+			}),
+			wantErr: "new password must not be the same as the current password",
+		},
+		{
+			desc: "privileged user cannot reuse current password for self",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     oldPassword,
+				},
+			},
+			ctx:        request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			pwdUpdater: pwdUpdater,
+			userCache:  userCache,
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			wantErr: "new password must not be the same as the current password",
+		},
+		{
 			desc: "user not found",
 			obj: &ext.PasswordChangeRequest{
 				Spec: ext.PasswordChangeRequestSpec{
