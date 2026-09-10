@@ -265,18 +265,25 @@ func (a *importedAdapter) resources() ([]resource, error) {
 }
 
 func (a *importedAdapter) configMapName() string {
-	distro := "rke2"
-	if strings.Contains(a.cluster.Status.Version.String(), "k3s") {
-		distro = "k3s"
-	}
-	return fmt.Sprintf("%s-etcd-snapshot-extra-metadata", distro)
+	return fmt.Sprintf("%s-etcd-snapshot-extra-metadata", a.distro())
 }
 
+// kubernetesVersionSelector points at the distro config k3sbasedupgrade reads for this cluster. Only
+// the config matching the driver is ever populated, so selecting the wrong one would offer a mode
+// that resolves to nothing.
 func (a *importedAdapter) kubernetesVersionSelector() string {
-	if strings.Contains(a.cluster.Status.Version.String(), "rke2") {
-		return selector(mgmtClusterKey, "spec", "rke2Config", "kubernetesVersion")
+	return selector(mgmtClusterKey, "spec", a.distro()+"Config", "kubernetesVersion")
+}
+
+// distro returns the runtime this imported cluster runs, keyed off Status.Driver — the same signal
+// k3sbasedupgrade branches on. Status.Version is deliberately not used: it is a *version.Info with a
+// value-receiver String(), so reading it panics on a cluster that has not reported a version yet,
+// and onChange runs for every mgmt cluster change.
+func (a *importedAdapter) distro() string {
+	if a.cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+		return capr.RuntimeK3S
 	}
-	return selector(mgmtClusterKey, "spec", "k3sConfig", "kubernetesVersion")
+	return capr.RuntimeRKE2
 }
 
 // provisioningAdapter handles a v2prov cluster. The provisioning Cluster holds the authoritative

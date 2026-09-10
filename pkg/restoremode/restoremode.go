@@ -70,9 +70,19 @@ var WritablePaths = map[string][][]string{
 	rkev1.SnapshotResourceRKE2ControlPlane: {
 		{"spec", "version"},
 	},
-	// SnapshotResourceMgmtCluster has no entry on purpose. clusterprovisioner writes
-	// spec.rke2Config.kubernetesVersion *from* the cluster's reported status, so restoring it would
-	// be overwritten on the next reconcile. Imported clusters support "none" only.
+	// An imported RKE2/K3s cluster's desired version lives on the mgmt cluster: k3sbasedupgrade
+	// reads spec.rke2Config.kubernetesVersion or spec.k3sConfig.kubernetesVersion (per
+	// Status.Driver) and drives the downstream system-upgrade-controller plans from it. Only the
+	// distro config Status.Driver selects is ever populated, so listing both is safe — the other
+	// resolves to nothing. clusterprovisioner initialises that config when it is nil but does not
+	// overwrite an existing version, so a restored value survives.
+	rkev1.SnapshotResourceMgmtCluster: {
+		{"spec", "rke2Config", "kubernetesVersion"},
+		{"spec", "k3sConfig", "kubernetesVersion"},
+		{"spec", "clusterAgentDeploymentCustomization"},
+		{"spec", "fleetAgentDeploymentCustomization"},
+		{"spec", "webhookDeploymentCustomization"},
+	},
 }
 
 // Resources decompresses the resources payload out of a snapshot's metadata. A snapshot with no

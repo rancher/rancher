@@ -816,8 +816,8 @@ func validateRestoreMode(mode, snapshotName string, snapshot *rkev1.ETCDSnapshot
 // selects, as captured in the snapshot's metadata, back onto the object that owns the cluster.
 //
 // This runs before Shutdown, matching the legacy ordering where the cluster spec was updated before
-// the restore began, and well before the first PauseCluster(false) in reconcileRestartCluster — so
-// the provisioner observes the restored configuration when it resumes reconciling.
+// the restore began. It is also why the Restore step can install the right Kubernetes version: the
+// configuration is in place, and propagated, before any node plan is built from it.
 func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling restore cluster config", s.op.Namespace, s.op.Name)
 
@@ -877,6 +877,24 @@ func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCD
 		opv1alpha1.InProgressCondition.True(&status)
 		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
 		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: applying restore mode %q", status.Step, mode))
+
+		return status, nil
+	}
+
+	// The restored configuration is on the restore target, but the objects rendered off it may not
+	// have caught up. Later steps build node plans from those — the Restore step installs the
+	// Kubernetes version they carry — so hold here until they are current rather than racing ahead
+	// and restoring with the pre-restore configuration.
+	settled, err := s.adapter.WaitForRestoreTarget()
+	if err != nil {
+		return status, err
+	}
+	if !settled {
+		logrus.Infof("[etcdsnapshotrestore] %s/%s: waiting for the cluster to observe the restored configuration", s.op.Namespace, s.op.Name)
+
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: waiting for the cluster to observe the restored configuration", status.Step))
 
 		return status, nil
 	}
@@ -1152,54 +1170,9 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
-	value := s.idempotencyValue()
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
-	args := []string{
-		"server",
-		"--cluster-reset",
-		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
-		"--etcd-disable-snapshots=false",
-	}
-
-	var env []string
-
-	files := []plan.File{
-		{
-			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
-			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-		},
-		ops.IdempotentScriptFile(provisioningDir),
-	}
-
-	if snapshot == nil {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
-	} else if snapshot.SnapshotFile.S3 == nil {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
-	} else {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
-		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
-		args = append(args, s3Args...)
-		env = append(env, s3Env...)
-		files = append(files, s3Files...)
-	}
-
-	nodePlan := &plan.Plan{
-		Files: files,
-		OneTimeInstructions: []plan.OneTimeInstruction{
-			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    "remove-etcd-db-dir",
-					Command: "rm",
-					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
-				},
-			}),
-			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
-		},
-	}
-
-	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildRestorePlan(s, secret, snapshot, snapshotName), opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1729,6 +1702,73 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 // buildPostRestoreNodeCleanupPlan assembles the plan that runs the node-cleanup script on the init
 // node. A non-empty skipReason signals that the caller should skip the cleanup phase entirely (the
 // returned plan is nil in that case).
+// buildRestorePlan builds the plan that resets etcd from the snapshot on the elected leader:
+// reinstall the configured distro version, wipe the etcd data directory, then `--cluster-reset`
+// onto the snapshot. A nil snapshot means no ETCDSnapshot resource exists and snapshotName names a
+// file already on disk.
+func buildRestorePlan(s *scope, secret *corev1.Secret, snapshot *rkev1.ETCDSnapshot, snapshotName string) *plan.Plan {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	value := s.idempotencyValue()
+
+	args := []string{
+		"server",
+		"--cluster-reset",
+		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
+		"--etcd-disable-snapshots=false",
+	}
+
+	var env []string
+
+	files := []plan.File{
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
+			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+		},
+		ops.IdempotentScriptFile(provisioningDir),
+	}
+
+	if snapshot == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
+	} else if snapshot.SnapshotFile.S3 == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
+	} else {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
+		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
+		args = append(args, s3Args...)
+		env = append(env, s3Env...)
+		files = append(files, s3Files...)
+	}
+
+	var instructions []plan.OneTimeInstruction
+
+	// Install the configured Kubernetes version before resetting, so a snapshot taken on an older
+	// version is restored by that version's binary — a newer server cannot --cluster-reset onto
+	// older etcd data. This is what makes a downgrade-on-restore work, mirroring the
+	// install-with-skip-start in the legacy planner's restore plan. The RestoreClusterConfig step
+	// has already written the snapshot's version onto the cluster and waited for it to propagate, so
+	// "the configured version" here is the version being restored to.
+	if install, ok := s.adapter.InstallInstruction(secret); ok {
+		instructions = append(instructions, ops.ConvertToIdempotentInstruction(
+			provisioningDir, idempotencyKey+"/install", value, install))
+	}
+
+	instructions = append(instructions,
+		ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
+			CommonInstruction: plan.CommonInstruction{
+				Name:    "remove-etcd-db-dir",
+				Command: "rm",
+				Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
+			},
+		}),
+		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
+	)
+
+	return &plan.Plan{
+		Files:               files,
+		OneTimeInstructions: instructions,
+	}
+}
+
 func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSecrets []*corev1.Secret) (*plan.Plan, string) {
 	kubectl := s.adapter.KubectlPath(initSecret)
 	kubeconfig := s.adapter.KubeconfigPath(initSecret)

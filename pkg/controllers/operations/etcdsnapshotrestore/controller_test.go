@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 	"testing"
 
@@ -59,6 +60,15 @@ type stubAdapter struct {
 	updatedTargets    []*unstructured.Unstructured
 	updateRestoreErr  error
 	restoreTargetKeys []string
+
+	// restoreTargetSettled is what WaitForRestoreTarget reports. The zero value is false so a test
+	// has to opt in to the settled state, mirroring a cluster that has not yet observed a write.
+	restoreTargetSettled bool
+	waitRestoreTargetErr error
+
+	// installVersion, when set, is the Kubernetes version InstallInstruction installs. Empty means
+	// this cluster type does not manage its distro version.
+	installVersion string
 }
 
 func (a *stubAdapter) EtcdSnapshotNamespace() string {
@@ -95,6 +105,28 @@ func (a *stubAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error 
 		}
 	}
 	return nil
+}
+
+func (a *stubAdapter) WaitForRestoreTarget() (bool, error) {
+	return a.restoreTargetSettled, a.waitRestoreTargetErr
+}
+
+func (a *stubAdapter) InstallInstruction(secret *corev1.Secret) (planapi.OneTimeInstruction, bool) {
+	if a.installVersion == "" {
+		return planapi.OneTimeInstruction{}, false
+	}
+	return planapi.OneTimeInstruction{
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "install",
+			Image:   "rancher/system-agent-installer-rke2:" + strings.ReplaceAll(a.installVersion, "+", "-"),
+			Command: "sh",
+			Args:    []string{"-c", "run.sh"},
+			Env: []string{
+				"INSTALL_RKE2_SKIP_START=true",
+				"RKE2_DATA_DIR=" + a.DistroDataDirectory(secret),
+			},
+		},
+	}, true
 }
 
 func (a *stubAdapter) BeaconRef() (string, string)                       { return "test-namespace", "test-cluster" }
@@ -857,6 +889,7 @@ func TestReconcileRestoreClusterConfig(t *testing.T) {
 
 	t.Run("applies the mode then advances on the next reconcile", func(t *testing.T) {
 		adapter := defaultAdapter()
+		adapter.restoreTargetSettled = true
 		adapter.restoreTargets = map[string]*unstructured.Unstructured{
 			rkev1.SnapshotResourceProvCluster: provClusterTarget(),
 		}
@@ -892,6 +925,93 @@ func TestReconcileRestoreClusterConfig(t *testing.T) {
 		}
 		if len(adapter.updatedTargets) != 1 {
 			t.Errorf("expected no second update, got %d", len(adapter.updatedTargets))
+		}
+	})
+
+	t.Run("holds until the cluster has observed the restored configuration", func(t *testing.T) {
+		// The write has already landed, so there is nothing left to apply — but the objects rendered
+		// off the restore target have not caught up. Advancing here would let the Restore step build
+		// a node plan, and install a Kubernetes version, from the pre-restore configuration.
+		target := provClusterTarget()
+		if err := unstructured.SetNestedField(target.Object, "v1.33.0+rke2r1", "spec", "kubernetesVersion"); err != nil {
+			t.Fatal(err)
+		}
+
+		adapter := defaultAdapter()
+		adapter.restoreTargetSettled = false
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: target,
+		}
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		s := resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig {
+			t.Errorf("step = %q, want to stay in RestoreClusterConfig", status.Step)
+		}
+		if len(adapter.updatedTargets) != 0 {
+			t.Errorf("expected no writes, got %d", len(adapter.updatedTargets))
+		}
+
+		// Once it settles, the same reconcile advances without writing.
+		adapter.restoreTargetSettled = true
+		status, err = h.reconcileRestoreClusterConfig(s, status)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
+		}
+	})
+
+	t.Run("propagates a restore target wait error", func(t *testing.T) {
+		target := provClusterTarget()
+		if err := unstructured.SetNestedField(target.Object, "v1.33.0+rke2r1", "spec", "kubernetesVersion"); err != nil {
+			t.Fatal(err)
+		}
+
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: target,
+		}
+		adapter.waitRestoreTargetErr = fmt.Errorf("boom")
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+
+		_, err := h.reconcileRestoreClusterConfig(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err == nil {
+			t.Error("expected the error to propagate")
+		}
+	})
+
+	t.Run("a mode restoring nothing still does not wait", func(t *testing.T) {
+		// "none" writes nothing, so there is nothing to propagate and no reason to hold.
+		adapter := defaultAdapter()
+		adapter.restoreTargetSettled = false
+		h := &handler{}
+
+		status, err := h.reconcileRestoreClusterConfig(resolveScope("", adapter), opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
 		}
 	})
 
@@ -984,4 +1104,98 @@ func assertSameStrings(t *testing.T, want, got []string) {
 			t.Fatalf("got %v, want %v (mismatch on %q)", got, want, k)
 		}
 	}
+}
+
+// TestBuildRestorePlanInstallsConfiguredVersion covers the downgrade mechanism: the restore plan has
+// to reinstall the distro at the configured Kubernetes version before --cluster-reset, because a
+// newer server cannot reset onto etcd data written by an older one.
+func TestBuildRestorePlanInstallsConfiguredVersion(t *testing.T) {
+	t.Parallel()
+
+	secret := makePlanSecret("etcd-0", "node-etcd-0", map[string]string{capr.EtcdRoleLabel: "true"})
+
+	t.Run("the install precedes the etcd wipe and the reset", func(t *testing.T) {
+		t.Parallel()
+
+		adapter := defaultAdapter()
+		adapter.installVersion = "v1.33.0+rke2r1"
+		s := newTestScope(adapter, types.UID("uid-1"))
+
+		nodePlan := buildRestorePlan(s, secret, nil, "snapshot-1")
+
+		assertInstructionOrder(t, nodePlan, []string{idempotencyKey + "/install", idempotencyKey + "/clean-etcd-dir", idempotencyKey + "/restore"})
+
+		// The install has to carry the version-tagged image and must not start the distro: the
+		// restore itself is what brings the server up, via --cluster-reset.
+		install := nodePlan.OneTimeInstructions[0]
+		if install.Image == "" || !strings.HasSuffix(install.Image, ":v1.33.0-rke2r1") {
+			t.Errorf("image = %q, want it tagged with the configured version", install.Image)
+		}
+		if !slices.Contains(install.Env, "INSTALL_RKE2_SKIP_START=true") {
+			t.Errorf("env = %v, want the distro start suppressed", install.Env)
+		}
+	})
+
+	t.Run("a cluster type that does not manage its version restores without reinstalling", func(t *testing.T) {
+		t.Parallel()
+
+		// An imported cluster: Rancher does not choose its distro version, so there is nothing to
+		// install and the restore proceeds as it did before this step existed.
+		adapter := defaultAdapter()
+		s := newTestScope(adapter, types.UID("uid-1"))
+
+		nodePlan := buildRestorePlan(s, secret, nil, "snapshot-1")
+
+		assertInstructionOrder(t, nodePlan, []string{idempotencyKey + "/clean-etcd-dir", idempotencyKey + "/restore"})
+	})
+
+	t.Run("the install is scoped to this operation", func(t *testing.T) {
+		t.Parallel()
+
+		// Every restore instruction runs through the idempotency wrapper keyed on the op's UID, so a
+		// re-reconcile does not reinstall and two operations never share tracking state.
+		adapter := defaultAdapter()
+		adapter.installVersion = "v1.33.0+rke2r1"
+
+		first := buildRestorePlan(newTestScope(adapter, types.UID("uid-1")), secret, nil, "snapshot-1")
+		second := buildRestorePlan(newTestScope(adapter, types.UID("uid-2")), secret, nil, "snapshot-1")
+
+		if fmt.Sprint(first.OneTimeInstructions[0].Args) == fmt.Sprint(second.OneTimeInstructions[0].Args) {
+			t.Error("expected the install instruction to be scoped to the operation UID")
+		}
+		if !slices.Contains(first.OneTimeInstructions[0].Args, idempotencyKey+"/install") {
+			t.Errorf("args = %v, want the install idempotency key", first.OneTimeInstructions[0].Args)
+		}
+	})
+}
+
+// assertInstructionOrder checks the plan's one-time instructions carry the given idempotency
+// identifiers in order.
+func assertInstructionOrder(t *testing.T, nodePlan *planapi.Plan, want []string) {
+	t.Helper()
+
+	var got []string
+	for _, inst := range nodePlan.OneTimeInstructions {
+		got = append(got, instructionIdentifier(inst))
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("instructions = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("instruction %d = %q, want %q (full order: %v)", i, got[i], want[i], got)
+		}
+	}
+}
+
+// instructionIdentifier returns the idempotency identifier of a wrapped instruction.
+// ops.IdempotentInstruction rewrites the instruction to run through the idempotency script with the
+// argument list [-x, <script>, <identifier>, <hashedValue>, <hashedCommand>, <command>,
+// <provisioningDir>, <args>...], so the identifier is the third argument.
+func instructionIdentifier(inst planapi.OneTimeInstruction) string {
+	if inst.Command != "/bin/sh" || len(inst.Args) < 3 {
+		return inst.Name
+	}
+	return inst.Args[2]
 }

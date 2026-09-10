@@ -751,3 +751,54 @@ func TestOnChange(t *testing.T) {
 		assert.Nil(t, out)
 	})
 }
+
+func TestImportedAdapterDistro(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		driver            string
+		version           *version.Info
+		expectedConfigMap string
+		expectedSelector  string
+	}{
+		{
+			name:              "rke2 driver",
+			driver:            apimgmtv3.ClusterDriverRke2,
+			version:           &version.Info{GitVersion: kubernetesVersion},
+			expectedConfigMap: "rke2-etcd-snapshot-extra-metadata",
+			expectedSelector:  "$['cluster.management.cattle.io']['spec']['rke2Config']['kubernetesVersion']",
+		},
+		{
+			name:              "k3s driver",
+			driver:            apimgmtv3.ClusterDriverK3s,
+			version:           &version.Info{GitVersion: "v1.32.5+k3s1"},
+			expectedConfigMap: "k3s-etcd-snapshot-extra-metadata",
+			expectedSelector:  "$['cluster.management.cattle.io']['spec']['k3sConfig']['kubernetesVersion']",
+		},
+		{
+			// onChange runs for every mgmt cluster change, including ones that have not reported a
+			// version yet. Reading Status.Version here would panic.
+			name:              "no reported version yet",
+			driver:            "",
+			version:           nil,
+			expectedConfigMap: "rke2-etcd-snapshot-extra-metadata",
+			expectedSelector:  "$['cluster.management.cattle.io']['spec']['rke2Config']['kubernetesVersion']",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cluster := mgmtCluster()
+			cluster.Status.Driver = tt.driver
+			cluster.Status.Version = tt.version
+
+			a := &importedAdapter{cluster: cluster}
+
+			assert.Equal(t, tt.expectedConfigMap, a.configMapName())
+			assert.Equal(t, tt.expectedSelector, a.kubernetesVersionSelector())
+		})
+	}
+}

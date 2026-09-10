@@ -102,6 +102,29 @@ func (a *CAPRKE2Adapter) UpdateRestoreTarget(obj *unstructured.Unstructured) err
 	return err
 }
 
+// WaitForRestoreTarget always reports ready. The RKE2ControlPlane is itself the restore target, so
+// there is no intermediate object to render before the restored configuration takes effect —
+// unlike CAPR, where the RKEControlPlane is regenerated from the provv1.Cluster a restore writes to.
+func (a *CAPRKE2Adapter) WaitForRestoreTarget() (bool, error) {
+	return true, nil
+}
+
+// InstallInstruction reinstalls RKE2 at the RKE2ControlPlane's version. The image is Rancher's
+// system-agent installer, resolved against the global system-default-registry: CAPRKE2 models no
+// per-cluster registry the way an RKEControlPlane's machineGlobalConfig does.
+func (a *CAPRKE2Adapter) InstallInstruction(secret *corev1.Secret) (plan.OneTimeInstruction, bool) {
+	if a.controlPlane.Spec.Version == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(
+		a.controlPlane.Spec.Version,
+		a.DistroDataDirectory(secret),
+		nil,
+		nil,
+	), true
+}
+
 // ToS3ArgsEnvAndFiles returns the S3 args/env/files that should be appended to an etcd-snapshot
 // save operation for this cluster. CAPRKE2 does not yet model S3 snapshot configuration on the
 // RKE2ControlPlane in a form that the operations controllers consume, so this is a no-op for now

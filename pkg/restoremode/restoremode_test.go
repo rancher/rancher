@@ -252,17 +252,37 @@ func TestResolveWildcard(t *testing.T) {
 		assert.Empty(t, matches)
 	})
 
-	t.Run("skips a resource key with no writable paths", func(t *testing.T) {
+	t.Run("resolves an imported cluster's desired version and agent customizations", func(t *testing.T) {
 		t.Parallel()
 
-		// The mgmt cluster is deliberately absent from WritablePaths, so a wildcard restore of an
-		// imported cluster selects nothing even though the payload is populated.
+		// An imported RKE2 cluster: k3sbasedupgrade drives the downstream upgrade from
+		// spec.rke2Config.kubernetesVersion, so it is restorable. The k3sConfig path is listed too
+		// but resolves to nothing here, since only the config matching Status.Driver is populated.
 		matches, err := Resolve(rkev1.RestoreModeSelectorWildcard, map[string]any{
 			rkev1.SnapshotResourceMgmtCluster: map[string]any{
 				"spec": map[string]any{
-					"rke2Config": map[string]any{"kubernetesVersion": kubernetesVersion},
+					"rke2Config":                          map[string]any{"kubernetesVersion": kubernetesVersion},
+					"clusterAgentDeploymentCustomization": map[string]any{"appendTolerations": []any{map[string]any{"key": "a"}}},
 				},
 			},
+		})
+		require.NoError(t, err)
+
+		var got []string
+		for _, m := range matches {
+			got = append(got, join(m.Path))
+		}
+		assert.ElementsMatch(t, []string{
+			"spec/rke2Config/kubernetesVersion",
+			"spec/clusterAgentDeploymentCustomization",
+		}, got)
+	})
+
+	t.Run("skips a resource key with no writable paths", func(t *testing.T) {
+		t.Parallel()
+
+		matches, err := Resolve(rkev1.RestoreModeSelectorWildcard, map[string]any{
+			"secret.v1": map[string]any{"data": map[string]any{"token": "shhh"}},
 		})
 		require.NoError(t, err)
 		assert.Empty(t, matches)
