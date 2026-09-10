@@ -87,96 +87,98 @@ func TestSearchPrincipals(t *testing.T) {
 		"okta",
 		"adfs",
 	} {
-		userType := providerName + "_user"
-		groupType := providerName + "_group"
+		t.Run(providerName, func(t *testing.T) {
+			userType := providerName + "_user"
+			groupType := providerName + "_group"
 
-		tests := []struct {
-			desc             string
-			searchKey        string
-			principalType    string
-			isLdapConfigured bool
-			principals       []string
-		}{
-			{
-				desc:             "search for user with ldap",
-				isLdapConfigured: true,
-				searchKey:        "al",
-				principalType:    common.UserPrincipalType,
-				principals: []string{
-					userType + "://alice",
-				},
-			},
-			{
-				desc:             "search for user without ldap",
-				isLdapConfigured: false,
-				searchKey:        "alice",
-				principalType:    common.UserPrincipalType,
-				principals: []string{
-					userType + "://alice",
-				},
-			},
-			{
-				desc:             "search for group without ldap",
-				isLdapConfigured: false,
-				searchKey:        "admins",
-				principalType:    common.GroupPrincipalType,
-				principals: []string{
-					groupType + "://admins",
-				},
-			},
-			{
-				desc:             "search for any principal without ldap",
-				isLdapConfigured: false,
-				searchKey:        "dev",
-				principalType:    "",
-				principals: []string{
-					userType + "://dev",
-					groupType + "://dev",
-				},
-			},
-		}
-
-		for _, tt := range tests {
-			tt := tt
-			t.Run(tt.desc, func(t *testing.T) {
-				provider := &Provider{
-					name:      providerName,
-					userType:  userType,
-					groupType: groupType,
-					ldapProvider: &mockLdapProvider{
-						providerName:     providerName,
-						isLdapConfigured: tt.isLdapConfigured,
+			tests := []struct {
+				desc             string
+				searchKey        string
+				principalType    string
+				isLdapConfigured bool
+				principals       []string
+			}{
+				{
+					desc:             "search for user with ldap",
+					isLdapConfigured: true,
+					searchKey:        "al",
+					principalType:    common.UserPrincipalType,
+					principals: []string{
+						userType + "://alice",
 					},
-				}
-
-				results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &apiv3.Token{})
-				require.NoError(t, err)
-				require.Len(t, results, len(tt.principals))
-				for _, principal := range results {
-					assert.Contains(t, tt.principals, principal.Name)
-				}
-			})
-
-			// same behaviour for ext tokens
-			t.Run(tt.desc+", ext", func(t *testing.T) {
-				provider := &Provider{
-					name:      providerName,
-					userType:  userType,
-					groupType: groupType,
-					ldapProvider: &mockLdapProvider{
-						providerName:     providerName,
-						isLdapConfigured: tt.isLdapConfigured,
+				},
+				{
+					desc:             "search for user without ldap",
+					isLdapConfigured: false,
+					searchKey:        "alice",
+					principalType:    common.UserPrincipalType,
+					principals: []string{
+						userType + "://alice",
 					},
-				}
+				},
+				{
+					desc:             "search for group without ldap",
+					isLdapConfigured: false,
+					searchKey:        "admins",
+					principalType:    common.GroupPrincipalType,
+					principals: []string{
+						groupType + "://admins",
+					},
+				},
+				{
+					desc:             "search for any principal without ldap",
+					isLdapConfigured: false,
+					searchKey:        "dev",
+					principalType:    "",
+					principals: []string{
+						userType + "://dev",
+						groupType + "://dev",
+					},
+				},
+			}
 
-				results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &ext.Token{})
-				require.NoError(t, err)
-				require.Len(t, results, len(tt.principals))
-				for _, principal := range results {
-					assert.Contains(t, tt.principals, principal.Name)
-				}
-			})
-		}
+			for _, tt := range tests {
+				tt := tt
+				t.Run(tt.desc, func(t *testing.T) {
+					provider := &Provider{
+						name:      providerName,
+						userType:  userType,
+						groupType: groupType,
+						ldapProvider: &mockLdapProvider{
+							providerName:     providerName,
+							isLdapConfigured: tt.isLdapConfigured,
+						},
+					}
+
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &apiv3.Token{})
+					require.NoError(t, err)
+					require.Len(t, results, len(tt.principals))
+					for _, principal := range results {
+						assert.Contains(t, tt.principals, principal.Name)
+					}
+				})
+
+				// same behaviour for ext tokens
+				t.Run(tt.desc+", ext", func(t *testing.T) {
+					provider := &Provider{
+						name:      providerName,
+						userType:  userType,
+						groupType: groupType,
+						ldapProvider: &mockLdapProvider{
+							providerName:     providerName,
+							isLdapConfigured: tt.isLdapConfigured,
+						},
+					}
+
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &ext.Token{})
+					require.NoError(t, err)
+					require.Len(t, results, len(tt.principals))
+					for _, principal := range results {
+						assert.Contains(t, tt.principals, principal.Name)
+					}
+				})
+			}
+		})
 	}
 }
 
