@@ -70,7 +70,6 @@ For detailed guides on specific topics, see:
 
 - `tlsVerificationOptions` (`TLSVerificationSpec`, optional)
   - `verifyHostname` (`bool`, default: `true`)
-  - `verifyExpiration` (`bool`, default: `true`)
 
 ## Request credential injection
 
@@ -88,7 +87,7 @@ For detailed guides on specific topics, see:
 - `caBundle` and `insecureSkipTLSVerify: true` are mutually exclusive.
 - `clientCertificate.name` must refer to a Secret in the same namespace.
 - `clientCertificate` is currently not consumed by `pkg/httpproxy/proxy.go` transport logic.
-- `verifyHostname` and `verifyExpiration` default to `true` when omitted.
+- `verifyHostname` defaults to `true` when omitted.
 
 ## Common examples
 

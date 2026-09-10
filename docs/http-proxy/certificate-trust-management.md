@@ -127,7 +127,6 @@ spec:
   - domain: api.example.com
     tlsVerificationOptions:
       verifyHostname: false          # Skip hostname verification
-      verifyExpiration: false        # Skip expiration check
 ```
 
 **Options:**
@@ -139,12 +138,6 @@ Controls whether the certificate's hostname matches the connection hostname.
 - `false`: Hostname verification is disabled (only used with self-signed certs in dev environments)
 
 **Note:** Setting to `false` has the same effect as `insecureSkipTLSVerify: true`
-
-#### `verifyExpiration` (boolean, default: true)
-Controls whether the certificate's validity period is checked.
-
-- `true`: Expiration verification is enabled (default)
-- `false`: Expired certificates are accepted (not recommended for production)
 
 **Note:** Expiration verification is handled by the underlying crypto/tls package and cannot be completely disabled programmatically. This field is provided for future flexibility and explicit configuration.
 
@@ -186,7 +179,6 @@ spec:
     # Control verification behavior
     tlsVerificationOptions:
       verifyHostname: true
-      verifyExpiration: true
 ```
 
 ## Security Considerations
@@ -207,7 +199,6 @@ spec:
    - Only disable in controlled, non-production environments
 
 4. **Keep Certificates Updated**
-   - Ensure `verifyExpiration: true` (default)
    - Implement certificate rotation procedures
 
 ### Limitations
@@ -225,7 +216,7 @@ spec:
 - **Solution:** Add the CA certificate to `caBundle`
 
 **Error:** `x509: certificate has expired`
-- **Solution:** Update the certificate or set `verifyExpiration: false` (not recommended)
+- **Solution:** Update the certificate
 
 **Error:** `x509: certificate is valid for ... not <hostname>`
 - **Solution:** Use `serverName` to specify the correct hostname for SNI

@@ -6636,11 +6636,6 @@ func (in *TLSVerificationSpec) DeepCopyInto(out *TLSVerificationSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.VerifyExpiration != nil {
-		in, out := &in.VerifyExpiration, &out.VerifyExpiration
-		*out = new(bool)
-		**out = **in
-	}
 	return
 }
 

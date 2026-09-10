@@ -1,11 +1,11 @@
 package httpproxy
 
 import (
-	"strings"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -139,25 +139,6 @@ func TestBuildTLSConfigForRoute_WithVerifyHostnameTrue_EnablesVerification(t *te
 	assert.False(t, tlsConfig.InsecureSkipVerify)
 }
 
-func TestBuildTLSConfigForRoute_WithVerifyExpirationFalse_IgnoresExpiration(t *testing.T) {
-	// Note: The Go crypto/tls package doesn't expose a direct way to control expiration checking
-	// via the Config struct. This test verifies that the code doesn't fail when VerifyExpiration
-	// is set to false. The actual expiration check is handled by the TLS handshake.
-	verifyExpirationFalse := false
-	route := &mgmt.ProxyEndpointRoute{
-		Domain: "api.example.com",
-		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
-			VerifyExpiration: &verifyExpirationFalse,
-		},
-	}
-
-	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
-	require.NoError(t, err)
-	assert.NotNil(t, tlsConfig)
-	// The InsecureSkipVerify flag is only set when VerifyHostname is false
-	assert.False(t, tlsConfig.InsecureSkipVerify)
-}
-
 func TestBuildTLSConfigForRoute_WithBothServerNameAndCABundle(t *testing.T) {
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -190,14 +171,12 @@ func TestBuildTLSConfigForRoute_WithAllOptions(t *testing.T) {
 	require.NotEmpty(t, certPEM)
 
 	verifyHostnameFalse := false
-	verifyExpirationFalse := false
 	route := &mgmt.ProxyEndpointRoute{
 		Domain:     "api.example.com",
 		ServerName: "internal.example.com",
 		CABundle:   string(certPEM),
 		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
 			VerifyHostname: &verifyHostnameFalse,
-			VerifyExpiration: &verifyExpirationFalse,
 		},
 	}
 
@@ -335,4 +314,3 @@ func TestPerRouteTLSTransport_MultipleSecurityOptions_AllApplied(t *testing.T) {
 	assert.NotNil(t, transport.TLSClientConfig.RootCAs)
 	assert.False(t, transport.TLSClientConfig.InsecureSkipVerify)
 }
-

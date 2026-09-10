@@ -77,7 +77,6 @@ spec:
 | `serverName` | string | No | 253 | SNI hostname for TLS handshake |
 | `clientCertificate.name` | string | No | — | Name of Kubernetes Secret with client cert |
 | `tlsVerificationOptions.verifyHostname` | bool | No | — | Enable/disable hostname verification (default: true) |
-| `tlsVerificationOptions.verifyExpiration` | bool | No | — | Enable/disable expiration checking (default: true) |
 
 ## Validation Rules
 

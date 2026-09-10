@@ -486,9 +486,8 @@ func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute, requestHostname stri
 	// Apply verification options if specified
 	if route.TLSVerificationOptions != nil {
 		if route.TLSVerificationOptions.VerifyHostname != nil && !*route.TLSVerificationOptions.VerifyHostname {
-			tlsConfig.InsecureSkipVerify = true
+			tlsConfig.ServerName = ""
 		}
-		// Note: VerifyExpiration is handled by the underlying crypto/tls verification
 	}
 
 	return tlsConfig, nil

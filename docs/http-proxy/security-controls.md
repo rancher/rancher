@@ -59,7 +59,6 @@ The `serverName` field (max 253 characters, standard DNS hostname length) is val
 The `tlsVerificationOptions` field controls hostname and expiration verification:
 
 - `verifyHostname`: If `false`, disables hostname validation (use only for development/testing)
-- `verifyExpiration`: Reserved for future use; currently the Go crypto/tls package always validates expiration
 
 Setting `verifyHostname: false` is equivalent to setting `tlsConfig.InsecureSkipVerify = true` and should only be used in non-production environments.
 

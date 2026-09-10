@@ -166,12 +166,6 @@ type TLSVerificationSpec struct {
 	// +optional
 	// +kubebuilder:validation:default=true
 	VerifyHostname *bool `json:"verifyHostname,omitempty"`
-
-	// VerifyExpiration controls whether the certificate's validity period is checked.
-	// Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
-	// +optional
-	// +kubebuilder:validation:default=true
-	VerifyExpiration *bool `json:"verifyExpiration,omitempty"`
 }
 
 type ProxyEndpointStatus struct{}

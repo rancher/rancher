@@ -23,7 +23,6 @@ type SecretReference struct {
 ```go
 type TLSVerificationSpec struct {
     VerifyHostname   *bool  // Skip hostname verification if false
-    VerifyExpiration *bool  // For future use
 }
 ```
 

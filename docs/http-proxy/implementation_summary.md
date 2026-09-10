@@ -23,7 +23,6 @@ over TLS connections to external services.
   ```go
   type TLSVerificationSpec struct {
       VerifyHostname   *bool  // Skip hostname verification if false
-      VerifyExpiration *bool  // For future use
   }
   ```
 
@@ -62,7 +61,6 @@ over TLS connections to external services.
 - `serverName` string field (max 253 chars)
 - `tlsVerificationOptions` object with:
   - `verifyHostname` boolean (default: true)
-  - `verifyExpiration` boolean (default: true)
 - Complete descriptions and validation rules
 
 ### 4. Test Suite (`pkg/httpproxy/cert_management_test.go`)
@@ -124,7 +122,6 @@ Integration tests with real TLS servers
 
 ### ✅ Certificate Verification Options
 - `VerifyHostname`: Enable/disable hostname verification
-- `VerifyExpiration`: Prepare for future fine-grained expiration handling
 - Secure defaults (both enabled)
 - Full test coverage
 

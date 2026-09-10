@@ -188,11 +188,6 @@ spec:
                       description: TLSVerificationOptions controls certificate verification
                         behavior.
                       properties:
-                        verifyExpiration:
-                          description: |-
-                            VerifyExpiration controls whether the certificate's validity period is checked.
-                            Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
-                          type: boolean
                         verifyHostname:
                           description: |-
                             VerifyHostname controls whether the certificate's hostname matches the connection hostname.

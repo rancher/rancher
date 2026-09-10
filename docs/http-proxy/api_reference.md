@@ -121,28 +121,6 @@ tlsVerificationOptions:
 
 ---
 
-#### `verifyExpiration`
-
-**Type:** `*bool`
-
-**Default:** `true`
-
-**Description:** Controls certificate expiration checking.
-
-**Behavior:**
-- `nil` or `true`: Expiration verification enabled (standard)
-- `false`: Prepared for future fine-grained expiration handling
-
-**Note:** Currently, Go's crypto/tls package always validates expiration. This field is provided for future flexibility.
-
-**Example:**
-```yaml
-tlsVerificationOptions:
-  verifyExpiration: false
-```
-
----
-
 ## Complete Examples
 
 ### Example 1: Self-Signed Certificate with Custom CA
@@ -218,7 +196,6 @@ spec:
     # Verification options
     tlsVerificationOptions:
       verifyHostname: true
-      verifyExpiration: true
 ```
 
 ### Example 5: Permissive Development Configuration
@@ -234,7 +211,6 @@ spec:
     # Disable hostname verification for self-signed dev certificates
     tlsVerificationOptions:
       verifyHostname: false
-      verifyExpiration: false
 ```
 
 ---
@@ -285,7 +261,6 @@ spec:
 
 2. tlsVerificationOptions
    ├─ VerifyHostname controls InsecureSkipVerify flag
-   └─ VerifyExpiration for future use
 
 3. caBundle
    ├─ Provides custom CA certificates
@@ -374,7 +349,6 @@ When multiple routes could match a request:
 | `clientCertificate` | 🔄 Type Defined | Ready for implementation |
 | `serverName` | ✅ Production Ready | Full SNI support |
 | `tlsVerificationOptions.verifyHostname` | ✅ Production Ready | Fully tested |
-| `tlsVerificationOptions.verifyExpiration` | ✅ Production Ready | Prepared for future use |
 
 ---
 
