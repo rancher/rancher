@@ -183,6 +183,30 @@ type Adapter interface {
 	// UpdateRestoreTarget persists modifications made to an object returned by RestoreTarget.
 	UpdateRestoreTarget(obj *unstructured.Unstructured) error
 
+	// WaitForRestoreTarget reports whether the objects derived from the restore target have caught
+	// up with its current spec. A restore writes cluster configuration onto the restore target, but
+	// the node plans a restore then runs are built from objects rendered off it, so acting before
+	// that rendering has happened would use the pre-restore configuration.
+	//
+	// Returns true when there is nothing to wait for, either because the derived objects are current
+	// or because this cluster type renders nothing off its restore target.
+	WaitForRestoreTarget() (bool, error)
+
+	// InstallInstruction returns the instruction that installs the distro at the Kubernetes version
+	// the cluster is currently configured for, without starting it. Returns false when this cluster
+	// type's distro version is not managed by Rancher and so cannot be reinstalled.
+	//
+	// A restore of a snapshot taken on an older Kubernetes version has to run against that version's
+	// binary — a newer server cannot `--cluster-reset` onto older etcd data. Reinstalling here is
+	// what makes a downgrade-on-restore work, mirroring the install-with-skip-start the legacy CAPR
+	// planner puts in its restore plan (see pkg/capr/planner/etcdrestore.go).
+	//
+	// dataDir is passed in rather than resolved from secret because the caller has already resolved
+	// it for the rest of the plan it is assembling: this keeps the install and the instructions
+	// around it pointed at the same directory, and avoids repeating a lookup that can fail (see
+	// DistroDataDirectory).
+	InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool)
+
 	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
 	// all expected nodes.
 	WaitForRegister() (bool, error)

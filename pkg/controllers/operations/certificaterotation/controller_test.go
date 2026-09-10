@@ -45,6 +45,17 @@ func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
 	return a.provisioningDir
 }
+
+// The four methods below complete the ops.Adapter contract for the restore-mode machinery. Nothing
+// in certificate rotation restores cluster configuration or installs a distro version, so each is a
+// no-op: RestoreTarget serves no resources, the update is never reached, the wait never blocks, and
+// there is no version to install.
+func (a *stubAdapter) RestoreTarget(_ string) (*unstructured.Unstructured, error) { return nil, nil }
+func (a *stubAdapter) UpdateRestoreTarget(_ *unstructured.Unstructured) error     { return nil }
+func (a *stubAdapter) WaitForRestoreTarget() (bool, error)                        { return true, nil }
+func (a *stubAdapter) InstallInstruction(_ *corev1.Secret, _ string) (plan.OneTimeInstruction, bool) {
+	return plan.OneTimeInstruction{}, false
+}
 func (a *stubAdapter) DistroManifestPaths(dataDir string) ops.ManifestPaths {
 	return ops.DistroManifestPaths(a.RuntimeCommand(), dataDir)
 }
