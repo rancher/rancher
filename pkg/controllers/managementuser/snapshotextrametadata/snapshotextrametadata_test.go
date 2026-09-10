@@ -256,11 +256,11 @@ func TestSanitize(t *testing.T) {
 func TestSelector(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "$['cluster.management.cattle.io'].spec.rke2Config.kubernetesVersion",
+	assert.Equal(t, "$['cluster.management.cattle.io']['spec']['rke2Config']['kubernetesVersion']",
 		selector(mgmtClusterKey, "spec", "rke2Config", "kubernetesVersion"))
-	assert.Equal(t, "$['cluster.provisioning.cattle.io'].spec.kubernetesVersion",
+	assert.Equal(t, "$['cluster.provisioning.cattle.io']['spec']['kubernetesVersion']",
 		selector(provClusterKey, "spec", "kubernetesVersion"))
-	assert.Equal(t, "$['rke2controlplane.controlplane.cluster.x-k8s.io'].spec.version",
+	assert.Equal(t, "$['rke2controlplane.controlplane.cluster.x-k8s.io']['spec']['version']",
 		selector(rke2ControlPlaneKey, "spec", "version"))
 }
 
@@ -303,7 +303,7 @@ func TestNewAdapter(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, mgmtClusterKey, res[0].key)
-		assert.Equal(t, "$['cluster.management.cattle.io'].spec.rke2Config.kubernetesVersion", a.kubernetesVersionSelector())
+		assert.Equal(t, "$['cluster.management.cattle.io']['spec']['rke2Config']['kubernetesVersion']", a.kubernetesVersionSelector())
 	})
 
 	t.Run("v2prov administrated cluster", func(t *testing.T) {
@@ -325,7 +325,7 @@ func TestNewAdapter(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, provClusterKey, res[0].key)
-		assert.Equal(t, "$['cluster.provisioning.cattle.io'].spec.kubernetesVersion", a.kubernetesVersionSelector())
+		assert.Equal(t, "$['cluster.provisioning.cattle.io']['spec']['kubernetesVersion']", a.kubernetesVersionSelector())
 	})
 
 	t.Run("turtles imported CAPRKE2 cluster", func(t *testing.T) {
@@ -347,7 +347,7 @@ func TestNewAdapter(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, rke2ControlPlaneKey, res[0].key)
-		assert.Equal(t, "$['rke2controlplane.controlplane.cluster.x-k8s.io'].spec.version", a.kubernetesVersionSelector())
+		assert.Equal(t, "$['rke2controlplane.controlplane.cluster.x-k8s.io']['spec']['version']", a.kubernetesVersionSelector())
 	})
 
 	t.Run("turtles imported cluster with a non-CAPRKE2 control plane is unsupported", func(t *testing.T) {
@@ -459,19 +459,19 @@ func TestRenderData(t *testing.T) {
 			name:             "imported",
 			adapter:          &importedAdapter{cluster: mgmtCluster()},
 			expectedKey:      mgmtClusterKey,
-			expectedSelector: "$['cluster.management.cattle.io'].spec.rke2Config.kubernetesVersion",
+			expectedSelector: "$['cluster.management.cattle.io']['spec']['rke2Config']['kubernetesVersion']",
 		},
 		{
 			name:             "v2prov",
 			adapter:          &provisioningAdapter{cluster: provCluster()},
 			expectedKey:      provClusterKey,
-			expectedSelector: "$['cluster.provisioning.cattle.io'].spec.kubernetesVersion",
+			expectedSelector: "$['cluster.provisioning.cattle.io']['spec']['kubernetesVersion']",
 		},
 		{
 			name:             "caprke2",
 			adapter:          &caprke2Adapter{controlPlane: rke2ControlPlane()},
 			expectedKey:      rke2ControlPlaneKey,
-			expectedSelector: "$['rke2controlplane.controlplane.cluster.x-k8s.io'].spec.version",
+			expectedSelector: "$['rke2controlplane.controlplane.cluster.x-k8s.io']['spec']['version']",
 		},
 	}
 
@@ -614,7 +614,7 @@ func TestOnChange(t *testing.T) {
 		configMaps.EXPECT().Get(metav1.NamespaceSystem, configMapName, gomock.Any()).Return(existingConfigMap(), nil)
 		configMaps.EXPECT().Update(gomock.Any()).DoAndReturn(func(cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 			assert.Contains(t, decodeResources(t, cm.Data), provClusterKey)
-			assert.Equal(t, "$['cluster.provisioning.cattle.io'].spec.kubernetesVersion",
+			assert.Equal(t, "$['cluster.provisioning.cattle.io']['spec']['kubernetesVersion']",
 				decodeRestoreModes(t, cm.Data)["kubernetesVersion"])
 			return cm, nil
 		})
@@ -633,7 +633,7 @@ func TestOnChange(t *testing.T) {
 		configMaps.EXPECT().Get(metav1.NamespaceSystem, configMapName, gomock.Any()).Return(existingConfigMap(), nil)
 		configMaps.EXPECT().Update(gomock.Any()).DoAndReturn(func(cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 			assert.Contains(t, decodeResources(t, cm.Data), rke2ControlPlaneKey)
-			assert.Equal(t, "$['rke2controlplane.controlplane.cluster.x-k8s.io'].spec.version",
+			assert.Equal(t, "$['rke2controlplane.controlplane.cluster.x-k8s.io']['spec']['version']",
 				decodeRestoreModes(t, cm.Data)["kubernetesVersion"])
 			return cm, nil
 		})
