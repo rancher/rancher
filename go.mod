@@ -92,7 +92,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/gnostic-models v0.7.1
 	github.com/google/go-containerregistry v0.22.0
-	github.com/google/go-github/v73 v73.0.0
+	github.com/google/go-github/v91 v91.0.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/invopop/jsonschema v0.14.0
