@@ -258,7 +258,7 @@ func TestCleanupClientSecretsWithLDAPConfig(t *testing.T) {
 		err = CleanupClientSecrets(secrets, config)
 		assert.NoError(t, err)
 
-		t.Run("Cleanup deletes provider secrets - " + config.Type, func(t *testing.T) {
+		t.Run("Cleanup deletes provider secrets - "+config.Type, func(t *testing.T) {
 			s, err = secrets.Get(common.SecretsNamespace, secretName1, metav1.GetOptions{})
 			assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName1)
 			assert.Nil(t, s, "expected the secret to be nil")
