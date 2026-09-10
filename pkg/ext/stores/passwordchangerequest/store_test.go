@@ -69,16 +69,17 @@ func TestCreate(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc       string
-		obj        *ext.PasswordChangeRequest
-		ctx        context.Context
-		options    *metav1.CreateOptions
-		authorizer authorizer.Authorizer
-		pwdUpdater func() PasswordUpdater
-		userCache  func() mgmtv3.UserCache
-		userClient func() mgmtv3.UserClient
-		wantObj    *ext.PasswordChangeRequest
-		wantErr    string
+		desc           string
+		obj            *ext.PasswordChangeRequest
+		ctx            context.Context
+		options        *metav1.CreateOptions
+		authorizer     authorizer.Authorizer
+		pwdUpdater     func() PasswordUpdater
+		userCache      func() mgmtv3.UserCache
+		userClient     func() mgmtv3.UserClient
+		wantObj        *ext.PasswordChangeRequest
+		wantErr        string
+		wantBadRequest bool
 	}{
 		{
 			desc: "password changed for the same user",
@@ -219,7 +220,8 @@ func TestCreate(t *testing.T) {
 			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 				return authorizer.DecisionDeny, "", nil
 			}),
-			wantErr: "new password must not be the same as the current password",
+			wantErr:        "new password must not be the same as the current password",
+			wantBadRequest: true,
 		},
 		{
 			desc: "same user with mustChangePassword cannot reuse current password",
@@ -236,7 +238,8 @@ func TestCreate(t *testing.T) {
 			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 				return authorizer.DecisionDeny, "", nil
 			}),
-			wantErr: "new password must not be the same as the current password",
+			wantErr:        "new password must not be the same as the current password",
+			wantBadRequest: true,
 		},
 		{
 			desc: "privileged user cannot reuse current password for self",
@@ -253,7 +256,61 @@ func TestCreate(t *testing.T) {
 			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 				return authorizer.DecisionAllow, "", nil
 			}),
-			wantErr: "new password must not be the same as the current password",
+			wantErr:        "new password must not be the same as the current password",
+			wantBadRequest: true,
+		},
+		{
+			desc: "same user cannot reuse current password in a dry run",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     oldPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			options: &metav1.CreateOptions{
+				DryRun: []string{metav1.DryRunAll},
+			},
+			pwdUpdater:     pwdUpdater,
+			userCache:      userCache,
+			wantErr:        "new password must not be the same as the current password",
+			wantBadRequest: true,
+		},
+		{
+			desc: "privileged user can reset another user with the same current and new password",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     oldPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().UpdatePassword(userID, oldPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userCache,
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			wantObj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     oldPassword,
+				},
+				Status: ext.PasswordChangeRequestStatus{
+					Conditions: []metav1.Condition{{
+						Type:   "PasswordUpdated",
+						Status: "True",
+					}},
+					Summary: status.SummaryCompleted,
+				},
+			},
 		},
 		{
 			desc: "user not found",
@@ -432,6 +489,9 @@ func TestCreate(t *testing.T) {
 
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
+				if tt.wantBadRequest {
+					assert.True(t, apierrors.IsBadRequest(err))
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.wantObj, obj)
