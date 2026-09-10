@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -111,7 +110,9 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	for _, m := range allMachines {
 		// if none are set, then nodes syncer has not completed
 		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
-			return nil, errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying", m.Status.NodeName)
+			logrus.Debugf("[cluster-stats] node role cannot be determined because node %s has not finished syncing, will retry", m.Status.NodeName)
+			s.Clusters.Controller().EnqueueAfter(cluster.Namespace, cluster.Name, quietPeriod)
+			return nil, nil
 		}
 		if isTaintedNoExecuteNoSchedule(m) && !m.Spec.Worker {
 			continue
