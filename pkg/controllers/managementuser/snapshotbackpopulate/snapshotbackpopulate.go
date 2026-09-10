@@ -87,6 +87,7 @@ type handler struct {
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
 func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wrangler.CAPIContext, cluster *apimgmtv3.Cluster) {
 	logrus.Debugf("[snapshotbackpopulate] Registering controller for cluster %s", userContext.ClusterName)
+
 	h := handler{
 		dynamic:                    userContext.Management.Wrangler.Dynamic,
 		restMapper:                 userContext.Management.Wrangler.RESTMapper,
