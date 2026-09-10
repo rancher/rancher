@@ -550,6 +550,19 @@ func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.O
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
 	case OKTAName:
+		secretName, err := common.SavePasswordSecret(
+			s.secrets,
+			ldapConfig.LdapFields.ServiceAccountPassword,
+			client.LdapConfigFieldServiceAccountPassword,
+			samlConfig.Type,
+		)
+		if err != nil {
+			return config, fmt.Errorf("unable to save ldap service account password: %w", err)
+		}
+
+		ldapConfig.LdapFields.ServiceAccountPassword = secretName
+		// Set the status for OKTA password migration to True so it doesn't get re-migrated
+		apiv3.AuthConfigOKTAPasswordMigrated.SetStatus(&samlConfig, "True")
 		fullConfig = &apiv3.OKTAConfig{
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
