@@ -1,7 +1,3 @@
-github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7 h1:Bh/Q2YdbhfFSLHPqw3ZyYPXDpBsy5ptmqFCfa7PH2h4=
-github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7/go.mod h1:rrFa/YyrZuIP4AMSGHUUrqHto617xfvGD+zO51CjxiU=
-github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545 h1:orKmwxUhFSRndERwVNxR7ZQ49bzxWvw9IoYH6ZJwFxg=
-github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545/go.mod h1:okraQd3hPrRfMQu+3piQeftTSvnWYRtP3R0BPjiJ1w8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
@@ -82,6 +78,10 @@ github.com/prometheus/common v0.70.0 h1:bcpru3tWPVnxGnETLgOV5jbp/JRXgYEyv65CuBLA
 github.com/prometheus/common v0.70.0/go.mod h1:S/SFasQmgGiYH6C81LKCtYa8QACgthGg5zxL2udV7SY=
 github.com/prometheus/procfs v0.21.1 h1:GljZCt+zSTS+NZq88cyQ1LjZ+RCHp3uVuabBWA5+OJI=
 github.com/prometheus/procfs v0.21.1/go.mod h1:aB55Cww9pdSJVHk0hUf0inxWyyjPogFIjmHKYgMKmtY=
+github.com/rancher/lasso v0.2.10 h1:8yz31RMjSDQkg0K4+2EuaO+FGorbNDgWDfdCVTNzElk=
+github.com/rancher/lasso v0.2.10/go.mod h1:O/+Qi1B0rDFsDuIbPecaUzvAdKNUFg9eZZFAuegnTh0=
+github.com/rancher/wrangler/v3 v3.8.0-rc.1 h1:2ywpeMnPZihu73UNDilPDITNXFesZfuvyLclbzn0z00=
+github.com/rancher/wrangler/v3 v3.8.0-rc.1/go.mod h1:IaBqAfzbG9qCwF9c3sCb17Z4TKiCEyO7JUx+4tMwrAo=
 github.com/sirupsen/logrus v1.10.0 h1:T8MxJJXVZkfcC5zSRMRAg2F8+lxjmUCGGWPzFxO+Msc=
 github.com/sirupsen/logrus v1.10.0/go.mod h1:FXZFonkDAnFozmO+5hGAFvB0Yg9/j2SIhA/QuIkP180=
 github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=

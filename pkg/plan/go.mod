@@ -5,11 +5,6 @@ go 1.26.0
 toolchain go1.26.6
 
 replace (
-	github.com/rancher/lasso => github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7
-	github.com/rancher/wrangler/v3 => github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545
-)
-
-replace (
 	k8s.io/api => k8s.io/api v0.37.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.37.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.37.0
@@ -41,8 +36,8 @@ replace (
 )
 
 require (
-	github.com/rancher/lasso v0.2.9
-	github.com/rancher/wrangler/v3 v3.7.1
+	github.com/rancher/lasso v0.2.10
+	github.com/rancher/wrangler/v3 v3.8.0-rc.1
 	github.com/stretchr/testify v1.12.1
 	k8s.io/api v0.37.0
 	k8s.io/apimachinery v0.37.0

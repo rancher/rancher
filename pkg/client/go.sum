@@ -1,7 +1,5 @@
 github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f h1:xKm9cVm820lQ5NP5EjAQowTrXyVlfZN/qcf7+jKdGh0=
 github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f/go.mod h1:S7vI/bxR7/vvKcbRFhkQrMCQGuVNtX6qIdM3I7oRrrw=
-github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545 h1:orKmwxUhFSRndERwVNxR7ZQ49bzxWvw9IoYH6ZJwFxg=
-github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545/go.mod h1:okraQd3hPrRfMQu+3piQeftTSvnWYRtP3R0BPjiJ1w8=
 github.com/fxamacker/cbor/v2 v2.9.1 h1:2rWm8B193Ll4VdjsJY28jxs70IdDsHRWgQYAI80+rMQ=
 github.com/fxamacker/cbor/v2 v2.9.1/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
@@ -10,6 +8,8 @@ github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 h1:JeSE6pjso5THxAzdVpqr6/geYxZytqFMBCOtn/ujyeo=
 github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674/go.mod h1:r4w70xmWCQKmi1ONH4KIaBptdivuRPyosB9RmPlGEwA=
+github.com/rancher/wrangler/v3 v3.8.0-rc.1 h1:2ywpeMnPZihu73UNDilPDITNXFesZfuvyLclbzn0z00=
+github.com/rancher/wrangler/v3 v3.8.0-rc.1/go.mod h1:IaBqAfzbG9qCwF9c3sCb17Z4TKiCEyO7JUx+4tMwrAo=
 github.com/sirupsen/logrus v1.10.1 h1:xi4336Zh11WpU14fXR6I67V3yaTPQYwRx2WEtHbRg4Q=
 github.com/sirupsen/logrus v1.10.1/go.mod h1:vsQHnG7xzNsxk3NrwboUiWPnIC3dmbjcGPykD7+tiHk=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
