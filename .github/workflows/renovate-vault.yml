@@ -48,7 +48,7 @@ jobs:
       contents: read
       id-token: write # Required for Vault OIDC authentication.
     # https://github.com/rancher/renovate-config/releases
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@dea92a08bcb3b0c0943e6ae3dc6b2cc68f93fc17 # Improve Renovate run time
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@481512bc69c6d1eb0b14781b854ee3b588233c25 # Grant Renovate status permission
     # Note: github.event.inputs.<name> with '||' fallbacks is used across all inputs
     # so that scheduled cron runs (where github.event.inputs is null) safely default.
     with:
