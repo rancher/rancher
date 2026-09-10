@@ -173,6 +173,7 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 
 func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 	t := true
+	f := false
 	u1000 := int64(1000)
 
 	// Collect whitelisted environment variables from the whitelist-envvars setting.
@@ -190,6 +191,12 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 
 	return corev1.PodSpec{
 		ServiceAccountName: consts.ServiceAccountName,
+		SecurityContext: &corev1.PodSecurityContext{
+			RunAsNonRoot:   &t,
+			RunAsGroup:     &u1000,
+			RunAsUser:      &u1000,
+			SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+		},
 		Containers: []corev1.Container{
 			{
 				Name:            "scc-operator",
@@ -197,10 +204,13 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Env:             envVars,
 				SecurityContext: &corev1.SecurityContext{
-					RunAsNonRoot:   &t,
-					RunAsGroup:     &u1000,
-					RunAsUser:      &u1000,
-					SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+					AllowPrivilegeEscalation: &f,
+					ReadOnlyRootFilesystem:   &t,
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{
+							"ALL",
+						},
+					},
 				},
 			},
 		},
