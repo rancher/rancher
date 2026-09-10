@@ -120,7 +120,7 @@ require (
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.0
 	github.com/rancher/dynamiclistener v0.9.0
-	github.com/rancher/eks-operator v1.15.0
+	github.com/rancher/eks-operator v1.15.1
 	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
 	github.com/rancher/gke-operator v1.15.0
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
@@ -192,14 +192,14 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.27 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.31 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.1 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.1 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.1 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.73.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.311.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.54.7 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.75.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.317.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/iam v1.56.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.8.0 // indirect
