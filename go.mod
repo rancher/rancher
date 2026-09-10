@@ -10,14 +10,12 @@ replace (
 	github.com/rancher/dynamiclistener => github.com/Abhishek-Valaboju/dynamiclistener v0.9.2-0.20260828093312-6c9b5c8443ba
 	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e1194d9
 	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb
-	github.com/rancher/lasso => github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7
 	github.com/rancher/machine => github.com/Abhishek-Valaboju/machine v0.15.1-0.20260828101855-1594dd5e692c
 	github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
 	github.com/rancher/remotedialer-proxy => github.com/Abhishek-Valaboju/remotedialer-proxy v0.9.0-rc.1.0.20260828104351-1fd17c3731f2
 	github.com/rancher/shepherd => github.com/Abhishek-Valaboju/shepherd v0.0.0-20260902171309-1a4f1c27c7f1
 	github.com/rancher/steve => github.com/Abhishek-Valaboju/steve v0.9.8-0.20260831074818-fb7007cf9486
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/Abhishek-Valaboju/system-upgrade-controller/pkg/apis v0.0.0-20260831051815-cbe86707c07c
-	github.com/rancher/wrangler/v3 => github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545
 )
 
 replace (
@@ -141,8 +139,8 @@ require (
 	github.com/rancher/gke-operator v1.15.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
-	github.com/rancher/lasso v0.2.9
-	github.com/rancher/machine v0.15.0-rancher146-rc.4
+	github.com/rancher/lasso v0.2.10
+	github.com/rancher/machine v0.15.0-rancher146-rc.2
 	github.com/rancher/muchang v0.1.1
 	github.com/rancher/norman v0.10.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
@@ -153,7 +151,7 @@ require (
 	github.com/rancher/shepherd v0.0.0-20260921153737-8e09fea6aaaf
 	github.com/rancher/steve v0.10.4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
-	github.com/rancher/wrangler/v3 v3.7.1
+	github.com/rancher/wrangler/v3 v3.8.0-rc.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
@@ -274,10 +272,7 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/extism/go-sdk v1.7.1 // indirect
-	github.com/fatih/camelcase v1.0.0 // indirect
-	github.com/fatih/color v1.19.0 // indirect
-	github.com/felixge/httpsnoop v1.1.0 // indirect
-	github.com/fluxcd/cli-utils v1.2.1 // indirect
+	github.com/fluxcd/cli-utils v1.2.2 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
@@ -350,7 +345,7 @@ require (
 	github.com/rancher/wrangler v1.1.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.12 // indirect
@@ -509,7 +504,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.45.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

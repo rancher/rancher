@@ -25,8 +25,6 @@ github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e11
 github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e1194d9/go.mod h1:wOCW72qy9n19TyAf51qWvFtHxwjuIjQJdQK+8b2IseM=
 github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb h1:+i4bWqJ/Q02CHeTJ2M+OBcxioma/81HmvD0HkO58TU0=
 github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb/go.mod h1:QV7Dq+cBsZaGwQ7geVsOwhQk+BqxjRIG9bB4iQxRbE0=
-github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7 h1:Bh/Q2YdbhfFSLHPqw3ZyYPXDpBsy5ptmqFCfa7PH2h4=
-github.com/Abhishek-Valaboju/lasso v0.2.9-0.20260828055838-34eaedfec2e7/go.mod h1:rrFa/YyrZuIP4AMSGHUUrqHto617xfvGD+zO51CjxiU=
 github.com/Abhishek-Valaboju/machine v0.15.1-0.20260828101855-1594dd5e692c h1:7zG5PlQV+YlK7LepFcqkD+pvvHYs/S6/QGos6UqA7zk=
 github.com/Abhishek-Valaboju/machine v0.15.1-0.20260828101855-1594dd5e692c/go.mod h1:0J7Cd95eDM8Y4+O+zvrNYEC43jBwIEZ12OhxCD2iTT8=
 github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f h1:xKm9cVm820lQ5NP5EjAQowTrXyVlfZN/qcf7+jKdGh0=
@@ -39,8 +37,6 @@ github.com/Abhishek-Valaboju/steve v0.9.8-0.20260831074818-fb7007cf9486 h1:OVSeH
 github.com/Abhishek-Valaboju/steve v0.9.8-0.20260831074818-fb7007cf9486/go.mod h1:/OWEEpBqWHMoV/cSGxfAERz8mstphdjUpSRpkeG9Uw0=
 github.com/Abhishek-Valaboju/system-upgrade-controller/pkg/apis v0.0.0-20260831051815-cbe86707c07c h1:pWJ4ldkcUz2xf1cehy8cO6Ih55fGncbmlGiH72Vuj4o=
 github.com/Abhishek-Valaboju/system-upgrade-controller/pkg/apis v0.0.0-20260831051815-cbe86707c07c/go.mod h1:CzjC/2r7mf4iWoKxozaEAGBM5AMXUth1bf/FJY84fZs=
-github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545 h1:orKmwxUhFSRndERwVNxR7ZQ49bzxWvw9IoYH6ZJwFxg=
-github.com/Abhishek-Valaboju/wrangler/v3 v3.5.1-rc.1.0.20260828064927-bed3da9cc545/go.mod h1:okraQd3hPrRfMQu+3piQeftTSvnWYRtP3R0BPjiJ1w8=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 h1:bvDV9vkmnHYOMsOr4WLk+Vo07yKIzd94sVoIqshQ4bU=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24/go.mod h1:8o94RPi1/7XTJvwPpRSzSUedZrtlirdB3r9Z20bi2f8=
 github.com/Azure/azure-sdk-for-go v68.0.0+incompatible h1:fcYLmCpyNYRnvJbPerq7U0hS+6+I79yEDJBqVNcqUzU=
@@ -700,6 +696,8 @@ github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1 h1:vRtxuvIF0UarXI
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1/go.mod h1:xavYr3cNyyAeA72nMVB60+q/EJ8Anu+loQWFJyXOeP8=
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379 h1:/DKzOm5Du2jPLE5rXPGhsb0XeT68kWEIRi6jnzMeyGk=
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379/go.mod h1:IfqyXrTiCAg8rTJodbGApTiORgujJnBH+QyHHJlFSII=
+github.com/rancher/lasso v0.2.10 h1:8yz31RMjSDQkg0K4+2EuaO+FGorbNDgWDfdCVTNzElk=
+github.com/rancher/lasso v0.2.10/go.mod h1:O/+Qi1B0rDFsDuIbPecaUzvAdKNUFg9eZZFAuegnTh0=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/muchang v0.1.1 h1:2UJ7FPn+DZKspmqioWQpGb/DvotKFJZdFrV961ZPHdU=
@@ -710,6 +708,8 @@ github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHR
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
+github.com/rancher/wrangler/v3 v3.8.0-rc.1 h1:2ywpeMnPZihu73UNDilPDITNXFesZfuvyLclbzn0z00=
+github.com/rancher/wrangler/v3 v3.8.0-rc.1/go.mod h1:IaBqAfzbG9qCwF9c3sCb17Z4TKiCEyO7JUx+4tMwrAo=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 h1:EaDatTxkdHG+U3Bk4EUr+DZ7fOGwTfezUiUJMaIcaho=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5/go.mod h1:fyalQWdtzDBECAQFBJuQe5bzQ02jGd5Qcbgb97Flm7U=
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb27yVE+gIAfeqp8LUCc=
