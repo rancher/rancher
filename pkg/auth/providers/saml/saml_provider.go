@@ -61,6 +61,7 @@ type Provider struct {
 }
 
 var SamlProviders = make(map[string]*Provider)
+var getLDAPConfig = ldap.GetLDAPConfig
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	provider := &Provider{
@@ -509,7 +510,7 @@ func splitPrincipalID(principalID string) (string, string) {
 
 func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.Object, error) {
 	// if errors we might not want to turn on ldap
-	ldapConfig, _, err := ldap.GetLDAPConfig(s.ldapProvider)
+	ldapConfig, _, err := getLDAPConfig(s.ldapProvider)
 
 	// can be misconfigured but still want it saved
 	if err != nil {
