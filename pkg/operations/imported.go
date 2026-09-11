@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -466,6 +467,110 @@ func (a *ImportedAdapter) DistroManifestPaths(dataDir string) ManifestPaths {
 	return DistroManifestPaths(a.RuntimeCommand(), dataDir)
 }
 
+// normalizeCNIValues splits each raw --cni/RKE2_CNI value on commas and trims surrounding
+// whitespace from each plugin name, preserving order — Multus's position relative to Calico is
+// meaningful (RKE2 normally lists it first), so the values must not be sorted or deduplicated.
+func normalizeCNIValues(values []string) []string {
+	var normalized []string
+	for _, value := range values {
+		for _, plugin := range strings.Split(value, ",") {
+			if plugin = strings.TrimSpace(plugin); plugin != "" {
+				normalized = append(normalized, plugin)
+			}
+		}
+	}
+	return normalized
+}
+
+// rke2ServerCNI resolves one RKE2 server node's effective bundled CNI selection.
+//
+// Precedence matches RKE2 itself: an explicit --cni argument always wins; only when it is absent
+// does the RKE2_CNI environment variable apply; only when neither is set does RKE2's own default
+// (Canal) apply. Environment parsing is skipped entirely when --cni is present, so a malformed,
+// unrelated rke2.io/node-env annotation cannot block resolution.
+//
+// A nil args result means the server has not reported its runtime arguments yet — that is
+// missing information, not evidence of any particular CNI, so it is returned as an error rather
+// than silently assumed to be Canal.
+func rke2ServerCNI(node *mgmtv3.Node) ([]string, error) {
+	args, err := nodeArgsForRuntime(node, capr.RuntimeRKE2)
+	if err != nil {
+		return nil, fmt.Errorf("parsing runtime arguments for server node %s/%s: %w", node.Namespace, node.Name, err)
+	}
+	if args == nil {
+		return nil, fmt.Errorf("server node %s/%s has not reported its runtime arguments yet", node.Namespace, node.Name)
+	}
+
+	if cni := arguments(args).Values("--cni"); len(cni) > 0 {
+		return normalizeCNIValues(cni), nil
+	}
+
+	env, err := nodeEnvForRuntime(node, capr.RuntimeRKE2)
+	if err != nil {
+		return nil, fmt.Errorf("parsing runtime environment for server node %s/%s: %w", node.Namespace, node.Name, err)
+	}
+	if cni := env["RKE2_CNI"]; cni != "" {
+		return normalizeCNIValues([]string{cni}), nil
+	}
+
+	return []string{"canal"}, nil
+}
+
+// effectiveRKE2CNI resolves the bundled CNI plugin selection configured on this imported RKE2
+// cluster. That configuration lives on the cluster's RKE2 control-plane node(s), not on the node
+// receiving a given plan — a Linux worker normally runs `rke2 agent` and does not repeat the
+// server's --cni selection in its own arguments, but a Calico worker still needs the Calico
+// liveness probe.
+//
+// Only control-plane nodes deploy the bundled CNI; an etcd-only node has no CNI configuration of
+// its own to conflict with, so it is excluded from both the source list and the comparison below.
+//
+// This only detects RKE2's own bundled CNI selection. It does not, and cannot, detect an
+// independently installed Calico deployment when the cluster is configured with cni: none —
+// that is out of scope here.
+func (a *ImportedAdapter) effectiveRKE2CNI() ([]string, error) {
+	nodes, err := a.clients.Mgmt.Node().Cache().List(a.cluster.Name, labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("listing management nodes for cluster %s: %w", a.cluster.Name, err)
+	}
+
+	var servers []*mgmtv3.Node
+	for _, node := range nodes {
+		if node.DeletionTimestamp != nil {
+			continue
+		}
+		if node.Spec.ControlPlane {
+			servers = append(servers, node)
+		}
+	}
+	if len(servers) == 0 {
+		return nil, fmt.Errorf("cluster %s has no RKE2 control-plane node(s) to resolve CNI configuration from", a.cluster.Name)
+	}
+
+	// Sort so resolution order — and therefore which server's name appears first in a conflict
+	// error — is stable across reconciles instead of depending on cache iteration order.
+	slices.SortFunc(servers, func(a, b *mgmtv3.Node) int { return strings.Compare(a.Name, b.Name) })
+
+	var resolved []string
+	var resolvedFrom string
+	for _, node := range servers {
+		cni, err := rke2ServerCNI(node)
+		if err != nil {
+			return nil, err
+		}
+		if resolvedFrom == "" {
+			resolved = cni
+			resolvedFrom = node.Name
+			continue
+		}
+		if !slices.Equal(resolved, cni) {
+			return nil, fmt.Errorf("cluster %s has conflicting effective CNI selections: server %s resolved %v, server %s resolved %v",
+				a.cluster.Name, resolvedFrom, resolved, node.Name, cni)
+		}
+	}
+	return resolved, nil
+}
+
 // componentTLSSettingsFromNodeArgs extracts scheduler/controller-manager
 // TLS settings from imported node arguments.
 func componentTLSSettingsFromNodeArgs(args []string, component string) ComponentTLSSettings {
@@ -487,6 +592,8 @@ func componentTLSSettingsFromNodeArgs(args []string, component string) Component
 		if !ok {
 			continue
 		}
+		// clean possible double-dash prefix from the inner argument key, e.g. --secure-port=6443
+		key = strings.TrimPrefix(key, "--")
 		switch key {
 		case SecurePortArgument:
 			settings.SecurePort = value
@@ -573,6 +680,23 @@ func (a *ImportedAdapter) RenderProbes(secret *corev1.Secret, supervisor bool) (
 		}
 		supervisorProbe.HTTPGetAction.URL = fmt.Sprintf(supervisorProbe.HTTPGetAction.URL, loopbackAddress, port, runtime)
 		probes[SupervisorProbeName] = supervisorProbe
+	}
+
+	// Calico applicability comes from the imported RKE2 cluster's control-plane node(s)
+	// configuration, not from the node receiving this plan — Linux workers don't repeat the
+	// server's --cni selection in their own arguments, but a Calico worker still needs this
+	// liveness probe. Only Linux, non-etcd-only RKE2 nodes are eligible to receive it at all.
+	etcdOnly := IsEtcd(secret) && !IsControlPlane(secret)
+	calicoProbeApplies := runtime == capr.RuntimeRKE2 && !IsWindows(secret) && !etcdOnly
+
+	if calicoProbeApplies {
+		cni, err := a.effectiveRKE2CNI()
+		if err != nil {
+			return probes, err
+		}
+		if slices.Contains(cni, CalicoProbeName) {
+			probes[CalicoProbeName] = AllProbes[CalicoProbeName]
+		}
 	}
 
 	probes = InsertDataDirForProbes(dataDir, probes)

@@ -2,12 +2,15 @@ package operations
 
 import (
 	"encoding/json"
+	"errors"
+	"maps"
 	"testing"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -469,11 +472,18 @@ func TestImportedAdapter_ComponentTLSSettingsFromNodeArgs(t *testing.T) {
 			want:      ComponentTLSSettings{SecurePort: "10262"},
 		},
 		{
-			name: "unknown component returns empty",
+			name: "scheduler uses prefixed args",
 			args: []string{
-				"--kube-controller-manager-arg", "secure-port=10261",
+				"--kube-scheduler-arg", "--secure-port=10262",
+				"--kube-scheduler-arg", "--tls-cert-file=/custom/ks.crt",
+				"--kube-scheduler-arg", "--tls-private-key-file=/custom/ks.key",
 			},
-			component: "unknown-component",
+			component: KubeSchedulerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10262",
+				TLSCertFile:       "/custom/ks.crt",
+				TLSPrivateKeyFile: "/custom/ks.key",
+			},
 		},
 	}
 
@@ -932,10 +942,12 @@ func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *test
 			Name:      "node-a",
 			Namespace: "c-mine",
 		},
+		Spec: mgmtv3.NodeSpec{ControlPlane: true},
 		Status: mgmtv3.NodeStatus{
 			NodeAnnotations: map[string]string{
 				// A custom secure-port and TLS cert for controller-manager; scheduler only
-				// overrides its secure-port and keeps the default cert path.
+				// overrides its secure-port and keeps the default cert path. No --cni is set,
+				// so this node's own RKE2 server config resolves to the Canal default.
 				rke2NodeArgsAnnotation: `["--kube-controller-manager-arg","secure-port=10261",` +
 					`"--kube-controller-manager-arg","tls-cert-file=/custom/kcm.crt",` +
 					`"--kube-scheduler-arg","secure-port=10262"]`,
@@ -943,9 +955,8 @@ func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *test
 		},
 	}
 
-	// RenderProbes reads node args twice: once via DistroDataDirectory, once to compute the
-	// effective component TLS settings for the probes.
-	nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil).Times(2)
+	nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil).AnyTimes()
+	nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{node}, nil)
 
 	stubMgmt := &stubMgmtInterface{nodeCache: nodeCache}
 	adapter := &ImportedAdapter{
@@ -972,6 +983,437 @@ func TestImportedAdapter_RenderProbes_UsesConfiguredComponentTLSSettings(t *test
 	scheduler := probes[KubeSchedulerProbeName]
 	assert.Equal(t, "https://127.0.0.1:10262/healthz", scheduler.HTTPGetAction.URL)
 	assert.Equal(t, "/var/lib/rancher/rke2/server/tls/kube-scheduler/kube-scheduler.crt", scheduler.HTTPGetAction.CACert)
+}
+
+// calicoTestSecret builds a machine-plan secret with lifecycle labels pointing at machineName,
+// plus any extra role/OS labels needed by a Calico-probe test case.
+func calicoTestSecret(machineName string, roleLabels map[string]string) *corev1.Secret {
+	labels := map[string]string{
+		planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
+		planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+		planv1alpha1.MachineLifecycleNameLabel:  machineName,
+	}
+	maps.Copy(labels, roleLabels)
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-plan",
+			Namespace: "c-mine",
+			Labels:    labels,
+		},
+	}
+}
+
+// calicoTestNode builds a management Node fixture with the given RKE2 role Spec and raw
+// rke2.io/node-args / rke2.io/node-env annotation values ("" omits the annotation entirely).
+func calicoTestNode(name string, spec mgmtv3.NodeSpec, args, env string) *mgmtv3.Node {
+	annotations := map[string]string{}
+	if args != "" {
+		annotations[rke2NodeArgsAnnotation] = args
+	}
+	if env != "" {
+		annotations[rke2NodeEnvAnnotation] = env
+	}
+	return &mgmtv3.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "c-mine"},
+		Spec:       spec,
+		Status:     mgmtv3.NodeStatus{NodeAnnotations: annotations},
+	}
+}
+
+func calicoTestAdapter(provider string, nodeCache generic.CacheInterface[*mgmtv3.Node]) *ImportedAdapter {
+	return &ImportedAdapter{
+		cluster: &mgmtv3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "c-mine"},
+			Status:     mgmtv3.ClusterStatus{Provider: provider},
+		},
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt:       &stubMgmtInterface{nodeCache: nodeCache},
+				RESTMapper: &fakeRESTMapper{},
+			},
+		},
+	}
+}
+
+func jsonArgs(t *testing.T, args []string) string {
+	t.Helper()
+	encoded, err := json.Marshal(args)
+	assert.NoError(t, err)
+	return string(encoded)
+}
+
+// TestImportedAdapter_RenderProbes_CalicoProbeSelection covers eligibility and single-node
+// clusters, where the target of the plan is also the cluster's only RKE2 server — so the node's
+// own --cni configuration is both the target's and the cluster's effective CNI.
+func TestImportedAdapter_RenderProbes_CalicoProbeSelection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		provider       string
+		labels         map[string]string
+		spec           mgmtv3.NodeSpec
+		nodeArgs       []string
+		callsCNILookup bool
+		wantCalico     bool
+	}{
+		{
+			name:           "RKE2 --cni calico includes Calico",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{ControlPlane: true},
+			nodeArgs:       []string{"server", "--cni", "calico"},
+			callsCNILookup: true,
+			wantCalico:     true,
+		},
+		{
+			name:           "RKE2 --cni multus,calico includes Calico",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{ControlPlane: true},
+			nodeArgs:       []string{"server", "--cni", "multus,calico"},
+			callsCNILookup: true,
+			wantCalico:     true,
+		},
+		{
+			name:           "RKE2 --cni=calico includes Calico",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{ControlPlane: true},
+			nodeArgs:       []string{"server", "--cni=calico"},
+			callsCNILookup: true,
+			wantCalico:     true,
+		},
+		{
+			name:           "RKE2 --cni canal does not include Calico",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{ControlPlane: true},
+			nodeArgs:       []string{"server", "--cni", "canal"},
+			callsCNILookup: true,
+			wantCalico:     false,
+		},
+		{
+			name:           "RKE2 with no --cni does not include Calico",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{ControlPlane: true},
+			nodeArgs:       []string{"server"},
+			callsCNILookup: true,
+			wantCalico:     false,
+		},
+		{
+			name:           "RKE2 --cni cilium does not include Calico",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{ControlPlane: true},
+			nodeArgs:       []string{"server", "--cni", "cilium"},
+			callsCNILookup: true,
+			wantCalico:     false,
+		},
+		{
+			name:           "K3s skips RKE2 CNI lookup",
+			provider:       capr.RuntimeK3S,
+			labels:         map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{ControlPlane: true},
+			nodeArgs:       []string{"server"},
+			callsCNILookup: false,
+			wantCalico:     false,
+		},
+		{
+			name:           "etcd-only RKE2 node with Calico does not include Calico",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.EtcdRoleLabel: "true"},
+			spec:           mgmtv3.NodeSpec{Etcd: true},
+			nodeArgs:       []string{"server", "--cni", "calico"},
+			callsCNILookup: false,
+			wantCalico:     false,
+		},
+		{
+			name:           "Windows worker skips RKE2 CNI lookup",
+			provider:       capr.RuntimeRKE2,
+			labels:         map[string]string{capr.WorkerRoleLabel: "true", capr.CattleOSLabel: "windows"},
+			spec:           mgmtv3.NodeSpec{Worker: true},
+			nodeArgs:       []string{"agent"},
+			callsCNILookup: false,
+			wantCalico:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+			secret := calicoTestSecret("node-a", tt.labels)
+
+			argsAnnotation := rke2NodeArgsAnnotation
+			if tt.provider == capr.RuntimeK3S {
+				argsAnnotation = k3sNodeArgsAnnotation
+			}
+			node := &mgmtv3.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "node-a", Namespace: "c-mine"},
+				Spec:       tt.spec,
+				Status: mgmtv3.NodeStatus{
+					NodeAnnotations: map[string]string{
+						argsAnnotation: jsonArgs(t, tt.nodeArgs),
+					},
+				},
+			}
+			nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil).AnyTimes()
+			if tt.callsCNILookup {
+				nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{node}, nil)
+			}
+
+			probes, err := calicoTestAdapter(tt.provider, nodeCache).RenderProbes(secret, false)
+			assert.NoError(t, err)
+			if tt.wantCalico {
+				assert.Contains(t, probes, CalicoProbeName)
+			} else {
+				assert.NotContains(t, probes, CalicoProbeName)
+			}
+		})
+	}
+}
+
+// TestImportedAdapter_RenderProbes_CalicoAppliesToWorkerFromServerConfig proves that Calico
+// applicability comes from the cluster's RKE2 server configuration, not from the target node's
+// own arguments: a plain worker running `rke2 agent` never repeats --cni, but must still receive
+// the Calico probe when a server node in the same cluster selected Calico.
+func TestImportedAdapter_RenderProbes_CalicoAppliesToWorkerFromServerConfig(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+	secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+
+	worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+	server := calicoTestNode("node-server", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server", "--cni", "calico"}), "")
+
+	nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+	nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{worker, server}, nil)
+
+	probes, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+	assert.NoError(t, err)
+	assert.Contains(t, probes, CalicoProbeName)
+}
+
+// TestImportedAdapter_RenderProbes_CalicoServerEnvironmentPrecedence covers the precedence
+// between a server's explicit --cni argument and its RKE2_CNI environment fallback, and proves
+// environment parsing is skipped (and therefore cannot block rendering) once --cni is present.
+func TestImportedAdapter_RenderProbes_CalicoServerEnvironmentPrecedence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		args       []string
+		env        string
+		wantCalico bool
+	}{
+		{
+			name:       "environment fallback used when --cni is absent",
+			args:       []string{"server"},
+			env:        `{"RKE2_CNI":"calico"}`,
+			wantCalico: true,
+		},
+		{
+			name:       "explicit --cni always outranks the environment",
+			args:       []string{"server", "--cni", "canal"},
+			env:        `{"RKE2_CNI":"calico"}`,
+			wantCalico: false,
+		},
+		{
+			name:       "malformed environment does not block an explicit --cni",
+			args:       []string{"server", "--cni", "calico"},
+			env:        `{invalid-json`,
+			wantCalico: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+			// The target is a plain worker, kept separate from the server whose args/env are
+			// under test — a malformed server rke2.io/node-env must not affect resolving the
+			// target's own data directory.
+			secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+			worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+			server := calicoTestNode("node-server", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, tt.args), tt.env)
+
+			nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+			nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{worker, server}, nil)
+
+			probes, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+			assert.NoError(t, err)
+			if tt.wantCalico {
+				assert.Contains(t, probes, CalicoProbeName)
+			} else {
+				assert.NotContains(t, probes, CalicoProbeName)
+			}
+		})
+	}
+}
+
+// TestImportedAdapter_RenderProbes_CalicoCNILookupFailures covers the paths where Rancher cannot
+// safely determine the cluster's effective RKE2 CNI, and must return an error instead of guessing
+// — the operation retries rather than silently skipping a probe the cluster may actually need.
+func TestImportedAdapter_RenderProbes_CalicoCNILookupFailures(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no suitable server node", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+		worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+
+		nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{worker}, nil)
+
+		_, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.Error(t, err)
+	})
+
+	t.Run("server has not reported runtime arguments yet", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		secret := calicoTestSecret("node-a", map[string]string{capr.ControlPlaneRoleLabel: "true"})
+		node := calicoTestNode("node-a", mgmtv3.NodeSpec{ControlPlane: true}, "", "")
+
+		nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil).AnyTimes()
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{node}, nil)
+
+		_, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "has not reported its runtime arguments yet")
+	})
+
+	t.Run("management node list failure propagates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		secret := calicoTestSecret("node-a", map[string]string{capr.ControlPlaneRoleLabel: "true"})
+		node := calicoTestNode("node-a", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server"}), "")
+		listErr := errors.New("list failed")
+
+		nodeCache.EXPECT().Get("c-mine", "node-a").Return(node, nil).AnyTimes()
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return(nil, listErr)
+
+		_, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, listErr)
+	})
+
+	t.Run("malformed required server node-args annotation propagates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		// The target is a plain worker with valid arguments; only the (separate) server's
+		// node-args annotation is malformed.
+		secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+		worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+		server := calicoTestNode("node-server", mgmtv3.NodeSpec{ControlPlane: true}, `{invalid-json`, "")
+
+		nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{worker, server}, nil)
+
+		_, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.Error(t, err)
+	})
+
+	t.Run("malformed server environment required for fallback propagates", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		// The server has reported arguments but no explicit CNI, so resolving its
+		// RKE2_CNI fallback is required. Malformed environment data is not safe to ignore.
+		secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+		worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+		server := calicoTestNode("node-server", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server"}), `{invalid-json`)
+
+		nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{worker, server}, nil)
+
+		_, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "parsing runtime environment")
+	})
+
+	t.Run("deleting server is ignored", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+		worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+		deletingServer := calicoTestNode("node-deleting", mgmtv3.NodeSpec{ControlPlane: true}, `{invalid-json`, "")
+		deletionTime := metav1.Now()
+		deletingServer.DeletionTimestamp = &deletionTime
+		liveServer := calicoTestNode("node-live", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server", "--cni", "canal"}), "")
+
+		nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{deletingServer, worker, liveServer}, nil)
+
+		probes, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.NoError(t, err)
+		assert.NotContains(t, probes, CalicoProbeName)
+	})
+
+	t.Run("equivalent server CNI selections do not conflict", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+		worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+		serverA := calicoTestNode("node-a", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server", "--cni", "multus", "--cni", "calico"}), "")
+		serverB := calicoTestNode("node-b", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server", "--cni", "multus,calico"}), "")
+
+		nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{serverB, worker, serverA}, nil)
+
+		probes, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.NoError(t, err)
+		assert.Contains(t, probes, CalicoProbeName)
+	})
+
+	t.Run("conflicting server CNI selections", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		secret := calicoTestSecret("node-a", map[string]string{capr.ControlPlaneRoleLabel: "true"})
+		nodeA := calicoTestNode("node-a", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server", "--cni", "calico"}), "")
+		nodeB := calicoTestNode("node-b", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server", "--cni", "canal"}), "")
+
+		nodeCache.EXPECT().Get("c-mine", "node-a").Return(nodeA, nil).AnyTimes()
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{nodeA, nodeB}, nil)
+
+		_, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "conflicting effective CNI selections")
+	})
+
+	t.Run("etcd-only server is ignored in split-role cluster", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nodeCache := ctrlfake.NewMockCacheInterface[*mgmtv3.Node](ctrl)
+
+		// Only control-plane nodes deploy the bundled CNI. An etcd-only node reporting plain
+		// server args with no CNI setting must not be read as a Canal selection, nor compared
+		// against the control-plane node's Calico selection as a conflict.
+		secret := calicoTestSecret("node-worker", map[string]string{capr.WorkerRoleLabel: "true"})
+		worker := calicoTestNode("node-worker", mgmtv3.NodeSpec{Worker: true}, jsonArgs(t, []string{"agent"}), "")
+		etcdOnly := calicoTestNode("node-etcd", mgmtv3.NodeSpec{Etcd: true}, jsonArgs(t, []string{"server"}), "")
+		controlPlane := calicoTestNode("node-cp", mgmtv3.NodeSpec{ControlPlane: true}, jsonArgs(t, []string{"server", "--cni", "calico"}), "")
+
+		nodeCache.EXPECT().Get("c-mine", "node-worker").Return(worker, nil)
+		nodeCache.EXPECT().List("c-mine", gomock.Any()).Return([]*mgmtv3.Node{etcdOnly, worker, controlPlane}, nil)
+
+		probes, err := calicoTestAdapter(capr.RuntimeRKE2, nodeCache).RenderProbes(secret, false)
+		assert.NoError(t, err)
+		assert.Contains(t, probes, CalicoProbeName)
+	})
 }
 
 // --- arguments tests --------------------------------

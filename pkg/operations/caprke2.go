@@ -244,13 +244,8 @@ func (a *CAPRKE2Adapter) extraArgsFor(component string) []string {
 // ComponentTLSSettings returns scheduler/controller-manager TLS settings from CAPRKE2
 // control-plane extra args.
 func (a *CAPRKE2Adapter) ComponentTLSSettings(_ *corev1.Secret, component string) (ComponentTLSSettings, error) {
-	args := a.extraArgsFor(component)
-	if args == nil {
-		return ComponentTLSSettings{}, nil
-	}
-
 	var settings ComponentTLSSettings
-	for _, arg := range args {
+	for _, arg := range a.extraArgsFor(component) {
 		key, value, ok := strings.Cut(arg, "=")
 		if !ok {
 			continue

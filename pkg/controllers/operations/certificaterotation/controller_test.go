@@ -161,12 +161,12 @@ func TestTerminalHandler_OwningOperationUnpausesAndReleasesBeacon(t *testing.T) 
 			s := terminalScope("certificate-rotation/fleet-default/rotation", adapter)
 
 			_, err := terminal.handler(h, s, opv1alpha1.CertificateRotationStatus{})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, []bool{false}, adapter.pauseCalls)
-			if assert.Len(t, beacons.statusUpdates, 1) {
-				assert.Empty(t, beacons.statusUpdates[0].Status.Owner)
-				assert.False(t, beacons.statusUpdates[0].Status.Active)
-			}
+			require.Len(t, beacons.statusUpdates, 1)
+			assert.Empty(t, beacons.statusUpdates[0].Status.Owner)
+			assert.False(t, beacons.statusUpdates[0].Status.Active)
+
 			assert.Equal(t, terminal.wantEnqueues, dynamic.enqueues)
 		})
 	}
@@ -192,7 +192,7 @@ func TestTerminalHandler_NonOwnerDoesNotUnpauseOrReleaseBeacon(t *testing.T) {
 			s.beacon.Status.Owner = "certificate-rotation/fleet-default/newer-rotation"
 
 			_, err := terminal.handler(h, s, opv1alpha1.CertificateRotationStatus{})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Empty(t, adapter.pauseCalls)
 			assert.Empty(t, beacons.statusUpdates)
 			assert.Zero(t, dynamic.enqueues)
@@ -281,10 +281,10 @@ func TestComponentCertificateCleanupInstructions(t *testing.T) {
 			}
 
 			instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, tt.services, adapter.dataDir, adapter.DistroManifestPaths(adapter.dataDir))
-			assert.NoError(t, err)
-			assert.Len(t, instructions, len(tt.expected))
+			require.NoError(t, err)
+			require.Len(t, instructions, len(tt.expected))
 			for i, instruction := range instructions {
-				assert.GreaterOrEqual(t, len(instruction.Args), 4)
+				require.GreaterOrEqual(t, len(instruction.Args), 4)
 				assert.Equal(t, "rm", instruction.Args[len(instruction.Args)-4])
 				assert.Equal(t, []string{"-f", tt.expected[i]}, instruction.Args[len(instruction.Args)-2:])
 			}
@@ -332,7 +332,7 @@ func TestComponentCertificateCleanupInstructions_SkipsUnselectedComponentBeforeR
 	// Their TLS settings must never be fetched — otherwise the configured settingsErr would
 	// surface here even though neither component is relevant to this request.
 	instructions, err := componentCertificateCleanupInstructions(s, &corev1.Secret{}, []string{"etcd"}, adapter.dataDir, adapter.DistroManifestPaths(adapter.dataDir))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, instructions)
 	assert.Empty(t, adapter.settingsCalls)
 }
@@ -384,7 +384,7 @@ func TestCertificateRotationRuntimeInstructions_CustomDataDirWithServices(t *tes
 
 	instructions := certificateRotationRuntimeInstructions(
 		s, secret, "/custom/data-dir", []string{"etcd", "api-server"})
-	assert.Len(t, instructions, 1)
+	require.Len(t, instructions, 1)
 
 	args := instructions[0].Args
 	assert.Equal(t, []string{
@@ -415,7 +415,7 @@ func TestCertificateRotationRuntimeInstructions_CustomDataDirNoServices(t *testi
 
 	instructions := certificateRotationRuntimeInstructions(
 		s, secret, "/custom/data-dir", nil)
-	assert.Len(t, instructions, 1)
+	require.Len(t, instructions, 1)
 
 	args := instructions[0].Args
 	assert.Equal(t, []string{
@@ -432,7 +432,7 @@ func TestManifestRemovalInstructions_DataDirWithSpacesIsNotInterpolated(t *testi
 
 	dataDir := "/var/lib/rancher/testing/certificate rotation"
 	instructions := manifestRemovalInstructions("/var/lib/rancher/capr", "operation", ops.DistroManifestPaths(capr.RuntimeRKE2, dataDir))
-	assert.Len(t, instructions, 1)
+	require.Len(t, instructions, 1)
 
 	instr := instructions[0]
 	assert.Equal(t, "/bin/sh", instr.Command)
@@ -593,7 +593,7 @@ func TestReconcileRotate_UnsupportedServiceFailsBeforePlanAssignment(t *testing.
 	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
 
 	got, err := h.reconcileRotate(s, status)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseFailed, got.Phase)
 	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.FailedCondition.GetReason(&got))
 	assert.Contains(t, opv1alpha1.FailedCondition.GetMessage(&got), "rke2-server")
@@ -690,7 +690,7 @@ func TestReconcileRotate_AssignedPlanCarriesOperationEnvOnce(t *testing.T) {
 	}
 
 	got, err := h.reconcileRotate(s, status)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, opv1alpha1.OperationPhaseFailed, got.Phase)
 
 	if !assert.NotNil(t, assigned, "AssignPlan must have been called") {
@@ -698,8 +698,8 @@ func TestReconcileRotate_AssignedPlanCarriesOperationEnvOnce(t *testing.T) {
 	}
 
 	var assignedPlan plan.Plan
-	assert.NoError(t, json.Unmarshal(assigned.Data["plan"], &assignedPlan))
-	assert.NotEmpty(t, assignedPlan.OneTimeInstructions)
+	require.NoError(t, json.Unmarshal(assigned.Data["plan"], &assignedPlan))
+	require.NotEmpty(t, assignedPlan.OneTimeInstructions)
 
 	wantEnv := fmt.Sprintf("CERTIFICATE_ROTATION_OPERATION_UID=%s", op.UID)
 	for _, instr := range assignedPlan.OneTimeInstructions {
