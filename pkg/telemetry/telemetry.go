@@ -78,9 +78,13 @@ type SystemTelemetry interface {
 	CpuArchitecture() string
 }
 
+// ComputeTelmetry ...
+// [2] Should this new flag be computed within ComputeTelmetry interface?
 type ComputeTelmetry interface {
 	CpuCores() (int, error)
 	MemoryCapacityBytes() (int, error)
+	// Something like:
+	// GPUCapability() (bool, error)
 }
 
 type nodeTelemetryImpl struct {
@@ -220,6 +224,11 @@ type clusterTelemetryImpl struct {
 }
 
 var _ ClusterTelemetry = (*clusterTelemetryImpl)(nil)
+
+// [2] Should this new flag be computed within ComputeTelmetry interface?
+// func (n *clusterTelemetryImpl) GPUCapability() (bool, error) {
+// 	TODO: Check if secret is present...
+// }
 
 func (c *clusterTelemetryImpl) CpuCores() (int, error) {
 	cpuQ := c.Status.Capacity.Cpu()

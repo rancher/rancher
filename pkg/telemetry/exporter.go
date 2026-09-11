@@ -227,6 +227,10 @@ func (s *secretTelemetryExporter) CollectAndExport() error {
 	if err != nil {
 		return err
 	}
+
+	// [1] Detect whether a Kubernetes Secret configured for the NVIDIA registry exists in
+	// any of the connected clusters and report this single boolean fact back in the
+	// SUSE Customer Center (SCC) registration payload.
 	payload, err := GenerateSCCPayload(telG)
 	if err != nil {
 		return err
