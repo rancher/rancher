@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/types"
@@ -54,6 +55,24 @@ type adProvider struct {
 	certs       string
 	caPool      *x509.CertPool
 	tokenMGR    *tokens.Manager
+
+	// Test seams. All nil in production; each falls back to the real method.
+	dial       func(*v3.ActiveDirectoryConfig, *x509.CertPool) (ldapv3.Client, error)
+	loadConfig func() (*v3.ActiveDirectoryConfig, *x509.CertPool, error)
+}
+
+func (p *adProvider) ldapConnectionOrDefault(config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (ldapv3.Client, error) {
+	if p.dial != nil {
+		return p.dial(config, caPool)
+	}
+	return p.ldapConnection(config, caPool)
+}
+
+func (p *adProvider) configOrDefault() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
+	if p.loadConfig != nil {
+		return p.loadConfig()
+	}
+	return p.getActiveDirectoryConfig()
 }
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -99,8 +118,11 @@ func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, in
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
 
-	config, caPool, err := p.getActiveDirectoryConfig()
+	config, caPool, err := p.configOrDefault()
 	if err != nil {
+		if errors.Is(err, errBindConfiguration) {
+			return v3.Principal{}, nil, "", apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
+		}
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
 
@@ -109,7 +131,7 @@ func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, in
 		return v3.Principal{}, nil, "", apierror.WrapAPIError(err, validation.ClusterUnavailable, StatusLoginDisabled)
 	}
 
-	lConn, err := p.ldapConnection(config, caPool)
+	lConn, err := p.ldapConnectionOrDefault(config, caPool)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -127,27 +149,39 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 	var principals []v3.Principal
 	var err error
 
-	config, caPool, err := p.getActiveDirectoryConfig()
+	config, caPool, err := p.configOrDefault()
 	if err != nil {
+		if errors.Is(err, errBindConfiguration) {
+			return nil, apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
+		}
 		return principals, nil
 	}
 
-	lConn, err := p.ldapConnection(config, caPool)
+	lConn, err := p.ldapConnectionOrDefault(config, caPool)
 	if err != nil {
 		return principals, nil
 	}
 	defer lConn.Close()
 
 	principals, err = p.searchPrincipals(searchKey, principalType, config, lConn)
-	if err == nil {
-		for _, principal := range principals {
-			if principal.PrincipalType == "user" {
-				if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
-					principal.Me = true
-				}
-			} else if principal.PrincipalType == "group" {
-				principal.MemberOf = p.userMGR.IsMemberOf(myToken, principal)
+	if err != nil {
+		// A channel binding rejection or a malformed token is a fault an
+		// operator must see. Every other search failure keeps the historic
+		// behaviour of returning an empty result, because callers rely on
+		// principal search degrading rather than erroring.
+		if classifyBindFailure(err) != bindFailureNone {
+			return nil, apierror.WrapAPIError(err, validation.ServerError, mapBindError(err).Error())
+		}
+		return principals, nil
+	}
+
+	for _, principal := range principals {
+		if principal.PrincipalType == "user" {
+			if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
+				principal.Me = true
 			}
+		} else if principal.PrincipalType == "group" {
+			principal.MemberOf = p.userMGR.IsMemberOf(myToken, principal)
 		}
 	}
 
@@ -155,8 +189,11 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 }
 
 func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	config, caPool, err := p.getActiveDirectoryConfig()
+	config, caPool, err := p.configOrDefault()
 	if err != nil {
+		if errors.Is(err, errBindConfiguration) {
+			return v3.Principal{}, apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
+		}
 		return v3.Principal{}, nil
 	}
 
@@ -186,12 +223,21 @@ func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x50
 	if !ok {
 		return nil, nil, fmt.Errorf("failed to retrieve ActiveDirectoryConfig, cannot read k8s Unstructured data")
 	}
-	storedADConfigMap := u.UnstructuredContent()
+	return p.decodeActiveDirectoryConfig(u.UnstructuredContent())
+}
 
+// decodeActiveDirectoryConfig performs everything after the fetch: decode,
+// validate, CA pool, service-account secret. Pure with respect to the API
+// server, so it is directly testable from a map.
+func (p *adProvider) decodeActiveDirectoryConfig(storedADConfigMap map[string]any) (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
 	storedADConfig := &v3.ActiveDirectoryConfig{}
-	err = common.Decode(storedADConfigMap, storedADConfig)
+	err := common.Decode(storedADConfigMap, storedADConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to decode Active Directory Config: %w", err)
+	}
+
+	if err := validateBindConfiguration(storedADConfig); err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", errBindConfiguration, err)
 	}
 
 	if p.certs != storedADConfig.Certificate || p.caPool == nil {
@@ -225,7 +271,7 @@ func newCAPool(cert string) (*x509.CertPool, error) {
 }
 
 func (p *adProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, _, err := p.getActiveDirectoryConfig()
+	config, _, err := p.configOrDefault()
 	if err != nil {
 		logrus.Errorf("Error fetching AD config: %v", err)
 		return false, err
@@ -260,7 +306,7 @@ func (e LoginDisabledError) Error() string {
 
 // IsDisabledProvider checks if the Azure Active Directory provider is currently disabled in Rancher.
 func (p *adProvider) IsDisabledProvider() (bool, error) {
-	adConfig, _, err := p.getActiveDirectoryConfig()
+	adConfig, _, err := p.configOrDefault()
 	if err != nil {
 		return false, err
 	}

@@ -5,6 +5,7 @@ const (
 	ActiveDirectoryConfigFieldAccessMode                   = "accessMode"
 	ActiveDirectoryConfigFieldAllowedPrincipalIDs          = "allowedPrincipalIds"
 	ActiveDirectoryConfigFieldAnnotations                  = "annotations"
+	ActiveDirectoryConfigFieldBindMechanism                = "bindMechanism"
 	ActiveDirectoryConfigFieldCertificate                  = "certificate"
 	ActiveDirectoryConfigFieldConnectionTimeout            = "connectionTimeout"
 	ActiveDirectoryConfigFieldCreated                      = "created"
@@ -49,6 +50,7 @@ type ActiveDirectoryConfig struct {
 	AccessMode                   string            `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
 	AllowedPrincipalIDs          []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations                  map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	BindMechanism                string            `json:"bindMechanism,omitempty" yaml:"bindMechanism,omitempty"`
 	Certificate                  string            `json:"certificate,omitempty" yaml:"certificate,omitempty"`
 	ConnectionTimeout            int64             `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 	Created                      string            `json:"created,omitempty" yaml:"created,omitempty"`

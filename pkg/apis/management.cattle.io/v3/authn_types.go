@@ -526,6 +526,13 @@ type ActiveDirectoryConfig struct {
 	GroupMemberMappingAttribute  string   `json:"groupMemberMappingAttribute,omitempty" norman:"default=member,required"`
 	ConnectionTimeout            int64    `json:"connectionTimeout,omitempty"           norman:"default=5000,notnullable,required"`
 	NestedGroupMembershipEnabled *bool    `json:"nestedGroupMembershipEnabled,omitempty" norman:"default=false"`
+
+	// BindMechanism selects how Rancher binds to the directory.
+	// "simple" (default) is an LDAP simple bind. "ntlm" is a Sicily NTLMv2 bind
+	// carrying an RFC 5929 tls-server-end-point channel binding token, required
+	// by domain controllers enforcing LdapEnforceChannelBinding=Always.
+	// "kerberos" is reserved for a future mechanism and is currently rejected.
+	BindMechanism string `json:"bindMechanism,omitempty" norman:"type=enum,options=simple|ntlm,default=simple"`
 }
 
 func (c *ActiveDirectoryConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
