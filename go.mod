@@ -116,10 +116,10 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.15.2-rc.1
 	github.com/rancher/ali-operator v1.15.1-rc.1
-	github.com/rancher/apiserver v0.9.9
+	github.com/rancher/apiserver v0.9.10
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.0
-	github.com/rancher/dynamiclistener v0.9.1
+	github.com/rancher/dynamiclistener v0.9.3
 	github.com/rancher/eks-operator v1.15.2-rc.1
 	github.com/rancher/fleet/pkg/apis v0.16.1
 	github.com/rancher/gke-operator v1.15.3-rc.1
@@ -128,19 +128,19 @@ require (
 	github.com/rancher/lasso v0.2.9
 	github.com/rancher/machine v0.15.0-rancher145.2-rc.0
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.9.10
+	github.com/rancher/norman v0.9.11
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.8.0
 	github.com/rancher/shepherd v0.0.0-20260610155525-6d926c75d49a
-	github.com/rancher/steve v0.9.21
+	github.com/rancher/steve v0.9.23
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
-	github.com/rancher/wrangler/v3 v3.7.1
+	github.com/rancher/wrangler/v3 v3.7.2
 	github.com/robfig/cron v1.2.0
-	github.com/sirupsen/logrus v1.9.4
-	github.com/stretchr/testify v1.11.1
+	github.com/sirupsen/logrus v1.10.2
+	github.com/stretchr/testify v1.12.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.17
 	github.com/vmware/govmomi v0.42.0
@@ -289,7 +289,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
@@ -298,7 +298,7 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/controller-manager v0.36.4 // indirect
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
-	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
+	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/kms v0.36.4 // indirect
 	k8s.io/streaming v0.36.4 // indirect
 	modernc.org/libc v1.72.0 // indirect
