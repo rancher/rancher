@@ -161,7 +161,7 @@ var (
 	ClusterAutoscaling = newPrimeFeature(
 		"cluster-autoscaling",
 		"Enable Rancher cluster-autoscaler support",
-		true,
+		IsPrime(), // we only want this to show in the UI if it's a prime build - even if it's a prime-only feature.
 		false,
 		true,
 	)

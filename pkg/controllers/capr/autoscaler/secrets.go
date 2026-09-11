@@ -26,8 +26,9 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 	// (TLS, mirrors), but does not cover the registry used for the autoscaler chart/image.
 	// In this case, the global credentials should be used. When the cluster _does_ have valid
 	// credentials for the chart host, the cluster-scoped secrets are used.
-	if image.GetRegistryAuthSecretForHostname(provCluster, autoScalerChartRepositoryHost()) != "" {
-		username, password, err := h.findClusterLevelAutoScalerHostnameCreds(provCluster)
+	chartHost := chartRepositoryHost(h.getChartRepository(capiCluster))
+	if image.GetRegistryAuthSecretForHostname(provCluster, chartHost) != "" {
+		username, password, err := h.findClusterLevelAutoScalerHostnameCreds(provCluster, chartHost)
 		if err != nil && !errors.Is(err, cluster.ErrRegistryHostnameNotFound) {
 			return "", "", err
 		}
@@ -36,7 +37,7 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 			if err != nil {
 				return "", "", err
 			}
-			imagePullSecretName, err = h.ensureClusterScopedImagePullSecretInNamespace(provCluster, capiCluster, username, password)
+			imagePullSecretName, err = h.ensureClusterScopedImagePullSecretInNamespace(provCluster, capiCluster, chartHost, username, password)
 			if err != nil {
 				return "", "", err
 			}
@@ -48,7 +49,7 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 		return "", "", err
 	}
 
-	return h.ensureRootHelmOpSecrets()
+	return h.ensureRootHelmOpSecrets(chartHost)
 }
 
 // ensureRootHelmOpSecrets manages the shared Helm basic-auth secret and dockerconfigjson image
@@ -56,8 +57,8 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 // pull secret, or empty strings if no credentials are available (in which case any previously
 // created secrets are also deleted). Creating two shared root secrets helps reduce the number
 // of objects created when there are many clusters using the GSDR and the autoscaler.
-func (h *autoscalerHandler) ensureRootHelmOpSecrets() (string, string, error) {
-	username, password, err := h.findGlobalClusterAutoScalerHostnameCreds()
+func (h *autoscalerHandler) ensureRootHelmOpSecrets(chartHost string) (string, string, error) {
+	username, password, err := h.findGlobalClusterAutoScalerHostnameCreds(chartHost)
 	if err != nil {
 		return "", "", err
 	}
@@ -77,7 +78,7 @@ func (h *autoscalerHandler) ensureRootHelmOpSecrets() (string, string, error) {
 		return "", "", err
 	}
 
-	dockerConfigData, err := dockerConfigSecretData(autoScalerChartRepositoryHost(), username, password)
+	dockerConfigData, err := dockerConfigSecretData(chartHost, username, password)
 	if err != nil {
 		return "", "", err
 	}
@@ -116,8 +117,7 @@ func (h *autoscalerHandler) ensureClusterScopedHelmOpSecretInNamespace(capiClust
 // secret in the provisioning cluster's namespace for pulling the autoscaler chart image.
 // If the chart host matches the cluster's system default registry, no secret is created because
 // credentials are already configured at provisioning time.
-func (h *autoscalerHandler) ensureClusterScopedImagePullSecretInNamespace(provCluster *provv1.Cluster, capiCluster *capi.Cluster, username, password string) (string, error) {
-	chartHost := autoScalerChartRepositoryHost()
+func (h *autoscalerHandler) ensureClusterScopedImagePullSecretInNamespace(provCluster *provv1.Cluster, capiCluster *capi.Cluster, chartHost, username, password string) (string, error) {
 	sdrURL, _ := image.GetPrivateRepoURLFromCluster(provCluster)
 	if chartHost == sdrURL {
 		return "", nil
@@ -190,12 +190,12 @@ func (h *autoscalerHandler) upsertSecret(namespace, secretName string, secretTyp
 }
 
 // findGlobalClusterAutoScalerHostnameCreds iterates over globally configured pull secrets and
-// returns the first username/password pair that covers the autoscaler chart repository host.
+// returns the first username/password pair that covers the provided chart host.
 // When the global system default registry URL is not set, it falls back to searching the
 // SystemDefaultRegistryPullSecrets directly, since those secrets may still contain credentials
-// for the autoscaler chart repository even without a GSDR URL configured.
+// for the provided chart host even without a GSDR URL configured.
 // Returns empty strings (no error) when no matching credentials are found.
-func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds() (string, string, error) {
+func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds(chartHost string) (string, string, error) {
 	registry, _ := cluster.GetPrivateRegistry(nil)
 	pullSecrets := cluster.GlobalPullSecretRefs()
 	if registry != nil {
@@ -209,7 +209,7 @@ func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds() (string, 
 			}
 			return "", "", err
 		}
-		username, password, err := cluster.ExtractUsernamePasswordFromPullSecret(autoScalerChartRepositoryHost(), sec)
+		username, password, err := cluster.ExtractUsernamePasswordFromPullSecret(chartHost, sec)
 		if err != nil {
 			if errors.Is(err, cluster.ErrRegistryHostnameNotFound) {
 				continue
@@ -224,8 +224,7 @@ func (h *autoscalerHandler) findGlobalClusterAutoScalerHostnameCreds() (string, 
 // findClusterLevelAutoScalerHostnameCreds looks up the credentials for the autoscaler chart host
 // from the provisioning cluster's registry configuration. The username and password is extracted from the first
 // Auth secret found on the cluster which contains credentials for the autoscaler host.
-func (h *autoscalerHandler) findClusterLevelAutoScalerHostnameCreds(provCluster *provv1.Cluster) (string, string, error) {
-	chartHost := autoScalerChartRepositoryHost()
+func (h *autoscalerHandler) findClusterLevelAutoScalerHostnameCreds(provCluster *provv1.Cluster, chartHost string) (string, string, error) {
 	ps := image.GetRegistryAuthSecretForHostname(provCluster, chartHost)
 	if ps == "" {
 		return "", "", nil

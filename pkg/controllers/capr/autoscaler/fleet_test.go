@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
@@ -226,6 +227,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_UpdateExistingHelmOp()
 
 func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 	cluster := s.createTestCluster("test-cluster", "default")
+	repository := s.h.getChartRepository(cluster)
 
 	existingHelmOp := &fleet.HelmOp{
 		ObjectMeta: metav1.ObjectMeta{
@@ -242,9 +244,9 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 				BundleDeploymentOptions: fleet.BundleDeploymentOptions{
 					DefaultNamespace: "kube-system",
 					Helm: &fleet.HelmOptions{
-						Chart:       getChartName(),
+						Chart:       getChartName(repository),
 						Version:     s.h.chartVersionsForCluster(cluster).chartVersion,
-						Repo:        settings.ClusterAutoscalerChartRepository.Get(),
+						Repo:        repository,
 						ReleaseName: "cluster-autoscaler",
 						Values: &fleet.GenericMap{
 							Data: map[string]any{
@@ -313,18 +315,33 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_NoOverride() {
 	cluster := s.createTestCluster("test-cluster", "default")
 
-	result := s.h.getChartImageSettings(cluster, "")
-	s.Equal(map[string]any{}, result)
+	result := s.h.getChartImageSettings(cluster, "autoscaler-pull-secret")
+	s.Equal(map[string]any{
+		"pullSecrets": []string{"autoscaler-pull-secret"},
+		"repository":  "rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":    "docker.io",
+		"tag":         defaultChartVersionConfigs.imageTag,
+	}, result)
 }
 
 func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_WithValidImage() {
-	originalImage := settings.ClusterAutoscalerImage.Get()
-	defer func() {
-		_ = settings.ClusterAutoscalerImage.Set(originalImage)
-	}()
-	_ = settings.ClusterAutoscalerImage.Set("registry.example.com/cluster-autoscaler:1.2.3")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerImage: "registry.example.com/cluster-autoscaler:1.2.3",
+	})
 
-	cluster := s.createTestCluster("test-cluster", "default")
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
 
 	result := s.h.getChartImageSettings(cluster, "")
 	expected := map[string]any{
@@ -333,6 +350,73 @@ func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_WithValidImage() {
 		"tag":        "1.2.3",
 	}
 	s.Equal(expected, result)
+}
+
+func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageUsesClusterRegistry() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local"},
+					},
+				},
+			},
+		},
+	}
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+
+	result := s.h.getChartImageSettings(cluster, "")
+	s.Equal(map[string]any{
+		"repository": "rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":   "cluster-registry.local",
+		"tag":        defaultChartVersionConfigs.imageTag,
+	}, result)
+}
+
+func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageFallsBackToGlobalRegistry() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec:       provv1.ClusterSpec{RKEConfig: &provv1.RKEConfig{}},
+	}
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withSettings(map[settings.Setting]string{
+		settings.SystemDefaultRegistry: "global-registry.local",
+	})
+
+	result := s.h.getChartImageSettings(cluster, "")
+	s.Equal(map[string]any{
+		"repository": "rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":   "global-registry.local",
+		"tag":        defaultChartVersionConfigs.imageTag,
+	}, result)
 }
 
 // Test cases for getKubernetesMinorVersion method
@@ -657,6 +741,92 @@ func (s *autoscalerSuite) TestManageHelmOpSecrets_GSDREqualsChartHost_ClusterHas
 			"because clusters with their own SDR do not get GSDR credentials in their containerd config")
 }
 
+func (s *autoscalerSuite) TestEnsureRootHelmOpSecrets_UsesProvidedChartHost() {
+	const (
+		chartRepository = "oci://charts.example.com/rancher/cluster-autoscaler"
+		globalRegistry  = "registry.example.com"
+		pullSecretName  = "autoscaler-pull-secret"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepository,
+		settings.SystemDefaultRegistry:            globalRegistry,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	pullSecretData, err := dockerConfigSecretData(globalRegistry, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+
+	created := map[string]*corev1.Secret{}
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+		created[secret.Name] = secret
+		return secret, nil
+	}).Times(2)
+
+	helmOpSec, imagePullSec, err := s.h.ensureRootHelmOpSecrets(globalRegistry)
+	s.NoError(err)
+	s.Equal(autoscalerHelmSecretResourceName, helmOpSec)
+	s.Equal(autoscalerChartImagePullSecretName, imagePullSec)
+	s.Contains(string(created[autoscalerChartImagePullSecretName].Data[corev1.DockerConfigJsonKey]), globalRegistry)
+}
+
+func (s *autoscalerSuite) TestSyncRootHelmOpSecret_UsesSystemDefaultRegistry() {
+	const (
+		globalRegistry = "registry.example.com"
+		chartRepo      = "oci://charts.example.com/rancher/cluster-autoscaler"
+		pullSecretName = "autoscaler-pull-secret"
+	)
+
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: chartRepo,
+		settings.SystemDefaultRegistry:            globalRegistry,
+		settings.SystemDefaultRegistryPullSecrets: pullSecretName,
+	})
+
+	pullSecretData, err := dockerConfigSecretData(globalRegistry, "user", "pass")
+	s.Require().NoError(err)
+	globalPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: pullSecretName, Namespace: "cattle-system"},
+		Type:       corev1.SecretTypeDockerConfigJson,
+		Data:       pullSecretData,
+	}
+	s.secretCache.EXPECT().Get("cattle-system", pullSecretName).Return(globalPullSecret, nil)
+
+	notFound := errors.NewNotFound(schema.GroupResource{}, "")
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerHelmSecretResourceName).Return(nil, notFound)
+	s.secretCache.EXPECT().Get("fleet-default", autoscalerChartImagePullSecretName).Return(nil, notFound)
+
+	created := map[string]*corev1.Secret{}
+	s.secretClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+		created[secret.Name] = secret
+		return secret, nil
+	}).Times(2)
+
+	setting := &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: settings.SystemDefaultRegistryPullSecrets.Name}}
+	result, err := s.h.syncRootHelmOpSecret("", setting)
+	s.NoError(err)
+	s.Same(setting, result)
+	s.Contains(string(created[autoscalerChartImagePullSecretName].Data[corev1.DockerConfigJsonKey]), globalRegistry)
+}
+
+func (s *autoscalerSuite) TestSyncRootHelmOpSecret_IgnoresUnrelatedSetting() {
+	setting := &v3.Setting{ObjectMeta: metav1.ObjectMeta{Name: "unrelated-setting"}}
+
+	result, err := s.h.syncRootHelmOpSecret("", setting)
+	s.NoError(err)
+	s.Same(setting, result)
+}
+
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters() {
 	cluster := s.createTestCluster("test-cluster-123", "test-namespace-456")
 	helmOpName := helmOpName(cluster)
@@ -667,4 +837,100 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ExplicitSettingIsPreserved() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "oci://registry.rancher.io/rancher/cluster-autoscaler",
+	})
+	s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", s.h.getChartRepository(cluster))
+	s.Empty(getChartName(s.h.getChartRepository(cluster)))
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ExplicitHTTPSSettingIsPreserved() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "https://charts.example.com",
+	})
+	s.Equal("https://charts.example.com", s.h.getChartRepository(cluster))
+	s.Equal("cluster-autoscaler", getChartName(s.h.getChartRepository(cluster)))
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ReturnsEmptyWithoutPrivateRegistry() {
+	cluster := s.createTestCluster("test-cluster", "default")
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "",
+		settings.SystemDefaultRegistry:            "",
+	})
+
+	repository := s.h.getChartRepository(cluster)
+	s.Empty(repository)
+	s.Equal("cluster-autoscaler", getChartName(repository))
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_ClusterRegistryTakesPrecedence() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local"},
+					},
+				},
+			},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "",
+		settings.SystemDefaultRegistry:            "global-registry.local",
+	})
+	s.Equal("oci://cluster-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", s.h.getChartRepository(cluster))
+}
+
+func (s *autoscalerSuite) TestGetChartRepository_FallsBackToGlobalRegistry() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{},
+		},
+	}
+
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+	s.withSettings(map[settings.Setting]string{
+		settings.ClusterAutoscalerChartRepository: "",
+		settings.SystemDefaultRegistry:            "fallback-registry.local",
+	})
+	s.Equal("oci://fallback-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", s.h.getChartRepository(cluster))
 }
