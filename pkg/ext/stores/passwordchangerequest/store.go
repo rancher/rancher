@@ -44,8 +44,7 @@ var GVK = ext.SchemeGroupVersion.WithKind(kind)
 
 type PasswordUpdater interface {
 	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
-	UpdatePassword(userId string, newPassword string) error
-	CreatePassword(user *v3.User, password string) error
+	SetPassword(user *v3.User, newPassword string) error
 }
 
 // +k8s:openapi-gen=false
@@ -163,13 +162,7 @@ func (s *Store) Create(
 	// Checking the current password is only required if the user doesn't have permissions on update on users and update
 	// secrets in the cattle-local-user-passwords namespace.
 	if canUpdateAnyPassword {
-		err := s.pwdUpdater.UpdatePassword(req.Spec.UserID, req.Spec.NewPassword)
-		if apierrors.IsNotFound(err) {
-			// The user has no password yet. This is the case for a user created
-			// through the public API, where the password is set separately.
-			err = s.pwdUpdater.CreatePassword(user, req.Spec.NewPassword)
-		}
-		if err != nil {
+		if err := s.pwdUpdater.SetPassword(user, req.Spec.NewPassword); err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error updating password: %w", err))
 		}
 

@@ -13,6 +13,7 @@ import (
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -63,14 +64,7 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 			Annotations: map[string]string{
 				passwordHashAnnotation: pbkdf2sha3512Hash,
 			},
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					Name:       user.Name,
-					UID:        user.UID,
-					APIVersion: "management.cattle.io/v3",
-					Kind:       "User",
-				},
-			},
+			OwnerReferences: []metav1.OwnerReference{ownerReference(user)},
 		},
 		Data: map[string][]byte{
 			"password": hashedPassword,
@@ -101,12 +95,34 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
 
-	type patchOp struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
+	return p.updatePassword(secret, newPassword, nil)
+}
+
+// SetPassword stores the password for the user, creating the secret when it
+// does not exist. An existing secret is updated the same way UpdatePassword
+// does, and is made to be owned by the user so it is removed with the user.
+func (p *Pbkdf2) SetPassword(user *v3.User, newPassword string) error {
+	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, user.Name)
+	if apierrors.IsNotFound(err) {
+		return p.CreatePassword(user, newPassword)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get password secret: %w", err)
 	}
 
+	return p.updatePassword(secret, newPassword, user)
+}
+
+type patchOp struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
+// updatePassword replaces the secret data with the hashed new password in a
+// single patch. A missing hash annotation is set, and when owner is not nil
+// and the secret has no owner reference to it, one is added.
+func (p *Pbkdf2) updatePassword(secret *corev1.Secret, newPassword string, owner *v3.User) error {
 	var value map[string][]byte
 	var ops []patchOp
 	switch secret.Annotations[passwordHashAnnotation] {
@@ -152,6 +168,16 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 		}
 	default:
 		return fmt.Errorf("unsupported hashing algorithm %q", secret.Annotations[passwordHashAnnotation])
+	}
+
+	if owner != nil && !hasOwner(secret.OwnerReferences, owner) {
+		refs := make([]metav1.OwnerReference, 0, len(secret.OwnerReferences)+1)
+		refs = append(refs, secret.OwnerReferences...)
+		ops = append(ops, patchOp{
+			Op:    "add",
+			Path:  "/metadata/ownerReferences",
+			Value: append(refs, ownerReference(owner)),
+		})
 	}
 
 	patch, err := json.Marshal(append([]patchOp{{
@@ -268,6 +294,25 @@ func generateSalt() ([]byte, error) {
 	}
 
 	return salt, nil
+}
+
+func ownerReference(user *v3.User) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		Name:       user.Name,
+		UID:        user.UID,
+		APIVersion: "management.cattle.io/v3",
+		Kind:       "User",
+	}
+}
+
+func hasOwner(refs []metav1.OwnerReference, user *v3.User) bool {
+	for _, ref := range refs {
+		if ref.Kind == "User" && ref.Name == user.Name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func rfc6901PathEscape(s string) string {

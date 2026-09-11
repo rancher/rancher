@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,9 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestValidatePassword(t *testing.T) {
@@ -310,27 +307,19 @@ func (f *fakeAccessControl) FilterList(apiContext *types.APIContext, schema *typ
 }
 
 type fakePasswordUpdater struct {
-	updateErr   error
-	createErr   error
-	updatedUser string
-	createdUser *apiv3.User
-	password    string
+	err      error
+	user     *apiv3.User
+	password string
 }
 
 func (f *fakePasswordUpdater) VerifyAndUpdatePassword(string, string, string) error {
 	return nil
 }
 
-func (f *fakePasswordUpdater) UpdatePassword(userId string, newPassword string) error {
-	f.updatedUser = userId
+func (f *fakePasswordUpdater) SetPassword(user *apiv3.User, newPassword string) error {
+	f.user = user
 	f.password = newPassword
-	return f.updateErr
-}
-
-func (f *fakePasswordUpdater) CreatePassword(user *apiv3.User, password string) error {
-	f.createdUser = user
-	f.password = password
-	return f.createErr
+	return f.err
 }
 
 type fakeResponseWriter struct {
@@ -348,7 +337,6 @@ func TestSetPassword(t *testing.T) {
 
 	userID := "u-abc"
 	newPassword := "fake-new-password"
-	notFound := fmt.Errorf("failed to get password secret: %w", apierrors.NewNotFound(schema.GroupResource{Resource: "secrets"}, userID))
 	user := &apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: userID,
@@ -358,34 +346,23 @@ func TestSetPassword(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		pwdUpdater  *fakePasswordUpdater
-		userGetErr  error
-		wantErr     string
-		wantCreated bool
+		name       string
+		pwdUpdater *fakePasswordUpdater
+		userGetErr error
+		wantErr    string
 	}{
 		{
-			name:       "existing password is updated",
+			name:       "password is set",
 			pwdUpdater: &fakePasswordUpdater{},
 		},
 		{
-			name:        "missing password is created",
-			pwdUpdater:  &fakePasswordUpdater{updateErr: notFound},
-			wantCreated: true,
-		},
-		{
-			name:       "error updating password",
-			pwdUpdater: &fakePasswordUpdater{updateErr: errors.New("unexpected error")},
+			name:       "error setting password",
+			pwdUpdater: &fakePasswordUpdater{err: errors.New("unexpected error")},
 			wantErr:    "unexpected error",
 		},
 		{
-			name:       "error creating password",
-			pwdUpdater: &fakePasswordUpdater{updateErr: notFound, createErr: errors.New("unexpected error")},
-			wantErr:    "unexpected error",
-		},
-		{
-			name:       "error getting user for missing password",
-			pwdUpdater: &fakePasswordUpdater{updateErr: notFound},
+			name:       "error getting user",
+			pwdUpdater: &fakePasswordUpdater{},
 			userGetErr: errors.New("unexpected error"),
 			wantErr:    "unexpected error",
 		},
@@ -429,13 +406,8 @@ func TestSetPassword(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, userID, tt.pwdUpdater.updatedUser)
+			assert.Equal(t, user, tt.pwdUpdater.user)
 			assert.Equal(t, newPassword, tt.pwdUpdater.password)
-			if tt.wantCreated {
-				assert.Equal(t, user, tt.pwdUpdater.createdUser)
-			} else {
-				assert.Nil(t, tt.pwdUpdater.createdUser)
-			}
 			assert.Equal(t, false, store.updateData[client.UserFieldMustChangePassword])
 			assert.Equal(t, http.StatusOK, rw.code)
 		})

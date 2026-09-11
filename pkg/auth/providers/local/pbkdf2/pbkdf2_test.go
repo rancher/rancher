@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/bcrypt"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -913,6 +914,171 @@ func TestVerifyPassword(t *testing.T) {
 				saltGenerator: test.mockSaltGenerator,
 			}
 			err := p.VerifyPassword(test.user, test.password)
+			if test.expectErrorMessage == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.expectErrorMessage)
+			}
+		})
+	}
+}
+
+func TestSetPassword(t *testing.T) {
+	ctlr := gomock.NewController(t)
+	fakeUserID := "fake-user-id"
+	fakePassword := "fake-password"
+	fakeNewPasswordHash := "fake-new-password-hash"
+	fakeNewPasswordSalt := "fake-new-password-salt"
+	fakeNewPasswordBcryptHash := "fake-new-password-bcrypt-hash"
+	fakeUser := &v3.User{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fakeUserID,
+			UID:  types.UID("fake-uuid"),
+		},
+	}
+	ownerRef := metav1.OwnerReference{
+		Name:       fakeUserID,
+		UID:        types.UID("fake-uuid"),
+		APIVersion: "management.cattle.io/v3",
+		Kind:       "User",
+	}
+	type patchOp struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}
+	replaceData := func(value map[string][]byte) patchOp {
+		return patchOp{Op: "replace", Path: "/data", Value: value}
+	}
+	pbkdf2Data := map[string][]byte{
+		"password": []byte(fakeNewPasswordHash),
+		"salt":     []byte(fakeNewPasswordSalt),
+	}
+	hashKey := func(password string, salt []byte, iter, keyLength int) ([]byte, error) {
+		return []byte(fakeNewPasswordHash), nil
+	}
+	saltGenerator := func() ([]byte, error) {
+		return []byte(fakeNewPasswordSalt), nil
+	}
+
+	tests := map[string]struct {
+		secret             *v1.Secret
+		secretErr          error
+		expectCreate       *v1.Secret
+		expectPatch        []patchOp
+		expectErrorMessage string
+	}{
+		"the secret is created when it does not exist": {
+			secretErr: apierrors.NewNotFound(v1.Resource("secrets"), fakeUserID),
+			expectCreate: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fakeUserID,
+					Namespace: LocalUserPasswordsNamespace,
+					Annotations: map[string]string{
+						passwordHashAnnotation: pbkdf2sha3512Hash,
+					},
+					OwnerReferences: []metav1.OwnerReference{ownerRef},
+				},
+				Data: pbkdf2Data,
+			},
+		},
+		"a secret without a hash annotation or owner is hashed, annotated and owned": {
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fakeUserID,
+					Namespace: LocalUserPasswordsNamespace,
+				},
+				Data: map[string][]byte{"password": []byte(fakePassword)},
+			},
+			expectPatch: []patchOp{
+				replaceData(pbkdf2Data),
+				{Op: "add", Path: "/metadata/annotations", Value: map[string]string{passwordHashAnnotation: pbkdf2sha3512Hash}},
+				{Op: "add", Path: "/metadata/ownerReferences", Value: []metav1.OwnerReference{ownerRef}},
+			},
+		},
+		"an owned pbkdf2 secret only gets its data replaced": {
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            fakeUserID,
+					Namespace:       LocalUserPasswordsNamespace,
+					Annotations:     map[string]string{passwordHashAnnotation: pbkdf2sha3512Hash},
+					OwnerReferences: []metav1.OwnerReference{ownerRef},
+				},
+				Data: map[string][]byte{"password": []byte("old"), "salt": []byte("old")},
+			},
+			expectPatch: []patchOp{replaceData(pbkdf2Data)},
+		},
+		"an owned bcrypt secret only gets its data replaced": {
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            fakeUserID,
+					Namespace:       LocalUserPasswordsNamespace,
+					Annotations:     map[string]string{passwordHashAnnotation: bcryptHash},
+					OwnerReferences: []metav1.OwnerReference{ownerRef},
+				},
+				Data: map[string][]byte{"password": []byte("old")},
+			},
+			expectPatch: []patchOp{replaceData(map[string][]byte{"password": []byte(fakeNewPasswordBcryptHash)})},
+		},
+		"an owner reference to the user is added next to existing owners": {
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        fakeUserID,
+					Namespace:   LocalUserPasswordsNamespace,
+					Annotations: map[string]string{passwordHashAnnotation: pbkdf2sha3512Hash},
+					OwnerReferences: []metav1.OwnerReference{
+						{Name: "other", UID: "other-uid", APIVersion: "v1", Kind: "ConfigMap"},
+					},
+				},
+				Data: map[string][]byte{"password": []byte("old"), "salt": []byte("old")},
+			},
+			expectPatch: []patchOp{
+				replaceData(pbkdf2Data),
+				{Op: "add", Path: "/metadata/ownerReferences", Value: []metav1.OwnerReference{
+					{Name: "other", UID: "other-uid", APIVersion: "v1", Kind: "ConfigMap"},
+					ownerRef,
+				}},
+			},
+		},
+		"error when the hash annotation has an unknown value": {
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        fakeUserID,
+					Namespace:   LocalUserPasswordsNamespace,
+					Annotations: map[string]string{passwordHashAnnotation: "argon2"},
+				},
+				Data: map[string][]byte{"password": []byte("old")},
+			},
+			expectErrorMessage: `unsupported hashing algorithm "argon2"`,
+		},
+		"error when secret can't be fetched": {
+			secretErr:          errors.New("unexpected error"),
+			expectErrorMessage: "failed to get password secret: unexpected error",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			secretCache := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+			secretCache.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(test.secret, test.secretErr)
+			secretClient := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			if test.expectCreate != nil {
+				secretClient.EXPECT().Create(test.expectCreate).Return(nil, nil)
+			}
+			if test.expectPatch != nil {
+				patch, err := json.Marshal(test.expectPatch)
+				assert.NoError(t, err)
+				secretClient.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
+			}
+			p := Pbkdf2{
+				secretClient:  secretClient,
+				secretLister:  secretCache,
+				hashKey:       hashKey,
+				bcryptKey:     func(_ []byte, _ int) ([]byte, error) { return []byte(fakeNewPasswordBcryptHash), nil },
+				saltGenerator: saltGenerator,
+			}
+			err := p.SetPassword(fakeUser, fakePassword)
 			if test.expectErrorMessage == "" {
 				assert.NoError(t, err)
 			} else {

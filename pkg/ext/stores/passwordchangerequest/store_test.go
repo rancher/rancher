@@ -132,7 +132,12 @@ func TestCreate(t *testing.T) {
 			}),
 			pwdUpdater: func() PasswordUpdater {
 				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+				mock.EXPECT().SetPassword(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userID,
+					},
+					Username: username,
+				}, newPassword).Return(nil)
 
 				return mock
 			},
@@ -244,7 +249,12 @@ func TestCreate(t *testing.T) {
 			}),
 			pwdUpdater: func() PasswordUpdater {
 				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+				mock.EXPECT().SetPassword(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userID,
+					},
+					Username: username,
+				}, newPassword).Return(nil)
 
 				return mock
 			},
@@ -278,69 +288,6 @@ func TestCreate(t *testing.T) {
 					Summary: status.SummaryCompleted,
 				},
 			},
-		},
-		{
-			desc: "password secret is created when it does not exist for a different user",
-			obj: &ext.PasswordChangeRequest{
-				Spec: ext.PasswordChangeRequestSpec{
-					UserID:      userID,
-					NewPassword: newPassword,
-				},
-			},
-			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
-			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-				return authorizer.DecisionAllow, "", nil
-			}),
-			pwdUpdater: func() PasswordUpdater {
-				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(fmt.Errorf("failed to get password secret: %w", apierrors.NewNotFound(v3.Resource("secret"), userID)))
-				mock.EXPECT().CreatePassword(&v3.User{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: userID,
-					},
-					Username: username,
-				}, newPassword).Return(nil)
-
-				return mock
-			},
-			userCache: userCache,
-			wantObj: &ext.PasswordChangeRequest{
-				Spec: ext.PasswordChangeRequestSpec{
-					UserID:      userID,
-					NewPassword: newPassword,
-				},
-				Status: ext.PasswordChangeRequestStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   "PasswordUpdated",
-							Status: "True",
-						},
-					},
-					Summary: status.SummaryCompleted,
-				},
-			},
-		},
-		{
-			desc: "error creating the password secret for a different user",
-			obj: &ext.PasswordChangeRequest{
-				Spec: ext.PasswordChangeRequestSpec{
-					UserID:      userID,
-					NewPassword: newPassword,
-				},
-			},
-			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
-			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-				return authorizer.DecisionAllow, "", nil
-			}),
-			pwdUpdater: func() PasswordUpdater {
-				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(fmt.Errorf("failed to get password secret: %w", apierrors.NewNotFound(v3.Resource("secret"), userID)))
-				mock.EXPECT().CreatePassword(gomock.Any(), newPassword).Return(errors.New("unexpected error"))
-
-				return mock
-			},
-			userCache: userCache,
-			wantErr:   "unexpected error",
 		},
 		{
 			desc: "missing password secret is not created for the same user",
@@ -405,7 +352,12 @@ func TestCreate(t *testing.T) {
 			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
 			pwdUpdater: func() PasswordUpdater {
 				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(errors.New("unexpected error"))
+				mock.EXPECT().SetPassword(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userID,
+					},
+					Username: username,
+				}, newPassword).Return(errors.New("unexpected error"))
 
 				return mock
 			},
@@ -470,7 +422,7 @@ func TestCreate(t *testing.T) {
 			}),
 			pwdUpdater: func() PasswordUpdater {
 				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+				mock.EXPECT().SetPassword(gomock.Any(), newPassword).Return(nil)
 
 				return mock
 			},
@@ -595,7 +547,12 @@ func TestCreateWithFirstLoginOff(t *testing.T) {
 			}),
 			pwdUpdater: func() PasswordUpdater {
 				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+				mock.EXPECT().SetPassword(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userID,
+					},
+					Username: username,
+				}, newPassword).Return(nil)
 
 				return mock
 			},
@@ -702,7 +659,12 @@ func TestCreateWithFirstLogin(t *testing.T) {
 			}),
 			pwdUpdater: func() PasswordUpdater {
 				mock := mocks.NewMockPasswordUpdater(ctrl)
-				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+				mock.EXPECT().SetPassword(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userID,
+					},
+					Username: username,
+				}, newPassword).Return(nil)
 
 				return mock
 			},

@@ -16,14 +16,12 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type PasswordUpdater interface {
 	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
-	UpdatePassword(userId string, newPassword string) error
-	CreatePassword(user *apiv3.User, password string) error
+	SetPassword(user *apiv3.User, newPassword string) error
 }
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -166,20 +164,12 @@ func (h *Handler) setPassword(request *types.APIContext) error {
 	if !ok {
 		return errors.New("failed to get userId")
 	}
-	if err := h.PwdChanger.UpdatePassword(userId, newPass); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
-		}
-
-		// The user has no password yet. This is the case for a user created
-		// through the public API, where the password is set separately.
-		user, err := h.UserClient.Get(userId, v1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if err := h.PwdChanger.CreatePassword(user, newPass); err != nil {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
-		}
+	user, err := h.UserClient.Get(userId, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if err := h.PwdChanger.SetPassword(user, newPass); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
 	userData[client.UserFieldMustChangePassword] = false
