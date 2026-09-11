@@ -90,15 +90,27 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 // the password is changed. This happens when an admin changes the password for
 // a user which has not logged in since the upgrade, leaving its secret to
 // contain a BCRYPT hash.
+//
+// A secret without a hash annotation is treated as never hashed. This happens
+// when the secret was written as a plain Secret, not through a Rancher
+// password API, while the webhook that hashes such secrets was not running.
+// The new password is hashed with PBKDF2 and the annotation is set.
 func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, userId)
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
 
+	type patchOp struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}
+
 	var value map[string][]byte
+	var ops []patchOp
 	switch secret.Annotations[passwordHashAnnotation] {
-	case pbkdf2sha3512Hash:
+	case pbkdf2sha3512Hash, "":
 		salt, err := p.saltGenerator()
 		if err != nil {
 			return fmt.Errorf("failed to generate salt: %w", err)
@@ -113,6 +125,22 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 			"password": hashedNewPassword,
 			"salt":     salt,
 		}
+
+		if _, ok := secret.Annotations[passwordHashAnnotation]; !ok {
+			if len(secret.Annotations) == 0 {
+				ops = append(ops, patchOp{
+					Op:    "add",
+					Path:  "/metadata/annotations",
+					Value: map[string]string{passwordHashAnnotation: pbkdf2sha3512Hash},
+				})
+			} else {
+				ops = append(ops, patchOp{
+					Op:    "add",
+					Path:  "/metadata/annotations/" + rfc6901PathEscape(passwordHashAnnotation),
+					Value: pbkdf2sha3512Hash,
+				})
+			}
+		}
 	case bcryptHash:
 		hashedNewPassword, err := p.bcryptKey([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
@@ -126,15 +154,11 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 		return fmt.Errorf("unsupported hashing algorithm %q", secret.Annotations[passwordHashAnnotation])
 	}
 
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	patch, err := json.Marshal(append([]patchOp{{
 		Op:    "replace",
 		Path:  "/data",
 		Value: value,
-	}})
+	}}, ops...))
 	if err != nil {
 		return fmt.Errorf("failed to marshal patch: %w", err)
 	}

@@ -223,7 +223,146 @@ func TestCreate(t *testing.T) {
 				cache.EXPECT().Get(gomock.Any()).Return(nil, apierrors.NewNotFound(v3.Resource("user"), ""))
 				return cache
 			},
+			userClient: func() mgmtv3.UserClient {
+				mock := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+				mock.EXPECT().Get(userID, metav1.GetOptions{}).Return(nil, apierrors.NewNotFound(v3.Resource("user"), ""))
+				return mock
+			},
 			wantErr: fmt.Sprintf("user %s not found", userID),
+		},
+		{
+			desc: "user is read from the API when not yet in the cache",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:      userID,
+					NewPassword: newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: func() mgmtv3.UserCache {
+				cache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+				cache.EXPECT().Get(userID).Return(nil, apierrors.NewNotFound(v3.Resource("user"), ""))
+				return cache
+			},
+			userClient: func() mgmtv3.UserClient {
+				mock := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+				mock.EXPECT().Get(userID, metav1.GetOptions{}).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userID,
+					},
+					Username: username,
+				}, nil)
+				return mock
+			},
+			wantObj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:      userID,
+					NewPassword: newPassword,
+				},
+				Status: ext.PasswordChangeRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "PasswordUpdated",
+							Status: "True",
+						},
+					},
+					Summary: status.SummaryCompleted,
+				},
+			},
+		},
+		{
+			desc: "password secret is created when it does not exist for a different user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:      userID,
+					NewPassword: newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().UpdatePassword(userID, newPassword).Return(fmt.Errorf("failed to get password secret: %w", apierrors.NewNotFound(v3.Resource("secret"), userID)))
+				mock.EXPECT().CreatePassword(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: userID,
+					},
+					Username: username,
+				}, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userCache,
+			wantObj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:      userID,
+					NewPassword: newPassword,
+				},
+				Status: ext.PasswordChangeRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "PasswordUpdated",
+							Status: "True",
+						},
+					},
+					Summary: status.SummaryCompleted,
+				},
+			},
+		},
+		{
+			desc: "error creating the password secret for a different user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:      userID,
+					NewPassword: newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().UpdatePassword(userID, newPassword).Return(fmt.Errorf("failed to get password secret: %w", apierrors.NewNotFound(v3.Resource("secret"), userID)))
+				mock.EXPECT().CreatePassword(gomock.Any(), newPassword).Return(errors.New("unexpected error"))
+
+				return mock
+			},
+			userCache: userCache,
+			wantErr:   "unexpected error",
+		},
+		{
+			desc: "missing password secret is not created for the same user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().VerifyAndUpdatePassword(userID, oldPassword, newPassword).Return(fmt.Errorf("failed to get password secret: %w", apierrors.NewNotFound(v3.Resource("secret"), userID)))
+
+				return mock
+			},
+			userCache: userCache,
+			wantErr:   "failed to get password secret",
 		},
 		{
 			desc: "dry run",

@@ -284,6 +284,137 @@ func TestUpdatePassword(t *testing.T) {
 				return []byte(fakeNewPasswordSalt), nil
 			},
 		},
+		"a secret without a hash annotation is hashed with pbkdf2 and annotated": {
+			userID:   fakeUserID,
+			password: fakePassword,
+			mockHashKey: func(password string, salt []byte, iter, keyLength int) ([]byte, error) {
+				return []byte(fakeNewPasswordHash), nil
+			},
+			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
+				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fakeUserID,
+						Namespace: LocalUserPasswordsNamespace,
+					},
+					Data: map[string][]byte{
+						"password": []byte(fakePassword),
+					},
+				}, nil)
+
+				return mock
+			},
+			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+				patch, _ := json.Marshal([]struct {
+					Op    string `json:"op"`
+					Path  string `json:"path"`
+					Value any    `json:"value"`
+				}{
+					{
+						Op:   "replace",
+						Path: "/data",
+						Value: map[string][]byte{
+							"password": []byte(fakeNewPasswordHash),
+							"salt":     []byte(fakeNewPasswordSalt),
+						},
+					},
+					{
+						Op:   "add",
+						Path: "/metadata/annotations",
+						Value: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
+					},
+				})
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
+
+				return mock
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
+			},
+		},
+		"a secret with other annotations but no hash annotation keeps them and gets the hash annotation": {
+			userID:   fakeUserID,
+			password: fakePassword,
+			mockHashKey: func(password string, salt []byte, iter, keyLength int) ([]byte, error) {
+				return []byte(fakeNewPasswordHash), nil
+			},
+			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
+				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fakeUserID,
+						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							"other": "value",
+						},
+					},
+					Data: map[string][]byte{
+						"password": []byte(fakePassword),
+					},
+				}, nil)
+
+				return mock
+			},
+			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+				patch, _ := json.Marshal([]struct {
+					Op    string `json:"op"`
+					Path  string `json:"path"`
+					Value any    `json:"value"`
+				}{
+					{
+						Op:   "replace",
+						Path: "/data",
+						Value: map[string][]byte{
+							"password": []byte(fakeNewPasswordHash),
+							"salt":     []byte(fakeNewPasswordSalt),
+						},
+					},
+					{
+						Op:    "add",
+						Path:  "/metadata/annotations/cattle.io~1password-hash",
+						Value: pbkdf2sha3512Hash,
+					},
+				})
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
+
+				return mock
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
+			},
+		},
+		"error when the hash annotation has an unknown value": {
+			userID:   fakeUserID,
+			password: fakePassword,
+			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
+				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fakeUserID,
+						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: "argon2",
+						},
+					},
+					Data: map[string][]byte{
+						"password": []byte(fakePassword),
+					},
+				}, nil)
+
+				return mock
+			},
+			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
+			},
+			expectErrorMessage: `unsupported hashing algorithm "argon2"`,
+		},
 		"error when secret can't be fetched": {
 			userID:   fakeUserID,
 			password: fakePassword,

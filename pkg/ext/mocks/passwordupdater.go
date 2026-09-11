@@ -12,6 +12,7 @@ package mocks
 import (
 	reflect "reflect"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -37,6 +38,20 @@ func NewMockPasswordUpdater(ctrl *gomock.Controller) *MockPasswordUpdater {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockPasswordUpdater) EXPECT() *MockPasswordUpdaterMockRecorder {
 	return m.recorder
+}
+
+// CreatePassword mocks base method.
+func (m *MockPasswordUpdater) CreatePassword(user *v3.User, password string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreatePassword", user, password)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreatePassword indicates an expected call of CreatePassword.
+func (mr *MockPasswordUpdaterMockRecorder) CreatePassword(user, password any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePassword", reflect.TypeOf((*MockPasswordUpdater)(nil).CreatePassword), user, password)
 }
 
 // UpdatePassword mocks base method.

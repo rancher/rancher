@@ -1,12 +1,24 @@
 package user
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/rancher/norman/types"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestValidatePassword(t *testing.T) {
@@ -295,4 +307,137 @@ func (f *fakeAccessControl) Filter(apiContext *types.APIContext, schema *types.S
 
 func (f *fakeAccessControl) FilterList(apiContext *types.APIContext, schema *types.Schema, objs []map[string]interface{}, context map[string]string) []map[string]interface{} {
 	return objs
+}
+
+type fakePasswordUpdater struct {
+	updateErr   error
+	createErr   error
+	updatedUser string
+	createdUser *apiv3.User
+	password    string
+}
+
+func (f *fakePasswordUpdater) VerifyAndUpdatePassword(string, string, string) error {
+	return nil
+}
+
+func (f *fakePasswordUpdater) UpdatePassword(userId string, newPassword string) error {
+	f.updatedUser = userId
+	f.password = newPassword
+	return f.updateErr
+}
+
+func (f *fakePasswordUpdater) CreatePassword(user *apiv3.User, password string) error {
+	f.createdUser = user
+	f.password = password
+	return f.createErr
+}
+
+type fakeResponseWriter struct {
+	code int
+	obj  interface{}
+}
+
+func (f *fakeResponseWriter) Write(_ *types.APIContext, code int, obj interface{}) {
+	f.code = code
+	f.obj = obj
+}
+
+func TestSetPassword(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abc"
+	newPassword := "fake-new-password"
+	notFound := fmt.Errorf("failed to get password secret: %w", apierrors.NewNotFound(schema.GroupResource{Resource: "secrets"}, userID))
+	user := &apiv3.User{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: userID,
+			UID:  "fake-uid",
+		},
+		Username: "fake-username",
+	}
+
+	tests := []struct {
+		name        string
+		pwdUpdater  *fakePasswordUpdater
+		userGetErr  error
+		wantErr     string
+		wantCreated bool
+	}{
+		{
+			name:       "existing password is updated",
+			pwdUpdater: &fakePasswordUpdater{},
+		},
+		{
+			name:        "missing password is created",
+			pwdUpdater:  &fakePasswordUpdater{updateErr: notFound},
+			wantCreated: true,
+		},
+		{
+			name:       "error updating password",
+			pwdUpdater: &fakePasswordUpdater{updateErr: errors.New("unexpected error")},
+			wantErr:    "unexpected error",
+		},
+		{
+			name:       "error creating password",
+			pwdUpdater: &fakePasswordUpdater{updateErr: notFound, createErr: errors.New("unexpected error")},
+			wantErr:    "unexpected error",
+		},
+		{
+			name:       "error getting user for missing password",
+			pwdUpdater: &fakePasswordUpdater{updateErr: notFound},
+			userGetErr: errors.New("unexpected error"),
+			wantErr:    "unexpected error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &mockStore{
+				byIDResults: []map[string]interface{}{{
+					types.ResourceFieldID:    userID,
+					client.UserFieldUsername: user.Username,
+				}},
+			}
+			userClient := &fakes.UserInterfaceMock{
+				GetFunc: func(name string, _ metav1.GetOptions) (*apiv3.User, error) {
+					assert.Equal(t, userID, name)
+					return user, tt.userGetErr
+				},
+			}
+			h := &Handler{
+				UserClient: userClient,
+				PwdChanger: tt.pwdUpdater,
+			}
+
+			body, _ := json.Marshal(map[string]string{"newPassword": newPassword})
+			req := httptest.NewRequest("POST", "/v3/users/"+userID+"?action=setpassword", bytes.NewReader(body))
+			rw := &fakeResponseWriter{}
+			apiCtx := &types.APIContext{
+				Request:        req,
+				ResponseWriter: rw,
+				ID:             userID,
+				Schema:         &types.Schema{Store: store},
+			}
+
+			err := h.setPassword(apiCtx)
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, userID, tt.pwdUpdater.updatedUser)
+			assert.Equal(t, newPassword, tt.pwdUpdater.password)
+			if tt.wantCreated {
+				assert.Equal(t, user, tt.pwdUpdater.createdUser)
+			} else {
+				assert.Nil(t, tt.pwdUpdater.createdUser)
+			}
+			assert.Equal(t, false, store.updateData[client.UserFieldMustChangePassword])
+			assert.Equal(t, http.StatusOK, rw.code)
+		})
+	}
 }
