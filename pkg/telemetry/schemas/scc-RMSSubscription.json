@@ -112,6 +112,11 @@
             "type": "boolean",
             "description": "Identifies the cluster hosting RMS itself",
             "default": false
+          },
+          "nvidia_registry_secret_present": {
+            "type": "boolean",
+            "description": "FIXME",
+            "default": false
           }
         },
         "additionalProperties": true,
