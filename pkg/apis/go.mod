@@ -41,11 +41,11 @@ require (
 	github.com/rancher/eks-operator v1.15.2-rc.1
 	github.com/rancher/fleet/pkg/apis v0.16.1
 	github.com/rancher/gke-operator v1.15.3-rc.1
-	github.com/rancher/norman v0.9.10
+	github.com/rancher/norman v0.9.11
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
-	github.com/rancher/wrangler/v3 v3.7.1
-	github.com/sirupsen/logrus v1.9.4
-	github.com/stretchr/testify v1.11.1
+	github.com/rancher/wrangler/v3 v3.7.2
+	github.com/sirupsen/logrus v1.10.0
+	github.com/stretchr/testify v1.12.0
 	k8s.io/api v0.36.4
 	k8s.io/apimachinery v0.36.4
 	sigs.k8s.io/cluster-api v1.13.2
