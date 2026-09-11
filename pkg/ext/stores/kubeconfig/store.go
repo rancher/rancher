@@ -277,10 +277,7 @@ func (s *Store) Create(
 
 	if createValidation != nil {
 		if err := createValidation(ctx, obj); err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, err
-			}
-			return nil, apierrors.NewBadRequest(fmt.Sprintf("create validation failed for kubeconfig: %s", err))
+			return nil, validationError(err, "create", "")
 		}
 	}
 
@@ -1118,7 +1115,8 @@ func ownedByToken(configMap *corev1.ConfigMap, tokenIDs []string) bool {
 	return false
 }
 
-// getConfigMap retrieves a ConfigMap by name, optionally using the cache.
+// getConfigMap retrieves a ConfigMap by name, optionally using the cache. Any
+// error is an [apierrors.APIStatus] scoped to the Kubeconfig resource.
 func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache bool) (*corev1.ConfigMap, error) {
 	var (
 		configMap *corev1.ConfigMap
@@ -1131,10 +1129,7 @@ func (s *Store) getConfigMap(name string, options *metav1.GetOptions, useCache b
 		configMap, err = s.configMapClient.Get(namespace, name, *options)
 	}
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
-		}
-		return nil, fmt.Errorf("error getting configmap %s: %w", name, err)
+		return nil, mapBackingError(err, name)
 	}
 
 	if configMap.Labels[KindLabel] != KindLabelValue {
@@ -1533,10 +1528,7 @@ func (s *Store) DeleteCollection(
 		}
 		if deleteValidation != nil {
 			if err := deleteValidation(ctx, kubeconfig); err != nil {
-				if _, ok := err.(apierrors.APIStatus); ok {
-					return nil, err
-				}
-				return nil, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
+				return nil, validationError(err, "delete", configMap.Name)
 			}
 		}
 		// Pass nil deleteValidation: validation already ran above, so an IsNotFound
@@ -1641,12 +1633,8 @@ func (s *Store) delete(
 	options *metav1.DeleteOptions,
 ) (runtime.Object, bool, error) {
 	if deleteValidation != nil {
-		err := deleteValidation(ctx, kubeconfig)
-		if err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, false, err
-			}
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("delete validation for kubeconfig %s failed: %s", configMap.Name, err))
+		if err := deleteValidation(ctx, kubeconfig); err != nil {
+			return nil, false, validationError(err, "delete", configMap.Name)
 		}
 	}
 
@@ -1740,7 +1728,9 @@ func (s *Store) Update(
 
 	newObj, err := objInfo.UpdatedObject(ctx, oldKubeconfig)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting updated object for kubeconfig %s: %v", name, err))
+		// For a PATCH the apiserver applies the patch and runs admission in
+		// here, so the error may already carry a client-facing status code.
+		return nil, false, apiStatusOrInternalError(err)
 	}
 
 	newKubeconfig, ok := newObj.(*ext.Kubeconfig)
@@ -1758,12 +1748,8 @@ func (s *Store) Update(
 	}
 
 	if updateValidation != nil {
-		err = updateValidation(ctx, newKubeconfig, oldKubeconfig)
-		if err != nil {
-			if _, ok := err.(apierrors.APIStatus); ok {
-				return nil, false, err
-			}
-			return nil, false, apierrors.NewBadRequest(fmt.Sprintf("update validation for kubeconfig %s failed: %s", name, err))
+		if err := updateValidation(ctx, newKubeconfig, oldKubeconfig); err != nil {
+			return nil, false, validationError(err, "update", name)
 		}
 	}
 
