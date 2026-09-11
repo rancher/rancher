@@ -24,8 +24,10 @@ import (
 type stubAdapter struct {
 	runtimeCommand    string
 	dataDir           string
+	dataDirErr        error
 	provisioningDir   string
 	kubectlPath       string
+	kubectlPathErr    error
 	kubeconfigPath    string
 	serverUnit        string
 	waitForRegisterOK bool
@@ -40,17 +42,28 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
 
-func (a *stubAdapter) BeaconRef() (string, string)                       { return "test-namespace", "test-cluster" }
-func (a *stubAdapter) WaitForRegister() (bool, error)                    { return a.waitForRegisterOK, nil }
-func (a *stubAdapter) PauseCluster(_ bool) error                         { return nil }
-func (a *stubAdapter) RuntimeCommand() string                            { return a.runtimeCommand }
-func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string       { return a.dataDir }
+func (a *stubAdapter) BeaconRef() (string, string)    { return "test-namespace", "test-cluster" }
+func (a *stubAdapter) WaitForRegister() (bool, error) { return a.waitForRegisterOK, nil }
+func (a *stubAdapter) PauseCluster(_ bool) error      { return nil }
+func (a *stubAdapter) RuntimeCommand() string         { return a.runtimeCommand }
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return a.dataDir, a.dataDirErr
+}
+func (a *stubAdapter) DistroManifestPaths(_ string) ops.ManifestPaths {
+	return ops.ManifestPaths{}
+}
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
 func (a *stubAdapter) ServerUnit() string                                { return a.serverUnit }
+func (a *stubAdapter) RuntimeService(_ *corev1.Secret) string            { return a.serverUnit }
+func (a *stubAdapter) DistroServices(secret *corev1.Secret) []string {
+	return ops.DistroServices(a.runtimeCommand, secret)
+}
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return map[string]rkeplan.Probe{}, nil
 }
-func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string    { return a.kubectlPath }
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) (string, error) {
+	return a.kubectlPath, a.kubectlPathErr
+}
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
 	return nil, nil
@@ -64,6 +77,9 @@ func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string {
 }
 func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return "/etc/rancher/" + a.runtimeCommand + "/config.yaml.d"
+}
+func (a *stubAdapter) ComponentTLSSettings(_ *corev1.Secret, _ string) (ops.ComponentTLSSettings, error) {
+	return ops.ComponentTLSSettings{}, nil
 }
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
@@ -135,7 +151,10 @@ func TestBuildPostRestoreNodeCleanupPlan(t *testing.T) {
 	})
 	allSecrets := []*corev1.Secret{initSecret, other}
 
-	plan, skipReason := buildPostRestoreNodeCleanupPlan(s, initSecret, allSecrets)
+	plan, skipReason, err := buildPostRestoreNodeCleanupPlan(s, initSecret, allSecrets)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if skipReason != "" {
 		t.Fatalf("unexpected skipReason: %q", skipReason)
 	}
@@ -206,7 +225,11 @@ func TestBuildPostRestoreNodeCleanupPlan(t *testing.T) {
 	for _, e := range instr.Env {
 		envSet[e] = true
 	}
-	if !envSet["KUBECTL="+s.adapter.KubectlPath(initSecret)] {
+	kubectlPath, err := s.adapter.KubectlPath(initSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !envSet["KUBECTL="+kubectlPath] {
 		t.Errorf("KUBECTL env missing or wrong: %v", instr.Env)
 	}
 	if !envSet["KUBECONFIG="+s.adapter.KubeconfigPath(initSecret)] {
@@ -229,7 +252,10 @@ func TestBuildPostRestoreNodeCleanupPlanSkipsWhenNoNodeNames(t *testing.T) {
 		capr.InitNodeLabel: "true",
 	})
 	// initSecret has no node-name label; allSecrets list has only this secret.
-	plan, skipReason := buildPostRestoreNodeCleanupPlan(s, initSecret, []*corev1.Secret{initSecret})
+	plan, skipReason, err := buildPostRestoreNodeCleanupPlan(s, initSecret, []*corev1.Secret{initSecret})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if plan != nil {
 		t.Error("expected nil plan when there are no node names to preserve")
 	}
@@ -248,12 +274,40 @@ func TestBuildPostRestoreNodeCleanupPlanSkipsWhenNoKubectl(t *testing.T) {
 		capr.EtcdRoleLabel: "true",
 		capr.InitNodeLabel: "true",
 	})
-	plan, skipReason := buildPostRestoreNodeCleanupPlan(s, initSecret, []*corev1.Secret{initSecret})
+	plan, skipReason, err := buildPostRestoreNodeCleanupPlan(s, initSecret, []*corev1.Secret{initSecret})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if plan != nil {
 		t.Error("expected nil plan when kubectl path is missing")
 	}
 	if skipReason == "" {
 		t.Error("expected non-empty skipReason when kubectl path is missing")
+	}
+}
+
+func TestBuildPostRestoreNodeCleanupPlan_KubectlPathErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	a := defaultAdapter()
+	a.kubectlPathErr = fmt.Errorf("kubectl path unavailable")
+	s := newTestScope(a, "restore-uid")
+	initSecret := makePlanSecret("init", "node-init", map[string]string{
+		capr.EtcdRoleLabel: "true",
+		capr.InitNodeLabel: "true",
+	})
+
+	// An error resolving kubectl's path is a real failure to retry, not the same as the
+	// adapter successfully reporting no kubectl/kubeconfig configured.
+	plan, skipReason, err := buildPostRestoreNodeCleanupPlan(s, initSecret, []*corev1.Secret{initSecret})
+	if err == nil {
+		t.Fatal("expected error when adapter.KubectlPath fails")
+	}
+	if plan != nil {
+		t.Error("expected nil plan when adapter.KubectlPath fails")
+	}
+	if skipReason != "" {
+		t.Errorf("expected empty skipReason on error, got %q", skipReason)
 	}
 }
 
@@ -275,7 +329,10 @@ func TestBuildPreflightPlan(t *testing.T) {
 		capr.InitNodeLabel: "true",
 	})
 
-	plan := buildPreflightPlan(s, secret)
+	plan, err := buildPreflightPlan(s, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if len(plan.OneTimeInstructions) != 1 {
 		t.Fatalf("expected 1 instruction, got %d", len(plan.OneTimeInstructions))
@@ -296,6 +353,26 @@ func TestBuildPreflightPlan(t *testing.T) {
 	}
 }
 
+func TestBuildPreflightPlan_DataDirectoryErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	a := defaultAdapter()
+	a.dataDirErr = fmt.Errorf("data directory unavailable")
+	s := newTestScope(a, "restore-uid")
+	secret := makePlanSecret("init", "node-init", map[string]string{
+		capr.EtcdRoleLabel: "true",
+		capr.InitNodeLabel: "true",
+	})
+
+	plan, err := buildPreflightPlan(s, secret)
+	if err == nil {
+		t.Fatal("expected error when adapter.DistroDataDirectory fails")
+	}
+	if plan != nil {
+		t.Error("expected nil plan when adapter.DistroDataDirectory fails")
+	}
+}
+
 func TestBuildShutdownPlan(t *testing.T) {
 	t.Parallel()
 
@@ -308,7 +385,10 @@ func TestBuildShutdownPlan(t *testing.T) {
 			capr.ControlPlaneRoleLabel: "true",
 		})
 
-		plan := buildShutdownPlan(s, secret)
+		plan, err := buildShutdownPlan(s, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		var names []string
 		for _, instr := range plan.OneTimeInstructions {
@@ -320,7 +400,11 @@ func TestBuildShutdownPlan(t *testing.T) {
 		}
 
 		// The killall script reads the data directory out of the environment.
-		wantEnv := fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(adapter.RuntimeCommand()), adapter.DistroDataDirectory(secret))
+		dataDir, err := adapter.DistroDataDirectory(secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantEnv := fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(adapter.RuntimeCommand()), dataDir)
 		var found bool
 		for _, e := range plan.OneTimeInstructions[1].Env {
 			if e == wantEnv {
@@ -341,7 +425,10 @@ func TestBuildShutdownPlan(t *testing.T) {
 			capr.WorkerRoleLabel: "true",
 		})
 
-		plan := buildShutdownPlan(s, secret)
+		plan, err := buildShutdownPlan(s, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// No etcd data or TLS material to clear on a worker.
 		if len(plan.OneTimeInstructions) != 2 {
@@ -353,6 +440,26 @@ func TestBuildShutdownPlan(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestBuildShutdownPlan_DataDirectoryErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	a := defaultAdapter()
+	a.dataDirErr = fmt.Errorf("data directory unavailable")
+	s := newTestScope(a, "restore-uid")
+	secret := makePlanSecret("init", "node-init", map[string]string{
+		capr.EtcdRoleLabel:         "true",
+		capr.ControlPlaneRoleLabel: "true",
+	})
+
+	plan, err := buildShutdownPlan(s, secret)
+	if err == nil {
+		t.Fatal("expected error when adapter.DistroDataDirectory fails")
+	}
+	if plan != nil {
+		t.Error("expected nil plan when adapter.DistroDataDirectory fails")
+	}
 }
 
 // TestAssignedPlansAreOperationScoped covers the property every plan this controller assigns depends
@@ -370,15 +477,15 @@ func TestAssignedPlansAreOperationScoped(t *testing.T) {
 	})
 
 	builders := map[string]struct {
-		build func(*scope) *planapi.Plan
+		build func(*scope) (*planapi.Plan, error)
 		step  opv1alpha1.ETCDSnapshotRestoreStep
 	}{
 		"preflight": {
-			build: func(s *scope) *planapi.Plan { return buildPreflightPlan(s, secret) },
+			build: func(s *scope) (*planapi.Plan, error) { return buildPreflightPlan(s, secret) },
 			step:  opv1alpha1.ETCDSnapshotRestoreStepPreflight,
 		},
 		"shutdown": {
-			build: func(s *scope) *planapi.Plan { return buildShutdownPlan(s, secret) },
+			build: func(s *scope) (*planapi.Plan, error) { return buildShutdownPlan(s, secret) },
 			step:  opv1alpha1.ETCDSnapshotRestoreStepShutdown,
 		},
 	}
@@ -387,7 +494,11 @@ func TestAssignedPlansAreOperationScoped(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			marshal := func(uid types.UID) string {
 				s := newTestScope(defaultAdapter(), uid)
-				p := ops.WithOperationEnv(b.build(s), ops.OperationEnv(ControllerOwnerKey, s.op, b.step))
+				p, err := b.build(s)
+				if err != nil {
+					t.Fatal(err)
+				}
+				p = ops.WithOperationEnv(p, ops.OperationEnv(ControllerOwnerKey, s.op, b.step))
 				data, err := json.Marshal(p)
 				if err != nil {
 					t.Fatal(err)

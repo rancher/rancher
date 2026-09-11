@@ -28,6 +28,10 @@ type FakeOperationV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeOperationV1alpha1) CertificateRotations(namespace string) v1alpha1.CertificateRotationInterface {
+	return newFakeCertificateRotations(c, namespace)
+}
+
 func (c *FakeOperationV1alpha1) ETCDSnapshotRestores(namespace string) v1alpha1.ETCDSnapshotRestoreInterface {
 	return newFakeETCDSnapshotRestores(c, namespace)
 }

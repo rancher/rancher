@@ -673,7 +673,11 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 		logrus.Warnf("[etcdsnapshotrestore] %s/%s: could not find snapshot token hash in snapshot %s/%s, skipping preflight step", s.op.Namespace, s.op.Name, s.adapter.EtcdSnapshotNamespace(), snapshotName)
 	} else {
 		for _, secret := range secrets {
-			planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildPreflightPlan(s, secret), opEnv), 1, 1)
+			nodePlan, err := buildPreflightPlan(s, secret)
+			if err != nil {
+				return status, err
+			}
+			planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 			if err != nil {
 				return status, err
 			}
@@ -789,7 +793,11 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
 	for _, secret := range secrets {
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildShutdownPlan(s, secret), opEnv), 1, 1)
+		nodePlan, err := buildShutdownPlan(s, secret)
+		if err != nil {
+			return status, err
+		}
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -920,6 +928,10 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 	}
 
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	dataDir, err := s.adapter.DistroDataDirectory(secret)
+	if err != nil {
+		return status, err
+	}
 	value := s.idempotencyValue()
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
@@ -959,7 +971,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 				CommonInstruction: plan.CommonInstruction{
 					Name:    "remove-etcd-db-dir",
 					Command: "rm",
-					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
+					Args:    []string{"-rf", path.Join(dataDir, "server/db/etcd")},
 				},
 			}),
 			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
@@ -1072,7 +1084,10 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		controlPlaneSecret = secrets[0]
 	}
 
-	kubectl := s.adapter.KubectlPath(etcdSecret)
+	kubectl, err := s.adapter.KubectlPath(etcdSecret)
+	if err != nil {
+		return status, err
+	}
 	kubeconfig := s.adapter.KubeconfigPath(etcdSecret)
 
 	podSelectors := []string{
@@ -1421,7 +1436,11 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 // an attempt it considers already reconciled, prints a message instead of running the command. With
 // SaveOutput that message would land in the applied output in place of the hash. A check must run on
 // every attempt, so it relies on the operation environment for plan uniqueness instead.
-func buildPreflightPlan(s *scope, secret *corev1.Secret) *plan.Plan {
+func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
+	dataDir, err := s.adapter.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
 	return &plan.Plan{
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			{
@@ -1431,19 +1450,23 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 					Command: "/bin/sh",
 					Args: []string{
 						"-c",
-						fmt.Sprintf(TokenHashCommandFormat, s.adapter.DistroDataDirectory(secret)),
+						fmt.Sprintf(TokenHashCommandFormat, dataDir),
 					},
 				},
 			},
 		},
-	}
+	}, nil
 }
 
 // buildShutdownPlan assembles the plan which stops the distro on a node ahead of the restore: it
 // clears any idempotency tracking left by a previous attempt, runs the distro's killall script, and
 // on etcd and control-plane nodes lays down the etcd tombstone and removes the TLS directory.
-func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
+func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	dataDir, err := s.adapter.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
 	// Clear any prior idempotency tracking under the restore key before starting; subsequent
 	// reconciles see the cleanup already applied and skip it.
 	instructions := []plan.OneTimeInstruction{
@@ -1453,7 +1476,7 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 				Name:    "shutdown",
 				Command: "/bin/sh",
 				Env: []string{
-					fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), s.adapter.DistroDataDirectory(secret)),
+					fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), dataDir),
 				},
 				Args: []string{
 					"-c",
@@ -1470,7 +1493,7 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 			CommonInstruction: plan.CommonInstruction{
 				Name:    "create-etcd-tombstone",
 				Command: "touch",
-				Args:    []string{path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd/tombstone")},
+				Args:    []string{path.Join(dataDir, "server/db/etcd/tombstone")},
 			},
 		})
 	}
@@ -1481,7 +1504,7 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 				CommonInstruction: plan.CommonInstruction{
 					Name:    "remove-tls-directory",
 					Command: "rm",
-					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/tls")},
+					Args:    []string{"-rf", path.Join(dataDir, "server/tls")},
 				},
 			},
 		)
@@ -1490,17 +1513,20 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 	return &plan.Plan{
 		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
 		OneTimeInstructions: instructions,
-	}
+	}, nil
 }
 
 // buildPostRestoreNodeCleanupPlan assembles the plan that runs the node-cleanup script on the init
 // node. A non-empty skipReason signals that the caller should skip the cleanup phase entirely (the
 // returned plan is nil in that case).
-func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSecrets []*corev1.Secret) (*plan.Plan, string) {
-	kubectl := s.adapter.KubectlPath(initSecret)
+func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSecrets []*corev1.Secret) (*plan.Plan, string, error) {
+	kubectl, err := s.adapter.KubectlPath(initSecret)
+	if err != nil {
+		return nil, "", err
+	}
 	kubeconfig := s.adapter.KubeconfigPath(initSecret)
 	if kubectl == "" || kubeconfig == "" {
-		return nil, "adapter did not provide kubectl/kubeconfig paths"
+		return nil, "adapter did not provide kubectl/kubeconfig paths", nil
 	}
 
 	var nodeNamesBuf []byte
@@ -1513,7 +1539,7 @@ func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSec
 	// With no node names to preserve, the cleanup script would delete every node — bail out instead
 	// so we don't strand the cluster.
 	if len(nodeNamesBuf) == 0 {
-		return nil, "no node names available from machine-plan secrets"
+		return nil, "no node names available from machine-plan secrets", nil
 	}
 
 	provisioningDir := s.adapter.ProvisioningDataDirectory(initSecret)
@@ -1544,7 +1570,7 @@ func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSec
 					fmt.Sprintf("KUBECONFIG=%s", kubeconfig),
 				}),
 		},
-	}, ""
+	}, "", nil
 }
 
 // reconcilePostRestoreNodeCleanup deletes Node objects from the restored cluster that no longer
@@ -1601,7 +1627,10 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	nodePlan, skipReason := buildPostRestoreNodeCleanupPlan(s, initSecret, allSecrets)
+	nodePlan, skipReason, err := buildPostRestoreNodeCleanupPlan(s, initSecret, allSecrets)
+	if err != nil {
+		return status, err
+	}
 	if skipReason != "" {
 		logrus.Warnf("[etcdsnapshotrestore] %s/%s: %s, skipping node cleanup", s.op.Namespace, s.op.Name, skipReason)
 		status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepRestartCluster)

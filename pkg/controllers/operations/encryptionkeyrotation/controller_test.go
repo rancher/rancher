@@ -45,8 +45,11 @@ func (a *stubAdapter) RuntimeCommand() string {
 	return "rke2"
 }
 
-func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) string {
-	return "/var/lib/rancher/rke2"
+func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
+	return "/var/lib/rancher/rke2", nil
+}
+func (a *stubAdapter) DistroManifestPaths(_ string) ops.ManifestPaths {
+	return ops.ManifestPaths{}
 }
 
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string {
@@ -56,12 +59,20 @@ func (a *stubAdapter) ServerUnit() string {
 	return "rke2-server"
 }
 
+func (a *stubAdapter) RuntimeService(_ *corev1.Secret) string {
+	return "rke2-server"
+}
+
+func (a *stubAdapter) DistroServices(secret *corev1.Secret) []string {
+	return ops.DistroServices(a.RuntimeCommand(), secret)
+}
+
 func (a *stubAdapter) RenderProbes(_ *corev1.Secret, _ bool) (map[string]rkeplan.Probe, error) {
 	return map[string]rkeplan.Probe{}, nil
 }
 
-func (a *stubAdapter) KubectlPath(_ *corev1.Secret) string {
-	return "/var/lib/rancher/rke2/bin/kubectl"
+func (a *stubAdapter) KubectlPath(_ *corev1.Secret) (string, error) {
+	return "/var/lib/rancher/rke2/bin/kubectl", nil
 }
 
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string {
@@ -86,6 +97,9 @@ func (a *stubAdapter) ConfigFile(_ *corev1.Secret) string {
 }
 func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/config.yaml.d"
+}
+func (a *stubAdapter) ComponentTLSSettings(_ *corev1.Secret, _ string) (ops.ComponentTLSSettings, error) {
+	return ops.ComponentTLSSettings{}, nil
 }
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
