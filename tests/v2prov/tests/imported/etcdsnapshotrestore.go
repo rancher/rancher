@@ -105,6 +105,15 @@ func WithRestoreLabels(labels map[string]string) SnapshotRestoreOption {
 	}
 }
 
+// WithRestoreMode sets the restore mode, i.e. how much of the cluster configuration captured in the
+// snapshot is restored alongside etcd. The mode must be one the snapshot advertises on its
+// capr.RestoreModeOptionsAnnotation, otherwise the operation is canceled during preflight.
+func WithRestoreMode(mode string) SnapshotRestoreOption {
+	return func(op *opv1alpha1.ETCDSnapshotRestore) {
+		op.Spec.Args.RestoreMode = mode
+	}
+}
+
 // WithRestoreTTL overrides the default TTL. The operation CR is garbage collected TTL seconds after
 // it reaches a terminal phase, so tests which assert against a terminal operation (rather than just
 // waiting for it) need a longer window than the default to avoid racing that deletion. A negative

@@ -7,6 +7,26 @@ import (
 const (
 	SnapshotMetadataClusterSpecKey = "provisioning-cluster-spec"
 
+	// SnapshotMetadataResourcesKey holds the objects a snapshot can be restored from, as a
+	// base64/gzip encoded map of resource type to object.
+	SnapshotMetadataResourcesKey = "resources"
+
+	// SnapshotMetadataRestoreModesKey holds the restore modes a snapshot offers, as a JSON map of
+	// mode name to a selector rooted at the resources payload. The selector identifies the fields
+	// the mode restores; an empty selector restores nothing and RestoreModeSelectorWildcard
+	// restores everything.
+	SnapshotMetadataRestoreModesKey = "restoreModes"
+
+	// RestoreModeSelectorWildcard is the restore mode selector meaning "every published field".
+	RestoreModeSelectorWildcard = "*"
+
+	// Resource keys the objects in the resources payload are published under, one per cluster type.
+	// A restore mode selector's first segment is one of these, which is also what identifies the
+	// object a restore writes back to.
+	SnapshotResourceMgmtCluster      = "cluster.management.cattle.io"
+	SnapshotResourceProvCluster      = "cluster.provisioning.cattle.io"
+	SnapshotResourceRKE2ControlPlane = "rke2controlplane.controlplane.cluster.x-k8s.io"
+
 	RestoreRKEConfigNone              = "none"
 	RestoreRKEConfigKubernetesVersion = "kubernetesVersion"
 	RestoreRKEConfigAll               = "all"

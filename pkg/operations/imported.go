@@ -5,6 +5,7 @@ import (
 	"path"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/plan"
@@ -132,6 +133,79 @@ func (a *ImportedAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	}
 
 	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+// RestoreTarget returns the mgmt v3 Cluster, which is where an imported cluster's restorable
+// configuration lives. Its spec.rke2Config/spec.k3sConfig kubernetesVersion is the *desired*
+// version — k3sbasedupgrade reads it and drives the downstream system-upgrade-controller plans from
+// it — and the agent-customization fields are applied by Rancher directly.
+func (a *ImportedAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceMgmtCluster {
+		return nil, nil
+	}
+
+	cluster, err := a.clients.Mgmt.Cluster().Cache().Get(a.cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+func (a *ImportedAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	cluster := &mgmtv3.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return fmt.Errorf("converting mgmt cluster %s from unstructured: %w", obj.GetName(), err)
+	}
+
+	_, err := a.clients.Mgmt.Cluster().Update(cluster)
+	return err
+}
+
+// WaitForRestoreTarget always reports ready. The mgmt v3 Cluster is itself the restore target and
+// nothing upstream is rendered off it — the desired version is consumed downstream by the
+// system-upgrade-controller, well after this operation has finished.
+func (a *ImportedAdapter) WaitForRestoreTarget() (bool, error) {
+	return true, nil
+}
+
+// InstallInstruction reinstalls the distro at the version the mgmt cluster is configured for.
+//
+// For an imported cluster a version change would normally be rolled out by the downstream
+// system-upgrade-controller, but that happens long after this operation completes and
+// `--cluster-reset` has to run against the snapshot's own binary. Installing it here puts the right
+// version in place before the reset, and leaves the upgrade controller with nothing to do because
+// the nodes already match the desired version.
+func (a *ImportedAdapter) InstallInstruction(secret *corev1.Secret) (plan.OneTimeInstruction, bool) {
+	version := a.kubernetesVersion()
+	if version == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(version, a.DistroDataDirectory(secret), nil, a.cluster.Spec.AgentEnvVars), true
+}
+
+// kubernetesVersion returns the version the mgmt cluster is configured for, preferring the distro
+// config Status.Driver selects — the same choice k3sbasedupgrade makes — and falling back to the
+// version the cluster last reported when no desired version has been set.
+func (a *ImportedAdapter) kubernetesVersion() string {
+	if a.cluster.Status.Driver == mgmtv3.ClusterDriverK3s {
+		if a.cluster.Spec.K3sConfig != nil && a.cluster.Spec.K3sConfig.Version != "" {
+			return a.cluster.Spec.K3sConfig.Version
+		}
+	} else if a.cluster.Spec.Rke2Config != nil && a.cluster.Spec.Rke2Config.Version != "" {
+		return a.cluster.Spec.Rke2Config.Version
+	}
+
+	if a.cluster.Status.Version != nil {
+		return a.cluster.Status.Version.GitVersion
+	}
+	return ""
 }
 
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {

@@ -6,6 +6,7 @@ import (
 
 	bootstrapv1beta2 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta2"
 	controlplanev1beta2 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta2"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -71,6 +72,57 @@ func (a *CAPRKE2Adapter) ClusterObject() (*unstructured.Unstructured, error) {
 	}
 
 	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+// RestoreTarget returns the RKE2ControlPlane for its resource key. ClusterObject returns the CAPI
+// Cluster, which carries none of the cluster's configuration — the RKE2ControlPlane holds the
+// Kubernetes version and server config a restore writes back. Fetched dynamically because CAPRKE2's
+// CRDs only exist once turtles is enabled, so there is no generated typed cache for them.
+func (a *CAPRKE2Adapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceRKE2ControlPlane {
+		return nil, nil
+	}
+
+	obj, err := a.clients.Dynamic.Get(controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlane"), a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("expected *unstructured.Unstructured for RKE2ControlPlane %s/%s, got %T",
+			a.controlPlane.Namespace, a.controlPlane.Name, obj)
+	}
+
+	return ustr, nil
+}
+
+func (a *CAPRKE2Adapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	_, err := a.clients.Dynamic.Update(obj)
+	return err
+}
+
+// WaitForRestoreTarget always reports ready. The RKE2ControlPlane is itself the restore target, so
+// there is no intermediate object to render before the restored configuration takes effect —
+// unlike CAPR, where the RKEControlPlane is regenerated from the provv1.Cluster a restore writes to.
+func (a *CAPRKE2Adapter) WaitForRestoreTarget() (bool, error) {
+	return true, nil
+}
+
+// InstallInstruction reinstalls RKE2 at the RKE2ControlPlane's version. The image is Rancher's
+// system-agent installer, resolved against the global system-default-registry: CAPRKE2 models no
+// per-cluster registry the way an RKEControlPlane's machineGlobalConfig does.
+func (a *CAPRKE2Adapter) InstallInstruction(secret *corev1.Secret) (plan.OneTimeInstruction, bool) {
+	if a.controlPlane.Spec.Version == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(
+		a.controlPlane.Spec.Version,
+		a.DistroDataDirectory(secret),
+		nil,
+		nil,
+	), true
 }
 
 // ToS3ArgsEnvAndFiles returns the S3 args/env/files that should be appended to an etcd-snapshot

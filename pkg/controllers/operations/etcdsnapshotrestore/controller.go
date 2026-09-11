@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
@@ -18,11 +21,13 @@ import (
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/restoremode"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,6 +46,12 @@ const (
 	// PreflightStepHookLabelPrefix gates the Preflight step, before the controller performs
 	// the necessary preflight checks to determine whether or not the operation can proceed.
 	PreflightStepHookLabelPrefix = "preflight.step.hook.operation.cattle.io/"
+
+	// RestoreClusterConfigStepHookLabelPrefix gates the RestoreClusterConfig step, before the
+	// controller writes the cluster configuration captured in the snapshot back onto the object that
+	// owns the cluster. Gating here lets a delegate inspect or adjust the configuration a restore is
+	// about to apply, while the cluster is still running.
+	RestoreClusterConfigStepHookLabelPrefix = "restore-cluster-config.step.hook.operation.cattle.io/"
 
 	// ShutdownStepHookLabelPrefix gates the Shutdown step, before the controller assigns the
 	// killall + tombstone-touch + tls/cred-directory cleanup plan to every non-Windows secret.
@@ -436,6 +447,8 @@ func stepHookPrefixFor(step opv1alpha1.ETCDSnapshotRestoreStep) string {
 	switch step {
 	case opv1alpha1.ETCDSnapshotRestoreStepPreflight:
 		return PreflightStepHookLabelPrefix
+	case opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig:
+		return RestoreClusterConfigStepHookLabelPrefix
 	case opv1alpha1.ETCDSnapshotRestoreStepShutdown:
 		return ShutdownStepHookLabelPrefix
 	case opv1alpha1.ETCDSnapshotRestoreStepRestore:
@@ -588,6 +601,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	switch s.op.Status.Step {
 	case opv1alpha1.ETCDSnapshotRestoreStepPreflight:
 		return h.reconcilePreflight(s, status)
+	case opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig:
+		return h.reconcileRestoreClusterConfig(s, status)
 	case opv1alpha1.ETCDSnapshotRestoreStepShutdown:
 		return h.reconcileShutdown(s, status)
 	case opv1alpha1.ETCDSnapshotRestoreStepRestore:
@@ -606,9 +621,10 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
+	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
 		status.Step,
 		opv1alpha1.ETCDSnapshotRestoreStepPreflight,
+		opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
 		opv1alpha1.ETCDSnapshotRestoreStepShutdown,
 		opv1alpha1.ETCDSnapshotRestoreStepRestore,
 		opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,
@@ -746,10 +762,245 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 		return status, nil
 	}
 
-	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to shutdown", s.op.Namespace, s.op.Name)
+	// Validate the requested restore mode while the cluster is still running, so an unavailable mode
+	// cancels the operation before anything is shut down.
+	if reason, ok := validateRestoreMode(s.op.Spec.Args.RestoreMode, snapshotName, snapshot); !ok {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
+
+		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+		opv1alpha1.CanceledCondition.Message(&status, reason)
+
+		return status, nil
+	}
+
+	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to restore cluster config", s.op.Namespace, s.op.Name)
+
+	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig)
+	return status, nil
+}
+
+// restoresClusterConfig reports whether mode asks for any cluster configuration to be restored. An
+// empty mode and "none" both mean "etcd only".
+func restoresClusterConfig(mode string) bool {
+	return mode != "" && mode != rkev1.RestoreRKEConfigNone
+}
+
+// validateRestoreMode validates a requested restore mode against the modes the snapshot advertises,
+// returning (reason, false) when the mode cannot be honoured. snapshotbackpopulate computes the
+// annotation by resolving each mode's selector against the resources the snapshot captured, so a
+// mode listed there is one this snapshot can actually satisfy.
+func validateRestoreMode(mode, snapshotName string, snapshot *rkev1.ETCDSnapshot) (string, bool) {
+	if !restoresClusterConfig(mode) {
+		return "", true
+	}
+
+	// The caller tolerates a missing snapshot CR by treating Args.Name as a bare file on disk. That
+	// works for restoring etcd, but there is then nothing to read a cluster configuration from.
+	if snapshot == nil {
+		return fmt.Sprintf("restore mode %q requires an etcdsnapshot.rke.cattle.io resource, but none exists for snapshot %q", mode, snapshotName), false
+	}
+
+	available := restoremode.AvailableModes(snapshot.Annotations[capr.RestoreModeOptionsAnnotation])
+	if !slices.Contains(available, mode) {
+		return fmt.Sprintf("restore mode %q is not available for snapshot %s/%s, which offers [%s]",
+			mode, snapshot.Namespace, snapshot.Name, strings.Join(available, ", ")), false
+	}
+
+	return "", true
+}
+
+// reconcileRestoreClusterConfig applies the requested restore mode: it writes the fields the mode
+// selects, as captured in the snapshot's metadata, back onto the object that owns the cluster.
+//
+// This runs before Shutdown, matching the legacy ordering where the cluster spec was updated before
+// the restore began. It is also why the Restore step can install the right Kubernetes version: the
+// configuration is in place, and propagated, before any node plan is built from it.
+func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
+	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling restore cluster config", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, RestoreClusterConfigStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	mode := s.op.Spec.Args.RestoreMode
+	if !restoresClusterConfig(mode) {
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: restore mode %q restores no cluster configuration, transitioning to shutdown", s.op.Namespace, s.op.Name, mode)
+
+		status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepShutdown)
+		return status, nil
+	}
+
+	matches, reason, err := h.resolveRestoreMode(s, mode)
+	if err != nil {
+		return status, err
+	}
+	if reason != "" {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
+
+		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+		opv1alpha1.CanceledCondition.Message(&status, reason)
+
+		return status, nil
+	}
+
+	applied, reason, err := h.applyRestoreMode(s, matches)
+	if err != nil {
+		return status, err
+	}
+	if reason != "" {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
+
+		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+		opv1alpha1.CanceledCondition.Message(&status, reason)
+
+		return status, nil
+	}
+
+	// An update was issued, so the caches this reconcile read are stale. Come back and re-resolve;
+	// once every field already holds its restored value nothing is applied and we advance.
+	if applied {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: applying restore mode %q", status.Step, mode))
+
+		return status, nil
+	}
+
+	// The restored configuration is on the restore target, but the objects rendered off it may not
+	// have caught up. Later steps build node plans from those — the Restore step installs the
+	// Kubernetes version they carry — so hold here until they are current rather than racing ahead
+	// and restoring with the pre-restore configuration.
+	settled, err := s.adapter.WaitForRestoreTarget()
+	if err != nil {
+		return status, err
+	}
+	if !settled {
+		logrus.Infof("[etcdsnapshotrestore] %s/%s: waiting for the cluster to observe the restored configuration", s.op.Namespace, s.op.Name)
+
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: waiting for the cluster to observe the restored configuration", status.Step))
+
+		return status, nil
+	}
+
+	logrus.Infof("[etcdsnapshotrestore] %s/%s: applied restore mode %q, transitioning to shutdown", s.op.Namespace, s.op.Name, mode)
 
 	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepShutdown)
 	return status, nil
+}
+
+// resolveRestoreMode reads the snapshot's metadata and returns the fields mode selects that Rancher
+// permits restoring. A non-empty reason means the operation cannot proceed.
+func (h *handler) resolveRestoreMode(s *scope, mode string) ([]restoremode.Match, string, error) {
+	snapshot, err := h.etcdsnapshots.Get(s.adapter.EtcdSnapshotNamespace(), s.op.Spec.Args.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, fmt.Sprintf("restore mode %q requires an etcdsnapshot.rke.cattle.io resource, but %s/%s does not exist",
+			mode, s.adapter.EtcdSnapshotNamespace(), s.op.Spec.Args.Name), nil
+	} else if err != nil {
+		return nil, "", err
+	}
+
+	metadata, err := snapshotutil.SnapshotMetadata(snapshot)
+	if err != nil {
+		return nil, fmt.Sprintf("cannot apply restore mode %q: reading metadata of snapshot %s/%s: %v",
+			mode, snapshot.Namespace, snapshot.Name, err), nil
+	}
+
+	modes, err := restoremode.Modes(metadata)
+	if err != nil {
+		return nil, fmt.Sprintf("cannot apply restore mode %q for snapshot %s/%s: %v", mode, snapshot.Namespace, snapshot.Name, err), nil
+	}
+
+	selector, ok := modes[mode]
+	if !ok {
+		return nil, fmt.Sprintf("snapshot %s/%s does not declare restore mode %q", snapshot.Namespace, snapshot.Name, mode), nil
+	}
+
+	resources, err := restoremode.Resources(metadata)
+	if err != nil {
+		return nil, fmt.Sprintf("cannot apply restore mode %q for snapshot %s/%s: %v", mode, snapshot.Namespace, snapshot.Name, err), nil
+	}
+
+	resolved, err := restoremode.Resolve(selector, resources)
+	if err != nil {
+		return nil, fmt.Sprintf("restore mode %q of snapshot %s/%s has an unusable selector %q: %v",
+			mode, snapshot.Namespace, snapshot.Name, selector, err), nil
+	}
+
+	allowed, denied := restoremode.Writable(resolved)
+	for _, d := range denied {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: restore mode %q selects %s, which Rancher does not restore; skipping it",
+			s.op.Namespace, s.op.Name, mode, d)
+	}
+
+	if len(allowed) == 0 {
+		return nil, fmt.Sprintf("restore mode %q of snapshot %s/%s selects no field that Rancher restores", mode, snapshot.Namespace, snapshot.Name), nil
+	}
+
+	return allowed, "", nil
+}
+
+// applyRestoreMode writes matches onto the live objects their resource keys address, returning
+// whether anything was updated. A non-empty reason means the operation cannot proceed.
+func (h *handler) applyRestoreMode(s *scope, matches []restoremode.Match) (bool, string, error) {
+	byResource := map[string][]restoremode.Match{}
+	for _, m := range matches {
+		byResource[m.ResourceKey] = append(byResource[m.ResourceKey], m)
+	}
+
+	applied := false
+	for key, resourceMatches := range byResource {
+		target, err := s.adapter.RestoreTarget(key)
+		if err != nil {
+			return false, "", err
+		}
+		if target == nil {
+			return false, fmt.Sprintf("restore mode selects %s, which this cluster has no counterpart for", key), nil
+		}
+
+		updated := target.DeepCopy()
+		for _, m := range resourceMatches {
+			current, found, err := unstructured.NestedFieldNoCopy(updated.Object, m.Path...)
+			if err != nil {
+				return false, fmt.Sprintf("reading %s from %s: %v", m, key, err), nil
+			}
+			if found && equality.Semantic.DeepEqual(current, m.Value) {
+				continue
+			}
+			if err := unstructured.SetNestedField(updated.Object, m.Value, m.Path...); err != nil {
+				return false, fmt.Sprintf("restoring %s onto %s: %v", m, key, err), nil
+			}
+			logrus.Infof("[etcdsnapshotrestore] %s/%s: restoring %s on %s %s/%s",
+				s.op.Namespace, s.op.Name, m, updated.GetKind(), updated.GetNamespace(), updated.GetName())
+		}
+
+		if equality.Semantic.DeepEqual(target.Object, updated.Object) {
+			continue
+		}
+
+		if err := s.adapter.UpdateRestoreTarget(updated); err != nil {
+			return false, "", err
+		}
+		applied = true
+	}
+
+	return applied, "", nil
 }
 
 func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
@@ -919,54 +1170,9 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
-	value := s.idempotencyValue()
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
-	args := []string{
-		"server",
-		"--cluster-reset",
-		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
-		"--etcd-disable-snapshots=false",
-	}
-
-	var env []string
-
-	files := []plan.File{
-		{
-			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
-			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-		},
-		ops.IdempotentScriptFile(provisioningDir),
-	}
-
-	if snapshot == nil {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
-	} else if snapshot.SnapshotFile.S3 == nil {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
-	} else {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
-		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
-		args = append(args, s3Args...)
-		env = append(env, s3Env...)
-		files = append(files, s3Files...)
-	}
-
-	nodePlan := &plan.Plan{
-		Files: files,
-		OneTimeInstructions: []plan.OneTimeInstruction{
-			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    "remove-etcd-db-dir",
-					Command: "rm",
-					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
-				},
-			}),
-			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
-		},
-	}
-
-	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(buildRestorePlan(s, secret, snapshot, snapshotName), opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1496,6 +1702,73 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 // buildPostRestoreNodeCleanupPlan assembles the plan that runs the node-cleanup script on the init
 // node. A non-empty skipReason signals that the caller should skip the cleanup phase entirely (the
 // returned plan is nil in that case).
+// buildRestorePlan builds the plan that resets etcd from the snapshot on the elected leader:
+// reinstall the configured distro version, wipe the etcd data directory, then `--cluster-reset`
+// onto the snapshot. A nil snapshot means no ETCDSnapshot resource exists and snapshotName names a
+// file already on disk.
+func buildRestorePlan(s *scope, secret *corev1.Secret, snapshot *rkev1.ETCDSnapshot, snapshotName string) *plan.Plan {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	value := s.idempotencyValue()
+
+	args := []string{
+		"server",
+		"--cluster-reset",
+		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
+		"--etcd-disable-snapshots=false",
+	}
+
+	var env []string
+
+	files := []plan.File{
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
+			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+		},
+		ops.IdempotentScriptFile(provisioningDir),
+	}
+
+	if snapshot == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
+	} else if snapshot.SnapshotFile.S3 == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
+	} else {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
+		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
+		args = append(args, s3Args...)
+		env = append(env, s3Env...)
+		files = append(files, s3Files...)
+	}
+
+	var instructions []plan.OneTimeInstruction
+
+	// Install the configured Kubernetes version before resetting, so a snapshot taken on an older
+	// version is restored by that version's binary — a newer server cannot --cluster-reset onto
+	// older etcd data. This is what makes a downgrade-on-restore work, mirroring the
+	// install-with-skip-start in the legacy planner's restore plan. The RestoreClusterConfig step
+	// has already written the snapshot's version onto the cluster and waited for it to propagate, so
+	// "the configured version" here is the version being restored to.
+	if install, ok := s.adapter.InstallInstruction(secret); ok {
+		instructions = append(instructions, ops.ConvertToIdempotentInstruction(
+			provisioningDir, idempotencyKey+"/install", value, install))
+	}
+
+	instructions = append(instructions,
+		ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
+			CommonInstruction: plan.CommonInstruction{
+				Name:    "remove-etcd-db-dir",
+				Command: "rm",
+				Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
+			},
+		}),
+		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
+	)
+
+	return &plan.Plan{
+		Files:               files,
+		OneTimeInstructions: instructions,
+	}
+}
+
 func buildPostRestoreNodeCleanupPlan(s *scope, initSecret *corev1.Secret, allSecrets []*corev1.Secret) (*plan.Plan, string) {
 	kubectl := s.adapter.KubectlPath(initSecret)
 	kubeconfig := s.adapter.KubeconfigPath(initSecret)
