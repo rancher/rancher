@@ -752,12 +752,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		targets = append(targets, rotationTarget{secret: secret, nodeServices: nodeServices})
 	}
 
-	if len(targets) == 0 {
-		logrus.Errorf("[certificaterotation] %s/%s: no eligible machine-plan secrets found", s.op.Namespace, s.op.Name)
-		markFailed(&status, opv1alpha1.PlanFailedReason, "no eligible machine-plan secrets found")
-		return status, nil
-	}
-
 	// Tie plan content to this operation and step so the system-agent reruns rotated plans
 	// instead of reusing stale applied output. Applied only when a plan is assigned, below.
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
@@ -847,14 +841,19 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 		// AssignPlan updates this machine-plan secret and returns the agent's latest
 		// applied status for the same plan. A later reconcile continues from that status.
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(&nodePlan, opEnv), 0, 0)
+		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(&nodePlan, opEnv), 1, 1)
 		if err != nil {
 			return status, err
 		}
 
 		if planStatus.Failure() {
-			logrus.Errorf("[certificaterotation] %s/%s: certificate rotation plan failed for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("certificate rotation plan failed for %s/%s", secret.Namespace, secret.Name))
+			message := fmt.Sprintf(
+				"certificate rotation plan failed for %s/%s; verify the runtime service is healthy before starting another disruptive operation: %s",
+				secret.Namespace, secret.Name, plan.Message([]plan.PlanStatus{*planStatus}),
+			)
+
+			logrus.Errorf("[certificaterotation] %s/%s: %s", s.op.Namespace, s.op.Name, message)
+			markFailed(&status, opv1alpha1.PlanFailedReason, message)
 			return status, nil
 		}
 

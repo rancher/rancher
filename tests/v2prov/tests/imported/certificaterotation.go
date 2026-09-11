@@ -286,13 +286,6 @@ func summarizeCertificateRotation(op *opv1alpha1.CertificateRotation) certificat
 	}
 }
 
-// CertificateRotationCheckpoint is the state captured when WaitForCertificateRotationHookPause
-// confirms a hook has fired.
-type CertificateRotationCheckpoint struct {
-	Op     *opv1alpha1.CertificateRotation
-	Beacon *planv1alpha1.Beacon
-}
-
 // WaitForCertificateRotationHookPause polls until the named hook on the op has fired.
 func WaitForCertificateRotationHookPause(
 	t *testing.T,
@@ -301,10 +294,9 @@ func WaitForCertificateRotationHookPause(
 	beaconNS, beaconName, hookLabelKey, delegateName string,
 	expectedPhase opv1alpha1.OperationPhase,
 	expectedStep opv1alpha1.CertificateRotationStep,
-) CertificateRotationCheckpoint {
+) {
 	t.Helper()
 
-	var checkpoint CertificateRotationCheckpoint
 	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, 25*time.Minute, true, func(_ context.Context) (bool, error) {
 		latestOp, err := clients.Operation.CertificateRotation().Get(op.Namespace, op.Name, metav1.GetOptions{})
 		if err != nil {
@@ -332,14 +324,12 @@ func WaitForCertificateRotationHookPause(
 			return false, nil
 		}
 
-		checkpoint = CertificateRotationCheckpoint{Op: latestOp, Beacon: beacon}
 		return true, nil
 	})
 	if err != nil {
 		t.Fatalf("timed out waiting for hook %q to pause op %s/%s at phase=%q step=%q: %v",
 			hookLabelKey, op.Namespace, op.Name, expectedPhase, expectedStep, err)
 	}
-	return checkpoint
 }
 
 // AdvancePastCertificateRotationHook clears the hook label and pops the delegate.

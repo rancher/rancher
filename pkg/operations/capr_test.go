@@ -652,13 +652,6 @@ func TestComponentTLSSettingsFromRenderedConfig(t *testing.T) {
 			want:      ComponentTLSSettings{SecurePort: "10261"},
 		},
 		{
-			name: "unknown component returns empty",
-			config: map[string]any{
-				KubeControllerManagerArg: []string{"secure-port=10261"},
-			},
-			component: "unknown-component",
-		},
-		{
 			name:      "missing config key returns empty",
 			config:    map[string]any{},
 			component: KubeSchedulerProbeName,

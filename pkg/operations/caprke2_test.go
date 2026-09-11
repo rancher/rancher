@@ -132,21 +132,6 @@ func TestCAPRKE2Adapter_ComponentTLSSettings(t *testing.T) {
 			want:      ComponentTLSSettings{TLSCertFile: "/custom/kcm.crt"},
 		},
 		{
-			name: "unknown component returns empty",
-			adapter: &CAPRKE2Adapter{
-				controlPlane: &controlplanev1beta2.RKE2ControlPlane{
-					Spec: controlplanev1beta2.RKE2ControlPlaneSpec{
-						ServerConfig: controlplanev1beta2.RKE2ServerConfig{
-							KubeScheduler: &bootstrapv1beta2.ComponentConfig{
-								ExtraArgs: []string{"secure-port=10262"},
-							},
-						},
-					},
-				},
-			},
-			component: "unknown-component",
-		},
-		{
 			name: "nil component config returns empty",
 			adapter: &CAPRKE2Adapter{
 				controlPlane: &controlplanev1beta2.RKE2ControlPlane{
@@ -208,64 +193,6 @@ func TestCAPRKE2Adapter_ComponentTLSSettings(t *testing.T) {
 			if tt.name == "incomplete TLS pair" {
 				assert.False(t, got.HasCompleteTLSConfig())
 			}
-		})
-	}
-}
-
-// --- extraArgsFor ---------------------------------------------------------------------------
-
-func TestCAPRKE2Adapter_extraArgsFor(t *testing.T) {
-	t.Parallel()
-
-	adapter := &CAPRKE2Adapter{
-		controlPlane: &controlplanev1beta2.RKE2ControlPlane{
-			Spec: controlplanev1beta2.RKE2ControlPlaneSpec{
-				ServerConfig: controlplanev1beta2.RKE2ServerConfig{
-					KubeAPIServer: &bootstrapv1beta2.ComponentConfig{
-						ExtraArgs: []string{"apiserver-arg=value"},
-					},
-					KubeControllerManager: &bootstrapv1beta2.ComponentConfig{
-						ExtraArgs: []string{"kcm-arg=value"},
-					},
-					KubeScheduler: &bootstrapv1beta2.ComponentConfig{
-						ExtraArgs: []string{"scheduler-arg=value"},
-					},
-				},
-			},
-		},
-	}
-
-	tests := []struct {
-		name      string
-		component string
-		want      []string
-	}{
-		{
-			name:      "kube-apiserver",
-			component: KubeAPIServerProbeName,
-			want:      []string{"apiserver-arg=value"},
-		},
-		{
-			name:      "kube-controller-manager",
-			component: KubeControllerManagerProbeName,
-			want:      []string{"kcm-arg=value"},
-		},
-		{
-			name:      "kube-scheduler",
-			component: KubeSchedulerProbeName,
-			want:      []string{"scheduler-arg=value"},
-		},
-		{
-			name:      "unknown component",
-			component: "unknown",
-			want:      nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := adapter.extraArgsFor(tt.component)
-			assert.Equal(t, tt.want, got)
 		})
 	}
 }

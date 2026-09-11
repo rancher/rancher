@@ -49,8 +49,8 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }
-func (a *stubAdapter) PauseCluster(_ bool) error                   { return nil }
-func (a *stubAdapter) RuntimeCommand() string                      { return a.runtimeCommand }
+func (a *stubAdapter) PauseCluster(_ bool) error { return nil }
+func (a *stubAdapter) RuntimeCommand() string    { return a.runtimeCommand }
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 	return a.dataDir, nil
 }
