@@ -38,7 +38,7 @@ echo "Uninstalling Rancher resources in the following namespaces: ${namespaces}"
 
 for namespace in ${namespaces}; do
   for app in $(helm list -n "${namespace}" -q); do
-    if [[ ${app} =~ .crd$ ]]; then
+    if [[ ${app} =~ .crd$ ]] || [[ ${app} == "rancher" ]]; then
       echo "--- Skip the app [${app}] in the namespace [${namespace}]"
       continue
     fi
