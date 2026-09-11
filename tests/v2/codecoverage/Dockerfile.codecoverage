@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/golang:1.25
+FROM registry.suse.com/bci/golang:1.27
 
 # Configure Go
 ENV GOPATH /root/go

@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/golang:1.25
+FROM registry.suse.com/bci/golang:1.27
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
@@ -23,7 +23,7 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
     fi
 
-ENV GOLANGCI_LINT=v1.59.0
+ENV GOLANGCI_LINT=v2.9.0
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
     fi
