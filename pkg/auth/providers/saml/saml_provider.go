@@ -343,7 +343,7 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 	if s.hasLdapGroupSearch() {
 		combinedConfig, err := s.combineSamlAndLdapConfig(config)
 		if err != nil {
-			logrus.Warnf("problem combining saml and ldap config, saving partial configuration %s", err.Error())
+			return err
 		}
 		_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, combinedConfig)
 		if err != nil {

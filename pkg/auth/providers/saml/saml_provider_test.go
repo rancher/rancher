@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/crewjam/saml"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -159,6 +160,50 @@ func TestCombineSamlAndLdapConfigStoresLDAPPasswordInSecret(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSaveSamlConfigReturnsErrorWhenLDAPPasswordSecretSaveFails(t *testing.T) {
+	originalGetLDAPConfig := getLDAPConfig
+	t.Cleanup(func() {
+		getLDAPConfig = originalGetLDAPConfig
+	})
+
+	getLDAPConfig = func(common.AuthProvider) (*apiv3.LdapConfig, *x509.CertPool, error) {
+		return &apiv3.LdapConfig{
+			LdapFields: apiv3.LdapFields{
+				ServiceAccountPassword: "test-password",
+			},
+		}, nil, nil
+	}
+
+	ctrl := gomock.NewController(t)
+	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretCache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secretController.EXPECT().Cache().Return(secretCache)
+	secretCache.EXPECT().Get(common.SecretsNamespace, "oktaconfig-serviceaccountpassword").Return(nil, assert.AnError)
+
+	provider := &Provider{
+		name:         OKTAName,
+		secrets:      secretController,
+		ldapProvider: &mockLdapProvider{providerName: OKTAName},
+		authConfigs: &fakes.AuthConfigInterfaceMock{
+			ObjectClientFunc: func() *objectclient.ObjectClient {
+				t.Fatal("auth config update should not be attempted when saving the LDAP password secret fails")
+				return nil
+			},
+		},
+		getSamlConfig: func() (*apiv3.SamlConfig, error) {
+			return &apiv3.SamlConfig{
+				AuthConfig: apiv3.AuthConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "okta"},
+				},
+			}, nil
+		},
+	}
+
+	err := provider.saveSamlConfig(&apiv3.SamlConfig{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to save ldap service account password")
 }
 
 func TestSearchPrincipals(t *testing.T) {
