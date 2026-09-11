@@ -69,6 +69,7 @@ func TestTelemetryManagedClusterCount(t *testing.T) {
 			tc.input.localNodes,
 			tc.input.managedClusters,
 			tc.input.managedNodes,
+			true,
 		)
 		assert.Equal(rancherT.ManagedClusterCount(), tc.expected)
 	}
@@ -119,6 +120,7 @@ func TestTelemetryManagedNodes(t *testing.T) {
 			tc.input.localNodes,
 			tc.input.managedClusters,
 			tc.input.managedNodes,
+			true,
 		)
 		assert.Equal(rancherT.LocalNodeCount(), tc.expected)
 	}
@@ -169,6 +171,7 @@ func TestTelemetryLocalClusterCompute(t *testing.T) {
 			tc.input.localNodes,
 			tc.input.managedClusters,
 			tc.input.managedNodes,
+			true,
 		)
 
 		clT := rancherT.LocalClusterTelemetry()
@@ -257,6 +260,7 @@ func TestTelemetryLocalNodeCompute(t *testing.T) {
 			tc.input.localNodes,
 			tc.input.managedClusters,
 			tc.input.managedNodes,
+			true,
 		)
 		clT := rancherT.LocalClusterTelemetry()
 		totalCores := int(0)
@@ -358,6 +362,7 @@ func TestTelemetryClusterCompute(t *testing.T) {
 			tc.input.localNodes,
 			tc.input.managedClusters,
 			tc.input.managedNodes,
+			true,
 		)
 		totalCores := int(0)
 		totalMem := int(0)
@@ -495,6 +500,7 @@ func TestTelemetryPerNodeCompute(t *testing.T) {
 			tc.input.localNodes,
 			tc.input.managedClusters,
 			tc.input.managedNodes,
+			true,
 		)
 		totalCores := int(0)
 		totalMem := int(0)

@@ -1,16 +1,22 @@
 package telemetry
 
 import (
+	"context"
 	"errors"
 	"iter"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
 	v3ctrl "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -58,6 +64,8 @@ type RancherManagerTelemetry interface {
 
 	// RancherVersionTelemetry exposes versioning related metadata
 	RancherVersionTelemetry
+
+	IsNVIDIAPresent() bool
 }
 
 type ClusterTelemetry interface {
@@ -140,11 +148,12 @@ func (n *nodeTelemetryImpl) KernelVersion() string {
 }
 
 type rancherTelemetryImpl struct {
-	rancherVersion string
-	gitHash        string
-	installUUID    string
-	clusterUUID    string
-	serverURL      string
+	rancherVersion  string
+	gitHash         string
+	installUUID     string
+	clusterUUID     string
+	serverURL       string
+	isNVIDIAPresent bool
 
 	localCluster *v3.Cluster
 	localNodes   []*v3.Node
@@ -154,6 +163,10 @@ type rancherTelemetryImpl struct {
 }
 
 var _ RancherManagerTelemetry = (*rancherTelemetryImpl)(nil)
+
+func (r *rancherTelemetryImpl) IsNVIDIAPresent() bool {
+	return r.isNVIDIAPresent
+}
 
 func (r *rancherTelemetryImpl) ManagedClusterCount() int {
 	return 1 + len(r.managedClusters)
@@ -256,17 +269,20 @@ type TelemetryGatherer struct {
 	clusterUUID    string
 	serverURL      string
 
-	nodeCache    v3ctrl.NodeCache
-	clusterCache v3ctrl.ClusterCache
+	nodeCache           v3ctrl.NodeCache
+	clusterCache        v3ctrl.ClusterCache
+	multiClusterManager wrangler.MultiClusterManager
 }
 
 func NewTelemetryGatherer(
 	clusterCache v3ctrl.ClusterCache,
 	nodeCache v3ctrl.NodeCache,
+	multiClusterManager wrangler.MultiClusterManager,
 ) TelemetryGatherer {
 	return TelemetryGatherer{
-		clusterCache: clusterCache,
-		nodeCache:    nodeCache,
+		clusterCache:        clusterCache,
+		nodeCache:           nodeCache,
+		multiClusterManager: multiClusterManager,
 	}
 }
 
@@ -276,6 +292,43 @@ func (t *TelemetryGatherer) visitWithInitInfo(info initcond.InitInfo) {
 	t.installUUID = info.InstallUUID
 	t.rancherVersion = info.RancherVersion
 	t.gitHash = info.GitHash
+}
+
+func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
+	var isNVIDIAPresent atomic.Bool
+	isNVIDIAPresent.Store(false)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+
+	for _, cl := range clusters {
+		wg.Go(func() {
+			if isNVIDIAPresent.Load() {
+				return
+			}
+
+			k8s, _ := t.multiClusterManager.K8sClient(cl.Name)
+			if k8s != nil {
+				_, err := k8s.
+					CoreV1().
+					Secrets("aif-operator").
+					Get(
+						ctx,
+						"nvidia-registry",
+						metav1.GetOptions{},
+					)
+
+				if err == nil {
+					isNVIDIAPresent.Store(true)
+				}
+			}
+		})
+	}
+
+	wg.Wait()
+	return isNVIDIAPresent.Load()
 }
 
 func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, error) {
@@ -321,6 +374,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 		localNodes,
 		managedCls,
 		nodeMap,
+		t.isNVIDIAPresent(cls),
 	), nil
 }
 
@@ -334,6 +388,7 @@ func newTelemetryImpl(
 	localNodes []*v3.Node,
 	clList []*v3.Cluster,
 	nodeMap map[ClusterID][]*v3.Node,
+	isNVIDIAPresent bool,
 ) *rancherTelemetryImpl {
 	return &rancherTelemetryImpl{
 		rancherVersion:  version,
@@ -345,6 +400,7 @@ func newTelemetryImpl(
 		localNodes:      localNodes,
 		managedClusters: clList,
 		managedNodes:    nodeMap,
+		isNVIDIAPresent: isNVIDIAPresent,
 	}
 }
 

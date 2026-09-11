@@ -7,6 +7,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -57,7 +58,7 @@ func TestTelemetryManager(t *testing.T) {
 	nodeCache.EXPECT().List(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(_ string, _ any) ([]*v3.Node, error) {
 		return []*v3.Node{}, nil
 	})
-	telG := NewTelemetryGatherer(clusterCache, nodeCache)
+	telG := NewTelemetryGatherer(clusterCache, nodeCache, wrangler.Context{}.MultiClusterManager)
 
 	manager := NewTelemetryExporterManager(telG, time.Millisecond)
 	assert.NotNil(manager)
