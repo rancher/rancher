@@ -109,37 +109,6 @@ func TestBuildTLSConfigForRoute_WithNoCertificatePEMBlock_ReturnsError(t *testin
 	assert.Contains(t, err.Error(), "must contain at least one CERTIFICATE")
 }
 
-func TestBuildTLSConfigForRoute_WithVerifyHostnameFalse_DisablesVerification(t *testing.T) {
-	verifyHostnameFalse := false
-	route := &mgmt.ProxyEndpointRoute{
-		Domain: "api.example.com",
-		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
-			VerifyHostname: &verifyHostnameFalse,
-		},
-	}
-
-	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
-	require.NoError(t, err)
-	assert.NotNil(t, tlsConfig)
-	assert.Empty(t, tlsConfig.ServerName)
-}
-
-func TestBuildTLSConfigForRoute_WithVerifyHostnameTrue_EnablesVerification(t *testing.T) {
-	verifyHostnameTrue := true
-	route := &mgmt.ProxyEndpointRoute{
-		Domain: "api.example.com",
-		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
-			VerifyHostname: &verifyHostnameTrue,
-		},
-	}
-
-	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
-	require.NoError(t, err)
-	assert.NotNil(t, tlsConfig)
-	assert.NotEmpty(t, tlsConfig.ServerName)
-	assert.False(t, tlsConfig.InsecureSkipVerify)
-}
-
 func TestBuildTLSConfigForRoute_WithBothServerNameAndCABundle(t *testing.T) {
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -171,20 +140,15 @@ func TestBuildTLSConfigForRoute_WithAllOptions(t *testing.T) {
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.Certificate().Raw})
 	require.NotEmpty(t, certPEM)
 
-	verifyHostnameFalse := false
 	route := &mgmt.ProxyEndpointRoute{
 		Domain:     "api.example.com",
 		ServerName: "internal.example.com",
 		CABundle:   string(certPEM),
-		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
-			VerifyHostname: &verifyHostnameFalse,
-		},
 	}
 
 	tlsConfig, err := buildTLSConfigForRoute(route, "api.example.com")
 	require.NoError(t, err)
 	assert.NotNil(t, tlsConfig)
-	assert.Empty(t, tlsConfig.ServerName)
 	assert.NotNil(t, tlsConfig.RootCAs)
 }
 
@@ -244,13 +208,9 @@ func TestPerRouteTLSTransport_WithServerNameOption_AppliesSNI(t *testing.T) {
 	// Create a route with ServerName set to something different (hostname mismatch scenario)
 	// This would normally fail on a real server unless it handles multiple SANs
 	// For testing purposes, we use VerifyHostname false to avoid cert verification issues
-	verifyHostnameFalse := false
 	route := &mgmt.ProxyEndpointRoute{
 		Domain:     tsURL.Hostname(),
 		ServerName: "alternative-hostname.local",
-		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
-			VerifyHostname: &verifyHostnameFalse,
-		},
 	}
 
 	// Create a transport for the route
@@ -258,7 +218,6 @@ func TestPerRouteTLSTransport_WithServerNameOption_AppliesSNI(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, transport)
 	assert.NotNil(t, transport.TLSClientConfig)
-	assert.Empty(t, transport.TLSClientConfig.ServerName)
 }
 
 func TestPerRouteTLSTransport_MultipleSecurityOptions_AllApplied(t *testing.T) {
@@ -273,14 +232,10 @@ func TestPerRouteTLSTransport_MultipleSecurityOptions_AllApplied(t *testing.T) {
 	tsURL, err := url.Parse(ts.URL)
 	require.NoError(t, err)
 
-	verifyHostnameTrue := true
 	route := &mgmt.ProxyEndpointRoute{
 		Domain:     tsURL.Hostname(),
 		ServerName: "custom-sni.local",
 		CABundle:   string(certPEM),
-		TLSVerificationOptions: &mgmt.TLSVerificationSpec{
-			VerifyHostname: &verifyHostnameTrue,
-		},
 	}
 
 	transport, err := buildTransportForRoute(route, tsURL.Hostname())

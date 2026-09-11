@@ -75,23 +75,12 @@ type ProxyEndpointRoute struct {
 	// +kubebuilder:validation:MaxLength=100000
 	CABundle string `json:"caBundle,omitempty"`
 
-	// ClientCertificate references a Kubernetes Secret containing client certificate and key
-	// for mutual TLS (mTLS) authentication. The secret must be in the same namespace as the
-	// ProxyEndpoint. The secret must contain "tls.crt" and "tls.key" fields with PEM-encoded
-	// certificate and private key respectively.
-	// +optional
-	ClientCertificate *SecretReference `json:"clientCertificate,omitempty"`
-
 	// ServerName is the SNI (Server Name Indication) hostname to use during the TLS handshake.
 	// If not specified, the domain hostname is used. This is useful when the endpoint domain
 	// does not match the certificate's CN or SAN fields.
 	// +optional
 	// +kubebuilder:validation:MaxLength=253
 	ServerName string `json:"serverName,omitempty"`
-
-	// TLSVerificationOptions controls certificate verification behavior.
-	// +optional
-	TLSVerificationOptions *TLSVerificationSpec `json:"tlsVerificationOptions,omitempty"`
 
 	// CredentialInjection defines how credentials are applied to proxied requests for this domain.
 	// When set, clients need to supply a credential ID and values for the secret fields via X-API-CattleAuth-Header;
@@ -152,20 +141,12 @@ type InjectionFieldMapping struct {
 	SecretField string `json:"secretField"`
 }
 
-// SecretReference refers to a Kubernetes secret in the same namespace.
 type SecretReference struct {
-	// Name is the name of the secret object.
-	// +required
-	Name string `json:"name"`
+	//TODO: Delete this struct
 }
 
-// TLSVerificationSpec controls certificate verification behavior for TLS connections.
 type TLSVerificationSpec struct {
-	// VerifyHostname controls whether the certificate's hostname matches the connection hostname.
-	// Defaults to true. Only has effect when InsecureSkipTLSVerify is false.
-	// +optional
-	// +kubebuilder:validation:default=true
-	VerifyHostname *bool `json:"verifyHostname,omitempty"`
+	//TODO: Delete this struct
 }
 
 type ProxyEndpointStatus struct{}

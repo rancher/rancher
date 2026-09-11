@@ -419,7 +419,7 @@ func (t *perRouteTLSTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 
 	// If the route has custom certificate settings, build a transport for it
-	if route.CABundle != "" || route.ServerName != "" || route.TLSVerificationOptions != nil {
+	if route.CABundle != "" || route.ServerName != "" {
 		decodeCABundleIfPossible(route)
 		transport, err := buildTransportForRoute(route, req.URL.Hostname())
 		if err != nil {
@@ -464,13 +464,6 @@ func buildTLSConfigForRoute(route *mgmt.ProxyEndpointRoute, requestHostname stri
 		serverName = route.ServerName
 	}
 	tlsConfig.ServerName = serverName
-
-	// Apply verification options if specified
-	if route.TLSVerificationOptions != nil {
-		if route.TLSVerificationOptions.VerifyHostname != nil && !*route.TLSVerificationOptions.VerifyHostname {
-			tlsConfig.ServerName = ""
-		}
-	}
 
 	return tlsConfig, nil
 }
