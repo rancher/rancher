@@ -223,10 +223,20 @@ func (s *secretTelemetryExporter) Register(telG TelemetryGatherer) {
 }
 
 func (s *secretTelemetryExporter) CollectAndExport() error {
+	list, err := s.ctrl.List("aif-operator", metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=aif-operator"})
+	if err != nil {
+		return err
+	}
+
+	for _, v := range list.Items {
+		fmt.Println(v)
+	}
+
 	telG, err := s.telG.GetClusterTelemetry()
 	if err != nil {
 		return err
 	}
+	// [1]
 	payload, err := GenerateSCCPayload(telG)
 	if err != nil {
 		return err

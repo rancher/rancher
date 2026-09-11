@@ -63,6 +63,7 @@ type RancherManagerTelemetry interface {
 type ClusterTelemetry interface {
 	ComputeTelmetry
 	PerNodeTelemetry() iter.Seq2[NodeID, NodeTelemetry]
+	AifNVIDIARegistrySecretPresent() (bool, error)
 }
 
 type NodeTelemetry interface {
@@ -220,6 +221,13 @@ type clusterTelemetryImpl struct {
 }
 
 var _ ClusterTelemetry = (*clusterTelemetryImpl)(nil)
+
+func (c *clusterTelemetryImpl) AifNVIDIARegistrySecretPresent() (bool, error) {
+	// [3]
+	// TODO: Check if secret is present...
+	// FIXME: Should this function return an error or not?
+	return true, nil
+}
 
 func (c *clusterTelemetryImpl) CpuCores() (int, error) {
 	cpuQ := c.Status.Capacity.Cpu()
