@@ -1,8 +1,8 @@
 module github.com/rancher/rancher
 
-go 1.25.8
+go 1.26.0
 
-toolchain go1.25.14
+toolchain go1.26.8
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
