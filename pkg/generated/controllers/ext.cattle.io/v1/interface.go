@@ -31,6 +31,7 @@ func init() {
 }
 
 type Interface interface {
+	CloudCredential() CloudCredentialController
 	GroupMembershipRefreshRequest() GroupMembershipRefreshRequestController
 	Kubeconfig() KubeconfigController
 	PasswordChangeRequest() PasswordChangeRequestController
@@ -47,6 +48,10 @@ func New(controllerFactory controller.SharedControllerFactory) Interface {
 
 type version struct {
 	controllerFactory controller.SharedControllerFactory
+}
+
+func (v *version) CloudCredential() CloudCredentialController {
+	return generic.NewController[*v1.CloudCredential, *v1.CloudCredentialList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "CloudCredential"}, "cloudcredentials", true, v.controllerFactory)
 }
 
 func (v *version) GroupMembershipRefreshRequest() GroupMembershipRefreshRequestController {
