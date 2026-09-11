@@ -700,6 +700,8 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 		return nil, fmt.Errorf("waiting for server-url setting to be set")
 	}
 
+	prebootstrap := capr.ShouldPreBootstrap(cluster)
+
 	ops := &systemtemplate.TemplateOps{
 		AgentImage:     agentImage,
 		AuthImage:      authImage,
@@ -707,7 +709,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            url,
-		IsPreBootstrap: capr.PreBootstrap(cluster),
+		IsPreBootstrap: prebootstrap,
 		Cluster:        cluster,
 		AgentFeatures:  features,
 		Taints:         taints,
