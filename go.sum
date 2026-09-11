@@ -636,8 +636,8 @@ github.com/rancher/apiserver v0.10.0 h1:6koiip9lw0g9roCAqtCIDgBaShH3aM0k41xNpgDz
 github.com/rancher/apiserver v0.10.0/go.mod h1:UAvpDyi36wzrbpBEaJVBSqXCRnDpt4WoMoqOMggDIqM=
 github.com/rancher/channelserver v0.11.0 h1:R1oRG2SkGkC0EKHsa+VgBuLKHzEGVE1NMJeP/6c5vPo=
 github.com/rancher/channelserver v0.11.0/go.mod h1:ZWuXGR708g5FoMdmf+fXE2XEOztdm3bcwjdMmriY1kg=
-github.com/rancher/cluster-api-provider-rke2 v0.25.0 h1:/BVUHgficJxfSRFLwBdgkzP7Guts8wdftpF/CfpH7Vo=
-github.com/rancher/cluster-api-provider-rke2 v0.25.0/go.mod h1:O8moqon9fN6XNW9n9Viy7aS+m2y4eLWtS1FjUs/RqLQ=
+github.com/rancher/cluster-api-provider-rke2 v0.25.2 h1:Mf70rt+un0uSSHG4s3FnHwjnGrOOhzFr/NMh5pltE48=
+github.com/rancher/cluster-api-provider-rke2 v0.25.2/go.mod h1:V2+GSXIbOEi2aMc7eWeUNmPKXjzgp/b8UQgZGDe5/Xo=
 github.com/rancher/dynamiclistener v0.9.0 h1:IppFgaKHBN4H0CeFLRiFDzUfZuoB7C8RvW+TuEAamDM=
 github.com/rancher/dynamiclistener v0.9.0/go.mod h1:3Hcbw5m/9/RMas1eeghac6pdN2/cJ2BkNcIDjOCcEQg=
 github.com/rancher/eks-operator v1.15.1 h1:vTLeA5xepc3cNR8BKvGyLN02SHf3G7Vc82Jk2DExAjw=
@@ -1081,8 +1081,8 @@ sigs.k8s.io/aws-iam-authenticator v0.6.17 h1:YV/4D1XRzstuKTK2f3XD2nPA9rIKyi3YVdH
 sigs.k8s.io/aws-iam-authenticator v0.6.17/go.mod h1:CnvFyzR/xeLHmUY/BD0qW6q0wp6KIwXmFp4eTfrHdP8=
 sigs.k8s.io/cli-utils v0.37.2 h1:GOfKw5RV2HDQZDJlru5KkfLO1tbxqMoyn1IYUxqBpNg=
 sigs.k8s.io/cli-utils v0.37.2/go.mod h1:V+IZZr4UoGj7gMJXklWBg6t5xbdThFBcpj4MrZuCYco=
-sigs.k8s.io/cluster-api v1.13.2 h1:NVdbVLmh6IyfdtENQAi80AijJf/FjfQLODz/6caDjlc=
-sigs.k8s.io/cluster-api v1.13.2/go.mod h1:h7cyiUh+N7sIBkSerqU8cDkYMtRlXVO1c5RoJE1p5+g=
+sigs.k8s.io/cluster-api v1.13.5 h1:RH6xfpOhKvQSJf5LxQWWbhXkc9Y1DXvQCkiscYvkAdc=
+sigs.k8s.io/cluster-api v1.13.5/go.mod h1:LalzJFvxSP1GQJreWrqeXWaLlUD0X5Z8+tgMyQW+9mE=
 sigs.k8s.io/controller-runtime v0.24.1 h1:miPEwrmirImAvgME1L9qebGHrOnGJoVmVdtOU9fRfo4=
 sigs.k8s.io/controller-runtime v0.24.1/go.mod h1:vFkfY5fGt5xAC/sKb8IBFKgWPNKG9OUG29dR8Y2wImw=
 sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 h1:IpInykpT6ceI+QxKBbEflcR5EXP7sU1kvOlxwZh5txg=
