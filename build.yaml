@@ -9,7 +9,7 @@ partnerChartDefaultBranch: main
 rke2ChartDefaultBranch: main
 # Charts Versions
 fleetVersion: 111.0.0+up0.17.0-alpha.3
-remoteDialerProxyVersion: 111.0.0+up0.9.0-rc.2
+remoteDialerProxyVersion: 111.0.0+up0.9.0-rc.3
 # NOTE: CAPI controller version has to be updated in scripts/package-env
 turtlesVersion: 110.0.0+up0.27.0
 webhookVersion: 111.0.0+up0.12.1-rc.4
