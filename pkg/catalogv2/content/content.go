@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -225,7 +224,10 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	chart, err := index.Get(chartName, version)
 	if err != nil {
 		return nil, err
+	} else if len(chart.URLs) == 0 {
+		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chart.Name, chart.Version, validation.NotFound)
 	}
+	chartURL := chart.URLs[0]
 
 	// Retrieve the clusterRepo
 	repo, err := c.getRepo(namespace, name)
@@ -233,23 +235,15 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	// If the commit status of the repository is not an empty string
-	// Return the Chart through Git without checking the secret
-	if repo.status.Commit != "" {
+	if repo.status.Commit != "" && !isRemoteChart(chartURL, repo.status.URL) {
+		// Git-based ClusterRepos can include the chart tarballs as part of the repository.
+		// Retrieve the chart from the local file.
 		return git.Chart(namespace, name, repo.status.URL, chart)
 	}
 
 	secret, err := catalogv2.GetSecret(c.secrets, repo.spec, repo.metadata.Namespace)
 	if err != nil {
 		return nil, err
-	}
-
-	// Check if chart is nil and has at least one URL
-	if chart == nil {
-		return nil, errors.New("chart is nil")
-	}
-	if len(chart.URLs) <= 0 {
-		return nil, errors.New("chart has no urls specified")
 	}
 
 	switch {
@@ -261,6 +255,13 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 	default:
 		return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 	}
+}
+
+func isRemoteChart(chartURL, gitURL string) bool {
+	if strings.HasSuffix(chartURL, "file://") || strings.HasSuffix(chartURL, gitURL) {
+		return false
+	}
+	return strings.Contains(chartURL, "://")
 }
 
 // Info retrieves detailed information about a specific Helm chart from a Helm repository.
