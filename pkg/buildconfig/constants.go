@@ -10,5 +10,5 @@ const (
 	FleetVersion             = "107.0.16+up0.13.16-rc.1"
 	ProvisioningCAPIVersion  = "107.0.0+up0.8.0"
 	RemoteDialerProxyVersion = "106.0.2+up0.5.1"
-	WebhookVersion           = "107.0.8+up0.8.9"
+	WebhookVersion           = "107.0.9+up0.8.10-rc.1"
 )
