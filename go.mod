@@ -118,9 +118,9 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.14.6-rc.1
 	github.com/rancher/ali-operator v1.14.5-rc.1
-	github.com/rancher/apiserver v0.8.7
+	github.com/rancher/apiserver v0.8.8
 	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
-	github.com/rancher/dynamiclistener v0.8.3
+	github.com/rancher/dynamiclistener v0.8.4
 	github.com/rancher/eks-operator v1.14.6-rc.1
 	github.com/rancher/fleet/pkg/apis v0.15.5
 	github.com/rancher/gke-operator v1.14.7-rc.1
@@ -129,19 +129,19 @@ require (
 	github.com/rancher/lasso v0.2.8
 	github.com/rancher/machine v0.15.0-rancher142.6-rc.0
 	github.com/rancher/muchang v0.1.0
-	github.com/rancher/norman v0.8.8
+	github.com/rancher/norman v0.8.9
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.7.5
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20260804210509-d33eb553955c
-	github.com/rancher/steve v0.8.27
+	github.com/rancher/steve v0.8.28
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.6.0
+	github.com/rancher/wrangler/v3 v3.6.1
 	github.com/robfig/cron v1.2.0
-	github.com/sirupsen/logrus v1.9.4
-	github.com/stretchr/testify v1.11.1
+	github.com/sirupsen/logrus v1.10.2
+	github.com/stretchr/testify v1.12.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.16
 	github.com/vmware/govmomi v0.42.0
@@ -159,9 +159,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.20.2
-	k8s.io/api v0.35.6
+	k8s.io/api v0.35.8
 	k8s.io/apiextensions-apiserver v0.35.6
-	k8s.io/apimachinery v0.35.6
+	k8s.io/apimachinery v0.35.8
 	k8s.io/apiserver v0.35.6
 	k8s.io/cli-runtime v0.35.6
 	k8s.io/client-go v12.0.0+incompatible
@@ -239,6 +239,7 @@ require (
 	github.com/google/cel-go v0.30.0 // indirect
 	github.com/google/go-github/v67 v67.0.0 // indirect
 	github.com/google/go-github/v72 v72.0.0 // indirect
+	github.com/google/renameio/v2 v2.0.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.19 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
@@ -276,7 +277,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260724162435-b2f20204f0df // indirect
@@ -412,7 +413,7 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/cluster-bootstrap v0.35.6 // indirect
 	k8s.io/code-generator v0.35.6 // indirect
