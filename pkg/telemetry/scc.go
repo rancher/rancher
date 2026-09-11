@@ -58,10 +58,13 @@ type sccSystemKey struct {
 	Upstream bool `json:"upstream,omitempty"`
 }
 
+// SccCluster ...
+// [2] Should this new flag be part of the SccCluster interface?
 type SccCluster struct {
 	Count    int  `json:"count" jsonschema:"minimum=1,description=De-duplication of identical clusters"`
 	Nodes    int  `json:"nodes" jsonschema:"minimum=0"`
 	Upstream bool `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself,default=false"`
+	// NVIDIARegistrySecretPresent bool `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=TODO,default=false"`
 }
 
 // JSONSchemaExtend allows SccCluster to accept additional properties
@@ -90,6 +93,7 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	var systems []SccSystem
 	var clusters []SccCluster
 
+	// We have to check for the secret presence within each cluster...
 	localCluster := telG.LocalClusterTelemetry()
 	localNodeCount := 0
 	for _, localNode := range localCluster.PerNodeTelemetry() {
@@ -108,10 +112,13 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		systemsMap[k]++
 	}
 
+	// [3] Add NVIDIA flag to payload:
+	// "nvidia_registry_secret_present": bool
 	clusters = append(clusters, SccCluster{
 		Nodes:    localNodeCount,
 		Upstream: true,
 		Count:    1,
+		// NVIDIARegistrySecretPresent: TODO,
 	})
 
 	for _, cluster := range telG.PerManagedClusterTelemetry() {
