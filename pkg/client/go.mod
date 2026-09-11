@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.25.14
 
 require (
-	github.com/rancher/norman v0.8.8
+	github.com/rancher/norman v0.8.9
 	k8s.io/apimachinery v0.35.6
 )
 
@@ -15,12 +15,12 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rancher/wrangler/v3 v3.6.0 // indirect
+	github.com/rancher/wrangler/v3 v3.6.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
