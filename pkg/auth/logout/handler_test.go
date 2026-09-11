@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
@@ -16,7 +17,7 @@ import (
 )
 
 type fakeTokenManager struct {
-	getTokenFunc          func(token string) (*v3.Token, int, error)
+	getTokenFunc          func(token string) (accessor.TokenAccessor, int, error)
 	deleteTokenByNameFunc func(name string) (int, error)
 }
 
@@ -35,124 +36,82 @@ func (m *fakeTokenManager) DeleteTokenByName(name string) (int, error) {
 
 func TestLogout(t *testing.T) {
 	tokenID := "token-5lwps"
-	bearerToken := tokenID + ":jslbp8qbkvpndjj4xmvl9crwh7w96pvxrg4xltsmcbcvvcrk9thphq"
 
-	tokenManager := &fakeTokenManager{
-		getTokenFunc: func(token string) (*v3.Token, int, error) {
-			assert.Equal(t, bearerToken, token)
-			return &v3.Token{
+	for _, tcase := range []struct {
+		kind   string
+		prefix string
+		token  accessor.TokenAccessor
+	}{
+		{
+			kind:   "legacy",
+			prefix: "",
+			token: &v3.Token{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: tokenID,
 				},
-			}, 0, nil
+			},
 		},
-		deleteTokenByNameFunc: func(name string) (int, error) {
-			assert.Equal(t, tokenID, name)
-			return http.StatusOK, nil
+		{
+			kind:   "ext",
+			prefix: "ext/",
+			token: &ext.Token{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: tokenID,
+				},
+			},
 		},
-	}
+	} {
+		bearerToken := tcase.prefix + tokenID + ":jslbp8qbkvpndjj4xmvl9crwh7w96pvxrg4xltsmcbcvvcrk9thphq"
 
-	var logoutCalled bool
-	logoutFunc := func(w http.ResponseWriter, r *http.Request, accessor accessor.TokenAccessor) error {
-		logoutCalled = true
-		return nil
-	}
+		tokenManager := &fakeTokenManager{
+			getTokenFunc: func(token string) (accessor.TokenAccessor, int, error) {
+				assert.Equal(t, bearerToken, token)
+				return tcase.token, 0, nil
+			},
+			deleteTokenByNameFunc: func(name string) (int, error) {
+				assert.Equal(t, tcase.prefix+tokenID, name)
+				return http.StatusOK, nil
+			},
+		}
 
-	checkCookiesUnset := func(t *testing.T, w *httptest.ResponseRecorder) {
-		require.Len(t, w.Result().Cookies(), 4)
-		for _, cookie := range w.Result().Cookies() {
-			switch cookie.Name {
-			case tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie:
-				assert.Equal(t, "", cookie.Value)
-				assert.Equal(t, -1, cookie.MaxAge)
-				assert.True(t, cookie.HttpOnly)
-				assert.Equal(t, "/", cookie.Path)
-				assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
-				assert.Equal(t, cookieUnsetTimestamp, cookie.Expires)
-			default:
-				require.FailNow(t, "unexpected cookie "+cookie.Name)
+		var logoutCalled bool
+		logoutFunc := func(w http.ResponseWriter, r *http.Request, accessor accessor.TokenAccessor) error {
+			logoutCalled = true
+			return nil
+		}
+
+		checkCookiesUnset := func(t *testing.T, w *httptest.ResponseRecorder) {
+			require.Len(t, w.Result().Cookies(), 4)
+			for _, cookie := range w.Result().Cookies() {
+				switch cookie.Name {
+				case tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie:
+					assert.Equal(t, "", cookie.Value)
+					assert.Equal(t, -1, cookie.MaxAge)
+					assert.True(t, cookie.HttpOnly)
+					assert.Equal(t, "/", cookie.Path)
+					assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
+					assert.Equal(t, cookieUnsetTimestamp, cookie.Expires)
+				default:
+					require.FailNow(t, "unexpected cookie "+cookie.Name)
+				}
 			}
 		}
-	}
-	checkSuccessResponse := func(t *testing.T, w *httptest.ResponseRecorder) {
-		assert.True(t, logoutCalled)
-		assert.Equal(t, http.StatusOK, w.Result().StatusCode)
-		checkCookiesUnset(t, w)
-	}
-
-	authRequest := func(path string) *http.Request {
-		r := httptest.NewRequest(http.MethodPost, path, nil)
-		r.AddCookie(&http.Cookie{
-			Name:  tokens.CookieName,
-			Value: bearerToken,
-		})
-		return r
-	}
-
-	t.Run("standard logout", func(t *testing.T) {
-		h := &handler{
-			tokenMgr: tokenManager,
-			logout:   logoutFunc,
-		}
-		r := authRequest("/v1/logout")
-		w := httptest.NewRecorder()
-		logoutCalled = false
-
-		h.ServeHTTP(w, r)
-
-		checkSuccessResponse(t, w)
-	})
-
-	t.Run("logout all", func(t *testing.T) {
-		h := &handler{
-			tokenMgr:  tokenManager,
-			logoutAll: logoutFunc,
+		checkSuccessResponse := func(t *testing.T, w *httptest.ResponseRecorder) {
+			assert.True(t, logoutCalled)
+			assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+			checkCookiesUnset(t, w)
 		}
 
-		for _, url := range []string{"/v1/logout?all", "/v3/tokens?action=logoutAll"} {
-			r := authRequest(url)
-			w := httptest.NewRecorder()
-			logoutCalled = false
-
-			h.ServeHTTP(w, r)
-
-			checkSuccessResponse(t, w)
+		authRequest := func(path string) *http.Request {
+			r := httptest.NewRequest(http.MethodPost, path, nil)
+			r.AddCookie(&http.Cookie{
+				Name:  tokens.CookieName,
+				Value: bearerToken,
+			})
+			return r
 		}
-	})
 
-	t.Run("no session cookie", func(t *testing.T) {
-		h := &handler{
-			tokenMgr: tokenManager,
-			logout:   logoutFunc,
-		}
-		r := httptest.NewRequest(http.MethodPost, "/v1/logout", nil)
-		w := httptest.NewRecorder()
-		logoutCalled = false
-
-		h.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusUnauthorized, w.Result().StatusCode)
-		assert.False(t, logoutCalled)
-	})
-
-	t.Run("get token returns status that isn't ok", func(t *testing.T) {
-		statusMap := map[int]int{
-			http.StatusNotFound:            http.StatusInternalServerError,
-			http.StatusUnauthorized:        http.StatusUnauthorized,
-			http.StatusUnprocessableEntity: http.StatusUnprocessableEntity,
-			http.StatusGone:                http.StatusOK,
-		}
-		for statusIn, statusOut := range statusMap {
-			tokenManager := &fakeTokenManager{
-				getTokenFunc: func(token string) (*v3.Token, int, error) {
-					assert.Equal(t, bearerToken, token)
-					return nil, statusIn, errors.New(http.StatusText(statusIn))
-				},
-				deleteTokenByNameFunc: func(name string) (int, error) {
-					assert.Equal(t, tokenID, name)
-					return http.StatusOK, nil
-				},
-			}
+		t.Run("standard logout, "+tcase.kind, func(t *testing.T) {
 			h := &handler{
 				tokenMgr: tokenManager,
 				logout:   logoutFunc,
@@ -163,55 +122,115 @@ func TestLogout(t *testing.T) {
 
 			h.ServeHTTP(w, r)
 
-			assert.Equal(t, statusOut, w.Result().StatusCode)
-			checkCookiesUnset(t, w)
-			assert.Equal(t, statusOut == http.StatusOK, logoutCalled)
-		}
-	})
+			checkSuccessResponse(t, w)
+		})
 
-	t.Run("logout fails", func(t *testing.T) {
-		h := &handler{
-			tokenMgr: tokenManager,
-			logout: func(w http.ResponseWriter, r *http.Request, accessor accessor.TokenAccessor) error {
-				return errors.New("some error")
-			},
-		}
-		r := authRequest("/v1/logout")
-		w := httptest.NewRecorder()
+		t.Run("logout all,"+tcase.kind, func(t *testing.T) {
+			h := &handler{
+				tokenMgr:  tokenManager,
+				logoutAll: logoutFunc,
+			}
 
-		h.ServeHTTP(w, r)
+			for _, url := range []string{"/v1/logout?all", "/v3/tokens?action=logoutAll"} {
+				r := authRequest(url)
+				w := httptest.NewRecorder()
+				logoutCalled = false
 
-		assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
-	})
+				h.ServeHTTP(w, r)
 
-	t.Run("delete token fails", func(t *testing.T) {
-		tokenManager := &fakeTokenManager{
-			getTokenFunc: func(token string) (*v3.Token, int, error) {
-				assert.Equal(t, bearerToken, token)
-				return &v3.Token{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: tokenID,
+				checkSuccessResponse(t, w)
+			}
+		})
+
+		t.Run("no session cookie", func(t *testing.T) {
+			h := &handler{
+				tokenMgr: tokenManager,
+				logout:   logoutFunc,
+			}
+			r := httptest.NewRequest(http.MethodPost, "/v1/logout", nil)
+			w := httptest.NewRecorder()
+			logoutCalled = false
+
+			h.ServeHTTP(w, r)
+
+			assert.Equal(t, http.StatusUnauthorized, w.Result().StatusCode)
+			assert.False(t, logoutCalled)
+		})
+
+		t.Run("get token returns status that isn't ok, "+tcase.kind, func(t *testing.T) {
+			statusMap := map[int]int{
+				http.StatusNotFound:            http.StatusInternalServerError,
+				http.StatusUnauthorized:        http.StatusUnauthorized,
+				http.StatusUnprocessableEntity: http.StatusUnprocessableEntity,
+				http.StatusGone:                http.StatusOK,
+			}
+			for statusIn, statusOut := range statusMap {
+				tokenManager := &fakeTokenManager{
+					getTokenFunc: func(token string) (accessor.TokenAccessor, int, error) {
+						assert.Equal(t, bearerToken, token)
+						return nil, statusIn, errors.New(http.StatusText(statusIn))
 					},
-				}, 0, nil
-			},
-			deleteTokenByNameFunc: func(name string) (int, error) {
-				assert.Equal(t, tokenID, name)
-				return http.StatusInternalServerError, errors.New("some error")
-			},
-		}
+					deleteTokenByNameFunc: func(name string) (int, error) {
+						require.FailNow(t, "unexpected DeleteTokenByName call when GetToken returns an error")
+						return 0, nil
+					},
+				}
+				h := &handler{
+					tokenMgr: tokenManager,
+					logout:   logoutFunc,
+				}
+				r := authRequest("/v1/logout")
+				w := httptest.NewRecorder()
+				logoutCalled = false
 
-		h := &handler{
-			tokenMgr: tokenManager,
-			logout:   logoutFunc,
-		}
-		r := authRequest("/v1/logout")
-		w := httptest.NewRecorder()
-		logoutCalled = false
+				h.ServeHTTP(w, r)
 
-		h.ServeHTTP(w, r)
+				assert.Equal(t, statusOut, w.Result().StatusCode)
+				checkCookiesUnset(t, w)
+				assert.Equal(t, statusOut == http.StatusOK, logoutCalled)
+			}
+		})
 
-		assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
-		checkCookiesUnset(t, w)
-		assert.True(t, logoutCalled)
-	})
+		t.Run("logout fails, "+tcase.kind, func(t *testing.T) {
+			h := &handler{
+				tokenMgr: tokenManager,
+				logout: func(w http.ResponseWriter, r *http.Request, accessor accessor.TokenAccessor) error {
+					return errors.New("some error")
+				},
+			}
+			r := authRequest("/v1/logout")
+			w := httptest.NewRecorder()
+
+			h.ServeHTTP(w, r)
+
+			assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+		})
+
+		t.Run("delete token fails, "+tcase.kind, func(t *testing.T) {
+			tokenManager := &fakeTokenManager{
+				getTokenFunc: func(token string) (accessor.TokenAccessor, int, error) {
+					assert.Equal(t, bearerToken, token)
+					return tcase.token, 0, nil
+				},
+				deleteTokenByNameFunc: func(name string) (int, error) {
+					assert.Equal(t, tcase.prefix+tokenID, name)
+					return http.StatusInternalServerError, errors.New("some error")
+				},
+			}
+
+			h := &handler{
+				tokenMgr: tokenManager,
+				logout:   logoutFunc,
+			}
+			r := authRequest("/v1/logout")
+			w := httptest.NewRecorder()
+			logoutCalled = false
+
+			h.ServeHTTP(w, r)
+
+			assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+			checkCookiesUnset(t, w)
+			assert.True(t, logoutCalled)
+		})
+	}
 }

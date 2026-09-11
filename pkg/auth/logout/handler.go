@@ -90,9 +90,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.tokenMgr.DeleteTokenByName(storedToken.GetName())
+	_, err = h.tokenMgr.DeleteTokenByName(storedToken.GetFullName())
 	if err != nil { // NotFound is already handled by DeleteTokenByName.
-		logrus.Errorf("logout: deleting session token %s: %v", storedToken.GetName(), err)
+		logrus.Errorf("logout: deleting session token %s: %v", storedToken.GetFullName(), err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
