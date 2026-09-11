@@ -12,7 +12,7 @@ jobs:
   validate:
     runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
     env:
-      GOLANG_CI_LINT_VERSION: v2.12.1
+      GOLANG_CI_LINT_VERSION: v2.13.2
       GOLANG_VERSION: '1.26'
     steps:
       - name: Git safe directory
