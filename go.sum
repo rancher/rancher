@@ -630,8 +630,8 @@ github.com/prometheus/procfs v0.21.1 h1:GljZCt+zSTS+NZq88cyQ1LjZ+RCHp3uVuabBWA5+
 github.com/prometheus/procfs v0.21.1/go.mod h1:aB55Cww9pdSJVHk0hUf0inxWyyjPogFIjmHKYgMKmtY=
 github.com/rancher/aks-operator v1.15.1 h1:rXNhHHDljGeksqbEMM0DyBrpmWAm15HsEKqm9FuJaWE=
 github.com/rancher/aks-operator v1.15.1/go.mod h1:XgY8/M0FbnteAUnaC4gOJK3CswzBH0XVdZ2mNP3qq0Q=
-github.com/rancher/ali-operator v1.15.0-rc.3 h1:FVIgpnCaLyZjsJ6IYLHZV3vs7GjUYA4OwmOlPA/QtnY=
-github.com/rancher/ali-operator v1.15.0-rc.3/go.mod h1:LAIvfUxjKovWDTdasdGfFYpO+qg49kXDj7lHMWVWa04=
+github.com/rancher/ali-operator v1.15.0 h1:Dg5WeEp9G9amgJv1SKMCXL6N6jWbNc/J4gMWvLRSQjs=
+github.com/rancher/ali-operator v1.15.0/go.mod h1:U8F45IZ0RXKLU7Tf25L9HkHxQ2pZaiY6qIbpTxwi+PM=
 github.com/rancher/apiserver v0.10.0 h1:6koiip9lw0g9roCAqtCIDgBaShH3aM0k41xNpgDzfSA=
 github.com/rancher/apiserver v0.10.0/go.mod h1:UAvpDyi36wzrbpBEaJVBSqXCRnDpt4WoMoqOMggDIqM=
 github.com/rancher/channelserver v0.11.0 h1:R1oRG2SkGkC0EKHsa+VgBuLKHzEGVE1NMJeP/6c5vPo=
