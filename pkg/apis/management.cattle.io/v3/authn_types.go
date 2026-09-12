@@ -704,7 +704,8 @@ type PingConfig struct {
 }
 
 type ADFSConfig struct {
-	SamlConfig `json:",inline" mapstructure:",squash"`
+	SamlConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
 }
 
 type KeyCloakConfig struct {

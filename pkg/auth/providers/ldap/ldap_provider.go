@@ -30,6 +30,7 @@ const (
 	ShibbolethName = "shibboleth"
 	ObjectClass    = "objectClass"
 	OKTAName       = "okta"
+	ADFSName       = "adfs"
 )
 
 // An ErrorNotConfigured indicates that the requested LDAP operation
@@ -53,6 +54,7 @@ var (
 		OpenLdapName:   "",
 		ShibbolethName: client.ShibbolethConfigFieldOpenLdapConfig,
 		OKTAName:       client.OKTAConfigFieldOpenLdapConfig,
+		ADFSName:       client.ADFSConfigFieldOpenLdapConfig,
 	}
 )
 
@@ -326,7 +328,8 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 
 // if provider only enabled for search by a SAML provider
 func (p *ldapProvider) samlSearchProvider() bool {
-	return ShibbolethName == p.providerName || OKTAName == p.providerName
+	// see also saml_provider.go -- hasLdapGroupSearch()
+	return ShibbolethName == p.providerName || OKTAName == p.providerName || ADFSName == p.providerName
 }
 
 func (p *ldapProvider) samlSearchGetPrincipal(
