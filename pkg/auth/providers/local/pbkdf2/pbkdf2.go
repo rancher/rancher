@@ -7,12 +7,14 @@ import (
 	"crypto/sha3"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -63,14 +65,7 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 			Annotations: map[string]string{
 				passwordHashAnnotation: pbkdf2sha3512Hash,
 			},
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					Name:       user.Name,
-					UID:        user.UID,
-					APIVersion: "management.cattle.io/v3",
-					Kind:       "User",
-				},
-			},
+			OwnerReferences: []metav1.OwnerReference{ownerReference(user)},
 		},
 		Data: map[string][]byte{
 			"password": hashedPassword,
@@ -90,15 +85,55 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 // the password is changed. This happens when an admin changes the password for
 // a user which has not logged in since the upgrade, leaving its secret to
 // contain a BCRYPT hash.
+//
+// A secret without a hash annotation is treated as never hashed. This happens
+// when the secret was written as a plain Secret, not through a Rancher
+// password API, while the webhook that hashes such secrets was not running.
+// The new password is hashed with PBKDF2 and the annotation is set.
 func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, userId)
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
 
+	return p.updatePassword(secret, newPassword, nil)
+}
+
+// SetPassword stores the password for the user, creating the secret when it
+// does not exist. An existing secret is updated the same way UpdatePassword
+// does, and is made to be owned by the user so it is removed with the user.
+func (p *Pbkdf2) SetPassword(user *v3.User, newPassword string) error {
+	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, user.Name)
+	if apierrors.IsNotFound(err) {
+		err = p.CreatePassword(user, newPassword)
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		// The secret was created after the cache was read. Get it from the API.
+		secret, err = p.secretClient.Get(LocalUserPasswordsNamespace, user.Name, metav1.GetOptions{})
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get password secret: %w", err)
+	}
+
+	return p.updatePassword(secret, newPassword, user)
+}
+
+type patchOp struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
+// updatePassword replaces the secret data with the hashed new password in a
+// single patch. The hash annotation is set when it does not name the algorithm
+// used, and when owner is not nil and the secret has no owner reference to it,
+// one is added.
+func (p *Pbkdf2) updatePassword(secret *corev1.Secret, newPassword string, owner *v3.User) error {
 	var value map[string][]byte
+	var algorithm string
 	switch secret.Annotations[passwordHashAnnotation] {
-	case pbkdf2sha3512Hash:
+	case pbkdf2sha3512Hash, "":
 		salt, err := p.saltGenerator()
 		if err != nil {
 			return fmt.Errorf("failed to generate salt: %w", err)
@@ -113,6 +148,7 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 			"password": hashedNewPassword,
 			"salt":     salt,
 		}
+		algorithm = pbkdf2sha3512Hash
 	case bcryptHash:
 		hashedNewPassword, err := p.bcryptKey([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
@@ -122,19 +158,48 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 		value = map[string][]byte{
 			"password": hashedNewPassword,
 		}
+		algorithm = bcryptHash
 	default:
 		return fmt.Errorf("unsupported hashing algorithm %q", secret.Annotations[passwordHashAnnotation])
 	}
 
-	patch, err := json.Marshal([]struct {
-		Op    string `json:"op"`
-		Path  string `json:"path"`
-		Value any    `json:"value"`
-	}{{
+	ops := []patchOp{{
 		Op:    "replace",
 		Path:  "/data",
 		Value: value,
-	}})
+	}}
+
+	if secret.Annotations[passwordHashAnnotation] != algorithm {
+		if len(secret.Annotations) == 0 {
+			ops = append(ops, patchOp{
+				Op:    "add",
+				Path:  "/metadata/annotations",
+				Value: map[string]string{passwordHashAnnotation: algorithm},
+			})
+		} else {
+			ops = append(ops, patchOp{
+				Op:    "add",
+				Path:  "/metadata/annotations/" + rfc6901PathEscape(passwordHashAnnotation),
+				Value: algorithm,
+			})
+		}
+	}
+
+	if owner != nil {
+		want := ownerReference(owner)
+		ownedByUser := func(ref metav1.OwnerReference) bool {
+			return ref.APIVersion == want.APIVersion && ref.Kind == want.Kind && ref.Name == want.Name && ref.UID == want.UID
+		}
+		if !slices.ContainsFunc(secret.OwnerReferences, ownedByUser) {
+			ops = append(ops, patchOp{
+				Op:    "add",
+				Path:  "/metadata/ownerReferences",
+				Value: slices.Concat(secret.OwnerReferences, []metav1.OwnerReference{want}),
+			})
+		}
+	}
+
+	patch, err := json.Marshal(ops)
 	if err != nil {
 		return fmt.Errorf("failed to marshal patch: %w", err)
 	}
@@ -199,11 +264,7 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 			return fmt.Errorf("failed to hash password: %w", err)
 		}
 
-		patch, err := json.Marshal([]struct {
-			Op    string `json:"op"`
-			Path  string `json:"path"`
-			Value any    `json:"value"`
-		}{
+		patch, err := json.Marshal([]patchOp{
 			{
 				Op:   "replace",
 				Path: "/data",
@@ -244,6 +305,15 @@ func generateSalt() ([]byte, error) {
 	}
 
 	return salt, nil
+}
+
+func ownerReference(user *v3.User) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		Name:       user.Name,
+		UID:        user.UID,
+		APIVersion: "management.cattle.io/v3",
+		Kind:       "User",
+	}
 }
 
 func rfc6901PathEscape(s string) string {
