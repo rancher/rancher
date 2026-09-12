@@ -7,6 +7,7 @@ import (
 	"crypto/sha3"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -120,11 +121,12 @@ type patchOp struct {
 }
 
 // updatePassword replaces the secret data with the hashed new password in a
-// single patch. A missing hash annotation is set, and when owner is not nil
-// and the secret has no owner reference to it, one is added.
+// single patch. The hash annotation is set when it does not name the algorithm
+// used, and when owner is not nil and the secret has no owner reference to it,
+// one is added.
 func (p *Pbkdf2) updatePassword(secret *corev1.Secret, newPassword string, owner *v3.User) error {
 	var value map[string][]byte
-	var ops []patchOp
+	var algorithm string
 	switch secret.Annotations[passwordHashAnnotation] {
 	case pbkdf2sha3512Hash, "":
 		salt, err := p.saltGenerator()
@@ -141,22 +143,7 @@ func (p *Pbkdf2) updatePassword(secret *corev1.Secret, newPassword string, owner
 			"password": hashedNewPassword,
 			"salt":     salt,
 		}
-
-		if _, ok := secret.Annotations[passwordHashAnnotation]; !ok {
-			if len(secret.Annotations) == 0 {
-				ops = append(ops, patchOp{
-					Op:    "add",
-					Path:  "/metadata/annotations",
-					Value: map[string]string{passwordHashAnnotation: pbkdf2sha3512Hash},
-				})
-			} else {
-				ops = append(ops, patchOp{
-					Op:    "add",
-					Path:  "/metadata/annotations/" + rfc6901PathEscape(passwordHashAnnotation),
-					Value: pbkdf2sha3512Hash,
-				})
-			}
-		}
+		algorithm = pbkdf2sha3512Hash
 	case bcryptHash:
 		hashedNewPassword, err := p.bcryptKey([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
@@ -166,25 +153,47 @@ func (p *Pbkdf2) updatePassword(secret *corev1.Secret, newPassword string, owner
 		value = map[string][]byte{
 			"password": hashedNewPassword,
 		}
+		algorithm = bcryptHash
 	default:
 		return fmt.Errorf("unsupported hashing algorithm %q", secret.Annotations[passwordHashAnnotation])
 	}
 
-	if owner != nil && !hasOwner(secret.OwnerReferences, owner) {
-		refs := make([]metav1.OwnerReference, 0, len(secret.OwnerReferences)+1)
-		refs = append(refs, secret.OwnerReferences...)
-		ops = append(ops, patchOp{
-			Op:    "add",
-			Path:  "/metadata/ownerReferences",
-			Value: append(refs, ownerReference(owner)),
-		})
-	}
-
-	patch, err := json.Marshal(append([]patchOp{{
+	ops := []patchOp{{
 		Op:    "replace",
 		Path:  "/data",
 		Value: value,
-	}}, ops...))
+	}}
+
+	if secret.Annotations[passwordHashAnnotation] != algorithm {
+		if len(secret.Annotations) == 0 {
+			ops = append(ops, patchOp{
+				Op:    "add",
+				Path:  "/metadata/annotations",
+				Value: map[string]string{passwordHashAnnotation: algorithm},
+			})
+		} else {
+			ops = append(ops, patchOp{
+				Op:    "add",
+				Path:  "/metadata/annotations/" + rfc6901PathEscape(passwordHashAnnotation),
+				Value: algorithm,
+			})
+		}
+	}
+
+	if owner != nil {
+		ownedByUser := func(ref metav1.OwnerReference) bool {
+			return ref.Kind == "User" && ref.Name == owner.Name
+		}
+		if !slices.ContainsFunc(secret.OwnerReferences, ownedByUser) {
+			ops = append(ops, patchOp{
+				Op:    "add",
+				Path:  "/metadata/ownerReferences",
+				Value: slices.Concat(secret.OwnerReferences, []metav1.OwnerReference{ownerReference(owner)}),
+			})
+		}
+	}
+
+	patch, err := json.Marshal(ops)
 	if err != nil {
 		return fmt.Errorf("failed to marshal patch: %w", err)
 	}
@@ -249,11 +258,7 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 			return fmt.Errorf("failed to hash password: %w", err)
 		}
 
-		patch, err := json.Marshal([]struct {
-			Op    string `json:"op"`
-			Path  string `json:"path"`
-			Value any    `json:"value"`
-		}{
+		patch, err := json.Marshal([]patchOp{
 			{
 				Op:   "replace",
 				Path: "/data",
@@ -303,16 +308,6 @@ func ownerReference(user *v3.User) metav1.OwnerReference {
 		APIVersion: "management.cattle.io/v3",
 		Kind:       "User",
 	}
-}
-
-func hasOwner(refs []metav1.OwnerReference, user *v3.User) bool {
-	for _, ref := range refs {
-		if ref.Kind == "User" && ref.Name == user.Name {
-			return true
-		}
-	}
-
-	return false
 }
 
 func rfc6901PathEscape(s string) string {

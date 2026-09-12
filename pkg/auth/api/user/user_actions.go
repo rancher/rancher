@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -166,7 +167,7 @@ func (h *Handler) setPassword(request *types.APIContext) error {
 	}
 	user, err := h.UserClient.Get(userId, v1.GetOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get user %s: %w", userId, err)
 	}
 	if err := h.PwdChanger.SetPassword(user, newPass); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())

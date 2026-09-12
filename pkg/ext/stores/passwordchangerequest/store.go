@@ -231,7 +231,7 @@ func (s *Store) Create(
 // created, before the cache has caught up.
 func (s *Store) getUser(name string) (*v3.User, error) {
 	user, err := s.userCache.Get(name)
-	if err == nil || !apierrors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		return user, err
 	}
 
