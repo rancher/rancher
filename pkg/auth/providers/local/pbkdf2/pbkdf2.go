@@ -105,7 +105,12 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 func (p *Pbkdf2) SetPassword(user *v3.User, newPassword string) error {
 	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, user.Name)
 	if apierrors.IsNotFound(err) {
-		return p.CreatePassword(user, newPassword)
+		err = p.CreatePassword(user, newPassword)
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		// The secret was created after the cache was read. Get it from the API.
+		secret, err = p.secretClient.Get(LocalUserPasswordsNamespace, user.Name, metav1.GetOptions{})
 	}
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
@@ -181,14 +186,15 @@ func (p *Pbkdf2) updatePassword(secret *corev1.Secret, newPassword string, owner
 	}
 
 	if owner != nil {
+		want := ownerReference(owner)
 		ownedByUser := func(ref metav1.OwnerReference) bool {
-			return ref.Kind == "User" && ref.Name == owner.Name
+			return ref.APIVersion == want.APIVersion && ref.Kind == want.Kind && ref.Name == want.Name && ref.UID == want.UID
 		}
 		if !slices.ContainsFunc(secret.OwnerReferences, ownedByUser) {
 			ops = append(ops, patchOp{
 				Op:    "add",
 				Path:  "/metadata/ownerReferences",
-				Value: slices.Concat(secret.OwnerReferences, []metav1.OwnerReference{ownerReference(owner)}),
+				Value: slices.Concat(secret.OwnerReferences, []metav1.OwnerReference{want}),
 			})
 		}
 	}

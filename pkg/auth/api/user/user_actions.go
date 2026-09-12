@@ -17,6 +17,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -166,6 +167,9 @@ func (h *Handler) setPassword(request *types.APIContext) error {
 		return errors.New("failed to get userId")
 	}
 	user, err := h.UserClient.Get(userId, v1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("user %s not found", userId))
+	}
 	if err != nil {
 		return fmt.Errorf("failed to get user %s: %w", userId, err)
 	}

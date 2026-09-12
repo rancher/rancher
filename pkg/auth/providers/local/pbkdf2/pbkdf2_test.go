@@ -1017,9 +1017,74 @@ func TestSetPassword(t *testing.T) {
 		secret             *v1.Secret
 		secretErr          error
 		expectCreate       *v1.Secret
+		createErr          error
+		liveSecret         *v1.Secret
+		liveErr            error
 		expectPatch        []patchOp
 		expectErrorMessage string
 	}{
+		"the secret is updated when creating it finds it already exists": {
+			secretErr: apierrors.NewNotFound(v1.Resource("secrets"), fakeUserID),
+			expectCreate: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fakeUserID,
+					Namespace: LocalUserPasswordsNamespace,
+					Annotations: map[string]string{
+						passwordHashAnnotation: pbkdf2sha3512Hash,
+					},
+					OwnerReferences: []metav1.OwnerReference{ownerRef},
+				},
+				Data: pbkdf2Data,
+			},
+			createErr: apierrors.NewAlreadyExists(v1.Resource("secrets"), fakeUserID),
+			liveSecret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            fakeUserID,
+					Namespace:       LocalUserPasswordsNamespace,
+					Annotations:     map[string]string{passwordHashAnnotation: pbkdf2sha3512Hash},
+					OwnerReferences: []metav1.OwnerReference{ownerRef},
+				},
+				Data: map[string][]byte{"password": []byte("old"), "salt": []byte("old")},
+			},
+			expectPatch: []patchOp{replaceData(pbkdf2Data)},
+		},
+		"error when the secret can't be fetched after creating it finds it already exists": {
+			secretErr: apierrors.NewNotFound(v1.Resource("secrets"), fakeUserID),
+			expectCreate: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fakeUserID,
+					Namespace: LocalUserPasswordsNamespace,
+					Annotations: map[string]string{
+						passwordHashAnnotation: pbkdf2sha3512Hash,
+					},
+					OwnerReferences: []metav1.OwnerReference{ownerRef},
+				},
+				Data: pbkdf2Data,
+			},
+			createErr:          apierrors.NewAlreadyExists(v1.Resource("secrets"), fakeUserID),
+			liveErr:            errors.New("unexpected error"),
+			expectErrorMessage: "failed to get password secret: unexpected error",
+		},
+		"an owner reference to a user with a different uid does not count": {
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        fakeUserID,
+					Namespace:   LocalUserPasswordsNamespace,
+					Annotations: map[string]string{passwordHashAnnotation: pbkdf2sha3512Hash},
+					OwnerReferences: []metav1.OwnerReference{
+						{Name: fakeUserID, UID: "stale-uid", APIVersion: "management.cattle.io/v3", Kind: "User"},
+					},
+				},
+				Data: map[string][]byte{"password": []byte("old"), "salt": []byte("old")},
+			},
+			expectPatch: []patchOp{
+				replaceData(pbkdf2Data),
+				{Op: "add", Path: "/metadata/ownerReferences", Value: []metav1.OwnerReference{
+					{Name: fakeUserID, UID: "stale-uid", APIVersion: "management.cattle.io/v3", Kind: "User"},
+					ownerRef,
+				}},
+			},
+		},
 		"the secret is created when it does not exist": {
 			secretErr: apierrors.NewNotFound(v1.Resource("secrets"), fakeUserID),
 			expectCreate: &v1.Secret{
@@ -1116,7 +1181,10 @@ func TestSetPassword(t *testing.T) {
 			secretCache.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(test.secret, test.secretErr)
 			secretClient := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
 			if test.expectCreate != nil {
-				secretClient.EXPECT().Create(test.expectCreate).Return(nil, nil)
+				secretClient.EXPECT().Create(test.expectCreate).Return(nil, test.createErr)
+			}
+			if test.liveSecret != nil || test.liveErr != nil {
+				secretClient.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID, metav1.GetOptions{}).Return(test.liveSecret, test.liveErr)
 			}
 			if test.expectPatch != nil {
 				patch, err := json.Marshal(test.expectPatch)

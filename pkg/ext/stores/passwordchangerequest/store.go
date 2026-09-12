@@ -143,6 +143,12 @@ func (s *Store) Create(
 		return nil, apierrors.NewInternalError(fmt.Errorf("can't get user %s: %w", req.Spec.UserID, err))
 	}
 
+	// Local login resolves the user by username, so a password is only usable
+	// on a user that has one.
+	if user.Username == "" {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("user %s has no username and cannot log in locally", req.Spec.UserID))
+	}
+
 	// Password must not be the same as the username.
 	if req.Spec.NewPassword == user.Username {
 		return nil, apierrors.NewBadRequest("password cannot be the same as the username")

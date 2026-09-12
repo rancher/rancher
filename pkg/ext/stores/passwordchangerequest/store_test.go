@@ -210,6 +210,29 @@ func TestCreate(t *testing.T) {
 			wantErr:    "password cannot be the same as the username",
 		},
 		{
+			desc: "password is not set for a non-local user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:      userID,
+					NewPassword: newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			pwdUpdater: pwdUpdater,
+			userCache: func() mgmtv3.UserCache {
+				cache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+				cache.EXPECT().Get(gomock.Any()).Return(&v3.User{
+					ObjectMeta:   metav1.ObjectMeta{Name: userID},
+					PrincipalIDs: []string{"okta_user://someone"},
+				}, nil)
+				return cache
+			},
+			wantErr: fmt.Sprintf("user %s has no username and cannot log in locally", userID),
+		},
+		{
 			desc: "user not found",
 			obj: &ext.PasswordChangeRequest{
 				Spec: ext.PasswordChangeRequestSpec{

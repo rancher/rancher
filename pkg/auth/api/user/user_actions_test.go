@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -15,7 +16,9 @@ import (
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestValidatePassword(t *testing.T) {
@@ -346,11 +349,19 @@ func TestSetPassword(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		pwdUpdater *fakePasswordUpdater
-		userGetErr error
-		wantErr    string
+		name         string
+		pwdUpdater   *fakePasswordUpdater
+		userGetErr   error
+		wantErr      string
+		wantNotFound bool
 	}{
+		{
+			name:         "user not found",
+			pwdUpdater:   &fakePasswordUpdater{},
+			userGetErr:   apierrors.NewNotFound(schema.GroupResource{Resource: "users"}, userID),
+			wantErr:      "not found",
+			wantNotFound: true,
+		},
 		{
 			name:       "password is set",
 			pwdUpdater: &fakePasswordUpdater{},
@@ -403,6 +414,7 @@ func TestSetPassword(t *testing.T) {
 
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
+				assert.Equal(t, tt.wantNotFound, httperror.IsNotFound(err))
 				return
 			}
 			require.NoError(t, err)
