@@ -79,3 +79,54 @@ tests:
     - equal:
         path: spec.ports[0].targetPort
         value: 444
+- it: should set nodePort on both ports when service.type is NodePort
+  set:
+    service.type: NodePort
+    service.nodePort: 30080
+    service.nodePortHttps: 30080
+  documentIndex: 0
+  asserts:
+    - equal:
+        path: spec.ports[0].nodePort
+        value: 30080
+    - equal:
+        path: spec.ports[1].nodePort
+        value: 30080
+- it: should set separate nodePortHttps when provided
+  set:
+    service.type: NodePort
+    service.nodePort: 30080
+    service.nodePortHttps: 30443
+  documentIndex: 0
+  asserts:
+    - equal:
+        path: spec.ports[0].nodePort
+        value: 30080
+    - equal:
+        path: spec.ports[1].nodePort
+        value: 30443
+- it: should not set nodePort when service.type is not NodePort
+  set:
+    service.type: ClusterIP
+    service.nodePort: 30080
+  documentIndex: 0
+  asserts:
+    - isNull:
+        path: spec.ports[0].nodePort
+    - isNull:
+        path: spec.ports[1].nodePort
+- it: should set nodePort on HTTPS only when HTTP is disabled
+  set:
+    service.type: NodePort
+    service.nodePort: 30443
+    service.nodePortHttps: 30443
+    service.disableHTTP: true
+    ingress.servicePort: 443
+  documentIndex: 0
+  asserts:
+    - equal:
+        path: spec.ports[0].name
+        value: https
+    - equal:
+        path: spec.ports[0].nodePort
+        value: 30443
