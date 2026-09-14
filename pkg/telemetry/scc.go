@@ -46,6 +46,11 @@ type SccSystem struct {
 	Upstream bool   `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself"`
 }
 
+type clusterMapKey struct {
+	NodesCount                  int
+	NVIDIARegistrySecretPresent bool
+}
+
 // JSONSchemaExtend allows SccSystem to accept additional properties
 func (SccSystem) JSONSchemaExtend(schema *jsonschema.Schema) {
 	schema.AdditionalProperties = jsonschema.TrueSchema
@@ -58,13 +63,11 @@ type sccSystemKey struct {
 	Upstream bool `json:"upstream,omitempty"`
 }
 
-// SccCluster ...
-// [2] Should this new flag be part of the SccCluster interface?
 type SccCluster struct {
-	Count    int  `json:"count" jsonschema:"minimum=1,description=De-duplication of identical clusters"`
-	Nodes    int  `json:"nodes" jsonschema:"minimum=0"`
-	Upstream bool `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself,default=false"`
-	// NVIDIARegistrySecretPresent bool `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=TODO,default=false"`
+	Count                       int  `json:"count" jsonschema:"minimum=1,description=De-duplication of identical clusters"`
+	Nodes                       int  `json:"nodes" jsonschema:"minimum=0"`
+	Upstream                    bool `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself,default=false"`
+	NVIDIARegistrySecretPresent bool `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=FIXME,default=false"`
 }
 
 // JSONSchemaExtend allows SccCluster to accept additional properties
@@ -84,17 +87,19 @@ func bytesToMiBRounded(bytes int) int {
 	return (bytes + MiB - 1) / MiB
 }
 
-type nodeCount int
-
 func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	now := time.Now()
 	systemsMap := map[sccSystemKey]int{}
-	clustersMap := map[nodeCount]int{}
+	clustersMap := map[clusterMapKey]int{}
 	var systems []SccSystem
 	var clusters []SccCluster
 
-	// We have to check for the secret presence within each cluster...
 	localCluster := telG.LocalClusterTelemetry()
+	isNVIDIARegistryPresent, err := localCluster.AifNVIDIARegistrySecretPresent()
+	// FIXME: Should we return an error here or not?
+	if err != nil {
+		return nil, err
+	}
 	localNodeCount := 0
 	for _, localNode := range localCluster.PerNodeTelemetry() {
 		localNodeCount++
@@ -112,13 +117,11 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		systemsMap[k]++
 	}
 
-	// [3] Add NVIDIA flag to payload:
-	// "nvidia_registry_secret_present": bool
 	clusters = append(clusters, SccCluster{
-		Nodes:    localNodeCount,
-		Upstream: true,
-		Count:    1,
-		// NVIDIARegistrySecretPresent: TODO,
+		Nodes:                       localNodeCount,
+		Upstream:                    true,
+		Count:                       1,
+		NVIDIARegistrySecretPresent: isNVIDIARegistryPresent,
 	})
 
 	for _, cluster := range telG.PerManagedClusterTelemetry() {
@@ -138,10 +141,19 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 			nCount++
 		}
 
-		if _, ok := clustersMap[nodeCount(nCount)]; !ok {
-			clustersMap[nodeCount(nCount)] = 0
+		isNVIDIARegistryPresent, err := cluster.AifNVIDIARegistrySecretPresent()
+		// FIXME: Should we return a error here?
+		if err != nil {
+			return nil, err
 		}
-		clustersMap[nodeCount(nCount)]++
+		clusterKey := clusterMapKey{
+			NodesCount:                  nCount,
+			NVIDIARegistrySecretPresent: isNVIDIARegistryPresent,
+		}
+		if _, ok := clustersMap[clusterKey]; !ok {
+			clustersMap[clusterKey] = 0
+		}
+		clustersMap[clusterKey]++
 
 	}
 	for system, count := range systemsMap {
@@ -156,9 +168,10 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 
 	for cl, count := range clustersMap {
 		clusters = append(clusters, SccCluster{
-			Nodes:    int(cl),
-			Upstream: false,
-			Count:    count,
+			Nodes:                       cl.NodesCount,
+			Upstream:                    false,
+			Count:                       count,
+			NVIDIARegistrySecretPresent: cl.NVIDIARegistrySecretPresent,
 		})
 	}
 

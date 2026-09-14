@@ -63,6 +63,7 @@ type RancherManagerTelemetry interface {
 type ClusterTelemetry interface {
 	ComputeTelmetry
 	PerNodeTelemetry() iter.Seq2[NodeID, NodeTelemetry]
+	AifNVIDIARegistrySecretPresent() (bool, error)
 }
 
 type NodeTelemetry interface {
@@ -78,13 +79,9 @@ type SystemTelemetry interface {
 	CpuArchitecture() string
 }
 
-// ComputeTelmetry ...
-// [2] Should this new flag be computed within ComputeTelmetry interface?
 type ComputeTelmetry interface {
 	CpuCores() (int, error)
 	MemoryCapacityBytes() (int, error)
-	// Something like:
-	// GPUCapability() (bool, error)
 }
 
 type nodeTelemetryImpl struct {
@@ -225,10 +222,11 @@ type clusterTelemetryImpl struct {
 
 var _ ClusterTelemetry = (*clusterTelemetryImpl)(nil)
 
-// [2] Should this new flag be computed within ComputeTelmetry interface?
-// func (n *clusterTelemetryImpl) GPUCapability() (bool, error) {
-// 	TODO: Check if secret is present...
-// }
+func (c *clusterTelemetryImpl) AifNVIDIARegistrySecretPresent() (bool, error) {
+	// TODO: Check if secret is present...
+	// FIXME: Should this function return an error or not?
+	return true, nil
+}
 
 func (c *clusterTelemetryImpl) CpuCores() (int, error) {
 	cpuQ := c.Status.Capacity.Cpu()
