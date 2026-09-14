@@ -81,15 +81,14 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 
 // stopRecord stops r and removes it from the manager, but only if it is still the active record for
 // its cluster. Callbacks held by a record can outlive it, and tearing down whichever record happens
-// to be current would stop controllers that are working fine.
+// to be current would stop controllers that are working fine. The check and the removal have to be
+// atomic, otherwise a replacement installed in between would be the one deleted.
 func (m *Manager) stopRecord(r *record) {
-	obj, ok := m.controllers.Load(r.clusterRec.UID)
-	if !ok || obj.(*record) != r {
+	if !m.controllers.CompareAndDelete(r.clusterRec.UID, r) {
 		return
 	}
 	logrus.Infof("Stopping cluster agent for %s", r.cluster.ClusterName)
 	r.cancel()
-	m.controllers.Delete(r.clusterRec.UID)
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {

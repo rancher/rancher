@@ -302,7 +302,7 @@ func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() 
 			err := wait.ExponentialBackoffWithContext(ctx, backoff, func(context.Context) (bool, error) {
 				attempts++
 				if lastErr = f(); lastErr != nil {
-					logrus.Warnf("deferred controller start failed for cluster %s, retrying: %v", w.ClusterName, lastErr)
+					logrus.Warnf("deferred controller start attempt failed for cluster %s: %v", w.ClusterName, lastErr)
 					return false, nil
 				}
 				return true, nil
