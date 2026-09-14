@@ -776,6 +776,10 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 		return status, nil
 	}
 
+	if err = s.adapter.PauseCluster(true); err != nil {
+		return status, err
+	}
+
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to restore cluster config", s.op.Namespace, s.op.Name)
 
 	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig)
@@ -1481,6 +1485,10 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		value = value + "/initial"
 	} else {
 		value = value + "/final"
+	}
+
+	if err = s.adapter.PauseCluster(false); err != nil {
+		return status, err
 	}
 
 	initSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)

@@ -52,8 +52,10 @@ mc mb --insecure myminio/%s
 sleep infinity
 `
 
-// createTLSSecret creates a TLS Secret with a self signed cert + key for the given service FQDN + IP.
-func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQDN, serviceIP string) (*corev1.Secret, error) {
+// createTLSSecret creates a TLS Secret with a self signed cert + key for the given service FQDN + IP,
+// plus any extra IPs callers need in the SANs (see getObjectStore's external mode, where clients reach
+// the store by node IP rather than through the Service).
+func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQDN, serviceIP string, extraIPs []net.IP) (*corev1.Secret, error) {
 	objectStoreTLSSecretName := objectStore + "-tls"
 	secret, err := clients.Core.Secret().Get(namespace, objectStoreTLSSecretName, metav1.GetOptions{})
 	if err == nil {
@@ -62,7 +64,7 @@ func createTLSSecret(clients *clients.Clients, namespace, objectStore, serviceFQ
 		return nil, err
 	}
 
-	cert, key, err := utils.GenerateSelfSignedCertKey(serviceFQDN, []net.IP{net.ParseIP(serviceIP)}, nil)
+	cert, key, err := utils.GenerateSelfSignedCertKey(serviceFQDN, append([]net.IP{net.ParseIP(serviceIP)}, extraIPs...), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -179,13 +181,16 @@ func createHelperConfigmap(clients *clients.Clients, namespace, objectStore, buc
 	return cm, err
 }
 
-func createService(clients *clients.Clients, namespace, objectStore string) (*corev1.Service, error) {
+// createService exposes the object store. serviceType is NodePort when the store has to be reachable
+// from outside the local cluster's network, and ClusterIP otherwise.
+func createService(clients *clients.Clients, namespace, objectStore string, serviceType corev1.ServiceType) (*corev1.Service, error) {
 	svc, err := clients.Core.Service().Create(&corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      objectStore,
 			Namespace: namespace,
 		},
 		Spec: corev1.ServiceSpec{
+			Type: serviceType,
 			Ports: []corev1.ServicePort{{
 				Name:        "http",
 				Protocol:    corev1.ProtocolTCP,
@@ -211,11 +216,15 @@ func createService(clients *clients.Clients, namespace, objectStore string) (*co
 
 	err = wait.Object(clients.Ctx, clients.Core.Service().Watch, svc, func(obj runtime.Object) (bool, error) {
 		latestSvc := obj.(*corev1.Service)
-		if latestSvc.Spec.ClusterIP != "" {
-			svc = latestSvc
-			return true, nil
+		if latestSvc.Spec.ClusterIP == "" {
+			return false, nil
 		}
-		return false, nil
+		// A NodePort service is only usable once the port has actually been allocated.
+		if serviceType == corev1.ServiceTypeNodePort && latestSvc.Spec.Ports[0].NodePort == 0 {
+			return false, nil
+		}
+		svc = latestSvc
+		return true, nil
 	})
 	if err != nil {
 		return nil, err
@@ -353,6 +362,47 @@ type Info struct {
 }
 
 func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket string) (Info, error) {
+	return getObjectStore(clients, namespace, identifier, bucket, false)
+}
+
+// GetExternalObjectStore is GetObjectStore for machines that are not pods in the local cluster and so
+// cannot reach a ClusterIP — CAPD machines, for instance, are Docker containers on the same bridge
+// network as the local cluster's nodes but outside its pod network. The store is exposed on a
+// NodePort and the returned Endpoint addresses a node directly; every node IP is added to the
+// certificate's SANs so the returned Cert still verifies.
+//
+// Callers must not share an identifier with GetObjectStore: the two modes differ in Service type and
+// certificate, and the per-identifier objects are created once and then reused.
+func GetExternalObjectStore(clients *clients.Clients, namespace, identifier, bucket string) (Info, error) {
+	return getObjectStore(clients, namespace, identifier, bucket, true)
+}
+
+// nodeIPs returns the InternalIP of every node in the local cluster, which is what an external client
+// dials a NodePort on.
+func nodeIPs(clients *clients.Clients) ([]net.IP, error) {
+	nodes, err := clients.Core.Node().List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var ips []net.IP
+	for _, node := range nodes.Items {
+		for _, addr := range node.Status.Addresses {
+			if addr.Type != corev1.NodeInternalIP {
+				continue
+			}
+			if ip := net.ParseIP(addr.Address); ip != nil {
+				ips = append(ips, ip)
+			}
+		}
+	}
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("no node in the local cluster reports an InternalIP")
+	}
+	return ips, nil
+}
+
+func getObjectStore(clients *clients.Clients, namespace, identifier, bucket string, external bool) (Info, error) {
 	objectStoreLock.Lock()
 	defer objectStoreLock.Unlock()
 	hid := name.Hex(identifier, 5)
@@ -374,14 +424,28 @@ func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 		return Info{}, err
 	}
 
-	svc, err := createService(clients, namespace, objectStore)
+	serviceType := corev1.ServiceTypeClusterIP
+	var extraIPs []net.IP
+	if external {
+		serviceType = corev1.ServiceTypeNodePort
+		if extraIPs, err = nodeIPs(clients); err != nil {
+			return Info{}, err
+		}
+	}
+
+	svc, err := createService(clients, namespace, objectStore, serviceType)
 	if err != nil {
 		return Info{}, err
 	}
 
-	tls, err := createTLSSecret(clients, namespace, objectStore, fmt.Sprintf(objectStoreServiceNameTemplate, objectStore, namespace), svc.Spec.ClusterIP)
+	tls, err := createTLSSecret(clients, namespace, objectStore, fmt.Sprintf(objectStoreServiceNameTemplate, objectStore, namespace), svc.Spec.ClusterIP, extraIPs)
 	if err != nil {
 		return Info{}, err
+	}
+
+	endpoint := fmt.Sprintf("%s:9000", svc.Spec.ClusterIP)
+	if external {
+		endpoint = fmt.Sprintf("%s:%d", extraIPs[0], svc.Spec.Ports[0].NodePort)
 	}
 
 	pod, err := getPod(clients, namespace, objectStore)
@@ -401,7 +465,7 @@ func GetObjectStore(clients *clients.Clients, namespace, identifier, bucket stri
 		AccessKey:           string(cs.Data[secretKeyCredAccessKey]),
 		SecretKey:           string(cs.Data[secretKeyCredSecretKey]),
 		Bucket:              bucket,
-		Endpoint:            fmt.Sprintf("%s:9000", svc.Spec.ClusterIP),
+		Endpoint:            endpoint,
 		Cert:                base64.StdEncoding.EncodeToString(tls.Data[secretKeyTLSPublicCrt]),
 		CloudCredentialName: cc.Name,
 	}, nil
