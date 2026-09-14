@@ -388,8 +388,8 @@ func (l *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBindin
 	}
 	globalRoleBinding.Annotations[crbNameAnnotation] = crbName
 
-	grLabels := map[string]string{grbOwnerLabel: globalRoleBinding.Name}
-	maps.Copy(grLabels, globalRoleBindingLabel)
+	grbLabels := map[string]string{grbOwnerLabel: globalRoleBinding.Name}
+	maps.Copy(grbLabels, globalRoleBindingLabel)
 
 	desiredCRB := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -402,7 +402,7 @@ func (l *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBindin
 					UID:        globalRoleBinding.UID,
 				},
 			},
-			Labels: grLabels,
+			Labels: grbLabels,
 		},
 		Subjects: []rbacv1.Subject{rbac.GetGRBSubject(globalRoleBinding)},
 		RoleRef: rbacv1.RoleRef{
@@ -412,7 +412,9 @@ func (l *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBindin
 		},
 	}
 
-	clusterRoleBindings, err := l.crbLister.List(labels.SelectorFromSet(map[string]string{grbOwnerLabel: globalRoleBinding.Name}))
+	clusterRoleBindings, err := l.crbClient.List(metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(grbLabels).String(),
+	})
 	if err != nil {
 		err = fmt.Errorf("couldn't list ClusterRoleBindings for globalRoleBinding %v: %w", globalRoleBinding.Name, err)
 		l.status.AddCondition(localConditions, condition, failedToUpdateClusterRoleBinding, err)
@@ -420,7 +422,7 @@ func (l *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBindin
 	}
 
 	// Delete any ClusterRoleBindings that were created for this GlobalRoleBinding but have the wrong name.
-	for _, clusterRoleBinding := range clusterRoleBindings {
+	for _, clusterRoleBinding := range clusterRoleBindings.Items {
 		if clusterRoleBinding.Name != crbName {
 			if err := rbac.DeleteResource(clusterRoleBinding.Name, l.crbClient); err != nil {
 				err = fmt.Errorf("couldn't delete ClusterRoleBinding %v for globalRoleBinding %v: %w", clusterRoleBinding.Name, globalRoleBinding.Name, err)

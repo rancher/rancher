@@ -95,7 +95,7 @@ func ensureNamespaceWithRetry(ctx context.Context, namespaceClient corecontrolle
 	})
 }
 
-// middleware adds security headers, and returns not found if there aren't any OIDCClients
+// middleware adds security and CORS headers.
 func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -103,16 +103,12 @@ func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+
 		oidcClients, err := p.authHandler.oidcClientCache.List(labels.Everything())
 		if err != nil {
 			oidcerror.WriteError(oidcerror.ServerError, "failed to list OIDCCLients", http.StatusInternalServerError, w)
 			return
 		}
-		if len(oidcClients) == 0 {
-			oidcerror.WriteError(oidcerror.ServerError, "no OIDCClients configured", http.StatusInternalServerError, w)
-			return
-		}
-
 		for _, oidcClient := range oidcClients {
 			for _, redirectURI := range oidcClient.Spec.RedirectURIs {
 				url, err := url.Parse(redirectURI)

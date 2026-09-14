@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"testing"
@@ -22,9 +23,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	registry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
@@ -175,6 +179,7 @@ var (
 	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
 	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
 	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
+	admissionDenialMessage  = "ValidatingAdmissionPolicy 'block' denied request: blocked"
 
 	parseBoolError error
 	parseIntError  error
@@ -398,6 +403,171 @@ func TestStoreDeleteCollection(t *testing.T) {
 	})
 }
 
+func TestStoreDeleteCollectionKeepsItemStatusCode(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	secretClient := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretClient.EXPECT().List(TokenNamespace, gomock.Any()).
+		Return(&corev1.SecretList{
+			ListMeta: metav1.ListMeta{ResourceVersion: "1"},
+			Items:    []corev1.Secret{*properSecret.DeepCopy()},
+		}, nil)
+	denied := apierrors.NewInvalid(schema.GroupKind{Kind: "Secret"}, "bogus", nil)
+	denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+	secretClient.EXPECT().Delete(TokenNamespace, "bogus", gomock.Any()).Return(denied)
+	secretClient.EXPECT().Cache().Return(nil)
+	userClient := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+	userClient.EXPECT().Cache().Return(nil)
+	auth := NewMockauthHandler(ctrl)
+	auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&mockUser{name: properUser}, false, true, nil)
+
+	store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
+
+	obj, err := store.DeleteCollection(t.Context(), nil, &metav1.DeleteOptions{}, &metainternalversion.ListOptions{})
+	require.Error(t, err)
+	assert.Nil(t, obj)
+	assert.True(t, apierrors.IsInvalid(err), "admission denial must stay 422, got %v", err)
+	assert.Contains(t, err.Error(), admissionDenialMessage)
+	assert.NotContains(t, err.Error(), "secret")
+}
+
+type fakeUpdatedObjectInfo struct {
+	obj runtime.Object
+	err error
+}
+
+func (i *fakeUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
+	return nil
+}
+
+func (i *fakeUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
+	return i.obj, i.err
+}
+
+var _ rest.UpdatedObjectInfo = &fakeUpdatedObjectInfo{}
+
+func TestStoreUpdate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("forbidden secret keeps its status code", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, true, true, nil)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().Get(TokenNamespace, "bogus").
+			Return(nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("denied")))
+
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
+		obj, created, err := store.Update(context.TODO(), "bogus", &fakeUpdatedObjectInfo{}, nil, nil, false, &metav1.UpdateOptions{})
+
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, created)
+		assert.True(t, apierrors.IsForbidden(err), "backing 403 must stay 403, got %v", err)
+		assert.NotContains(t, err.Error(), "secret")
+	})
+
+	t.Run("status error from updated object keeps its status code", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, true, true, nil)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().Get(TokenNamespace, "bogus").Return(properSecret.DeepCopy(), nil)
+
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
+		objInfo := &fakeUpdatedObjectInfo{err: apierrors.NewBadRequest("malformed patch")}
+		obj, created, err := store.Update(context.TODO(), "bogus", objInfo, nil, nil, false, &metav1.UpdateOptions{})
+
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.False(t, created)
+		assert.True(t, apierrors.IsBadRequest(err), "patch 400 must stay 400, got %v", err)
+	})
+}
+
+func TestStoreValidationCallbackErrors(t *testing.T) {
+	t.Parallel()
+
+	wrappedForbidden := fmt.Errorf("admission: %w", apierrors.NewForbidden(GVR.GroupResource(), "bogus", errors.New("denied")))
+
+	newStore := func(t *testing.T, cachedSecret *corev1.Secret) *Store {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, true, true, nil).AnyTimes()
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		if cachedSecret != nil {
+			// Update reads through the cache, Delete bypasses it.
+			scache.EXPECT().Get(TokenNamespace, "bogus").Return(cachedSecret, nil).AnyTimes()
+			secrets.EXPECT().Get(TokenNamespace, "bogus", gomock.Any()).Return(cachedSecret, nil).AnyTimes()
+		}
+		return New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
+	}
+
+	t.Run("create keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, nil)
+		validation := func(ctx context.Context, obj runtime.Object) error { return wrappedForbidden }
+
+		_, err := store.Create(context.TODO(), properToken.DeepCopy(), validation, &metav1.CreateOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+
+	t.Run("create turns a plain error into a bad request", func(t *testing.T) {
+		store := newStore(t, nil)
+		validation := func(ctx context.Context, obj runtime.Object) error { return errors.New("nope") }
+
+		_, err := store.Create(context.TODO(), properToken.DeepCopy(), validation, &metav1.CreateOptions{})
+		assert.True(t, apierrors.IsBadRequest(err), "plain validation error must be 400, got %v", err)
+	})
+
+	t.Run("delete keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj runtime.Object) error { return wrappedForbidden }
+
+		_, _, err := store.Delete(context.TODO(), "bogus", validation, &metav1.DeleteOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+
+	t.Run("delete turns a plain error into a bad request", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj runtime.Object) error { return errors.New("nope") }
+
+		_, _, err := store.Delete(context.TODO(), "bogus", validation, &metav1.DeleteOptions{})
+		assert.True(t, apierrors.IsBadRequest(err), "plain validation error must be 400, got %v", err)
+	})
+
+	t.Run("update keeps a wrapped status code", func(t *testing.T) {
+		store := newStore(t, properSecret.DeepCopy())
+		validation := func(ctx context.Context, obj, old runtime.Object) error { return wrappedForbidden }
+
+		_, _, err := store.Update(context.TODO(), "bogus", &fakeUpdatedObjectInfo{obj: properToken.DeepCopy()}, nil, validation, false, &metav1.UpdateOptions{})
+		assert.True(t, apierrors.IsForbidden(err), "wrapped 403 must stay 403, got %v", err)
+		assert.IsType(t, &apierrors.StatusError{}, err, "status error must be returned unwrapped")
+	})
+}
+
 func TestStoreDelete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
@@ -419,8 +589,7 @@ func TestStoreDelete(t *testing.T) {
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
-		assert.Equal(t, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token bogus: %w",
-			errSomeError)), err)
+		assert.Equal(t, apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")), err)
 	})
 
 	t.Run("failed to get secret, not found", func(t *testing.T) {
@@ -1267,7 +1436,7 @@ func TestStoreCreate(t *testing.T) {
 		},
 		{
 			name: "failed to create secret - some error",
-			err:  apierrors.NewInternalError(fmt.Errorf("failed to store token: %w", errSomeError)),
+			err:  apierrors.NewInternalError(errors.New("error accessing backing object for token " + GeneratePrefix)),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -1315,8 +1484,57 @@ func TestStoreCreate(t *testing.T) {
 			},
 		},
 		{
+			name: "failed to create secret - admission denied",
+			err: func() error {
+				denied := apierrors.NewInvalid(GVK.GroupKind(), GeneratePrefix, nil)
+				denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+				denied.ErrStatus.Message += ": " + admissionDenialMessage
+				return denied
+			}(),
+			tok: &ext.Token{
+				Spec: ext.TokenSpec{
+					UserID: "world",
+				},
+			},
+			opts: &metav1.CreateOptions{},
+			storeSetup: func( // configure store backend clients
+				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				users *fake.MockNonNamespacedCacheInterface[*v3.User],
+				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
+				cluster *fake.MockNonNamespacedCacheInterface[*v3.Cluster],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&mockUser{name: "world"}, false, true, nil)
+				auth.EXPECT().SessionID(gomock.Any()).
+					Return("session-token", nil)
+				token.EXPECT().Get("session-token").Return(&v3.Token{
+					AuthProvider: "local",
+					UserPrincipal: v3.Principal{
+						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
+					}}, nil)
+				users.EXPECT().Get("world").
+					Return(&v3.User{
+						DisplayName: "worldwide",
+						Username:    "wide",
+						Enabled:     ptr.To(true),
+					}, nil)
+				hasher.EXPECT().MakeAndHashSecret().Return("", "", nil)
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				denied := apierrors.NewInvalid(schema.GroupKind{Kind: "Secret"}, "", nil)
+				denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+				secrets.EXPECT().Create(gomock.Any()).
+					Return(nil, denied)
+			},
+		},
+		{
 			name: "failed to create secret - already exists",
-			err:  helloAlreadyExistsError,
+			err:  apierrors.NewAlreadyExists(GVR.GroupResource(), GeneratePrefix),
 			tok: &ext.Token{
 				Spec: ext.TokenSpec{
 					UserID: "world",
@@ -2229,7 +2447,8 @@ func TestSystemStoreDelete(t *testing.T) {
 		token      string                // name of token to delete
 		opts       *metav1.DeleteOptions // delete options
 		err        error                 // expected op result, error
-		storeSetup func(                 // configure store backend clients
+		check      func(t *testing.T, err error)
+		storeSetup func( // configure store backend clients
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList])
 	}{
 		{
@@ -2248,7 +2467,7 @@ func TestSystemStoreDelete(t *testing.T) {
 			name:  "secret other error is fail",
 			token: "bogus",
 			opts:  &metav1.DeleteOptions{},
-			err:   apierrors.NewInternalError(fmt.Errorf("failed to delete token bogus: %w", errSomeError)),
+			err:   apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")),
 			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
 				secrets.EXPECT().
 					Delete(TokenNamespace, "bogus", gomock.Any()).
@@ -2264,6 +2483,50 @@ func TestSystemStoreDelete(t *testing.T) {
 				secrets.EXPECT().
 					Delete(TokenNamespace, "bogus", gomock.Any()).
 					Return(nil)
+			},
+		},
+		{
+			name:  "admission denial on secret keeps its status code",
+			token: "bogus",
+			opts:  &metav1.DeleteOptions{},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				denied := apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus",
+					errors.New("ValidatingAdmissionPolicy 'block' denied request: blocked"))
+				denied.ErrStatus.Reason = metav1.StatusReasonInvalid
+				denied.ErrStatus.Code = 422
+				denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: "ValidatingAdmissionPolicy 'block' denied request: blocked"}}
+				secrets.EXPECT().
+					Delete(TokenNamespace, "bogus", gomock.Any()).
+					Return(denied)
+			},
+			check: func(t *testing.T, err error) {
+				require.True(t, apierrors.IsInvalid(err), "expected 422, got %v", err)
+				status, ok := err.(apierrors.APIStatus)
+				require.True(t, ok)
+				details := status.Status().Details
+				require.NotNil(t, details)
+				assert.Equal(t, GVR.Group, details.Group)
+				assert.Equal(t, GVK.Kind, details.Kind)
+				assert.Equal(t, "bogus", details.Name)
+				require.Len(t, details.Causes, 1)
+				assert.Equal(t, "ValidatingAdmissionPolicy 'block' denied request: blocked", details.Causes[0].Message)
+				assert.Contains(t, err.Error(), "ValidatingAdmissionPolicy 'block' denied request: blocked")
+				assert.NotContains(t, err.Error(), "secret")
+				assert.NotContains(t, err.Error(), "unhandled error code")
+			},
+		},
+		{
+			name:  "conflict on secret keeps its status code",
+			token: "bogus",
+			opts:  &metav1.DeleteOptions{},
+			storeSetup: func(secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]) {
+				secrets.EXPECT().
+					Delete(TokenNamespace, "bogus", gomock.Any()).
+					Return(apierrors.NewConflict(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("uid mismatch")))
+			},
+			check: func(t *testing.T, err error) {
+				require.True(t, apierrors.IsConflict(err), "expected 409, got %v", err)
+				assert.NotContains(t, err.Error(), "secret")
 			},
 		},
 	}
@@ -2284,13 +2547,59 @@ func TestSystemStoreDelete(t *testing.T) {
 
 			// perform test and validate results
 			err := store.Delete(test.token, test.opts)
-			if test.err != nil {
+			switch {
+			case test.check != nil:
+				test.check(t, err)
+			case test.err != nil:
 				assert.Equal(t, test.err, err)
-			} else {
+			default:
 				assert.NoError(t, err)
 			}
 		})
 	}
+}
+
+func TestAPIStatusOrInternalError(t *testing.T) {
+	t.Parallel()
+
+	bad := apierrors.NewBadRequest("malformed")
+	assert.Same(t, bad, apiStatusOrInternalError(bad))
+
+	// A wrapped status error must come back unwrapped: the apiserver derives
+	// the HTTP code with a type switch and would treat the wrapper as a 500.
+	got := apiStatusOrInternalError(fmt.Errorf("validation: %w", bad))
+	assert.True(t, apierrors.IsBadRequest(got), "wrapped 400 must stay 400, got %v", got)
+	assert.IsType(t, &apierrors.StatusError{}, got)
+
+	// Any APIStatus implementation counts, not only *StatusError, since the
+	// apiserver matches on the interface.
+	custom := &customStatusError{code: 409}
+	assert.Same(t, custom, apiStatusOrInternalError(fmt.Errorf("wrapped: %w", custom)))
+
+	assert.True(t, apierrors.IsInternalError(apiStatusOrInternalError(errors.New("boom"))))
+}
+
+type customStatusError struct{ code int32 }
+
+func (e *customStatusError) Error() string { return "custom" }
+func (e *customStatusError) Status() metav1.Status {
+	return metav1.Status{Status: metav1.StatusFailure, Code: e.code, Reason: metav1.StatusReasonConflict}
+}
+
+func TestMapBackingErrorForbiddenCauseReachesMessage(t *testing.T) {
+	t.Parallel()
+
+	denied := apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("denied"))
+	denied.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: admissionDenialMessage}}
+
+	got := mapBackingError(denied, "bogus")
+	require.True(t, apierrors.IsForbidden(got))
+	assert.Contains(t, got.Error(), admissionDenialMessage)
+	assert.NotContains(t, got.Error(), "secret")
+	status, ok := got.(apierrors.APIStatus)
+	require.True(t, ok)
+	require.Len(t, status.Status().Details.Causes, 1)
+	assert.Equal(t, admissionDenialMessage, status.Status().Details.Causes[0].Message)
 }
 
 func TestSystemStoreAddLabel(t *testing.T) {
@@ -2692,7 +3001,32 @@ func TestSystemStoreUpdate(t *testing.T) {
 					Update(gomock.Any()).
 					Return(nil, errSomeError)
 			},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to save updated token: %w", errSomeError)),
+			err: apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")),
+		},
+		{
+			name:     "update conflict keeps its status code",
+			fullPerm: true,
+			opts:     &metav1.UpdateOptions{},
+			old:      &properToken,
+			token: func() *ext.Token {
+				changed := properToken.DeepCopy()
+				changed.Spec.TTL = 2000
+				return changed
+			}(),
+			storeSetup: func(
+				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
+				scache *fake.MockCacheInterface[*corev1.Secret],
+				timer *MocktimeHandler,
+				hasher *MockhashHandler,
+				auth *MockauthHandler) {
+
+				timer.EXPECT().Now().Return("this is a fake now")
+
+				secrets.EXPECT().
+					Update(gomock.Any()).
+					Return(nil, apierrors.NewConflict(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("stale")))
+			},
+			err: apierrors.NewConflict(GVR.GroupResource(), "bogus", errors.New(registry.OptimisticLockErrorMsg)),
 		},
 		{
 			name:     "read back broken data after update",
@@ -2836,9 +3170,20 @@ func TestSystemStoreGet(t *testing.T) {
 			},
 			tokname: "bogus",
 			opts:    &metav1.GetOptions{},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", "bogus",
-				errSomeError)),
-			tok: nil,
+			err:     apierrors.NewInternalError(errors.New("error accessing backing object for token bogus")),
+			tok:     nil,
+		},
+		{
+			name: "forbidden secret keeps its status code",
+			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
+				secrets.EXPECT().
+					Get(TokenNamespace, "bogus").
+					Return(nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "bogus", errors.New("denied")))
+			},
+			tokname: "bogus",
+			opts:    &metav1.GetOptions{},
+			err:     apierrors.NewForbidden(GVR.GroupResource(), "bogus", errors.New("backing store denied the request")),
+			tok:     nil,
 		},
 		{
 			name: "empty secret (not found)",

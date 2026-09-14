@@ -147,6 +147,11 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 		Type: ClusterRoleExists,
 	}
 
+	grLabels := map[string]string{
+		globalRoleLabel: "true",
+		grOwnerLabel:    globalRole.Name,
+	}
+
 	desiredClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,
@@ -158,16 +163,13 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 					UID:        globalRole.UID,
 				},
 			},
-			Labels: map[string]string{
-				globalRoleLabel: "true",
-				grOwnerLabel:    globalRole.Name,
-			},
+			Labels: grLabels,
 		},
 		Rules: globalRole.Rules,
 	}
 
 	clusterRoles, err := gr.crClient.List(metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", grOwnerLabel, globalRole.Name),
+		LabelSelector: labels.SelectorFromSet(grLabels).String(),
 	})
 	if err != nil {
 		err = fmt.Errorf("couldn't list ClusterRoles for globalRole %v: %w", globalRole.Name, err)

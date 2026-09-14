@@ -5,7 +5,7 @@ go 1.26.0
 toolchain go1.26.6
 
 require (
-	github.com/rancher/norman v0.9.7
+	github.com/rancher/norman v0.10.0
 	k8s.io/apimachinery v0.36.4
 )
 

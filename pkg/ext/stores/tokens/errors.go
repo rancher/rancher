@@ -1,4 +1,4 @@
-package kubeconfig
+package tokens
 
 import (
 	"errors"
@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	registry "k8s.io/apiserver/pkg/registry/generic/registry"
 )
 
@@ -23,33 +22,33 @@ func statusDetails(err error) *metav1.StatusDetails {
 	return status.Status().Details
 }
 
-// mapBackingError re-scopes an error from a backing object (ConfigMap or token)
-// to the Kubeconfig GroupResource, preserving the apierrors classification so
-// clients see 404/409/403/422 instead of an opaque 500. Every branch rebuilds
-// the error: a backing error passed through verbatim would leak the backing
-// resource's identity in its details and message. Unexpected errors are logged
-// at Error level; client-side errors (Invalid, BadRequest) at Warn level.
+// mapBackingError re-scopes an error from the backing Secret to the Token
+// GroupResource, preserving the apierrors classification so clients see
+// 404/409/403/422 instead of an opaque 500. Every branch rebuilds the error: a
+// backing error passed through verbatim would leak the backing resource's
+// identity in its details and message. Unexpected errors are logged at Error
+// level; client-side errors (Invalid, BadRequest) at Warn level.
 func mapBackingError(err error, resource string) error {
 	switch {
 	case err == nil:
 		return nil
 	case apierrors.IsNotFound(err):
-		return apierrors.NewNotFound(gvr.GroupResource(), resource)
+		return apierrors.NewNotFound(GVR.GroupResource(), resource)
 	case apierrors.IsConflict(err):
-		return apierrors.NewConflict(gvr.GroupResource(), resource,
+		return apierrors.NewConflict(GVR.GroupResource(), resource,
 			errors.New(registry.OptimisticLockErrorMsg))
 	case apierrors.IsAlreadyExists(err):
-		return apierrors.NewAlreadyExists(gvr.GroupResource(), resource)
+		return apierrors.NewAlreadyExists(GVR.GroupResource(), resource)
 	case apierrors.IsForbidden(err):
-		rebuilt := apierrors.NewForbidden(gvr.GroupResource(), resource, errors.New("backing store denied the request"))
+		rebuilt := apierrors.NewForbidden(GVR.GroupResource(), resource, errors.New("backing store denied the request"))
 		if details := statusDetails(err); details != nil && len(details.Causes) > 0 {
 			rebuilt.ErrStatus.Details.Causes = details.Causes
 			rebuilt.ErrStatus.Message += ": " + causeMessages(details.Causes)
 		}
 		return rebuilt
 	case apierrors.IsInvalid(err):
-		logrus.Warnf("kubeconfig: invalid backing object for kubeconfig %s: %v", resource, err)
-		rebuilt := apierrors.NewInvalid(schema.GroupKind{Group: gvr.Group, Kind: Kind}, resource, nil)
+		logrus.Warnf("tokens: invalid backing object for token %s: %v", resource, err)
+		rebuilt := apierrors.NewInvalid(GVK.GroupKind(), resource, nil)
 		if details := statusDetails(err); details != nil && len(details.Causes) > 0 {
 			// Causes are copied as-is: their messages are already rendered by
 			// the backing store, and an admission denial carries a cause with no
@@ -60,21 +59,21 @@ func mapBackingError(err error, resource string) error {
 		}
 		return rebuilt
 	case apierrors.IsBadRequest(err):
-		logrus.Warnf("kubeconfig: bad request on backing object for kubeconfig %s: %v", resource, err)
-		return apierrors.NewBadRequest(fmt.Sprintf("invalid request for kubeconfig %s", resource))
+		logrus.Warnf("tokens: bad request on backing object for token %s: %v", resource, err)
+		return apierrors.NewBadRequest(fmt.Sprintf("invalid request for token %s", resource))
 	case apierrors.IsTooManyRequests(err):
 		var retryAfter int32
 		if details := statusDetails(err); details != nil {
 			retryAfter = details.RetryAfterSeconds
 		}
-		logrus.Warnf("kubeconfig: backing store throttled for kubeconfig %s: %v", resource, err)
-		return apierrors.NewTooManyRequests(fmt.Sprintf("too many requests for kubeconfig %s", resource), int(retryAfter))
+		logrus.Warnf("tokens: backing store throttled for token %s: %v", resource, err)
+		return apierrors.NewTooManyRequests(fmt.Sprintf("too many requests for token %s", resource), int(retryAfter))
 	case apierrors.IsServiceUnavailable(err):
-		logrus.Warnf("kubeconfig: backing store unavailable for kubeconfig %s: %v", resource, err)
-		return apierrors.NewServiceUnavailable(fmt.Sprintf("backing store unavailable for kubeconfig %s", resource))
+		logrus.Warnf("tokens: backing store unavailable for token %s: %v", resource, err)
+		return apierrors.NewServiceUnavailable(fmt.Sprintf("backing store unavailable for token %s", resource))
 	default:
-		logrus.Errorf("kubeconfig: backing store error for kubeconfig %s: %v", resource, err)
-		return apierrors.NewInternalError(errors.New("error accessing backing object for kubeconfig " + resource))
+		logrus.Errorf("tokens: backing store error for token %s: %v", resource, err)
+		return apierrors.NewInternalError(errors.New("error accessing backing object for token " + resource))
 	}
 }
 
@@ -104,15 +103,12 @@ func apiStatusOrInternalError(err error) error {
 
 // validationError returns the status error carried by err, unwrapped, so an
 // admission decision keeps its code, and otherwise reports a plain validation
-// failure for the verb as a 400. The name is left out when not yet known.
-func validationError(err error, verb, name string) error {
+// failure for the verb as a 400.
+func validationError(err error, verb string) error {
 	if statusErr := asAPIStatus(err); statusErr != nil {
 		return statusErr
 	}
-	if name == "" {
-		return apierrors.NewBadRequest(fmt.Sprintf("%s validation failed for kubeconfig: %s", verb, err))
-	}
-	return apierrors.NewBadRequest(fmt.Sprintf("%s validation for kubeconfig %s failed: %s", verb, name, err))
+	return apierrors.NewBadRequest(fmt.Sprintf("error validating %s: %s", verb, err))
 }
 
 // causeMessages renders status causes for a message, prefixing each with its
