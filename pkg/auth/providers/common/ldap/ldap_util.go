@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -224,23 +225,27 @@ func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, provi
 
 func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *ConfigAttributes, lConn ldapv3.Client,
 	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
-	groupMap[groupPrincipal.ObjectMeta.Name] = true
-	principals := []v3.Principal{}
-
 	parts := strings.SplitN(groupPrincipal.ObjectMeta.Name, ":", 2)
 	if len(parts) != 2 {
 		return errors.Errorf("invalid id %v", groupPrincipal.ObjectMeta.Name)
 	}
-	groupValue := strings.TrimPrefix(parts[1], "//")
+	groupDN := strings.TrimPrefix(parts[1], "//")
 
-	groupDN := groupValue
 	if config.GroupIDAttribute != "" {
-		dn, err := ResolveIdentifierToDN(searchDomain, config.GroupIDAttribute, groupValue, config.GroupObjectClass, config.ObjectClass, lConn)
+		dn, err := ResolveIdentifierToDN(searchDomain, config.GroupObjectClass, config.GroupIDAttribute, groupDN, lConn)
 		if err != nil {
-			return fmt.Errorf("ldap: failed to resolve group identifier %q to DN: %w", groupValue, err)
+			return fmt.Errorf("ldap: failed to resolve group identifier %q to DN: %w", groupDN, err)
 		}
 		groupDN = dn
+		searchAttributes = append(slices.Clone(searchAttributes), config.GroupIDAttribute)
 	}
+
+	return gatherParentGroupsByDN(groupPrincipal.ObjectMeta.Name, groupDN, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
+}
+
+func gatherParentGroupsByDN(groupName, groupDN, searchDomain, groupScope string, config *ConfigAttributes, lConn ldapv3.Client,
+	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
+	groupMap[groupName] = true
 
 	filter := fmt.Sprintf(
 		"(&(%s=%s)(%s=%s))",
@@ -261,23 +266,27 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 		return err
 	}
 
-	for i := 0; i < len(resultGroups.Entries); i++ {
-		entry := resultGroups.Entries[i]
+	type parentGroup struct {
+		principal v3.Principal
+		dn        string
+	}
+	var parents []parentGroup
+	for _, entry := range resultGroups.Entries {
 		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, config.GroupIDAttribute)
 		if err != nil {
 			logrus.Errorf("Error translating group result: %v", err)
 			continue
 		}
-		principals = append(principals, *principal)
+		parents = append(parents, parentGroup{principal: *principal, dn: entry.DN})
 	}
 
-	for _, gp := range principals {
-		if _, ok := groupMap[gp.ObjectMeta.Name]; ok {
+	for _, parent := range parents {
+		if _, ok := groupMap[parent.principal.ObjectMeta.Name]; ok {
 			continue
 		}
 
-		*nestedGroupPrincipals = append(*nestedGroupPrincipals, gp)
-		err = GatherParentGroups(gp, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
+		*nestedGroupPrincipals = append(*nestedGroupPrincipals, parent.principal)
+		err = gatherParentGroupsByDN(parent.principal.ObjectMeta.Name, parent.dn, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
 		if err != nil {
 			return err
 		}
@@ -286,16 +295,22 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	return nil
 }
 
-func ResolveIdentifierToDN(searchBase, identifierAttribute, identifierValue, objectClass, objectClassAttr string, lConn ldapv3.Client) (string, error) {
+// NewIdentifierSearchRequest builds a whole-subtree search for the single entry of the given
+// object class whose identifier attribute equals identifierValue.
+func NewIdentifierSearchRequest(searchBase, objectClass, identifierAttribute, identifierValue string, attributes []string) *ldapv3.SearchRequest {
 	filter := fmt.Sprintf(
 		"(&(%s=%s)(%s=%s))",
-		objectClassAttr,
+		"objectClass",
 		SanitizeAttr(objectClass),
 		SanitizeAttr(identifierAttribute),
 		ldapv3.EscapeFilter(identifierValue),
 	)
+	return NewWholeSubtreeSearchRequest(searchBase, filter, attributes)
+}
 
-	search := NewWholeSubtreeSearchRequest(searchBase, filter, []string{"dn"})
+// ResolveIdentifierToDN returns the DN of the single entry whose identifier attribute equals identifierValue.
+func ResolveIdentifierToDN(searchBase, objectClass, identifierAttribute, identifierValue string, lConn ldapv3.Client) (string, error) {
+	search := NewIdentifierSearchRequest(searchBase, objectClass, identifierAttribute, identifierValue, []string{"dn"})
 	result, err := lConn.Search(search)
 	if err != nil {
 		return "", fmt.Errorf("ldap: error resolving identifier %s=%s: %w", identifierAttribute, identifierValue, err)

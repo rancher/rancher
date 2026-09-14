@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -352,10 +353,8 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	}
 
 	var searchRequest *ldapv3.SearchRequest
-	var identifierAttr string
 
 	if scope == p.userScope {
-		identifierAttr = config.UserLoginAttribute
 		filter := fmt.Sprintf(
 			"(&(%s=%s)(%s=%s))",
 			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
@@ -368,7 +367,6 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 			config.GetUserSearchAttributes(ObjectClass),
 		)
 	} else {
-		identifierAttr = config.GroupDNAttribute
 		filter := fmt.Sprintf(
 			"(&(%s=%s)(%s=%s))",
 			ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass),
@@ -396,7 +394,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 	entry := result.Entries[0]
 	return ldap.AttributesToPrincipal(
 		entry.Attributes,
-		entry.DN,
+		p.samlSearchExternalID(entry, scope, config),
 		scope,
 		p.providerName,
 		config.UserObjectClass,
@@ -404,7 +402,21 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		config.UserLoginAttribute,
 		config.GroupObjectClass,
 		config.GroupNameAttribute,
-		identifierAttr)
+		"")
+}
+
+// samlSearchExternalID returns the external ID SAML search providers (Shibboleth, Okta) use when no
+// identifier attribute is configured: the login attribute for users and the group DN attribute for groups,
+// falling back to the entry DN when the attribute is absent.
+func (p *ldapProvider) samlSearchExternalID(entry *ldapv3.Entry, scope string, config *v3.LdapConfig) string {
+	attribute := config.GroupDNAttribute
+	if scope == p.userScope {
+		attribute = config.UserLoginAttribute
+	}
+	if values := ldap.GetAttributeValuesByName(entry.Attributes, attribute); len(values) > 0 {
+		return values[0] // only support first
+	}
+	return entry.DN
 }
 
 func (p *ldapProvider) getPrincipalByAttribute(
@@ -426,39 +438,40 @@ func (p *ldapProvider) getPrincipalByAttribute(
 		return nil, err
 	}
 
-	var filter string
-	var searchBase string
-	var attrs []string
+	return p.searchPrincipalByAttribute(lConn, externalID, scope, identifierAttribute, config)
+}
 
+func (p *ldapProvider) searchPrincipalByAttribute(lConn ldapv3.Client, externalID, scope, identifierAttribute string, config *v3.LdapConfig) (*v3.Principal, error) {
+	var searchRequest *ldapv3.SearchRequest
 	if scope == p.userScope {
-		filter = fmt.Sprintf(
-			"(&(%s=%s)(%s=%s))",
-			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
-			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
+		searchRequest = ldap.NewIdentifierSearchRequest(
+			config.UserSearchBase,
+			config.UserObjectClass,
+			identifierAttribute,
+			externalID,
+			config.GetUserSearchAttributes(ObjectClass),
 		)
-		searchBase = config.UserSearchBase
-		attrs = config.GetUserSearchAttributes(ObjectClass)
 	} else {
-		filter = fmt.Sprintf(
-			"(&(%s=%s)(%s=%s))",
-			ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass),
-			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
-		)
-		searchBase = config.GroupSearchBase
+		searchBase := config.GroupSearchBase
 		if searchBase == "" {
 			searchBase = config.UserSearchBase
 		}
-		attrs = config.GetGroupSearchAttributes(ObjectClass)
+		searchRequest = ldap.NewIdentifierSearchRequest(
+			searchBase,
+			config.GroupObjectClass,
+			identifierAttribute,
+			externalID,
+			config.GetGroupSearchAttributes(ObjectClass),
+		)
 	}
 
-	searchRequest := ldap.NewWholeSubtreeSearchRequest(searchBase, filter, attrs)
 	result, err := lConn.Search(searchRequest)
 	if err != nil {
 		return nil, fmt.Errorf("ldap: error searching for %s=%s: %w", identifierAttribute, externalID, err)
 	}
 
 	if len(result.Entries) < 1 {
-		return nil, fmt.Errorf("ldap: no entry found for %s=%s", identifierAttribute, externalID)
+		return nil, &common.NonTransientError{Err: httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%s=%s not found", identifierAttribute, externalID))}
 	} else if len(result.Entries) > 1 {
 		return nil, fmt.Errorf("ldap: multiple entries found for %s=%s", identifierAttribute, externalID)
 	}

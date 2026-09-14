@@ -123,24 +123,19 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupMemberMappingAttribute")
 	}
 	if config.UserIDAttribute != "" && !ldap.IsValidAttr(config.UserIDAttribute) {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userIdentifierAttribute")
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userIDAttribute")
 	}
 	if config.GroupIDAttribute != "" && !ldap.IsValidAttr(config.GroupIDAttribute) {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupIdentifierAttribute")
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupIDAttribute")
 	}
 
 	storedLDAPConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
 	if err != nil {
 		return err
 	}
-	if storedLDAPConfig.Enabled {
-		if config.UserIDAttribute != storedLDAPConfig.UserIDAttribute {
-			return httperror.NewAPIError(httperror.InvalidBodyContent,
-				"userIDAttribute cannot be changed on an enabled provider")
-		}
-		if config.GroupIDAttribute != storedLDAPConfig.GroupIDAttribute {
-			return httperror.NewAPIError(httperror.InvalidBodyContent,
-				"groupIDAttribute cannot be changed on an enabled provider")
+	if storedLDAPConfig.Enabled && configApplyInput.Enabled {
+		if err := validateIDAttributesUnchanged(storedLDAPConfig, config); err != nil {
+			return err
 		}
 	}
 
@@ -221,6 +216,18 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// validateIDAttributesUnchanged rejects changes to the principal identifier attributes of an enabled provider.
+// Changing them would orphan every binding that references the old principal names.
+func validateIDAttributesUnchanged(stored, incoming *v3.LdapConfig) error {
+	if incoming.UserIDAttribute != stored.UserIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "userIDAttribute cannot be changed on an enabled provider")
+	}
+	if incoming.GroupIDAttribute != stored.GroupIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "groupIDAttribute cannot be changed on an enabled provider")
 	}
 	return nil
 }

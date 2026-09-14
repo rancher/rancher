@@ -122,14 +122,11 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 
 	var result *ldapv3.SearchResult
 	if config.UserIDAttribute != "" {
-		filter := fmt.Sprintf(
-			"(&(%s=%s)(%s=%s))",
-			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
-			ldap.SanitizeAttr(config.UserIDAttribute), ldapv3.EscapeFilter(externalID),
-		)
-		search := ldap.NewWholeSubtreeSearchRequest(
+		search := ldap.NewIdentifierSearchRequest(
 			config.UserSearchBase,
-			filter,
+			config.UserObjectClass,
+			config.UserIDAttribute,
+			externalID,
 			config.GetUserSearchAttributes(defaultUserAttributes...),
 		)
 		result, err = lConn.Search(search)
@@ -295,8 +292,9 @@ func (p *adProvider) getGroupPrincipalsFromSearch(
 	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
 
 	if err != nil {
-		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) && config.Enabled {
-			// If bind fails because service account password has changed, just return identities formed from groups in `memberOf`
+		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) && config.Enabled && config.GroupIDAttribute == "" {
+			// If bind fails because service account password has changed, just return identities formed from groups in `memberOf`.
+			// This is only possible when group principals are identified by DN.
 			groupList := []v3.Principal{}
 			for _, dn := range groupDN {
 				grp := v3.Principal{
@@ -454,31 +452,33 @@ func (p *adProvider) getPrincipalByAttribute(externalID, scope, identifierAttrib
 		return nil, fmt.Errorf("activedirectory: error binding service account: %w", err)
 	}
 
-	var filter string
-	var searchBase string
-	var attrs []string
+	return p.searchPrincipalByAttribute(lConn, externalID, scope, identifierAttribute, config)
+}
+
+func (p *adProvider) searchPrincipalByAttribute(lConn ldapv3.Client, externalID, scope, identifierAttribute string, config *v3.ActiveDirectoryConfig) (*v3.Principal, error) {
+	var search *ldapv3.SearchRequest
 	if strings.EqualFold(UserScope, scope) {
-		filter = fmt.Sprintf(
-			"(&(%s=%s)(%s=%s))",
-			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
-			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
+		search = ldap.NewIdentifierSearchRequest(
+			config.UserSearchBase,
+			config.UserObjectClass,
+			identifierAttribute,
+			externalID,
+			config.GetUserSearchAttributes(defaultUserAttributes...),
 		)
-		searchBase = config.UserSearchBase
-		attrs = config.GetUserSearchAttributes(defaultUserAttributes...)
 	} else {
-		filter = fmt.Sprintf(
-			"(&(%s=%s)(%s=%s))",
-			ObjectClass, ldap.SanitizeAttr(config.GroupObjectClass),
-			ldap.SanitizeAttr(identifierAttribute), ldapv3.EscapeFilter(externalID),
-		)
-		searchBase = config.UserSearchBase
+		searchBase := config.UserSearchBase
 		if config.GroupSearchBase != "" {
 			searchBase = config.GroupSearchBase
 		}
-		attrs = config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass)
+		search = ldap.NewIdentifierSearchRequest(
+			searchBase,
+			config.GroupObjectClass,
+			identifierAttribute,
+			externalID,
+			config.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass),
+		)
 	}
 
-	search := ldap.NewWholeSubtreeSearchRequest(searchBase, filter, attrs)
 	result, err := lConn.Search(search)
 	if err != nil {
 		return nil, fmt.Errorf("activedirectory: error searching for %s=%s: %w", identifierAttribute, externalID, err)

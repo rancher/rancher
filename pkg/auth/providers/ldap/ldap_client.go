@@ -149,11 +149,11 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 	userScope = p.userScope
 	groupScope = p.groupScope
 
-	userIdentifierAttr := config.UserIDAttribute
-	if p.samlSearchProvider() && userIdentifierAttr == "" {
-		userIdentifierAttr = config.UserLoginAttribute
+	userExternalID := entry.DN
+	if config.UserIDAttribute == "" && p.samlSearchProvider() {
+		userExternalID = p.samlSearchExternalID(entry, userScope, config)
 	}
-	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, userScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, userIdentifierAttr)
+	user, err := ldap.AttributesToPrincipal(entry.Attributes, userExternalID, userScope, p.providerName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, config.UserIDAttribute)
 	if err != nil {
 		return v3.Principal{}, groupPrincipals, err
 	}
@@ -486,22 +486,15 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 	for i := 0; i < len(results.Entries); i++ {
 		entry := results.Entries[i]
 
-		var identifierAttr string
-		if strings.EqualFold("user", entityType) {
-			identifierAttr = config.UserIDAttribute
-			if p.samlSearchProvider() && identifierAttr == "" {
-				identifierAttr = config.UserLoginAttribute
-			}
-		} else {
-			identifierAttr = config.GroupIDAttribute
-			if p.samlSearchProvider() && identifierAttr == "" {
-				identifierAttr = config.GroupDNAttribute
-			}
+		identifierAttr := p.identifierAttributeForScope(config, scope)
+		externalID := entry.DN
+		if identifierAttr == "" && p.samlSearchProvider() {
+			externalID = p.samlSearchExternalID(entry, scope, config)
 		}
 
 		principal, err := ldap.AttributesToPrincipal(
 			entry.Attributes,
-			entry.DN,
+			externalID,
 			scope,
 			p.providerName,
 			config.UserObjectClass,
@@ -549,14 +542,11 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 
 	var result *ldapv3.SearchResult
 	if config.UserIDAttribute != "" {
-		filter := fmt.Sprintf(
-			"(&(%s=%s)(%s=%s))",
-			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
-			ldap.SanitizeAttr(config.UserIDAttribute), ldapv3.EscapeFilter(externalID),
-		)
-		searchRequest := ldap.NewWholeSubtreeSearchRequest(
+		searchRequest := ldap.NewIdentifierSearchRequest(
 			config.UserSearchBase,
-			filter,
+			config.UserObjectClass,
+			config.UserIDAttribute,
+			externalID,
 			config.GetUserSearchAttributes(ObjectClass),
 		)
 		result, err = lConn.Search(searchRequest)
@@ -587,7 +577,7 @@ func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string)
 		return nil, fmt.Errorf("ldap: user search found more than one result")
 	}
 
-	userDN := result.Entries[0].DN //userDN is externalID
+	userDN := result.Entries[0].DN
 
 	searchOpRequest := ldap.NewBaseObjectSearchRequest(
 		userDN,
