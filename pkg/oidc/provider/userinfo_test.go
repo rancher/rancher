@@ -107,9 +107,10 @@ func TestUserInfoEndpoint(t *testing.T) {
 				mockParams.useAttributeLister.EXPECT().Get(fakeUserID).Return(&fakeUserAttributes, nil)
 			},
 			wantResponse: &UserInfoResponse{
-				Sub:      fakeUserID,
-				UserName: fakeUserName,
-				Groups:   []string{fakeGroupName},
+				Sub:               fakeUserID,
+				UserName:          fakeUserName,
+				PreferredUsername: fakeUserName,
+				Groups:            []string{fakeGroupName},
 			},
 		},
 		"success response without profile": {
