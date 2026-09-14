@@ -6,10 +6,13 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -76,10 +79,28 @@ func NewImported(clients *clients.Clients, c *v3.Cluster) (*v3.Cluster, error) {
 	return created, nil
 }
 
+// ImportedClusterOptions carries optional extras for the nodes NewImportedClusterPods creates.
+type ImportedClusterOptions struct {
+	// ServerConfig entries are added to the config.yaml drop-in of every server (etcd and/or
+	// control-plane) node, emitted in sorted key order so the rendered user data is deterministic.
+	// Agent nodes are deliberately left alone — server-only keys are not valid in an agent's config.
+	ServerConfig map[string]string
+	// ServerFiles are written verbatim on every server node before the distro is installed, keyed by
+	// absolute path. For anything a config key has to point at, e.g. an S3 endpoint CA bundle.
+	ServerFiles map[string]string
+}
+
 // NewImportedClusterPods creates systemd-node pods that independently bootstrap an RKE2/K3s cluster.
 // The first ETCD node is brought up as the init node, and subsequent nodes join via the
 // init node's IP at the supervisor port (9345 for RKE2, 6443 for K3s).
-func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion string, pools []ImportedNodePool, labels map[string]string, registryCACert []byte) ([]*corev1.Pod, error) {
+func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion string, pools []ImportedNodePool, labels map[string]string, registryCACert []byte, opts ...ImportedClusterOptions) ([]*corev1.Pod, error) {
+	var options ImportedClusterOptions
+	if len(opts) > 1 {
+		return nil, fmt.Errorf("at most one ImportedClusterOptions may be supplied, got %d", len(opts))
+	} else if len(opts) == 1 {
+		options = opts[0]
+	}
+
 	distro := capr.GetRuntime(k8sVersion)
 	supervisorPort := capr.GetRuntimeSupervisorPort(k8sVersion)
 
@@ -118,7 +139,7 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 
 	var pods []*corev1.Pod
 
-	initScript := importedNodeUserData(distro, k8sVersion, token, "imported-init-0", "", true, initSpec.cp, initSpec.etcd, initSpec.worker, initSpec.dataDir, registryCACert)
+	initScript := importedNodeUserData(distro, k8sVersion, token, "imported-init-0", "", true, initSpec.cp, initSpec.etcd, initSpec.worker, initSpec.dataDir, registryCACert, options)
 	initPod, err := systemdnode.New(clients, namespace, initScript, labels, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create init node: %w", err)
@@ -137,7 +158,7 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 
 	for i, spec := range joinSpecs {
 		nodeName := fmt.Sprintf("imported-node-%d", i+1)
-		script := importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL, false, spec.cp, spec.etcd, spec.worker, spec.dataDir, registryCACert)
+		script := importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL, false, spec.cp, spec.etcd, spec.worker, spec.dataDir, registryCACert, options)
 		pod, err := systemdnode.New(clients, namespace, script, labels, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create node %s: %w", nodeName, err)
@@ -825,7 +846,7 @@ func generateImportedToken() (string, error) {
 	return fmt.Sprintf("%x", b), nil
 }
 
-func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, dataDir string, registryCACert []byte) string {
+func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, dataDir string, registryCACert []byte, options ImportedClusterOptions) string {
 	isServer := etcd || cp
 	rancherDir := fmt.Sprintf("/etc/rancher/%s", distro)
 	configDir := rancherDir + "/config.yaml.d"
@@ -861,6 +882,17 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 		}
 	}
 
+	var extraFiles string
+	if isServer {
+		for _, key := range slices.Sorted(maps.Keys(options.ServerConfig)) {
+			configLines = append(configLines, fmt.Sprintf("%s: %s", key, options.ServerConfig[key]))
+		}
+		for _, path := range slices.Sorted(maps.Keys(options.ServerFiles)) {
+			extraFiles += fmt.Sprintf("mkdir -p %s\ncat > %s <<'EXTRAFILE'\n%s\nEXTRAFILE\n",
+				filepath.Dir(path), path, options.ServerFiles[path])
+		}
+	}
+
 	configContent := strings.Join(configLines, "\n")
 
 	var installCmd, serviceName string
@@ -891,8 +923,8 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 			rancherDir, registryHost, registryHost, caPath, caPath, string(registryCACert))
 	}
 
-	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s\nsystemctl enable %s\nsystemctl start %s\n",
-		configDir, configDir, configContent, registryBlock, installCmd, serviceName, serviceName)
+	return fmt.Sprintf("#!/usr/bin/env sh\nset -e\nmkdir -p %s\ncat > %s/50-test.yaml <<'EOF'\n%s\nEOF\n%s%s%s\nsystemctl enable %s\nsystemctl start %s\n",
+		configDir, configDir, configContent, extraFiles, registryBlock, installCmd, serviceName, serviceName)
 }
 
 func appendGlobalRegistrySelector(c *provisioningv1api.Cluster, host string) {

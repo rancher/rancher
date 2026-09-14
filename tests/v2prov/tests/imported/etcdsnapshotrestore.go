@@ -87,6 +87,48 @@ func waitForBackpopulatedSnapshot(t *testing.T, clients *clients.Clients, cluste
 	return picked
 }
 
+// waitForBackpopulatedS3Snapshot polls until the S3 copy of a snapshot has been back-populated for
+// the cluster, then returns the most recently created one.
+//
+// A cluster configured for S3 produces two ETCDSnapshotFiles per snapshot — the distro writes the
+// file locally and then uploads it — and only the S3 one carries its extra metadata durably, since
+// the metadata is stored in the bucket alongside the snapshot rather than next to the local file.
+//
+// Unlike a local snapshot, an S3 snapshot has no node identity stamped on it: snapshotbackpopulate
+// owns it by the cluster, because any etcd node can pull it back out of the bucket. So the selector
+// is the cluster label alone and the storage is checked on the object.
+func waitForBackpopulatedS3Snapshot(t *testing.T, clients *clients.Clients, clusterNamespace, clusterName string, createdAfter time.Time) *rkev1.ETCDSnapshot {
+	t.Helper()
+
+	var picked *rkev1.ETCDSnapshot
+	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, 10*time.Minute, true, func(_ context.Context) (bool, error) {
+		list, err := clients.RKE.ETCDSnapshot().List(clusterNamespace, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, clusterName),
+		})
+		if err != nil {
+			return false, err
+		}
+		for i := range list.Items {
+			s := &list.Items[i]
+			if s.SnapshotFile.S3 == nil || s.SnapshotFile.Name == "" {
+				continue
+			}
+			if s.SnapshotFile.CreatedAt == nil || !s.SnapshotFile.CreatedAt.Time.After(createdAfter) {
+				continue
+			}
+			if picked == nil || s.SnapshotFile.CreatedAt.After(picked.SnapshotFile.CreatedAt.Time) {
+				picked = s
+			}
+		}
+		return picked != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for a back-populated S3 ETCDSnapshot CR in %s: %v", clusterNamespace, err)
+	}
+	t.Logf("using S3 snapshot %s/%s (file=%s)", picked.Namespace, picked.Name, picked.SnapshotFile.Name)
+	return picked
+}
+
 // SnapshotRestoreOption mutates the ETCDSnapshotRestore object before it is submitted. Mirrors
 // SnapshotSaveOption — use it to attach lifecycle-hook labels or override the default TTL.
 type SnapshotRestoreOption func(*opv1alpha1.ETCDSnapshotRestore)

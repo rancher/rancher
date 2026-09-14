@@ -64,7 +64,10 @@ func setUpImportedCluster(t *testing.T, clients *clients.Clients, displayName st
 
 // setUpImportedClusterAtVersion is setUpImportedCluster with the distro version pinned, for tests
 // that need to bring a cluster up on one version and then move it to another.
-func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displayName string, pools []cluster.ImportedNodePool, k8sVersion string) *importedClusterFixture {
+//
+// opts, when supplied, is passed through to cluster.NewImportedClusterPods — used by the restore-mode
+// tests to point the cluster's etcd snapshots at an object store.
+func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displayName string, pools []cluster.ImportedNodePool, k8sVersion string, opts ...cluster.ImportedClusterOptions) *importedClusterFixture {
 	t.Helper()
 
 	ns, err := namespace.Random(clients)
@@ -77,7 +80,7 @@ func setUpImportedClusterAtVersion(t *testing.T, clients *clients.Clients, displ
 		t.Fatal(err)
 	}
 
-	pods, err := cluster.NewImportedClusterPods(clients, ns.Name, k8sVersion, pools, nil, registryCACert)
+	pods, err := cluster.NewImportedClusterPods(clients, ns.Name, k8sVersion, pools, nil, registryCACert, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
