@@ -101,13 +101,13 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 
 	var installImageOverride string
 	if h.registryOverride != "" {
+		installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
 		imageSettings, ok := values["image"].(map[string]interface{})
 		if !ok {
 			imageSettings = map[string]interface{}{}
+			values["image"] = imageSettings
 		}
 		imageSettings["repository"] = h.registryOverride + "/rancher/rancher-webhook"
-		values["image"] = imageSettings
-		installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
 	}
 
 	h.setPriorityClass(values)
@@ -217,6 +217,9 @@ func (h *handler) getChartValues(chartName string) map[string]interface{} {
 	return configMapValues
 }
 
+// relatedSettings and relatedFeatures are relatedresource.Resolver functions that match the signature
+// func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error). For cluster-scoped
+// resources like Settings and Features, the namespace and name parameters are unused; only obj matters.
 func relatedSettings(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
 	if s, ok := obj.(*v3.Setting); ok {
 		if _, ok := watchedSettings[s.Name]; ok {
