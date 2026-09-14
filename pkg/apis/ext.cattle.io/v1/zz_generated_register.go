@@ -30,6 +30,7 @@ import (
 )
 
 var (
+	CloudCredentialResourceName               = "cloudcredentials"
 	GroupMembershipRefreshRequestResourceName = "groupmembershiprefreshrequests"
 	KubeconfigResourceName                    = "kubeconfigs"
 	PasswordChangeRequestResourceName         = "passwordchangerequests"
@@ -59,6 +60,8 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&CloudCredential{},
+		&CloudCredentialList{},
 		&GroupMembershipRefreshRequest{},
 		&GroupMembershipRefreshRequestList{},
 		&Kubeconfig{},

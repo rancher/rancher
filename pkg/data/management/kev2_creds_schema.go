@@ -3,6 +3,7 @@ package management
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -61,6 +62,8 @@ func addKev2OperatorCredsSchemas(management *config.ManagementContext) error {
 
 func (csh *KEv2CredsSchemaHandler) createOrUpdateCredSchema(operatorName string, credFields map[string]v32.Field) error {
 	name := credentialConfigSchemaName(operatorName)
+	publicFields := derivePublicFields(credFields)
+	privateFields := derivePrivateFields(credFields)
 	credSchema, err := csh.schemaLister.Get("", name)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -69,6 +72,8 @@ func (csh *KEv2CredsSchemaHandler) createOrUpdateCredSchema(operatorName string,
 			credentialSchema := &v32.DynamicSchema{
 				Spec: v32.DynamicSchemaSpec{
 					ResourceFields: credFields,
+					PublicFields:   publicFields,
+					PrivateFields:  privateFields,
 				},
 			}
 			credentialSchema.Name = name
@@ -76,9 +81,16 @@ func (csh *KEv2CredsSchemaHandler) createOrUpdateCredSchema(operatorName string,
 			return err
 		}
 		return err
-	} else if !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) {
+	}
+
+	needsUpdate := !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) ||
+		!reflect.DeepEqual(credSchema.Spec.PublicFields, publicFields) ||
+		!reflect.DeepEqual(credSchema.Spec.PrivateFields, privateFields)
+	if needsUpdate {
 		toUpdate := credSchema.DeepCopy()
 		toUpdate.Spec.ResourceFields = credFields
+		toUpdate.Spec.PublicFields = publicFields
+		toUpdate.Spec.PrivateFields = privateFields
 		_, err := csh.schemaClient.Update(toUpdate)
 		if err != nil {
 			return err
@@ -86,6 +98,34 @@ func (csh *KEv2CredsSchemaHandler) createOrUpdateCredSchema(operatorName string,
 	}
 
 	return nil
+}
+
+// derivePublicFields returns a sorted list of field names whose type is not
+// "password". This provides a default PublicFields list for credential schemas
+// that don't have explicit public/private annotations.
+func derivePublicFields(credFields map[string]v32.Field) []string {
+	var publicFields []string
+	for name, field := range credFields {
+		if field.Type != "password" {
+			publicFields = append(publicFields, name)
+		}
+	}
+	sort.Strings(publicFields)
+	return publicFields
+}
+
+// derivePrivateFields returns a sorted list of field names whose type is
+// "password". This provides a default PrivateFields list for credential schemas
+// that don't have explicit public/private annotations.
+func derivePrivateFields(credFields map[string]v32.Field) []string {
+	var privateFields []string
+	for name, field := range credFields {
+		if field.Type == "password" {
+			privateFields = append(privateFields, name)
+		}
+	}
+	sort.Strings(privateFields)
+	return privateFields
 }
 
 func credentialConfigSchemaName(operatorName string) string {
