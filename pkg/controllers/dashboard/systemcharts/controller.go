@@ -234,6 +234,30 @@ func (h *handler) onRepo(_ string, repo *catalog.ClusterRepo) (*catalog.ClusterR
 func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
+			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.RemoteDialerProxyChartName,
+			ChartName:           chart.RemoteDialerProxyChartName,
+			ExactVersionSetting: settings.RemoteDialerProxyVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{}
+				// add priority class value
+				h.setPriorityClass(values, chart.RemoteDialerProxyChartName)
+				// add image pull secrets, RDP uses local object references at
+				// the top level.
+				h.setImagePullSecrets(values, true)
+				return values
+			},
+			Enabled: func() bool {
+				// do not deploy RDP in downstream cluster
+				if features.MCMAgent.Enabled() {
+					return false
+				}
+
+				return ext.RDPEnabled()
+			},
+			RemoveNamespace: false,
+		},
+		{
 			// webhookchart controller manages the webhook on the local cluster (early install).
 			// systemcharts manages it here only for downstream clusters (MCMAgent enabled) so
 			// the same chart version and WDC-driven ConfigMap values are applied there.
@@ -262,30 +286,6 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			Enabled: func() bool {
 				return features.MCMAgent.Enabled()
 			},
-		},
-		{
-			ReleaseNamespace:    namespace.System,
-			ReleaseName:         chart.RemoteDialerProxyChartName,
-			ChartName:           chart.RemoteDialerProxyChartName,
-			ExactVersionSetting: settings.RemoteDialerProxyVersion,
-			Values: func() map[string]interface{} {
-				values := map[string]interface{}{}
-				// add priority class value
-				h.setPriorityClass(values, chart.RemoteDialerProxyChartName)
-				// add image pull secrets, RDP uses local object references at
-				// the top level.
-				h.setImagePullSecrets(values, true)
-				return values
-			},
-			Enabled: func() bool {
-				// do not deploy RDP in downstream cluster
-				if features.MCMAgent.Enabled() {
-					return false
-				}
-
-				return ext.RDPEnabled()
-			},
-			RemoveNamespace: false,
 		},
 		{
 			ReleaseNamespace: "rancher-operator-system",
