@@ -105,7 +105,7 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	}
 
 	// RKE2: wait to update the connected condition until it is pre-bootstrapped
-	if capr.PreBootstrap(cluster) &&
+	if capr.ShouldPreBootstrap(cluster) &&
 		cluster.Annotations["provisioning.cattle.io/administrated"] == "true" &&
 		cluster.Name != "local" {
 		// overriding it to be disconnected until bootstrapping is done

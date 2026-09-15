@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strings"
 	"time"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -26,14 +25,6 @@ import (
 // NamespaceController listens to cluster namespace events,
 // reads secrets from the management namespace of corresponding project,
 // and creates the secrets in the cluster namespace
-
-const (
-	syncAnnotation             = "provisioning.cattle.io/sync"
-	syncPreBootstrapAnnotation = "provisioning.cattle.io/sync-bootstrap"
-	syncNamespaceAnnotation    = "provisioning.cattle.io/sync-target-namespace"
-	syncNameAnnotation         = "provisioning.cattle.io/sync-target-name"
-	syncedAtAnnotation         = "provisioning.cattle.io/synced-at"
-)
 
 var (
 	// as of right now kube-system is the only appropriate target for this functionality.
@@ -111,17 +102,17 @@ func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface
 
 func (c *ResourceSyncController) syncable(obj *corev1.Secret) bool {
 	// no sync annotations, we don't care about this secret
-	if obj.Annotations[syncAnnotation] == "" && obj.Annotations[syncPreBootstrapAnnotation] == "" {
+	if obj.Annotations[capr.SyncAnnotation] == "" && obj.Annotations[capr.SyncPreBootstrapAnnotation] == "" {
 		return false
 	}
 
 	// if secret is authorized to be synchronized to the cluster
-	if !slices.Contains(strings.Split(obj.Annotations[capr.AuthorizedObjectAnnotation], ","), c.clusterName) {
+	if !capr.ClusterAuthorizedForSecret(obj.Annotations[capr.AuthorizedObjectAnnotation], c.clusterName) {
 		return false
 	}
 
 	// if the secret is not in a namespace that we are allowed to sync to
-	if !slices.Contains(approvedPreBootstrapTargetNamespaces, obj.Annotations[syncNamespaceAnnotation]) {
+	if !slices.Contains(approvedPreBootstrapTargetNamespaces, obj.Annotations[capr.SyncNamespaceAnnotation]) {
 		return false
 	}
 
@@ -130,7 +121,7 @@ func (c *ResourceSyncController) syncable(obj *corev1.Secret) bool {
 
 func (c *ResourceSyncController) bootstrapSyncable(obj *corev1.Secret) bool {
 	// only difference between sync and bootstrapSync is requiring the boostrap sync annotation to be set to "true"
-	return c.syncable(obj) && obj.Annotations[syncPreBootstrapAnnotation] == "true"
+	return c.syncable(obj) && obj.Annotations[capr.SyncPreBootstrapAnnotation] == "true"
 }
 
 func (c *ResourceSyncController) injectClusterIdIntoSecretData(sec *corev1.Secret) *corev1.Secret {
@@ -162,11 +153,11 @@ func (c *ResourceSyncController) sync(_ string, obj *corev1.Secret) (*corev1.Sec
 		return obj, nil
 	}
 
-	name := obj.Annotations[syncNameAnnotation]
+	name := obj.Annotations[capr.SyncNameAnnotation]
 	if name == "" {
 		name = obj.Name
 	}
-	ns := obj.Annotations[syncNamespaceAnnotation]
+	ns := obj.Annotations[capr.SyncNamespaceAnnotation]
 	if ns == "" {
 		ns = obj.Namespace
 	}
@@ -211,6 +202,6 @@ func (c *ResourceSyncController) sync(_ string, obj *corev1.Secret) (*corev1.Sec
 
 	logrus.Debugf("[resource-sync][secret] successfully synchronized secret %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, c.clusterName)
 
-	obj.Annotations[syncedAtAnnotation] = time.Now().Format(time.RFC3339)
+	obj.Annotations[capr.SyncedAtAnnotation] = time.Now().Format(time.RFC3339)
 	return obj, nil
 }
