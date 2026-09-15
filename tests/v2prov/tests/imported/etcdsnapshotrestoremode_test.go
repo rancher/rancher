@@ -140,15 +140,81 @@ func assertSnapshotOffersMode(t *testing.T, snapshot *rkev1.ETCDSnapshot, mode s
 		snapshot.Namespace, snapshot.Name, offered, mode)
 }
 
-// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersion verifies the downgrade path:
-// a snapshot taken on one minor, the cluster upgraded to the next, then restored selecting
-// kubernetesVersion — after which the cluster is configured for, and running, the snapshot's
-// version again, on the same nodes, and healthy.
+// The six Test_Imported_Operation_SetD_ETCDSnapshotRestoreMode* tests below are the restore-mode
+// matrix for an imported cluster: every mode against both places a snapshot can live.
+//
+//	                   | local | s3
+//	none               |   ✓   | ✓
+//	kubernetesVersion  |   ✓   | ✓
+//	all                |   ✓   | ✓
+//
+// The modes only differ in how much of the configuration captured in the snapshot comes back with
+// the etcd rollback, so all six cases run the same scenario — provision on the older version,
+// capture a snapshot, upgrade and change the cluster agent's customization, then restore — and
+// differ only in what they expect of the cluster afterwards. That symmetry is the point: `none`
+// leaving the post-upgrade configuration alone is as much an assertion as `all` reverting it.
+//
+// Storage is a real dimension rather than an implementation detail. Snapshot extra metadata — what
+// the restore modes are resolved from — is stamped onto an ETCDSnapshotFile by the distro at the
+// moment it registers the resource, and for a local file that metadata is not persisted anywhere,
+// while for S3 it is uploaded to the bucket alongside the snapshot and read back on listing. So the
+// two paths reach the same feature through genuinely different plumbing. An imported cluster upgrades
+// in place, keeping its nodes and their disks, so a local snapshot survives the upgrade here — unlike
+// the CAPRKE2 case, where the upgrade replaces the machine and S3 is the only option.
+
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneLocal verifies that a `none` restore from
+// a machine-local snapshot rolls etcd back and leaves the cluster's configuration alone.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneLocal(t *testing.T) {
+	runImportedRestoreModeTest(t, "rm-none-local", rkev1.RestoreRKEConfigNone, snapshotStorageLocal)
+}
+
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3 is the S3 counterpart.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeNoneS3(t *testing.T) {
+	runImportedRestoreModeTest(t, "rm-none-s3", rkev1.RestoreRKEConfigNone, snapshotStorageS3)
+}
+
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocal verifies the downgrade
+// path from a machine-local snapshot: the cluster ends up configured for, and running, the
+// snapshot's version, while everything else keeps its post-snapshot value.
 //
 // This is the mode's whole purpose. The restore has to reinstall the distro at the snapshot's
-// version before `--cluster-reset`, because a newer server cannot reset onto etcd data written by
-// an older one.
-func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersion(t *testing.T) {
+// version before `--cluster-reset`, because a newer server cannot reset onto etcd data written by an
+// older one.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionLocal(t *testing.T) {
+	runImportedRestoreModeTest(t, "rm-kv-local", rkev1.RestoreRKEConfigKubernetesVersion, snapshotStorageLocal)
+}
+
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionS3 is the S3 counterpart.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersionS3(t *testing.T) {
+	runImportedRestoreModeTest(t, "rm-kv-s3", rkev1.RestoreRKEConfigKubernetesVersion, snapshotStorageS3)
+}
+
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllLocal verifies that `all` restores the rest
+// of the captured configuration too, not just the Kubernetes version — here, the cluster agent's
+// deployment customization, which the other two modes must leave at its post-snapshot value.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllLocal(t *testing.T) {
+	runImportedRestoreModeTest(t, "rm-all-local", rkev1.RestoreRKEConfigAll, snapshotStorageLocal)
+}
+
+// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3 is the S3 counterpart.
+func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAllS3(t *testing.T) {
+	runImportedRestoreModeTest(t, "rm-all-s3", rkev1.RestoreRKEConfigAll, snapshotStorageS3)
+}
+
+// The two configuration values every case in the matrix moves, so that each mode can be pinned by
+// what it does and does not put back.
+const (
+	capturedToleration = "captured-before-snapshot"
+	changedToleration  = "changed-after-snapshot"
+)
+
+// runImportedRestoreModeTest runs one cell of the matrix: snapshot on the older version, upgrade and
+// change the agent customization, restore selecting mode, then assert what that mode is supposed to
+// have restored — plus, in every case, that etcd itself rolled back, that no node was replaced, and
+// that the cluster came out healthy.
+func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage snapshotStorage) {
+	t.Helper()
+
 	requireTwoVersions(t)
 
 	clients, err := clients.New()
@@ -157,25 +223,36 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersion(t *te
 	}
 	defer clients.Close()
 
-	fx := setUpImportedRestoreModeCluster(t, clients, "restore-mode-kv")
+	fx := setUpImportedRestoreModeCluster(t, clients, displayName, storage)
 
 	// The cluster comes up on the older version, so that is what the snapshot captures.
 	waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
 	waitForImportedSnapshotMetadataReady(t, fx)
+
+	// Tolerations are a convenient probe for the agent customization: a plain list on the mgmt
+	// cluster spec that Rancher applies to the cattle-cluster-agent deployment, so a restore either
+	// brings the whole value back or it does not.
+	setAgentToleration(t, clients, fx.mgmtCluster.Name, capturedToleration)
+	waitForAgentToleration(t, clients, fx.mgmtCluster, capturedToleration)
 
 	proof := newConfigMapProof()
 	proof.create(t, fx)
 
 	before := time.Now()
 	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef)
-	snapshot := waitForBackpopulatedS3Snapshot(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, before)
-	assertSnapshotOffersMode(t, snapshot, rkev1.RestoreRKEConfigKubernetesVersion)
-	assertImportedSnapshotCapturedVersion(t, clients, fx.mgmtCluster.Name, snapshot.Name, rkev1.RestoreRKEConfigKubernetesVersion)
+	snapshot := waitForBackpopulatedSnapshotForStorage(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, storage, before)
+	assertSnapshotOffersMode(t, snapshot, mode)
+	if mode != rkev1.RestoreRKEConfigNone {
+		// `none` declares no selector, so there is nothing to resolve; for the other two, check the
+		// snapshot really did capture the pre-upgrade version.
+		assertImportedSnapshotCapturedVersion(t, clients, fx.mgmtCluster.Name, snapshot.Name, mode)
+	}
 
 	nodesBefore := importedNodeIdentities(t, fx)
 
-	// Upgrade. This is what the restore has to undo.
-	logrus.Infof("upgrading cluster %s from %s to %s", fx.mgmtCluster.Name, previousK8sVersion, defaults.SomeK8sVersion)
+	// Move both things a mode could restore.
+	logrus.Infof("upgrading cluster %s from %s to %s and changing its agent customization",
+		fx.mgmtCluster.Name, previousK8sVersion, defaults.SomeK8sVersion)
 	setDesiredVersion(t, clients, fx.mgmtCluster.Name, defaults.SomeK8sVersion)
 	waitForReportedVersion(t, clients, fx.mgmtCluster, defaults.SomeK8sVersion)
 
@@ -185,115 +262,76 @@ func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeKubernetesVersion(t *te
 	// restore meaningful: both halves of the test measure the same thing.
 	assertImportedNodesUnchanged(t, fx, nodesBefore, "the upgrade should have been carried out in place")
 
-	// Delete the ConfigMap so the etcd rollback is observable independently of the version change.
+	setAgentToleration(t, clients, fx.mgmtCluster.Name, changedToleration)
+	waitForAgentToleration(t, clients, fx.mgmtCluster, changedToleration)
+
+	// Delete the ConfigMap so the etcd rollback is observable independently of any configuration
+	// change — which is the only thing a `none` restore leaves behind as evidence.
 	proof.delete(t, fx)
 
 	op := RunETCDSnapshotRestoreOperationTest(t, clients, fx.mgmtCluster.Name, snapshot.Name, fx.clusterRef,
-		WithRestoreMode(rkev1.RestoreRKEConfigKubernetesVersion),
+		WithRestoreMode(mode),
 		WithRestoreTTL(-1))
 	require.NotNil(t, op)
 
 	proof.assertRestored(t, fx)
 
-	// The restore should have rewritten the desired version back to the snapshot's, and the nodes
-	// should be running it — the reinstall in the Restore step is what puts the older binary back.
-	waitForDesiredVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
-	waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
+	// What each mode is expected to have put back. Waiting is only appropriate where a change is
+	// expected: for the values a mode must *not* restore there is nothing to wait for, and they are
+	// asserted below once the cluster has settled.
+	expectedVersion := previousK8sVersion
+	expectedToleration := changedToleration
 
-	latest, err := clients.Mgmt.Cluster().Get(fx.mgmtCluster.Name, metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.Equal(t, previousK8sVersion, desiredVersion(latest),
-		"kubernetesVersion restore should configure the cluster for the snapshot's version")
-	require.NotNil(t, latest.Status.Version)
-	assert.Equal(t, previousK8sVersion, latest.Status.Version.GitVersion,
-		"cluster should be running the snapshot's version after the restore")
-
-	assertImportedNodesUnchanged(t, fx, nodesBefore, "the restore must not replace any node")
-	assertImportedClusterHealthy(t, clients, fx, previousK8sVersion)
-}
-
-// Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAll verifies that `all` restores the rest of
-// the captured configuration too, not just the Kubernetes version. It changes the cluster agent's
-// deployment customization alongside the version, then asserts the restore reverts both.
-func Test_Imported_Operation_SetD_ETCDSnapshotRestoreModeAll(t *testing.T) {
-	requireTwoVersions(t)
-
-	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
+	switch mode {
+	case rkev1.RestoreRKEConfigNone:
+		// No configuration is restored at all, so the cluster stays on the version it was upgraded
+		// to, running etcd data from before the upgrade.
+		expectedVersion = defaults.SomeK8sVersion
+	case rkev1.RestoreRKEConfigKubernetesVersion:
+		waitForDesiredVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
+		waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
+	case rkev1.RestoreRKEConfigAll:
+		waitForDesiredVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
+		waitForAgentToleration(t, clients, fx.mgmtCluster, capturedToleration)
+		waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
+		expectedToleration = capturedToleration
+	default:
+		t.Fatalf("unhandled restore mode %q", mode)
 	}
-	defer clients.Close()
-
-	fx := setUpImportedRestoreModeCluster(t, clients, "restore-mode-all")
-
-	waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
-	waitForImportedSnapshotMetadataReady(t, fx)
-
-	// The customization captured in the snapshot. Tolerations are a convenient probe: they are a
-	// plain list on the mgmt cluster spec that Rancher applies to the cattle-cluster-agent
-	// deployment, so a restore either brings the whole value back or it does not.
-	capturedToleration := "captured-before-snapshot"
-	setAgentToleration(t, clients, fx.mgmtCluster.Name, capturedToleration)
-	waitForAgentToleration(t, clients, fx.mgmtCluster, capturedToleration)
-
-	proof := newConfigMapProof()
-	proof.create(t, fx)
-
-	before := time.Now()
-	RunETCDSnapshotSaveOperationTest(t, clients, fx.mgmtCluster.Name, fx.clusterRef)
-	snapshot := waitForBackpopulatedS3Snapshot(t, clients, fx.mgmtCluster.Name, fx.mgmtCluster.Name, before)
-	assertSnapshotOffersMode(t, snapshot, rkev1.RestoreRKEConfigAll)
-	assertImportedSnapshotCapturedVersion(t, clients, fx.mgmtCluster.Name, snapshot.Name, rkev1.RestoreRKEConfigAll)
-
-	nodesBefore := importedNodeIdentities(t, fx)
-
-	// Change both things the restore should revert.
-	logrus.Infof("upgrading cluster %s and changing its agent customization", fx.mgmtCluster.Name)
-	setDesiredVersion(t, clients, fx.mgmtCluster.Name, defaults.SomeK8sVersion)
-	waitForReportedVersion(t, clients, fx.mgmtCluster, defaults.SomeK8sVersion)
-	assertImportedNodesUnchanged(t, fx, nodesBefore, "the upgrade should have been carried out in place")
-
-	setAgentToleration(t, clients, fx.mgmtCluster.Name, "changed-after-snapshot")
-	waitForAgentToleration(t, clients, fx.mgmtCluster, "changed-after-snapshot")
-
-	proof.delete(t, fx)
-
-	op := RunETCDSnapshotRestoreOperationTest(t, clients, fx.mgmtCluster.Name, snapshot.Name, fx.clusterRef,
-		WithRestoreMode(rkev1.RestoreRKEConfigAll),
-		WithRestoreTTL(-1))
-	require.NotNil(t, op)
-
-	proof.assertRestored(t, fx)
-
-	// `all` covers every field the snapshot captured that Rancher permits restoring, so both the
-	// version and the agent customization go back.
-	waitForDesiredVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
-	waitForAgentToleration(t, clients, fx.mgmtCluster, capturedToleration)
-	waitForReportedVersion(t, clients, fx.mgmtCluster, previousK8sVersion)
-
-	latest, err := clients.Mgmt.Cluster().Get(fx.mgmtCluster.Name, metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.Equal(t, previousK8sVersion, desiredVersion(latest),
-		"all should restore the snapshot's kubernetes version")
-	assert.Equal(t, capturedToleration, agentToleration(latest),
-		"all should restore the snapshot's cluster agent customization")
 
 	assertImportedNodesUnchanged(t, fx, nodesBefore, "the restore must not replace any node")
-	assertImportedClusterHealthy(t, clients, fx, previousK8sVersion)
+	assertImportedClusterHealthy(t, clients, fx, expectedVersion)
+
+	// Read the settled cluster once, so the assertions for the values this mode should have left
+	// alone are not racing the restore's own writes.
+	latest, err := clients.Mgmt.Cluster().Get(fx.mgmtCluster.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, expectedVersion, desiredVersion(latest),
+		"restore mode %q should leave the cluster configured for %s", mode, expectedVersion)
+	require.NotNil(t, latest.Status.Version)
+	assert.Equal(t, expectedVersion, latest.Status.Version.GitVersion,
+		"restore mode %q should leave the cluster running %s", mode, expectedVersion)
+	assert.Equal(t, expectedToleration, agentToleration(latest),
+		"restore mode %q should leave the cluster agent customization at %q", mode, expectedToleration)
 }
 
-// setUpImportedRestoreModeCluster brings up a single-node imported cluster on the older version with
-// etcd snapshots going to a Minio object store.
+// setUpImportedRestoreModeCluster brings up a single-node imported cluster on the older version,
+// configured to keep etcd snapshots wherever the case under test needs them.
 //
-// S3 rather than machine-local disk is the point here, and it is not about convenience. RKE2/K3s
-// stamp ETCDSnapshotFile.Spec.Metadata only on the resource belonging to the node that took the
-// snapshot, and do not persist that metadata next to the file; a node that merely re-discovers a local
-// file registers it bare, which leaves the upstream ETCDSnapshot offering only the "none" restore
-// mode. For S3 the metadata is uploaded with the snapshot (as <folder>/.metadata/<name>) and read back
-// out of the bucket by whichever node lists it, so nothing about the test depends on which node
-// happens to reconcile the snapshot.
-func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayName string) *importedClusterFixture {
+// For snapshotStorageLocal the cluster is left alone and snapshots stay on the node's disk, which is
+// durable enough here because an imported cluster upgrades in place and keeps its nodes. For
+// snapshotStorageS3 an object store is stood up and the distro is pointed at it; the snapshot is then
+// written locally *and* uploaded, and the test restores from the uploaded copy.
+func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayName string, storage snapshotStorage) *importedClusterFixture {
 	t.Helper()
+
+	pools := []cluster.ImportedNodePool{
+		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
+	}
+
+	if storage == snapshotStorageLocal {
+		return setUpImportedClusterAtVersion(t, cs, displayName, pools, previousK8sVersion)
+	}
 
 	// The nodes are pods in this cluster, so a ClusterIP endpoint is reachable — unlike the CAPRKE2
 	// case, which needs objectstore's external flavour. Living in `default` mirrors the shared
@@ -308,11 +346,8 @@ func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayN
 	folder := displayName + "-" + strings.ToLower(name.Hex(time.Now().String(), 8))
 	t.Logf("etcd snapshots go to s3://%s/%s at %s", osInfo.Bucket, folder, osInfo.Endpoint)
 
-	fx := setUpImportedClusterAtVersion(t, cs, displayName, []cluster.ImportedNodePool{
-		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
-	}, previousK8sVersion, importedS3Options(previousK8sVersion, osInfo, folder))
-
-	return fx
+	return setUpImportedClusterAtVersion(t, cs, displayName, pools, previousK8sVersion,
+		importedS3Options(previousK8sVersion, osInfo, folder))
 }
 
 // importedS3Options renders the object store as the etcd-s3* config keys RKE2/K3s read, plus the CA
