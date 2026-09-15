@@ -20,6 +20,7 @@ const (
 	ADFSConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	ADFSConfigFieldName                = "name"
 	ADFSConfigFieldNameIDFormat        = "nameIDFormat"
+	ADFSConfigFieldOpenLdapConfig      = "openLdapConfig"
 	ADFSConfigFieldOwnerReferences     = "ownerReferences"
 	ADFSConfigFieldRancherAPIHost      = "rancherApiHost"
 	ADFSConfigFieldRemoved             = "removed"
@@ -52,6 +53,7 @@ type ADFSConfig struct {
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NameIDFormat        string            `json:"nameIDFormat,omitempty" yaml:"nameIDFormat,omitempty"`
+	OpenLdapConfig      *LdapFields       `json:"openLdapConfig,omitempty" yaml:"openLdapConfig,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`

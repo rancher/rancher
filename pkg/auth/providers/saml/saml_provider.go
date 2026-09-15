@@ -515,7 +515,7 @@ func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.O
 	if err != nil {
 		logrus.Warnf("error pulling %s ldap configs: %s\n", s.name, err)
 
-		// if the the config subkey not in the crd
+		// if the config subkey not in the crd
 		if ldapConfig == nil {
 			return config, nil
 		}
@@ -554,13 +554,29 @@ func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.O
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
+	case ADFSName:
+		secretName, err := common.SavePasswordSecret(
+			s.secrets,
+			ldapConfig.LdapFields.ServiceAccountPassword,
+			client.LdapConfigFieldServiceAccountPassword,
+			samlConfig.Type,
+		)
+		if err != nil {
+			return config, fmt.Errorf("unable to save ldap service account password: %w", err)
+		}
+		ldapConfig.LdapFields.ServiceAccountPassword = secretName
+		fullConfig = &apiv3.ADFSConfig{
+			SamlConfig:     samlConfig,
+			OpenLdapConfig: ldapConfig.LdapFields,
+		}
 	}
 
 	return fullConfig, nil
 }
 
 func (s *Provider) hasLdapGroupSearch() bool {
-	return ShibbolethName == s.name || OKTAName == s.name
+	// see also ldap_provider.go -- samlSearchProvider()
+	return ShibbolethName == s.name || OKTAName == s.name || ADFSName == s.name
 }
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
