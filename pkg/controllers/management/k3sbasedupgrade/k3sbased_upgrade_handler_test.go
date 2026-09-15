@@ -11,8 +11,7 @@ import (
 
 // TestOnClusterChange_Paused covers the pause gate. The handler is deliberately zero-valued: every
 // path past the gate dereferences h.manager or h.clusterClient, so these cases only pass because the
-// gate returns before any of that — which is the point, since an etcd snapshot restore needs version
-// management to render nothing at all while it rewrites the cluster's version.
+// gate returns before any of that.
 func TestOnClusterChange_Paused(t *testing.T) {
 	t.Parallel()
 
