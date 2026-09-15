@@ -82,22 +82,6 @@ sources:
     transformers:
       - find: '\S+'
 
-  machine-module-sum:
-    name: 'Get go.sum module hash for {{ source "machine-release" }}'
-    kind: shell
-    dependson:
-      - 'machine-release'
-    spec:
-      command: 'GOTOOLCHAIN=auto go mod download -json github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}@{{ source "machine-release" }} | grep ''"Sum":'' | sed -E ''s/.*"Sum": "([^"]+)".*/\1/'''
-
-  machine-go-mod-sum:
-    name: 'Get go.sum go.mod hash for {{ source "machine-release" }}'
-    kind: shell
-    dependson:
-      - 'machine-release'
-    spec:
-      command: 'GOTOOLCHAIN=auto go mod download -json github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}@{{ source "machine-release" }} | grep ''"GoModSum":'' | sed -E ''s/.*"GoModSum": "([^"]+)".*/\1/'''
-
 targets:
   update-go-mod-machine-version:
     name: 'Update github.com/rancher/machine to {{ source "machine-release" }} in go.mod'
@@ -109,25 +93,21 @@ targets:
       matchpattern: 'github\.com/rancher/machine v\S+'
       replacepattern: 'github.com/rancher/machine {{ source "machine-release" }}'
 
-  update-go-sum-machine-module-hash:
-    name: 'Update github.com/rancher/machine module hash in go.sum'
-    kind: file
+  tidy-go-mod:
+    name: 'Run go mod tidy after updating Rancher Machine'
+    dependson:
+      - 'update-go-mod-machine-version'
+    kind: shell
     scmid: 'default'
-    sourceid: 'machine-module-sum'
+    disablesourceinput: true
     spec:
-      file: 'go.sum'
-      matchpattern: 'github\.com/rancher/machine v[^/ ]+ h1:\S+'
-      replacepattern: 'github.com/rancher/machine {{ source "machine-release" }} {{ source "machine-module-sum" }}'
-
-  update-go-sum-machine-go-mod-hash:
-    name: 'Update github.com/rancher/machine go.mod hash in go.sum'
-    kind: file
-    scmid: 'default'
-    sourceid: 'machine-go-mod-sum'
-    spec:
-      file: 'go.sum'
-      matchpattern: 'github\.com/rancher/machine v\S+/go\.mod h1:\S+'
-      replacepattern: 'github.com/rancher/machine {{ source "machine-release" }}/go.mod {{ source "machine-go-mod-sum" }}'
+      command: 'go mod tidy'
+      changedif:
+        kind: file/checksum
+        spec:
+          files:
+            - 'go.mod'
+            - 'go.sum'
 
   update-dockerfile-runtime-machine-version:
     name: 'Update ENV CATTLE_MACHINE_VERSION to {{ source "machine-release" }} in Dockerfile.runtime'
