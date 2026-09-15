@@ -21,7 +21,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.16
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.16
+ARG CATTLE_KDM_BRANCH=dev-v2.16-rke2-k3s-pr
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -75,7 +75,7 @@ ENV GOCACHE=/root/.cache/go/cache
 FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
-    curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
+    curl -sLf "https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
 
 # Main stage using bci-micro as the base image
