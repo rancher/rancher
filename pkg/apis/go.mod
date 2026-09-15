@@ -5,11 +5,10 @@ go 1.26.0
 toolchain go1.26.6
 
 replace (
-	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.14.0-rc.1.0.20260902074845-42b70cc84c64
-	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260902103845-8111ed396886
-	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e1194d9
-	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb
-	github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
+	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.14.0-rc.1.0.20260915080302-ce656f763271
+	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260915092420-578910db5978
+	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260915081725-64b113975206
+	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260915091508-881b96e7145e
 )
 
 replace (
@@ -49,7 +48,7 @@ require (
 	github.com/rancher/eks-operator v1.15.1
 	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
 	github.com/rancher/gke-operator v1.15.2
-	github.com/rancher/norman v0.10.0
+	github.com/rancher/norman v0.10.1
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/wrangler/v3 v3.8.0-rc.1
 	github.com/sirupsen/logrus v1.10.2
@@ -103,7 +102,7 @@ require (
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/apiextensions-apiserver v0.37.0 // indirect
