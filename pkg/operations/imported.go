@@ -10,6 +10,7 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -943,7 +944,48 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 	})
 }
 
-// PauseCluster is a no-op for imported clusters since they have no CAPI cluster.
-func (a *ImportedAdapter) PauseCluster(_ bool) error {
-	return nil
+// PauseCluster suspends version management for the imported cluster by toggling
+// importedclusterversionmanagement.VersionManagementPausedAnno on the mgmt v3 Cluster.
+//
+// An imported cluster has no CAPI object to pause, but it does have a controller that reacts to the
+// cluster's desired Kubernetes version: k3sbasedupgrade renders system-upgrade-controller plans from
+// it. A restore rewrites that version and reinstalls the distro on the nodes itself, so without this
+// the upgrade controller would see the rewritten version mid-restore and start draining nodes to roll
+// out plans of its own. See the annotation's own comment for the rest.
+//
+// The annotation is read straight off the object on every reconcile of the upgrade handler, so the
+// pause takes effect as soon as this returns.
+func (a *ImportedAdapter) PauseCluster(pause bool) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Read through the client rather than trusting a.cluster: the operation holds its adapter
+		// across reconciles, and the annotation is the one field two steps of the same operation both
+		// write.
+		cluster, err := a.clients.Mgmt.Cluster().Get(a.cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if pause {
+			if cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] == "true" {
+				return nil
+			}
+			cluster = cluster.DeepCopy()
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] = "true"
+		} else {
+			if _, ok := cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno]; !ok {
+				return nil
+			}
+			cluster = cluster.DeepCopy()
+			delete(cluster.Annotations, importedclusterversionmanagement.VersionManagementPausedAnno)
+		}
+
+		logrus.Infof("[operations] imported cluster %s: setting %s=%v", cluster.Name,
+			importedclusterversionmanagement.VersionManagementPausedAnno, pause)
+
+		_, err = a.clients.Mgmt.Cluster().Update(cluster)
+		return err
+	})
 }
