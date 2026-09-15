@@ -302,17 +302,56 @@ func runImportedRestoreModeTest(t *testing.T, displayName, mode string, storage 
 	assertImportedNodesUnchanged(t, fx, nodesBefore, "the restore must not replace any node")
 	assertImportedClusterHealthy(t, clients, fx, expectedVersion)
 
-	// Read the settled cluster once, so the assertions for the values this mode should have left
-	// alone are not racing the restore's own writes.
-	latest, err := clients.Mgmt.Cluster().Get(fx.mgmtCluster.Name, metav1.GetOptions{})
-	require.NoError(t, err)
+	// The reported version is the last thing to settle, so wait for it rather than sampling it, then
+	// assert the rest off the object that wait last read.
+	latest := waitForReportedGitVersion(t, clients, fx.mgmtCluster.Name, expectedVersion)
 	assert.Equal(t, expectedVersion, desiredVersion(latest),
 		"restore mode %q should leave the cluster configured for %s", mode, expectedVersion)
-	require.NotNil(t, latest.Status.Version)
-	assert.Equal(t, expectedVersion, latest.Status.Version.GitVersion,
-		"restore mode %q should leave the cluster running %s", mode, expectedVersion)
 	assert.Equal(t, expectedToleration, agentToleration(latest),
 		"restore mode %q should leave the cluster agent customization at %q", mode, expectedToleration)
+}
+
+// waitForReportedGitVersion waits up to five minutes for the cluster to report version in
+// status.version.gitVersion, and returns the last cluster it read.
+//
+// Unlike everything else these tests assert, the reported version is not something Rancher was told —
+// it is something Rancher observed, relayed from the downstream API server after the cluster agent
+// reconnects. It therefore lags every other signal: the desired version flips the moment the restore
+// writes it, and the nodes report their kubelet version sooner, while status.version can still be the
+// pre-restore value (or briefly absent) for minutes. Sampling it immediately is a race, and five
+// minutes is generous for an observation that normally lands within a sync or two.
+func waitForReportedGitVersion(t *testing.T, clients *clients.Clients, name, version string) *mgmtv3.Cluster {
+	t.Helper()
+
+	logrus.Infof("waiting for cluster %s to report version %s", name, version)
+
+	var (
+		latest     *mgmtv3.Cluster
+		lastReason string
+	)
+	err := utilwait.PollUntilContextTimeout(clients.Ctx, 10*time.Second, 5*time.Minute, true, func(context.Context) (bool, error) {
+		cluster, err := clients.Mgmt.Cluster().Get(name, metav1.GetOptions{})
+		if err != nil {
+			lastReason = fmt.Sprintf("get: %v", err)
+			return false, nil
+		}
+		latest = cluster
+
+		if cluster.Status.Version == nil {
+			lastReason = "status.version is not set yet"
+			return false, nil
+		}
+		if cluster.Status.Version.GitVersion != version {
+			lastReason = fmt.Sprintf("reports %s", cluster.Status.Version.GitVersion)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for cluster %s to report version %s: %s", name, version, lastReason)
+	}
+
+	return latest
 }
 
 // setUpImportedRestoreModeCluster brings up a single-node imported cluster on the older version,

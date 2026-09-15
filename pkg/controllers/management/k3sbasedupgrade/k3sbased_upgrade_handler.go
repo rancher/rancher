@@ -31,6 +31,16 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 		return cluster, nil
 	}
 
+	// An etcd snapshot restore suspends version management while it rewrites the cluster's desired
+	// version and reinstalls the distro itself. Exit before touching anything: mid-restore there is
+	// nothing useful to render, and both branches below write — plans downstream, or the cluster's
+	// upgrade condition upstream.
+	if importedclusterversionmanagement.Paused(cluster) {
+		logrus.Debugf("[k3s-based-upgrader] [%s] version management is paused by %s, skipping",
+			cluster.Name, importedclusterversionmanagement.VersionManagementPausedAnno)
+		return cluster, nil
+	}
+
 	if !importedclusterversionmanagement.Enabled(cluster) {
 		var masterPlan, workerPlan planv1.Plan
 
