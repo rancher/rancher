@@ -120,11 +120,11 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.2
-ENV CATTLE_MACHINE_CHECKSUM_amd64=95055ce7ae997efb5fe29ef438e32c1b5e5d9bfcd45ae58f43212db76079af10
-ENV CATTLE_MACHINE_CHECKSUM_arm64=b498782153b2781ff842bd56a06c0d727bfe623361005b75a16ea3170d979028
-ENV CATTLE_K3S_VERSION=v1.37.0-rc2+k3s1
-ENV CATTLE_MACHINE_PROVISION_IMAGE=abhishek1814/machine:v1.37
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.5
+ENV CATTLE_MACHINE_CHECKSUM_amd64=d03da9fd21ba70af33d9fa9402f8a32664122dbb39d6ffe52a83c5551ef7b1a5
+ENV CATTLE_MACHINE_CHECKSUM_arm64=d496b5a49a1036c355f9683ab3825d552ac7dfa2199f1b4281cb9761719df9d3
+ENV CATTLE_K3S_VERSION=v1.37.0+k3s1
+ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.6.12
 ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
 ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
@@ -175,9 +175,9 @@ RUN case "${ARCH}" in \
         *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
     esac && \
     curl -fsSL "https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz"  > /tmp/rancher-machine.tar.gz && \
-    # printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
-    # sha256sum -c machine.sha256 && \
-    # rm machine.sha256 && \
+    printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
+    sha256sum -c machine.sha256 && \
+    rm machine.sha256 && \
     tar xvzf /tmp/rancher-machine.tar.gz -C /usr/bin && \
     rm /tmp/rancher-machine.tar.gz && \
     chown root:root /usr/bin/rancher-machine
@@ -198,7 +198,7 @@ RUN case "${ARCH}" in \
 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.37.0-rc2-k3s1 \
+COPY --from=rancher/k3s:v1.37.0-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -357,7 +357,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.37.0-rc2+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.0+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
