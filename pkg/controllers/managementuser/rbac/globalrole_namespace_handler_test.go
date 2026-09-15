@@ -1,0 +1,531 @@
+package rbac
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
+var errRoleNotFound = apierrors.NewNotFound(schema.GroupResource{}, "")
+
+func TestOnNamespaceChangeSkipsIrrelevantNamespaces(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		ns *corev1.Namespace
+	}{
+		"nil namespace": {
+			ns: nil,
+		},
+		"namespace being deleted": {
+			ns: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "testns3",
+					DeletionTimestamp: &metav1.Time{},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			// no cache or client calls are expected at all
+			h := &inheritedNamespacedRulesHandler{
+				grCache:      wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
+				grbCache:     wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl),
+				roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+				roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
+				rbCache:      wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl),
+				clusterName:  "c-m-test",
+			}
+
+			obj, err := h.onNamespaceChange("testns3", test.ns)
+			assert.NoError(t, err)
+			assert.Equal(t, test.ns, obj)
+		})
+	}
+}
+
+func TestOnNamespaceChangeNoMatchingGlobalRoles(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, "testns3").Return(nil, nil)
+
+	h := &inheritedNamespacedRulesHandler{
+		grCache:      grCache,
+		grbCache:     wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl),
+		roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+		roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
+		rbCache:      wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl),
+		clusterName:  "c-m-test",
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
+	_, err := h.onNamespaceChange("testns3", ns)
+	assert.NoError(t, err)
+}
+
+func TestOnNamespaceChangeGlobalRoleIndexError(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, "testns3").Return(nil, fmt.Errorf("index error"))
+
+	h := &inheritedNamespacedRulesHandler{
+		grCache:     grCache,
+		clusterName: "c-m-test",
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
+	_, err := h.onNamespaceChange("testns3", ns)
+	assert.Error(t, err)
+}
+
+func TestOnNamespaceChangeCreatesRole(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	rules := []rbacv1.PolicyRule{{
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+		Verbs:     []string{"get", "list"},
+	}}
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": rules,
+		},
+	}
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, "testns3").Return([]*v3.GlobalRole{gr}, nil)
+	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return(nil, nil)
+
+	wantRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nsgrole3-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/gr-owner": "nsgrole3",
+			},
+		},
+		Rules: rules,
+	}
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(nil, errRoleNotFound)
+	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+	roles.EXPECT().Get("testns3", "nsgrole3-testns3", metav1.GetOptions{}).Return(nil, errRoleNotFound)
+	roles.EXPECT().Create(wantRole).Return(wantRole, nil)
+
+	h := &inheritedNamespacedRulesHandler{
+		grCache:      grCache,
+		grbCache:     grbCache,
+		roles:        roles,
+		roleCache:    roleCache,
+		roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
+		rbCache:      wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl),
+		clusterName:  "c-m-test",
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
+	_, err := h.onNamespaceChange("testns3", ns)
+	assert.NoError(t, err)
+}
+
+func TestOnNamespaceChangeUpdatesRoleWithDifferentRules(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	rules := []rbacv1.PolicyRule{{
+		APIGroups: []string{"apps"},
+		Resources: []string{"deployments"},
+		Verbs:     []string{"get"},
+	}}
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": rules,
+		},
+	}
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, "testns3").Return([]*v3.GlobalRole{gr}, nil)
+	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return(nil, nil)
+
+	existing := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nsgrole3-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/gr-owner": "nsgrole3",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{{
+			APIGroups: []string{""},
+			Resources: []string{"secrets"},
+			Verbs:     []string{"get"},
+		}},
+	}
+	wantRole := existing.DeepCopy()
+	wantRole.Rules = rules
+
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(existing, nil)
+	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+	roles.EXPECT().Get("testns3", "nsgrole3-testns3", metav1.GetOptions{}).Return(existing, nil)
+	roles.EXPECT().Update(wantRole).Return(wantRole, nil)
+
+	h := &inheritedNamespacedRulesHandler{
+		grCache:      grCache,
+		grbCache:     grbCache,
+		roles:        roles,
+		roleCache:    roleCache,
+		roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
+		rbCache:      wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl),
+		clusterName:  "c-m-test",
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
+	_, err := h.onNamespaceChange("testns3", ns)
+	assert.NoError(t, err)
+}
+
+func TestOnNamespaceChangeCreatesRoleBindingsForGRBs(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	rules := []rbacv1.PolicyRule{{
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+		Verbs:     []string{"get"},
+	}}
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": rules,
+		},
+	}
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta:     metav1.ObjectMeta{Name: "grb1"},
+		GlobalRoleName: "nsgrole3",
+		UserName:       "user-abc",
+	}
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, "testns3").Return([]*v3.GlobalRole{gr}, nil)
+	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return([]*v3.GlobalRoleBinding{grb}, nil)
+
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nsgrole3-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/gr-owner": "nsgrole3",
+			},
+		},
+		Rules: rules,
+	}, nil)
+
+	wantRB := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "grb1-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/grb-owner": "grb1",
+			},
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:     "User",
+			Name:     "user-abc",
+			APIGroup: rbacv1.GroupName,
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     "nsgrole3-testns3",
+		},
+	}
+	rbCache := wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+	rbCache.EXPECT().Get("testns3", "grb1-testns3").Return(nil, errRoleNotFound)
+	roleBindings := wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+	roleBindings.EXPECT().Create(wantRB).Return(wantRB, nil)
+
+	h := &inheritedNamespacedRulesHandler{
+		grCache:      grCache,
+		grbCache:     grbCache,
+		roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+		roleCache:    roleCache,
+		roleBindings: roleBindings,
+		rbCache:      rbCache,
+		clusterName:  "c-m-test",
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
+	_, err := h.onNamespaceChange("testns3", ns)
+	assert.NoError(t, err)
+}
+
+func TestOnNamespaceChangeLeavesCorrectRoleBindingAlone(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	rules := []rbacv1.PolicyRule{{
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+		Verbs:     []string{"get"},
+	}}
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": rules,
+		},
+	}
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta:     metav1.ObjectMeta{Name: "grb1"},
+		GlobalRoleName: "nsgrole3",
+		UserName:       "user-abc",
+	}
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, "testns3").Return([]*v3.GlobalRole{gr}, nil)
+	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return([]*v3.GlobalRoleBinding{grb}, nil)
+
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nsgrole3-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/gr-owner": "nsgrole3",
+			},
+		},
+		Rules: rules,
+	}, nil)
+
+	existingRB := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "grb1-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/grb-owner": "grb1",
+			},
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:     "User",
+			Name:     "user-abc",
+			APIGroup: rbacv1.GroupName,
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     "nsgrole3-testns3",
+		},
+	}
+	rbCache := wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+	rbCache.EXPECT().Get("testns3", "grb1-testns3").Return(existingRB, nil)
+
+	// no Create or Delete expected on the RoleBinding client
+	h := &inheritedNamespacedRulesHandler{
+		grCache:      grCache,
+		grbCache:     grbCache,
+		roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+		roleCache:    roleCache,
+		roleBindings: wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
+		rbCache:      rbCache,
+		clusterName:  "c-m-test",
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
+	_, err := h.onNamespaceChange("testns3", ns)
+	assert.NoError(t, err)
+}
+
+func TestOnNamespaceChangeRecreatesIncorrectRoleBinding(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	rules := []rbacv1.PolicyRule{{
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+		Verbs:     []string{"get"},
+	}}
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": rules,
+		},
+	}
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta:     metav1.ObjectMeta{Name: "grb1"},
+		GlobalRoleName: "nsgrole3",
+		UserName:       "user-abc",
+	}
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().GetByIndex(pkgrbac.GRDownstreamNSIndex, "testns3").Return([]*v3.GlobalRole{gr}, nil)
+	grbCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+	grbCache.EXPECT().GetByIndex(pkgrbac.GRBGlobalRoleIndex, "nsgrole3").Return([]*v3.GlobalRoleBinding{grb}, nil)
+
+	roleCache := wfakes.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get("testns3", "nsgrole3-testns3").Return(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nsgrole3-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/gr-owner": "nsgrole3",
+			},
+		},
+		Rules: rules,
+	}, nil)
+
+	// existing RoleBinding has the wrong subject; RoleRef is immutable so it must be recreated
+	existingRB := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "grb1-testns3",
+			Namespace: "testns3",
+			Labels: map[string]string{
+				"authz.management.cattle.io/grb-owner": "grb1",
+			},
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:     "User",
+			Name:     "someone-else",
+			APIGroup: rbacv1.GroupName,
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     "nsgrole3-testns3",
+		},
+	}
+	wantRB := existingRB.DeepCopy()
+	wantRB.Subjects = []rbacv1.Subject{{
+		Kind:     "User",
+		Name:     "user-abc",
+		APIGroup: rbacv1.GroupName,
+	}}
+
+	rbCache := wfakes.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+	rbCache.EXPECT().Get("testns3", "grb1-testns3").Return(existingRB, nil)
+	roleBindings := wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+	roleBindings.EXPECT().Delete("testns3", "grb1-testns3", gomock.Any()).Return(nil)
+	roleBindings.EXPECT().Create(wantRB).Return(wantRB, nil)
+
+	h := &inheritedNamespacedRulesHandler{
+		grCache:      grCache,
+		grbCache:     grbCache,
+		roles:        wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
+		roleCache:    roleCache,
+		roleBindings: roleBindings,
+		rbCache:      rbCache,
+		clusterName:  "c-m-test",
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "testns3"}}
+	_, err := h.onNamespaceChange("testns3", ns)
+	assert.NoError(t, err)
+}
+
+// TestRegisterInheritedNamespacedRulesHandlerSkipsLocalCluster ensures the handler is not wired
+// for the local cluster: inheritedNamespacedRules apply to downstream clusters only, and the
+// leader-side controllers deliberately exclude local.
+func TestRegisterInheritedNamespacedRulesHandlerSkipsLocalCluster(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	// no OnChange registration expected on the namespace controller
+	namespaces := wfakes.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+	roles := wfakes.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+	roleBindings := wfakes.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+
+	RegisterInheritedNamespacedRulesHandler(context.Background(), namespaces,
+		wfakes.NewMockNonNamespacedControllerInterface[*v3.GlobalRole, *v3.GlobalRoleList](ctrl),
+		wfakes.NewMockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl),
+		roles, roleBindings, "local")
+}
+
+func TestGlobalRoleEnqueueNamespaces(t *testing.T) {
+	t.Parallel()
+
+	h := &inheritedNamespacedRulesHandler{clusterName: "c-m-test"}
+
+	keys, err := h.globalRoleEnqueueNamespaces("", "", nil)
+	assert.NoError(t, err)
+	assert.Nil(t, keys)
+
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": {{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}},
+			"testns4": {{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"list"}}},
+		},
+	}
+	keys, err = h.globalRoleEnqueueNamespaces("", gr.Name, gr)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []relatedresource.Key{{Name: "testns3"}, {Name: "testns4"}}, keys)
+
+	noRules := &v3.GlobalRole{ObjectMeta: metav1.ObjectMeta{Name: "plain"}}
+	keys, err = h.globalRoleEnqueueNamespaces("", noRules.Name, noRules)
+	assert.NoError(t, err)
+	assert.Empty(t, keys)
+}
+
+func TestGlobalRoleBindingEnqueueNamespaces(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	gr := &v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "nsgrole3"},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"testns3": {{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}},
+		},
+	}
+	grb := &v3.GlobalRoleBinding{
+		ObjectMeta:     metav1.ObjectMeta{Name: "grb1"},
+		GlobalRoleName: "nsgrole3",
+		UserName:       "user-abc",
+	}
+
+	grCache := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCache.EXPECT().Get("nsgrole3").Return(gr, nil)
+
+	h := &inheritedNamespacedRulesHandler{grCache: grCache, clusterName: "c-m-test"}
+
+	keys, err := h.globalRoleBindingEnqueueNamespaces("", grb.Name, grb)
+	assert.NoError(t, err)
+	assert.Equal(t, []relatedresource.Key{{Name: "testns3"}}, keys)
+
+	// a GlobalRole not yet in the cache is not an error: the GlobalRole's own event enqueues its namespaces
+	grCacheMissing := wfakes.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+	grCacheMissing.EXPECT().Get("missing").Return(nil, errRoleNotFound)
+	h = &inheritedNamespacedRulesHandler{grCache: grCacheMissing, clusterName: "c-m-test"}
+	keys, err = h.globalRoleBindingEnqueueNamespaces("", "grb2", &v3.GlobalRoleBinding{
+		ObjectMeta:     metav1.ObjectMeta{Name: "grb2"},
+		GlobalRoleName: "missing",
+	})
+	assert.NoError(t, err)
+	assert.Empty(t, keys)
+}

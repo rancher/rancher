@@ -105,6 +105,28 @@ targets:
         keyword: "ENV"
         matcher: "DOCKER_MACHINE_HARVESTER_VERSION"
 
+  update-dockerfile-amd64-sha:
+    name: 'Update ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64 to {{ source "get-sha256-binary-amd64-next-version" }} in Dockerfile'
+    kind: dockerfile
+    scmid: 'default'
+    sourceid: 'get-sha256-binary-amd64-next-version'
+    spec:
+      file: 'package/Dockerfile'
+      instruction:
+        keyword: "ENV"
+        matcher: "DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64"
+
+  update-dockerfile-arm64-sha:
+    name: 'Update ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64 to {{ source "get-sha256-binary-arm64-next-version" }} in Dockerfile'
+    kind: dockerfile
+    scmid: 'default'
+    sourceid: 'get-sha256-binary-arm64-next-version'
+    spec:
+      file: 'package/Dockerfile'
+      instruction:
+        keyword: "ENV"
+        matcher: "DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64"
+
   update-machine-driver-version:
     name: 'Update Harvester Docker machine {{ source "harvester-docker-machine-release" }} in machine driver file'
     kind: file
@@ -138,7 +160,7 @@ targets:
   go-fmt:
     name: 'Run go fmt in machine driver file'
     dependson:
-      - 'update-machine-driver-version' 
+      - 'update-machine-driver-version'
       - 'update-machine-driver-amd64-sha'
       - 'update-machine-driver-arm64-sha'
     kind: shell

@@ -99,22 +99,16 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 }
 
 func (h *handler) OnChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	if op == nil {
-		return status, nil
-	}
-	if op.DeletionTimestamp != nil {
-		return status, nil
-	}
-	if ops.IsPaused(&op.Spec.OperationSpec) {
-		logrus.Debugf("[encryptionkeyrotation] %s/%s: skipping paused operation", op.Namespace, op.Name)
-		return status, nil
-	}
-
 	status, err := h.onChange(op, status)
 	if err != nil {
 		return status, err
 	}
 	status = updateStatus(op, status)
+
+	// Paused operations resume on a spec change; skip TTL cleanup and polling until then.
+	if ops.IsPaused(&op.Spec.OperationSpec) {
+		return status, nil
+	}
 
 	if equality.Semantic.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
@@ -139,6 +133,17 @@ func (h *handler) OnChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 }
 
 func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	if op == nil {
+		return status, nil
+	}
+	if op.DeletionTimestamp != nil {
+		return status, nil
+	}
+	if ops.IsPaused(&op.Spec.OperationSpec) {
+		logrus.Debugf("[encryptionkeyrotation] %s/%s: skipping paused operation", op.Namespace, op.Name)
+		return status, nil
+	}
+
 	if status.Phase == "" {
 		status.Phase = opv1alpha1.OperationPhasePending
 		status.LastUpdated = metav1.Now()
@@ -484,7 +489,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 		return status, err
 	}
 
-	env := operationEnv(s.op, status.Step)
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 	runtime := s.adapter.RuntimeCommand()
 
 	nodePlan := &plan.Plan{
@@ -495,7 +500,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 					Name:    rotateKeysInstructionName,
 					Command: "/bin/sh",
 					Args:    []string{"-c", rotateKeysScript(runtime)},
-					Env:     env,
 				},
 				SaveOutput: true,
 			},
@@ -506,7 +510,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 					Name:    waitForStatusInstructionName,
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
-					Env:     env,
 				},
 			},
 			// 3. One-time status snapshot captured when the plan is applied; provides an
@@ -516,7 +519,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     env,
 				},
 				SaveOutput: true,
 			},
@@ -528,7 +530,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     env,
 				},
 				PeriodSeconds: 5,
 			},
@@ -539,7 +540,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	// Use finite failure threshold so a plan that can't execute
 	// is marked Failed rather than retried forever. The wrapper always exits 0, so a
 	// real apply failure here means the wrapper itself couldn't run.
-	planStatus, err := h.store.AssignPlan(leader, nodePlan, 1, 1)
+	planStatus, err := h.store.AssignPlan(leader, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -662,7 +663,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 		return status, nil
 	}
 
-	env := operationEnv(s.op, status.Step)
+	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 	serverUnit := s.adapter.ServerUnit()
 	runtime := s.adapter.RuntimeCommand()
 
@@ -673,7 +674,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 	// reencrypt_finished while hashes still differ across servers.
 	for i, secret := range secrets {
 		requireHashMatch := i == len(secrets)-1
-		status, done, err := h.reconcileRestartNode(s, status, secret, env, serverUnit, runtime, requireHashMatch)
+		status, done, err := h.reconcileRestartNode(s, status, secret, opEnv, serverUnit, runtime, requireHashMatch)
 		if err != nil {
 			return status, err
 		}
@@ -702,7 +703,7 @@ func (h *handler) reconcileRestartNode(
 	s *scope,
 	status opv1alpha1.EncryptionKeyRotationStatus,
 	secret *corev1.Secret,
-	env []string,
+	opEnv []string,
 	serverUnit string,
 	runtime string,
 	requireHashMatch bool,
@@ -718,7 +719,6 @@ func (h *handler) reconcileRestartNode(
 				Name:    "restart",
 				Command: "systemctl",
 				Args:    []string{"restart", serverUnit},
-				Env:     env,
 			},
 		},
 		{
@@ -726,7 +726,6 @@ func (h *handler) reconcileRestartNode(
 				Name:    "wait-for-systemctl-status",
 				Command: "/bin/sh",
 				Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
-				Env:     env,
 			},
 		},
 	}
@@ -742,7 +741,6 @@ func (h *handler) reconcileRestartNode(
 					Name:    waitForStatusInstructionName,
 					Command: "/bin/sh",
 					Args:    []string{"-c", waitForStatusScript(runtime)},
-					Env:     env,
 				},
 			},
 			plan.OneTimeInstruction{
@@ -750,7 +748,6 @@ func (h *handler) reconcileRestartNode(
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     env,
 				},
 				SaveOutput: true,
 			},
@@ -761,14 +758,13 @@ func (h *handler) reconcileRestartNode(
 					Name:    statusPeriodicName,
 					Command: runtime,
 					Args:    []string{"secrets-encrypt", "status"},
-					Env:     env,
 				},
 				PeriodSeconds: 5,
 			},
 		}
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, nodePlan, 5, 5)
+	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 5, 5)
 	if err != nil {
 		return status, false, err
 	}
@@ -920,6 +916,15 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 	logrus.Tracef("[encryptionkeyrotation] %s/%s: updating conditions", op.Namespace, op.Name)
 
 	status.ObservedGeneration = op.Generation
+	if op.Spec.Paused {
+		opv1alpha1.PausedCondition.True(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.PausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "Operation is paused")
+	} else {
+		opv1alpha1.PausedCondition.False(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.NotPausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "")
+	}
 
 	if status.Phase == opv1alpha1.OperationPhasePending {
 		opv1alpha1.PendingCondition.True(&status)
@@ -1039,16 +1044,6 @@ func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 	s.beacon = updated
 
 	return nil
-}
-
-// operationEnv returns env vars that tie plan content to the operation UID and
-// current step. This keeps rotate and restart plans byte-distinct so
-// system-agent reruns them instead of reusing stale applied output.
-func operationEnv(op *opv1alpha1.EncryptionKeyRotation, step opv1alpha1.EncryptionKeyRotationStep) []string {
-	return []string{
-		fmt.Sprintf("ENCRYPTION_KEY_ROTATION_OPERATION_UID=%s", op.UID),
-		fmt.Sprintf("ENCRYPTION_KEY_ROTATION_STEP=%s", step),
-	}
 }
 
 // errRotateKeysOutputNotYet is returned by readRotateKeysResult when the rotate-keys output

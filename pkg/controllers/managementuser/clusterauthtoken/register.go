@@ -152,15 +152,20 @@ func Register(ctx context.Context, cluster *config.UserContext, secretsCache cor
 	}).Sync)
 
 	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
+		extTokenStore := extstore.NewSystemFromWrangler(cluster.Management.Wrangler)
+
 		extToken := w.Client.Token()
 		handler.extTokenIndexer.Store(extToken.Informer().GetIndexer())
+		// Only the ext handlers registered just below read extTokenStore, so
+		// setting it here happens before any of them can run.
+		handler.extTokenStore = extTokenStore
 		extTokenLifecycle(ctx, extToken, extTokenController, clusterName, handler)
 
 		catHandler := &clusterAuthTokenHandler{
 			tokenCache:    tokenCache,
 			tokenClient:   tokenClient,
 			extTokenCache: extToken.Cache(),
-			extTokenStore: extstore.NewSystemFromWrangler(cluster.Management.Wrangler),
+			extTokenStore: extTokenStore,
 		}
 		cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, catHandler.sync)
 	})

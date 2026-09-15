@@ -44,6 +44,7 @@ tests:
 - it: should Just have default env vars with default values.yaml
   set:
     systemDefaultRegistry: ""
+    assetsImage.tag: "stable-tag"
   asserts:
     - equal:
         path: spec.template.spec.containers[0].env
@@ -56,9 +57,12 @@ tests:
             value: "true"
           - name: IMPERATIVE_API_APP_SELECTOR
             value: RELEASE-NAME-rancher
+          - name: CATTLE_CHARTS_IMAGE
+            value: rancher/rancher-assets:stable-tag
 - it: should have systemDefaultRegistry env var set when value is not empty
   set:
     systemDefaultRegistry: "suseregistry"
+    assetsImage.tag: "stable-tag"
   asserts:
     - equal:
         path: spec.template.spec.containers[0].env
@@ -73,6 +77,8 @@ tests:
             value: "true"
           - name: IMPERATIVE_API_APP_SELECTOR
             value: RELEASE-NAME-rancher
+          - name: CATTLE_CHARTS_IMAGE
+            value: suseregistry/rancher/rancher-assets:stable-tag
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
   - equal:
@@ -199,14 +205,18 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.volumes
+      content:
+        name: custom-logos
 - it: should not create custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.volumes
+      content:
+        name: custom-logos
 - it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim
   set:
     customLogos.enabled: true
@@ -325,14 +335,18 @@ tests:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.containers[0].volumeMounts
+      content:
+        name: custom-logos
 - it: should not mount custom-logos volume if not customLogos.enabled
   set:
     customLogos.enabled: false
   asserts:
-  - isNullOrEmpty:
+  - notContains:
       path: spec.template.spec.containers[0].volumeMounts
+      content:
+        name: custom-logos
 - it: should set priorityClassName=system-node-critical
   set:
     priorityClassName: "system-node-critical"
@@ -700,6 +714,7 @@ tests:
   set:
     systemDefaultRegistry: ""
     cacheSyncTimeout: 10m
+    assetsImage.tag: stable-tag
   asserts:
   - equal:
       path: spec.template.spec.containers[0].env
@@ -714,6 +729,8 @@ tests:
           value: RELEASE-NAME-rancher
         - name: CACHE_SYNC_TIMEOUT
           value: 10m
+        - name: CATTLE_CHARTS_IMAGE
+          value: rancher/rancher-assets:stable-tag
 - it: should enable hostNetwork and set dnsPolicy when hostNetwork is true
   set:
     hostNetwork: true
@@ -732,6 +749,7 @@ tests:
         path: spec.template.spec.dnsPolicy
 - it: should configure rancher deployments with namespace options
   set:
+    assetsImage.tag: stable-tag
     rancherNamespaces:
       enabled: true
       labels:
@@ -752,6 +770,8 @@ tests:
             value: RELEASE-NAME-rancher
           - name: RANCHER_NAMESPACES_OPTIONS
             value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"}}"
+          - name: CATTLE_CHARTS_IMAGE
+            value: rancher/rancher-assets:stable-tag
 - it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when imagePullSecrets is empty
   asserts:
     - notContains:

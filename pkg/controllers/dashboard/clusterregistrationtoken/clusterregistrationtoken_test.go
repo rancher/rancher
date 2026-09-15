@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -270,4 +271,56 @@ func TestHandleTTL_DisabledFeatureHonorsExistingGracePeriod(t *testing.T) {
 	require.NotNil(t, updated(), "expired grace period must be cleaned up from the Secret even when the feature is disabled")
 	require.Empty(t, updated().Data[gracePeriodExpiresAtDataKey])
 	require.Empty(t, updated().Data[expiresAtDataKey], "feature disabled: no new expiry should be assigned")
+}
+
+// TestEnsureCRTTokenReaderRole_StableOrderingAvoidsSpuriousUpdate ensures that when the
+// same set of CRTs is listed in a different order than what's stored on the Role (which
+// can happen because informer cache List() order isn't guaranteed stable across calls),
+// the Role is not needlessly Updated, since that bumps its ResourceVersion and invalidates
+// every bound subject's cached AccessSet in steve.
+func TestEnsureCRTTokenReaderRole_StableOrderingAvoidsSpuriousUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	namespace := "c-test"
+
+	nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+	nsCache.EXPECT().Get(namespace).Return(&corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	}, nil)
+
+	// Existing Role already has the secret names sorted.
+	existingRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: crtTokenReaderRole},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				ResourceNames: []string{SecretName("crt-a"), SecretName("crt-b"), SecretName("crt-c")},
+				Verbs:         []string{"get"},
+			},
+		},
+	}
+	roleCache := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
+	roleCache.EXPECT().Get(namespace, crtTokenReaderRole).Return(existingRole, nil)
+
+	roleClient := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+	roleClient.EXPECT().Update(gomock.Any()).Times(0) // must NOT be called
+
+	// CRT cache returns the same set of CRTs but in a different (unsorted) order than
+	// how they were originally stored on the Role - simulating non-deterministic
+	// informer indexer iteration order.
+	crtCache := fake.NewMockCacheInterface[*v3.ClusterRegistrationToken](ctrl)
+	crtCache.EXPECT().List(namespace, gomock.Any()).Return([]*v3.ClusterRegistrationToken{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "crt-c"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "crt-a"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "crt-b"}},
+	}, nil)
+
+	h := &handler{
+		namespaceCache:                nsCache,
+		roleCache:                     roleCache,
+		roles:                         roleClient,
+		clusterRegistrationTokenCache: crtCache,
+	}
+
+	require.NoError(t, h.ensureCRTTokenReaderRole(namespace))
 }

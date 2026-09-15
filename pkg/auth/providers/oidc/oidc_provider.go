@@ -54,14 +54,15 @@ type tokenManager interface {
 }
 
 type OpenIDCProvider struct {
-	Name        string
-	Type        string
-	CTX         context.Context
-	AuthConfigs v3.AuthConfigInterface
-	Secrets     wcorev1.SecretController
-	UserMGR     user.Manager
-	TokenMgr    tokenManager
-	GetConfig   func() (*apiv3.OIDCConfig, error)
+	Name         string
+	Type         string
+	CTX          context.Context
+	AuthConfigs  v3.AuthConfigInterface
+	Secrets      wcorev1.SecretController
+	UserMGR      user.Manager
+	TokenMgr     tokenManager
+	UserSearcher *common.UserSearcher
+	GetConfig    func() (*apiv3.OIDCConfig, error)
 }
 
 type ClaimInfo struct {
@@ -199,13 +200,14 @@ func coerceToStringSlice(v any) []string {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, TokenMgr *tokens.Manager) common.AuthProvider {
 	p := &OpenIDCProvider{
-		Name:        Name,
-		Type:        client.OIDCConfigType,
-		CTX:         ctx,
-		AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-		Secrets:     mgmtCtx.Wrangler.Core.Secret(),
-		UserMGR:     userMGR,
-		TokenMgr:    TokenMgr,
+		Name:         Name,
+		Type:         client.OIDCConfigType,
+		CTX:          ctx,
+		AuthConfigs:  mgmtCtx.Management.AuthConfigs(""),
+		Secrets:      mgmtCtx.Wrangler.Core.Secret(),
+		UserMGR:      userMGR,
+		TokenMgr:     TokenMgr,
+		UserSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 	}
 
 	p.GetConfig = p.GetOIDCConfig
@@ -270,14 +272,18 @@ func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oa
 	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, err
 }
 
+// SearchPrincipals returns the users Rancher already knows about that match
+// searchValue, followed by a principal of the requested type holding searchValue
+// itself. OIDC has no lookup mechanism, so that last principal lets an admin
+// enter a subject or group ID by hand for an identity Rancher has not seen yet.
+// An OIDC subject is an ID chosen by the identity provider, so on its own it
+// only helps someone who already knows that ID.
 func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	var principals []apiv3.Principal
-
 	if principalType == "" {
 		principalType = UserType
 	}
 
-	p := apiv3.Principal{
+	fromSearchValue := apiv3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + principalType + "://" + searchValue},
 		DisplayName:   searchValue,
 		LoginName:     searchValue,
@@ -285,8 +291,11 @@ func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, to
 		Provider:      o.Name,
 	}
 
-	principals = append(principals, p)
-	return principals, nil
+	if principalType != UserType {
+		return []apiv3.Principal{fromSearchValue}, nil
+	}
+
+	return common.PrincipalsWithFallback(o.UserSearcher, o.Name, searchValue, fromSearchValue)
 }
 
 func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {

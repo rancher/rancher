@@ -9,9 +9,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const chartsSmallForkURL = "https://github.com/rancher/charts-small-fork"
-const mainBranch = "main"
-const lastBranch = "test-1"
+const (
+	chartsSmallForkURL = "https://github.com/rancher/charts-small-fork"
+	mainBranch         = "main"
+	lastBranch         = "test-1"
+)
 
 func TestMain(m *testing.M) {
 	// Run all the tests
@@ -179,7 +181,7 @@ func Test_Update(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.dir != "" {
-				err := os.MkdirAll(tc.dir, 0755)
+				err := os.MkdirAll(tc.dir, 0o755)
 				assert.NoError(t, err)
 			}
 

@@ -349,3 +349,73 @@ func (f fakeUserLister) List(namespace string, selector labels.Selector) ([]*v3.
 func (f fakeUserLister) Get(namespace, name string) (*v3.User, error) {
 	return nil, nil
 }
+
+func TestProviderSearchPrincipalHybridUser(t *testing.T) {
+	t.Parallel()
+
+	testUsers := []*v3.User{
+		{
+			// Hybrid user: keeps a local login after an external provider was
+			// enabled, so a binding on its local:// principal still grants
+			// access when it logs in locally. It has to stay findable under
+			// local even though the external provider returns a principal for
+			// the same person.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-admin"},
+			Username:     "admin",
+			DisplayName:  "Default Admin",
+			PrincipalIDs: []string{"genericoidc_user://sub-0009", "local://u-admin"},
+		},
+		{
+			// External user with no local login. Must not surface as local.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+			DisplayName:  "Admin Assistant",
+			PrincipalIDs: []string{"genericoidc_user://sub-0001", "local://u-oidc1"},
+		},
+	}
+
+	provider := Provider{
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
+	}
+
+	got, err := provider.SearchPrincipals("admin", "", nil)
+	require.NoError(t, err)
+
+	var ids []string
+	for _, principal := range got {
+		ids = append(ids, principal.Name)
+	}
+
+	require.Equal(t, []string{"local://u-admin"}, ids)
+}
+
+func TestProviderSearchPrincipalWhitespaceSearchKey(t *testing.T) {
+	t.Parallel()
+
+	testUsers := []*v3.User{
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: "u-12345"},
+			Username:    "test",
+			DisplayName: "Test User",
+		},
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: "u-23456"},
+			Username:    "other",
+			DisplayName: "Other User",
+		},
+	}
+
+	provider := Provider{
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
+	}
+
+	// A key of only whitespace normalizes to nothing, which every user would
+	// otherwise contain. Keys longer than searchIndexDefaultLen take the
+	// full-scan path, where that would return every user.
+	for _, searchKey := range []string{"", " ", "   ", "          "} {
+		got, err := provider.SearchPrincipals(searchKey, "", nil)
+		require.NoError(t, err)
+		require.Empty(t, got, "search key %q", searchKey)
+	}
+}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/steve/pkg/stores/proxy"
+	steveclient "github.com/rancher/steve/pkg/client"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +32,7 @@ func onError(rw http.ResponseWriter, _ *http.Request, code int, err error) {
 }
 
 type log struct {
-	cg proxy.ClientGetter
+	cg steveclient.ClientGetter
 }
 
 func (l *log) ServeHTTP(resp http.ResponseWriter, req *http.Request) {

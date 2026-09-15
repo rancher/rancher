@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
+func Test_Provisioning_Custom_SetA_OneNodeWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
@@ -92,7 +92,7 @@ func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
+func Test_Provisioning_Custom_SetA_ThreeNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +156,7 @@ func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
+func Test_Provisioning_Custom_SetB_UniqueRoles(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -236,7 +236,7 @@ func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
+func Test_Provisioning_Custom_SetB_ThreeNodeWithTaints(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}

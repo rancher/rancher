@@ -10,6 +10,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
+	etoken "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3/fakes"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
@@ -82,6 +83,8 @@ func TestExtCreate(t *testing.T) {
 		tokenHashingEnabled       bool
 		updateAuthTokenErr        error
 		createAuthTokenErr        error
+		extTokenHash              string
+		extTokenSecretErr         error
 
 		wantClusterAuthToken bool
 		wantAuthTokenUpdate  bool
@@ -98,6 +101,33 @@ func TestExtCreate(t *testing.T) {
 
 			wantClusterAuthToken: true,
 			wantAuthTokenEnabled: true,
+		},
+		{
+			name:                "hash absent from status, create token from backing secret hash",
+			token:               stripExtTokenHash(testToken),
+			extTokenHash:        hashedTokenKey,
+			existingTokenError:  authTokenNotFoundError,
+			tokenHashingEnabled: true,
+
+			wantClusterAuthToken: true,
+			wantAuthTokenEnabled: true,
+		},
+		{
+			name:                "backing secret missing, retry",
+			token:               stripExtTokenHash(testToken),
+			extTokenSecretErr:   apierrors.NewNotFound(schema.GroupResource{Group: "ext.cattle.io", Resource: "tokens"}, testToken.Name),
+			existingTokenError:  authTokenNotFoundError,
+			tokenHashingEnabled: true,
+
+			wantError: true,
+		},
+		{
+			name:                "backing secret carries no hash, retry",
+			token:               stripExtTokenHash(testToken),
+			existingTokenError:  authTokenNotFoundError,
+			tokenHashingEnabled: true,
+
+			wantError: true,
 		},
 		{
 			name:                "legacy token hash, don't create token",
@@ -204,6 +234,8 @@ func TestExtCreate(t *testing.T) {
 				TokenHashingEnabled:       test.tokenHashingEnabled,
 				UpdateAuthTokenErr:        test.updateAuthTokenErr,
 				CreateAuthTokenErr:        test.createAuthTokenErr,
+				ExtTokenHash:              test.extTokenHash,
+				ExtTokenSecretErr:         test.extTokenSecretErr,
 				CallCreate:                true,
 			})
 			if test.wantError {
@@ -234,7 +266,7 @@ func TestExtCreate(t *testing.T) {
 					// tokenHashing is enabled, hash should
 					// be the same on token and cluster auth
 					// token
-					require.Equal(t, test.token.Status.Hash, hashedToken)
+					require.Equal(t, wantHash(test.extTokenHash, test.token), hashedToken)
 				}
 			} else {
 				require.Nil(t, output.ModifiedClusterAuthToken)
@@ -525,6 +557,8 @@ func TestExtUpdate(t *testing.T) {
 		tokenHashingEnabled       bool
 		updateAuthTokenErr        error
 		createAuthTokenErr        error
+		extTokenHash              string
+		extTokenSecretErr         error
 
 		wantClusterAuthToken bool
 		wantAuthTokenUpdate  bool
@@ -541,6 +575,37 @@ func TestExtUpdate(t *testing.T) {
 			wantClusterAuthToken: true,
 			wantAuthTokenEnabled: false,
 			wantAuthTokenUpdate:  true,
+		},
+		{
+			name:                      "hash absent from status, update token from backing secret hash",
+			token:                     stripExtTokenHash(testToken),
+			extTokenHash:              hashedTokenKey,
+			existingClusterAuthToken:  oldAuthToken,
+			existingClusterAuthSecret: oldAuthSecret,
+			tokenHashingEnabled:       true,
+
+			wantClusterAuthToken: true,
+			wantAuthTokenUpdate:  true,
+			wantAuthTokenEnabled: true,
+		},
+		{
+			name:                      "backing secret missing, retry",
+			token:                     stripExtTokenHash(testToken),
+			extTokenSecretErr:         apierrors.NewNotFound(schema.GroupResource{Group: "ext.cattle.io", Resource: "tokens"}, testToken.Name),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			tokenHashingEnabled:       true,
+
+			wantError: true,
+		},
+		{
+			name:                      "backing secret carries no hash, retry",
+			token:                     stripExtTokenHash(testToken),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			tokenHashingEnabled:       true,
+
+			wantError: true,
 		},
 		{
 			name:                      "token enabled missing, no token update",
@@ -695,6 +760,8 @@ func TestExtUpdate(t *testing.T) {
 				TokenHashingEnabled:       test.tokenHashingEnabled,
 				UpdateAuthTokenErr:        test.updateAuthTokenErr,
 				CreateAuthTokenErr:        test.createAuthTokenErr,
+				ExtTokenHash:              test.extTokenHash,
+				ExtTokenSecretErr:         test.extTokenSecretErr,
 				CallCreate:                false,
 			})
 			if test.wantError {
@@ -721,7 +788,7 @@ func TestExtUpdate(t *testing.T) {
 
 				if modifiedSecret != nil {
 					hashedToken := string(modifiedSecret.Data["hash"])
-					require.Equal(t, test.token.Status.Hash, hashedToken)
+					require.Equal(t, wantHash(test.extTokenHash, test.token), hashedToken)
 				}
 			} else {
 				require.Nil(t, output.ModifiedClusterAuthToken)
@@ -1155,6 +1222,23 @@ func hashExtToken(token *extv1.Token, hashedToken string) *extv1.Token {
 	return newToken
 }
 
+// wantHash mirrors the harness default for the hash held by a token's backing
+// secret: the hash the test case asks for, or the one in the token status.
+func wantHash(extTokenHash string, token *extv1.Token) string {
+	if extTokenHash != "" {
+		return extTokenHash
+	}
+	return token.Status.Hash
+}
+
+// stripExtTokenHash models how the ext.cattle.io API serves tokens: the hash
+// lives in the backing secret and is never part of the status the informer sees.
+func stripExtTokenHash(token *extv1.Token) *extv1.Token {
+	newToken := token.DeepCopy()
+	newToken.Status.Hash = ""
+	return newToken
+}
+
 func setExtTokenEnabled(token *extv1.Token, enabled *bool) *extv1.Token {
 	newToken := token.DeepCopy()
 	newToken.Spec.Enabled = enabled
@@ -1182,6 +1266,12 @@ type testExtInput struct {
 	UpdateAuthTokenErr        error
 	CreateAuthTokenErr        error
 	CallCreate                bool
+
+	// ExtTokenHash is the hash held by the token's backing secret. It defaults
+	// to the hash in the token status, for the cases which do not care about
+	// the difference between the two.
+	ExtTokenHash      string
+	ExtTokenSecretErr error
 }
 
 type testOutput struct {
@@ -1272,6 +1362,36 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		}, nil
 	}
 
+	// The ext token store the handler reads the token hash from, backed by the
+	// token's secret in the local cluster.
+	extTokenHash := testInput.ExtTokenHash
+	if extTokenHash == "" {
+		extTokenHash = testInput.Token.Status.Hash
+	}
+	mockExtSecretCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	mockExtSecretCache.EXPECT().Get(etoken.TokenNamespace, gomock.Any()).DoAndReturn(
+		func(namespace, name string) (*corev1.Secret, error) {
+			if testInput.ExtTokenSecretErr != nil {
+				return nil, testInput.ExtTokenSecretErr
+			}
+			return &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+					Labels: map[string]string{
+						etoken.SecretKindLabel: etoken.SecretKindLabelValue,
+					},
+				},
+				Data: map[string][]byte{
+					etoken.FieldHash: []byte(extTokenHash),
+				},
+			}, nil
+		}).AnyTimes()
+	mockExtSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	mockExtSecrets.EXPECT().Cache().Return(mockExtSecretCache)
+	mockUsers := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+	mockUsers.EXPECT().Cache().Return(nil)
+
 	features.TokenHashing.Set(testInput.TokenHashingEnabled)
 	h := tokenHandler{
 		clusterAuthTokenLister:     &mockLister,
@@ -1282,6 +1402,7 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		clusterUserAttribute:       &fakes.ClusterUserAttributeInterfaceMock{},
 		clusterSecret:              mockSecrets,
 		clusterSecretLister:        mockSecretLister,
+		extTokenStore:              etoken.NewSystem(nil, nil, mockExtSecrets, mockUsers, nil, nil, nil, nil, nil),
 	}
 	var err error
 	if testInput.CallCreate {

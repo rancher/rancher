@@ -194,7 +194,11 @@ func (l *userLifecycle) onCreate(user *v3.User) (*v3.User, error) {
 	}
 	user.Annotations[userLifecycleAnnotation] = "true"
 
-	return l.users.Update(user)
+	impClient, err := l.users.WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		return nil, fmt.Errorf("impersonating webhook to update user: %w", err)
+	}
+	return impClient.Update(user)
 }
 
 func (l *userLifecycle) onUpdate(user *v3.User) (*v3.User, error) {

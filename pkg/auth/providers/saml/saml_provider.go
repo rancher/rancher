@@ -1,10 +1,12 @@
 package saml
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/pkg/errors"
@@ -33,6 +35,7 @@ const (
 	KeyCloakName        = "keycloak"
 	OKTAName            = "okta"
 	ShibbolethName      = "shibboleth"
+	GenericSAMLName     = "genericsaml"
 	loginAction         = "login"
 	testAndEnableAction = "testAndEnable"
 )
@@ -49,31 +52,37 @@ type Provider struct {
 	groupType       string
 	clientState     ClientState
 	ldapProvider    common.AuthProvider
+	userSearcher    *common.UserSearcher
 	sloEnabled      bool
 	sloForced       bool
 
 	getSamlConfig  func() (*apiv3.SamlConfig, error)
-	assertionCache *assertionCache
+	assertionStore assertionStore
 }
 
 var SamlProviders = make(map[string]*Provider)
 
-func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	provider := &Provider{
-		authConfigs:    mgmtCtx.Management.AuthConfigs(""),
-		secrets:        mgmtCtx.Wrangler.Core.Secret(),
-		samlTokens:     mgmtCtx.Management.SamlTokens(""),
-		userMGR:        userMGR,
-		tokenMGR:       tokenMGR,
-		name:           name,
-		userType:       name + "_user",
-		groupType:      name + "_group",
-		assertionCache: newAssertionCache(),
+		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
+		secrets:      mgmtCtx.Wrangler.Core.Secret(),
+		samlTokens:   mgmtCtx.Management.SamlTokens(""),
+		userMGR:      userMGR,
+		tokenMGR:     tokenMGR,
+		name:         name,
+		userType:     name + "_user",
+		groupType:    name + "_group",
+		userSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 	}
 	provider.getSamlConfig = provider.getSamlConfigFromUnstructured
 	if provider.hasLdapGroupSearch() {
 		provider.ldapProvider = ldap.Configure(mgmtCtx, userMGR, tokenMGR, name)
 	}
+
+	logrus.Debugf("SAML: Using ConfigMap assertion store for %v", name)
+	store := newConfigMapIDStore(mgmtCtx.Wrangler.Core.ConfigMap(), mgmtCtx.Wrangler.Core.ConfigMap().Cache())
+	provider.assertionStore = store
+	go store.cleanUpExpiredAssertionIDs(ctx, time.Tick(time.Minute))
 
 	SamlProviders[name] = provider
 	return provider
@@ -101,6 +110,8 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]any) (map[strin
 		p[publicclient.OKTAProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	case ShibbolethName:
 		p[publicclient.ShibbolethProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
+	case GenericSAMLName:
+		p[publicclient.GenericSAMLProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	}
 	return p, nil
 }
@@ -304,6 +315,8 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 		configType = client.OKTAConfigType
 	case ShibbolethName:
 		configType = client.ShibbolethConfigType
+	case GenericSAMLName:
+		configType = client.GenericSAMLConfigType
 	}
 
 	config.APIVersion = "management.cattle.io/v3"
@@ -371,9 +384,13 @@ func (s *Provider) UsesUserSecrets() bool      { return false }
 func (s *Provider) CanRefreshPrincipals() bool { return s.name == ShibbolethName }
 
 // SearchPrincipals searches for a principal by name using LDAP if configured.
-// Otherwise it returns a "fake" principal of a requested type with the name as the searchKey.
+// Otherwise it returns the users Rancher already knows about whose display name
+// or username matches the searchKey, followed by a principal of the requested
+// type holding the searchKey itself.
 // If the principalType is empty, both user and group principals are returned.
-// This is done because SAML, in the absence of LDAP, doesn't have a user/group lookup mechanism.
+// This is done because SAML, in the absence of LDAP, doesn't have a user/group
+// lookup mechanism, so that last principal lets an admin enter an external ID by
+// hand for an identity Rancher has not seen yet.
 func (s *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	if s.hasLdapGroupSearch() {
 		principals, err := s.ldapProvider.SearchPrincipals(searchKey, principalType, token)
@@ -386,13 +403,19 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token acces
 	var principals []apiv3.Principal
 
 	if principalType != common.GroupPrincipalType {
-		principals = append(principals, apiv3.Principal{
+		fromSearchKey := apiv3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + searchKey},
 			DisplayName:   searchKey,
 			LoginName:     searchKey,
 			PrincipalType: common.UserPrincipalType,
 			Provider:      s.name,
-		})
+		}
+
+		users, err := common.PrincipalsWithFallback(s.userSearcher, s.name, searchKey, fromSearchKey)
+		if err != nil {
+			return nil, err
+		}
+		principals = append(principals, users...)
 	}
 
 	if principalType != common.UserPrincipalType {
@@ -467,6 +490,8 @@ func formSamlRedirectURLFromMap(config map[string]any, name string) string {
 		hostname, _ = config[client.OKTAConfigFieldRancherAPIHost].(string)
 	case ShibbolethName:
 		hostname, _ = config[client.ShibbolethConfigFieldRancherAPIHost].(string)
+	case GenericSAMLName:
+		hostname, _ = config[client.GenericSAMLConfigFieldRancherAPIHost].(string)
 	}
 
 	path := hostname + "/v1-saml/" + name + "/login"

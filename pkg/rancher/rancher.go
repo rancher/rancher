@@ -237,35 +237,28 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
-	if features.Auth.Enabled() {
-		sc, err := config.NewScaledContext(*restConfig, nil)
-		if err != nil {
-			return nil, err
-		}
+	sc, err := config.NewScaledContext(*restConfig, nil)
+	if err != nil {
+		return nil, err
+	}
 
-		sc.Wrangler = wranglerContext
+	sc.Wrangler = wranglerContext
 
-		sc.UserManager, err = common.NewUserManagerNoBindings(wranglerContext)
-		if err != nil {
-			return nil, err
-		}
+	sc.UserManager, err = common.NewUserManagerNoBindings(wranglerContext)
+	if err != nil {
+		return nil, err
+	}
 
-		sc.ClientGetter, err = normanStoreProxy.NewClientGetterFromConfig(*restConfig)
-		if err != nil {
-			return nil, err
-		}
+	sc.ClientGetter, err = normanStoreProxy.NewClientGetterFromConfig(*restConfig)
+	if err != nil {
+		return nil, err
+	}
 
-		tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
+	tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc)
 
-		authServer, err = auth.NewServer(ctx, wranglerContext, sc, tokenAuthenticator)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		authServer, err = auth.NewAlwaysAdmin()
-		if err != nil {
-			return nil, err
-		}
+	authServer, err = auth.NewServer(ctx, wranglerContext, sc, tokenAuthenticator)
+	if err != nil {
+		return nil, err
 	}
 
 	if !features.Turtles.Enabled() {
@@ -306,7 +299,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		AuthMiddleware:  steveauth.ExistingContext,
 		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Core.Secret().Cache()),
 		ClusterRegistry: opts.ClusterRegistry,
-		SQLCache:        features.UISQLCache.Enabled(),
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
 			GCInterval:  gcInterval,
 			GCKeepCount: gcKeepCount,
@@ -501,7 +493,17 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return errors.New("dashboard.Register() failed: " + err.Error())
 		}
 
-		return runMigrations(r.Wrangler)
+		if err := runMigrations(r.Wrangler); err != nil {
+			return err
+		}
+
+		if err := r.Wrangler.StartFactoryWithTransaction(ctx, func(ctx context.Context) error {
+			dashboard.RegisterPostMigration(ctx, r.Wrangler)
+			return nil
+		}); err != nil {
+			return errors.New("dashboard.RegisterPostMigration() failed: " + err.Error())
+		}
+		return nil
 	})
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::DefferedCAPIRegistration", func(ctx context.Context) error {

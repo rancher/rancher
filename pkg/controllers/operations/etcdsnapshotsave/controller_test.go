@@ -5,10 +5,12 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -17,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -274,20 +277,83 @@ func (f *fakeBeaconClient) UpdateStatus(b *planv1alpha1.Beacon) (*planv1alpha1.B
 	return b, nil
 }
 
+type fakeETCDSnapshotSaveController struct {
+	operationcontrollers.ETCDSnapshotSaveController
+	enqueueCalls int
+	deleteCalls  int
+}
+
+func (f *fakeETCDSnapshotSaveController) EnqueueAfter(_, _ string, _ time.Duration) {
+	f.enqueueCalls++
+}
+
+func (f *fakeETCDSnapshotSaveController) Delete(_, _ string, _ *metav1.DeleteOptions) error {
+	f.deleteCalls++
+	return nil
+}
+
 // --- updateStatus ---------------------------------------------------------------------------
 
-func TestUpdateStatusPaused(t *testing.T) {
+func TestUpdateStatusPausedCondition(t *testing.T) {
 	t.Parallel()
 
-	op := newOp()
-	op.Spec.Paused = true
-	op.Generation = 7
+	cases := []struct {
+		name            string
+		paused          bool
+		initiallyPaused bool
+		expectedStatus  string
+		expectedReason  string
+		expectedMessage string
+	}{
+		{
+			name:            "paused",
+			paused:          true,
+			initiallyPaused: false,
+			expectedStatus:  "True",
+			expectedReason:  opv1alpha1.PausedReason,
+			expectedMessage: "Operation is paused",
+		},
+		{
+			name:            "resumed",
+			paused:          false,
+			initiallyPaused: true,
+			expectedStatus:  "False",
+			expectedReason:  opv1alpha1.NotPausedReason,
+			expectedMessage: "",
+		},
+	}
 
-	status := updateStatus(op, opv1alpha1.ETCDSnapshotSaveStatus{})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOp()
+			op.Spec.Paused = tc.paused
+			op.Generation = 7
 
-	assert.Equal(t, int64(7), status.ObservedGeneration, "ObservedGeneration must be copied from the op")
-	assert.Equal(t, "True", opv1alpha1.PausedCondition.GetStatus(&status))
-	assert.Equal(t, opv1alpha1.PausedReason, opv1alpha1.PausedCondition.GetReason(&status))
+			initialStatus := opv1alpha1.ETCDSnapshotSaveStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase: opv1alpha1.OperationPhaseInProgress,
+				},
+				Step: opv1alpha1.ETCDSnapshotSaveStepSave,
+			}
+
+			if tc.initiallyPaused {
+				opv1alpha1.PausedCondition.True(&initialStatus)
+				opv1alpha1.PausedCondition.Reason(&initialStatus, opv1alpha1.PausedReason)
+				opv1alpha1.PausedCondition.Message(&initialStatus, "Operation is paused")
+			}
+
+			status := updateStatus(op, initialStatus)
+
+			assert.Equal(t, int64(7), status.ObservedGeneration, "ObservedGeneration must be copied from the op")
+			assert.Equal(t, tc.expectedStatus, opv1alpha1.PausedCondition.GetStatus(&status))
+			assert.Equal(t, tc.expectedReason, opv1alpha1.PausedCondition.GetReason(&status))
+			assert.Equal(t, tc.expectedMessage, opv1alpha1.PausedCondition.GetMessage(&status))
+
+			// Verify phase and step are unchanged
+			assert.Equal(t, initialStatus.Phase, status.Phase, "Phase should be unchanged")
+			assert.Equal(t, initialStatus.Step, status.Step, "Step should be unchanged")
+		})
+	}
 }
 
 func TestUpdateStatusByPhase(t *testing.T) {
@@ -337,6 +403,8 @@ func TestUpdateStatusByPhase(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			op := newOp()
 			status := updateStatus(op, opv1alpha1.ETCDSnapshotSaveStatus{
 				OperationStatus: opv1alpha1.OperationStatus{Phase: tc.phase},
@@ -345,8 +413,6 @@ func TestUpdateStatusByPhase(t *testing.T) {
 		})
 	}
 }
-
-// --- handlePending --------------------------------------------------------------------------
 
 func TestHandlePending_NilBeacon(t *testing.T) {
 	t.Parallel()
@@ -418,8 +484,6 @@ func TestHandlePending_WaitForRegisterErrorBubbles(t *testing.T) {
 	assert.ErrorIs(t, err, sentinel)
 }
 
-// --- handleInProgress -----------------------------------------------------------------------
-
 func TestHandleInProgress_BeaconLost(t *testing.T) {
 	t.Parallel()
 
@@ -446,8 +510,6 @@ func TestHandleInProgress_UnknownStep(t *testing.T) {
 	assert.Equal(t, opv1alpha1.OperationPhaseFailed, got.Phase)
 	assert.Equal(t, opv1alpha1.UnknownStepReason, opv1alpha1.FailedCondition.GetReason(&got))
 }
-
-// --- handleFailed / handleSucceeded --------------------------------------------------------
 
 func TestHandleFailed_HoldingBeaconReleases(t *testing.T) {
 	t.Parallel()
@@ -516,8 +578,6 @@ func TestHandleSucceeded_HoldingBeaconEnqueuesCluster(t *testing.T) {
 	}
 }
 
-// --- reconcileSave --------------------------------------------------------------------------
-
 // expectedSaveInstruction builds the snapshot save instruction the controller will dispatch given
 // an op spec and stubAdapter, so tests can predict the exact plan bytes the agent will see.
 func expectedSaveInstruction(op *opv1alpha1.ETCDSnapshotSave, runtime string) planapi.OneTimeInstruction {
@@ -534,15 +594,18 @@ func expectedSaveInstruction(op *opv1alpha1.ETCDSnapshotSave, runtime string) pl
 	}
 }
 
+// Both plans are scoped to the operation and step they belong to, exactly as the controller assigns
+// them: without that the plan bytes of two operations would be identical, and the second would be
+// reported as already applied instead of being executed.
 func expectedSavePlan(op *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) *planapi.Plan {
-	return &planapi.Plan{
+	return ops.WithOperationEnv(&planapi.Plan{
 		OneTimeInstructions: []planapi.OneTimeInstruction{expectedSaveInstruction(op, adapter.runtimeCommand)},
 		Probes:              adapter.probes,
-	}
+	}, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.ETCDSnapshotSaveStepSave))
 }
 
-func expectedRestartPlan(adapter *stubAdapter) *planapi.Plan {
-	return &planapi.Plan{
+func expectedRestartPlan(op *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) *planapi.Plan {
+	return ops.WithOperationEnv(&planapi.Plan{
 		OneTimeInstructions: []planapi.OneTimeInstruction{
 			{CommonInstruction: planapi.CommonInstruction{
 				Name:    "restart",
@@ -551,7 +614,7 @@ func expectedRestartPlan(adapter *stubAdapter) *planapi.Plan {
 			}},
 		},
 		Probes: adapter.probes,
-	}
+	}, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.ETCDSnapshotSaveStepRestart))
 }
 
 func TestReconcileSave_NoSecrets(t *testing.T) {
@@ -563,7 +626,7 @@ func TestReconcileSave_NoSecrets(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	status, err := h.reconcileSave(newScope(newOp(), nil, defaultAdapter()), opv1alpha1.ETCDSnapshotSaveStatus{})
+	status, err := h.reconcileSave(newScope(newOp(), nil, defaultAdapter()), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepSave})
 	// The Collector validator surfaces the empty-set condition as an error; the outer status
 	// handler will requeue (and the op stays in its current phase until the situation resolves).
 	assert.NoError(t, err, "terminal errors should not trigger reenqueue")
@@ -583,7 +646,7 @@ func TestReconcileSave_WaitsForPlanApply(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepSave})
 	assert.NoError(t, err)
 	// Plan was just delivered to the agent — controller must report InProgress and let the next
 	// reconcile poll feedback.
@@ -604,7 +667,7 @@ func TestReconcileSave_TransitionsToRestartWhenApplied(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepSave})
 	assert.NoError(t, err)
 	assert.Empty(t, string(got.Phase), "phase must not change on a clean transition")
 	assert.Equal(t, opv1alpha1.ETCDSnapshotSaveStepRestart, got.Step)
@@ -623,7 +686,7 @@ func TestReconcileSave_PlanFailureMarksFailed(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	got, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepSave})
 	assert.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseFailed, got.Phase)
 	assert.Equal(t, opv1alpha1.PlanFailedReason, opv1alpha1.FailedCondition.GetReason(&got))
@@ -646,7 +709,7 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	_, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	_, err := h.reconcileSave(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepSave})
 	assert.NoError(t, err)
 
 	wantArgs := []string{"etcd-snapshot", "save", "--name", "my-snap"}
@@ -655,8 +718,6 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	}
 }
 
-// --- reconcileRestart -----------------------------------------------------------------------
-
 func TestReconcileRestart_MarksSucceededWhenApplied(t *testing.T) {
 	t.Parallel()
 
@@ -664,13 +725,13 @@ func TestReconcileRestart_MarksSucceededWhenApplied(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(adapter))
+	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(op, adapter))
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepRestart})
 	assert.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, got.Phase)
 	assert.Equal(t, opv1alpha1.FinishedReason, opv1alpha1.SucceededCondition.GetReason(&got))
@@ -689,7 +750,7 @@ func TestReconcileRestart_WaitsForPlanApply(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepRestart})
 	assert.NoError(t, err)
 	assert.Empty(t, string(got.Phase), "phase must not advance to Succeeded while restart is pending")
 	assert.Equal(t, opv1alpha1.WaitingForPlanAppliedReason, opv1alpha1.InProgressCondition.GetReason(&got))
@@ -702,13 +763,13 @@ func TestReconcileRestart_PlanFailureMarksFailed(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	secret := withFailedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(adapter))
+	secret := withFailedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(op, adapter))
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepRestart})
 	assert.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseFailed, got.Phase)
 	assert.Equal(t, opv1alpha1.PlanFailedReason, opv1alpha1.FailedCondition.GetReason(&got))
@@ -721,7 +782,7 @@ func TestReconcileRestart_FiltersToEtcdSecrets(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	etcd := withAppliedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(adapter))
+	etcd := withAppliedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(op, adapter))
 	worker := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "worker-1",
@@ -740,9 +801,161 @@ func TestReconcileRestart_FiltersToEtcdSecrets(t *testing.T) {
 	}
 	h.store = planapi.NewStore(h.secrets)
 
-	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{})
+	got, err := h.reconcileRestart(newScope(op, nil, adapter), opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepRestart})
 	assert.NoError(t, err)
 	// Worker secret must be ignored — only etcd nodes receive the restart plan; success would
 	// not be reached if the worker were included (its plan is not in "applied" state).
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, got.Phase, "non-etcd secrets must not be in the iteration")
+}
+
+// TestAssignedPlansAreOperationScoped covers the property the assigned plans depend on: AssignPlan
+// only writes a plan whose bytes differ from the one already on the secret, and the system-agent only
+// re-runs a plan whose content changed. Two saves of the same shape must therefore serialize
+// differently, otherwise a save retried after a failed one would be reported as already applied and
+// succeed without ever taking a snapshot.
+func TestAssignedPlansAreOperationScoped(t *testing.T) {
+	t.Parallel()
+
+	adapter := defaultAdapter()
+
+	opWithUID := func(uid types.UID) *opv1alpha1.ETCDSnapshotSave {
+		op := newOp()
+		op.UID = uid
+		return op
+	}
+
+	for name, build := range map[string]func(*opv1alpha1.ETCDSnapshotSave) *planapi.Plan{
+		"save":    func(op *opv1alpha1.ETCDSnapshotSave) *planapi.Plan { return expectedSavePlan(op, adapter) },
+		"restart": func(op *opv1alpha1.ETCDSnapshotSave) *planapi.Plan { return expectedRestartPlan(op, adapter) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			marshal := func(uid types.UID) string {
+				data, err := json.Marshal(build(opWithUID(uid)))
+				assert.NoError(t, err)
+				return string(data)
+			}
+
+			assert.NotEqual(t, marshal("save-uid-1"), marshal("save-uid-2"),
+				"plans for two operations must not serialize identically, or the second is reported as already applied")
+			assert.Equal(t, marshal("save-uid-1"), marshal("save-uid-1"),
+				"plans for one operation must serialize identically across reconciles")
+		})
+	}
+}
+
+func TestOnChange_StablePausedOperation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		phase       opv1alpha1.OperationPhase
+		step        opv1alpha1.ETCDSnapshotSaveStep
+		ttl         int64
+		lastUpdated metav1.Time
+	}{
+		{
+			name:        "stable in-progress paused operation",
+			phase:       opv1alpha1.OperationPhaseInProgress,
+			step:        opv1alpha1.ETCDSnapshotSaveStepSave,
+			ttl:         300,
+			lastUpdated: metav1.Now(),
+		},
+		{
+			name:        "stable terminal expired paused operation",
+			phase:       opv1alpha1.OperationPhaseSucceeded,
+			step:        opv1alpha1.ETCDSnapshotSaveStepSave,
+			ttl:         0,
+			lastUpdated: metav1.NewTime(metav1.Now().Add(-10 * time.Minute)),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOp()
+			op.Spec.Paused = true
+			op.Spec.TTL = tc.ttl
+			op.Generation = 7
+
+			initialStatus := opv1alpha1.ETCDSnapshotSaveStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase:       tc.phase,
+					LastUpdated: tc.lastUpdated,
+				},
+				Step: tc.step,
+			}
+
+			// Pre-compute the expected status with paused condition
+			currentStatus := updateStatus(op, initialStatus)
+			op.Status = currentStatus
+
+			controller := &fakeETCDSnapshotSaveController{}
+			h := &handler{
+				etcdsnapshotsaves: controller,
+			}
+
+			returnedStatus, err := h.OnChange(op, op.Status)
+			if err != nil {
+				t.Fatalf("OnChange returned error: %v", err)
+			}
+
+			// Verify status unchanged
+			if !equality.Semantic.DeepEqual(returnedStatus, currentStatus) {
+				t.Errorf("returnedStatus differs from currentStatus")
+			}
+
+			// Verify phase and step preserved
+			assert.Equal(t, tc.phase, returnedStatus.Phase)
+			assert.Equal(t, tc.step, returnedStatus.Step)
+
+			// Verify no delete occurred
+			assert.Zero(t, controller.deleteCalls, "Delete should not be called")
+
+			// Verify no enqueue occurred
+			assert.Zero(t, controller.enqueueCalls, "EnqueueAfter should not be called")
+		})
+	}
+}
+
+func TestOnChange_Paused(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Paused = true
+	op.Generation = 7
+
+	initialStatus := opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase: opv1alpha1.OperationPhaseInProgress,
+		},
+		Step: opv1alpha1.ETCDSnapshotSaveStepSave,
+	}
+
+	op.Status = initialStatus
+
+	h := &handler{}
+	status, err := h.OnChange(op, op.Status)
+
+	if err != nil {
+		t.Fatalf("OnChange returned error: %v", err)
+	}
+	if got := opv1alpha1.PausedCondition.GetStatus(&status); got != "True" {
+		t.Errorf("PausedCondition status = %q, want %q", got, "True")
+	}
+	if got := opv1alpha1.PausedCondition.GetReason(&status); got != opv1alpha1.PausedReason {
+		t.Errorf("PausedCondition reason = %q, want %q", got, opv1alpha1.PausedReason)
+	}
+	if got := opv1alpha1.PausedCondition.GetMessage(&status); got != "Operation is paused" {
+		t.Errorf("PausedCondition message = %q, want %q", got, "Operation is paused")
+	}
+	if status.ObservedGeneration != int64(7) {
+		t.Errorf("ObservedGeneration = %d, want 7", status.ObservedGeneration)
+	}
+	if status.Phase != initialStatus.Phase {
+		t.Errorf("Phase = %q, want %q (unchanged)", status.Phase, initialStatus.Phase)
+	}
+	if status.Step != initialStatus.Step {
+		t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
+	}
 }

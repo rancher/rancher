@@ -38,20 +38,27 @@ on:
         type: string
 
   schedule:
-    - cron: '30 4,6 * * 1-5'
+    - cron: '30 6 * * 1-5'
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 jobs:
   call-workflow:
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@f1f302ad1fbfdd3dde0e32a1dc2e941485118532 # v1.0.4
+    permissions:
+      contents: read
+      id-token: write # Required for Vault OIDC authentication.
+    # https://github.com/rancher/renovate-config/releases
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@b20e059a3642b4f6add6f9db276349daca5ea54e # v1.0.10
+    # Note: github.event.inputs.<name> with '||' fallbacks is used across all inputs
+    # so that scheduled cron runs (where github.event.inputs is null) safely default.
     with:
-      configMigration: ${{ inputs.configMigration || 'true' }}
-      logLevel: ${{ inputs.logLevel || 'info' }}
-      overrideSchedule: ${{ github.event.inputs.overrideSchedule == 'true' && '{''schedule'':null}' || '' }}
-      renovateConfig: ${{ inputs.renovateConfig || '.github/renovate.json' }}
-      minimumReleaseAge: ${{ inputs.minimumReleaseAge || 'null' }}
+      configMigration: ${{ github.event.inputs.configMigration || 'true' }}
+      logLevel: ${{ github.event.inputs.logLevel || 'info' }}
+      overrideSchedule: ${{ github.event.inputs.overrideSchedule || 'false' }}
+      renovateConfig: ${{ github.event.inputs.renovateConfig || '.github/renovate.json' }}
+      minimumReleaseAge: ${{ github.event.inputs.minimumReleaseAge || 'null' }}
     secrets:
+      # Optional: RENOVATE_FORK_GH_TOKEN allows this action to run on repository forks where
+      # Vault/App token generation is unavailable. Defaulting to '' allows the caller
+      # to fall back gracefully on standard runs without failing secret evaluation.
       override-token: "${{ secrets.RENOVATE_FORK_GH_TOKEN || '' }}"

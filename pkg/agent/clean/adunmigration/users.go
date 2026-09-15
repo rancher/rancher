@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func describePlannedChanges(workunit migrateUserWorkUnit) {
@@ -41,9 +41,15 @@ func deleteDuplicateUsers(workunit migrateUserWorkUnit, sc *config.ScaledContext
 func updateModifiedUser(workunit migrateUserWorkUnit, sc *config.ScaledContext) {
 	workunit.originalUser.Annotations[adGUIDMigrationAnnotation] = workunit.guid
 	workunit.originalUser.Labels[adGUIDMigrationLabel] = migratedLabelValue
-	_, err := sc.Management.Users("").Update(workunit.originalUser)
+	impClient, err := sc.Wrangler.Mgmt.User().WithImpersonation(controllers.WebhookImpersonation())
+	if err != nil {
+		logrus.Errorf("[%v] failed to impersonate webhook to update user '%v': %v", migrateAdUserOperation, workunit.originalUser.Name, err)
+		return
+	}
+	_, err = impClient.Update(workunit.originalUser)
 	if err != nil {
 		logrus.Errorf("[%v] failed to save modified user '%v' with: %v", migrateAdUserOperation, workunit.originalUser.Name, err)
+		return
 	}
 	logrus.Infof("[%v] user %v was successfully migrated", migrateAdUserOperation, workunit.originalUser.Name)
 }

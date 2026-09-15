@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -40,6 +41,7 @@ type tokenHandler struct {
 	clusterUserAttributeLister clusterv3.ClusterUserAttributeLister
 	tokenIndexer               cache.Indexer
 	extTokenIndexer            atomic.Value // holds cache.Indexer; written once by the EXT API DeferFunc, read by v3 remove handlers
+	extTokenStore              *extstore.SystemStore
 	userLister                 managementv3.UserLister
 	userAttributeLister        managementv3.UserAttributeLister
 	clusterSecret              wcore.SecretClient
@@ -57,6 +59,24 @@ func validateToken(name, userID string) error {
 	return nil
 }
 
+// extTokenHash returns the hash of the named ext token. The ext.cattle.io API
+// strips Status.Hash from everything it serves, including the list and watch
+// calls backing this controller's informer, so the hash has to be read from the
+// token's backing secret instead.
+func (h *tokenHandler) extTokenHash(name string) (string, error) {
+	secret, err := h.extTokenStore.GetSecret(name, nil, true)
+	if err != nil {
+		return "", fmt.Errorf("unable to retrieve backing secret of token [%s]: %w", name, err)
+	}
+
+	hash := string(secret.Data[extstore.FieldHash])
+	if hash == "" {
+		return "", fmt.Errorf("backing secret of token [%s] carries no hash", name)
+	}
+
+	return hash, nil
+}
+
 // extCreate is called when a given ext token is created, and is responsible for
 // updating/creating the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
@@ -71,8 +91,13 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	}
 
 	// we can sync tokens which are hashed by copying the hash downstream
+	hash, err := h.extTokenHash(token.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// token is hashed, we can safely attempt to sync downstream
-	hashVersion, err := hashers.GetHashVersion(token.Status.Hash)
+	hashVersion, err := hashers.GetHashVersion(hash)
 	if err != nil {
 		// the token hash is unlikely to change, re-enqueing would just produce a flood of errors
 		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err.Error())
@@ -80,7 +105,7 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 	}
 	// we only sync tokens downstream that were created with SHA3
 	if hashVersion == hashers.SHA3Version {
-		return nil, h.createClusterAuthToken(token, token.Status.Hash)
+		return nil, h.createClusterAuthToken(token, hash)
 	}
 
 	// token is hashed, but we can't sync it since we don't have the raw value
@@ -106,6 +131,11 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	}
 	clusterAuthToken = clusterAuthToken.DeepCopy()
 
+	hash, err := h.extTokenHash(token.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	forced := false
 	clusterAuthTokenSecret, err := h.clusterSecretLister.Get(h.namespace, common.ClusterAuthTokenSecretName(token.Name))
 	if err != nil {
@@ -117,8 +147,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 		// missing. Make it now, and force an update later.
 
 		forced = true
-		hashedValue := token.Status.Hash
-		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
+		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hash)
 	} else {
 		clusterAuthTokenSecret = clusterAuthTokenSecret.DeepCopy()
 	}
@@ -141,7 +170,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	}
 
 	// note: ext tokens are always hashed (contrary to v3 Tokens)
-	hashVersion, err := hashers.GetHashVersion(token.Status.Hash)
+	hashVersion, err := hashers.GetHashVersion(hash)
 	if err != nil {
 		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err.Error())
 		return token, generic.ErrSkip
@@ -149,7 +178,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	// we only sync tokens downstream that were created with SHA3
 	if hashVersion == hashers.SHA3Version {
 		// trigger the compare to compare the values of the tokens
-		current.value = token.Status.Hash
+		current.value = hash
 		old.value = common.ClusterAuthTokenSecretValue(clusterAuthTokenSecret)
 	}
 

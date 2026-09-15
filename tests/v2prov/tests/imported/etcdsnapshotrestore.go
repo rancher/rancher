@@ -105,6 +105,16 @@ func WithRestoreLabels(labels map[string]string) SnapshotRestoreOption {
 	}
 }
 
+// WithRestoreTTL overrides the default TTL. The operation CR is garbage collected TTL seconds after
+// it reaches a terminal phase, so tests which assert against a terminal operation (rather than just
+// waiting for it) need a longer window than the default to avoid racing that deletion. A negative
+// TTL disables expiry entirely.
+func WithRestoreTTL(seconds int64) SnapshotRestoreOption {
+	return func(op *opv1alpha1.ETCDSnapshotRestore) {
+		op.Spec.TTL = seconds
+	}
+}
+
 // buildSnapshotRestoreOp assembles the ETCDSnapshotRestore object with the standard defaults so the
 // Create/Run/Hook helpers don't duplicate the literal.
 func buildSnapshotRestoreOp(namespace, snapshotName string, clusterRef corev1.ObjectReference, opts ...SnapshotRestoreOption) *opv1alpha1.ETCDSnapshotRestore {
@@ -265,6 +275,41 @@ func AdvancePastSnapshotRestoreHook(
 	if _, err := plan.PopDelegate(beacon, delegateName, clients.Plan.Beacon()); err != nil {
 		t.Fatalf("pop delegate %q from beacon %s/%s: %v", delegateName, beaconNS, beaconName, err)
 	}
+}
+
+// WaitForSnapshotRestoreFailed polls until the op reaches the Failed phase and returns it, for tests
+// which assert that a restore is refused. Fails fast if the operation instead succeeds.
+//
+// Canceled is reported separately from Failed on purpose: the preflight step cancels (rather than
+// fails) the operation when the check instruction itself could not run — e.g. the server token file
+// was not found where the controller looked for it — which is a different defect from the check
+// running and rejecting the snapshot.
+func WaitForSnapshotRestoreFailed(t *testing.T, clients *clients.Clients, op *opv1alpha1.ETCDSnapshotRestore) *opv1alpha1.ETCDSnapshotRestore {
+	t.Helper()
+
+	var latestOp *opv1alpha1.ETCDSnapshotRestore
+	err := utilwait.PollUntilContextTimeout(clients.Ctx, 5*time.Second, 10*time.Minute, true, func(_ context.Context) (bool, error) {
+		got, err := clients.Operation.ETCDSnapshotRestore().Get(op.Namespace, op.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		switch got.Status.Phase {
+		case opv1alpha1.OperationPhaseSucceeded:
+			return false, fmt.Errorf("operation %s/%s reached Succeeded but should have failed", got.Namespace, got.Name)
+		case opv1alpha1.OperationPhaseCanceled:
+			return false, fmt.Errorf("operation %s/%s was canceled at step %q (%s: %s) but should have failed",
+				got.Namespace, got.Name, got.Status.Step,
+				opv1alpha1.CanceledCondition.GetReason(got), opv1alpha1.CanceledCondition.GetMessage(got))
+		case opv1alpha1.OperationPhaseFailed:
+			latestOp = got
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		handleError(t, clients, op.Spec.ClusterRef.Name, err)
+	}
+	return latestOp
 }
 
 // WaitForSnapshotRestoreSucceeded polls until the op reaches Succeeded with no delegate left on

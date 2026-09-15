@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr/installer"
-	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -33,12 +32,17 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 	clusterID := convert.ToString(crt.Spec.ClusterName)
 	crtStatus := crt.Status.DeepCopy()
 
-	return AssignCommands(crtStatus, clusterID, h.clusters)
+	cluster, err := h.clustersCache.Get(clusterID)
+	if err != nil {
+		return *crtStatus, err
+	}
+
+	return AssignCommands(crtStatus, cluster)
 }
 
 // AssignCommands populates the command fields in a CRT status using the "{token}" placeholder.
 // Substitution of the placeholder with the real token happens at the API layer.
-func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, clusterID string, clusters mgmtcontrollers.ClusterCache) (v32.ClusterRegistrationTokenStatus, error) {
+func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, cluster *v32.Cluster) (v32.ClusterRegistrationTokenStatus, error) {
 	checksum := systemtemplate.CAChecksum()
 	ca := ""
 	caWindows := ""
@@ -47,7 +51,7 @@ func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, clusterID str
 		caWindows = " -CaChecksum " + checksum
 	}
 
-	url, err := getURL(tokenPlaceholder, clusterID)
+	url, err := getURL(tokenPlaceholder, cluster.Name)
 	if err != nil {
 		return *crtStatus, err
 	}
@@ -61,11 +65,6 @@ func AssignCommands(crtStatus *v32.ClusterRegistrationTokenStatus, clusterID str
 	crtStatus.ManifestURL = url
 
 	rootURL, err := getRootURL()
-	if err != nil {
-		return *crtStatus, err
-	}
-
-	cluster, err := clusters.Get(clusterID)
 	if err != nil {
 		return *crtStatus, err
 	}

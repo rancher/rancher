@@ -17,11 +17,11 @@ ARG GODEP_STEVE_PATH
 ARG GODEP_WRANGLER=scratch
 ARG GODEP_WRANGLER_PATH
 
-ARG CHART_DEFAULT_BRANCH=dev-v2.15
+ARG CHART_DEFAULT_BRANCH=dev-v2.16
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.15
+ARG CATTLE_KDM_BRANCH=dev-v2.16
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -32,17 +32,21 @@ FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
 
-FROM registry.suse.com/bci/bci-micro:15.7 AS final
+FROM registry.suse.com/bci/bci-micro:16.0 AS final
 RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.7 AS chroot-builder
+FROM registry.suse.com/bci/bci-base:16.0 AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
+
+# Assert that builder matches the target OS version
+RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ]
+
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-      catatonit curl util-linux ca-certificates ca-certificates-mozilla xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
+      catatonit curl util-linux ca-certificates ca-certificates-mozilla findutils xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
 
 
 FROM chroot-builder AS chroot-builder-server
@@ -54,7 +58,7 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
-      jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
@@ -62,37 +66,11 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26.5 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26.6 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
 ENV GOCACHE=/root/.cache/go/cache
-
-FROM builder AS rancher-charts
-ARG CHART_DEFAULT_BRANCH
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone --no-checkout -b $CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
-
-FROM builder AS partner-charts
-ARG PARTNER_CHART_DEFAULT_BRANCH
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone --no-checkout -b $PARTNER_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
-
-
-FROM builder AS rke2-charts
-ARG RKE2_CHART_DEFAULT_BRANCH
-RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
-    # Temporarily clone from our GitHub's main repo, to avoid unnecessary load in git.rancher.io
-    git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
-    # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
-    git clone --no-checkout -b $RKE2_CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
-
 
 FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
@@ -111,6 +89,9 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/mount --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
+
+# pkg/jailer expects /etc/nsswitch.conf; SLES 16 only ships it under /usr/etc.
+RUN cp /usr/etc/nsswitch.conf /etc/nsswitch.conf
 
 RUN useradd rancher && \
     groupadd jail-accessors && \
@@ -139,10 +120,10 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher145
-ENV CATTLE_MACHINE_CHECKSUM_amd64=7cf9e1a42982429d05d66c106d4560269cdfc617f84417013c72a56f1171f668
-ENV CATTLE_MACHINE_CHECKSUM_arm64=8f0f1084b5af73c71d982b652b086421ad26468c9e7d27ded00813de133ac174
-ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.4
+ENV CATTLE_MACHINE_CHECKSUM_amd64=1d961c67b3dfe0d7d7bdcae1256b96277f5948cf48e68a8c2eebd60baf9b9bc7
+ENV CATTLE_MACHINE_CHECKSUM_arm64=8e85bf417ace7a43b0f8b04ceb10065c8d92ddcd295ea9707018956b0202b2c5
+ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.6.12
 ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
@@ -150,24 +131,24 @@ ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.2.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.6
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=7db00430a1c047e6627681446a99219815156e971043ba7a22a083d69fafe44a
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=e536ded30af40bdfa53a1010e39dfe2f72f5add499b564b9516c1385ee3a98c5
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.9
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=159ec4d8c0d9dae8e322e7ddff64c0a5837c3dc209ae2e345128d4d5cb32279d
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=32a2d906bae047884c30dfd5370f83458edfc77e016b631dcdd46c9f98610951
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.2
-ENV CATTLE_WINS_AGENT_CHECKSUM=9078b9ed1dd4bd14b496a9810786a38104ca897e5a40770746b279349bca43b3
-ENV CATTLE_WINS_AGENT_CHECKSUM_install=b2837612bc0fb3da630748392923459ec344de98e31a42739418747162de18bd
-ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=a55a1b229d9d80aa64687f9c617a41a4265aff862a4f73f31139d05ddc6cc858
+ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.5
+ENV CATTLE_WINS_AGENT_CHECKSUM=48ff26bd222f577f8963a019287d5611d5337c3b90f9bd76cc07145b7c5e5dc2
+ENV CATTLE_WINS_AGENT_CHECKSUM_install=551ab55e30f0fad203bedbee819662e198ba567f76cd0d31f71fc07dc309d45a
+ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=af543484cfd5c72556dedc677569e3eec5c537b011f9c96ca8974be6090869f7
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.15.0
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=e68913abef52f99b1aee3ccbfafdf49025859d921e89ec99af2244f876e99da0
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=c9f9b1a0237cd02179edc8f4f0922302994d08932d14e8c327bb1fdc632a2e87
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=2deaab5392ca8b24e52438be75fc1414db0bbb674c6e623e6d1fd86f227afc2a
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.1
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=bfec66bf7146bd17a1c88b4fa789fe844db23ccf41a0ee210960b2f3663c53cf
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=fd88313c2a7a3374f0e28421499ce3f270594072515dc595b33af60701a9d8f8
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=8dbf0013663a08c31d31e8ebff4d94a6ac8fc6e986091356c23bd3ea165e7e01
 ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -186,10 +167,6 @@ ARG CATTLE_GKE_OPERATOR_VERSION
 ENV CATTLE_GKE_OPERATOR_VERSION=$CATTLE_GKE_OPERATOR_VERSION
 ARG CATTLE_ALI_OPERATOR_VERSION
 ENV CATTLE_ALI_OPERATOR_VERSION=$CATTLE_ALI_OPERATOR_VERSION
-
-COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
-COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
-COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 
 
 RUN case "${ARCH}" in \
@@ -221,7 +198,7 @@ RUN case "${ARCH}" in \
 
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.2-k3s1 \
+COPY --from=rancher/k3s:v1.36.4-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -380,7 +357,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.36.1+k3s1
+ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -474,6 +451,9 @@ ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=$CATTLE_BASE_CLUSTER_AUTOSCA
 ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=$CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE
 ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=$CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT
 
+# We still create the catalogs dir
+RUN mkdir -p /var/lib/rancher-data/local-catalogs
+
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
@@ -483,6 +463,7 @@ COPY --chown=root:root --chmod=0755 \
     package/entrypoint.sh \
     package/jailer.sh /usr/bin/
 
+VOLUME /var/lib/rancher-data/local-catalogs
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
@@ -534,13 +515,15 @@ ARG VERSION
 ENV AGENT_IMAGE=${RANCHER_REPO}/rancher-agent:${VERSION}
 
 ENV SSL_CERT_DIR=/etc/kubernetes/ssl/certs
-COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
-COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
-COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
 COPY --from=agent-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
+
+# We still create the catalogs dir
+RUN mkdir -p /var/lib/rancher-data/local-catalogs
+
+VOLUME /var/lib/rancher-data/local-catalogs
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
     "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \

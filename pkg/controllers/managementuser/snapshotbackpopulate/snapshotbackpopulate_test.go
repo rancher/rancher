@@ -3,6 +3,7 @@ package snapshotbackpopulate
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"strings"
 	"testing"
@@ -303,8 +304,9 @@ func TestOnUpstreamChange(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			ctrl := gomock.NewController(t)
 			h := tt.handlerFunc(ctrl)
 			snapshotCopy := tt.snapshot.DeepCopy()
@@ -323,6 +325,8 @@ func TestOnUpstreamChange(t *testing.T) {
 }
 
 func TestOnDownstreamChange(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
 	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
@@ -551,6 +555,8 @@ func TestOnDownstreamChange(t *testing.T) {
 }
 
 func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
+	t.Parallel()
+
 	compressSpec := func(t *testing.T, spec *provv1.ClusterSpec) string {
 		payload, err := snapshotutil.CompressInterface(spec)
 		require.NoError(t, err)
@@ -784,8 +790,9 @@ func TestGetCluster(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			h := handler{
 				clusterRef: tt.clusterRef,
 				dynamic:    &dynamicClientFake{obj: tt.dynamicObj, err: tt.dynamicErr},
@@ -871,8 +878,9 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			ctrl := gomock.NewController(t)
 			cache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
 			tt.cacheFunc(cache)
@@ -894,6 +902,8 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 }
 
 func TestGetLogPrefix(t *testing.T) {
+	t.Parallel()
+
 	cluster := newProvisioningClusterUnstructured("test-namespace", "test-cluster")
 	expected := fmt.Sprintf("[snapshotbackpopulate] %s/test-namespace/test-cluster:",
 		schema.FromAPIVersionAndKind("provisioning.cattle.io/v1", "Cluster").String())
@@ -911,9 +921,7 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 
 	drop := func(key string) map[string]string {
 		l := make(map[string]string, len(allLabels))
-		for k, v := range allLabels {
-			l[k] = v
-		}
+		maps.Copy(l, allLabels)
 		delete(l, key)
 		return l
 	}
@@ -981,14 +989,16 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 
 	mapper := testRESTMapper()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			obj := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "test-node",
 					Labels: tt.labels,
 				},
 			}
+
 			ref, err := planv1alpha1.MachineLifecycleLabelsToObjectReference(obj, tt.contextNamespace, mapper)
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -1002,6 +1012,8 @@ func TestMachineLifecycleLabelsToObjectReference(t *testing.T) {
 }
 
 func TestGenerateSafeSnapshotName(t *testing.T) {
+	t.Parallel()
+
 	callTime := time.Unix(1_700_000_000, 0)
 
 	newSpec := func(name, node, loc string, s3 bool) k3s.ETCDSnapshotSpec {
@@ -1048,8 +1060,9 @@ func TestGenerateSafeSnapshotName(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := generateSafeSnapshotName(tc.spec, callTime)
 			require.Equal(t, strings.ToLower(got), got)
 			require.True(t, strings.HasPrefix(got, tc.wantPrefix), got)
@@ -1065,6 +1078,8 @@ func TestGenerateSafeSnapshotName(t *testing.T) {
 	}
 
 	t.Run("Digest changes when location changes", func(t *testing.T) {
+		t.Parallel()
+
 		a := newSpec("ok", "cp-0", "s3://bucket/prefix/A", true)
 		b := newSpec("ok", "cp-0", "s3://bucket/prefix/B", true)
 
@@ -1075,4 +1090,100 @@ func TestGenerateSafeSnapshotName(t *testing.T) {
 		require.True(t, strings.HasPrefix(gb, "s3-ok-"))
 		require.NotEqual(t, ga, gb, "digest suffix must differ when location differs")
 	})
+}
+
+func TestGetSnapshotHash(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		snapshot *k3s.ETCDSnapshotFile
+		want     string
+	}{
+		{
+			name:     "nil snapshot",
+			snapshot: nil,
+			want:     "",
+		},
+		{
+			name: "empty snapshot",
+			snapshot: &k3s.ETCDSnapshotFile{
+				Spec: k3s.ETCDSnapshotSpec{},
+			},
+			want: "",
+		},
+		{
+			name: "empty annotations",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "empty rke2",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.rke2.cattle.io/snapshot-token-hash": "",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "empty k3s",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.k3s.cattle.io/snapshot-token-hash": "",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "unrelated",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.testing.cattle.io/snapshot-token-hash": "abc123",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "rke2",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.rke2.cattle.io/snapshot-token-hash": "abc123",
+					},
+				},
+			},
+			want: "abc123",
+		},
+		{
+			name: "k3s",
+			snapshot: &k3s.ETCDSnapshotFile{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"etcd.k3s.cattle.io/snapshot-token-hash": "abc123",
+					},
+				},
+			},
+			want: "abc123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := getSnapshotHash(tt.snapshot)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

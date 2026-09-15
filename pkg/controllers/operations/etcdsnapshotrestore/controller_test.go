@@ -2,14 +2,18 @@ package etcdsnapshotrestore
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	corev1 "k8s.io/api/core/v1"
@@ -119,6 +123,21 @@ func makePlanSecret(name, nodeName string, labels map[string]string) *corev1.Sec
 			UID:       types.UID(name + "-uid"),
 		},
 	}
+}
+
+type fakeETCDSnapshotRestoreController struct {
+	operationcontrollers.ETCDSnapshotRestoreController
+	enqueueCalls int
+	deleteCalls  int
+}
+
+func (f *fakeETCDSnapshotRestoreController) EnqueueAfter(_, _ string, _ time.Duration) {
+	f.enqueueCalls++
+}
+
+func (f *fakeETCDSnapshotRestoreController) Delete(_, _ string, _ *metav1.DeleteOptions) error {
+	f.deleteCalls++
+	return nil
 }
 
 func TestBuildPostRestoreNodeCleanupPlan(t *testing.T) {
@@ -262,5 +281,355 @@ func TestIdempotencyValueStable(t *testing.T) {
 	s := newTestScope(defaultAdapter(), "abc-123")
 	if got := s.idempotencyValue(); got != "abc-123" {
 		t.Errorf("idempotencyValue = %q, want %q", got, "abc-123")
+	}
+}
+
+func TestBuildPreflightPlan(t *testing.T) {
+	t.Parallel()
+
+	s := newTestScope(defaultAdapter(), "restore-uid")
+	secret := makePlanSecret("init", "node-init", map[string]string{
+		capr.EtcdRoleLabel: "true",
+		capr.InitNodeLabel: "true",
+	})
+
+	plan := buildPreflightPlan(s, secret)
+
+	if len(plan.OneTimeInstructions) != 1 {
+		t.Fatalf("expected 1 instruction, got %d", len(plan.OneTimeInstructions))
+	}
+	instr := plan.OneTimeInstructions[0]
+	// The name is the key reconcilePreflight reads the token hash back under.
+	if instr.Name != preflightInstructionName {
+		t.Errorf("instruction Name = %q, want %q", instr.Name, preflightInstructionName)
+	}
+	if !instr.SaveOutput {
+		t.Error("SaveOutput must be set; the step compares the instruction's output against the snapshot")
+	}
+
+	// Wrapping the check in the idempotent script would print a message in place of the hash on an
+	// attempt it considers already reconciled.
+	if len(instr.Args) > 1 && instr.Args[1] == ops.IdempotentActionScriptPath(s.adapter.ProvisioningDataDirectory(secret)) {
+		t.Error("the preflight check must not be idempotent-wrapped; it has to run on every attempt")
+	}
+}
+
+func TestBuildShutdownPlan(t *testing.T) {
+	t.Parallel()
+
+	s := newTestScope(defaultAdapter(), "restore-uid")
+	adapter := defaultAdapter()
+
+	t.Run("etcd and control plane node", func(t *testing.T) {
+		secret := makePlanSecret("init", "node-init", map[string]string{
+			capr.EtcdRoleLabel:         "true",
+			capr.ControlPlaneRoleLabel: "true",
+		})
+
+		plan := buildShutdownPlan(s, secret)
+
+		var names []string
+		for _, instr := range plan.OneTimeInstructions {
+			names = append(names, instr.Name)
+		}
+		want := []string{"remove idempotency tracking", "shutdown", "create-etcd-tombstone", "remove-tls-directory"}
+		if strings.Join(names, ",") != strings.Join(want, ",") {
+			t.Errorf("instructions = %v, want %v", names, want)
+		}
+
+		// The killall script reads the data directory out of the environment.
+		wantEnv := fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(adapter.RuntimeCommand()), adapter.DistroDataDirectory(secret))
+		var found bool
+		for _, e := range plan.OneTimeInstructions[1].Env {
+			if e == wantEnv {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("shutdown instruction env = %v, want it to contain %q", plan.OneTimeInstructions[1].Env, wantEnv)
+		}
+
+		if len(plan.Files) != 1 || plan.Files[0].Path != ops.IdempotentActionScriptPath(adapter.ProvisioningDataDirectory(secret)) {
+			t.Errorf("expected the idempotent script file, got %v", plan.Files)
+		}
+	})
+
+	t.Run("worker node", func(t *testing.T) {
+		secret := makePlanSecret("worker-1", "node-worker-1", map[string]string{
+			capr.WorkerRoleLabel: "true",
+		})
+
+		plan := buildShutdownPlan(s, secret)
+
+		// No etcd data or TLS material to clear on a worker.
+		if len(plan.OneTimeInstructions) != 2 {
+			t.Fatalf("expected 2 instructions, got %d", len(plan.OneTimeInstructions))
+		}
+		for _, instr := range plan.OneTimeInstructions {
+			if instr.Name == "create-etcd-tombstone" || instr.Name == "remove-tls-directory" {
+				t.Errorf("unexpected instruction %q for a worker node", instr.Name)
+			}
+		}
+	})
+}
+
+// TestAssignedPlansAreOperationScoped covers the property every plan this controller assigns depends
+// on: the system-agent only re-runs a plan whose serialized content changed, and AssignPlan only
+// writes a plan whose bytes differ from the one already on the secret. Two operations doing the same
+// work must therefore serialize differently, or the second is reported as already applied — its
+// instructions never run and its output is the first operation's. Reconciles of one operation must
+// serialize identically, or the plan would churn and re-trigger its instructions.
+func TestAssignedPlansAreOperationScoped(t *testing.T) {
+	t.Parallel()
+
+	secret := makePlanSecret("init", "node-init", map[string]string{
+		capr.EtcdRoleLabel:         "true",
+		capr.ControlPlaneRoleLabel: "true",
+	})
+
+	builders := map[string]struct {
+		build func(*scope) *planapi.Plan
+		step  opv1alpha1.ETCDSnapshotRestoreStep
+	}{
+		"preflight": {
+			build: func(s *scope) *planapi.Plan { return buildPreflightPlan(s, secret) },
+			step:  opv1alpha1.ETCDSnapshotRestoreStepPreflight,
+		},
+		"shutdown": {
+			build: func(s *scope) *planapi.Plan { return buildShutdownPlan(s, secret) },
+			step:  opv1alpha1.ETCDSnapshotRestoreStepShutdown,
+		},
+	}
+
+	for name, b := range builders {
+		t.Run(name, func(t *testing.T) {
+			marshal := func(uid types.UID) string {
+				s := newTestScope(defaultAdapter(), uid)
+				p := ops.WithOperationEnv(b.build(s), ops.OperationEnv(ControllerOwnerKey, s.op, b.step))
+				data, err := json.Marshal(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return string(data)
+			}
+
+			if marshal("restore-uid-1") == marshal("restore-uid-2") {
+				t.Error("plans for two operations serialize identically, so the second would be reported as already applied")
+			}
+			if marshal("restore-uid-1") != marshal("restore-uid-1") {
+				t.Error("plans for one operation must serialize identically across reconciles")
+			}
+		})
+	}
+}
+
+func newOp() *opv1alpha1.ETCDSnapshotRestore {
+	return &opv1alpha1.ETCDSnapshotRestore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "restore-1",
+			Namespace:  "fleet-default",
+			UID:        types.UID("restore-uid"),
+			Generation: 1,
+		},
+		Spec: opv1alpha1.ETCDSnapshotRestoreSpec{
+			OperationSpec: opv1alpha1.OperationSpec{},
+		},
+	}
+}
+
+func TestUpdateStatusPausedCondition(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name            string
+		paused          bool
+		initiallyPaused bool
+		expectedStatus  string
+		expectedReason  string
+		expectedMessage string
+	}{
+		{
+			name:            "paused",
+			paused:          true,
+			initiallyPaused: false,
+			expectedStatus:  "True",
+			expectedReason:  opv1alpha1.PausedReason,
+			expectedMessage: "Operation is paused",
+		},
+		{
+			name:            "resumed",
+			paused:          false,
+			initiallyPaused: true,
+			expectedStatus:  "False",
+			expectedReason:  opv1alpha1.NotPausedReason,
+			expectedMessage: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOp()
+			op.Spec.Paused = tc.paused
+			op.Generation = 7
+
+			initialStatus := opv1alpha1.ETCDSnapshotRestoreStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase: opv1alpha1.OperationPhaseInProgress,
+				},
+				Step: opv1alpha1.ETCDSnapshotRestoreStepRestore,
+			}
+
+			if tc.initiallyPaused {
+				opv1alpha1.PausedCondition.True(&initialStatus)
+				opv1alpha1.PausedCondition.Reason(&initialStatus, opv1alpha1.PausedReason)
+				opv1alpha1.PausedCondition.Message(&initialStatus, "Operation is paused")
+			}
+
+			status := updateStatus(op, initialStatus)
+
+			if status.ObservedGeneration != int64(7) {
+				t.Errorf("ObservedGeneration = %d, want 7", status.ObservedGeneration)
+			}
+			if got := opv1alpha1.PausedCondition.GetStatus(&status); got != tc.expectedStatus {
+				t.Errorf("PausedCondition status = %q, want %q", got, tc.expectedStatus)
+			}
+			if got := opv1alpha1.PausedCondition.GetReason(&status); got != tc.expectedReason {
+				t.Errorf("PausedCondition reason = %q, want %q", got, tc.expectedReason)
+			}
+			if got := opv1alpha1.PausedCondition.GetMessage(&status); got != tc.expectedMessage {
+				t.Errorf("PausedCondition message = %q, want %q", got, tc.expectedMessage)
+			}
+
+			// Verify phase and step are unchanged
+			if status.Phase != initialStatus.Phase {
+				t.Errorf("Phase = %q, want %q (unchanged)", status.Phase, initialStatus.Phase)
+			}
+			if status.Step != initialStatus.Step {
+				t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
+			}
+		})
+	}
+}
+
+func TestOnChange_StablePausedOperation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		phase       opv1alpha1.OperationPhase
+		step        opv1alpha1.ETCDSnapshotRestoreStep
+		ttl         int64
+		lastUpdated metav1.Time
+	}{
+		{
+			name:        "stable in-progress paused operation",
+			phase:       opv1alpha1.OperationPhaseInProgress,
+			step:        opv1alpha1.ETCDSnapshotRestoreStepRestore,
+			ttl:         300,
+			lastUpdated: metav1.Now(),
+		},
+		{
+			name:        "stable terminal expired paused operation",
+			phase:       opv1alpha1.OperationPhaseSucceeded,
+			step:        opv1alpha1.ETCDSnapshotRestoreStepRestore,
+			ttl:         0,
+			lastUpdated: metav1.NewTime(metav1.Now().Add(-10 * time.Minute)),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOp()
+			op.Spec.Paused = true
+			op.Spec.TTL = tc.ttl
+			op.Generation = 7
+
+			initialStatus := opv1alpha1.ETCDSnapshotRestoreStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase:       tc.phase,
+					LastUpdated: tc.lastUpdated,
+				},
+				Step: tc.step,
+			}
+
+			// Pre-compute the expected status with paused condition
+			currentStatus := updateStatus(op, initialStatus)
+			op.Status = currentStatus
+
+			controller := &fakeETCDSnapshotRestoreController{}
+			h := &handler{
+				etcdsnapshotrestores: controller,
+			}
+
+			returnedStatus, err := h.OnChange(op, op.Status)
+			if err != nil {
+				t.Fatalf("OnChange returned error: %v", err)
+			}
+
+			// Verify status unchanged
+			if !reflect.DeepEqual(returnedStatus, currentStatus) {
+				t.Errorf("returnedStatus differs from currentStatus")
+			}
+
+			// Verify phase and step preserved
+			if returnedStatus.Phase != tc.phase {
+				t.Errorf("Phase = %q, want %q", returnedStatus.Phase, tc.phase)
+			}
+			if returnedStatus.Step != tc.step {
+				t.Errorf("Step = %q, want %q", returnedStatus.Step, tc.step)
+			}
+
+			// Verify no delete occurred
+			if controller.deleteCalls != 0 {
+				t.Errorf("Delete called %d times, want 0", controller.deleteCalls)
+			}
+
+			// Verify no enqueue occurred
+			if controller.enqueueCalls != 0 {
+				t.Errorf("EnqueueAfter called %d times, want 0", controller.enqueueCalls)
+			}
+		})
+	}
+}
+
+func TestOnChange_Paused(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Paused = true
+	op.Generation = 7
+
+	initialStatus := opv1alpha1.ETCDSnapshotRestoreStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase: opv1alpha1.OperationPhaseInProgress,
+		},
+		Step: opv1alpha1.ETCDSnapshotRestoreStepRestore,
+	}
+
+	op.Status = initialStatus
+
+	h := &handler{}
+	status, err := h.OnChange(op, op.Status)
+
+	if err != nil {
+		t.Fatalf("OnChange returned error: %v", err)
+	}
+	if got := opv1alpha1.PausedCondition.GetStatus(&status); got != "True" {
+		t.Errorf("PausedCondition status = %q, want %q", got, "True")
+	}
+	if got := opv1alpha1.PausedCondition.GetReason(&status); got != opv1alpha1.PausedReason {
+		t.Errorf("PausedCondition reason = %q, want %q", got, opv1alpha1.PausedReason)
+	}
+	if got := opv1alpha1.PausedCondition.GetMessage(&status); got != "Operation is paused" {
+		t.Errorf("PausedCondition message = %q, want %q", got, "Operation is paused")
+	}
+	if status.ObservedGeneration != int64(7) {
+		t.Errorf("ObservedGeneration = %d, want 7", status.ObservedGeneration)
+	}
+	if status.Phase != initialStatus.Phase {
+		t.Errorf("Phase = %q, want %q (unchanged)", status.Phase, initialStatus.Phase)
+	}
+	if status.Step != initialStatus.Step {
+		t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
 	}
 }

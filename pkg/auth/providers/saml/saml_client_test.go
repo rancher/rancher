@@ -4,6 +4,9 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +14,10 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetUserIdFromRelayState(t *testing.T) {
@@ -194,61 +200,126 @@ func TestValidateFinalRedirectURL(t *testing.T) {
 	}
 }
 
-func TestAssertionCache(t *testing.T) {
-	t.Parallel()
+func genericSAMLTestKeyAndCert(t *testing.T) (keyPEM string, certPEM string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
 
-	t.Run("new ID is not seen", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		expiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-1", expiry))
-	})
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "rancher-test-sp"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
 
-	t.Run("same ID seen twice", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		expiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-replay", expiry))
-		assert.True(t, c.seen("id-replay", expiry))
-	})
+	keyPEM = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}))
+	certPEM = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: der,
+	}))
+	return keyPEM, certPEM
+}
 
-	t.Run("different IDs are tracked independently", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		expiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-a", expiry))
-		assert.False(t, c.seen("id-b", expiry))
-		assert.True(t, c.seen("id-a", expiry))
-		assert.True(t, c.seen("id-b", expiry))
-	})
+const genericSAMLTestIDPMetadata = `<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://idp.example.com/metadata">
+  <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://idp.example.com/sso"/>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://idp.example.com/slo"/>
+  </IDPSSODescriptor>
+</EntityDescriptor>`
 
-	t.Run("expired ID is evicted and accepted again", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		// Insert with an already-expired time.
-		pastExpiry := time.Now().Add(-time.Second)
-		assert.False(t, c.seen("id-expired", pastExpiry))
+func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
+	keyPEM, certPEM := genericSAMLTestKeyAndCert(t)
+	force := true
 
-		// The entry is expired; the next call should evict it and accept a fresh one.
-		futureExpiry := time.Now().Add(time.Minute)
-		assert.False(t, c.seen("id-expired", futureExpiry))
-	})
+	base := func() *apiv3.SamlConfig {
+		return &apiv3.SamlConfig{
+			IDPMetadataContent: genericSAMLTestIDPMetadata,
+			SpCert:             certPEM,
+			SpKey:              keyPEM,
+			RancherAPIHost:     "https://rancher.example.com",
+			EntityID:           "https://rancher.example.com/v1-saml/genericsaml/saml/metadata",
+		}
+	}
 
-	t.Run("eviction does not remove live entries", func(t *testing.T) {
-		t.Parallel()
-		c := newAssertionCache()
-		liveExpiry := time.Now().Add(time.Minute)
-		pastExpiry := time.Now().Add(-time.Second)
+	tests := []struct {
+		name        string
+		mutate      func(c *apiv3.SamlConfig)
+		wantNameID  saml.NameIDFormat
+		wantSigAlg  string
+		wantIDPInit bool
+		wantForce   *bool
+		wantErr     bool
+	}{
+		{
+			name:       "defaults",
+			mutate:     func(c *apiv3.SamlConfig) {},
+			wantNameID: saml.UnspecifiedNameIDFormat,
+			wantSigAlg: dsig.RSASHA256SignatureMethod,
+		},
+		{
+			name: "explicit knobs",
+			mutate: func(c *apiv3.SamlConfig) {
+				c.NameIDFormat = "emailAddress"
+				c.SignatureMethod = "RSA-SHA1"
+				c.AllowIdpInitiated = true
+				c.ForceAuthn = &force
+			},
+			wantNameID:  saml.EmailAddressNameIDFormat,
+			wantSigAlg:  dsig.RSASHA1SignatureMethod,
+			wantIDPInit: true,
+			wantForce:   &force,
+		},
+		{
+			name:    "invalid nameIDFormat errors",
+			mutate:  func(c *apiv3.SamlConfig) { c.NameIDFormat = "bogus" },
+			wantErr: true,
+		},
+	}
 
-		assert.False(t, c.seen("id-live", liveExpiry))
-		assert.False(t, c.seen("id-stale", pastExpiry))
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset engine state for isolation.
+			appliedVersion = ""
+			SamlProviders[GenericSAMLName] = &Provider{name: GenericSAMLName}
+			t.Cleanup(func() {
+				delete(SamlProviders, GenericSAMLName)
+				handlerMu.Lock()
+				delete(routeHandlers, "GenericSAMLACS")
+				delete(routeHandlers, "GenericSAMLSLO")
+				delete(routeHandlers, "GenericSAMLSLOGet")
+				delete(routeHandlers, "GenericSAMLMetadata")
+				handlerMu.Unlock()
+			})
 
-		// Trigger eviction via any seen() call.
-		assert.False(t, c.seen("id-new", liveExpiry))
+			cfg := base()
+			cfg.ResourceVersion = "test-" + string(rune('a'+i))
+			tt.mutate(cfg)
 
-		// The live entry must still be detected as a replay.
-		assert.True(t, c.seen("id-live", liveExpiry))
-	})
+			err := InitializeSamlServiceProvider(cfg, GenericSAMLName)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			sp := SamlProviders[GenericSAMLName].serviceProvider
+			require.NotNil(t, sp)
+			assert.Equal(t, tt.wantNameID, sp.AuthnNameIDFormat)
+			assert.Equal(t, tt.wantSigAlg, sp.SignatureMethod)
+			assert.Equal(t, tt.wantIDPInit, sp.AllowIDPInitiated)
+			assert.Equal(t, tt.wantForce, sp.ForceAuthn)
+
+			handlerMu.RLock()
+			_, acsRegistered := routeHandlers["GenericSAMLACS"]
+			_, metaRegistered := routeHandlers["GenericSAMLMetadata"]
+			handlerMu.RUnlock()
+			assert.True(t, acsRegistered, "GenericSAMLACS route handler should be registered")
+			assert.True(t, metaRegistered, "GenericSAMLMetadata route handler should be registered")
+		})
+	}
 }
 
 func TestCheckAssertionTimeConditions(t *testing.T) {

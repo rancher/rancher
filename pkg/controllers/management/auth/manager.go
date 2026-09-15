@@ -105,7 +105,7 @@ type managerInterface interface {
 	grantManagementPlanePrivileges(string, map[string]string, v1.Subject, interface{}) error
 	grantManagementClusterScopedPrivilegesInProjectNamespace(string, string, map[string]string, v1.Subject, *v3.ClusterRoleTemplateBinding) error
 	grantManagementProjectScopedPrivilegesInClusterNamespace(string, string, map[string]string, v1.Subject, *v3.ProjectRoleTemplateBinding) error
-	checkIfRoleTemplateGrantsCRTAccess(string) (bool, error)
+	checkIfRoleTemplateGrantsCRTAccess(string) (bool, bool, error)
 }
 
 type manager struct {
@@ -453,8 +453,16 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	if err != nil {
 		return err
 	}
+	// The crt-token-reader RoleBinding is managed independently by
+	// ensureCRTTokenReaderRoleBinding/removeCRTTokenReaderRoleBinding (crtb_handler.go). Skip it here
+	// by its exact name so it isn't deleted as undesired on every sync. We can't match on
+	// RoleRef.Name, since that would also match any custom RoleTemplate named "crt-token-reader".
+	crtTokenReaderRBName := crtTokenReaderRoleBindingName(namespace, subject)
 	for _, c := range current {
 		rb := c.(*v1.RoleBinding)
+		if rb.Name == crtTokenReaderRBName {
+			continue
+		}
 		currentRBs[rb.Name] = rb
 	}
 
@@ -618,19 +626,24 @@ func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.
 }
 
 // checkIfRoleTemplateGrantsCRTAccess checks if a RoleTemplate or any of its referenced RoleTemplates
-// grant access to clusterregistrationtokens
-func (m *manager) checkIfRoleTemplateGrantsCRTAccess(roleTemplateName string) (bool, error) {
+// grant access to clusterregistrationtokens. It also reports whether the RoleTemplate (or any
+// referenced RoleTemplate) already grants unrestricted read access to secrets, which makes a
+// separate crt-token-reader RoleBinding redundant.
+func (m *manager) checkIfRoleTemplateGrantsCRTAccess(roleTemplateName string) (grantsCRT bool, hasUnrestrictedSecretAccess bool, err error) {
 	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	for _, role := range roles {
-		if grantsCRTAccessFromRoleTemplate(role, m.crLister) {
-			return true, nil
+		roleGrantsCRT, roleHasUnrestrictedSecretAccess := grantsCRTAccessFromRoleTemplate(role, m.crLister)
+		grantsCRT = grantsCRT || roleGrantsCRT
+		hasUnrestrictedSecretAccess = hasUnrestrictedSecretAccess || roleHasUnrestrictedSecretAccess
+		if grantsCRT && hasUnrestrictedSecretAccess {
+			break
 		}
 	}
-	return false, nil
+	return grantsCRT, hasUnrestrictedSecretAccess, nil
 }
 
 // reconcileDesiredMGMTPlaneRoleBindings ensures that the desired management plane role bindings

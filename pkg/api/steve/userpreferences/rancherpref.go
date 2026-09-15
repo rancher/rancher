@@ -4,7 +4,7 @@ import (
 	"github.com/rancher/apiserver/pkg/store/empty"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/stores/proxy"
+	steveclient "github.com/rancher/steve/pkg/client"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,7 +19,7 @@ var (
 
 type rancherPrefStore struct {
 	empty.Store
-	cg proxy.ClientGetter
+	cg steveclient.ClientGetter
 }
 
 func (e *rancherPrefStore) getClient(apiOp *types.APIRequest) (dynamic.ResourceInterface, error) {

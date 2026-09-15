@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/cspadaptercharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/hostedcluster"
@@ -45,10 +44,6 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		return err
 	}
 
-	if err := cspadaptercharts.Register(ctx, clients); err != nil {
-		return err
-	}
-
 	clusterconnected.Register(ctx, clients)
 
 	if features.MCM.Enabled() {
@@ -64,10 +59,6 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		if err := fleetcharts.Register(ctx, clients); err != nil {
 			return err
 		}
-	}
-
-	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
-		clusterregistrationtoken.Register(ctx, clients)
 	}
 
 	if features.ProvisioningV2.Enabled() {
@@ -111,4 +102,12 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 	}
 
 	return nil
+}
+
+// RegisterPostMigration registers controllers that should only start after boot-time
+// migrations (see pkg/rancher/migrations.go) have completed. This avoids redundant or conflicting work on startup.
+func RegisterPostMigration(ctx context.Context, clients *wrangler.Context) {
+	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
+		clusterregistrationtoken.Register(ctx, clients)
+	}
 }

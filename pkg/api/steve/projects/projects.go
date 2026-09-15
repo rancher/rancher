@@ -10,19 +10,15 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/schema"
 	steveserver "github.com/rancher/steve/pkg/server"
-	"github.com/rancher/steve/pkg/stores/proxy"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 )
 
 type projectServer struct {
-	ctx            context.Context
-	asl            accesscontrol.AccessSetLookup
-	cf             *client.Factory
-	clusterLinks   []string
-	namespaceCache corecontrollers.NamespaceCache
+	ctx           context.Context
+	asl           accesscontrol.AccessSetLookup
+	schemaFactory schema.Factory
+	clusterLinks  []string
 }
 
 func Projects(ctx context.Context, config *wrangler.Context, server *steveserver.Server) (func(http.Handler) http.Handler, error) {
@@ -36,8 +32,7 @@ func Projects(ctx context.Context, config *wrangler.Context, server *steveserver
 func (s *projectServer) Setup(ctx context.Context, config *wrangler.Context, server *steveserver.Server) error {
 	s.ctx = ctx
 	s.asl = server.AccessSetLookup
-	s.cf = server.ClientFactory
-	s.namespaceCache = config.Core.Namespace().Cache()
+	s.schemaFactory = server.SchemaFactory
 
 	server.SchemaFactory.AddTemplate(schema.Template{
 		ID: "management.cattle.io.cluster",
@@ -52,7 +47,7 @@ func (s *projectServer) Setup(ctx context.Context, config *wrangler.Context, ser
 }
 
 func (s *projectServer) newSchemas() *types.APISchemas {
-	store := proxy.NewProxyStore(s.cf, nil, s.asl, s.namespaceCache)
+	store := newSteveStore(s.schemaFactory)
 	schemas := types.EmptyAPISchemas()
 
 	schemas.MustImportAndCustomize(v3.Project{}, func(schema *types.APISchema) {

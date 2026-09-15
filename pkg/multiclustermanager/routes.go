@@ -197,6 +197,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 			managementAPI.ServeHTTP(w, r)
 		}
 	})))
+	// The auth server registers this route too, and serves it when MCM is
+	// disabled. Keep the two in sync.
 	authed.Handle("POST /v1/logout", authedMW(logout))
 	saAuthed.Handle("/", authed)
 	authed.Handle("/", metricsAuthed)

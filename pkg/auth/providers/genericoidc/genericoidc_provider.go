@@ -31,13 +31,14 @@ const (
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	p := &GenOIDCProvider{
 		baseoidc.OpenIDCProvider{
-			Name:        Name,
-			Type:        client.GenericOIDCConfigType,
-			CTX:         ctx,
-			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
-			Secrets:     mgmtCtx.Wrangler.Core.Secret(),
-			UserMGR:     userMGR,
-			TokenMgr:    tokenMGR,
+			Name:         Name,
+			Type:         client.GenericOIDCConfigType,
+			CTX:          ctx,
+			AuthConfigs:  mgmtCtx.Management.AuthConfigs(""),
+			Secrets:      mgmtCtx.Wrangler.Core.Secret(),
+			UserMGR:      userMGR,
+			TokenMgr:     tokenMGR,
+			UserSearcher: common.NewUserSearcher(mgmtCtx.Management.Users("").Controller().Lister()),
 		},
 	}
 	p.GetConfig = p.GetOIDCConfig
@@ -49,22 +50,30 @@ func (g *GenOIDCProvider) GetName() string {
 	return Name
 }
 
-// SearchPrincipals will return a principal of the requested principalType with a displayName
-// that matches the searchValue.  If principalType is empty, both a user principal and a group principal will
-// be returned.  This is done because OIDC does not have a proper lookup mechanism.  In order
-// to provide some degree of functionality that allows manual entry for users/groups, this is the compromise.
+// SearchPrincipals will return the users Rancher already knows about whose
+// display name or username matches the searchValue, followed by a principal of
+// the requested principalType holding the searchValue itself.
+// If principalType is empty, both a user principal and a group principal will
+// be returned.  This is done because OIDC does not have a proper lookup
+// mechanism, so that last principal lets an admin enter a subject or group ID by
+// hand for an identity Rancher has not seen yet.
 func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	var principals []apiv3.Principal
 
 	if principalType != GroupType {
-		p := apiv3.Principal{
+		fromSearchValue := apiv3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + UserType + "://" + searchValue},
 			DisplayName:   searchValue,
 			LoginName:     searchValue,
 			PrincipalType: UserType,
 			Provider:      g.Name,
 		}
-		principals = append(principals, p)
+
+		users, err := common.PrincipalsWithFallback(g.UserSearcher, g.Name, searchValue, fromSearchValue)
+		if err != nil {
+			return nil, err
+		}
+		principals = append(principals, users...)
 	}
 
 	if principalType != UserType {

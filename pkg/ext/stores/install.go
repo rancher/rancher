@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
+	"github.com/rancher/steve/pkg/resources/ownership"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -44,14 +45,27 @@ func InstallStores(
 	}
 	logrus.Infof("Successfully installed %s store", tokens.SingularName)
 
+	// Tokens are stored in a single steve SQLite table shared by all users
+	// (populated by rancher's own service account, which is admin), but
+	// this store scopes list/get visibility to the requesting user via
+	// UserIDLabel. Register that scoping with steve so its /v1 list and
+	// /v1/count endpoints for tokens apply the same per-user filter this
+	// store applies -- see rancher/rancher#56849.
+	ownership.Register(tokens.GVK, ownership.NewUserIDLabelFilter(tokens.UserIDLabel))
+
+	kubeconfigGVK := extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind)
 	if err := server.Install(
 		extv1.KubeconfigResourceName,
-		extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
+		kubeconfigGVK,
 		kubeconfig.New(features.MCM.Enabled(), wranglerContext, server.GetAuthorizer()),
 	); err != nil {
 		return fmt.Errorf("unable to install %s store: %w", kubeconfig.Singular, err)
 	}
 	logrus.Infof("Successfully installed %s store", kubeconfig.Singular)
+
+	// See the Token registration above -- same per-user scoping applies to
+	// Kubeconfigs.
+	ownership.Register(kubeconfigGVK, ownership.NewUserIDLabelFilter(kubeconfig.UserIDLabel))
 
 	if err = server.Install(
 		extv1.PasswordChangeRequestResourceName,

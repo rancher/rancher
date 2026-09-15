@@ -190,6 +190,17 @@ func TestEnusure_metadata(t *testing.T) {
 	require.Equal(t, fleet.ReleaseNamespace, fleetObj.Annotations["meta.helm.sh/release-namespace"], "%s CRD missing expected annotation", bootstrapFleetCRD)
 }
 
+func TestRequiredCRDsIncludesAuthCRDs(t *testing.T) {
+	defer features.MCM.Unset()
+
+	for _, mcm := range []bool{true, false} {
+		t.Run(fmt.Sprintf("mcm=%v", mcm), func(t *testing.T) {
+			features.MCM.Set(mcm)
+			require.Subset(t, RequiredCRDs(), AuthCRDs(), "auth CRDs must be required regardless of MCM")
+		})
+	}
+}
+
 func setupFakeClient() *FakeClient {
 	fakeClient := &FakeClient{
 		client: fakeclientset.NewSimpleClientset(staticCRD).ApiextensionsV1().(*fake.FakeApiextensionsV1),

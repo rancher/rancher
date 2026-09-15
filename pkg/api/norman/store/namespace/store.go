@@ -161,12 +161,25 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		data[containerResourceLimitField] = project.ContainerDefaultResourceLimit
 	}
 
-	isFit, exceeded, err := resourcequota.IsQuotaFit(nsQuotaLimit, nsLimits, projectQuotaLimit)
+	isFit, exceeded, negatives, err := resourcequota.IsQuotaFit(nsQuotaLimit, nsLimits, projectQuotaLimit)
 	if err != nil || isFit {
 		return err
 	}
 
-	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds projectLimit on fields: %s", utils.FormatResourceList(exceeded)))
+	if len(negatives) > 0 && len(exceeded) > 0 {
+		message := fmt.Sprintf("negative on fields: %s; exceeds projectLimit on fields: %s",
+			utils.FormatResourceList(negatives),
+			utils.FormatResourceList(exceeded))
+		return httperror.NewFieldAPIError(httperror.InvalidState, quotaField, message)
+	}
+
+	if len(negatives) > 0 {
+		return httperror.NewFieldAPIError(httperror.MinLimitExceeded, quotaField,
+			fmt.Sprintf("negative on fields: %s", utils.FormatResourceList(negatives)))
+	}
+
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField,
+		fmt.Sprintf("exceeds projectLimit on fields: %s", utils.FormatResourceList(exceeded)))
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v32.ResourceQuotaLimit, error) {

@@ -150,6 +150,14 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 		if ns.DeletionTimestamp != nil {
 			continue
 		}
+		// Beware: Contrary to `getNamespacesLimits` this function
+		// rejects namespaces which are not validated as true. While
+		// doing so may cause us to overestimate the amount of resources
+		// available `IsQuotaFit` computes exact limits and will reject
+		// inadvertent oversubscriptions. To compute exact limits here
+		// we will have to know if a specific positive quantity is the
+		// very value causing an oversubscription or not. We cannot
+		// decide that.
 		set, err := namespaceutil.IsNamespaceConditionSet(ns, ResourceQuotaValidatedCondition, true)
 		if err != nil {
 			return err

@@ -43,12 +43,13 @@ func (m *MockmanagerInterface) EXPECT() *MockmanagerInterfaceMockRecorder {
 }
 
 // checkIfRoleTemplateGrantsCRTAccess mocks base method.
-func (m *MockmanagerInterface) checkIfRoleTemplateGrantsCRTAccess(arg0 string) (bool, error) {
+func (m *MockmanagerInterface) checkIfRoleTemplateGrantsCRTAccess(arg0 string) (bool, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "checkIfRoleTemplateGrantsCRTAccess", arg0)
 	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // checkIfRoleTemplateGrantsCRTAccess indicates an expected call of checkIfRoleTemplateGrantsCRTAccess.

@@ -4,16 +4,35 @@ import (
 	"fmt"
 	"testing"
 
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	"github.com/rancher/rancher/pkg/auth/providers/oidc"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/tools/cache"
 )
+
+func TestGenericSAMLTypeMapsToProviderName(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "genericsaml", nameFromType(client.GenericSAMLConfigType))
+	assert.Equal(t, "genericSAMLConfig", client.GenericSAMLConfigType)
+}
+
+func TestGenericSAMLIsSAMLProviderType(t *testing.T) {
+	assert.True(t, IsSAMLProviderType(client.GenericSAMLConfigType))
+}
 
 func TestIsSAMLProvider(t *testing.T) {
 	t.Parallel()
@@ -219,4 +238,64 @@ func TestIsLocalHiddenReflectsProviderStateChange(t *testing.T) {
 
 	assert.True(t, IsLocalHidden(), "local should be hidden while external provider is active")
 	assert.False(t, IsLocalHidden(), "local should reappear after external provider is disabled")
+}
+
+func TestSearchPrincipalsHybridUser(t *testing.T) {
+	users := []*apiv3.User{
+		{
+			// Hybrid user: kept a local login after OIDC was enabled. Both
+			// principals have to reach the caller, since a binding on the OIDC
+			// one grants nothing when they log in locally, and the other way
+			// round.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-admin"},
+			Username:     "admin",
+			DisplayName:  "Default Admin",
+			PrincipalIDs: []string{"genericoidc_user://sub-0009", "local://u-admin"},
+		},
+		{
+			// OIDC user with no local login. Findable under genericoidc, and
+			// must not surface as local. Issue rancher/rancher#54022.
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-oidc1"},
+			DisplayName:  "Admin Assistant",
+			PrincipalIDs: []string{"genericoidc_user://sub-0001", "local://u-oidc1"},
+		},
+	}
+
+	lister := &fakes.UserListerMock{
+		ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
+			return users, nil
+		},
+	}
+
+	informer := cache.NewSharedIndexInformer(&cache.ListWatch{}, &apiv3.User{}, 0, cache.Indexers{})
+	for _, u := range users {
+		require.NoError(t, informer.GetIndexer().Add(u))
+	}
+
+	SetProviders(map[string]common.AuthProvider{
+		genericoidc.Name: &genericoidc.GenOIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
+				Name:         genericoidc.Name,
+				UserSearcher: common.NewUserSearcher(lister),
+			},
+		},
+		local.Name: local.NewProvider(informer, lister, nil),
+	})
+	defer SetProviders(nil)
+
+	got, err := SearchPrincipals("admin", "", &apiv3.Token{AuthProvider: genericoidc.Name})
+	require.NoError(t, err)
+
+	var ids []string
+	for _, principal := range got {
+		ids = append(ids, principal.Name)
+	}
+
+	assert.Equal(t, []string{
+		"genericoidc_user://sub-0001", // Admin Assistant, resolved from the user cache
+		"genericoidc_user://sub-0009", // hybrid user's real OIDC subject
+		"genericoidc_user://admin",    // built from the search key
+		"genericoidc_group://admin",   // same, for a group
+		"local://u-admin",             // hybrid user's local login
+	}, ids)
 }
