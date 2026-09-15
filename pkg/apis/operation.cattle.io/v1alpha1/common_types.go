@@ -19,6 +19,13 @@ type OperationSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty"`
 
+	// Cancel requests the operation to stop permanently. Unlike Paused, it is terminal and cannot be unset.
+	// Recover by deleting and recreating the operation.
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:XValidation:rule="self || !oldSelf",message="cancel cannot be unset once true"
+	// +optional
+	Cancel bool `json:"cancel,omitempty"`
+
 	// TTL is the time-to-live for the operation in seconds.
 	// This TTL is only enforced when the operation is not paused and has reached a terminal state.
 	// Setting a value < 0 represents +infinity, i.e. an operation which does not expire.
