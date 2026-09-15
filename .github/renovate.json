@@ -1,5 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>rancher/renovate-config//default#main"],
   "baseBranchPatterns": [
     "main",
     "release/v2.15",
@@ -10,9 +11,6 @@
   ],
   "ignoreDeps": [
     "go.qase.io/client"
-  ],
-  "extends": [
-    "github>rancher/renovate-config//default#main"
   ],
   "prHourlyLimit": 6,
   "prConcurrentLimit": 20,

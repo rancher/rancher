@@ -14,7 +14,7 @@ replace (
 	github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
 	github.com/rancher/remotedialer-proxy => github.com/Abhishek-Valaboju/remotedialer-proxy v0.9.0-rc.1.0.20260828104351-1fd17c3731f2
 	github.com/rancher/shepherd => github.com/Abhishek-Valaboju/shepherd v0.0.0-20260902171309-1a4f1c27c7f1
-	github.com/rancher/steve => github.com/Abhishek-Valaboju/steve v0.9.8-0.20260831074818-fb7007cf9486
+	github.com/rancher/steve => github.com/Abhishek-Valaboju/steve v0.9.8-0.20260911074347-919a3b7ac493
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/Abhishek-Valaboju/system-upgrade-controller/pkg/apis v0.0.0-20260831051815-cbe86707c07c
 )
 
@@ -86,10 +86,10 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/aws/aws-sdk-go v1.55.8
-	github.com/aws/aws-sdk-go-v2 v1.45.1
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.2
-	github.com/aws/aws-sdk-go-v2/service/eks v1.96.0
-	github.com/aws/aws-sdk-go-v2/service/sts v1.48.0
+	github.com/aws/aws-sdk-go-v2 v1.46.0
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.3
+	github.com/aws/aws-sdk-go-v2/service/eks v1.98.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.49.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -107,7 +107,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/protobuf v1.5.4
 	github.com/google/gnostic-models v0.7.1
-	github.com/google/go-containerregistry v0.22.0
+	github.com/google/go-containerregistry v0.22.1
 	github.com/google/go-github/v73 v73.0.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/hashicorp/golang-lru v1.0.2
@@ -120,7 +120,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.4.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/locker v1.0.1
-	github.com/moby/moby/client v0.5.1
+	github.com/moby/moby/client v0.6.0
 	github.com/moby/sys/reexec v0.1.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
@@ -130,28 +130,29 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.93.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
-	github.com/rancher/aks-operator v1.15.0
-	github.com/rancher/ali-operator v1.15.0-rc.3
-	github.com/rancher/apiserver v0.10.0
+	github.com/rancher/aks-operator v1.15.1
+	github.com/rancher/ali-operator v1.15.0
+	github.com/rancher/apiserver v0.10.1
 	github.com/rancher/channelserver v0.11.0
-	github.com/rancher/cluster-api-provider-rke2 v0.25.0
-	github.com/rancher/dynamiclistener v0.9.0
-	github.com/rancher/eks-operator v1.15.0
+	github.com/rancher/cluster-api-provider-rke2 v0.25.2
+	github.com/rancher/dynamiclistener v0.10.0-rc.1
+	github.com/rancher/eks-operator v1.15.1
 	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
-	github.com/rancher/gke-operator v1.15.0
+	github.com/rancher/fleet/pkg/helmvalues v0.16.1
+	github.com/rancher/gke-operator v1.15.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.10
 	github.com/rancher/machine v0.15.0-rancher146-rc.2
 	github.com/rancher/muchang v0.1.1
-	github.com/rancher/norman v0.10.0
+	github.com/rancher/norman v0.10.1
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260520140148-1f22fcaec55b
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.2
 	github.com/rancher/shepherd v0.0.0-20260824145520-00de4a01fb4d
-	github.com/rancher/steve v0.10.3
+	github.com/rancher/steve v0.10.4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
 	github.com/rancher/wrangler/v3 v3.8.0-rc.1
 	github.com/robfig/cron v1.2.0
@@ -210,18 +211,18 @@ require (
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.32.34 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.1 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.76.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.318.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.57.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.8.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.36.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.41.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.9.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.37.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.42.0 // indirect
 	github.com/aws/smithy-go v1.28.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
@@ -281,7 +282,7 @@ require (
 	github.com/microsoft/kiota-serialization-multipart-go v1.1.2 // indirect
 	github.com/microsoft/kiota-serialization-text-go v1.1.3 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/moby/api v1.55.0 // indirect
+	github.com/moby/moby/api v1.56.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect

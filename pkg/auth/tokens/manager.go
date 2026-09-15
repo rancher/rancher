@@ -251,7 +251,17 @@ func (m *Manager) DeleteTokenByName(tokenName string) (int, error) {
 		err = m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
 	}
 	if err != nil {
+		// A `token not found` is intentionally treated as success.
+		// Not doing so will cause multiple concurrent deletes of the
+		// same token to throw an error (except the first) in a
+		// fundamentally benign situation.
+		//
+		// Regarding the overall issue fixed here this behaviour was
+		// only contributory, by making the main issue invisible, which
+		// was the misrouting of tokens by the caller. Adding logging is
+		// enough to address that.
 		if apierrors.IsNotFound(err) {
+			logrus.Debugf("token to delete (%s) not found", tokenName)
 			return 0, nil
 		}
 		return http.StatusInternalServerError, fmt.Errorf("failed to delete token")
