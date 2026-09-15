@@ -127,7 +127,7 @@ func runCAPRKE2OperationsTest(t *testing.T, opts cluster.CAPRKE2Options) {
 	t.Logf("snapshot save operation %s/%s completed", saveOp.Namespace, saveOp.Name)
 
 	// One snapshot file per etcd (control-plane) node. Workers do not run etcd.
-	waitForSnapshots(t, cs, fx.Namespace, fx.ClusterName, snapshotsValidAfter, int(opts.Replicas))
+	waitForSnapshots(t, cs, fx.MgmtClusterName, fx.MgmtClusterName, snapshotsValidAfter, int(opts.Replicas))
 
 	// --- ETCDSnapshotRestore ---
 	// Snapshots are labeled `rke.cattle.io/node-name = <CAPI Machine name>` (for CAPRKE2 the

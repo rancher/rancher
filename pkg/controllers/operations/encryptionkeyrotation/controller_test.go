@@ -37,6 +37,15 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{}, nil
 }
 
+// The restore-target and install methods complete the ops.Adapter contract; only the etcd snapshot
+// restore controller uses them.
+func (a *stubAdapter) RestoreTarget(_ string) (*unstructured.Unstructured, error) { return nil, nil }
+func (a *stubAdapter) UpdateRestoreTarget(_ *unstructured.Unstructured) error     { return nil }
+func (a *stubAdapter) WaitForRestoreTarget() (bool, error)                        { return true, nil }
+func (a *stubAdapter) InstallInstruction(_ *corev1.Secret) (plan.OneTimeInstruction, bool) {
+	return plan.OneTimeInstruction{}, false
+}
+
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }

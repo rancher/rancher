@@ -7,7 +7,9 @@ import (
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -61,10 +63,48 @@ func (s *stubMachineController) Cache() generic.CacheInterface[*capi.Machine] {
 type stubMgmtInterface struct {
 	mgmtcontrollers.Interface
 	nodeCache generic.CacheInterface[*mgmtv3.Node]
+	clusters  *stubClusterController
 }
 
 func (s *stubMgmtInterface) Node() mgmtcontrollers.NodeController {
 	return &stubNodeController{cache: s.nodeCache}
+}
+
+func (s *stubMgmtInterface) Cluster() mgmtcontrollers.ClusterController {
+	return s.clusters
+}
+
+// stubClusterController serves mgmt v3 Clusters from a map and records every Update, so a test can
+// assert both what an adapter wrote and that it did not write at all.
+type stubClusterController struct {
+	mgmtcontrollers.ClusterController
+	clusters  map[string]*mgmtv3.Cluster
+	updates   []*mgmtv3.Cluster
+	getErr    error
+	updateErr error
+}
+
+func (s *stubClusterController) Get(name string, _ metav1.GetOptions) (*mgmtv3.Cluster, error) {
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
+	cluster, ok := s.clusters[name]
+	if !ok {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "clusters"}, name)
+	}
+	return cluster.DeepCopy(), nil
+}
+
+func (s *stubClusterController) Update(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+	s.updates = append(s.updates, cluster.DeepCopy())
+	if s.updateErr != nil {
+		return nil, s.updateErr
+	}
+	if s.clusters == nil {
+		s.clusters = map[string]*mgmtv3.Cluster{}
+	}
+	s.clusters[cluster.Name] = cluster.DeepCopy()
+	return cluster, nil
 }
 
 type stubNodeController struct {

@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotextrametadata"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
 	"github.com/rancher/rancher/pkg/features"
@@ -128,6 +129,16 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 					if resource.Kind == "ETCDSnapshotFile" {
 						cluster.K3s = k3s.New(cluster.ControllerFactory)
 						snapshotbackpopulate.Register(ctx, cluster, capi, clusterRec)
+						// Publish the extra metadata ConfigMap so snapshots taken from here carry
+						// the resources/restoreModes payload the restore modes resolve against.
+						//
+						// Deliberately not registered for rancher-administrated (v2prov) clusters:
+						// pkg/capr/planner/manifests.go already writes a ConfigMap of the same name
+						// there as an auto-deploy manifest, carrying the legacy
+						// provisioning-cluster-spec key, and this controller replaces Data
+						// wholesale. Until the two writers are reconciled, v2prov keeps using the
+						// legacy payload.
+						snapshotextrametadata.Register(ctx, cluster, capi, clusterRec)
 						found = true
 						break
 					}

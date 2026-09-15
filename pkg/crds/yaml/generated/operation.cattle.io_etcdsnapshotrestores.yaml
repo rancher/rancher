@@ -25,6 +25,9 @@ spec:
     - jsonPath: .spec.args.name
       name: Snapshot
       type: string
+    - jsonPath: .spec.args.restoreMode
+      name: Mode
+      type: string
     - jsonPath: .spec.paused
       name: Paused
       type: string
@@ -71,6 +74,17 @@ spec:
                 properties:
                   name:
                     description: Name specifies the name of the ETCD snapshot file.
+                    type: string
+                  restoreMode:
+                    description: |-
+                      RestoreMode names a key in the snapshot's restoreModes metadata, e.g. "kubernetesVersion" or
+                      "all". The set of modes a given snapshot offers is published on the snapshot as the
+                      etcdsnapshot.rke.io/restore-mode-options annotation. Empty or "none" restores etcd without
+                      touching cluster configuration.
+
+                      Deliberately unvalidated: a downstream cluster may declare modes this Rancher does not know
+                      about.
+                    maxLength: 63
                     type: string
                 type: object
               clusterRef:
@@ -207,6 +221,7 @@ spec:
                   Step is typically only valid during the InProgress phase.
                 enum:
                 - Preflight
+                - RestoreClusterConfig
                 - Shutdown
                 - Restore
                 - PostRestorePodCleanup

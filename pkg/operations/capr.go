@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/rancher/channelserver/pkg/model"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/plan"
@@ -16,6 +18,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -52,6 +55,98 @@ func (a *CAPRAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	}
 
 	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+// RestoreTarget returns the provv1.Cluster for the provisioning-cluster resource key. That, not the
+// RKEControlPlane ClusterObject returns, is where a restored configuration has to be written:
+// provisioningcluster/template.go regenerates the RKEControlPlane from the provv1.Cluster on every
+// reconcile, so a write to the controlplane would be reverted. The provv1.Cluster, RKEControlPlane,
+// CAPI Cluster and beacon all share (namespace, name) for CAPR — see BeaconRef.
+func (a *CAPRAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceProvCluster {
+		return nil, nil
+	}
+
+	cluster, err := a.clients.Provisioning.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+func (a *CAPRAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	cluster := &provv1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return fmt.Errorf("converting provisioning cluster %s/%s from unstructured: %w", obj.GetNamespace(), obj.GetName(), err)
+	}
+
+	_, err := a.clients.Provisioning.Cluster().Update(cluster)
+	return err
+}
+
+// WaitForRestoreTarget reports whether the RKEControlPlane has been regenerated from the current
+// provisioning Cluster.
+//
+// provisioningcluster renders the RKEControlPlane from the provv1.Cluster and stamps the spec it
+// rendered from onto it as capr.ClusterSpecAnnotation. Comparing that against the live provv1.Cluster
+// spec tells us whether the controlplane — and therefore everything derived from it, including the
+// Kubernetes version a restore installs — reflects configuration a restore has just written. A
+// missing annotation counts as not yet rendered.
+func (a *CAPRAdapter) WaitForRestoreTarget() (bool, error) {
+	cluster, err := a.clients.Provisioning.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
+	if err != nil {
+		return false, err
+	}
+
+	rendered := a.controlPlane.Annotations[capr.ClusterSpecAnnotation]
+	if rendered == "" {
+		return false, nil
+	}
+
+	renderedSpec, err := snapshotutil.DecompressClusterSpec(rendered)
+	if err != nil {
+		return false, fmt.Errorf("decoding %s on rkecontrolplane %s/%s: %w",
+			capr.ClusterSpecAnnotation, a.controlPlane.Namespace, a.controlPlane.Name, err)
+	}
+
+	return equality.Semantic.DeepEqual(renderedForComparison(&cluster.Spec), renderedForComparison(renderedSpec)), nil
+}
+
+// renderedForComparison zeroes the fields provisioningcluster deliberately drops before stamping
+// capr.ClusterSpecAnnotation, so a rendered spec and a live one can be compared. Keep in sync with
+// provisioningcluster.rkeControlPlane and the note above provv1.RKEConfig — the same four fields are
+// stripped by snapshotextrametadata when it publishes a cluster into snapshot metadata.
+func renderedForComparison(spec *provv1.ClusterSpec) *provv1.ClusterSpec {
+	out := spec.DeepCopy()
+	if out.RKEConfig != nil {
+		out.RKEConfig.ETCDSnapshotRestore = nil
+		out.RKEConfig.ETCDSnapshotCreate = nil
+		out.RKEConfig.RotateCertificates = nil
+		out.RKEConfig.RotateEncryptionKeys = nil
+	}
+	return out
+}
+
+// InstallInstruction reinstalls the distro at the RKEControlPlane's Kubernetes version. That version
+// is what the restore-mode step writes when a restore rolls the cluster back, so installing it here
+// is what lets the subsequent --cluster-reset run against the snapshot's version.
+func (a *CAPRAdapter) InstallInstruction(secret *corev1.Secret) (plan.OneTimeInstruction, bool) {
+	if a.controlPlane.Spec.KubernetesVersion == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(
+		a.controlPlane.Spec.KubernetesVersion,
+		a.DistroDataDirectory(secret),
+		a.controlPlane,
+		toCoreEnvVars(a.controlPlane.Spec.AgentEnvVars),
+	), true
 }
 
 func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) (args []string, env []string, files []plan.File) {

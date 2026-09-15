@@ -1,6 +1,7 @@
 package snapshotbackpopulate
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +29,7 @@ import (
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/restoremode"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -49,8 +52,6 @@ const (
 	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
 	// SnapshotFileNameAnnotationKey is the annotation key used to store the snapshot file resource name.
 	SnapshotFileNameAnnotationKey = "etcdsnapshot.rke.io/snapshot-file-name"
-	// RestoreModeOptionsAnnotation is the annotation key used to store the available restore modes.
-	RestoreModeOptionsAnnotation = "etcdsnapshot.rke.io/restore-mode-options"
 )
 
 type Storage string
@@ -87,6 +88,7 @@ type handler struct {
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
 func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wrangler.CAPIContext, cluster *apimgmtv3.Cluster) {
 	logrus.Debugf("[snapshotbackpopulate] Registering controller for cluster %s", userContext.ClusterName)
+
 	h := handler{
 		dynamic:                    userContext.Management.Wrangler.Dynamic,
 		restMapper:                 userContext.Management.Wrangler.RESTMapper,
@@ -371,12 +373,24 @@ func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) st
 	return fmt.Sprintf("%s-%s-%s", storage, name, hex6)
 }
 
-// getRestoreModesAnnotation determines the appropriate value for the restore-mode-options annotation
-// by checking for a valid, parsable provisioning-cluster-spec and the presence of
-// fields required for each restore mode.
+// restoreModePrecedence is the order restore modes are emitted in. The annotation value has to be
+// stable across reconciles because populateUpstreamSnapshotFromDownstream diffs its own output to
+// decide whether to patch, and the modes come out of a map. Modes this Rancher does not know about
+// are emitted after the known ones, sorted, so a newer downstream payload still produces a stable
+// value.
+var restoreModePrecedence = map[string]int{
+	rkev1.RestoreRKEConfigNone:              0,
+	rkev1.RestoreRKEConfigKubernetesVersion: 1,
+	rkev1.RestoreRKEConfigAll:               2,
+}
+
+// getRestoreModesAnnotation determines the appropriate value for the restore-mode-options
+// annotation. Snapshots taken while the etcd snapshot extra metadata ConfigMap was in place carry a
+// restoreModes payload declaring a selector per mode, which is resolved against the resources
+// payload so a mode is only offered when the field it would restore was actually captured. Older
+// snapshots predate that ConfigMap and fall back to inspecting the provisioning-cluster-spec.
 func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstructured.Unstructured) string {
 	logPrefix := getLogPrefix(cluster)
-	availableModes := []string{rkev1.RestoreRKEConfigNone}
 
 	if downstream.Spec.Metadata == nil {
 		logrus.Warnf("%s: downstream snapshot %s/%s has nil metadata, setting restore mode to 'none'",
@@ -384,11 +398,81 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstru
 		return rkev1.RestoreRKEConfigNone
 	}
 
+	if payload := downstream.Spec.Metadata[rkev1.SnapshotMetadataRestoreModesKey]; payload != "" {
+		modes, err := restoreModesFromMetadata(downstream.Spec.Metadata, logPrefix)
+		if err != nil {
+			logrus.Warnf("%s: downstream snapshot %s/%s contains an unusable '%s' metadata payload: %v. Setting restore mode to 'none'",
+				logPrefix, downstream.Namespace, downstream.Name, rkev1.SnapshotMetadataRestoreModesKey, err)
+			return rkev1.RestoreRKEConfigNone
+		}
+		return strings.Join(modes, ",")
+	}
+
+	return strings.Join(restoreModesFromClusterSpec(downstream, logPrefix), ",")
+}
+
+// restoreModesFromMetadata parses the restoreModes payload and returns the modes whose selector
+// resolves against the resources payload. 'none' is always included: restoring without applying any
+// configuration is possible for every snapshot, whether or not the payload declares it.
+func restoreModesFromMetadata(metadata map[string]string, logPrefix string) ([]string, error) {
+	selectors, err := restoremode.Modes(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	resources, err := restoremode.Resources(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	available := []string{rkev1.RestoreRKEConfigNone}
+	for mode, selector := range selectors {
+		if mode == rkev1.RestoreRKEConfigNone {
+			continue
+		}
+
+		matches, err := restoremode.Resolve(selector, resources)
+		if err != nil {
+			logrus.Warnf("%s: restore mode %q has an unparsable selector %q: %v, the mode will be unavailable",
+				logPrefix, mode, selector, err)
+			continue
+		}
+		if len(matches) == 0 {
+			logrus.Warnf("%s: restore mode %q selector %q does not resolve against the published resources, the mode will be unavailable",
+				logPrefix, mode, selector)
+			continue
+		}
+		available = append(available, mode)
+	}
+
+	slices.SortFunc(available, func(a, b string) int {
+		pa, aKnown := restoreModePrecedence[a]
+		pb, bKnown := restoreModePrecedence[b]
+		switch {
+		case aKnown && bKnown:
+			return cmp.Compare(pa, pb)
+		case aKnown:
+			return -1
+		case bKnown:
+			return 1
+		default:
+			return strings.Compare(a, b)
+		}
+	})
+
+	return available, nil
+}
+
+// restoreModesFromClusterSpec is the pre-extra-metadata behaviour: derive the available modes from
+// the presence of the fields each one restores in the provisioning-cluster-spec payload.
+func restoreModesFromClusterSpec(downstream *k3s.ETCDSnapshotFile, logPrefix string) []string {
+	availableModes := []string{rkev1.RestoreRKEConfigNone}
+
 	specPayload, ok := downstream.Spec.Metadata[rkev1.SnapshotMetadataClusterSpecKey]
 	if !ok || specPayload == "" {
 		logrus.Warnf("%s: downstream snapshot %s/%s is missing '%s' key in metadata or key is empty, setting restore mode to 'none'",
 			logPrefix, downstream.Namespace, downstream.Name, rkev1.SnapshotMetadataClusterSpecKey)
-		return rkev1.RestoreRKEConfigNone
+		return availableModes
 	}
 
 	clusterSpec, err := snapshotutil.DecompressClusterSpec(specPayload)
@@ -399,7 +483,7 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstru
 			downstream.Name,
 			rkev1.SnapshotMetadataClusterSpecKey,
 			err)
-		return rkev1.RestoreRKEConfigNone
+		return availableModes
 	}
 
 	if clusterSpec.KubernetesVersion != "" {
@@ -416,7 +500,7 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *unstru
 			logPrefix, downstream.Namespace, downstream.Name)
 	}
 
-	return strings.Join(availableModes, ",")
+	return availableModes
 }
 
 // getSnapshotHash returns the value of the "etcd.rke2.cattle.io/snapshot-token-hash" or
@@ -472,7 +556,7 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 		upstream.Annotations = map[string]string{}
 	}
 
-	upstream.Annotations[RestoreModeOptionsAnnotation] = getRestoreModesAnnotation(downstream, cluster)
+	upstream.Annotations[capr.RestoreModeOptionsAnnotation] = getRestoreModesAnnotation(downstream, cluster)
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
 	upstream.Annotations[SnapshotFileNameAnnotationKey] = downstream.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name

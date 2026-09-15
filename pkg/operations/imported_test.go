@@ -1,14 +1,17 @@
 package operations
 
 import (
+	"errors"
 	"testing"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,11 +86,11 @@ func newImportedMachinePlanSecret(name, machineName string) *corev1.Secret {
 			UID:       types.UID(name + "-uid"),
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				planv1alpha1.MachineLifecycleGroupLabel: "management.cattle.io",
-				planv1alpha1.MachineLifecycleKindLabel: "Machine",
-				planv1alpha1.MachineLifecycleNameLabel: machineName,
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  machineName,
 			},
 		},
 		Type: capr.SecretTypeMachinePlan,
@@ -341,4 +344,122 @@ func TestImportedAdapter_WaitForRegister_SecretPointsToUnexpectedNode(t *testing
 	ok, err := adapter.WaitForRegister()
 	assert.NoError(t, err)
 	assert.False(t, ok, "secret pointing to unexpected node should return false")
+}
+
+// newPauseAdapter wires an ImportedAdapter over a stub mgmt client holding the given cluster.
+func newPauseAdapter(cluster *mgmtv3.Cluster) (*ImportedAdapter, *stubClusterController) {
+	clusters := &stubClusterController{
+		clusters: map[string]*mgmtv3.Cluster{cluster.Name: cluster},
+	}
+	return &ImportedAdapter{
+		cluster: cluster,
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt: &stubMgmtInterface{clusters: clusters},
+			},
+		},
+	}, clusters
+}
+
+func newPauseCluster(annotations map[string]string) *mgmtv3.Cluster {
+	return &mgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-mine", Annotations: annotations},
+	}
+}
+
+func TestImportedAdapter_PauseCluster(t *testing.T) {
+	t.Parallel()
+
+	const anno = importedclusterversionmanagement.VersionManagementPausedAnno
+
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		pause       bool
+		wantUpdate  bool
+		wantPaused  bool
+	}{
+		{
+			name:       "pausing an unannotated cluster",
+			pause:      true,
+			wantUpdate: true,
+			wantPaused: true,
+		},
+		{
+			name:        "pausing preserves unrelated annotations",
+			annotations: map[string]string{importedclusterversionmanagement.VersionManagementAnno: "true"},
+			pause:       true,
+			wantUpdate:  true,
+			wantPaused:  true,
+		},
+		{
+			name:        "pausing an already paused cluster does not write",
+			annotations: map[string]string{anno: "true"},
+			pause:       true,
+			wantUpdate:  false,
+			wantPaused:  true,
+		},
+		{
+			name:        "unpausing removes the annotation",
+			annotations: map[string]string{anno: "true"},
+			pause:       false,
+			wantUpdate:  true,
+			wantPaused:  false,
+		},
+		{
+			name:        "unpausing an unpaused cluster does not write",
+			annotations: nil,
+			pause:       false,
+			wantUpdate:  false,
+			wantPaused:  false,
+		},
+		{
+			// The annotation is only ever written as "true", but a stray value must still be cleaned
+			// up on unpause rather than left behind for the upgrade handler to interpret.
+			name:        "unpausing removes a non-true value",
+			annotations: map[string]string{anno: "false"},
+			pause:       false,
+			wantUpdate:  true,
+			wantPaused:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapter, clusters := newPauseAdapter(newPauseCluster(tt.annotations))
+
+			require.NoError(t, adapter.PauseCluster(tt.pause))
+
+			if tt.wantUpdate {
+				require.Len(t, clusters.updates, 1, "expected exactly one write")
+			} else {
+				assert.Empty(t, clusters.updates, "no-op must not write the cluster")
+			}
+
+			latest, err := clusters.Get("c-mine", metav1.GetOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantPaused, importedclusterversionmanagement.Paused(latest))
+
+			if !tt.wantPaused && tt.wantUpdate {
+				assert.NotContains(t, latest.Annotations, anno, "unpausing must remove the annotation, not blank it")
+			}
+			if tt.annotations[importedclusterversionmanagement.VersionManagementAnno] != "" {
+				assert.Equal(t, "true", latest.Annotations[importedclusterversionmanagement.VersionManagementAnno],
+					"unrelated annotations must survive")
+			}
+		})
+	}
+}
+
+func TestImportedAdapter_PauseCluster_GetError(t *testing.T) {
+	t.Parallel()
+
+	adapter, clusters := newPauseAdapter(newPauseCluster(nil))
+	clusters.getErr = errors.New("apiserver is down")
+
+	// The restore must not proceed believing it paused the cluster.
+	assert.ErrorContains(t, adapter.PauseCluster(true), "apiserver is down")
+	assert.Empty(t, clusters.updates)
 }

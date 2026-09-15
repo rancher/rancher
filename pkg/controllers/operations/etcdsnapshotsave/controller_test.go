@@ -46,6 +46,15 @@ func (a *stubAdapter) EtcdSnapshotNamespace() string { return "test-namespace" }
 func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{}, nil
 }
+
+// The restore-target and install methods complete the ops.Adapter contract; only the etcd snapshot
+// restore controller uses them.
+func (a *stubAdapter) RestoreTarget(_ string) (*unstructured.Unstructured, error) { return nil, nil }
+func (a *stubAdapter) UpdateRestoreTarget(_ *unstructured.Unstructured) error     { return nil }
+func (a *stubAdapter) WaitForRestoreTarget() (bool, error)                        { return true, nil }
+func (a *stubAdapter) InstallInstruction(_ *corev1.Secret) (planapi.OneTimeInstruction, bool) {
+	return planapi.OneTimeInstruction{}, false
+}
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }

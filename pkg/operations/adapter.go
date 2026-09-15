@@ -146,6 +146,39 @@ type Adapter interface {
 	// will create an operation for the management cluster object, but the true object is the CAPI cluster.
 	ClusterObject() (*unstructured.Unstructured, error)
 
+	// RestoreTarget returns the live object that resourceKey addresses for this cluster type, where
+	// resourceKey is one of the keys an etcd snapshot's `resources` metadata is published under
+	// (e.g. "cluster.provisioning.cattle.io"). Returns (nil, nil) when this cluster type has no
+	// such object, which makes any restore mode selecting it unavailable.
+	//
+	// This is deliberately not ClusterObject: the object whose configuration a restore writes back
+	// is not the one the operation controllers plan against. For v2prov it is the provv1.Cluster,
+	// because the provisioner regenerates the RKEControlPlane from it; for CAPRKE2 it is the
+	// RKE2ControlPlane, which the CAPI Cluster ClusterObject returns does not carry.
+	RestoreTarget(resourceKey string) (*unstructured.Unstructured, error)
+
+	// UpdateRestoreTarget persists modifications made to an object returned by RestoreTarget.
+	UpdateRestoreTarget(obj *unstructured.Unstructured) error
+
+	// WaitForRestoreTarget reports whether the objects derived from the restore target have caught
+	// up with its current spec. A restore writes cluster configuration onto the restore target, but
+	// the node plans a restore then runs are built from objects rendered off it, so acting before
+	// that rendering has happened would use the pre-restore configuration.
+	//
+	// Returns true when there is nothing to wait for, either because the derived objects are current
+	// or because this cluster type renders nothing off its restore target.
+	WaitForRestoreTarget() (bool, error)
+
+	// InstallInstruction returns the instruction that installs the distro at the Kubernetes version
+	// the cluster is currently configured for, without starting it. Returns false when this cluster
+	// type's distro version is not managed by Rancher and so cannot be reinstalled.
+	//
+	// A restore of a snapshot taken on an older Kubernetes version has to run against that version's
+	// binary — a newer server cannot `--cluster-reset` onto older etcd data. Reinstalling here is
+	// what makes a downgrade-on-restore work, mirroring the install-with-skip-start the legacy CAPR
+	// planner puts in its restore plan (see pkg/capr/planner/etcdrestore.go).
+	InstallInstruction(secret *corev1.Secret) (plan.OneTimeInstruction, bool)
+
 	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
 	// all expected nodes.
 	WaitForRegister() (bool, error)

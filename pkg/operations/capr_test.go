@@ -86,11 +86,11 @@ func newMachinePlanSecret(name, machineName string) *corev1.Secret {
 			UID:       types.UID(name + "-uid"),
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "cluster.x-k8s.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
-				planv1alpha1.MachineLifecycleKindLabel: "Machine",
-				planv1alpha1.MachineLifecycleNameLabel: machineName,
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  machineName,
 			},
 		},
 		Type: capr.SecretTypeMachinePlan,
@@ -240,8 +240,8 @@ func TestCAPRAdapter_WaitForRegister_MissingMachineNameLabel(t *testing.T) {
 			Namespace: "fleet-default",
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				// No MachineNameLabel
 			},
 		},
