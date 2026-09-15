@@ -219,6 +219,11 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1
 	}
 	status = updateStatus(op, status)
 
+	// Paused operations resume on a spec change; skip TTL cleanup and polling until then.
+	if ops.IsPaused(&op.Spec.OperationSpec) {
+		return status, nil
+	}
+
 	if reflect.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
 		//
@@ -1739,6 +1744,15 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnap
 	logrus.Tracef("[etcdsnapshotrestore] %s/%s: updating conditions", op.Namespace, op.Name)
 
 	status.ObservedGeneration = op.Generation
+	if op.Spec.Paused {
+		opv1alpha1.PausedCondition.True(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.PausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "Operation is paused")
+	} else {
+		opv1alpha1.PausedCondition.False(&status)
+		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.NotPausedReason)
+		opv1alpha1.PausedCondition.Message(&status, "")
+	}
 
 	if status.Phase == opv1alpha1.OperationPhasePending {
 		opv1alpha1.PendingCondition.True(&status)
