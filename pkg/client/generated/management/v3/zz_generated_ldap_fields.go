@@ -5,6 +5,7 @@ const (
 	LdapFieldsFieldCertificate                     = "certificate"
 	LdapFieldsFieldConnectionTimeout               = "connectionTimeout"
 	LdapFieldsFieldGroupDNAttribute                = "groupDNAttribute"
+	LdapFieldsFieldGroupIDAttribute                = "groupIDAttribute"
 	LdapFieldsFieldGroupMemberMappingAttribute     = "groupMemberMappingAttribute"
 	LdapFieldsFieldGroupMemberUserAttribute        = "groupMemberUserAttribute"
 	LdapFieldsFieldGroupNameAttribute              = "groupNameAttribute"
@@ -22,6 +23,7 @@ const (
 	LdapFieldsFieldTLS                             = "tls"
 	LdapFieldsFieldUserDisabledBitMask             = "userDisabledBitMask"
 	LdapFieldsFieldUserEnabledAttribute            = "userEnabledAttribute"
+	LdapFieldsFieldUserIDAttribute                 = "userIDAttribute"
 	LdapFieldsFieldUserLoginAttribute              = "userLoginAttribute"
 	LdapFieldsFieldUserLoginFilter                 = "userLoginFilter"
 	LdapFieldsFieldUserMemberAttribute             = "userMemberAttribute"
@@ -36,6 +38,7 @@ type LdapFields struct {
 	Certificate                     string   `json:"certificate,omitempty" yaml:"certificate,omitempty"`
 	ConnectionTimeout               int64    `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 	GroupDNAttribute                string   `json:"groupDNAttribute,omitempty" yaml:"groupDNAttribute,omitempty"`
+	GroupIDAttribute                string   `json:"groupIDAttribute,omitempty" yaml:"groupIDAttribute,omitempty"`
 	GroupMemberMappingAttribute     string   `json:"groupMemberMappingAttribute,omitempty" yaml:"groupMemberMappingAttribute,omitempty"`
 	GroupMemberUserAttribute        string   `json:"groupMemberUserAttribute,omitempty" yaml:"groupMemberUserAttribute,omitempty"`
 	GroupNameAttribute              string   `json:"groupNameAttribute,omitempty" yaml:"groupNameAttribute,omitempty"`
@@ -53,6 +56,7 @@ type LdapFields struct {
 	TLS                             bool     `json:"tls,omitempty" yaml:"tls,omitempty"`
 	UserDisabledBitMask             int64    `json:"userDisabledBitMask,omitempty" yaml:"userDisabledBitMask,omitempty"`
 	UserEnabledAttribute            string   `json:"userEnabledAttribute,omitempty" yaml:"userEnabledAttribute,omitempty"`
+	UserIDAttribute                 string   `json:"userIDAttribute,omitempty" yaml:"userIDAttribute,omitempty"`
 	UserLoginAttribute              string   `json:"userLoginAttribute,omitempty" yaml:"userLoginAttribute,omitempty"`
 	UserLoginFilter                 string   `json:"userLoginFilter,omitempty" yaml:"userLoginFilter,omitempty"`
 	UserMemberAttribute             string   `json:"userMemberAttribute,omitempty" yaml:"userMemberAttribute,omitempty"`
