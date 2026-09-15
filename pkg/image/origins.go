@@ -268,6 +268,7 @@ var OriginMap = map[string]string{
 	"rke2-cloud-provider":                                     "https://github.com/rancher/image-build-rke2-cloud-provider",
 	"rke2-runtime":                                            "https://github.com/rancher/rke2",
 	"rke2-upgrade":                                            "https://github.com/rancher/rke2-upgrade",
+	"rke2-security-responder":                                 "https://github.com/rancher/rke2-security-responder",
 	"supportability-review":                                   "https://github.com/rancher/supportability-review",
 	"supportability-review-app-frontend":                      "https://github.com/rancher/supportability-review",
 	"supportability-review-internal":                          "https://github.com/rancher/supportability-review",
