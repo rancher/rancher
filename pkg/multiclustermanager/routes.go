@@ -96,13 +96,13 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	unauthed.Handle("/v3/connect", connectHandler)
 	unauthed.Handle("/v3/connect/register", connectHandler)
 	unauthed.Handle("/v3/import/{token}_{clusterId}.yaml", http.HandlerFunc(clusterImport.ClusterImportHandler))
-	unauthed.Handle("/v3/settings/cacerts", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/first-login", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-banners", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-brand", managementAPI).MatcherFunc(onlyGet)
-	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/cacerts", readOnly(managementAPI)).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/first-login", readOnly(managementAPI)).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/ui-banners", readOnly(managementAPI)).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/ui-issues", readOnly(managementAPI)).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/ui-pl", readOnly(managementAPI)).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/ui-brand", readOnly(managementAPI)).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/ui-default-landing", readOnly(managementAPI)).MatcherFunc(onlyGet)
 	unauthed.Handle("/rancherversion", version.NewVersionHandler())
 	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
@@ -168,4 +168,20 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 // onlyGet will match only GET but will not return a 405 like route.Methods and instead just not match
 func onlyGet(req *http.Request, m *mux.RouteMatch) bool {
 	return req.Method == http.MethodGet
+}
+
+// readOnly strips Norman's method-override query params (_method and
+// action=remove) before delegating to h. These routes are served without any
+// authentication or access-control middleware, so they must never be
+// reinterpreted as a write regardless of query string or request body.
+func readOnly(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Has("_method") || q.Get("action") == "remove" {
+			q.Del("_method")
+			q.Del("action")
+			r.URL.RawQuery = q.Encode()
+		}
+		h.ServeHTTP(w, r)
+	})
 }
