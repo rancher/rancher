@@ -16,6 +16,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -298,8 +299,7 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 		AllPullSecrets:             registryConfigs,
 		SUCAppNameOverride: func() string {
 			// Set the field to ensure backward compatibility in the case of node-driver RKE2/K3s cluster
-			if ops.Cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
-				(ops.Cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || ops.Cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
+			if isProvisionedRKE2OrK3s(ops.Cluster) {
 				if ops.Cluster.Spec.DisplayName != "" {
 					return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
 						capr.SafeConcatName(48, ops.Cluster.Spec.DisplayName, "managed", "system-upgrade-controller"))
@@ -311,6 +311,21 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 	}
 
 	return t.Execute(resp, context)
+}
+
+// isProvisionedRKE2OrK3s reports whether this management cluster mirrors a v2prov (CAPR)
+// RKE2/K3s cluster, i.e. a node-driver or custom cluster.
+//
+// This deliberately does not read cluster.Status.Driver. For a v2prov cluster the driver
+// is "" until the cluster agent's tunnel session is authorized, and only then becomes
+// "imported" (see authorizeCluster in pkg/tunnelserver/mcmauthorizer). Any input to the
+// cluster agent manifest that changes at that moment rewrites cluster-agent.yaml inside
+// the CAPR node plan, which the planner treats as a minor plan change and applies
+// immediately, rolling the cluster agent that just connected and stalling provisioning.
+// The "provisioning.cattle.io/administrated" annotation this relies on instead is written
+// once when the management cluster is created and never changes.
+func isProvisionedRKE2OrK3s(cluster *apimgmtv3.Cluster) bool {
+	return imported.IsAdministratedByProvisioningCluster(cluster)
 }
 
 func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
@@ -328,8 +343,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 			}
 		}
 	}
-	if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
-		(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
+	if isProvisionedRKE2OrK3s(cluster) {
 		// the case of node-driver/custom RKE2/K3s cluster
 		// The SUC app must be installed in order for Rancher to upgrade the cluster’s Kubernetes version.
 		enableMSUC = true
@@ -347,6 +361,15 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 }
 
 func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, secretLister v1.SecretLister) ([]byte, error) {
+	// Known wrinkle for the CAPR planner, which renders this manifest into the node plan:
+	// AppliedClusterAgentDeploymentCustomization is only written by the clusterdeploy
+	// controller, which cannot run until the cluster agent has connected. So for a cluster
+	// that opts into a scheduling customization priority class, pcExists flips from false
+	// to true after the agent's first connection, changing the rendered manifest and
+	// rolling the agent once. Deriving it from the spec instead would render a
+	// priorityClassName before the PriorityClass object exists downstream (clusterdeploy
+	// applies that separately, it is not part of this template), leaving the agent pod
+	// Pending, so this is left as-is for now.
 	status := util.GetAgentSchedulingCustomizationStatus(cluster)
 	pcExists := status != nil && status.PriorityClass != nil
 

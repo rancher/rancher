@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,6 +14,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 )
+
+// markStartable puts a cluster into the state usercontrollers requires before it will start
+// the per-cluster controllers.
+//
+// sync and reconcileClusterOwnership gate on the Connected condition. Provisioned is set as
+// well because it is still required in production by clustermanager.ToRESTConfig, so a
+// cluster that is Connected but not Provisioned is not a state worth asserting against.
+func markStartable(cluster *v3.Cluster) {
+	v3.ClusterConditionProvisioned.True(cluster)
+	clusterconnected.Connected.True(cluster)
+}
 
 func newMockUserControllersController(t *testing.T, starter *simpleControllerStarter) (*userControllersController, *fake.MockNonNamespacedClientInterface[*v3.Cluster, *v3.ClusterList]) {
 	ctrl := gomock.NewController(t)
@@ -58,7 +70,7 @@ func TestAnnotationFailsToBeSaved(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.23.4"},
 			},
 		}
-		v3.ClusterConditionProvisioned.True(cluster)
+		markStartable(cluster)
 
 		mockClient.EXPECT().Update(gomock.Any()).Return(nil, errors.New("test error!"))
 		obj, err := controller.sync("", cluster)
@@ -81,7 +93,7 @@ func TestAnnotationFailsToBeSaved(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.23.4"},
 			},
 		}
-		v3.ClusterConditionProvisioned.True(cluster)
+		markStartable(cluster)
 
 		mockClient.EXPECT().Update(gomock.Any()).Return(nil, errors.New("test error!"))
 		obj, err := controller.sync("", cluster)
@@ -105,7 +117,7 @@ func TestClusterControllerFailsToRestart(t *testing.T) {
 			Version: &version.Info{GitVersion: "1.23.4"},
 		},
 	}
-	v3.ClusterConditionProvisioned.True(cluster)
+	markStartable(cluster)
 
 	obj, err := controller.sync("", cluster)
 	require.Error(t, err)
@@ -127,7 +139,7 @@ func TestClusterWithoutControllersVersionAnnotationGetsUpdated(t *testing.T) {
 			Version: &version.Info{GitVersion: "1.23.4"},
 		},
 	}
-	v3.ClusterConditionProvisioned.True(cluster)
+	markStartable(cluster)
 
 	mockClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.Cluster) (*v3.Cluster, error) { return obj, nil })
 	obj, err := controller.sync("", cluster)
@@ -151,7 +163,7 @@ func TestClusterControllersNotRestartedOnPatchVersionChange(t *testing.T) {
 			Version: &version.Info{GitVersion: "1.23.1"},
 		},
 	}
-	v3.ClusterConditionProvisioned.True(cluster)
+	markStartable(cluster)
 
 	obj, err := controller.sync("", cluster)
 	require.NoError(t, err)
@@ -179,7 +191,7 @@ func TestClusterControllersWereStoppedAndStartedOnVersionChange(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.25.2"},
 			},
 		}
-		v3.ClusterConditionProvisioned.True(cluster)
+		markStartable(cluster)
 
 		mockClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.Cluster) (*v3.Cluster, error) { return obj, nil })
 		obj, err := controller.sync("", cluster)
@@ -203,7 +215,7 @@ func TestClusterControllersWereStoppedAndStartedOnVersionChange(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.22.1"},
 			},
 		}
-		v3.ClusterConditionProvisioned.True(cluster)
+		markStartable(cluster)
 
 		mockClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.Cluster) (*v3.Cluster, error) { return obj, nil })
 		obj, err := controller.sync("", cluster)
