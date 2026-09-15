@@ -3,18 +3,13 @@ module github.com/rancher/rancher
 go 1.26.5
 
 replace (
-	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.14.0-rc.1.0.20260902074845-42b70cc84c64
-	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260902103845-8111ed396886
-	github.com/rancher/apiserver => github.com/Abhishek-Valaboju/apiserver v0.9.3-0.20260831054009-f4e34c2be4f4
+	github.com/rancher/aks-operator => github.com/Abhishek-Valaboju/aks-operator v1.14.0-rc.1.0.20260915080302-ce656f763271
+	github.com/rancher/ali-operator => github.com/Abhishek-Valaboju/ali-operator v1.14.0-rc.1.0.20260915092420-578910db5978
 	github.com/rancher/channelserver => github.com/Abhishek-Valaboju/channelserver v0.0.0-20260831061235-834b3518e831
-	github.com/rancher/dynamiclistener => github.com/Abhishek-Valaboju/dynamiclistener v0.9.2-0.20260828093312-6c9b5c8443ba
-	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260902080038-96744e1194d9
-	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260902111650-ef3130554dcb
-	github.com/rancher/machine => github.com/Abhishek-Valaboju/machine v0.15.1-0.20260828101855-1594dd5e692c
-	github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
-	github.com/rancher/remotedialer-proxy => github.com/Abhishek-Valaboju/remotedialer-proxy v0.9.0-rc.1.0.20260828104351-1fd17c3731f2
+	github.com/rancher/eks-operator => github.com/Abhishek-Valaboju/eks-operator v1.15.0-rc.1.0.20260915081725-64b113975206
+	github.com/rancher/gke-operator => github.com/Abhishek-Valaboju/gke-operator v1.15.0-rc.1.0.20260915091508-881b96e7145e
+	github.com/rancher/machine => github.com/Abhishek-Valaboju/machine v0.15.1-0.20260910115951-e3cdf17f6047
 	github.com/rancher/shepherd => github.com/Abhishek-Valaboju/shepherd v0.0.0-20260902171309-1a4f1c27c7f1
-	github.com/rancher/steve => github.com/Abhishek-Valaboju/steve v0.9.8-0.20260911074347-919a3b7ac493
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/Abhishek-Valaboju/system-upgrade-controller/pkg/apis v0.0.0-20260831051815-cbe86707c07c
 )
 
@@ -150,9 +145,9 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
-	github.com/rancher/remotedialer-proxy v0.9.0-rc.2
+	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
 	github.com/rancher/shepherd v0.0.0-20260824145520-00de4a01fb4d
-	github.com/rancher/steve v0.10.4
+	github.com/rancher/steve v0.10.5
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
 	github.com/rancher/wrangler/v3 v3.8.0-rc.1
 	github.com/robfig/cron v1.2.0
@@ -311,8 +306,8 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260720211330-0afa2a65878a // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260904194346-d0f1323225a4 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260904194346-d0f1323225a4 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/controller-manager v0.0.0 // indirect
@@ -407,7 +402,7 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.42.1 // indirect
+	github.com/onsi/gomega v1.43.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/procfs v0.21.1 // indirect

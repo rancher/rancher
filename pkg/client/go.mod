@@ -4,10 +4,8 @@ go 1.26.0
 
 toolchain go1.26.6
 
-replace github.com/rancher/norman => github.com/Abhishek-Valaboju/norman v0.10.1-0.20260828094032-75fa12a9114f
-
 require (
-	github.com/rancher/norman v0.0.0-00010101000000-000000000000
+	github.com/rancher/norman v0.10.1
 	k8s.io/apimachinery v0.37.0
 )
 
