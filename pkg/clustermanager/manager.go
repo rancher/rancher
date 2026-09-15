@@ -76,9 +76,19 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 	if !ok {
 		return
 	}
-	logrus.Infof("Stopping cluster agent for %s", obj.(*record).cluster.ClusterName)
-	obj.(*record).cancel()
-	m.controllers.Delete(cluster.UID)
+	m.stopRecord(obj.(*record))
+}
+
+// stopRecord stops r and removes it from the manager, but only if it is still the active record for
+// its cluster. Callbacks held by a record can outlive it, and tearing down whichever record happens
+// to be current would stop controllers that are working fine. The check and the removal have to be
+// atomic, otherwise a replacement installed in between would be the one deleted.
+func (m *Manager) stopRecord(r *record) {
+	if !m.controllers.CompareAndDelete(r.clusterRec.UID, r) {
+		return
+	}
+	logrus.Infof("Stopping cluster agent for %s", r.cluster.ClusterName)
+	r.cancel()
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
@@ -381,6 +391,11 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 		clusterRec: cluster,
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
+
+	clusterContext.OnDeferredStartError = func(err error) {
+		logrus.Errorf("failed to start deferred controllers for cluster %s, stopping cluster agent so they are started again: %v", cluster.Name, err)
+		m.stopRecord(s)
+	}
 
 	return s, nil
 }
