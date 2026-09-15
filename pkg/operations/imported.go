@@ -5,8 +5,10 @@ import (
 	"path"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -111,6 +113,18 @@ func administratedCAPIAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Clu
 	return capiClusterAdapter(clients, capiCluster, "")
 }
 
+// NewImportedAdapter returns an ImportedAdapter for the given mgmt v3 Cluster.
+//
+// Use it when the caller has already established that the cluster is a true imported standalone
+// RKE2/K3s cluster. NewAdapter re-derives that from the cluster's labels and annotations and will
+// dispatch to a CAPI-backed adapter instead when either indicates the cluster is provisioned.
+func NewImportedAdapter(clients *wrangler.CAPIContext, cluster *mgmtv3.Cluster) *ImportedAdapter {
+	return &ImportedAdapter{
+		cluster: cluster,
+		clients: clients,
+	}
+}
+
 // BeaconRef returns the mgmt v3 Cluster's name-as-namespace + name convention. The mgmt v3
 // Cluster is cluster-scoped, but its per-cluster namespace on the local cluster is named after
 // the cluster itself and hosts every downstream artifact (mgmt v3 Nodes, beacons, machine-plan
@@ -196,8 +210,39 @@ type ImportedAdapter struct {
 	clients *wrangler.CAPIContext
 }
 
-func (a *ImportedAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []plan.File) {
-	return nil, nil, nil
+// ETCDSnapshotS3 returns the etcd S3 configuration from the mgmt v3 Cluster's distro config. The
+// rke2 and k3s configs carry the same ETCD type, so which one applies follows the runtime.
+func (a *ImportedAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	if a.RuntimeCommand() == capr.RuntimeRKE2 {
+		if a.cluster.Spec.Rke2Config == nil {
+			return nil
+		}
+		return a.cluster.Spec.Rke2Config.ETCD.S3
+	}
+
+	if a.cluster.Spec.K3sConfig == nil {
+		return nil
+	}
+	return a.cluster.Spec.K3sConfig.ETCD.S3
+}
+
+// ToS3ArgsEnvAndFiles resolves s3 against the mgmt v3 Cluster's own S3 configuration and the cloud
+// credential either of them references. Cloud credentials for a mgmt cluster are named
+// "<namespace>:<name>" and live in the global namespace, which is where a bare name is resolved.
+func (a *ImportedAdapter) ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	target, err := ResolveS3Target(
+		a.clients.Core.Secret().Cache(),
+		s3,
+		a.ETCDSnapshotS3(),
+		namespaces.GlobalNamespace,
+		path.Join(a.DistroDataDirectory(secret), EndpointCADirectory),
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	args, env, files := RenderS3(target, prefix, secretKeyInEnv)
+	return args, env, files, nil
 }
 
 // WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for

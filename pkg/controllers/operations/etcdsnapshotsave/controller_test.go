@@ -8,6 +8,7 @@ import (
 	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
@@ -78,9 +79,10 @@ func (a *stubAdapter) ConfigDirectory(_ *corev1.Secret) string {
 func (a *stubAdapter) GetServerURL(_ *corev1.Secret) string      { return "" }
 func (a *stubAdapter) GetSupervisorPort(_ *corev1.Secret) string { return "9345" }
 func (a *stubAdapter) LoopbackAddress(_ *corev1.Secret) string   { return "127.0.0.1" }
-func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) ([]string, []string, []planapi.File) {
-	return nil, nil, nil
+func (a *stubAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret, _ *rkev1.ETCDSnapshotS3, _ string, _ bool) ([]string, []string, []planapi.File, error) {
+	return nil, nil, nil, nil
 }
+func (a *stubAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 { return nil }
 
 // fakeDynamic satisfies the controller's dynamicResolver interface for the success-path tests.
 // Enqueue records the (gvk, namespace, name) tuple so tests can assert handleSucceeded nudged
