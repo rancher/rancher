@@ -125,9 +125,6 @@ func TestPaused(t *testing.T) {
 			want:    false,
 		},
 		{
-			// Unlike Enabled there is no setting to fall back to, so anything that is not exactly
-			// "true" means not paused. Suspending version management is the unusual state; it should
-			// never be entered by accident.
 			name:    "unrecognised value",
 			cluster: clusterWithAnnotations(map[string]string{VersionManagementPausedAnno: "system-default"}),
 			want:    false,
