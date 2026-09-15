@@ -23,6 +23,7 @@ const (
 	PodStatusFieldResourceClaimStatuses                = "resourceClaimStatuses"
 	PodStatusFieldResources                            = "resources"
 	PodStatusFieldStartTime                            = "startTime"
+	PodStatusFieldVolumeHealth                         = "volumeHealth"
 )
 
 type PodStatus struct {
@@ -47,4 +48,5 @@ type PodStatus struct {
 	ResourceClaimStatuses                []PodResourceClaimStatus             `json:"resourceClaimStatuses,omitempty" yaml:"resourceClaimStatuses,omitempty"`
 	Resources                            *ResourceRequirements                `json:"resources,omitempty" yaml:"resources,omitempty"`
 	StartTime                            string                               `json:"startTime,omitempty" yaml:"startTime,omitempty"`
+	VolumeHealth                         []PodVolumeHealth                    `json:"volumeHealth,omitempty" yaml:"volumeHealth,omitempty"`
 }

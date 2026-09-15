@@ -122,7 +122,7 @@ jobs:
           CATTLE_KDM_BRANCH: ${{ steps.env.outputs.CATTLE_KDM_BRANCH }}
         run: |
           mkdir -p bin
-          curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > bin/data.json
+          curl -sLf "https://raw.githubusercontent.com/Abhishek-Valaboju/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data/data.json" > bin/data.json
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
