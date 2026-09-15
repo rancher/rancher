@@ -130,13 +130,13 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 			http.NotFound(w, r)
 		}
 	})
-	unauthed.Handle("GET /v3/settings/cacerts", managementAPI)
-	unauthed.Handle("GET /v3/settings/first-login", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-banners", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-issues", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-pl", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-brand", managementAPI)
-	unauthed.Handle("GET /v3/settings/ui-default-landing", managementAPI)
+	unauthed.Handle("GET /v3/settings/cacerts", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/first-login", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-banners", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-issues", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-pl", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-brand", readOnly(managementAPI))
+	unauthed.Handle("GET /v3/settings/ui-default-landing", readOnly(managementAPI))
 	unauthed.Handle("/rancherversion", version.NewVersionHandler())
 	unauthed.Handle("/v1-k3s-release/", channelserver)
 	unauthed.Handle("/v1-rke2-release/", channelserver)
@@ -214,4 +214,20 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		nextHandler = next
 		return limitingHandler(unauthed)
 	}, nil
+}
+
+// readOnly strips Norman's method-override query params (_method and
+// action=remove) before delegating to h. These routes are served without any
+// authentication or access-control middleware, so they must never be
+// reinterpreted as a write regardless of query string or request body.
+func readOnly(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Has("_method") || q.Get("action") == "remove" {
+			q.Del("_method")
+			q.Del("action")
+			r.URL.RawQuery = q.Encode()
+		}
+		h.ServeHTTP(w, r)
+	})
 }
