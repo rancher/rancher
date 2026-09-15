@@ -13,9 +13,11 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -28,8 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
@@ -502,28 +502,35 @@ func WaitForCAPRKE2Ready(t *testing.T, cs *clients.Clients, fx *CAPRKE2Fixture) 
 	t.Logf("management.cattle.io v3 Cluster %s is Ready", fx.MgmtClusterName)
 }
 
-// DownstreamClient builds a kubernetes.Interface against the CAPRKE2 cluster by reading the
-// admin kubeconfig that the CAPI cluster controller writes to a `<cluster>-kubeconfig` Secret
-// once the control plane is up. The returned client lets tests do downstream CRUD (e.g. read a
-// ConfigMap after a restore) without shelling out to kubectl from the test runner. This is the
-// CAPRKE2 analogue of the imported test's `execKubectl` closure.
+// RunCAPRKE2Kubectl runs RKE2's local kubectl inside a CAPD control-plane container.
 //
-// Errors if the kubeconfig secret is missing or unparseable — call after WaitForCAPRKE2Ready so
-// the secret is guaranteed to be present.
-func (f *CAPRKE2Fixture) DownstreamClient(cs *clients.Clients) (kubernetes.Interface, error) {
-	secret, err := cs.Core.Secret().Get(f.Namespace, fmt.Sprintf("%s-kubeconfig", f.ClusterName), metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("getting %s-kubeconfig: %w", f.ClusterName, err)
+// Workload API access from the v2prov host depends on the test topology. Run the recovery check
+// from the server instead, so it verifies the workload API rather than host network routing.
+//
+// This is intentionally limited to CAPRKE2Docker tests and requires the active Docker context.
+func RunCAPRKE2Kubectl(ctx context.Context, machineName string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	command := []string{
+		"exec",
+		machineName,
+		"/var/lib/rancher/rke2/bin/kubectl",
+		"--kubeconfig=/etc/rancher/rke2/rke2.yaml",
+		"--request-timeout=20s",
 	}
-	data := secret.Data["value"]
-	if len(data) == 0 {
-		return nil, fmt.Errorf("kubeconfig secret %s/%s has no 'value' data key", f.Namespace, secret.Name)
+	command = append(command, args...)
+
+	cmd := exec.CommandContext(ctx, "docker", command...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return stdout.Bytes(), fmt.Errorf("running kubectl in CAPRKE2 machine %s: %w: stdout=%q stderr=%q",
+			machineName, err, strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()))
 	}
-	cfg, err := clientcmd.RESTConfigFromKubeConfig(data)
-	if err != nil {
-		return nil, fmt.Errorf("parsing kubeconfig from %s/%s: %w", f.Namespace, secret.Name, err)
-	}
-	return kubernetes.NewForConfig(cfg)
+	return stdout.Bytes(), nil
 }
 
 func newUnstructured(gvk schema.GroupVersionKind, namespace, name string, body map[string]any) *unstructured.Unstructured {

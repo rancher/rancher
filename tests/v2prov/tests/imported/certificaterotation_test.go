@@ -42,7 +42,7 @@ type nodeCertificateMetadata struct {
 }
 
 // Test_Imported_Operation_SetD_ImportedCertificateRotation validates the baseline single-node
-// imported flow: certificate rotation succeeds and every server certificate is replaced.
+// imported flow: certificate rotation succeeds and the expected default server certificates change.
 func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
@@ -50,24 +50,19 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation(t *testing.T) {
 	}
 	defer cs.Close()
 
-	// Setup: bring up a single-node imported cluster with the default runtime data directory.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
-	// Before-rotation evidence: record certificate metadata so rotation can be proven later.
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	requiredPaths := requiredCertificatePaths(runtimeName)
 	before := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 
-	// Operation execution: run CertificateRotation to completion.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
 
-	// Recovery: the cluster must come back healthy on the rotated certificates.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 
-	// Final assertions: every required certificate actually rotated, and the API still works.
 	after := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 
@@ -84,8 +79,6 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Custom_Data_Dir(t 
 	}
 	defer cs.Close()
 
-	// Setup: bring up a single-node imported cluster with a non-default data-dir configured
-	// before bootstrap.
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	dataDir := fmt.Sprintf("/var/lib/rancher/testing/certificate-rotation-%s", runtimeName)
 
@@ -96,19 +89,15 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Custom_Data_Dir(t 
 	// The node must actually report the custom data-dir before trusting cert paths derived from it.
 	assertNodeArgsContainDataDir(t, cs, fx.mgmtCluster.Name, runtimeName, dataDir)
 
-	// Before-rotation evidence, using cert paths under the custom data-dir.
 	requiredPaths := requiredCertificatePathsForDataDir(dataDir)
 	before := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 
-	// Operation execution.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
 
-	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
-	// Final assertions: certificates under the custom data-dir actually rotated.
 	after := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 }
@@ -123,7 +112,6 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t
 	}
 	defer cs.Close()
 
-	// Setup.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-service-argument", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
@@ -144,16 +132,13 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Service_Argument(t
 	allPaths := append(append([]string(nil), etcdPaths...), nonEtcdPaths...)
 	before := collectRequiredCertificateMetadata(t, fx, allPaths)
 
-	// Operation execution, scoped to the etcd service only.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationServices("etcd"))
 	assert.Equal(t, []string{"etcd"}, op.Spec.Args.Services)
 
-	// Recovery.
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
-	// Final assertions: only etcd certs rotated, everything else stayed the same.
 	after := collectRequiredCertificateMetadata(t, fx, allPaths)
 	assertCertificateRotationMetadata(t, before, after, etcdPaths)
 	assertCertificateMetadataUnchanged(t, before, after, nonEtcdPaths)
@@ -169,7 +154,6 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Mixed_Role_Service
 	}
 	defer cs.Close()
 
-	// Setup: one etcd-only node, one control-plane-only node, and one worker-only node.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-mixed-role-service-argument", []cluster.ImportedNodePool{
 		{ETCD: true, Quantity: 1},
 		{ControlPlane: true, Quantity: 1},
@@ -205,14 +189,11 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Mixed_Role_Service
 	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 	op = WaitForCertificateRotationSucceeded(t, cs, op, beaconNS, beaconName)
 
-	// Recovery proves the rotated cluster returned to service. The certificate checks below prove
-	// the requested service filtering.
+	// Confirm recovery before checking the per-role service filtering below.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, expectedNodes)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
-	// Final assertions: etcd certificates rotated on the etcd node and the scheduler certificate
-	// rotated on the control-plane node.
 	afterEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdPaths)
 	afterScheduler := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, schedulerPaths)
 	afterUnchangedControlPlane := map[string]certificateMetadata{
@@ -239,7 +220,6 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 	}
 	defer cs.Close()
 
-	// Setup: bring up a single-node imported RKE2 cluster.
 	dataDir := "/var/lib/rancher/rke2"
 	kcmDefaultCert := dataDir + "/server/tls/kube-controller-manager/kube-controller-manager.crt"
 	kcmDefaultKey := dataDir + "/server/tls/kube-controller-manager/kube-controller-manager.key"
@@ -323,8 +303,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 		t.Fatalf("timed out waiting for imported management cluster %s to be Ready after RKE2 TLS reconfiguration: %v", fx.mgmtCluster.Name, err)
 	}
 
-	// Before-rotation evidence, split by whether the cert is expected to rotate: the custom
-	// kube-controller-manager/kube-scheduler pair is the active serving cert and must be left alone.
+	// The custom kube-controller-manager/kube-scheduler pairs are active and must remain unchanged.
 	rotatingPaths := []string{
 		dataDir + "/server/tls/client-admin.crt",
 		dataDir + "/server/tls/serving-kube-apiserver.crt",
@@ -338,15 +317,12 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_RKE2_TLS_Args(t *t
 	allPaths := append(append([]string(nil), rotatingPaths...), unchangedPaths...)
 	before := collectRequiredCertificateMetadata(t, fx, allPaths)
 
-	// Operation execution.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
 	op = WaitForCertificateRotationSucceeded(t, cs, op, fx.mgmtCluster.Name, fx.mgmtCluster.Name)
 
-	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
-	// Final assertions: server certs rotated, the custom TLS pair did not.
 	after := collectRequiredCertificateMetadata(t, fx, allPaths)
 	assertCertificateRotationMetadata(t, before, after, rotatingPaths)
 	assertCertificateMetadataUnchanged(t, before, after, unchangedPaths)
@@ -359,8 +335,8 @@ func shellQuote(value string) string {
 
 // Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook validates that a
 // delegate registered on the Rotate step hook and the Succeeded phase hook actually pauses the
-// operation at each hook point, and that the operation still completes and rotates once each
-// hook is advanced.
+// operation at each hook point, and that the operation still completes after each hook is
+// advanced.
 func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
@@ -368,12 +344,10 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 	}
 	defer cs.Close()
 
-	// Setup.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-lifecycle-hook", []cluster.ImportedNodePool{
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
-	// Before-rotation evidence.
 	runtimeName := capr.GetRuntime(defaults.SomeK8sVersion)
 	requiredPaths := requiredCertificatePaths(runtimeName)
 	before := collectRequiredCertificateMetadata(t, fx, requiredPaths)
@@ -385,7 +359,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 	rotateHookKey := certificaterotation.RotateStepHookLabelPrefix + hookName
 	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
-	// Operation execution, delegated at both the Rotate step hook and the Succeeded phase hook.
+	// Gate both the Rotate step and Succeeded phase.
 	op := CreateCertificateRotationOp(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationLabels(map[string]string{
 		rotateHookKey:    delegateName,
 		succeededHookKey: delegateName,
@@ -403,10 +377,8 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 
 	final := WaitForCertificateRotationSucceeded(t, cs, op, beaconNS, beaconName)
 
-	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, final)
 
-	// Final assertions: rotation still happened despite pausing at both hooks.
 	after := collectRequiredCertificateMetadata(t, fx, requiredPaths)
 	assertCertificateRotationMetadata(t, before, after, requiredPaths)
 }
@@ -422,7 +394,6 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Multi_Node(t *test
 	}
 	defer cs.Close()
 
-	// Setup: 1 etcd-only, 1 control-plane-only, 2 worker-only nodes.
 	fx := setUpImportedCluster(t, cs, "test-imported-certificate-rotation-multi-node", []cluster.ImportedNodePool{
 		{ETCD: true, Quantity: 1},
 		{ControlPlane: true, Quantity: 1},
@@ -459,18 +430,15 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotation_Multi_Node(t *test
 	beforeControlPlane := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, controlPlaneCertPaths)
 	beforeWorkerAgentTimestamp := collectWorkerAgentActiveTimestamp(t, cs, fx, workerPodNames, runtimeName)
 
-	// Operation execution.
 	op := RunCertificateRotationOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
 
 	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 	op = WaitForCertificateRotationSucceeded(t, cs, op, beaconNS, beaconName)
 
-	// Recovery.
 	waitForImportedCertificateRotationRecovery(t, cs, fx, runtimeName, op)
 	waitForImportedNodesReady(t, cs, fx.ns.Name, fx.pods[0].Name, fx.kubectlEnv, expectedNodes)
 	assertDownstreamAPIUsableAfterRotation(t, fx)
 
-	// Final assertions: etcd/control-plane certs rotated, worker agents restarted.
 	afterEtcd := collectNodeCertificateMetadata(t, cs, fx, etcdPodNames, etcdCertPaths)
 	afterControlPlane := collectNodeCertificateMetadata(t, cs, fx, controlPlanePodNames, controlPlaneCertPaths)
 	afterWorkerAgentTimestamp := collectWorkerAgentActiveTimestamp(t, cs, fx, workerPodNames, runtimeName)
