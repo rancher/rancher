@@ -50,6 +50,10 @@ type ImportedNodePool struct {
 	ETCD         bool
 	Worker       bool
 	Quantity     int
+
+	// DistroDataDir, when non-empty, sets the RKE2/K3s data-dir in the initial
+	// generated config for pods created from this pool, before the service starts.
+	DistroDataDir string
 }
 
 // NewImported creates a management cluster object for an imported cluster.
@@ -86,6 +90,7 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 
 	type nodeSpec struct {
 		cp, etcd, worker bool
+		dataDir          string
 	}
 
 	var initSpec *nodeSpec
@@ -94,9 +99,10 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 	for _, pool := range pools {
 		for i := 0; i < pool.Quantity; i++ {
 			spec := nodeSpec{
-				cp:     pool.ControlPlane,
-				etcd:   pool.ETCD,
-				worker: pool.Worker,
+				cp:      pool.ControlPlane,
+				etcd:    pool.ETCD,
+				worker:  pool.Worker,
+				dataDir: pool.DistroDataDir,
 			}
 			if initSpec == nil && pool.ETCD {
 				initSpec = &spec
@@ -112,7 +118,7 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 
 	var pods []*corev1.Pod
 
-	initScript := importedNodeUserData(distro, k8sVersion, token, "imported-init-0", "", true, initSpec.cp, initSpec.etcd, initSpec.worker, registryCACert)
+	initScript := importedNodeUserData(distro, k8sVersion, token, "imported-init-0", "", true, initSpec.cp, initSpec.etcd, initSpec.worker, initSpec.dataDir, registryCACert)
 	initPod, err := systemdnode.New(clients, namespace, initScript, labels, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create init node: %w", err)
@@ -131,7 +137,7 @@ func NewImportedClusterPods(clients *clients.Clients, namespace, k8sVersion stri
 
 	for i, spec := range joinSpecs {
 		nodeName := fmt.Sprintf("imported-node-%d", i+1)
-		script := importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL, false, spec.cp, spec.etcd, spec.worker, registryCACert)
+		script := importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL, false, spec.cp, spec.etcd, spec.worker, spec.dataDir, registryCACert)
 		pod, err := systemdnode.New(clients, namespace, script, labels, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create node %s: %w", nodeName, err)
@@ -819,7 +825,7 @@ func generateImportedToken() (string, error) {
 	return fmt.Sprintf("%x", b), nil
 }
 
-func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, registryCACert []byte) string {
+func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string, isInit, cp, etcd, worker bool, dataDir string, registryCACert []byte) string {
 	isServer := etcd || cp
 	rancherDir := fmt.Sprintf("/etc/rancher/%s", distro)
 	configDir := rancherDir + "/config.yaml.d"
@@ -827,6 +833,10 @@ func importedNodeUserData(distro, k8sVersion, token, nodeName, serverURL string,
 	var configLines []string
 	configLines = append(configLines, "node-name: "+nodeName)
 	configLines = append(configLines, "token: "+token)
+
+	if dataDir != "" {
+		configLines = append(configLines, "data-dir: "+dataDir)
+	}
 
 	if isInit && distro == capr.RuntimeK3S {
 		configLines = append(configLines, "cluster-init: true")
