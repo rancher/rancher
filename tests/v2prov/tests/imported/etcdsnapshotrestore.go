@@ -87,17 +87,26 @@ func waitForBackpopulatedSnapshot(t *testing.T, clients *clients.Clients, cluste
 	return picked
 }
 
-// waitForBackpopulatedS3Snapshot polls until the S3 copy of a snapshot has been back-populated for
-// the cluster, then returns the most recently created one.
+// snapshotStorage is where a snapshot lives, which decides which of the ETCDSnapshot resources a
+// test restores from. A cluster configured for S3 produces two per snapshot — the distro writes the
+// file locally and then uploads it — and they are not interchangeable: only the S3 copy keeps its
+// extra metadata when a node other than the one that took it re-registers the snapshot, because for
+// S3 the metadata is stored in the bucket alongside the file rather than nowhere at all.
+type snapshotStorage string
+
+const (
+	snapshotStorageLocal snapshotStorage = "local"
+	snapshotStorageS3    snapshotStorage = "s3"
+)
+
+// waitForBackpopulatedSnapshotForStorage polls until a snapshot with the given storage has been
+// back-populated for the cluster, then returns the most recently created one.
 //
-// A cluster configured for S3 produces two ETCDSnapshotFiles per snapshot — the distro writes the
-// file locally and then uploads it — and only the S3 one carries its extra metadata durably, since
-// the metadata is stored in the bucket alongside the snapshot rather than next to the local file.
-//
-// Unlike a local snapshot, an S3 snapshot has no node identity stamped on it: snapshotbackpopulate
-// owns it by the cluster, because any etcd node can pull it back out of the bucket. So the selector
-// is the cluster label alone and the storage is checked on the object.
-func waitForBackpopulatedS3Snapshot(t *testing.T, clients *clients.Clients, clusterNamespace, clusterName string, createdAfter time.Time) *rkev1.ETCDSnapshot {
+// The selector is the cluster label alone, with the storage checked on the object. A local snapshot
+// additionally carries the node it was taken on, but an S3 one does not — snapshotbackpopulate owns
+// an S3 snapshot by the cluster, because any etcd node can pull it back out of the bucket, and the
+// restore controller elects any etcd machine for the same reason.
+func waitForBackpopulatedSnapshotForStorage(t *testing.T, clients *clients.Clients, clusterNamespace, clusterName string, storage snapshotStorage, createdAfter time.Time) *rkev1.ETCDSnapshot {
 	t.Helper()
 
 	var picked *rkev1.ETCDSnapshot
@@ -110,7 +119,10 @@ func waitForBackpopulatedS3Snapshot(t *testing.T, clients *clients.Clients, clus
 		}
 		for i := range list.Items {
 			s := &list.Items[i]
-			if s.SnapshotFile.S3 == nil || s.SnapshotFile.Name == "" {
+			if s.SnapshotFile.Name == "" {
+				continue
+			}
+			if (s.SnapshotFile.S3 != nil) != (storage == snapshotStorageS3) {
 				continue
 			}
 			if s.SnapshotFile.CreatedAt == nil || !s.SnapshotFile.CreatedAt.Time.After(createdAfter) {
@@ -123,9 +135,9 @@ func waitForBackpopulatedS3Snapshot(t *testing.T, clients *clients.Clients, clus
 		return picked != nil, nil
 	})
 	if err != nil {
-		t.Fatalf("timed out waiting for a back-populated S3 ETCDSnapshot CR in %s: %v", clusterNamespace, err)
+		t.Fatalf("timed out waiting for a back-populated %s ETCDSnapshot CR in %s: %v", storage, clusterNamespace, err)
 	}
-	t.Logf("using S3 snapshot %s/%s (file=%s)", picked.Namespace, picked.Name, picked.SnapshotFile.Name)
+	t.Logf("using %s snapshot %s/%s (file=%s)", storage, picked.Namespace, picked.Name, picked.SnapshotFile.Name)
 	return picked
 }
 
