@@ -3,6 +3,7 @@ package activedirectory
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/rancher/apiserver/pkg/apierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	ldapFakes "github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
@@ -834,6 +836,52 @@ func TestGroupPrincipalsFallbackDistinguishesFailureKinds(t *testing.T) {
 			require.Error(t, err)
 			assert.Empty(t, got, "partial group data must not be returned for a non-credential failure")
 			assert.ErrorContains(t, err, test.wantInMsg)
+		})
+	}
+}
+
+func TestRefetchGroupPrincipalsMarksPermanentBindFailures(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		diagnostic       string
+		wantNonTransient bool
+		wantInMsg        string
+	}{
+		{
+			name:             "bad bindings will not resolve on retry",
+			diagnostic:       capturedBadBindings,
+			wantNonTransient: true,
+			wantInMsg:        "channel binding",
+		},
+		{
+			name:             "malformed token will not resolve on retry",
+			diagnostic:       capturedBadToken,
+			wantNonTransient: true,
+			wantInMsg:        "malformed",
+		},
+		{
+			name:       "a rotated password is worth retrying",
+			diagnostic: typicalWrongPassword,
+			wantInMsg:  "authentication failed",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider, _ := bindFailingProvider(t, test.diagnostic, true)
+
+			_, err := provider.RefetchGroupPrincipals(UserScope+"://"+userDN, "")
+
+			require.Error(t, err)
+			assert.ErrorContains(t, err, test.wantInMsg)
+
+			var nte *common.NonTransientError
+			assert.Equal(t, test.wantNonTransient, errors.As(err, &nte),
+				"the refresh controller stops retrying only on a non-transient error")
 		})
 	}
 }

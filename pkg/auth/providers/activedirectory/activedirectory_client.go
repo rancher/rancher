@@ -139,6 +139,14 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 func (p *adProvider) refetchGroupPrincipalsOnConn(lConn ldapv3.Client, config *v3.ActiveDirectoryConfig, principalID string) ([]v3.Principal, error) {
 	err := p.bindServiceAccount(lConn, config)
 	if err != nil {
+		// This runs on the provider refresh path, where a rejected channel
+		// binding token or a malformed one keeps failing until the
+		// configuration or the certificate changes. Marking it lets the
+		// refresh controller record the reason on the UserAttribute and stop
+		// retrying until the user logs in again.
+		if classifyBindFailure(err) != bindFailureNone {
+			return nil, &common.NonTransientError{Err: classifyServiceAccountBindError(err)}
+		}
 		return nil, classifyServiceAccountBindError(err)
 	}
 
