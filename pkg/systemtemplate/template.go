@@ -172,6 +172,10 @@ spec:
       {{- else if .Tolerations }}
       # Tolerations added based on found taints on controlplane nodes
 {{ .Tolerations | indent 6 }}
+      # Transient taint, excluded from the derived list above, tolerated always
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: "Exists"
       {{- else }}
       # No taints or no controlplane nodes found, added defaults
       - effect: NoSchedule

@@ -208,6 +208,20 @@ func SystemTemplate(resp io.Writer, ops *TemplateOps) error {
 
 			tolerationList = append(tolerationList, toleration)
 		}
+
+		// Render in a stable order. Reordering the list alone changes the
+		// deployment's pod-template-hash, which rolls out a new ReplicaSet and
+		// restarts the agent even though nothing about it actually changed.
+		sort.Slice(tolerationList, func(i, j int) bool {
+			if tolerationList[i].Key != tolerationList[j].Key {
+				return tolerationList[i].Key < tolerationList[j].Key
+			}
+			if tolerationList[i].Effect != tolerationList[j].Effect {
+				return tolerationList[i].Effect < tolerationList[j].Effect
+			}
+			return tolerationList[i].Value < tolerationList[j].Value
+		})
+
 		tolerations = toYAML(tolerationList)
 	}
 

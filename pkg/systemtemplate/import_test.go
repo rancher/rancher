@@ -70,16 +70,19 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
+			// deliberately out of order: the rendered tolerations must come out
+			// sorted, otherwise the pod template changes on every reconcile and
+			// the agent is rolled out endlessly
 			taints: []corev1.Taint{
+				{
+					Key:    "key2",
+					Effect: corev1.TaintEffectPreferNoSchedule,
+				},
 				{
 					Key:       "key1",
 					Value:     "value1",
 					Effect:    corev1.TaintEffectNoSchedule,
 					TimeAdded: &metav1.Time{}, // this should be stripped from tolerations
-				},
-				{
-					Key:    "key2",
-					Effect: corev1.TaintEffectPreferNoSchedule,
 				},
 			},
 		},

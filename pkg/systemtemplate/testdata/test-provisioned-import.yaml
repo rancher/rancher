@@ -160,6 +160,10 @@ spec:
       - effect: PreferNoSchedule
         key: key2
         operator: Exists
+      # Transient taint, excluded from the derived list above, tolerated always
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: "Exists"
       initContainers:
       - name: rancher-charts-copy
         image: 
