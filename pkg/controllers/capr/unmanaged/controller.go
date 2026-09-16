@@ -256,6 +256,10 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 	}
 	machine.Labels[capr.MachineIDLabel] = data.String("id")
 
+	if machine.Status.NodeLabels[corev1.LabelOSStable] == capr.WindowsMachineOS {
+		labels[capr.CattleOSLabel] = capr.WindowsMachineOS
+	}
+
 	if machine.Spec.Etcd {
 		labels[capr.EtcdRoleLabel] = "true"
 	}
