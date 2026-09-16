@@ -27,6 +27,7 @@ func TestTaintsNeedUpdate(t *testing.T) {
 		name                  string
 		nodeTaints            []corev1.Taint
 		expectedTaints        []corev1.Taint
+		configured            map[string]bool
 		expectUpdate          bool
 		expectedToAddCount    int
 		expectedToRemoveCount int
@@ -106,11 +107,52 @@ func TestTaintsNeedUpdate(t *testing.T) {
 			expectedToAddCount:    1,
 			expectedToRemoveCount: 1,
 		},
+		{
+			// The user explicitly configured node-role.kubernetes.io/control-plane=dedicated on
+			// the pool. It is theirs, not an implicit default, so it must survive on a worker.
+			name: "configured taint with a default key is kept on a worker",
+			nodeTaints: []corev1.Taint{
+				{Key: "node-role.kubernetes.io/control-plane", Value: "dedicated", Effect: corev1.TaintEffectNoSchedule},
+			},
+			expectedTaints:        nil,
+			configured:            map[string]bool{"node-role.kubernetes.io/control-plane:NoSchedule": true},
+			expectUpdate:          false,
+			expectedToAddCount:    0,
+			expectedToRemoveCount: 0,
+		},
+		{
+			// Same taint on a control-plane node: the default has the same key/effect but an
+			// empty value, and must not overwrite the configured value.
+			name: "configured taint with a default key is not normalized on a control plane node",
+			nodeTaints: []corev1.Taint{
+				{Key: "node-role.kubernetes.io/control-plane", Value: "dedicated", Effect: corev1.TaintEffectNoSchedule},
+			},
+			expectedTaints: []corev1.Taint{
+				{Key: "node-role.kubernetes.io/control-plane", Effect: corev1.TaintEffectNoSchedule},
+			},
+			configured:            map[string]bool{"node-role.kubernetes.io/control-plane:NoSchedule": true},
+			expectUpdate:          false,
+			expectedToAddCount:    0,
+			expectedToRemoveCount: 0,
+		},
+		{
+			// A configured taint that differs in effect does not shield the default one.
+			name: "configured taint with another effect does not shield the default",
+			nodeTaints: []corev1.Taint{
+				{Key: "node-role.kubernetes.io/control-plane", Effect: corev1.TaintEffectNoSchedule},
+				{Key: "node-role.kubernetes.io/control-plane", Value: "dedicated", Effect: corev1.TaintEffectNoExecute},
+			},
+			expectedTaints:        nil,
+			configured:            map[string]bool{"node-role.kubernetes.io/control-plane:NoExecute": true},
+			expectUpdate:          true,
+			expectedToAddCount:    0,
+			expectedToRemoveCount: 1,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			toAdd, toRemove, needsUpdate := h.taintsNeedUpdate(tt.nodeTaints, tt.expectedTaints)
+			toAdd, toRemove, needsUpdate := h.taintsNeedUpdate(tt.nodeTaints, tt.expectedTaints, tt.configured)
 
 			assert.Equal(t, tt.expectUpdate, needsUpdate, "needsUpdate mismatch")
 			assert.Equal(t, tt.expectedToAddCount, len(toAdd), "toAdd count mismatch")
@@ -190,113 +232,173 @@ func TestApplyTaintChanges(t *testing.T) {
 	}
 }
 
-func TestWorkerLabelLogic(t *testing.T) {
+func TestReconcileNodeMetadata(t *testing.T) {
+	controlPlaneTaint := capr.DefaultTaints[capr.DefaultTaintControlPlane]
+	etcdTaint := capr.DefaultTaints[capr.DefaultTaintEtcd]
+
 	tests := []struct {
-		name               string
-		machineHasWorker   bool
-		nodeHasWorkerLabel bool   // whether the node has the worker label at all
-		nodeWorkerValue    string // value of the label when present
-		shouldAddLabel     bool
-		shouldRemoveLabel  bool
-		shouldNormalize    bool
+		name           string
+		machineLabels  []string
+		taintsAnn      string
+		runtime        string
+		nodeLabels     map[string]string
+		nodeTaints     []corev1.Taint
+		expectUpdate   bool
+		expectedLabels map[string]string
+		expectedTaints []corev1.Taint
 	}{
 		{
-			name:               "add worker label",
-			machineHasWorker:   true,
-			nodeHasWorkerLabel: false,
-			nodeWorkerValue:    "",
-			shouldAddLabel:     true,
-			shouldRemoveLabel:  false,
-			shouldNormalize:    false,
+			name:           "worker label is added",
+			machineLabels:  []string{capr.WorkerRoleLabel},
+			expectUpdate:   true,
+			expectedLabels: map[string]string{workerLabel: "true"},
+			expectedTaints: nil,
 		},
 		{
-			name:               "remove worker label",
-			machineHasWorker:   false,
-			nodeHasWorkerLabel: true,
-			nodeWorkerValue:    "true",
-			shouldAddLabel:     false,
-			shouldRemoveLabel:  true,
-			shouldNormalize:    false,
+			name:           "worker label is removed when the role is gone",
+			machineLabels:  []string{capr.ControlPlaneRoleLabel},
+			nodeLabels:     map[string]string{workerLabel: "true"},
+			expectUpdate:   true,
+			expectedLabels: map[string]string{},
+			expectedTaints: []corev1.Taint{controlPlaneTaint},
 		},
 		{
-			name:               "no change - both have correct value",
-			machineHasWorker:   true,
-			nodeHasWorkerLabel: true,
-			nodeWorkerValue:    "true",
-			shouldAddLabel:     false,
-			shouldRemoveLabel:  false,
-			shouldNormalize:    false,
+			name:           "worker label value is normalized",
+			machineLabels:  []string{capr.WorkerRoleLabel},
+			nodeLabels:     map[string]string{workerLabel: "yes"},
+			expectUpdate:   true,
+			expectedLabels: map[string]string{workerLabel: "true"},
 		},
 		{
-			name:               "no change - neither have",
-			machineHasWorker:   false,
-			nodeHasWorkerLabel: false,
-			nodeWorkerValue:    "",
-			shouldAddLabel:     false,
-			shouldRemoveLabel:  false,
-			shouldNormalize:    false,
+			name:           "worker node already labelled is left alone",
+			machineLabels:  []string{capr.WorkerRoleLabel},
+			nodeLabels:     map[string]string{workerLabel: "true"},
+			expectUpdate:   false,
+			expectedLabels: map[string]string{workerLabel: "true"},
 		},
 		{
-			name:               "normalize empty value to true",
-			machineHasWorker:   true,
-			nodeHasWorkerLabel: true,
-			nodeWorkerValue:    "", // label exists but empty
-			shouldAddLabel:     false,
-			shouldRemoveLabel:  false,
-			shouldNormalize:    true,
+			name:           "other labels are preserved",
+			machineLabels:  []string{capr.WorkerRoleLabel},
+			nodeLabels:     map[string]string{"custom": "value"},
+			expectUpdate:   true,
+			expectedLabels: map[string]string{"custom": "value", workerLabel: "true"},
 		},
 		{
-			name:               "normalize wrong value to true",
-			machineHasWorker:   true,
-			nodeHasWorkerLabel: true,
-			nodeWorkerValue:    "yes", // wrong value
-			shouldAddLabel:     false,
-			shouldRemoveLabel:  false,
-			shouldNormalize:    true,
+			// Promoting a worker to control-plane+etcd: the worker label goes away and both
+			// default taints appear.
+			name:           "role change adds default taints and drops the worker label",
+			machineLabels:  []string{capr.ControlPlaneRoleLabel, capr.EtcdRoleLabel},
+			nodeLabels:     map[string]string{workerLabel: "true"},
+			expectUpdate:   true,
+			expectedLabels: map[string]string{},
+			expectedTaints: []corev1.Taint{etcdTaint, controlPlaneTaint},
+		},
+		{
+			// K3s does not get the etcd taint when the node is also control-plane.
+			name:           "k3s combined control plane and etcd only gets the control plane taint",
+			machineLabels:  []string{capr.ControlPlaneRoleLabel, capr.EtcdRoleLabel},
+			runtime:        capr.RuntimeK3S,
+			expectUpdate:   true,
+			expectedLabels: map[string]string{},
+			expectedTaints: []corev1.Taint{controlPlaneTaint},
+		},
+		{
+			name:           "gaining the worker role removes the default taints",
+			machineLabels:  []string{capr.ControlPlaneRoleLabel, capr.WorkerRoleLabel},
+			nodeTaints:     []corev1.Taint{controlPlaneTaint, {Key: "custom", Effect: corev1.TaintEffectNoSchedule}},
+			expectUpdate:   true,
+			expectedLabels: map[string]string{workerLabel: "true"},
+			expectedTaints: []corev1.Taint{{Key: "custom", Effect: corev1.TaintEffectNoSchedule}},
+		},
+		{
+			// The user configured the control-plane key explicitly on the pool, so the taint is
+			// theirs: it is neither removed on a worker nor rewritten with the default value.
+			name:           "explicitly configured taint is preserved on a worker",
+			machineLabels:  []string{capr.WorkerRoleLabel},
+			taintsAnn:      `[{"key":"node-role.kubernetes.io/control-plane","value":"dedicated","effect":"NoSchedule"}]`,
+			nodeTaints:     []corev1.Taint{{Key: "node-role.kubernetes.io/control-plane", Value: "dedicated", Effect: corev1.TaintEffectNoSchedule}},
+			expectUpdate:   true, // only for the worker label
+			expectedLabels: map[string]string{workerLabel: "true"},
+			expectedTaints: []corev1.Taint{{Key: "node-role.kubernetes.io/control-plane", Value: "dedicated", Effect: corev1.TaintEffectNoSchedule}},
+		},
+		{
+			name:           "explicitly configured taint is not normalized on a control plane node",
+			machineLabels:  []string{capr.ControlPlaneRoleLabel},
+			taintsAnn:      `[{"key":"node-role.kubernetes.io/control-plane","value":"dedicated","effect":"NoSchedule"}]`,
+			nodeTaints:     []corev1.Taint{{Key: "node-role.kubernetes.io/control-plane", Value: "dedicated", Effect: corev1.TaintEffectNoSchedule}},
+			expectUpdate:   false,
+			expectedLabels: map[string]string{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Simulate the logic from reconcileNodeMetadata
-			node := &corev1.Node{}
-			if node.Labels == nil {
-				node.Labels = make(map[string]string)
+			ctrl := gomock.NewController(t)
+			nodeClient := fake.NewMockNonNamespacedClientInterface[*corev1.Node, *corev1.NodeList](ctrl)
+
+			machine := &capi.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "machine-1",
+					Namespace: testCAPIClusterNS,
+					Labels:    map[string]string{},
+				},
+			}
+			for _, label := range tt.machineLabels {
+				machine.Labels[label] = "true"
+			}
+			if tt.taintsAnn != "" {
+				machine.Annotations = map[string]string{capr.TaintsAnnotation: tt.taintsAnn}
 			}
 
-			if tt.nodeHasWorkerLabel {
-				node.Labels[workerLabel] = tt.nodeWorkerValue
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "node-1", Labels: tt.nodeLabels},
+				Spec:       corev1.NodeSpec{Taints: tt.nodeTaints},
 			}
 
-			// Apply the actual controller logic
-			workerLabelVal, hasWorkerLabel := node.Labels[workerLabel]
-			needsUpdate := false
-
-			if tt.machineHasWorker && (!hasWorkerLabel || workerLabelVal != "true") {
-				// Add/normalize worker label
-				node.Labels[workerLabel] = "true"
-				needsUpdate = true
-			} else if !tt.machineHasWorker && hasWorkerLabel {
-				// Remove worker label
-				delete(node.Labels, workerLabel)
-				needsUpdate = true
+			var updated *corev1.Node
+			if tt.expectUpdate {
+				nodeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(n *corev1.Node) (*corev1.Node, error) {
+					updated = n
+					return n, nil
+				})
 			}
 
-			if tt.shouldAddLabel || tt.shouldRemoveLabel || tt.shouldNormalize {
-				assert.True(t, needsUpdate, "expected update but needsUpdate was false")
-			} else {
-				assert.False(t, needsUpdate, "expected no update but needsUpdate was true")
+			runtime := tt.runtime
+			if runtime == "" {
+				runtime = capr.RuntimeRKE2
 			}
 
-			// Verify final state
-			if tt.machineHasWorker {
-				assert.Equal(t, "true", node.Labels[workerLabel], "worker label should be 'true'")
-			} else {
-				_, exists := node.Labels[workerLabel]
-				assert.False(t, exists, "worker label should not be present")
+			h := &handler{nodeClient: nodeClient}
+			assert.NoError(t, h.reconcileNodeMetadata(machine, node, runtime))
+
+			if !tt.expectUpdate {
+				return
 			}
+			assert.Equal(t, tt.expectedLabels, updated.Labels, "labels mismatch")
+			assert.Equal(t, tt.expectedTaints, updated.Spec.Taints, "taints mismatch")
 		})
 	}
+}
+
+func TestConfiguredTaintKeys(t *testing.T) {
+	machine := func(annotation string) *capi.Machine {
+		m := &capi.Machine{ObjectMeta: metav1.ObjectMeta{Name: "machine-1", Namespace: testCAPIClusterNS}}
+		if annotation != "" {
+			m.Annotations = map[string]string{capr.TaintsAnnotation: annotation}
+		}
+		return m
+	}
+
+	keys, err := configuredTaintKeys(machine(""))
+	assert.NoError(t, err)
+	assert.Nil(t, keys)
+
+	keys, err = configuredTaintKeys(machine(`[{"key":"a","effect":"NoSchedule"},{"key":"b","value":"v","effect":"NoExecute"}]`))
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]bool{"a:NoSchedule": true, "b:NoExecute": true}, keys)
+
+	_, err = configuredTaintKeys(machine("not json"))
+	assert.Error(t, err)
 }
 
 const (
@@ -422,19 +524,22 @@ func TestOnMachineChange(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		machine        *capi.Machine
-		capiCluster    *capi.Cluster
-		capiClusterErr error
-		expectUpdate   bool
+		name            string
+		machine         *capi.Machine
+		capiCluster     *capi.Cluster
+		capiClusterErr  error
+		expectRKELookup bool
+		nodeErr         error
+		expectUpdate    bool
 	}{
 		{
 			// Regression test: the machine is labelled with the CAPI cluster name, which is
 			// not the management cluster name the handler used to compare against.
-			name:         "machine of this cluster is reconciled",
-			machine:      machine(testCAPIClusterNS, testCAPIClusterName, capr.ControlPlaneRoleLabel),
-			capiCluster:  capiCluster,
-			expectUpdate: true,
+			name:            "machine of this cluster is reconciled",
+			machine:         machine(testCAPIClusterNS, testCAPIClusterName, capr.ControlPlaneRoleLabel),
+			capiCluster:     capiCluster,
+			expectRKELookup: true,
+			expectUpdate:    true,
 		},
 		{
 			name:    "machine of another cluster is ignored",
@@ -465,13 +570,14 @@ func TestOnMachineChange(t *testing.T) {
 			capiClusterErr: apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, testCAPIClusterName),
 		},
 		{
+			// Skipped before any cluster lookup: OnNodeChange picks the machine back up once
+			// the node exists downstream.
 			name: "machine without a node reference is skipped",
 			machine: func() *capi.Machine {
 				m := machine(testCAPIClusterNS, testCAPIClusterName, capr.ControlPlaneRoleLabel)
 				m.Status.NodeRef = capi.MachineNodeReference{}
 				return m
 			}(),
-			capiCluster: capiCluster,
 		},
 		{
 			name: "machine whose infrastructure is not ready is skipped",
@@ -480,7 +586,15 @@ func TestOnMachineChange(t *testing.T) {
 				m.Status.Conditions = nil
 				return m
 			}(),
-			capiCluster: capiCluster,
+		},
+		{
+			// The node has not reached the downstream informer yet. The machine must not error
+			// out; OnNodeChange reconciles it when the node shows up.
+			name:            "machine whose node is not in the downstream cache yet is skipped",
+			machine:         machine(testCAPIClusterNS, testCAPIClusterName, capr.ControlPlaneRoleLabel),
+			capiCluster:     capiCluster,
+			expectRKELookup: true,
+			nodeErr:         apierrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, "node-1"),
 		},
 		{
 			name: "deleted machine is skipped",
@@ -507,13 +621,17 @@ func TestOnMachineChange(t *testing.T) {
 					Get(testCAPIClusterNS, testCAPIClusterName).
 					Return(tt.capiCluster, tt.capiClusterErr)
 			}
-			if tt.expectUpdate {
-				nodeCache.EXPECT().Get("node-1").Return(&corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
-				}, nil)
+			if tt.expectRKELookup {
 				rkeControlPlaneCache.EXPECT().Get(testCAPIClusterNS, testCAPIClusterName).Return(&rkev1.RKEControlPlane{
 					Spec: rkev1.RKEControlPlaneSpec{KubernetesVersion: "v1.32.3+rke2r1"},
 				}, nil)
+				var node *corev1.Node
+				if tt.nodeErr == nil {
+					node = &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}
+				}
+				nodeCache.EXPECT().Get("node-1").Return(node, tt.nodeErr)
+			}
+			if tt.expectUpdate {
 				nodeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(node *corev1.Node) (*corev1.Node, error) {
 					assert.Equal(t, []corev1.Taint{capr.DefaultTaints[capr.DefaultTaintControlPlane]}, node.Spec.Taints)
 					return node, nil
@@ -529,6 +647,143 @@ func TestOnMachineChange(t *testing.T) {
 			}
 
 			_, err := h.OnMachineChange("", tt.machine)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestOnNodeChange covers the case OnMachineChange cannot handle on its own: the machine already
+// has a NodeRef, but the downstream node only shows up (or comes back) afterwards, with no further
+// machine event to trigger a reconcile.
+func TestOnNodeChange(t *testing.T) {
+	now := metav1.Now()
+	node := func(annotations map[string]string) *corev1.Node {
+		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Annotations: annotations}}
+	}
+	linkedNode := node(map[string]string{
+		capi.MachineAnnotation:          "machine-1",
+		capi.ClusterNamespaceAnnotation: testCAPIClusterNS,
+	})
+	machine := &capi.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "machine-1",
+			Namespace: testCAPIClusterNS,
+			Labels: map[string]string{
+				capi.ClusterNameLabel:      testCAPIClusterName,
+				capr.ControlPlaneRoleLabel: "true",
+			},
+		},
+		Status: capi.MachineStatus{
+			Conditions: []metav1.Condition{{
+				Type:   capi.InfrastructureReadyCondition,
+				Status: metav1.ConditionTrue,
+			}},
+			NodeRef: capi.MachineNodeReference{Name: "node-1"},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		node              *corev1.Node
+		machine           *capi.Machine
+		machineErr        error
+		expectMachineLook bool
+		expectUpdate      bool
+	}{
+		{
+			name:              "node linked to a machine of this cluster is reconciled",
+			node:              linkedNode,
+			machine:           machine,
+			expectMachineLook: true,
+			expectUpdate:      true,
+		},
+		{
+			name: "node without the machine annotation is ignored",
+			node: node(nil),
+		},
+		{
+			name: "node annotated for another cluster namespace is ignored",
+			node: node(map[string]string{
+				capi.MachineAnnotation:          "machine-1",
+				capi.ClusterNamespaceAnnotation: "fleet-other",
+			}),
+		},
+		{
+			name:              "missing machine is skipped",
+			node:              linkedNode,
+			machineErr:        apierrors.NewNotFound(schema.GroupResource{Resource: "machines"}, "machine-1"),
+			expectMachineLook: true,
+		},
+		{
+			name: "machine of another cluster is ignored",
+			node: linkedNode,
+			machine: func() *capi.Machine {
+				m := machine.DeepCopy()
+				m.Labels[capi.ClusterNameLabel] = "another-cluster"
+				return m
+			}(),
+			expectMachineLook: true,
+		},
+		{
+			name: "machine whose infrastructure is not ready is skipped",
+			node: linkedNode,
+			machine: func() *capi.Machine {
+				m := machine.DeepCopy()
+				m.Status.Conditions = nil
+				return m
+			}(),
+			expectMachineLook: true,
+		},
+		{
+			name: "deleted node is skipped",
+			node: func() *corev1.Node {
+				n := linkedNode.DeepCopy()
+				n.DeletionTimestamp = &now
+				return n
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			machineCache := fake.NewMockCacheInterface[*capi.Machine](ctrl)
+			capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](ctrl)
+			rkeControlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
+			nodeClient := fake.NewMockNonNamespacedClientInterface[*corev1.Node, *corev1.NodeList](ctrl)
+
+			if tt.expectMachineLook {
+				machineCache.EXPECT().Get(testCAPIClusterNS, "machine-1").Return(tt.machine, tt.machineErr)
+			}
+			if tt.expectUpdate {
+				capiClusterCache.EXPECT().Get(testCAPIClusterNS, testCAPIClusterName).Return(&capi.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: testCAPIClusterName, Namespace: testCAPIClusterNS},
+					Spec: capi.ClusterSpec{
+						ControlPlaneRef: capi.ContractVersionedObjectReference{
+							APIGroup: capr.RKEAPIGroup,
+							Kind:     rkeControlPlaneKind,
+							Name:     testCAPIClusterName,
+						},
+					},
+				}, nil)
+				rkeControlPlaneCache.EXPECT().Get(testCAPIClusterNS, testCAPIClusterName).Return(&rkev1.RKEControlPlane{
+					Spec: rkev1.RKEControlPlaneSpec{KubernetesVersion: "v1.32.3+rke2r1"},
+				}, nil)
+				nodeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(n *corev1.Node) (*corev1.Node, error) {
+					assert.Equal(t, []corev1.Taint{capr.DefaultTaints[capr.DefaultTaintControlPlane]}, n.Spec.Taints)
+					return n, nil
+				})
+			}
+
+			h := &handler{
+				capiCluster:          types.NamespacedName{Namespace: testCAPIClusterNS, Name: testCAPIClusterName},
+				nodeClient:           nodeClient,
+				machineCache:         machineCache,
+				capiClusterCache:     capiClusterCache,
+				rkeControlPlaneCache: rkeControlPlaneCache,
+			}
+
+			_, err := h.OnNodeChange("", tt.node)
 			assert.NoError(t, err)
 		})
 	}
