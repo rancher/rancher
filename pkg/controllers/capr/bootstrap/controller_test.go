@@ -5,9 +5,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"testing"
+	"time"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/namespace"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/settings"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -302,6 +305,418 @@ func TestShouldCreateBootstrapSecret(t *testing.T) {
 		t.Run(string(tt.phase), func(t *testing.T) {
 			actual := shouldCreateBootstrapSecret(tt.phase)
 			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestReconcileMachinePreTerminateAnnotationReleasesMachineWithoutNodeRef(t *testing.T) {
+	const (
+		namespace     = "fleet-default"
+		bootstrapName = "bootstrap-1"
+		machineName   = "machine-1"
+		clusterName   = "cluster"
+	)
+
+	ctrl := gomock.NewController(t)
+	machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+	machineClient := ctrlfake.NewMockClientInterface[*capi.Machine, *capi.MachineList](ctrl)
+
+	deletionTime := metav1.NewTime(time.Now())
+	machine := &capi.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              machineName,
+			Namespace:         namespace,
+			DeletionTimestamp: &deletionTime,
+			Labels: map[string]string{
+				capr.EtcdRoleLabel: "true",
+			},
+			Annotations: map[string]string{
+				capiMachinePreTerminateAnnotation: capiMachinePreTerminateAnnotationOwner,
+			},
+		},
+	}
+
+	machineCache.EXPECT().Get(namespace, machineName).Return(machine, nil)
+	machineClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(updated *capi.Machine) (*capi.Machine, error) {
+		assert.NotContains(t, updated.Annotations, capiMachinePreTerminateAnnotation)
+		return updated, nil
+	})
+
+	h := &handler{
+		machineCache:  machineCache,
+		machineClient: machineClient,
+	}
+	bootstrap := &rkev1.RKEBootstrap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bootstrapName,
+			Namespace: namespace,
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: capi.GroupVersion.String(),
+				Kind:       "Machine",
+				Name:       machineName,
+			}},
+		},
+		Spec: rkev1.RKEBootstrapSpec{
+			ClusterName: clusterName,
+		},
+	}
+
+	result, err := h.reconcileMachinePreTerminateAnnotation(bootstrap)
+	assert.NoError(t, err)
+	assert.Same(t, bootstrap, result)
+}
+
+func TestReplacementEtcdMachineReady(t *testing.T) {
+	const (
+		deletingMachineName      = "machine-1"
+		deletingMachineNamespace = "fleet-default"
+		clusterName              = "cluster"
+	)
+
+	// planSecretOption changes one property of a replacement candidate.
+	type planSecretOption func(*v1.Secret)
+
+	withNoInitNodeLabel := func(s *v1.Secret) { delete(s.Labels, capr.InitNodeLabel) }
+	withNoEtcdRoleLabel := func(s *v1.Secret) { delete(s.Labels, capr.EtcdRoleLabel) }
+	withNoJoinURL := func(s *v1.Secret) { delete(s.Annotations, capr.JoinURLAnnotation) }
+	withNoProbesPassedAnnotation := func(s *v1.Secret) { delete(s.Annotations, planapi.PlanProbesPassedAnnotation) }
+	withDeletingSecret := func(s *v1.Secret) { s.DeletionTimestamp = &metav1.Time{Time: time.Now()} }
+	withWrongType := func(s *v1.Secret) { s.Type = v1.SecretTypeOpaque }
+
+	// newPlanSecret returns a candidate that satisfies all plan-secret checks by default.
+	newPlanSecret := func(machineName, machineNamespace, joinURL string, opts ...planSecretOption) *v1.Secret {
+		labels := map[string]string{
+			capr.MachineNameLabel: machineName,
+			capr.EtcdRoleLabel:    "true",
+			capr.InitNodeLabel:    "true",
+		}
+		if machineNamespace != "" {
+			labels[capr.MachineNamespaceLabel] = machineNamespace
+		}
+		annotations := map[string]string{
+			planapi.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+		}
+		if joinURL != "" {
+			annotations[capr.JoinURLAnnotation] = joinURL
+		}
+		s := &v1.Secret{
+			Type: capr.SecretTypeMachinePlan,
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:      labels,
+				Annotations: annotations,
+			},
+		}
+		for _, opt := range opts {
+			opt(s)
+		}
+		return s
+	}
+
+	// newReadyMachine returns a candidate that satisfies all Machine checks by default.
+	newReadyMachine := func(name, namespace, clusterName string) *capi.Machine {
+		return &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels: map[string]string{
+					capr.EtcdRoleLabel: "true",
+				},
+			},
+			Spec: capi.MachineSpec{
+				ClusterName: clusterName,
+			},
+			Status: capi.MachineStatus{
+				NodeRef: capi.MachineNodeReference{Name: "node-2"},
+				Conditions: []metav1.Condition{{
+					Type:   capi.MachineNodeReadyCondition,
+					Status: metav1.ConditionTrue,
+					Reason: capi.MachineNodeReadyReason,
+				}},
+			},
+		}
+	}
+
+	tests := []struct {
+		name              string
+		planSecrets       []*v1.Secret
+		setupMachineCache func(*ctrlfake.MockCacheInterface[*capi.Machine])
+		expected          bool
+		expectErr         bool
+	}{
+		{
+			name: "fully reconciled elected init etcd candidate is accepted",
+			planSecrets: []*v1.Secret{
+				newPlanSecret(deletingMachineName, "", "https://10.0.0.1:9345"),
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(newReadyMachine("machine-2", "fleet-default", clusterName), nil)
+			},
+			expected: true,
+		},
+		{
+			name: "candidate without InitNodeLabel is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", withNoInitNodeLabel),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "candidate without EtcdRoleLabel on plan secret is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", withNoEtcdRoleLabel),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "candidate missing joinURL is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", withNoJoinURL),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "candidate missing PlanProbesPassedAnnotation is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", withNoProbesPassedAnnotation),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "deleting plan secret is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", withDeletingSecret),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "wrong secret type is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", withWrongType),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "machine from another cluster is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(newReadyMachine("machine-2", "fleet-default", "other-cluster"), nil)
+			},
+			expected: false,
+		},
+		{
+			name: "machine without the etcd role is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				m := newReadyMachine("machine-2", "fleet-default", clusterName)
+				delete(m.Labels, capr.EtcdRoleLabel)
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(m, nil)
+			},
+			expected: false,
+		},
+		{
+			name: "missing NodeReady condition is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				m := newReadyMachine("machine-2", "fleet-default", clusterName)
+				m.Status.Conditions = nil
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(m, nil)
+			},
+			expected: false,
+		},
+		{
+			name: "false NodeReady condition is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				m := newReadyMachine("machine-2", "fleet-default", clusterName)
+				m.Status.Conditions = []metav1.Condition{{
+					Type:   capi.MachineNodeReadyCondition,
+					Status: metav1.ConditionFalse,
+					Reason: capi.MachineNodeNotReadyReason,
+				}}
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(m, nil)
+			},
+			expected: false,
+		},
+		{
+			name: "unknown NodeReady condition is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				m := newReadyMachine("machine-2", "fleet-default", clusterName)
+				m.Status.Conditions = []metav1.Condition{{
+					Type:   capi.MachineNodeReadyCondition,
+					Status: metav1.ConditionUnknown,
+					Reason: capi.MachineNodeReadyUnknownReason,
+				}}
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(m, nil)
+			},
+			expected: false,
+		},
+		{
+			name: "missing NodeRef is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				m := newReadyMachine("machine-2", "fleet-default", clusterName)
+				m.Status.NodeRef = capi.MachineNodeReference{}
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(m, nil)
+			},
+			expected: false,
+		},
+		{
+			name: "deleting candidate machine is rejected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				m := newReadyMachine("machine-2", "fleet-default", clusterName)
+				m.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(m, nil)
+			},
+			expected: false,
+		},
+		{
+			name: "deleting machine is never selected as its own replacement",
+			planSecrets: []*v1.Secret{
+				// The deleting machine otherwise satisfies every candidate check.
+				newPlanSecret(deletingMachineName, deletingMachineNamespace, "https://10.0.0.1:9345"),
+			},
+			// Reject the candidate before reading the machine cache.
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "machine cache error propagates",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345"),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(nil, fmt.Errorf("boom"))
+			},
+			expected:  false,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+			tt.setupMachineCache(machineCache)
+
+			h := &handler{
+				machineCache: machineCache,
+			}
+
+			bootstrap := &rkev1.RKEBootstrap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: deletingMachineNamespace,
+				},
+				Spec: rkev1.RKEBootstrapSpec{
+					ClusterName: clusterName,
+				},
+			}
+			deletingMachine := &capi.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      deletingMachineName,
+					Namespace: deletingMachineNamespace,
+				},
+				Spec: capi.MachineSpec{
+					ClusterName: clusterName,
+				},
+			}
+
+			actual, err := h.replacementEtcdMachineReady(bootstrap, deletingMachine, tt.planSecrets)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestMachineStillJoinedToJoinURL(t *testing.T) {
+	newPlanSecret := func(machineName, joinedTo string) *v1.Secret {
+		annotations := map[string]string{}
+		if joinedTo != "" {
+			annotations[capr.JoinedToAnnotation] = joinedTo
+		}
+		return &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					capr.MachineNameLabel: machineName,
+				},
+				Annotations: annotations,
+			},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		planSecrets  []*v1.Secret
+		joinURL      string
+		expectedName string
+		expectedOk   bool
+	}{
+		{
+			name: "matching non-empty URL is detected",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "https://10.0.0.1:9345"),
+			},
+			joinURL:      "https://10.0.0.1:9345",
+			expectedName: "machine-2",
+			expectedOk:   true,
+		},
+		{
+			name: "non-matching URL is ignored",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "https://10.0.0.9:9345"),
+			},
+			joinURL:    "https://10.0.0.1:9345",
+			expectedOk: false,
+		},
+		{
+			name: "empty join URL does not match",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "https://10.0.0.1:9345"),
+			},
+			joinURL:    "",
+			expectedOk: false,
+		},
+		{
+			name: "empty joined-to annotation does not match",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", ""),
+			},
+			joinURL:    "https://10.0.0.1:9345",
+			expectedOk: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			name, ok := machineStillJoinedToJoinURL(tt.planSecrets, tt.joinURL)
+			assert.Equal(t, tt.expectedOk, ok)
+			assert.Equal(t, tt.expectedName, name)
 		})
 	}
 }
