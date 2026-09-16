@@ -68,16 +68,21 @@ func splitNTLMIdentity(username, defaultDomain string) (string, string, error) {
 	domain := defaultDomain
 	user := username
 
+	// Each form reports its own empty domain. A qualified name can only be
+	// missing the domain part, and a bare name can only be missing
+	// defaultLoginDomain.
 	if parts := strings.Split(username, `\`); len(parts) > 1 {
 		if len(parts) > 2 {
 			return "", "", invalid("it contains more than one backslash")
 		}
+		if strings.TrimSpace(parts[0]) == "" {
+			return "", "", invalid("the domain part is empty")
+		}
 		domain, user = parts[0], parts[1]
-	}
-
-	if strings.TrimSpace(domain) == "" {
+	} else if strings.TrimSpace(domain) == "" {
 		return "", "", invalid("no domain was given and defaultLoginDomain is not set")
 	}
+
 	if strings.TrimSpace(user) == "" {
 		return "", "", invalid("the user part is empty")
 	}

@@ -757,7 +757,7 @@ func TestSearchPrincipalsSurfacesNonCredentialBindFailures(t *testing.T) {
 			require.Error(t, err, "the mapped error must reach the caller, not be swallowed")
 			assert.True(t, closed.Load(), "SearchPrincipals owns the connection and must close it")
 			assert.Empty(t, got)
-			assert.Contains(t, err.Error(), test.wantInMsg)
+			assert.ErrorContains(t, err, test.wantInMsg)
 
 			herr, ok := err.(*apierror.APIError)
 			require.True(t, ok)
@@ -833,7 +833,7 @@ func TestGroupPrincipalsFallbackDistinguishesFailureKinds(t *testing.T) {
 
 			require.Error(t, err)
 			assert.Empty(t, got, "partial group data must not be returned for a non-credential failure")
-			assert.Contains(t, err.Error(), test.wantInMsg)
+			assert.ErrorContains(t, err, test.wantInMsg)
 		})
 	}
 }
@@ -893,7 +893,7 @@ func TestGetPrincipalFallbackDistinguishesFailureKinds(t *testing.T) {
 
 			require.Error(t, err)
 			assert.Nil(t, got, "a DN-formed principal must not stand in for a non-credential failure")
-			assert.Contains(t, err.Error(), test.wantInMsg)
+			assert.ErrorContains(t, err, test.wantInMsg)
 		})
 	}
 }

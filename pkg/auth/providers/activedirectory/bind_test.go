@@ -130,7 +130,7 @@ func TestBindAsRejectsAnInvalidMechanism(t *testing.T) {
 	herr, ok := err.(*apierror.APIError)
 	require.True(t, ok)
 	assert.Equal(t, validation.InvalidOption, herr.Code)
-	assert.Contains(t, err.Error(), "bindMechanism")
+	assert.ErrorContains(t, err, "bindMechanism")
 	assert.False(t, bound.Load(), "an invalid mechanism must not reach the directory")
 }
 
@@ -157,7 +157,7 @@ func TestStoredConfigCallersSwallowLoadFailures(t *testing.T) {
 			&v3.BasicLogin{Username: userName, Password: userPassword})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "can't find authprovider")
+		assert.ErrorContains(t, err, "can't find authprovider")
 	})
 
 	t.Run("SearchPrincipals still returns empty and nil", func(t *testing.T) {
@@ -243,6 +243,7 @@ func TestSplitNTLMIdentity(t *testing.T) {
 		wantDomain    string
 		wantUser      string
 		wantErr       bool
+		wantReason    string // Substring of the rejection message.
 	}{
 		{
 			name:       "domain qualified",
@@ -265,19 +266,34 @@ func TestSplitNTLMIdentity(t *testing.T) {
 			wantUser:      "alice",
 		},
 		{
-			name:     "bare name without a default domain",
-			username: "alice",
-			wantErr:  true,
+			name:       "bare name without a default domain",
+			username:   "alice",
+			wantErr:    true,
+			wantReason: "no domain was given and defaultLoginDomain is not set",
 		},
-		{name: "empty", username: "", defaultDomain: "FOO", wantErr: true},
-		{name: "empty domain", username: `\alice`, defaultDomain: "FOO", wantErr: true},
-		{name: "empty user", username: `FOO\`, wantErr: true},
-		{name: "only a backslash", username: `\`, wantErr: true},
-		{name: "two backslashes", username: `A\B\alice`, wantErr: true},
-		{name: "upn", username: "alice@example.com", defaultDomain: "FOO", wantErr: true},
-		{name: "upn with a domain prefix", username: `FOO\alice@example.com`, wantErr: true},
-		{name: "distinguished name", username: "cn=alice,ou=foo,dc=example,dc=com", defaultDomain: "FOO", wantErr: true},
-		{name: "whitespace only", username: "   ", defaultDomain: "FOO", wantErr: true},
+		{
+			// A separator was given, so the default domain does not apply
+			// even when one is configured.
+			name:          "empty domain with a default domain configured",
+			username:      `\alice`,
+			defaultDomain: "FOO",
+			wantErr:       true,
+			wantReason:    "the domain part is empty",
+		},
+		{
+			name:       "empty domain without a default domain",
+			username:   `\alice`,
+			wantErr:    true,
+			wantReason: "the domain part is empty",
+		},
+		{name: "empty", username: "", defaultDomain: "FOO", wantErr: true, wantReason: "it is empty"},
+		{name: "empty user", username: `FOO\`, wantErr: true, wantReason: "the user part is empty"},
+		{name: "only a backslash", username: `\`, wantErr: true, wantReason: "the domain part is empty"},
+		{name: "two backslashes", username: `A\B\alice`, wantErr: true, wantReason: "it contains more than one backslash"},
+		{name: "upn", username: "alice@example.com", defaultDomain: "FOO", wantErr: true, wantReason: "user principal names are not supported"},
+		{name: "upn with a domain prefix", username: `FOO\alice@example.com`, wantErr: true, wantReason: "user principal names are not supported"},
+		{name: "distinguished name", username: "cn=alice,ou=foo,dc=example,dc=com", defaultDomain: "FOO", wantErr: true, wantReason: "distinguished names are not supported"},
+		{name: "whitespace only", username: "   ", defaultDomain: "FOO", wantErr: true, wantReason: "it is empty"},
 	}
 
 	for _, test := range tests {
@@ -291,6 +307,8 @@ func TestSplitNTLMIdentity(t *testing.T) {
 				herr, ok := err.(*apierror.APIError)
 				require.True(t, ok, "callers map this to an operator readable API error")
 				assert.Equal(t, validation.InvalidOption, herr.Code)
+				assert.ErrorContains(t, err, test.wantReason,
+					"the message has to name the mistake the operator made")
 				return
 			}
 			require.NoError(t, err)
