@@ -22,6 +22,11 @@ import (
 // downstream API calls to check the system-upgrade-controller app status.
 const systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
 
+// noSUCChartVersionReason is the SystemUpgradeControllerReady reason used when the
+// SystemUpgradeControllerChartVersion setting is empty. It is compared against the existing
+// condition so the accompanying warning is logged only when the state actually changes.
+const noSUCChartVersionReason = "the SystemUpgradeControllerChartVersion setting is not set"
+
 // throttleState tracks throttle and enqueue deduplication state for a single RKEControlPlane object.
 type throttleState struct {
 	lastDownstreamCheck time.Time // when the downstream API was last called
@@ -67,8 +72,14 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
 	if targetVersion == "" {
-		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
-		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
+		// Log only on transition. This is a status handler, so it runs on every
+		// RKEControlPlane change, and the condition set below already records the reason
+		// durably — logging unconditionally buries the rest of the log in duplicates.
+		if !capr.SystemUpgradeControllerReady.IsFalse(&status) ||
+			capr.SystemUpgradeControllerReady.GetReason(&status) != noSUCChartVersionReason {
+			logrus.Warnf("[rkecontrolplanecondition] %s/%s: %s", obj.Namespace, obj.Name, noSUCChartVersionReason)
+		}
+		capr.SystemUpgradeControllerReady.Reason(&status, noSUCChartVersionReason)
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
 		return status, nil

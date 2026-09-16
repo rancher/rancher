@@ -199,8 +199,9 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 		v32.ClusterConditionNoMemoryPressure.False(cluster)
 	}
 
+	knewVersion := cluster.Status.Version != nil
 	var oldVersion int
-	if cluster.Status.Version != nil {
+	if knewVersion {
 		oldVersion, err = minorVersion(cluster)
 		if err != nil {
 			return nil, err
@@ -216,7 +217,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 		if err != nil {
 			return nil, err
 		}
-		if newVersion >= 22 && oldVersion <= 21 {
+		if crossedV122Boundary(knewVersion, oldVersion, newVersion) {
 			err := s.restartAgentDeployment(cluster)
 			if err != nil {
 				return nil, err
@@ -264,6 +265,18 @@ func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 		})
 	}
 	return updated
+}
+
+// crossedV122Boundary reports whether a cluster just moved from Kubernetes <=1.21 to >=1.22 and
+// therefore needs its agent restarted, so that controllers gated on the v1.22 APIs are swapped.
+//
+// knewVersion must be false when no Kubernetes version had been observed for the cluster yet.
+// Without it, oldMinor's zero value — the state of every freshly provisioned cluster on its first
+// stats sync — is indistinguishable from "was running 1.21 or older", so the agent gets rolled on
+// brand new clusters for no reason. That costs a full agent pod startup plus a tunnel reconnect,
+// during the window where the cluster is still being provisioned.
+func crossedV122Boundary(knewVersion bool, oldMinor, newMinor int) bool {
+	return knewVersion && oldMinor <= 21 && newMinor >= 22
 }
 
 // restartAgentDeployment sets an annotation on the cluster agent deployment template
