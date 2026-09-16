@@ -141,7 +141,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	}
 
 	machinerole.Register(ctx, cluster, capi)
-	machineroletaint.Register(ctx, cluster, capi)
+	machineroletaint.Register(ctx, cluster, capi, clusterRec)
 }
 
 func RegisterFollower(cluster *config.UserContext) error {

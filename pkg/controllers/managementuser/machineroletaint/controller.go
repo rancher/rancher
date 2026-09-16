@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -13,19 +16,20 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
-	controllerName = "machine-role-taint"
-	workerLabel    = "node-role.kubernetes.io/worker"
+	controllerName      = "machine-role-taint"
+	workerLabel         = "node-role.kubernetes.io/worker"
+	rkeControlPlaneKind = "RKEControlPlane"
 )
 
 type handler struct {
-	clusterName          string
+	capiCluster          types.NamespacedName
 	nodeClient           corew.NodeClient
 	nodeCache            corew.NodeCache
-	machineCache         capicontrollers.MachineCache
 	capiClusterCache     capicontrollers.ClusterCache
 	rkeControlPlaneCache rkecontrollers.RKEControlPlaneCache
 }
@@ -34,20 +38,60 @@ type handler struct {
 // This controller watches CAPI Machine objects from the management cluster
 // and reconciles node taints and worker labels in the downstream cluster
 // when machine roles change.
-func Register(ctx context.Context, userContext *config.UserContext, capi *wrangler.CAPIContext) {
+func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wrangler.CAPIContext, clusterRec *apimgmtv3.Cluster) {
+	capiCluster, err := capiClusterRef(clusterRec, userContext.Management.Wrangler.Provisioning.Cluster().Cache())
+	if err != nil {
+		logrus.Errorf("[%s] not registering for cluster %s: %v", controllerName, clusterRec.Name, err)
+		return
+	}
+	if capiCluster == nil {
+		// Nothing to reconcile: this cluster has no CAPI machines backing its nodes.
+		logrus.Debugf("[%s] cluster %s is not backed by a CAPI cluster, skipping registration", controllerName, clusterRec.Name)
+		return
+	}
+
 	h := &handler{
-		clusterName:          userContext.ClusterName,
+		capiCluster:          *capiCluster,
 		nodeClient:           userContext.Corew.Node(),
 		nodeCache:            userContext.Corew.Node().Cache(),
-		machineCache:         capi.CAPI.Machine().Cache(),
-		capiClusterCache:     capi.CAPI.Cluster().Cache(),
+		capiClusterCache:     capiCtx.CAPI.Cluster().Cache(),
 		rkeControlPlaneCache: userContext.Management.Wrangler.RKE.RKEControlPlane().Cache(),
 	}
 
 	// Watch all CAPI machines but filter to this cluster in the handler
-	capi.CAPI.Machine().OnChange(ctx, controllerName, h.OnMachineChange)
+	capiCtx.CAPI.Machine().OnChange(ctx, controllerName, h.OnMachineChange)
 
-	logrus.Infof("[%s] registered for cluster %s", controllerName, userContext.ClusterName)
+	logrus.Debugf("[%s] registered for cluster %s (CAPI cluster %s)", controllerName, clusterRec.Name, capiCluster)
+}
+
+// capiClusterRef resolves the CAPI Cluster backing the given management cluster. The management
+// cluster name (c-m-xxxxx) is never the CAPI cluster name, so it cannot be compared against the
+// cluster-name label on a Machine directly.
+func capiClusterRef(cluster *apimgmtv3.Cluster, provClusterCache provcontrollers.ClusterCache) (*types.NamespacedName, error) {
+	ownerName := cluster.Labels[capr.CAPIClusterOwnerLabel]
+	ownerNS := cluster.Labels[capr.CAPIClusterOwnerNSLabel]
+
+	if (ownerName == "") != (ownerNS == "") {
+		return nil, fmt.Errorf("mgmt cluster %s carries only one of %s/%s; both must be set for a CAPI-native cluster",
+			cluster.Name, capr.CAPIClusterOwnerLabel, capr.CAPIClusterOwnerNSLabel)
+	}
+
+	if ownerName != "" {
+		return &types.NamespacedName{Namespace: ownerNS, Name: ownerName}, nil
+	}
+
+	provClusters, err := provClusterCache.GetByIndex(provcluster.ByCluster, cluster.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get provisioning cluster for %s: %w", cluster.Name, err)
+	}
+	switch len(provClusters) {
+	case 0:
+		return nil, nil
+	case 1:
+		return &types.NamespacedName{Namespace: provClusters[0].Namespace, Name: provClusters[0].Name}, nil
+	default:
+		return nil, fmt.Errorf("expected 1 provisioning cluster for cluster %s, got %d", cluster.Name, len(provClusters))
+	}
 }
 
 // OnMachineChange is called when a Machine object changes.
@@ -57,21 +101,26 @@ func (h *handler) OnMachineChange(key string, machine *capi.Machine) (*capi.Mach
 		return machine, nil
 	}
 
-	// CRITICAL: Filter to only machines for THIS downstream cluster
-	clusterName := machine.Labels[capi.ClusterNameLabel]
-	if clusterName != h.clusterName {
-		// This machine belongs to a different cluster, skip
+	// CRITICAL: filter to only machines for THIS downstream cluster. This handler is registered
+	// once per downstream cluster on the shared management-side Machine controller, so every
+	// machine event reaches every cluster's handler.
+	if machine.Namespace != h.capiCluster.Namespace || machine.Labels[capi.ClusterNameLabel] != h.capiCluster.Name {
 		return machine, nil
 	}
 
 	// Only reconcile machines whose cluster is backed by an RKE control plane.
-	capiCluster, err := h.capiClusterCache.Get(machine.Namespace, clusterName)
+	capiCluster, err := h.capiClusterCache.Get(h.capiCluster.Namespace, h.capiCluster.Name)
 	if err != nil {
-		return machine, fmt.Errorf("failed to get CAPI cluster %s/%s: %w", machine.Namespace, clusterName, err)
+		if apierrors.IsNotFound(err) {
+			// The cluster is gone or not created yet, nothing to reconcile.
+			return machine, nil
+		}
+		return machine, fmt.Errorf("failed to get CAPI cluster %s: %w", h.capiCluster, err)
 	}
 
 	if !capiCluster.Spec.ControlPlaneRef.IsDefined() ||
-		capiCluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup {
+		capiCluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup ||
+		capiCluster.Spec.ControlPlaneRef.Kind != rkeControlPlaneKind {
 		return machine, nil
 	}
 
@@ -104,10 +153,12 @@ func (h *handler) OnMachineChange(key string, machine *capi.Machine) (*capi.Mach
 	}
 
 	// Get runtime from RKEControlPlane
-	runtime, err := h.getRuntime(machine)
+	cp, err := h.rkeControlPlaneCache.Get(capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
-		return machine, fmt.Errorf("failed to get runtime: %w", err)
+		return machine, fmt.Errorf("failed to get RKEControlPlane %s/%s: %w",
+			capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name, err)
 	}
+	runtime := capr.GetRuntime(cp.Spec.KubernetesVersion)
 
 	// Reconcile node metadata (taints and worker label)
 	if err := h.reconcileNodeMetadata(machine, node, runtime); err != nil {
@@ -238,34 +289,4 @@ func (h *handler) applyTaintChanges(currentTaints []corev1.Taint, toAdd []corev1
 	newTaints = append(newTaints, toAdd...)
 
 	return newTaints
-}
-
-// getRuntime retrieves the runtime (K3s/RKE2) for the machine's cluster.
-func (h *handler) getRuntime(machine *capi.Machine) (string, error) {
-	// Get cluster name from machine label
-	clusterName := machine.Labels[capi.ClusterNameLabel]
-	if clusterName == "" {
-		return "", fmt.Errorf("machine %s/%s has no cluster label", machine.Namespace, machine.Name)
-	}
-
-	// Get CAPI cluster
-	capiCluster, err := h.capiClusterCache.Get(machine.Namespace, clusterName)
-	if err != nil {
-		return "", fmt.Errorf("failed to get CAPI cluster %s/%s: %w", machine.Namespace, clusterName, err)
-	}
-
-	// Verify it's an RKE control plane
-	if !capiCluster.Spec.ControlPlaneRef.IsDefined() ||
-		capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" ||
-		capiCluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup {
-		return "", fmt.Errorf("cluster %s/%s does not have an RKEControlPlane", machine.Namespace, clusterName)
-	}
-
-	// Get RKEControlPlane via ControlPlaneRef
-	cp, err := h.rkeControlPlaneCache.Get(machine.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
-	if err != nil {
-		return "", fmt.Errorf("failed to get RKEControlPlane: %w", err)
-	}
-
-	return capr.GetRuntime(cp.Spec.KubernetesVersion), nil
 }
