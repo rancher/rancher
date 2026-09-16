@@ -166,16 +166,9 @@ spec:
       - effect: NoExecute
         key: "node-role.kubernetes.io/etcd"
         operator: "Exists"
-      - effect: NoSchedule
-        key: node.cloudprovider.kubernetes.io/uninitialized
-        operator: "Exists"
       {{- else if .Tolerations }}
       # Tolerations added based on found taints on controlplane nodes
 {{ .Tolerations | indent 6 }}
-      # Transient taint, excluded from the derived list above, tolerated always
-      - effect: NoSchedule
-        key: node.cloudprovider.kubernetes.io/uninitialized
-        operator: "Exists"
       {{- else }}
       # No taints or no controlplane nodes found, added defaults
       - effect: NoSchedule
@@ -185,6 +178,8 @@ spec:
         key: "node-role.kubernetes.io/control-plane"
         operator: "Exists"
       {{- end }}
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: "Exists"
       {{- if .AppendTolerations }}
 {{ .AppendTolerations | indent 6 }}
       {{- end }}
