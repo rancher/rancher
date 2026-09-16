@@ -1,7 +1,6 @@
 package activedirectory
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -40,13 +39,6 @@ func validateBindConfiguration(config *v3.ActiveDirectoryConfig) error {
 			config.BindMechanism, bindMechanismSimple, bindMechanismNTLM)
 	}
 }
-
-// errBindConfiguration marks a failure caused by an invalid bind configuration
-// rather than by an unreachable or malformed auth config. Callers of
-// getActiveDirectoryConfig deliberately swallow generic load failures; this
-// sentinel lets them surface the one class of error an operator can act on
-// without changing behavior for any other.
-var errBindConfiguration = errors.New("invalid Active Directory bind configuration")
 
 // splitNTLMIdentity returns the NetBIOS domain and sAMAccountName the NTLM
 // mechanism accepts. It never applies to simple binds, which keep passing the
@@ -138,8 +130,11 @@ func (p *adProvider) bindUser(conn ldapv3.Client, config *v3.ActiveDirectoryConf
 // binding token — are returned as APIErrors carrying actionable messages.
 // Only an error from the directory comes back unclassified.
 func (p *adProvider) bindAs(conn ldapv3.Client, config *v3.ActiveDirectoryConfig, identity *ntlmIdentity, username, password string) error {
-	// Defense in depth: the config is validated where it is loaded and where
-	// it is applied, but a future caller could reach here another way.
+	// The stored config is not validated when it is loaded, so this check is
+	// what stops an unsupported mechanism from reaching the directory.
+	// testAndApply and the webhook reject one on write, but neither covers a
+	// config written before this validation existed or while the webhook was
+	// unavailable.
 	if err := validateBindConfiguration(config); err != nil {
 		return apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
 	}

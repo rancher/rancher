@@ -120,9 +120,6 @@ func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, in
 
 	config, caPool, err := p.configOrDefault()
 	if err != nil {
-		if errors.Is(err, errBindConfiguration) {
-			return v3.Principal{}, nil, "", apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
-		}
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
 
@@ -151,9 +148,6 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 
 	config, caPool, err := p.configOrDefault()
 	if err != nil {
-		if errors.Is(err, errBindConfiguration) {
-			return nil, apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
-		}
 		return principals, nil
 	}
 
@@ -191,9 +185,6 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
 	config, caPool, err := p.configOrDefault()
 	if err != nil {
-		if errors.Is(err, errBindConfiguration) {
-			return v3.Principal{}, apierror.WrapAPIError(err, validation.InvalidOption, err.Error())
-		}
 		return v3.Principal{}, nil
 	}
 
@@ -236,10 +227,11 @@ func (p *adProvider) decodeActiveDirectoryConfig(storedADConfigMap map[string]an
 		return nil, nil, fmt.Errorf("unable to decode Active Directory Config: %w", err)
 	}
 
-	if err := validateBindConfiguration(storedADConfig); err != nil {
-		return nil, nil, fmt.Errorf("%w: %w", errBindConfiguration, err)
-	}
-
+	// The bind mechanism is not validated here. saveActiveDirectoryConfig reads
+	// the stored object for its ObjectMeta, so failing the read on content
+	// would block the write that repairs it. Writes are validated by
+	// validateTestAndApplyInput and by the webhook, and bindAs rejects an
+	// invalid mechanism before it reaches the directory.
 	if p.certs != storedADConfig.Certificate || p.caPool == nil {
 		pool, err := newCAPool(storedADConfig.Certificate)
 		if err != nil {

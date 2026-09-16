@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"sync/atomic"
 	"testing"
 
@@ -78,42 +77,61 @@ func TestValidateBindConfiguration(t *testing.T) {
 	}
 }
 
-func TestDecodeActiveDirectoryConfigRejectsBadMechanism(t *testing.T) {
+func TestDecodeActiveDirectoryConfigAcceptsBadMechanism(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		mechanism string
-		tls       bool
-		wantErr   bool
-	}{
-		{name: "unknown mechanism", mechanism: "gssapi", tls: true, wantErr: true},
-		{name: "ntlm over plaintext", mechanism: bindMechanismNTLM, wantErr: true},
-		{name: "kerberos reserved", mechanism: bindMechanismKerberos, tls: true, wantErr: true},
-		{name: "ntlm over tls", mechanism: bindMechanismNTLM, tls: true},
-		{name: "empty is simple", mechanism: ""},
-	}
+	// A stored config that no longer validates must still decode. Saving a
+	// repaired config reads the stored object first, so a read that failed on
+	// content would leave no way to fix the config short of editing the
+	// authconfig by hand. Writes are checked by validateTestAndApplyInput and
+	// by the webhook, and bindAs checks again before anything reaches the
+	// directory.
+	mechanisms := []string{"gssapi", bindMechanismNTLM, bindMechanismKerberos, ""}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, mechanism := range mechanisms {
+		t.Run(mechanism, func(t *testing.T) {
 			t.Parallel()
 
-			_, _, err := (&adProvider{}).decodeActiveDirectoryConfig(map[string]any{
+			config, _, err := (&adProvider{}).decodeActiveDirectoryConfig(map[string]any{
 				"metadata":      map[string]any{"name": "activedirectory"},
-				"bindMechanism": test.mechanism,
-				"tls":           test.tls,
+				"bindMechanism": mechanism,
+				"tls":           false,
 				"servers":       []any{"dc1.example.com"},
 			})
 
-			if !test.wantErr {
-				require.NoError(t, err)
-				return
-			}
-			require.Error(t, err)
-			assert.ErrorIs(t, err, errBindConfiguration)
-			assert.Contains(t, err.Error(), "bindMechanism")
+			require.NoError(t, err)
+			assert.Equal(t, mechanism, config.BindMechanism, "decode must preserve the stored value")
 		})
 	}
+}
+
+func TestBindAsRejectsAnInvalidMechanism(t *testing.T) {
+	t.Parallel()
+
+	// The stored config is no longer validated on load, so this check is what
+	// stops an unsupported mechanism from reaching the directory.
+	var bound atomic.Bool
+	conn := &ldapFakes.FakeLdapConn{
+		BindFunc: func(string, string) error {
+			bound.Store(true)
+			return nil
+		},
+		NTLMChallengeBindFunc: func(*ldapv3.NTLMBindRequest) (*ldapv3.NTLMBindResult, error) {
+			bound.Store(true)
+			return &ldapv3.NTLMBindResult{}, nil
+		},
+	}
+
+	err := (&adProvider{}).bindAs(conn, &v3.ActiveDirectoryConfig{
+		BindMechanism: bindMechanismNTLM, // no TLS, no StartTLS
+	}, nil, userName, userPassword)
+
+	require.Error(t, err)
+	herr, ok := err.(*apierror.APIError)
+	require.True(t, ok)
+	assert.Equal(t, validation.InvalidOption, herr.Code)
+	assert.Contains(t, err.Error(), "bindMechanism")
+	assert.False(t, bound.Load(), "an invalid mechanism must not reach the directory")
 }
 
 // badConfigProvider returns a provider whose config load fails with the given
@@ -127,50 +145,9 @@ func badConfigProvider(err error) *adProvider {
 	}
 }
 
-func TestStoredConfigCallersSurfaceBindConfigurationErrors(t *testing.T) {
+func TestStoredConfigCallersSwallowLoadFailures(t *testing.T) {
 	t.Parallel()
 
-	loadErr := fmt.Errorf("%w: invalid bindMechanism %q", errBindConfiguration, "gssapi")
-
-	t.Run("AuthenticateUser", func(t *testing.T) {
-		t.Parallel()
-
-		_, _, _, err := badConfigProvider(loadErr).AuthenticateUser(nil, nil,
-			&v3.BasicLogin{Username: userName, Password: userPassword})
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "bindMechanism")
-		assert.NotContains(t, err.Error(), "can't find authprovider",
-			"a bind configuration fault must not be reported as a missing auth provider")
-	})
-
-	t.Run("SearchPrincipals", func(t *testing.T) {
-		t.Parallel()
-
-		got, err := badConfigProvider(loadErr).SearchPrincipals("alice", "user", &v3.Token{})
-
-		require.Error(t, err, "previously returned a nil error and an empty slice")
-		assert.Empty(t, got)
-		assert.Contains(t, err.Error(), "bindMechanism")
-	})
-
-	t.Run("GetPrincipal", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := badConfigProvider(loadErr).GetPrincipal(UserScope+"://"+userDN, &v3.Token{})
-
-		require.Error(t, err, "previously returned a nil error and a zero principal")
-		assert.Contains(t, err.Error(), "bindMechanism")
-	})
-}
-
-func TestStoredConfigCallersStillSwallowUnrelatedFailures(t *testing.T) {
-	t.Parallel()
-
-	// Anything that is not errBindConfiguration keeps the historic behaviour.
-	// This is what stops the change becoming a wider behavioural one than
-	// intended, and it is the test most likely to fail if the sentinel check
-	// is written as a catch-all.
 	loadErr := errors.New("failed to retrieve ActiveDirectoryConfig: connection refused")
 
 	t.Run("AuthenticateUser still reports the generic message", func(t *testing.T) {
