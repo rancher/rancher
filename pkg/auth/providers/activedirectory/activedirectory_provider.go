@@ -159,10 +159,10 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 
 	principals, err = p.searchPrincipals(searchKey, principalType, config, lConn)
 	if err != nil {
-		// A channel binding rejection or a malformed token is a fault an
-		// operator must see. Every other search failure keeps the historic
-		// behaviour of returning an empty result, because callers rely on
-		// principal search degrading rather than erroring.
+		// A channel binding rejection or a malformed token is returned to
+		// the caller. Every other search failure keeps the existing behaviour
+		// of returning an empty result, because callers rely on principal
+		// search degrading rather than erroring.
 		if classifyBindFailure(err) != bindFailureNone {
 			return nil, apierror.WrapAPIError(err, validation.ServerError, mapBindError(err).Error())
 		}

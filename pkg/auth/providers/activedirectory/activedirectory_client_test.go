@@ -468,7 +468,7 @@ func TestLoginUserSimpleKeepsUPNBehaviour(t *testing.T) {
 	provider := adProvider{tokenMGR: &tokens.Manager{}}
 	credentials := v3.BasicLogin{Username: "alice@example.com", Password: userPassword}
 
-	// A UPN still reaches the search and fails there, exactly as before.
+	// A UPN still reaches the search and fails there, as before.
 	_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 	require.Error(t, err)
 	require.Len(t, searched, 1)

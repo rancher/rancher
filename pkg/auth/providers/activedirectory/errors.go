@@ -17,8 +17,8 @@ import (
 //
 // Both were captured from a live domain controller. The leading field is the
 // SSPI security status; the `data` token is AD's own sub-status. In the first
-// they coincide, in the second they do not — which is why parsing only one of
-// them cannot classify both.
+// they coincide, in the second they do not, so parsing only one of them cannot
+// classify both.
 var (
 	securityStatusPattern = regexp.MustCompile(`(?i)^\s*([0-9a-f]{8}):`)
 	dataStatusPattern     = regexp.MustCompile(`(?i)\bdata\s+([0-9a-f]{1,8})\s*(?:,|$)`)
@@ -35,7 +35,7 @@ const (
 	// was refused as malformed, without the binding being evaluated.
 	dataInvalidParameter = "57"
 
-	// secInvalidToken is SEC_E_INVALID_TOKEN. It is NOT sufficient on its own:
+	// secInvalidToken is SEC_E_INVALID_TOKEN. It is not sufficient on its own:
 	// AD also reports it for ordinary credential failures such as data 52e
 	// (wrong password) and data 533 (account disabled). Only the pair
 	// identifies a malformed message.
@@ -89,8 +89,8 @@ const (
 //
 // Both arrive as LDAP result code 49, indistinguishable from a wrong password
 // unless the diagnostic is parsed. Every branch that treats code 49 as a
-// credential problem — the Unauthorized mapping, and the config.Enabled
-// password-rotation fallbacks — must consult this first.
+// credential problem (the Unauthorized mapping and the config.Enabled
+// password-rotation fallbacks) must consult this first.
 func classifyBindFailure(err error) bindFailureKind {
 	d, ok := parseADDiagnostic(err)
 	if !ok {
@@ -100,8 +100,8 @@ func classifyBindFailure(err error) bindFailureKind {
 	switch {
 	case d.Data == dataBadBindings:
 		// Data alone, deliberately. An eight-hex SEC_E_* value in the data
-		// field is self-identifying — AD uses short sub-statuses (52e, 533,
-		// 57) for everything else — so the security status adds no
+		// field is self-identifying, since AD uses short sub-statuses (52e,
+		// 533, 57) for everything else, so the security status adds no
 		// discrimination here, and requiring it would break against any DC
 		// version reporting this sub-status under a different leading value.
 		// The malformed-token case below is the opposite: two digits, no such
@@ -117,8 +117,8 @@ func classifyBindFailure(err error) bindFailureKind {
 }
 
 // mapBindError turns a non-credential bind failure into a message an operator
-// can act on, and leaves every other error exactly as it was so existing
-// lockout and invalid-credential handling is unaffected.
+// can act on, and returns every other error unchanged so existing lockout and
+// invalid-credential handling is unaffected.
 func mapBindError(err error) error {
 	if err == nil {
 		return nil
@@ -135,7 +135,7 @@ func mapBindError(err error) error {
 	case bindFailureMalformedToken:
 		return fmt.Errorf("the domain controller rejected the NTLM token as malformed "+
 			"(SEC_E_INVALID_TOKEN %s, data %s). This indicates a defect in how Rancher builds the "+
-			"authenticate message — not a credential, certificate or configuration problem: %w",
+			"authenticate message, not a credential, certificate or configuration problem: %w",
 			secInvalidToken, dataInvalidParameter, err)
 
 	default:

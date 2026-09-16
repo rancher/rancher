@@ -22,7 +22,7 @@ const (
 
 // avFlagMICPresent is the MsvAvFlags bit stating the AUTHENTICATE message
 // carries a MIC. Bit 0x00000004 (the client supplied an unverified target
-// name) is deliberately never set: no SPN is supplied at all.
+// name) is deliberately never set: no SPN is supplied.
 const avFlagMICPresent uint32 = 0x00000002
 
 // avPair is one AV_PAIR from a TargetInfo buffer. The terminating MsvAvEOL is
@@ -131,7 +131,7 @@ func upsertAVPair(pairs []avPair, id uint16, value []byte) []avPair {
 // It parses and re-serializes rather than appending. A well-formed TargetInfo
 // ends in an MsvAvEOL, and a pair written after it is invisible to any parser
 // that stops there, which would produce a bind carrying no effective channel
-// binding at all.
+// binding.
 //
 // The empty MsvAvTargetName is the MS-NLMP 3.1.5.1.2 ClientSuppliedTargetName
 // == NULL branch. It is not the same as omitting the pair.

@@ -189,9 +189,8 @@ func TestNewNegotiatorRejectsTheZeroToken(t *testing.T) {
 	t.Parallel()
 
 	// The all-zero token means "no channel binding" on the wire. A permissive
-	// domain controller would accept such a bind, which is precisely the
-	// outcome this feature exists to prevent, so it is refused at construction
-	// rather than left to the caller to avoid.
+	// domain controller would accept such a bind, so it is refused at
+	// construction rather than left to the caller to avoid.
 	_, err := NewNegotiator([16]byte{})
 	require.ErrorIs(t, err, ErrNoChannelBinding)
 }

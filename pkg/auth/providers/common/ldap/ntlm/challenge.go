@@ -44,7 +44,7 @@ func readVarField(msg []byte, at int, name string) ([]byte, error) {
 // It rejects a challenge that does not support the exchange this package
 // promises: without TARGET_INFO there is nowhere to carry the channel binding
 // token, and without EXTENDED_SESSIONSECURITY the response would not be
-// NTLMv2. It never downgrades.
+// NTLMv2.
 func parseChallenge(msg []byte) (*challenge, error) {
 	if len(msg) > maxNTLMChallengeSize {
 		return nil, fmt.Errorf("ntlm: challenge of %d bytes exceeds the %d byte limit", len(msg), maxNTLMChallengeSize)
@@ -95,8 +95,8 @@ func parseChallenge(msg []byte) (*challenge, error) {
 }
 
 // authenticateFlags is the flag word the client commits to for the session:
-// the offered set intersected with what the server returned. Nothing is
-// synthesized — a flag the server withheld is not asserted back at it.
+// the offered set intersected with what the server returned. A flag the server
+// withheld is not asserted back at it.
 //
 // parseChallenge has already rejected any challenge missing a flag in
 // requiredChallengeFlags, so the intersection cannot silently drop something
@@ -110,14 +110,13 @@ func authenticateFlags(l layout, challengeFlags uint32) uint32 {
 //
 // MS-NLMP 2.2.1.3 and 2.2.2.10 tie the presence of the VERSION field to a
 // negotiated NTLMSSP_NEGOTIATE_VERSION. Emitting the field while clearing the
-// flag — or setting the flag the server never returned — produces a message
-// whose header does not match its own flag word, which is precisely the class
-// of inconsistency that makes a domain controller reject a bind with no usable
-// diagnostic.
+// flag, or setting a flag the server never returned, produces a message whose
+// header does not match its own flag word. A domain controller rejects such a
+// bind without a usable diagnostic.
 //
-// So a version-enabled layout requires the server to have returned the flag.
-// Real Active Directory always does. If a server does not, this fails loudly
-// with an actionable message rather than silently relocating the MIC.
+// A version-enabled layout therefore requires the server to have returned the
+// flag. Real Active Directory always does. If a server does not, this returns
+// an actionable error instead of silently relocating the MIC.
 func effectiveLayout(l layout, challengeFlags uint32) (layout, error) {
 	if l.version && challengeFlags&flagVersion == 0 {
 		return layout{}, fmt.Errorf("ntlm: server did not negotiate NTLMSSP_NEGOTIATE_VERSION, so the version field and the MIC offset it fixes cannot be used")

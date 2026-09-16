@@ -47,8 +47,8 @@ func validateBindConfiguration(config *v3.ActiveDirectoryConfig) error {
 // Only DOMAIN\user and a bare user name with a configured default login domain
 // are accepted. A user principal name needs a search against
 // userPrincipalName and a canonicalization step that does not exist yet, so it
-// is rejected outright rather than silently treated as a bare name and failing
-// later as an unrelated lookup error.
+// is rejected here rather than treated as a bare name and failing later as an
+// unrelated lookup error.
 func splitNTLMIdentity(username, defaultDomain string) (string, string, error) {
 	invalid := func(reason string) error {
 		return apierror.NewAPIError(validation.InvalidOption,
@@ -125,13 +125,13 @@ func (p *adProvider) bindUser(conn ldapv3.Client, config *v3.ActiveDirectoryConf
 // identity, when non-nil, is an already-resolved NTLM identity and takes
 // precedence over parsing username.
 //
-// Failures bindAs detects itself — an invalid mechanism, a connection
-// without TLS state, a missing peer certificate, an underivable channel
-// binding token — are returned as APIErrors carrying actionable messages.
-// Only an error from the directory comes back unclassified.
+// Failures bindAs detects itself are returned as APIErrors carrying actionable
+// messages: an invalid mechanism, a connection without TLS state, a missing
+// peer certificate, an underivable channel binding token. Only an error from
+// the directory comes back unclassified.
 func (p *adProvider) bindAs(conn ldapv3.Client, config *v3.ActiveDirectoryConfig, identity *ntlmIdentity, username, password string) error {
-	// The stored config is not validated when it is loaded, so this check is
-	// what stops an unsupported mechanism from reaching the directory.
+	// The stored config is not validated when it is loaded, so this check
+	// stops an unsupported mechanism from reaching the directory.
 	// testAndApply and the webhook reject one on write, but neither covers a
 	// config written before this validation existed or while the webhook was
 	// unavailable.
@@ -186,7 +186,7 @@ func (p *adProvider) bindAs(conn ldapv3.Client, config *v3.ActiveDirectoryConfig
 	//
 	// The error is returned unwrapped. Callers inspect it with
 	// ldapv3.IsErrorWithCode, and classification into an APIError happens at
-	// the call sites that produce an API response — never here.
+	// the call sites that produce an API response, never here.
 	_, err = binder.NTLMChallengeBind(&ldapv3.NTLMBindRequest{
 		Domain:     identity.Domain,
 		Username:   identity.Username,
@@ -201,8 +201,8 @@ func (p *adProvider) bindAs(conn ldapv3.Client, config *v3.ActiveDirectoryConfig
 //
 // It replaces the classification that lived in ldap.AuthenticateServiceAccountUser.
 // The channel-binding case is separated out because it arrives as
-// invalidCredentials but is a configuration fault, not a wrong password, and
-// apierror.WrapAPIError drops the cause from the response — so the mapped
+// invalidCredentials but is a configuration fault, not a wrong password.
+// apierror.WrapAPIError drops the cause from the response, so the mapped
 // explanation has to be the message.
 func classifyServiceAccountBindError(err error) error {
 	if err == nil {

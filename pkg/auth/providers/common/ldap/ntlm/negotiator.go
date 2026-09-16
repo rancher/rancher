@@ -34,7 +34,7 @@ const (
 // NTLMChallengeBind call and is not safe for concurrent use.
 //
 // Callers cannot match on the errors returned here. go-ldap (v3.4.14) renders
-// negotiator failures with %s, not %w, so error identity is destroyed before
+// negotiator failures with %s, not %w, so error identity is lost before
 // NTLMChallengeBind returns. Do not build
 // errors.Is checks on ErrInvalidExchangeState or ErrMissingDomain outside this
 // package; that only becomes possible if go-ldap starts preserving %w itself.

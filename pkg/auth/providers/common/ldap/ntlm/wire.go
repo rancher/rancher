@@ -45,14 +45,14 @@ const baseFlags = flagUnicode |
 	flagTargetInfo
 
 // requiredChallengeFlags are the flags a CHALLENGE must return for this
-// package to answer it at all.
+// package to answer it.
 //
 // REQUEST_TARGET is deliberately absent. MS-NLMP 2.2.2.5 defines it as a
 // request for the CHALLENGE TargetName; the channel binding token travels in
 // TargetInfo, which NEGOTIATE_TARGET_INFO governs. Refusing a challenge for
-// withholding REQUEST_TARGET would reject a server that is perfectly capable
-// of the bind. It stays in baseFlags as an offer and is simply not asserted
-// back if the server does not return it.
+// withholding REQUEST_TARGET would reject a server that can complete the bind.
+// It stays in baseFlags as an offer and is not asserted back if the server
+// does not return it.
 const requiredChallengeFlags = flagUnicode |
 	flagNTLM |
 	flagExtendedSessionSecurity |
@@ -99,7 +99,7 @@ func fileTime(t time.Time) uint64 {
 // It errors rather than truncating. The length field is 16 bits while the
 // payloads it describes are built from server-supplied data, so an unchecked
 // cast would silently emit a message whose descriptors disagree with its
-// bytes — rejected by the domain controller as bad credentials, with nothing
+// bytes. The domain controller rejects that as bad credentials, with nothing
 // on the client indicating why.
 func putVarField(dst []byte, length, offset int, name string) error {
 	if length < 0 || length > maxVarFieldLen {

@@ -153,9 +153,9 @@ func TestParseChallengeAcceptsExactlyMaximumSize(t *testing.T) {
 	// A TargetInfo descriptor is a 16-bit length, so it can only ever describe
 	// 65 535 bytes; the cap is far above that. The message therefore reaches
 	// maxNTLMChallengeSize as a maximum-length descriptor followed by trailing
-	// bytes the descriptor does not cover. That is a legal NTLM message —
-	// security buffer offsets are 32-bit and payloads may leave gaps — and it
-	// is what lets the size limit be tested at all.
+	// bytes the descriptor does not cover. That is a legal NTLM message,
+	// because security buffer offsets are 32-bit and payloads may leave gaps,
+	// which is how the size limit can be tested.
 	//
 	// This exercises the size cap and the descriptor bounds check. It does not
 	// exercise AV-pair handling; parseChallenge never parses TargetInfo, and
@@ -222,9 +222,9 @@ func TestEffectiveLayoutRequiresNegotiatedVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, shipping, got)
 
-	// A version-enabled layout against a server that withheld the flag fails
-	// loudly. Emitting the field anyway would put the header and the flag word
-	// in disagreement and relocate the MIC without saying so.
+	// A version-enabled layout against a server that withheld the flag returns
+	// an error. Emitting the field anyway would put the header and the flag
+	// word in disagreement and relocate the MIC without saying so.
 	_, err = effectiveLayout(shipping, testChallengeFlags()&^flagVersion)
 	require.Error(t, err)
 

@@ -18,9 +18,9 @@ func ldapError(code uint16, diagnostic string) error {
 }
 
 // The two diagnostics below are verbatim captures from a live domain
-// controller on 2026-08-26. Synthetic strings are what let the previous
-// revision ship an unreachable mapping: it tested `data 80090308`, a shape AD
-// never emits, while the real message carries `data 57`.
+// controller on 2026-08-26. Synthetic strings let the previous revision ship
+// an unreachable mapping: it tested `data 80090308`, a shape AD never emits,
+// while the real message carries `data 57`.
 const (
 	capturedBadBindings = "80090346: LdapErr: DSID-0C09059A, comment: AcceptSecurityContext error, data 80090346, v4563"
 	capturedBadToken    = "80090308: LdapErr: DSID-0C09089F, comment: AcceptSecurityContext error, data 57, v4563"
@@ -115,8 +115,8 @@ func TestClassifyBindFailure(t *testing.T) {
 			want: bindFailureNone,
 		},
 		{
-			// The asymmetry, pinned: bad bindings is keyed on the data value
-			// alone, so a different leading status must not change the result.
+			// Bad bindings is keyed on the data value alone, so a different
+			// leading status must not change the result.
 			name: "bad bindings under a different security status still classifies",
 			err:  ldapError(ldapv3.LDAPResultInvalidCredentials, "8009030c: LdapErr: comment: AcceptSecurityContext error, data 80090346, v4563"),
 			want: bindFailureBadBindings,

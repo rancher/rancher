@@ -108,8 +108,8 @@ func TestDecodeActiveDirectoryConfigAcceptsBadMechanism(t *testing.T) {
 func TestBindAsRejectsAnInvalidMechanism(t *testing.T) {
 	t.Parallel()
 
-	// The stored config is no longer validated on load, so this check is what
-	// stops an unsupported mechanism from reaching the directory.
+	// The stored config is no longer validated on load, so this check stops an
+	// unsupported mechanism from reaching the directory.
 	var bound atomic.Bool
 	conn := &ldapFakes.FakeLdapConn{
 		BindFunc: func(string, string) error {

@@ -19,11 +19,11 @@ const (
 	specDomain   = "Domain"
 	specPassword = "Password"
 
-	// NTOWFv1 — MD4(UTF16LE("Password")). MS-NLMP 4.2.4.1.1.
+	// NTOWFv1: MD4(UTF16LE("Password")). MS-NLMP 4.2.4.1.1.
 	specNTHash = "a4f49c406510bdcab6824ee7c30fd852"
-	// NTOWFv2 — HMAC-MD5(NTOWFv1, UTF16LE("USER" + "Domain")). 4.2.4.1.1.
+	// NTOWFv2: HMAC-MD5(NTOWFv1, UTF16LE("USER" + "Domain")). 4.2.4.1.1.
 	specResponseKeyNT = "0c868a403bfd7a93a3001ef22ef02e3f"
-	// SessionBaseKey — HMAC-MD5(NTOWFv2, NTProofStr). 4.2.4.1.2.
+	// SessionBaseKey: HMAC-MD5(NTOWFv2, NTProofStr). 4.2.4.1.2.
 	specSessionBaseKey = "8de40ccadbc14a82f15cb0ad0de95ca3"
 	// LMv2Response for the 4.2.4 inputs. 4.2.4.2.1.
 	specLMv2Response = "86c35097ac9cec102554764a57cccc19aaaaaaaaaaaaaaaa"
@@ -86,8 +86,8 @@ func TestResponseKeyNTDependsOnDomain(t *testing.T) {
 // TestSpecVectorChain reproduces the full MS-NLMP 4.2.4 derivation against the
 // published constants. It is the independent oracle for the response key, the
 // client challenge framing, the NT proof and the session key: every value is
-// from the specification, so a passing run means the formulas are right rather
-// than merely self-consistent.
+// from the specification, so a passing run means the formulas are right, not
+// just self-consistent.
 //
 // The 4.2.4 fixtures predate channel binding, so the TargetInfo is passed
 // through untransformed and the timestamp is zero. Layout variation and the
@@ -386,14 +386,14 @@ func TestMICChangesWhenTheChannelBindingChanges(t *testing.T) {
 // reproduced all 444 accepted bytes including the MIC. The capture is retained
 // outside this repository because the message body embeds the domain
 // controller's real host and domain names as UTF-16 inside the target info,
-// and the test needs the bind account's NT hash — an unsalted MD4 of its
+// and the test needs the bind account's NT hash, an unsalted MD4 of its
 // password. Neither belongs in a public repository.
 //
 // The tests above therefore validate the pieces rather than the whole: the
 // derivation chain against the published MS-NLMP 4.2.4 vectors, the four header
 // layouts against a size table, the channel binding token against an
-// independently computed value, and the target info against a round trip. What
-// they cannot catch is a correct field assembled at the wrong offset.
+// independently computed value, and the target info against a round trip. They
+// cannot catch a correct field assembled at the wrong offset.
 //
 // Restoring that coverage needs a capture from a lab domain controller with
 // disposable names and a single-use account, run in a throwaway environment so
