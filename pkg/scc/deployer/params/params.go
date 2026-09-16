@@ -206,6 +206,10 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 				SecurityContext: &corev1.SecurityContext{
 					AllowPrivilegeEscalation: &f,
 					ReadOnlyRootFilesystem:   &t,
+					RunAsNonRoot:             &t,
+					RunAsGroup:               &u1000,
+					RunAsUser:                &u1000,
+					SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{
 							"ALL",
