@@ -1155,9 +1155,10 @@ func TestOnChange_DeletingWithoutOurFinalizerIsSkipped(t *testing.T) {
 	h, controller, beacons := newOnChangeHandler(newBeacon(testOwnerKey, true))
 
 	_, err := h.OnChange(op, op.Status)
-	assert.ErrorIs(t, err, generic.ErrSkip, "an operation we never finalized has no teardown left to run")
-	assert.Empty(t, controller.updates)
+	assert.NoError(t, err)
+	assert.Empty(t, controller.updates, "an operation we never finalized has no teardown left to run")
 	assert.Empty(t, beacons.statusUpdates, "the beacon must not be touched")
+	assert.Zero(t, controller.enqueueCalls, "an operation deleting under someone else's finalizer must not be polled")
 }
 
 // TestOnChange_DeletionCancelsInFlightOperation covers the core of the deletion contract: an
