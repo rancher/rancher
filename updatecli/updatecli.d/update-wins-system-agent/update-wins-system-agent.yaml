@@ -17,8 +17,8 @@ scms:
         squash: {{ .scm.commitmessage.squash }}
         type: '{{ .wins_system_agent.commitmessage.type }}'
         scope: '{{ .wins_system_agent.commitmessage.scope }}'
-        title: 'Bump versions of Wins and System Agent'
-        body: 'Bump versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
+        title: 'Bump versions of {{ source "changed-components" }}'
+        body: 'Bump versions of {{ source "changed-components-with-versions" }}.'
 
 actions:
   rancher-pr:
@@ -30,12 +30,12 @@ actions:
       reviewers:
         - 'rancher/rancher-team-2-hostbusters-dev'
       mergemethod: '{{ .scm.mergemethod }}'
-      title: '[{{ .scm.branch }}] Bump Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
-      description: 'Bump patch versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
+      title: '[{{ .scm.branch }}] Bump {{ source "changed-components-with-versions" }}.'
+      description: 'Bump patch versions of {{ source "changed-components-with-versions" }}.'
 
 sources:
   wins-current-base-version:
-    name: 'Get base Wins version (without pre-release suffix) from package/Dockerfile'
+    name: 'Get base wins version (without pre-release suffix) from package/Dockerfile'
     kind: file
     scmid: 'default'
     spec:
@@ -44,8 +44,18 @@ sources:
     transformers:
       - find: 'v\d+\.\d+\.\d+'
 
+  wins-current-version:
+    name: 'Get current wins version (with pre-release suffix) from package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
+    transformers:
+      - find: 'v\d+\.\d+\.\d+\S*'
+
   system-agent-current-base-version:
-    name: 'Get base System Agent version (without pre-release suffix) from package/Dockerfile'
+    name: 'Get base system-agent version (without pre-release suffix) from package/Dockerfile'
     kind: file
     scmid: 'default'
     spec:
@@ -54,8 +64,18 @@ sources:
     transformers:
       - find: 'v\d+\.\d+\.\d+'
 
+  system-agent-current-version:
+    name: 'Get current system-agent version (with pre-release suffix) from package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
+    transformers:
+      - find: 'v\d+\.\d+\.\d+\S*'
+
   wins-release:
-    name: 'Get latest upstream Wins version'
+    name: 'Get latest upstream wins version'
     kind: githubrelease
     dependson:
       - 'wins-current-base-version'
@@ -73,7 +93,7 @@ sources:
         pattern: '~{{ source "wins-current-base-version" }}-0'
 
   system-agent-release:
-    name: 'Get latest upstream System Agent version'
+    name: 'Get latest upstream system-agent version'
     kind: githubrelease
     dependson:
       - 'system-agent-current-base-version'
@@ -89,6 +109,48 @@ sources:
       versionfilter:
         kind: semver
         pattern: '~{{ source "system-agent-current-base-version" }}-0'
+
+  changed-components:
+    name: 'Compose the list of updated component names'
+    kind: shell
+    dependson:
+      - 'wins-current-version'
+      - 'wins-release'
+      - 'system-agent-current-version'
+      - 'system-agent-release'
+    spec:
+      command: |
+        if [ '{{ source "wins-current-version" }}' != '{{ source "wins-release" }}' ]; then wins_changed=true; else wins_changed=false; fi
+        if [ '{{ source "system-agent-current-version" }}' != '{{ source "system-agent-release" }}' ]; then system_agent_changed=true; else system_agent_changed=false; fi
+        if [ "$wins_changed" = true ] && [ "$system_agent_changed" = false ]; then
+          printf 'wins'
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = true ]; then
+          printf 'system-agent'
+        else
+          printf 'wins and system-agent'
+        fi
+
+  changed-components-with-versions:
+    name: 'Compose the list of updated components with their target versions'
+    kind: shell
+    dependson:
+      - 'wins-current-version'
+      - 'wins-release'
+      - 'system-agent-current-version'
+      - 'system-agent-release'
+    spec:
+      command: |
+        if [ '{{ source "wins-current-version" }}' != '{{ source "wins-release" }}' ]; then wins_changed=true; else wins_changed=false; fi
+        if [ '{{ source "system-agent-current-version" }}' != '{{ source "system-agent-release" }}' ]; then system_agent_changed=true; else system_agent_changed=false; fi
+        wins_part='wins to {{ source "wins-release" }}'
+        system_agent_part='system-agent to {{ source "system-agent-release" }}'
+        if [ "$wins_changed" = true ] && [ "$system_agent_changed" = false ]; then
+          printf '%s' "$wins_part"
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = true ]; then
+          printf '%s' "$system_agent_part"
+        else
+          printf '%s and %s' "$wins_part" "$system_agent_part"
+        fi
 
   wins-checksum:
     name: 'Get sha256 for wins.exe from {{ source "wins-release" }}'
@@ -259,7 +321,7 @@ targets:
       replacepattern: '$1 CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall={{ source "system-agent-checksum-uninstall" }}'
 
   update-pkg-settings-wins-release:
-    name: 'Update Wins to {{ source "wins-release" }} in pkg/settings/setting.go'
+    name: 'Update wins to {{ source "wins-release" }} in pkg/settings/setting.go'
     kind: file
     scmid: 'default'
     sourceid: 'wins-release'
@@ -269,7 +331,7 @@ targets:
       replacepattern: 'https://raw.githubusercontent.com/rancher/wins/{{ source "wins-release" }}/install.ps1'
 
   update-pkg-settings-system-agent-release:
-    name: 'Update System Agent to {{ source "system-agent-release" }} in pkg/settings/setting.go'
+    name: 'Update system-agent to {{ source "system-agent-release" }} in pkg/settings/setting.go'
     kind: file
     scmid: 'default'
     sourceid: 'system-agent-release'
