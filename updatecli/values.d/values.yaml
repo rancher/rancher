@@ -64,7 +64,7 @@ k3s:
     scope: 'k3s'
 
 wins_system_agent:
-  manifest: 'Update Wins and System Agent patch versions'
+  manifest: 'Update wins and system-agent patch versions'
   pipelineid: 'update-wins-system-agent-version'
   commitmessage:
     type: 'deps'
