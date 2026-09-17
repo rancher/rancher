@@ -80,6 +80,10 @@ const (
 	WaitingForEncryptionKeyRotationReason = "WaitingForEncryptionKeyRotation"
 
 	PreflightCheckFailedReason = "PreflightCheckFailed"
+
+	// OperationDeletedReason surfaces when an operation was canceled because it was deleted before
+	// terminal handling for it completed.
+	OperationDeletedReason = "OperationDeleted"
 )
 
 func WaitingForDelegateMessage(beacon *planv1alpha1.Beacon) string {
