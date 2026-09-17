@@ -73,9 +73,8 @@ func TestStopStopsTheRecordThatIsActuallyRegistered(t *testing.T) {
 }
 
 func TestStopClearsTheClusterWhileRecordsAreBeingReplaced(t *testing.T) {
-	// Race cover for the retry loop: the entry can change between Stop's load and its delete, and
-	// Stop has to keep going rather than return having stopped nothing - without spinning once
-	// nothing else is installing records.
+	// The entry can change between Stop's load and its delete. Whichever call wins the delete is the
+	// one that cancels, so no record is left running and none is cancelled twice.
 	m := &Manager{}
 	const uid = types.UID("uid-1")
 	clusterRec := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: uid}}

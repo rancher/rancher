@@ -27,7 +27,7 @@ func TestDeferredStartRetriesUntilItSucceeds(t *testing.T) {
 	done := make(chan struct{})
 	w := &UserContext{
 		ClusterName: "c-m-test",
-		OnDeferredStartError: func(error) {
+		OnDeferredStartError: func() {
 			t.Error("OnDeferredStartError called for a start that eventually succeeded")
 		},
 	}
@@ -54,24 +54,22 @@ func TestDeferredStartEscalatesWhenItKeepsFailing(t *testing.T) {
 	const steps = 3
 	useTestRetry(t, steps)
 
-	startErr := errors.New("apiserver is unreachable")
 	var calls atomic.Int32
-	failed := make(chan error, 1)
+	failed := make(chan struct{})
 	w := &UserContext{
 		ClusterName:          "c-m-test",
-		OnDeferredStartError: func(err error) { failed <- err },
+		OnDeferredStartError: func() { close(failed) },
 	}
 
 	starter := w.deferredStart(context.Background(), func() error {
 		calls.Add(1)
-		return startErr
+		return errors.New("apiserver is unreachable")
 	})
 
 	starter()
 
 	select {
-	case err := <-failed:
-		assert.ErrorIs(t, err, startErr)
+	case <-failed:
 	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for OnDeferredStartError")
 	}
@@ -99,11 +97,11 @@ func TestDeferredStartEscalationIsOptional(t *testing.T) {
 	}
 }
 
-func TestDeferredStartRunsASingleRetryLoop(t *testing.T) {
+func TestDeferredStartRunsOnce(t *testing.T) {
 	useTestRetry(t, 5)
 
-	// The starter is called from controller handlers, so it can fire repeatedly while an earlier
-	// attempt is still retrying. Those calls must not each start their own loop.
+	// The starter is called from controller handlers, so it fires repeatedly: while an earlier
+	// attempt is still retrying, and again long after one succeeded. Neither may start a second run.
 	release := make(chan struct{})
 	var concurrent, peak, calls atomic.Int32
 	finished := make(chan struct{})
@@ -115,11 +113,13 @@ func TestDeferredStartRunsASingleRetryLoop(t *testing.T) {
 		}
 		defer concurrent.Add(-1)
 
-		if calls.Add(1) == 1 {
+		switch calls.Add(1) {
+		case 1:
 			<-release
 			return errors.New("apiserver is unreachable")
+		case 2:
+			close(finished)
 		}
-		close(finished)
 		return nil
 	})
 
@@ -138,6 +138,12 @@ func TestDeferredStartRunsASingleRetryLoop(t *testing.T) {
 		t.Fatal("timed out waiting for the deferred start to succeed")
 	}
 	assert.EqualValues(t, 1, peak.Load(), "only one attempt should run at a time")
+
+	for range 10 {
+		starter()
+	}
+	assert.Never(t, func() bool { return calls.Load() > 2 }, 100*time.Millisecond, 10*time.Millisecond,
+		"the starter should do nothing once the controllers are up")
 }
 
 func TestDeferredStartStopsWhenTheContextIsCancelled(t *testing.T) {
@@ -148,7 +154,7 @@ func TestDeferredStartStopsWhenTheContextIsCancelled(t *testing.T) {
 	var once, calls atomic.Int32
 	w := &UserContext{
 		ClusterName: "c-m-test",
-		OnDeferredStartError: func(error) {
+		OnDeferredStartError: func() {
 			t.Error("OnDeferredStartError called after the context was cancelled")
 		},
 	}

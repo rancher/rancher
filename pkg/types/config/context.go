@@ -240,8 +240,8 @@ type UserContext struct {
 	KindNamespaces map[schema.GroupVersionKind]string
 
 	// OnDeferredStartError is invoked when a deferred controller registration for this cluster
-	// keeps failing and cannot be recovered in-process.
-	OnDeferredStartError func(error)
+	// keeps failing and cannot be recovered in-process. The failure has already been logged.
+	OnDeferredStartError func()
 
 	extraControllerFactoriesMutex sync.Mutex
 	extraControllerFactories      map[string]controller.SharedControllerFactory
@@ -284,29 +284,29 @@ func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx conte
 
 // deferredStart returns a starter that runs f in the background, retrying it while it fails.
 //
-// If f keeps failing, its handler registrations have been rolled back and nothing else will ever
-// retry them, so the failure is escalated to OnDeferredStartError to have the whole UserContext
-// rebuilt.
+// Retrying f is enough to recover from a failed registration, because each attempt registers the
+// handlers again. It is not enough to recover from a controller that failed to start: lasso caches
+// that failure on the sharedController and every later Start returns it without retrying anything,
+// so only a new controller factory can bring it back. Once the retries are exhausted the failure is
+// escalated to OnDeferredStartError to have the whole UserContext, and with it the factory, rebuilt.
 func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() {
 	backoff := deferredStartRetry
-	var inFlight atomic.Bool
+	// The starter is called from controller handlers, so it fires repeatedly. Only the first call
+	// does anything: either f eventually succeeds, or the retries run out and the UserContext is
+	// rebuilt, which replaces this starter along with it.
+	var started atomic.Bool
 
 	return func() {
-		if !inFlight.CompareAndSwap(false, true) {
+		if !started.CompareAndSwap(false, true) {
 			return
 		}
 
 		go func() {
-			defer inFlight.Store(false)
-
-			var (
-				attempts int
-				lastErr  error
-			)
+			var attempts int
 			err := wait.ExponentialBackoffWithContext(ctx, backoff, func(context.Context) (bool, error) {
 				attempts++
-				if lastErr = f(); lastErr != nil {
-					logrus.Warnf("deferred controller start attempt failed for cluster %s: %v", w.ClusterName, lastErr)
+				if err := f(); err != nil {
+					logrus.Warnf("deferred controller start attempt failed for cluster %s: %v", w.ClusterName, err)
 					return false, nil
 				}
 				return true, nil
@@ -317,29 +317,20 @@ func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() 
 				return
 			}
 
-			logrus.Errorf("deferred controller start failed for cluster %s after %d attempts, rebuilding cluster controllers: %v",
-				w.ClusterName, attempts, lastErr)
+			logrus.Errorf("deferred controller start failed for cluster %s after %d attempts, rebuilding cluster controllers",
+				w.ClusterName, attempts)
 			if w.OnDeferredStartError != nil {
-				w.OnDeferredStartError(lastErr)
+				w.OnDeferredStartError()
 			}
 		}()
 	}
 }
 
+// deferredStartAsync returns the work a deferred start does on each attempt: register the cluster's
+// handlers into a transaction, start the controllers, and commit the transaction only once the
+// controllers are up. It is not safe to call concurrently - deferredStart serializes it.
 func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx context.Context) error) func() error {
-	var (
-		startLock sync.Mutex
-		started   = false
-	)
-
 	return func() error {
-		startLock.Lock()
-		defer startLock.Unlock()
-
-		if started {
-			return nil
-		}
-
 		cancelCtx, cancel := context.WithCancel(ctx)
 		transaction := controller.NewHandlerTransaction(cancelCtx)
 		if err := register(transaction); err != nil {
@@ -355,7 +346,6 @@ func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx 
 		}
 
 		transaction.Commit()
-		started = true
 		go func() {
 			// this is to make go vet happy that we aren't leaking a context
 			<-ctx.Done()
