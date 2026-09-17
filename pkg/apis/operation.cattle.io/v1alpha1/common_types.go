@@ -72,6 +72,16 @@ type OperationStatus struct {
 	// +optional
 	LastUpdated metav1.Time `json:"lastUpdated,omitempty,omitzero"`
 
+	// TerminatedAt identifies when the controller finished handling the terminal phase of the
+	// Operation: the terminal-phase lifecycle hook (if any) ran to completion and the beacon was
+	// released. It is set once and never cleared, and is only ever set on an Operation which has
+	// reached a terminal phase.
+	// An Operation which reached a terminal phase is not necessarily terminated: terminal handling
+	// may still be delegated to another controller. An Operation deleted before it is terminated is
+	// canceled, as the work it dispatched is no longer tracked by anything.
+	// +optional
+	TerminatedAt metav1.Time `json:"terminatedAt,omitempty,omitzero"`
+
 	// Phase represents the current phase of the Operation.
 	// A Pending operation is one that is currently waiting to acquire the beacon, active it, and begin execution.
 	// An InProgress operation is one that is currently executing.
@@ -86,4 +96,19 @@ type OperationStatus struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+// SetTerminated records that terminal handling for the operation has completed. Operation
+// controllers must only call this once the terminal phase is fully handled — i.e. the terminal
+// phase hook has been satisfied and the beacon has been released — as it is what makes the
+// operation eligible for TTL garbage collection and what distinguishes a deletion that races
+// terminal handling (canceled) from one that follows it (left as-is).
+//
+// The timestamp is only written on the first call so it keeps pointing at the moment terminal
+// handling actually completed, no matter how many times the operation is reconciled afterwards.
+func (s *OperationStatus) SetTerminated() {
+	if !s.TerminatedAt.IsZero() {
+		return
+	}
+	s.TerminatedAt = metav1.Now()
 }
