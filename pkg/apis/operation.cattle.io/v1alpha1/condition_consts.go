@@ -84,6 +84,10 @@ const (
 
 	// FailedReason surfaces when an operation is failed. It is a generic, non-descript reason.
 	FailedReason = "Failed"
+
+	// OperationDeletedReason surfaces when an operation was canceled because it was deleted before
+	// terminal handling for it completed.
+	OperationDeletedReason = "OperationDeleted"
 )
 
 func WaitingForDelegateMessage(beacon *planv1alpha1.Beacon) string {
