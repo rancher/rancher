@@ -16,6 +16,17 @@ func IsTerminal(phase opv1alpha1.OperationPhase) bool {
 		phase == opv1alpha1.OperationPhaseCanceled
 }
 
+// IsTerminated returns true when the controller has recorded that terminal handling for the
+// operation completed — the terminal phase hook has been satisfied and the beacon has been
+// released, so nothing is left for the operation's controller to do.
+//
+// This is strictly stronger than IsTerminal: an operation which has reached a terminal phase may
+// still be waiting on a delegate to finish the terminal phase hook, in which case its beacon is
+// still held on its behalf. Deleting an operation in that window cancels it.
+func IsTerminated(status *opv1alpha1.OperationStatus) bool {
+	return !status.TerminatedAt.IsZero()
+}
+
 // IsExpired returns true when the operation has lived longer than its TTL measured from its
 // status.LastUpdated timestamp. Expired terminal operations can be safely deleted because
 // downstream controllers (system-agent, snapshotbackpopulate, etc.) have already seen the final
