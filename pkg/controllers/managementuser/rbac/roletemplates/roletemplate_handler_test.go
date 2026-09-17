@@ -116,6 +116,30 @@ func TestRTHandlerClusterRolesForRoleTemplate(t *testing.T) {
 			},
 		},
 		{
+			name: "roletemplates with project context and cluster scoped rules create extra clusterroles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myroletemplate",
+				},
+				Context:            "project",
+				ClusterScopedRules: []rbacv1.PolicyRule{sampleRule},
+			},
+			verify: func(t *testing.T, roles []*rbacv1.ClusterRole) {
+				if got, want := len(roles), 4; got != want {
+					t.Errorf("expected %d roles but got %d", want, got)
+				}
+				for i, want := range []string{"myroletemplate-cluster-scoped", "myroletemplate-cluster-scoped-aggregator", "myroletemplate", "myroletemplate-aggregator"} {
+					if got := roles[i].Name; got != want {
+						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
+					}
+				}
+				assert.Equal(t, []rbacv1.PolicyRule{sampleRule}, roles[0].Rules)
+				if got := roles[1].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
+					t.Errorf("expected cluster scoped aggregation rule not to be empty")
+				}
+			},
+		},
+		{
 			name: "roletemplates with project context and an inherited roletemplate with promoted rules creates an extra clusterrole for global resources",
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{
@@ -142,6 +166,37 @@ func TestRTHandlerClusterRolesForRoleTemplate(t *testing.T) {
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("some-roletemplate-promoted-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+				m.EXPECT().Get("some-roletemplate-cluster-scoped-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+			},
+		},
+		{
+			name: "roletemplates with project context and an inherited roletemplate with cluster scoped rules creates an extra clusterrole",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myroletemplate",
+				},
+				Context:           "project",
+				RoleTemplateNames: []string{"some-roletemplate"},
+			},
+			verify: func(t *testing.T, roles []*rbacv1.ClusterRole) {
+				if got, want := len(roles), 3; got != want {
+					t.Errorf("expected %d roles but got %d", want, got)
+				}
+				for i, want := range []string{"myroletemplate-cluster-scoped-aggregator", "myroletemplate", "myroletemplate-aggregator"} {
+					if got := roles[i].Name; got != want {
+						t.Errorf("role[%d] have incorrect name, got %q, want %q", i, got, want)
+					}
+				}
+				if got := roles[0].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
+					t.Errorf("expected cluster scoped aggregation rule not to be empty")
+				}
+				if got := roles[2].AggregationRule; got == nil || len(got.ClusterRoleSelectors) == 0 {
+					t.Errorf("expected aggregation rule not to be empty")
+				}
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("some-roletemplate-promoted-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Get("some-roletemplate-cluster-scoped-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
 			},
 		},
 		{
@@ -182,6 +237,7 @@ func TestRTHandlerClusterRolesForRoleTemplate(t *testing.T) {
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("some-roletemplate-promoted-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Get("some-roletemplate-cluster-scoped-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 			},
 		},
 		{

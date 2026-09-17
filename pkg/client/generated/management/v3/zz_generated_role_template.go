@@ -10,6 +10,7 @@ const (
 	RoleTemplateFieldAnnotations           = "annotations"
 	RoleTemplateFieldBuiltin               = "builtin"
 	RoleTemplateFieldClusterCreatorDefault = "clusterCreatorDefault"
+	RoleTemplateFieldClusterScopedRules    = "clusterScopedRules"
 	RoleTemplateFieldContext               = "context"
 	RoleTemplateFieldCreated               = "created"
 	RoleTemplateFieldCreatorID             = "creatorId"
@@ -34,6 +35,7 @@ type RoleTemplate struct {
 	Annotations           map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Builtin               bool              `json:"builtin,omitempty" yaml:"builtin,omitempty"`
 	ClusterCreatorDefault bool              `json:"clusterCreatorDefault,omitempty" yaml:"clusterCreatorDefault,omitempty"`
+	ClusterScopedRules    []PolicyRule      `json:"clusterScopedRules,omitempty" yaml:"clusterScopedRules,omitempty"`
 	Context               string            `json:"context,omitempty" yaml:"context,omitempty"`
 	Created               string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`

@@ -148,8 +148,9 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	return nil
 }
 
-// reconcileClusterRoleBindings handles the promoted and namespace Cluster Role Bindings for a PRTB.
-// Promoted CRBs are for any rules that are non-namespace scoped that are given by the PRTB.
+// reconcileClusterRoleBindings handles the promoted, cluster scoped, and namespace Cluster Role Bindings for a PRTB.
+// Promoted CRBs are for the implicit set of global resources that are non-namespace scoped that are given by the PRTB.
+// Cluster scoped CRBs are for the rules a user explicitly declares in the RoleTemplate's ClusterScopedRules field.
 // Namespace CRBs are to give the user either edit or read-only access to the namespaces within the project. Primarily used by the UI.
 func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	crbs := []*rbacv1.ClusterRoleBinding{}
@@ -162,16 +163,17 @@ func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateB
 		return err
 	}
 
-	// Check for promoted rules.
-	hasPromotedRule, err := p.doesRoleTemplateHavePromotedRules(rt)
-	if err != nil {
-		return err
-	}
-	if hasPromotedRule {
-		promotedRuleName := rbac.PromotedClusterRoleNameFor(prtb.RoleTemplateName)
-		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(prtb, promotedRuleName)
+	// Create cluster role bindings for promoted rules and cluster scoped rules, if they exist.
+	for _, clusterRoleNameFunc := range []func(string) string{
+		rbac.PromotedClusterRoleNameFor,
+		rbac.ClusterScopedClusterRoleNameFor,
+	} {
+		crb, err := p.buildClusterRoleBindingForRules(prtb, rt, clusterRoleNameFunc)
 		if err != nil {
 			return err
+		}
+		if crb == nil {
+			continue
 		}
 		crbs = append(crbs, crb)
 	}
@@ -318,9 +320,18 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 	return nil
 }
 
-// doesRoleTemplateHavePromotedRules checks if the PRTB's RoleTemplate has a ClusterRole for promoted rules.
-func (p *prtbHandler) doesRoleTemplateHavePromotedRules(rt *v3.RoleTemplate) (bool, error) {
-	_, err := p.crClient.Get(rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(rt.Name)), metav1.GetOptions{})
+// buildClusterRoleBindingForRules builds a binding when the RoleTemplate has an aggregate role for the given rule type.
+func (p *prtbHandler) buildClusterRoleBindingForRules(prtb *v3.ProjectRoleTemplateBinding, rt *v3.RoleTemplate, clusterRoleNameFunc func(string) string) (*rbacv1.ClusterRoleBinding, error) {
+	hasRules, err := p.doesRoleTemplateHaveRules(rt, clusterRoleNameFunc)
+	if err != nil || !hasRules {
+		return nil, err
+	}
+	return rbac.BuildAggregatingClusterRoleBindingFromRTB(prtb, clusterRoleNameFunc(prtb.RoleTemplateName))
+}
+
+// doesRoleTemplateHaveRules checks if the RoleTemplate has an aggregate ClusterRole for the given rule type.
+func (p *prtbHandler) doesRoleTemplateHaveRules(rt *v3.RoleTemplate, clusterRoleNameFunc func(string) string) (bool, error) {
+	_, err := p.crClient.Get(rbac.AggregatedClusterRoleNameFor(clusterRoleNameFunc(rt.Name)), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, err
 	}
