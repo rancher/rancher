@@ -3,6 +3,7 @@ package etcdsnapshotsave
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,6 +29,8 @@ import (
 const (
 	// ControllerOwnerKey is the value used to identify the etcd-snapshot-save handler currently owns the beacon.
 	ControllerOwnerKey = "etcd-snapshot-save"
+
+	Finalizer = "etcdsnapshotsave.operation.cattle.io"
 
 	// Step hook label prefixes for the etcdsnapshotsave operation. They follow the shared label
 	// semantics documented on planv1alpha1's phase-hook label constants, but each prefix only fires
@@ -108,15 +111,25 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 // updateStatus.
 //
 // When the resulting status is byte-identical to the prior status (no state moved this tick), the
-// handler either deletes the operation (terminal phase past its TTL — frees the beacon as a side
-// effect of the watcher seeing the deletion) or re-enqueues itself after 5 seconds so the next
-// poll can pick up any out-of-band changes (plan secret state, beacon transitions, etc.).
+// handler either deletes the operation (terminal phase past its TTL, terminal handling complete —
+// frees the beacon as a side effect of the watcher seeing the deletion) or re-enqueues itself after
+// 5 seconds so the next poll can pick up any out-of-band changes (plan secret state, beacon
+// transitions, etc.).
+//
+// Operations which are already deleting skip both of those and go through handleDeletion instead.
 func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	status, err := h.onChange(op, status)
 	if err != nil {
 		return status, err
 	}
 	status = updateStatus(op, status)
+
+	// A deleted operation has no TTL to enforce and nothing left to poll for; the only remaining
+	// work is retiring the finalizer once its teardown is done. This runs ahead of the paused check
+	// so a paused operation which is already deleting still gets torn down.
+	if op.DeletionTimestamp != nil {
+		return h.handleDeletion(op, status)
+	}
 
 	// Paused operations resume on a spec change; skip TTL cleanup and polling until then.
 	if ops.IsPaused(&op.Spec.OperationSpec) {
@@ -126,12 +139,15 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	if equality.Semantic.DeepEqual(op.Status, status) {
 		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
 		//
-		// The HasActiveLifecycleHook guard defers TTL garbage collection while any lifecycle-hook
-		// label is still on the op. Without it, an op that has reached a terminal phase but is
-		// waiting on a delegate (handleSucceeded/handleFailed/handleCanceled returned early with
-		// WaitingForDelegate) would be deleted on the very next reconcile as soon as the TTL is
-		// past, stranding the beacon delegate and any observer polling for the terminal phase.
+		// The IsTerminated and HasActiveLifecycleHook guards defer TTL garbage collection until
+		// terminal handling has actually completed. Without them, an op that has reached a terminal
+		// phase but is waiting on a delegate (handleSucceeded/handleFailed/handleCanceled returned
+		// early with WaitingForDelegate) would be deleted on the very next reconcile as soon as the
+		// TTL is past, stranding the beacon delegate and any observer polling for the terminal
+		// phase. It would also be canceled on the way out by the deletion handling above, which
+		// would bury the phase it actually finished in.
 		if ops.IsTerminal(status.Phase) &&
+			ops.IsTerminated(&status.OperationStatus) &&
 			ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
 			!planv1alpha1.HasActiveLifecycleHook(op) {
 			err = h.etcdsnapshotsaves.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
@@ -144,6 +160,85 @@ func (h *handler) OnChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		h.etcdsnapshotsaves.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
 	}
 	return status, nil
+}
+
+// handleDeletion drives the tail end of the deletion flow for an operation still carrying our
+// finalizer. onChange has already canceled the operation if it was deleted mid-flight and run the
+// terminal phase handler for it; all that is left here is deciding whether the finalizer can go.
+//
+// The finalizer is held until terminal handling has been recorded as complete, which keeps the
+// operation — and with it any beacon delegation made on its behalf — alive while a terminal phase
+// hook delegate finishes its work. The terminal status is also persisted before the finalizer is
+// dropped, so an observer waiting on the final phase gets to see it rather than the object simply
+// vanishing.
+func (h *handler) handleDeletion(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
+	if !equality.Semantic.DeepEqual(op.Status, status) {
+		// State moved this tick: let the status handler write it out. The resulting update
+		// re-enqueues the operation, and the next pass retires the finalizer.
+		return status, nil
+	}
+
+	if !ops.IsTerminated(&status.OperationStatus) {
+		// Terminal handling is still in flight — typically a canceled phase hook whose delegate has
+		// yet to hand the beacon back. Keep the finalizer and poll for it to finish.
+		logrus.Debugf("[etcdsnapshotsave] %s/%s: deferring deletion, terminal handling has not completed", op.Namespace, op.Name)
+		h.etcdsnapshotsaves.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
+		return status, nil
+	}
+
+	logrus.Infof("[etcdsnapshotsave] %s/%s: terminal handling complete, releasing operation for deletion", op.Namespace, op.Name)
+
+	return status, h.removeFinalizer(op)
+}
+
+// ensureFinalizer adds our finalizer to the operation if it is not already present. The status
+// handler only ever persists status, so the finalizer has to be written with an explicit Update;
+// the updated object is copied back over op so the resource version the status handler goes on to
+// use for its own UpdateStatus is not stale.
+func (h *handler) ensureFinalizer(op *opv1alpha1.ETCDSnapshotSave) error {
+	if slices.Contains(op.Finalizers, Finalizer) {
+		return nil
+	}
+
+	logrus.Debugf("[etcdsnapshotsave] %s/%s: adding finalizer", op.Namespace, op.Name)
+
+	updated := op.DeepCopy()
+	updated.Finalizers = append(updated.Finalizers, Finalizer)
+
+	updated, err := h.etcdsnapshotsaves.Update(updated)
+	if err != nil {
+		return err
+	}
+
+	*op = *updated
+
+	return nil
+}
+
+// removeFinalizer drops our finalizer from the operation, which lets the API server complete the
+// deletion. A NotFound is treated as success: something else (another finalizer holder finishing
+// last, or a previous attempt whose response was lost) already let the object go.
+func (h *handler) removeFinalizer(op *opv1alpha1.ETCDSnapshotSave) error {
+	if !slices.Contains(op.Finalizers, Finalizer) {
+		return nil
+	}
+
+	updated := op.DeepCopy()
+	updated.Finalizers = slices.DeleteFunc(updated.Finalizers, func(f string) bool {
+		return f == Finalizer
+	})
+
+	updated, err := h.etcdsnapshotsaves.Update(updated)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	*op = *updated
+
+	return nil
 }
 
 // scope bundles the per-reconcile values derived from the operation, parent cluster, and beacon.
@@ -160,15 +255,19 @@ type scope struct {
 	adapter    ops.Adapter
 }
 
-// onChange resolves the parent cluster reference, locates the cluster's beacon, builds an Adapter
-// for the cluster kind, and dispatches to the phase-specific handler. Returns the unmodified
-// status when:
+// onChange takes the finalizer (or, for an operation being deleted, cancels it when its terminal
+// handling had not completed), resolves the parent cluster reference, locates the cluster's beacon,
+// builds an Adapter for the cluster kind, and dispatches to the phase-specific handler. Returns the
+// unmodified status when:
 //
-//   - op is nil, being deleted, or paused;
+//   - op is nil, or paused and not being deleted;
 //   - the beacon has not yet been created during the Pending phase (allows the system-agent watcher
 //     to create it before we fail the operation);
 //   - the operation has reached a terminal phase (handleSucceeded/handleFailed perform their own
 //     beacon cleanup).
+//
+// A deleted operation whose cluster or beacon no longer exists is marked terminated on the spot:
+// there is nothing left to release, and the finalizer must not outlive the cluster it refers to.
 //
 // Marks the operation Failed when the parent cluster is missing or the current phase is unknown.
 func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
@@ -176,13 +275,45 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		return status, nil
 	}
 
-	if op.DeletionTimestamp != nil {
-		return status, nil
-	}
+	deleting := op.DeletionTimestamp != nil
 
-	if ops.IsPaused(&op.Spec.OperationSpec) {
-		logrus.Debugf("[etcdsnapshotsave] %s/%s: skipping paused operation", op.Namespace, op.Name)
-		return status, nil
+	if deleting {
+		// Teardown is driven off our finalizer. Without it the operation has either already been
+		// torn down or was never ours to begin with, and there is nothing left to reconcile.
+		if !slices.Contains(op.Finalizers, Finalizer) {
+			return status, nil
+		}
+
+		// An operation deleted before its terminal handling completed is canceled: the work it
+		// dispatched is no longer tracked by anything, so it can neither be reported as succeeded
+		// nor as failed. The terminal handler for the Canceled phase then runs below (releasing the
+		// beacon, honouring any canceled phase hook) before OnChange drops the finalizer.
+		//
+		// Note this deliberately also demotes an operation which reached Succeeded or Failed but
+		// whose terminal handling had not finished yet — until that completes its beacon is still
+		// held, on its own behalf or a delegate's.
+		if !ops.IsTerminated(&status.OperationStatus) && status.Phase != opv1alpha1.OperationPhaseCanceled {
+			logrus.Infof("[etcdsnapshotsave] %s/%s: marking operation as canceled: deleted in phase [%s] before terminal handling completed", op.Namespace, op.Name, status.Phase)
+
+			status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+			opv1alpha1.CanceledCondition.True(&status)
+			opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.OperationDeletedReason)
+			opv1alpha1.CanceledCondition.Message(&status, "operation deleted before terminal handling completed")
+		}
+	} else {
+		if ops.IsPaused(&op.Spec.OperationSpec) {
+			logrus.Debugf("[etcdsnapshotsave] %s/%s: skipping paused operation", op.Namespace, op.Name)
+			return status, nil
+		}
+
+		// The finalizer is what guarantees the controller observes the deletion of an operation
+		// which is still in flight, so it can cancel it and release the beacon. Paused operations
+		// are intentionally skipped above: a paused operation has dispatched nothing since it was
+		// paused, and taking the finalizer would only wedge its deletion until it is resumed.
+		if err := h.ensureFinalizer(op); err != nil {
+			return status, err
+		}
 	}
 
 	if status.Phase == "" {
@@ -197,6 +328,17 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 			key += fmt.Sprintf(", namespace=%s", op.Spec.ClusterRef.Namespace)
 		}
 		key += fmt.Sprintf(", name=%s", op.Spec.ClusterRef.Name)
+
+		// The beacon lives alongside the cluster, so a deleted operation whose cluster is gone has
+		// nothing left to release: terminal handling is trivially complete and the operation is
+		// free to finish deleting. Failing it here instead would both overwrite the Canceled phase
+		// and, for a cluster deleted mid-operation, wedge the deletion behind our finalizer.
+		if deleting {
+			logrus.Infof("[etcdsnapshotsave] %s/%s: cluster %s is gone, nothing to release", op.Namespace, op.Name, key)
+			status.SetTerminated()
+			return status, nil
+		}
+
 		logrus.Errorf("[etcdsnapshotsave]: %s/%s failed to find cluster for %s", op.Namespace, op.Name, key)
 
 		opv1alpha1.FailedCondition.True(&status)
@@ -204,6 +346,13 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("cluster %s not found", key))
 
 		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		// This failure is terminated on the spot rather than by handleFailed: the beacon is
+		// resolved through the cluster's adapter, so with no cluster there is no beacon to release
+		// and every subsequent reconcile would return here without ever reaching the terminal
+		// handler — leaving the operation ineligible for TTL garbage collection forever.
+		status.SetTerminated()
+
 		return status, nil
 	}
 	if err != nil {
@@ -233,7 +382,13 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 	namespace, beaconName := a.BeaconRef()
 
 	beacon, err := h.beacons.Get(namespace, beaconName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) && status.Phase == opv1alpha1.OperationPhasePending {
+	if apierrors.IsNotFound(err) && deleting {
+		// As above: no beacon means nothing to release, so let the deletion proceed rather than
+		// requeueing a NotFound forever.
+		logrus.Infof("[etcdsnapshotsave] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
+		status.SetTerminated()
+		return status, nil
+	} else if apierrors.IsNotFound(err) && status.Phase == opv1alpha1.OperationPhasePending {
 		logrus.Warnf("[etcdsnapshotsave]: %s/%s failed to find beacon %s/%s (clusterRef apiVersion=%s kind=%s name=%s)",
 			op.Namespace, op.Name, namespace, beaconName, ustr.GetAPIVersion(), ustr.GetKind(), ustr.GetName())
 
@@ -742,8 +897,10 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 // handleCanceled (unlike other handler functions) will attempt to release the beacon (if it is
 // held by the current object).
 // The difference between canceled and failed operations is that an operation fails itself, whereas another controller
-// cancels an operation.
-// This function mostly serves to execute the planv1alpha1.CanceledPhaseHookLabelPrefix, if it exists
+// cancels an operation, or it is deleted before its terminal handling completed.
+// This function mostly serves to execute the planv1alpha1.CanceledPhaseHookLabelPrefix, if it exists.
+// Once the hook has been satisfied and the beacon released, the operation is recorded as
+// terminated, which is what allows a deleted operation to finish deleting.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
 
@@ -765,13 +922,15 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 		}
 	}
 
+	status.SetTerminated()
+
 	return status, nil
 }
 
 // handleFailed releases the beacon when the operation has reached the Failed terminal phase, so
-// the next operation in line can acquire it. The toggle-off step pairs with handleSucceeded's
-// behaviour so the beacon's Active flag accurately reflects whether any operation is currently
-// running.
+// the next operation in line can acquire it, then records the operation as terminated. The
+// toggle-off step pairs with handleSucceeded's behaviour so the beacon's Active flag accurately
+// reflects whether any operation is currently running.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
@@ -794,6 +953,8 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 		}
 	}
 
+	status.SetTerminated()
+
 	return status, nil
 }
 
@@ -801,7 +962,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 // (owner path clears it fully, delegate path pops us off the chain) and, on the owner path,
 // nudges the parent cluster controller (snapshotbackpopulate, RKE controlplane, etc.) by
 // enqueueing the cluster object so any post-operation reconciliation runs promptly rather than
-// waiting for the next periodic resync.
+// waiting for the next periodic resync. The operation is recorded as terminated once that is done.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
@@ -828,6 +989,8 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveSt
 		gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
 		_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
 	}
+
+	status.SetTerminated()
 
 	return status, nil
 }
