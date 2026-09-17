@@ -40,7 +40,7 @@ func TestDeferredStartRetriesUntilItSucceeds(t *testing.T) {
 		return nil
 	})
 
-	require.NoError(t, starter())
+	starter()
 
 	select {
 	case <-done:
@@ -67,7 +67,7 @@ func TestDeferredStartEscalatesWhenItKeepsFailing(t *testing.T) {
 		return startErr
 	})
 
-	require.NoError(t, starter())
+	starter()
 
 	select {
 	case err := <-failed:
@@ -90,7 +90,7 @@ func TestDeferredStartEscalationIsOptional(t *testing.T) {
 		return errors.New("apiserver is unreachable")
 	})
 
-	require.NoError(t, starter())
+	starter()
 
 	select {
 	case <-called:
@@ -123,12 +123,12 @@ func TestDeferredStartRunsASingleRetryLoop(t *testing.T) {
 		return nil
 	})
 
-	require.NoError(t, starter())
+	starter()
 	// Wait for the first attempt to be in flight before piling on.
 	require.Eventually(t, func() bool { return calls.Load() == 1 }, 10*time.Second, time.Millisecond)
 
 	for range 10 {
-		require.NoError(t, starter())
+		starter()
 	}
 	close(release)
 
@@ -161,7 +161,7 @@ func TestDeferredStartStopsWhenTheContextIsCancelled(t *testing.T) {
 		return errors.New("apiserver is unreachable")
 	})
 
-	require.NoError(t, starter())
+	starter()
 	<-running
 	cancel()
 

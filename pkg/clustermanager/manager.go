@@ -72,23 +72,33 @@ func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.
 }
 
 func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
-	obj, ok := m.controllers.Load(cluster.UID)
-	if !ok {
-		return
+	for {
+		obj, ok := m.controllers.Load(cluster.UID)
+		if !ok {
+			return
+		}
+		if m.stopRecord(obj.(*record)) {
+			return
+		}
 	}
-	m.stopRecord(obj.(*record))
 }
 
 // stopRecord stops r and removes it from the manager, but only if it is still the active record for
-// its cluster. Callbacks held by a record can outlive it, and tearing down whichever record happens
-// to be current would stop controllers that are working fine. The check and the removal have to be
+// its cluster, and reports whether it did. Callbacks held by a record can outlive it - a deferred
+// start reports a failure long after it began - and tearing down whichever record happens to be
+// current would stop controllers that are working fine. The check and the removal have to be
 // atomic, otherwise a replacement installed in between would be the one deleted.
-func (m *Manager) stopRecord(r *record) {
+//
+// Returning early leaves nothing behind. A record only stops being the active one because start
+// replaced it, and start calls Stop on the old record before it installs the new one, so a record
+// this rejects has already been cancelled.
+func (m *Manager) stopRecord(r *record) bool {
 	if !m.controllers.CompareAndDelete(r.clusterRec.UID, r) {
-		return
+		return false
 	}
 	logrus.Infof("Stopping cluster agent for %s", r.cluster.ClusterName)
 	r.cancel()
+	return true
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
@@ -146,6 +156,11 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 	}
 
 	obj, _ = m.controllers.LoadOrStore(cluster.UID, clusterRecord)
+	if obj.(*record) != clusterRecord {
+		// Another goroutine installed a record for this cluster first. The one just built was never
+		// started, but it holds a cancel func that would otherwise live as long as the manager.
+		clusterRecord.cancel()
+	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
 		m.markUnavailable(cluster.Name)
 		return nil, err

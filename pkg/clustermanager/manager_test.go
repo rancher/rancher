@@ -55,3 +55,52 @@ func TestStopRecordIsANoopWhenTheClusterIsGone(t *testing.T) {
 
 	assert.NotPanics(t, func() { m.stopRecord(r) })
 }
+
+func TestStopStopsTheRecordThatIsActuallyRegistered(t *testing.T) {
+	// Stop resolves the cluster to whatever record is current rather than trusting the one its
+	// caller happens to be holding.
+	m := &Manager{}
+	stale := newTestRecord("c-m-test", "uid-1")
+	current := newTestRecord("c-m-test", "uid-1")
+	m.controllers.Store(current.clusterRec.UID, current)
+
+	m.Stop(stale.clusterRec)
+
+	assert.NoError(t, stale.ctx.Err(), "the caller's stale record is not what Stop acts on")
+	assert.Error(t, current.ctx.Err(), "the registered record should be stopped")
+	_, ok := m.controllers.Load(current.clusterRec.UID)
+	assert.False(t, ok, "the cluster should have no record left")
+}
+
+func TestStopClearsTheClusterWhileRecordsAreBeingReplaced(t *testing.T) {
+	// Race cover for the retry loop: the entry can change between Stop's load and its delete, and
+	// Stop has to keep going rather than return having stopped nothing - without spinning once
+	// nothing else is installing records.
+	m := &Manager{}
+	const uid = types.UID("uid-1")
+	clusterRec := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: uid}}
+
+	replaced := make(chan struct{})
+	go func() {
+		defer close(replaced)
+		for range 500 {
+			m.controllers.Store(uid, newTestRecord("c-m-test", uid))
+		}
+	}()
+
+	for range 500 {
+		m.Stop(clusterRec)
+	}
+	<-replaced
+	m.Stop(clusterRec)
+
+	_, ok := m.controllers.Load(uid)
+	assert.False(t, ok, "Stop should leave no record behind once nothing else is installing one")
+}
+
+func TestStopIsANoopWhenTheClusterIsGone(t *testing.T) {
+	m := &Manager{}
+	r := newTestRecord("c-m-test", "uid-1")
+
+	assert.NotPanics(t, func() { m.Stop(r.clusterRec) })
+}

@@ -274,7 +274,11 @@ var deferredStartRetry = wait.Backoff{
 	Jitter:   0.1,
 }
 
-func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() error {
+// DeferredStart returns a starter that registers and starts the cluster's controllers the first
+// time it is called. The starter returns nothing: it runs in the background, so there is no result
+// to hand back by the time it returns, and reporting a failure is its own job rather than the
+// caller's - see deferredStart.
+func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() {
 	return w.deferredStart(ctx, w.deferredStartAsync(ctx, register))
 }
 
@@ -283,13 +287,13 @@ func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx conte
 // If f keeps failing, its handler registrations have been rolled back and nothing else will ever
 // retry them, so the failure is escalated to OnDeferredStartError to have the whole UserContext
 // rebuilt.
-func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() error {
+func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() {
 	backoff := deferredStartRetry
 	var inFlight atomic.Bool
 
-	return func() error {
+	return func() {
 		if !inFlight.CompareAndSwap(false, true) {
-			return nil
+			return
 		}
 
 		go func() {
@@ -319,8 +323,6 @@ func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() 
 				w.OnDeferredStartError(lastErr)
 			}
 		}()
-
-		return nil
 	}
 }
 
