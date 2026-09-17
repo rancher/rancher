@@ -40,7 +40,7 @@ target "docker-metadata-action" {}
 target "server" {
   inherits = ["_base", "docker-metadata-action"]
   target = "server"
-  tags = ["${REPO}/rancher:${TAG}-${ARCH}"]
+  tags = ["${REPO}/rancher-server:${TAG}-${ARCH}"]
   output = DEST_DIR == "" ? ["type=docker"] : ["type=docker,dest=${DEST_DIR}/rancher-${OS}-${ARCH}.tar"]
 }
 
@@ -54,6 +54,6 @@ target "agent" {
 target "demo" {
   inherits = ["_base", "docker-metadata-action"]
   target = "demo"
-  tags = ["${REPO}/rancher-demo:${TAG}-${ARCH}"]
+  tags = ["${REPO}/rancher:${TAG}-${ARCH}"]
   output = DEST_DIR == "" ? ["type=docker"] : ["type=docker,dest=${DEST_DIR}/rancher-demo-${OS}-${ARCH}.tar"]
 }
