@@ -45,7 +45,7 @@ RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os
 # Install some packages with zypper in the chroot of the final micro image
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
-      catatonit curl util-linux ca-certificates-mozilla-prebuilt findutils xz gzip tar gawk vim-small openssh-clients
+      catatonit curl util-linux ca-certificates ca-certificates-mozilla-prebuilt findutils xz gzip tar gawk vim-small openssh-clients
 
 
 FROM chroot-builder AS chroot-builder-server
