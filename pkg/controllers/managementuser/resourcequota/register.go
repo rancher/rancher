@@ -25,7 +25,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 			(obj.Spec.ResourceQuota != nil ||
 				obj.Spec.ContainerDefaultResourceLimit != nil ||
 				obj.Spec.NamespaceDefaultResourceQuota != nil) {
-			return obj, starter()
+			starter()
 		}
 		return obj, nil
 	})

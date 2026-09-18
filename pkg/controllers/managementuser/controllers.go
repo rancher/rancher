@@ -46,14 +46,17 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	// For other clusters, we still need to wait for CAPI to be ready because
 	// registerProvV2 requires CAPI resources.
 	if cluster.ClusterName == "local" {
-		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			nodesyncer.Register(ctx, cluster, nil, kubeConfigGetter)
 			return nil
 		})()
 	}
 
 	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
-		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		// The starter cannot block this goroutine, so it starts the controllers in the background.
+		// Failures are retried there and, if they persist, reported through
+		// UserContext.OnDeferredStartError.
+		cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			// For non-local clusters, register nodesyncer with CAPI context
 			if cluster.ClusterName != "local" {
 				nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
