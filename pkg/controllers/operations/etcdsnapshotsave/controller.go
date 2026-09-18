@@ -859,11 +859,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
-	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
-
-	opv1alpha1.SucceededCondition.True(&status)
-	opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.FinishedReason)
-	opv1alpha1.SucceededCondition.Message(&status, "Operation completed successfully")
+	markSucceeded(&status)
 
 	return status, nil
 }
@@ -963,6 +959,16 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveSt
 			_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
 		},
 	})
+}
+
+// markSucceeded moves the operation into the Succeeded terminal phase. The condition is asserted
+// later, by updateStatus, once terminal handling has completed.
+func markSucceeded(status *opv1alpha1.ETCDSnapshotSaveStatus) {
+	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
+
+	opv1alpha1.SucceededCondition.True(status)
+	opv1alpha1.SucceededCondition.Reason(status, opv1alpha1.FinishedReason)
+	opv1alpha1.SucceededCondition.Message(status, "Operation completed successfully")
 }
 
 // markFailed moves the operation into the Failed terminal phase. Failed is what the operation
