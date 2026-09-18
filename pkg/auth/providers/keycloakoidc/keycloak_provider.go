@@ -484,10 +484,12 @@ func (k *keyCloakOIDCProvider) getLDAPGroupPrincipal(groupName string, token acc
 	}
 
 	matchSet := map[string]struct{}{}
+	matched := false
 	for _, principal := range principals {
 		if principal.ObjectMeta.Name == k.GetName()+"_"+GroupType+"://"+groupName ||
 			principal.DisplayName == groupName ||
 			principal.LoginName == groupName {
+			matched = true
 			matchName := strings.TrimSpace(principal.DisplayName)
 			if matchName == "" {
 				matchName = strings.TrimSpace(principal.LoginName)
@@ -497,6 +499,9 @@ func (k *keyCloakOIDCProvider) getLDAPGroupPrincipal(groupName string, token acc
 			}
 			matchSet[matchName] = struct{}{}
 		}
+	}
+	if matched && len(matchSet) == 0 {
+		return k.groupToPrincipal(groupName, token), true, nil
 	}
 	if len(matchSet) == 1 {
 		for matchName := range matchSet {
