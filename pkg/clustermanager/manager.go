@@ -404,7 +404,13 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 
 	clusterContext.OnDeferredStartError = func() {
 		logrus.Errorf("failed to start deferred controllers for cluster %s, stopping cluster agent so they are started again", cluster.Name)
+		// Dropping the record has to come first: it is what makes the next start build a new
+		// UserContext instead of finding this one and leaving it alone.
 		m.stopRecord(s)
+		// Ask for that start rather than waiting up to 30 seconds for the ownership reconcile to
+		// come round, which is documented as a temporary measure anyway. Only this path enqueues -
+		// an expected stop is followed by a start the caller is already making.
+		m.clusters.Controller().Enqueue("", cluster.Name)
 	}
 
 	return s, nil
