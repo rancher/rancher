@@ -8,7 +8,7 @@ on:
         required: true
 env:
   REGISTRY: "docker.io"
-  IMAGE: ${{ github.repository }}
+  IMAGE: ${{ github.repository_owner }}/rancher-server
   TAG: ${{ github.event.inputs.tag }}
   GIT_TAG: ${{ github.event.inputs.tag }}
 jobs:
