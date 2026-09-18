@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	authsecrets "github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	ldapprovider "github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
@@ -378,7 +379,7 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 		config.OpenLdapConfig = storedConfig.OpenLdapConfig
 	} else if reflect.DeepEqual(config.OpenLdapConfig, apiv3.LdapFields{}) &&
 		strings.HasPrefix(storedConfig.OpenLdapConfig.ServiceAccountPassword, common.SecretsNamespace+":") {
-		if err := common.DeleteSecret(k.Secrets, config.Type, client.LdapConfigFieldServiceAccountPassword); err != nil && !apierrors.IsNotFound(err) {
+		if err := k.cleanupEmbeddedLDAPSecrets(config.Type); err != nil {
 			return err
 		}
 	}
@@ -545,6 +546,18 @@ func validateScopes(input string) bool {
 	}
 	values := strings.Fields(input)
 	return slices.Contains(values, "openid")
+}
+
+func (k *keyCloakOIDCProvider) cleanupEmbeddedLDAPSecrets(configType string) error {
+	var result error
+	if fieldsMap, ok := authsecrets.SubTypeToFields[configType]; ok {
+		for _, field := range fieldsMap[client.KeyCloakOIDCConfigFieldOpenLdapConfig] {
+			if err := common.DeleteSecret(k.Secrets, configType, field); err != nil && !apierrors.IsNotFound(err) {
+				result = errors.Join(result, err)
+			}
+		}
+	}
+	return result
 }
 
 func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oauthConfig oauth2.Config, token accessor.TokenAccessor) (*oauth2.Token, error) {
