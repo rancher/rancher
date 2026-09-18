@@ -3623,6 +3623,7 @@ func (in *KeyCloakConfig) DeepCopy() *KeyCloakConfig {
 func (in *KeyCloakOIDCConfig) DeepCopyInto(out *KeyCloakOIDCConfig) {
 	*out = *in
 	in.OIDCConfig.DeepCopyInto(&out.OIDCConfig)
+	in.OpenLdapConfig.DeepCopyInto(&out.OpenLdapConfig)
 	return
 }
 

@@ -830,7 +830,8 @@ type GenericOIDCApplyInput struct {
 
 // KeyCloakOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
 type KeyCloakOIDCConfig struct {
-	OIDCConfig `json:",inline" mapstructure:",squash"`
+	OIDCConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig,omitempty"`
 }
 
 // GenericOIDCConfig is a wrapper for the AWS Cognito provider holding the OIDC Configuration

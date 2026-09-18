@@ -43,6 +43,70 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 		},
 	}
 
+	func TestKeycloakOIDCProvider_SearchPrincipalsLDAPGroups(t *testing.T) {
+		g := &keyCloakOIDCProvider{
+			ldapProvider: fakeAuthProvider{
+				searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+					require.Equal(t, GroupType, principalType)
+					return []apiv3.Principal{{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
+						},
+						DisplayName:   "rancher-admin",
+						PrincipalType: GroupType,
+						Provider:      Name,
+					}}, nil
+				},
+			},
+		}
+		g.GetConfig = func() (*apiv3.OIDCConfig, error) {
+			return &apiv3.OIDCConfig{GroupSearchEnabled: ptrTo(false)}, nil
+		}
+
+		result, err := g.SearchPrincipals("rancher-admin", GroupType, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []apiv3.Principal{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "keycloakoidc_group://rancher-admin",
+			},
+			DisplayName:   "rancher-admin",
+			LoginName:     "rancher-admin",
+			PrincipalType: GroupType,
+			Provider:      Name,
+		}}, result)
+	}
+
+	func TestKeycloakOIDCProvider_GetPrincipalLDAPGroup(t *testing.T) {
+		g := &keyCloakOIDCProvider{
+			ldapProvider: fakeAuthProvider{
+				searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+					require.Equal(t, "rancher-admin", name)
+					require.Equal(t, GroupType, principalType)
+					return []apiv3.Principal{{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
+						},
+						DisplayName:   "rancher-admin",
+						PrincipalType: GroupType,
+						Provider:      Name,
+					}}, nil
+				},
+			},
+		}
+
+		result, err := g.GetPrincipal("keycloakoidc_group://rancher-admin", nil)
+		require.NoError(t, err)
+		assert.Equal(t, apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "keycloakoidc_group://rancher-admin",
+			},
+			DisplayName:   "rancher-admin",
+			LoginName:     "rancher-admin",
+			PrincipalType: GroupType,
+			Provider:      Name,
+		}, result)
+	}
+
 	t.Run("test search for user principal with client authenticated search", func(t *testing.T) {
 		testSrv := newFakeKeycloakServer(t, privateKey, func(t *testing.T, r *http.Request) bool {
 			bearerString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -281,6 +345,57 @@ func (m *fakeTokenManager) UpdateSecret(userID, provider, secret string) error {
 
 	return m.updateSecretFunc(userID, provider, secret)
 }
+
+type fakeAuthProvider struct {
+	searchPrincipalsFunc func(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error)
+}
+
+func (f fakeAuthProvider) GetName() string { return Name }
+
+func (f fakeAuthProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	return apiv3.Principal{}, nil, "", nil
+}
+
+func (f fakeAuthProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	if f.searchPrincipalsFunc == nil {
+		return nil, nil
+	}
+	return f.searchPrincipalsFunc(name, principalType, myToken)
+}
+
+func (f fakeAuthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	return apiv3.Principal{}, nil
+}
+
+func (f fakeAuthProvider) CustomizeSchema(schema *types.Schema) {}
+
+func (f fakeAuthProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
+	return authConfig, nil
+}
+
+func (f fakeAuthProvider) UsesUserSecrets() bool { return false }
+
+func (f fakeAuthProvider) CanRefreshPrincipals() bool { return false }
+
+func (f fakeAuthProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	return nil, nil
+}
+
+func (f fakeAuthProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []apiv3.Principal) (bool, error) {
+	return false, nil
+}
+
+func (f fakeAuthProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
+	return nil
+}
+
+func (f fakeAuthProvider) IsDisabledProvider() (bool, error) { return false, nil }
+
+func (f fakeAuthProvider) LogoutAll(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error { return nil }
+
+func (f fakeAuthProvider) Logout(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error { return nil }
+
+func ptrTo[T any](v T) *T { return &v }
 
 func TestGetRefreshAndUpdateTokenInvalidGrant(t *testing.T) {
 	t.Parallel()
