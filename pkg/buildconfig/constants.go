@@ -9,6 +9,6 @@ const (
 	DefaultShellVersion      = "rancher/shell:v0.8.2-rc.4"
 	FleetVersion             = "110.0.2+up0.16.2"
 	RemoteDialerProxyVersion = "110.0.2+up0.8.2"
-	TurtlesVersion           = "110.0.2+up0.27.2-rc.0"
+	TurtlesVersion           = "110.0.2+up0.27.2"
 	WebhookVersion           = "110.0.3+up0.11.2-rc.4"
 )
