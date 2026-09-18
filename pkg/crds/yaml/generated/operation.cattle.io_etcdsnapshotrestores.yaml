@@ -165,10 +165,12 @@ spec:
                   Conditions represent the latest available observations of an operation's current state.
                   Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, Finalized, and
                   Paused.
-                  Succeeded, Failed and Canceled report how the operation ended and are only True once it has
-                  also terminated (see TerminatedAt); until then the one matching the terminal phase is Unknown
-                  and carries the reason for the outcome. Finalized is True whenever any of the three is, so an
-                  observer that only needs to know the operation is over can wait on it alone.
+                  Succeeded, Failed and Canceled report how the operation ended, and the one matching the
+                  terminal phase goes True as soon as that phase is reached. Finalized reports the separate
+                  question of whether the controller has finished with the operation — terminal phase hook
+                  satisfied, beacon released (see TerminatedAt) — and is True whenever any outcome condition is
+                  and that work is done, so an observer that only needs to know the operation is over can wait
+                  on it alone.
                   Operations may have additional conditions of their own.
                   Operations may also provide additional information in the form of messages.
                 items:
