@@ -2197,10 +2197,27 @@ func setWaitingForSinglePlan(status *opv1alpha1.ETCDSnapshotRestoreStatus, planS
 	opv1alpha1.InProgressCondition.Message(status, plan.Message([]plan.PlanStatus{*planStatus}))
 }
 
-// updateStatus updates the conditions of the operation based on the current status.
-// This function also updates the ObservedGeneration.
-// The handler is responsible for updating the condition relevant to the current phase, but this function updates the
-// remaining conditions.
+// updateStatus refreshes ObservedGeneration and every condition that is not the one the current
+// phase handler owns.
+//
+// Division of labour for the outcome conditions (Succeeded / Failed / Canceled): a phase handler
+// records *why* the operation ended, by setting the reason and message on the condition matching
+// the phase it moves to — markFailed and markCanceled do exactly that. This function decides
+// *when* that outcome is asserted, and is the only place that sets the status of an outcome
+// condition or of Finalized. A handler that sets its condition True (which the terminal handlers do
+// while waiting on a delegate) is therefore normalised here, not taken at face value.
+//
+// The three states, in order:
+//
+//   - not terminal: the operation is still running. Progress conditions report where it is;
+//     Finalized is False with NotFinalizedReason and no outcome is asserted.
+//   - terminal but not terminated: the outcome is known and readable from the phase and from the
+//     matching condition's reason, but terminal handling (phase hook, beacon release) is still
+//     outstanding, so nothing is final. InProgress stays True with FinalizingReason, Finalized is
+//     False with the same, and the matching outcome condition is Unknown.
+//   - terminated: the operation is over. The matching outcome condition goes True, keeping the
+//     reason and message it was given at decision time; the other two go False; Finalized goes
+//     True; and the progress conditions are cleared.
 func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnapshotRestoreStatus) opv1alpha1.ETCDSnapshotRestoreStatus {
 	logrus.Tracef("[etcdsnapshotrestore] %s/%s: updating conditions", op.Namespace, op.Name)
 
@@ -2215,33 +2232,87 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnap
 		opv1alpha1.PausedCondition.Message(&status, "")
 	}
 
-	if status.Phase == opv1alpha1.OperationPhasePending {
-		opv1alpha1.PendingCondition.True(&status)
-	} else if status.Phase == opv1alpha1.OperationPhaseInProgress {
+	if !ops.IsTerminal(status.Phase) {
+		opv1alpha1.FinalizedCondition.False(&status)
+		opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.NotFinalizedReason)
+		opv1alpha1.FinalizedCondition.Message(&status, "")
+
+		if status.Phase == opv1alpha1.OperationPhasePending {
+			opv1alpha1.PendingCondition.True(&status)
+		} else if status.Phase == opv1alpha1.OperationPhaseInProgress {
+			opv1alpha1.PendingCondition.False(&status)
+			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.InProgressReason)
+			opv1alpha1.PendingCondition.Message(&status, "Operation now in progress")
+		}
+
+		return status
+	}
+
+	outcome, summary := outcomeConditionFor(status.Phase)
+
+	if !ops.IsTerminated(&status.OperationStatus) {
+		// The operation is no longer doing the work it was asked to do, but it is not done with
+		// itself either: it still holds (or has delegated) the beacon. Report that as progress
+		// rather than as an outcome, so nothing observes a result that could still be superseded —
+		// a deletion in this window cancels the operation, see cancelForDeletion.
 		opv1alpha1.PendingCondition.False(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.InProgressReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation now in progress")
-	} else if status.Phase == opv1alpha1.OperationPhaseSucceeded {
-		opv1alpha1.PendingCondition.False(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation completed successfully")
-		opv1alpha1.InProgressCondition.False(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.InProgressCondition.Message(&status, "Operation completed successfully")
-		opv1alpha1.FailedCondition.False(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.NotFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, "Operation completed successfully")
-	} else if status.Phase == opv1alpha1.OperationPhaseFailed {
-		opv1alpha1.PendingCondition.False(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation failed")
-		opv1alpha1.InProgressCondition.False(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.InProgressCondition.Message(&status, "Operation failed")
-		opv1alpha1.SucceededCondition.False(&status)
-		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.NotSuccessfulReason)
-		opv1alpha1.SucceededCondition.Message(&status, "Operation failed")
+		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinalizingReason)
+		opv1alpha1.PendingCondition.Message(&status, summary)
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinalizingReason)
+		opv1alpha1.InProgressCondition.Message(&status, summary)
+
+		opv1alpha1.FinalizedCondition.False(&status)
+		opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinalizingReason)
+		opv1alpha1.FinalizedCondition.Message(&status, summary)
+
+		// Unknown, not False: the outcome is known, it just is not final. The reason and message
+		// the phase handler recorded are deliberately left in place — they are the only record of
+		// why the operation ended, and they carry over unchanged when this flips to True.
+		outcome.Unknown(&status)
+
+		return status
+	}
+
+	opv1alpha1.PendingCondition.False(&status)
+	opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
+	opv1alpha1.PendingCondition.Message(&status, summary)
+	opv1alpha1.InProgressCondition.False(&status)
+	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
+	opv1alpha1.InProgressCondition.Message(&status, summary)
+
+	opv1alpha1.FinalizedCondition.True(&status)
+	opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinishedReason)
+	opv1alpha1.FinalizedCondition.Message(&status, summary)
+
+	outcome.True(&status)
+
+	for cond, reason := range map[condition.Cond]string{
+		opv1alpha1.SucceededCondition: opv1alpha1.NotSuccessfulReason,
+		opv1alpha1.FailedCondition:    opv1alpha1.NotFailedReason,
+		opv1alpha1.CanceledCondition:  opv1alpha1.NotCanceledReason,
+	} {
+		if cond == outcome {
+			continue
+		}
+		cond.False(&status)
+		cond.Reason(&status, reason)
+		cond.Message(&status, summary)
 	}
 
 	return status
+}
+
+// outcomeConditionFor maps a terminal phase to the condition that reports it, along with the
+// one-line summary used as the message on every condition that merely reflects the outcome rather
+// than explaining it. Only ever called for a terminal phase.
+func outcomeConditionFor(phase opv1alpha1.OperationPhase) (condition.Cond, string) {
+	switch phase {
+	case opv1alpha1.OperationPhaseSucceeded:
+		return opv1alpha1.SucceededCondition, "Operation completed successfully"
+	case opv1alpha1.OperationPhaseCanceled:
+		return opv1alpha1.CanceledCondition, "Operation canceled"
+	default:
+		return opv1alpha1.FailedCondition, "Operation failed"
+	}
 }
