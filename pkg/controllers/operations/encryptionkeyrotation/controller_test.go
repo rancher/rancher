@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -534,38 +535,44 @@ func TestUpdateStatusByPhase(t *testing.T) {
 			},
 		},
 		{
-			// A terminal phase on its own is not an outcome: the operation still holds its beacon
-			// and the cluster is still paused, so the result is reported as finalizing progress and
-			// nothing is asserted yet.
-			name:  "succeeded but not terminated finalizes",
+			// The outcome is asserted as soon as the phase is reached; only Finalized waits for the
+			// controller to be done with the operation (hook satisfied, cluster unpaused, beacon
+			// released).
+			name:  "succeeded asserts the outcome and finalizes",
 			phase: opv1alpha1.OperationPhaseSucceeded,
 			check: func(t *testing.T, s opv1alpha1.EncryptionKeyRotationStatus) {
-				if string(opv1alpha1.InProgressCondition.GetStatus(&s)) != "True" {
-					t.Fatalf("expected InProgressCondition=True while finalizing")
+				if string(opv1alpha1.SucceededCondition.GetStatus(&s)) != "True" {
+					t.Fatalf("expected SucceededCondition=True once the phase is reached")
+				}
+				if string(opv1alpha1.FailedCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected FailedCondition=False")
+				}
+				if string(opv1alpha1.InProgressCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected InProgressCondition=False")
 				}
 				if opv1alpha1.InProgressCondition.GetReason(&s) != opv1alpha1.FinalizingReason {
 					t.Fatalf("expected InProgressCondition reason %q, got %q", opv1alpha1.FinalizingReason, opv1alpha1.InProgressCondition.GetReason(&s))
 				}
-				if string(opv1alpha1.SucceededCondition.GetStatus(&s)) != "Unknown" {
-					t.Fatalf("expected SucceededCondition=Unknown, got %q", opv1alpha1.SucceededCondition.GetStatus(&s))
-				}
 				if string(opv1alpha1.FinalizedCondition.GetStatus(&s)) != "False" {
-					t.Fatalf("expected FinalizedCondition=False")
+					t.Fatalf("expected FinalizedCondition=False while finalizing")
+				}
+				if opv1alpha1.FinalizedCondition.GetReason(&s) != opv1alpha1.FinalizingReason {
+					t.Fatalf("expected FinalizedCondition reason %q, got %q", opv1alpha1.FinalizingReason, opv1alpha1.FinalizedCondition.GetReason(&s))
 				}
 			},
 		},
 		{
-			name:  "failed but not terminated finalizes",
+			name:  "failed asserts the outcome and finalizes",
 			phase: opv1alpha1.OperationPhaseFailed,
 			check: func(t *testing.T, s opv1alpha1.EncryptionKeyRotationStatus) {
-				if string(opv1alpha1.InProgressCondition.GetStatus(&s)) != "True" {
-					t.Fatalf("expected InProgressCondition=True while finalizing")
+				if string(opv1alpha1.FailedCondition.GetStatus(&s)) != "True" {
+					t.Fatalf("expected FailedCondition=True once the phase is reached")
 				}
-				if string(opv1alpha1.FailedCondition.GetStatus(&s)) != "Unknown" {
-					t.Fatalf("expected FailedCondition=Unknown, got %q", opv1alpha1.FailedCondition.GetStatus(&s))
+				if string(opv1alpha1.SucceededCondition.GetStatus(&s)) != "False" {
+					t.Fatalf("expected SucceededCondition=False")
 				}
 				if string(opv1alpha1.FinalizedCondition.GetStatus(&s)) != "False" {
-					t.Fatalf("expected FinalizedCondition=False")
+					t.Fatalf("expected FinalizedCondition=False while finalizing")
 				}
 			},
 		},
@@ -1331,12 +1338,23 @@ func TestHandleTerminal_DelegatedDefersTermination(t *testing.T) {
 			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
 			s := newScope(op, newBeacon(beaconOwnerKey(op), true), adapter)
 
-			got, err := tc.handle(h, s, opv1alpha1.EncryptionKeyRotationStatus{})
+			// The outcome the phase handler recorded before delegating. It is the only record of
+			// why the operation ended, so delegating must not overwrite it — the delegate is
+			// reported on Finalized by updateStatus instead.
+			status := opv1alpha1.EncryptionKeyRotationStatus{}
+			tc.cond.True(&status)
+			tc.cond.Reason(&status, opv1alpha1.PlanFailedReason)
+			tc.cond.Message(&status, "the operative detail")
+
+			got, err := tc.handle(h, s, status)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if tc.cond.GetReason(&got) != opv1alpha1.WaitingForDelegateReason {
-				t.Fatalf("expected reason %q, got %q", opv1alpha1.WaitingForDelegateReason, tc.cond.GetReason(&got))
+			if tc.cond.GetReason(&got) != opv1alpha1.PlanFailedReason {
+				t.Fatalf("the outcome reason must survive the delegation, got %q", tc.cond.GetReason(&got))
+			}
+			if tc.cond.GetMessage(&got) != "the operative detail" {
+				t.Fatalf("the outcome message must survive the delegation, got %q", tc.cond.GetMessage(&got))
 			}
 			if !got.TerminatedAt.IsZero() {
 				t.Fatal("terminal handling is still delegated, so it must not be recorded as complete")
@@ -1445,6 +1463,17 @@ func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 	if status.Phase != opv1alpha1.OperationPhaseCanceled {
 		t.Fatalf("expected phase Canceled, got %q", status.Phase)
 	}
+	// The cancellation reason is the operation's outcome and must not be displaced by the delegate;
+	// the delegate is reported on Finalized, which is the thing still outstanding.
+	if opv1alpha1.CanceledCondition.GetReason(&status) != opv1alpha1.OperationDeletedReason {
+		t.Fatalf("expected the cancellation reason to survive, got %q", opv1alpha1.CanceledCondition.GetReason(&status))
+	}
+	if opv1alpha1.FinalizedCondition.GetReason(&status) != opv1alpha1.WaitingForDelegateReason {
+		t.Fatalf("expected Finalized to report the delegate, got %q", opv1alpha1.FinalizedCondition.GetReason(&status))
+	}
+	if !strings.Contains(opv1alpha1.FinalizedCondition.GetMessage(&status), "delegate-a") {
+		t.Fatalf("expected the delegate in the Finalized message, got %q", opv1alpha1.FinalizedCondition.GetMessage(&status))
+	}
 	if !status.TerminatedAt.IsZero() {
 		t.Fatal("the delegate still holds the beacon, so termination must not be recorded")
 	}
@@ -1478,6 +1507,12 @@ func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 	}
 	if status.TerminatedAt.IsZero() {
 		t.Fatal("the beacon has been released, so termination must be recorded")
+	}
+	if string(opv1alpha1.FinalizedCondition.GetStatus(&status)) != "True" {
+		t.Fatal("the delegate is gone, so the wait must resolve")
+	}
+	if opv1alpha1.CanceledCondition.GetReason(&status) != opv1alpha1.OperationDeletedReason {
+		t.Fatalf("the outcome reason must still be the one recorded at cancellation, got %q", opv1alpha1.CanceledCondition.GetReason(&status))
 	}
 
 	op.Status = status
@@ -1641,18 +1676,12 @@ func TestOnChange_PausedOperationDoesNotTakeFinalizer(t *testing.T) {
 
 // --- conditions ------------------------------------------------------------------------------
 
-// TestUpdateStatusOutcomeAssertedOnlyOnceTerminated is the property a `kubectl wait
-// --for=condition=Succeeded` depends on: no outcome condition may read True until the operation is
-// terminated, so a waiter never unblocks while the beacon is still held, the cluster is still
-// paused, or a terminal phase hook is still delegated.
-func TestUpdateStatusOutcomeAssertedOnlyOnceTerminated(t *testing.T) {
-	outcomes := []condition.Cond{
-		opv1alpha1.SucceededCondition,
-		opv1alpha1.FailedCondition,
-		opv1alpha1.CanceledCondition,
-		opv1alpha1.FinalizedCondition,
-	}
-
+// TestUpdateStatusFinalizedOnlyOnceTerminated pins the split between the two questions a waiter
+// can ask. The outcome is asserted the moment the operation reaches its terminal phase, so
+// `kubectl wait --for=condition=Succeeded` unblocks as soon as the work is done; Finalized is the
+// one that waits for the controller to be finished with the operation, so pairing the two means
+// "succeeded and fully wrapped up".
+func TestUpdateStatusFinalizedOnlyOnceTerminated(t *testing.T) {
 	for _, phase := range []opv1alpha1.OperationPhase{
 		opv1alpha1.OperationPhasePending,
 		opv1alpha1.OperationPhaseInProgress,
@@ -1667,10 +1696,17 @@ func TestUpdateStatusOutcomeAssertedOnlyOnceTerminated(t *testing.T) {
 				OperationStatus: opv1alpha1.OperationStatus{Phase: phase},
 			})
 
-			for _, cond := range outcomes {
-				if string(cond.GetStatus(&got)) == "True" {
-					t.Fatalf("%s must not be asserted before terminal handling completes", cond)
-				}
+			if string(opv1alpha1.FinalizedCondition.GetStatus(&got)) == "True" {
+				t.Fatal("Finalized must not be asserted before terminal handling completes")
+			}
+
+			if !ops.IsTerminal(phase) {
+				return
+			}
+
+			outcome, _ := outcomeConditionFor(phase)
+			if string(outcome.GetStatus(&got)) != "True" {
+				t.Fatalf("%s must be asserted as soon as the terminal phase is reached", outcome)
 			}
 		})
 	}

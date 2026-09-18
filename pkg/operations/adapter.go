@@ -201,7 +201,7 @@ type Adapter interface {
 	// has to come back on that same version rather than a minor ahead of the control plane it
 	// rejoins. Reinstalling is what makes a downgrade-on-restore work; the etcd snapshot restore does
 	// it once per node while the cluster is shut down. The legacy CAPR planner splits the same work
-	// between its restore plan and the full reconcile it runs afterwards (see
+	// between its restore plan and the full reconcile it runs afterward (see
 	// pkg/capr/planner/etcdrestore.go).
 	//
 	// secret identifies the node, which decides whether the server or the agent is installed, so

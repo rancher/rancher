@@ -710,7 +710,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 	}
 
 	// Collect every registered machine-plan secret in the collector's safe role order. The
-	// requested-service filter runs afterwards so the whole node set is available to decide
+	// requested-service filter runs afterward so the whole node set is available to decide
 	// which services the cluster's distro can actually rotate.
 	candidates, err := plan.NewCollector(h.secrets, s.clusterObj, s.namespace).
 		WithSorter(plan.DefaultSorter()).

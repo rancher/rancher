@@ -7,21 +7,26 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/condition"
 )
 
-// The conditions below split into progress conditions (Pending, InProgress, Paused), which report
-// what an operation is doing right now, and outcome conditions (Succeeded, Failed, Canceled, and
-// the Finalized summary), which report how it ended.
+// The conditions below split into three kinds: progress conditions (Pending, InProgress, Paused)
+// report what an operation is doing right now; outcome conditions (Succeeded, Failed, Canceled)
+// report how the work ended; and Finalized reports whether the controller is done with the
+// operation altogether.
 //
-// An outcome condition is only True once the operation is terminated: its terminal phase hook has
-// been satisfied and its beacon released, with nothing left for the controller to do. Reaching a
-// terminal phase is not enough — see OperationStatus.TerminatedAt. In the window in between, the
-// outcome is known but not yet asserted, so the matching outcome condition is Unknown while
-// carrying the reason and message for the outcome, and the InProgress condition reports
-// FinalizingReason.
+// An outcome condition goes True as soon as the operation reaches the matching terminal phase. At
+// that point the work it was asked to do is over and its result will not change — but the
+// controller is not necessarily finished: the terminal phase hook may still be delegated, the
+// cluster may still be paused, and the beacon may still be held. Finalized covers that last stretch
+// and goes True once it is complete (see OperationStatus.TerminatedAt).
 //
-// This makes each outcome condition a self-sufficient wait target — `Succeeded` means "succeeded
-// and fully wrapped up", never "succeeded but the beacon is still held" — and makes Finalized the
-// single target for "it is over, whatever happened", since kubectl cannot wait on a disjunction of
-// conditions.
+// So the two questions an observer can ask are answered separately:
+//
+//   - "how did it turn out?" — the outcome conditions, available as early as possible;
+//   - "is the controller done with it?" — Finalized, which is also the single target for
+//     "it is over, whatever happened", since kubectl cannot wait on a disjunction of conditions.
+//
+// Waiting on an outcome plus Finalized together means "succeeded and fully wrapped up". Note that
+// `kubectl wait` only ANDs repeated --for flags from v1.36 onwards; older clients silently honor
+// just the last one.
 var (
 	// PendingCondition represents the condition state for a task or process that is awaiting execution or resolution.
 	PendingCondition = condition.Cond("Pending")
@@ -30,21 +35,25 @@ var (
 	InProgressCondition = condition.Cond("InProgress")
 
 	// SucceededCondition represents the condition state for a task or process that completed successfully.
-	// True only once the operation has also terminated.
+	// True once the operation reaches the Succeeded phase; see FinalizedCondition for whether the
+	// controller has finished with it.
 	SucceededCondition = condition.Cond("Succeeded")
 
 	// FailedCondition represents the condition state for a task or process that has failed to complete successfully.
-	// True only once the operation has also terminated.
+	// True once the operation reaches the Failed phase; see FinalizedCondition for whether the
+	// controller has finished with it.
 	FailedCondition = condition.Cond("Failed")
 
 	// CanceledCondition represents the condition state for a task or process that has been canceled.
-	// True only once the operation has also terminated.
+	// True once the operation reaches the Canceled phase; see FinalizedCondition for whether the
+	// controller has finished with it.
 	CanceledCondition = condition.Cond("Canceled")
 
-	// FinalizedCondition reports that the operation is over and will not change again, whatever the
-	// outcome: it reached a terminal phase and its terminal handling completed. It is the summary
-	// of the three outcome conditions above, and exists so that an observer which does not care
-	// whether the operation succeeded can wait on one condition instead of racing two.
+	// FinalizedCondition reports that the controller is done with the operation and nothing about it
+	// will change again: it reached a terminal phase, its terminal phase hook has been satisfied,
+	// any cluster it paused has been unpaused, and its beacon has been released. It is the summary
+	// of the three outcome conditions above, so an observer which does not care how the operation
+	// turned out can wait on this one condition instead of racing two.
 	FinalizedCondition = condition.Cond("Finalized")
 
 	// PausedCondition represents the condition state for a task or process that has been paused.
@@ -84,10 +93,10 @@ const (
 	// cannot have been finalized.
 	NotFinalizedReason = "NotFinalized"
 
-	// FinalizingReason surfaces when an operation's outcome is known — it has reached a terminal
-	// phase — but its terminal handling has not completed: the terminal phase hook may still be
-	// delegated, and the beacon has not been released. The outcome is reported by the phase and by
-	// the reason on the matching outcome condition, but no outcome condition is True yet.
+	// FinalizingReason surfaces when an operation has reached a terminal phase — its outcome is
+	// asserted and will not change — but the controller has not finished with it: the terminal
+	// phase hook may still be delegated, the cluster may still be paused, and the beacon may still
+	// be held.
 	FinalizingReason = "Finalizing"
 
 	// NotFailedReason surfaces when an operation has not failed.
