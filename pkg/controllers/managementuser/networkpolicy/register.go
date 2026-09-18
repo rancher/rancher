@@ -21,7 +21,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 			obj.Name == cluster.ClusterName &&
 			obj.Spec.EnableNetworkPolicy != nil &&
 			*obj.Spec.EnableNetworkPolicy {
-			return obj, starter()
+			starter()
 		}
 		return obj, nil
 	})
