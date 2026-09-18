@@ -88,7 +88,7 @@ jobs:
   build-publish-chart:
     needs: [push-images]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     permissions:
       contents: read
       id-token: write
@@ -177,7 +177,7 @@ jobs:
         uses: ./.github/actions/merge-manifests
   create-images-files:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # latest
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     permissions:
       contents: read
     env:
@@ -208,7 +208,7 @@ jobs:
           path: /tmp/artifacts
   docker-image-digests:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     needs: [create-images-files, merge-server-agent-installer-manifests]
     env:
       ARTIFACTS_BASE_DIR: "dist"
@@ -240,7 +240,7 @@ jobs:
           path: /tmp/artifacts
   publish-artifacts:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     needs: [merge-server-agent-installer-manifests, create-images-files, docker-image-digests]
     permissions:
       contents: write
@@ -292,7 +292,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    container: ghcr.io/rancher/ci-image/go1.27 # zizmor: ignore[unpinned-images] -- internal image is exempt from this rule
     needs: [publish-artifacts, merge-server-agent-installer-manifests, docker-image-digests]
     permissions:
       contents: read
