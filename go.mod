@@ -119,14 +119,14 @@ require (
 	github.com/rancher/apiserver v0.10.0
 	github.com/rancher/channelserver v0.11.0
 	github.com/rancher/cluster-api-provider-rke2 v0.25.2
-	github.com/rancher/dynamiclistener v0.9.0
+	github.com/rancher/dynamiclistener v0.10.0-rc.1
 	github.com/rancher/eks-operator v1.15.1
 	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
 	github.com/rancher/fleet/pkg/helmvalues v0.16.1
 	github.com/rancher/gke-operator v1.15.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
-	github.com/rancher/lasso v0.2.9
+	github.com/rancher/lasso v0.2.10
 	github.com/rancher/machine v0.15.0-rancher146-rc.4
 	github.com/rancher/muchang v0.1.1
 	github.com/rancher/norman v0.10.0
@@ -134,11 +134,11 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
-	github.com/rancher/remotedialer-proxy v0.9.0-rc.2
+	github.com/rancher/remotedialer-proxy v0.9.0-rc.3
 	github.com/rancher/shepherd v0.0.0-20260824145520-00de4a01fb4d
 	github.com/rancher/steve v0.10.4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
-	github.com/rancher/wrangler/v3 v3.7.1
+	github.com/rancher/wrangler/v3 v3.8.0-rc.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
@@ -162,10 +162,10 @@ require (
 	k8s.io/api v0.37.0
 	k8s.io/apiextensions-apiserver v0.37.0
 	k8s.io/apimachinery v0.37.0
-	k8s.io/apiserver v0.36.4
+	k8s.io/apiserver v0.37.0
 	k8s.io/cli-runtime v0.36.4
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/kube-aggregator v0.36.4
+	k8s.io/kube-aggregator v0.37.0
 	k8s.io/kube-openapi v0.0.0-20260821135717-be32def86098
 	k8s.io/kubectl v0.36.4
 	k8s.io/kubernetes v1.36.4
@@ -247,6 +247,7 @@ require (
 	github.com/google/go-github/v67 v67.0.0 // indirect
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/renameio/v2 v2.0.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.20 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
@@ -299,9 +300,9 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/controller-manager v0.0.0 // indirect
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
-	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
+	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/kms v0.36.4 // indirect
-	k8s.io/streaming v0.36.4 // indirect
+	k8s.io/streaming v0.37.0 // indirect
 	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
@@ -408,7 +409,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.6.10 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.14 // indirect
 	go.etcd.io/etcd/client/v3 v3.6.10 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.46.0 // indirect
@@ -424,11 +425,11 @@ require (
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/cluster-bootstrap v0.36.1 // indirect
-	k8s.io/code-generator v0.36.4 // indirect
-	k8s.io/component-base v0.36.4 // indirect
+	k8s.io/code-generator v0.37.0 // indirect
+	k8s.io/component-base v0.37.0 // indirect
 	k8s.io/component-helpers v0.36.4 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.36.0 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
