@@ -52,11 +52,16 @@ type keyCloakOIDCConfigInput struct {
 }
 
 type keyCloakOIDCConfigPresence struct {
-	ClientAuthenticatedSearch *bool `json:"clientAuthenticatedSearch,omitempty"`
-	Enabled                   *bool `json:"enabled,omitempty"`
-	LogoutAllEnabled          *bool `json:"logoutAllEnabled,omitempty"`
-	LogoutAllForced           *bool `json:"logoutAllForced,omitempty"`
-	LogoutAllSupported        *bool `json:"logoutAllSupported,omitempty"`
+	ClientAuthenticatedSearch *bool                       `json:"clientAuthenticatedSearch,omitempty"`
+	Enabled                   *bool                       `json:"enabled,omitempty"`
+	LogoutAllEnabled          *bool                       `json:"logoutAllEnabled,omitempty"`
+	LogoutAllForced           *bool                       `json:"logoutAllForced,omitempty"`
+	LogoutAllSupported        *bool                       `json:"logoutAllSupported,omitempty"`
+	OpenLdapConfig            *keyCloakLDAPConfigPresence `json:"openLdapConfig,omitempty"`
+}
+
+type keyCloakLDAPConfigPresence struct {
+	ServiceAccountPassword *string `json:"serviceAccountPassword,omitempty"`
 }
 
 type keyCloakOIDCApplyInput struct {
@@ -293,6 +298,9 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.T
 		return apiv3.Principal{}, fmt.Errorf("invalid id %v", principalID)
 	}
 	externalID = strings.TrimPrefix(parts[1], "//")
+	if decodedExternalID, err := url.PathUnescape(externalID); err == nil {
+		externalID = decodedExternalID
+	}
 	parts = strings.SplitN(parts[0], "_", 2)
 	if len(parts) != 2 {
 		return apiv3.Principal{}, fmt.Errorf("invalid id %v", principalID)
@@ -406,7 +414,9 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	}
 	config.ClientSecret = name
 
-	if ldapConfigProvided && config.OpenLdapConfig.ServiceAccountPassword == "" &&
+	if ldapConfigProvided &&
+		presence != nil && presence.OpenLdapConfig != nil && presence.OpenLdapConfig.ServiceAccountPassword != nil &&
+		config.OpenLdapConfig.ServiceAccountPassword == "" &&
 		strings.HasPrefix(storedConfig.OpenLdapConfig.ServiceAccountPassword, common.SecretsNamespace+":") {
 		if err := common.DeleteSecret(k.Secrets, config.Type, client.LdapConfigFieldServiceAccountPassword); err != nil && !apierrors.IsNotFound(err) {
 			return err
@@ -653,6 +663,10 @@ func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *a
 	}
 	if !ldapConfigProvided {
 		config.OpenLdapConfig = storedConfig.OpenLdapConfig
+	} else if presence == nil || presence.OpenLdapConfig == nil || presence.OpenLdapConfig.ServiceAccountPassword == nil {
+		if config.OpenLdapConfig.ServiceAccountPassword == "" {
+			config.OpenLdapConfig.ServiceAccountPassword = storedConfig.OpenLdapConfig.ServiceAccountPassword
+		}
 	}
 }
 

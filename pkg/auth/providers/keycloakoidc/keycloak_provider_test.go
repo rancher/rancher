@@ -283,6 +283,29 @@ func TestKeycloakOIDCProvider_GetPrincipalLDAPGroup(t *testing.T) {
 	}, result)
 }
 
+func TestKeycloakOIDCProvider_GetPrincipalLDAPGroupUnescapesName(t *testing.T) {
+	g := &keyCloakOIDCProvider{
+		ldapProvider: fakeAuthProvider{
+			searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+				require.Equal(t, "rancher/admin", name)
+				require.Equal(t, GroupType, principalType)
+				return []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
+					},
+					DisplayName:   "rancher/admin",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				}}, nil
+			},
+		},
+	}
+
+	result, err := g.GetPrincipal("keycloakoidc_group://rancher%2Fadmin", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "keycloakoidc_group://rancher/admin", result.ObjectMeta.Name)
+}
+
 func TestKeycloakOIDCProvider_GetLDAPGroupPrincipalDedupesEquivalentMatches(t *testing.T) {
 	g := &keyCloakOIDCProvider{
 		ldapProvider: fakeAuthProvider{
