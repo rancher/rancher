@@ -365,7 +365,9 @@ func setUpImportedRestoreModeCluster(t *testing.T, cs *clients.Clients, displayN
 	t.Helper()
 
 	pools := []cluster.ImportedNodePool{
-		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
+		{ETCD: true, Quantity: 1},
+		{ControlPlane: true, Quantity: 1},
+		{Worker: true, Quantity: 1},
 	}
 
 	if storage == snapshotStorageLocal {

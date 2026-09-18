@@ -230,7 +230,7 @@ func setUpCAPRKE2RestoreModeCluster(t *testing.T, namePrefix string) (*clients.C
 
 	fx, err := cluster.NewCAPRKE2Cluster(cs, cluster.CAPRKE2Options{
 		NamePrefix:  namePrefix,
-		Replicas:    1,
+		Replicas:    3,
 		RKE2Version: previousK8sVersion,
 		S3: &cluster.CAPRKE2S3{
 			Endpoint:   osInfo.Endpoint,
