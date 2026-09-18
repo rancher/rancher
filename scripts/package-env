@@ -14,7 +14,7 @@ CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-$(build_yaml_get chartDefaultBranch
 
 # Empty when REGISTRY is unset, otherwise REGISTRY with exactly one trailing slash.
 REGISTRY_PREFIX=${REGISTRY:+${REGISTRY%/}/}
-IMAGE=${REGISTRY_PREFIX}${REPO}/rancher:${TAG}
+IMAGE=${REGISTRY_PREFIX}${REPO}/rancher-server:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:$(build_yaml_get systemAgentVersion)-suc
 WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:$(build_yaml_get winsAgentVersion)
