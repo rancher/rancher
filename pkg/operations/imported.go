@@ -188,7 +188,7 @@ func (a *ImportedAdapter) InstallInstruction(secret *corev1.Secret) (plan.OneTim
 		return plan.OneTimeInstruction{}, false
 	}
 
-	return installInstruction(version, a.DistroDataDirectory(secret), nil, a.cluster.Spec.AgentEnvVars), true
+	return installInstruction(version, a.DistroDataDirectory(secret), nil, a.cluster.Spec.AgentEnvVars, secret), true
 }
 
 // kubernetesVersion returns the version the mgmt cluster is configured for, preferring the distro

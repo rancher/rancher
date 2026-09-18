@@ -27,9 +27,13 @@ func installerImage(kubernetesVersion string, cp *rkev1.RKEControlPlane) string 
 // service back to it. Mirrors Planner.generateInstallInstructionWithSkipStart
 // (pkg/capr/planner/instructions.go).
 //
-// Windows is not handled: every operation that installs does so on an etcd node, and etcd never runs
-// on Windows. The callers filter Windows secrets out before they get here.
-func installInstruction(kubernetesVersion, dataDir string, cp *rkev1.RKEControlPlane, agentEnvVars []corev1.EnvVar) plan.OneTimeInstruction {
+// secret identifies the node being installed, which decides whether the installer lays down the
+// server or the agent: a node with neither the etcd nor the control-plane role runs the agent, and
+// installing without saying so would give it a server unit it never starts. Mirrors the isOnlyWorker
+// branch of Planner.generateInstallInstruction.
+//
+// Windows is not handled: the callers filter Windows secrets out before they get here.
+func installInstruction(kubernetesVersion, dataDir string, cp *rkev1.RKEControlPlane, agentEnvVars []corev1.EnvVar, secret *corev1.Secret) plan.OneTimeInstruction {
 	runtimeEnv := capr.GetRuntimeEnv(kubernetesVersion)
 
 	env := []string{
@@ -41,6 +45,13 @@ func installInstruction(kubernetesVersion, dataDir string, cp *rkev1.RKEControlP
 			continue
 		}
 		env = append(env, fmt.Sprintf("%s=%s", v.Name, v.Value))
+	}
+	// A node with neither the etcd nor the control-plane role runs the agent. This has to agree with
+	// how the caller picks the unit it restarts — installing a server and restarting rke2-agent (or
+	// the reverse) would leave the node's unit and its binaries out of step. A nil secret carries no
+	// role information at all, so it installs the server rather than guessing.
+	if secret != nil && !IsEtcd(secret) && !IsControlPlane(secret) {
+		env = append(env, fmt.Sprintf("INSTALL_%s_EXEC=agent", runtimeEnv))
 	}
 
 	return plan.OneTimeInstruction{

@@ -146,6 +146,7 @@ func (a *CAPRAdapter) InstallInstruction(secret *corev1.Secret) (plan.OneTimeIns
 		a.DistroDataDirectory(secret),
 		a.controlPlane,
 		toCoreEnvVars(a.controlPlane.Spec.AgentEnvVars),
+		secret,
 	), true
 }
 

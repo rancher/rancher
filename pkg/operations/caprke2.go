@@ -122,6 +122,7 @@ func (a *CAPRKE2Adapter) InstallInstruction(secret *corev1.Secret) (plan.OneTime
 		a.DistroDataDirectory(secret),
 		nil,
 		nil,
+		secret,
 	), true
 }
 

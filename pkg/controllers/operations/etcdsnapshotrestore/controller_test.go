@@ -388,8 +388,9 @@ func TestBuildPreflightPlan(t *testing.T) {
 func TestBuildShutdownPlan(t *testing.T) {
 	t.Parallel()
 
-	s := newTestScope(defaultAdapter(), "restore-uid")
 	adapter := defaultAdapter()
+	adapter.installVersion = "v1.33.0+rke2r1"
+	s := newTestScope(adapter, "restore-uid")
 
 	t.Run("etcd and control plane node", func(t *testing.T) {
 		secret := makePlanSecret("init", "node-init", map[string]string{
@@ -403,21 +404,17 @@ func TestBuildShutdownPlan(t *testing.T) {
 		for _, instr := range plan.OneTimeInstructions {
 			names = append(names, instr.Name)
 		}
-		want := []string{"remove idempotency tracking", "shutdown", "create-etcd-tombstone", "remove-tls-directory"}
+		// The install is ordered ahead of the killall, so anything it starts is torn down again.
+		want := []string{"remove idempotency tracking", "install", "shutdown", "create-etcd-tombstone", "remove-tls-directory"}
 		if strings.Join(names, ",") != strings.Join(want, ",") {
 			t.Errorf("instructions = %v, want %v", names, want)
 		}
 
 		// The killall script reads the data directory out of the environment.
+		shutdown := plan.OneTimeInstructions[2]
 		wantEnv := fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(adapter.RuntimeCommand()), adapter.DistroDataDirectory(secret))
-		var found bool
-		for _, e := range plan.OneTimeInstructions[1].Env {
-			if e == wantEnv {
-				found = true
-			}
-		}
-		if !found {
-			t.Errorf("shutdown instruction env = %v, want it to contain %q", plan.OneTimeInstructions[1].Env, wantEnv)
+		if !slices.Contains(shutdown.Env, wantEnv) {
+			t.Errorf("shutdown instruction env = %v, want it to contain %q", shutdown.Env, wantEnv)
 		}
 
 		if len(plan.Files) != 1 || plan.Files[0].Path != ops.IdempotentActionScriptPath(adapter.ProvisioningDataDirectory(secret)) {
@@ -432,13 +429,46 @@ func TestBuildShutdownPlan(t *testing.T) {
 
 		plan := buildShutdownPlan(s, secret)
 
-		// No etcd data or TLS material to clear on a worker.
-		if len(plan.OneTimeInstructions) != 2 {
-			t.Fatalf("expected 2 instructions, got %d", len(plan.OneTimeInstructions))
+		// No etcd data or TLS material to clear on a worker, but it is still installed and stopped:
+		// it has to come back on the same version as the control plane it rejoins.
+		if len(plan.OneTimeInstructions) != 3 {
+			t.Fatalf("expected 3 instructions, got %d", len(plan.OneTimeInstructions))
 		}
 		for _, instr := range plan.OneTimeInstructions {
 			if instr.Name == "create-etcd-tombstone" || instr.Name == "remove-tls-directory" {
 				t.Errorf("unexpected instruction %q for a worker node", instr.Name)
+			}
+		}
+	})
+
+	t.Run("the install lays down the configured version without starting it", func(t *testing.T) {
+		// This is the operation's only install: it runs here, on every node, while nothing is
+		// running. The reset in the Restore step and the restarts afterwards both depend on it, so it
+		// has to carry the version being restored to and must leave the service alone.
+		secret := makePlanSecret("init", "node-init", map[string]string{capr.EtcdRoleLabel: "true"})
+
+		install := buildShutdownPlan(s, secret).OneTimeInstructions[1]
+
+		if install.Name != "install" {
+			t.Fatalf("second instruction = %q, want the install", install.Name)
+		}
+		if !strings.HasSuffix(install.Image, ":v1.33.0-rke2r1") {
+			t.Errorf("image = %q, want it tagged with the configured version", install.Image)
+		}
+		if !slices.Contains(install.Env, "INSTALL_RKE2_SKIP_START=true") {
+			t.Errorf("env = %v, want the distro start suppressed", install.Env)
+		}
+	})
+
+	t.Run("a cluster type that does not manage its version shuts down without installing", func(t *testing.T) {
+		// An imported cluster whose version Rancher does not choose: there is no version to lay down,
+		// so the plan is the shutdown it always was.
+		noVersion := newTestScope(defaultAdapter(), "restore-uid")
+		secret := makePlanSecret("init", "node-init", map[string]string{capr.EtcdRoleLabel: "true"})
+
+		for _, instr := range buildShutdownPlan(noVersion, secret).OneTimeInstructions {
+			if instr.Name == "install" {
+				t.Error("expected no install instruction when the cluster has no configured version")
 			}
 		}
 	})
@@ -1109,39 +1139,19 @@ func assertSameStrings(t *testing.T, want, got []string) {
 // TestBuildRestorePlanInstallsConfiguredVersion covers the downgrade mechanism: the restore plan has
 // to reinstall the distro at the configured Kubernetes version before --cluster-reset, because a
 // newer server cannot reset onto etcd data written by an older one.
-func TestBuildRestorePlanInstallsConfiguredVersion(t *testing.T) {
+func TestBuildRestorePlanInstructions(t *testing.T) {
 	t.Parallel()
 
 	secret := makePlanSecret("etcd-0", "node-etcd-0", map[string]string{capr.EtcdRoleLabel: "true"})
 
-	t.Run("the install precedes the etcd wipe and the reset", func(t *testing.T) {
+	t.Run("the plan wipes etcd and resets, and installs nothing", func(t *testing.T) {
 		t.Parallel()
 
+		// The adapter does offer an install, so this pins that the restore deliberately leaves it to
+		// the Shutdown step rather than merely having nothing to install: by the time the reset runs,
+		// the snapshot's own binary is already on disk.
 		adapter := defaultAdapter()
 		adapter.installVersion = "v1.33.0+rke2r1"
-		s := newTestScope(adapter, types.UID("uid-1"))
-
-		nodePlan := buildRestorePlan(s, secret, nil, "snapshot-1")
-
-		assertInstructionOrder(t, nodePlan, []string{idempotencyKey + "/install", idempotencyKey + "/clean-etcd-dir", idempotencyKey + "/restore"})
-
-		// The install has to carry the version-tagged image and must not start the distro: the
-		// restore itself is what brings the server up, via --cluster-reset.
-		install := nodePlan.OneTimeInstructions[0]
-		if install.Image == "" || !strings.HasSuffix(install.Image, ":v1.33.0-rke2r1") {
-			t.Errorf("image = %q, want it tagged with the configured version", install.Image)
-		}
-		if !slices.Contains(install.Env, "INSTALL_RKE2_SKIP_START=true") {
-			t.Errorf("env = %v, want the distro start suppressed", install.Env)
-		}
-	})
-
-	t.Run("a cluster type that does not manage its version restores without reinstalling", func(t *testing.T) {
-		t.Parallel()
-
-		// An imported cluster: Rancher does not choose its distro version, so there is nothing to
-		// install and the restore proceeds as it did before this step existed.
-		adapter := defaultAdapter()
 		s := newTestScope(adapter, types.UID("uid-1"))
 
 		nodePlan := buildRestorePlan(s, secret, nil, "snapshot-1")
@@ -1149,22 +1159,21 @@ func TestBuildRestorePlanInstallsConfiguredVersion(t *testing.T) {
 		assertInstructionOrder(t, nodePlan, []string{idempotencyKey + "/clean-etcd-dir", idempotencyKey + "/restore"})
 	})
 
-	t.Run("the install is scoped to this operation", func(t *testing.T) {
+	t.Run("the instructions are scoped to this operation", func(t *testing.T) {
 		t.Parallel()
 
 		// Every restore instruction runs through the idempotency wrapper keyed on the op's UID, so a
-		// re-reconcile does not reinstall and two operations never share tracking state.
+		// re-reconcile does not reset etcd twice and two operations never share tracking state.
 		adapter := defaultAdapter()
-		adapter.installVersion = "v1.33.0+rke2r1"
 
 		first := buildRestorePlan(newTestScope(adapter, types.UID("uid-1")), secret, nil, "snapshot-1")
 		second := buildRestorePlan(newTestScope(adapter, types.UID("uid-2")), secret, nil, "snapshot-1")
 
 		if fmt.Sprint(first.OneTimeInstructions[0].Args) == fmt.Sprint(second.OneTimeInstructions[0].Args) {
-			t.Error("expected the install instruction to be scoped to the operation UID")
+			t.Error("expected the restore instructions to be scoped to the operation UID")
 		}
-		if !slices.Contains(first.OneTimeInstructions[0].Args, idempotencyKey+"/install") {
-			t.Errorf("args = %v, want the install idempotency key", first.OneTimeInstructions[0].Args)
+		if !slices.Contains(first.OneTimeInstructions[0].Args, idempotencyKey+"/clean-etcd-dir") {
+			t.Errorf("args = %v, want the clean-etcd-dir idempotency key", first.OneTimeInstructions[0].Args)
 		}
 	})
 }
@@ -1198,4 +1207,146 @@ func instructionIdentifier(inst planapi.OneTimeInstruction) string {
 		return inst.Name
 	}
 	return inst.Args[2]
+}
+
+func TestBuildRestartPlan(t *testing.T) {
+	t.Parallel()
+
+	const (
+		serverURL          = "10.0.0.1"
+		initialValue       = "uid-1/initial"
+		finalValue         = "uid-1/final"
+		restartTestVersion = "v1.33.0+rke2r1"
+	)
+
+	initSecret := makePlanSecret("init", "node-init", map[string]string{
+		capr.EtcdRoleLabel:         "true",
+		capr.ControlPlaneRoleLabel: "true",
+		capr.InitNodeLabel:         "true",
+	})
+	otherEtcd := makePlanSecret("etcd-2", "node-etcd-2", map[string]string{
+		capr.EtcdRoleLabel: "true",
+	})
+	worker := makePlanSecret("worker", "node-worker", map[string]string{
+		capr.WorkerRoleLabel: "true",
+	})
+
+	t.Run("each pass restarts without reinstalling", func(t *testing.T) {
+		t.Parallel()
+
+		// The version was installed during the Shutdown step, on every node at once, so a restart is
+		// all that is left to do. The adapter still offers an install, so this pins that the restart
+		// leaves it alone rather than there being nothing to install.
+		for _, secret := range []*corev1.Secret{initSecret, otherEtcd, worker} {
+			adapter := defaultAdapter()
+			adapter.installVersion = restartTestVersion
+			s := newTestScope(adapter, types.UID("uid-1"))
+
+			initial, err := buildRestartPlan(s, secret, initSecret, serverURL, initialValue, true)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", secret.Name, err)
+			}
+			assertInstructionOrder(t, initial, []string{idempotencyKey + "/restart"})
+
+			final, err := buildRestartPlan(s, secret, initSecret, serverURL, finalValue, false)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", secret.Name, err)
+			}
+			assertInstructionOrder(t, final, []string{idempotencyKey + "/restart", "remove-server-arg"})
+		}
+	})
+
+	t.Run("worker nodes restart the agent unit", func(t *testing.T) {
+		t.Parallel()
+
+		adapter := defaultAdapter()
+		adapter.installVersion = restartTestVersion
+		s := newTestScope(adapter, types.UID("uid-1"))
+
+		for _, tc := range []struct {
+			secret *corev1.Secret
+			want   string
+		}{
+			{secret: initSecret, want: "rke2-server"},
+			{secret: otherEtcd, want: "rke2-server"},
+			{secret: worker, want: "rke2-agent"},
+		} {
+			nodePlan, err := buildRestartPlan(s, tc.secret, initSecret, serverURL, initialValue, true)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", tc.secret.Name, err)
+			}
+			if args := restartInstructionArgs(t, nodePlan); !slices.Contains(args, tc.want) {
+				t.Errorf("node %s: restart args = %v, want the %s unit", tc.secret.Name, args, tc.want)
+			}
+		}
+	})
+
+	t.Run("the server drop-in points the non-leader nodes at the restored node", func(t *testing.T) {
+		t.Parallel()
+
+		adapter := defaultAdapter()
+		adapter.installVersion = restartTestVersion
+		s := newTestScope(adapter, types.UID("uid-1"))
+		dropIn := path.Join(adapter.ConfigDirectory(otherEtcd), "zz_etcd-snapshot-restore.yaml")
+
+		// Initial pass: every node but the leader gets the drop-in, and nothing removes it yet.
+		nodePlan, err := buildRestartPlan(s, otherEtcd, initSecret, serverURL, initialValue, true)
+		if err != nil {
+			t.Fatalf("buildRestartPlan: %v", err)
+		}
+		if len(nodePlan.Files) != 2 {
+			t.Fatalf("files = %d, want the idempotency script plus the drop-in", len(nodePlan.Files))
+		}
+		if nodePlan.Files[1].Path != dropIn {
+			t.Errorf("drop-in path = %q, want %q", nodePlan.Files[1].Path, dropIn)
+		}
+		content, err := base64.StdEncoding.DecodeString(nodePlan.Files[1].Content)
+		if err != nil {
+			t.Fatalf("decoding drop-in: %v", err)
+		}
+		if want := "server: \"https://10.0.0.1:9345\"\n"; string(content) != want {
+			t.Errorf("drop-in = %q, want %q", string(content), want)
+		}
+
+		// The leader is the node being pointed at, so it must not be told to join itself.
+		leaderPlan, err := buildRestartPlan(s, initSecret, initSecret, serverURL, initialValue, true)
+		if err != nil {
+			t.Fatalf("buildRestartPlan: %v", err)
+		}
+		if len(leaderPlan.Files) != 1 {
+			t.Errorf("leader files = %d, want no server drop-in", len(leaderPlan.Files))
+		}
+
+		// Final pass: the drop-in is removed everywhere, the leader included.
+		for _, secret := range []*corev1.Secret{initSecret, otherEtcd, worker} {
+			finalPlan, err := buildRestartPlan(s, secret, initSecret, serverURL, finalValue, false)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", secret.Name, err)
+			}
+			if len(finalPlan.Files) != 1 {
+				t.Errorf("node %s: files = %d, want the final pass to write no drop-in", secret.Name, len(finalPlan.Files))
+			}
+			last := finalPlan.OneTimeInstructions[len(finalPlan.OneTimeInstructions)-1]
+			if last.Name != "remove-server-arg" {
+				t.Errorf("node %s: last instruction = %q, want remove-server-arg", secret.Name, last.Name)
+			}
+			if !slices.Contains(last.Args, dropIn) {
+				t.Errorf("node %s: remove args = %v, want %q", secret.Name, last.Args, dropIn)
+			}
+		}
+	})
+}
+
+// restartInstructionArgs returns the arguments of the plan's restart instruction. It is wrapped by
+// the idempotency script, so the real command and its arguments sit at the tail of Args.
+func restartInstructionArgs(t *testing.T, nodePlan *planapi.Plan) []string {
+	t.Helper()
+
+	for _, inst := range nodePlan.OneTimeInstructions {
+		if instructionIdentifier(inst) == idempotencyKey+"/restart" {
+			return inst.Args
+		}
+	}
+	t.Fatalf("plan has no restart instruction: %v", nodePlan.OneTimeInstructions)
+	return nil
 }

@@ -1519,56 +1519,9 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	results := make([]plan.PlanStatus, 0, concurrency)
 
 	for _, secret := range secrets {
-		provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
-
-		probes, err := s.adapter.RenderProbes(secret, false)
+		nodePlan, err := buildRestartPlan(s, secret, initSecret, serverURL, value, nextStep != "")
 		if err != nil {
 			return status, err
-		}
-
-		unit := s.adapter.ServerUnit()
-		if secret.Labels[capr.EtcdRoleLabel] != "true" && secret.Labels[capr.ControlPlaneRoleLabel] != "true" {
-			unit = s.adapter.RuntimeCommand() + "-agent"
-		}
-
-		nodePlan := &plan.Plan{
-			Files: []plan.File{ops.IdempotentScriptFile(provisioningDir)},
-			OneTimeInstructions: []plan.OneTimeInstruction{
-				ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restart", value, "systemctl",
-					[]string{"restart", unit}, nil),
-			},
-			Probes: probes,
-		}
-
-		if secret.UID != initSecret.UID {
-			if nextStep != "" {
-				nodePlan.Files = append(nodePlan.Files, plan.File{
-					Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret)))),
-					Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-				})
-			} else {
-				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "remove-server-arg",
-						Command: "rm",
-						Args: []string{
-							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-						},
-					},
-				})
-			}
-		} else {
-			if nextStep == "" {
-				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "remove-server-arg",
-						Command: "rm",
-						Args: []string{
-							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-						},
-					},
-				})
-			}
 		}
 
 		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
@@ -1654,15 +1607,47 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 }
 
 // buildShutdownPlan assembles the plan which stops the distro on a node ahead of the restore: it
-// clears any idempotency tracking left by a previous attempt, runs the distro's killall script, and
-// on etcd and control-plane nodes lays down the etcd tombstone and removes the TLS directory.
+// clears any idempotency tracking left by a previous attempt, installs the distro version the
+// cluster is now configured for, runs the distro's killall script, and on etcd and control-plane
+// nodes lays down the etcd tombstone and removes the TLS directory.
+//
+// # Why the install lives here
+//
+// This is the one place in the operation that runs on every node while nothing is running, so it is
+// the one place a version change can be applied uniformly. A kubernetesVersion or all restore has
+// already rewritten the cluster's version by this point (the RestoreClusterConfig step did it, and
+// waited for it to propagate), and that version is usually older than what the nodes have on disk.
+// Two things depend on getting it onto disk before the cluster comes back:
+//
+//   - the Restore step's `--cluster-reset` runs on one node and must be executed by the snapshot's
+//     own binary, because a newer server cannot reset onto etcd data written by an older one;
+//   - every other node has to rejoin on that same version, or it would come up a minor ahead of the
+//     control plane it is joining.
+//
+// The legacy planner does this in two separate places — an install in the restore plan for the init
+// node (Planner.generateEtcdSnapshotRestorePlan) and another for every node when
+// rkev1.ETCDSnapshotPhaseInitialRestartCluster runs a full reconcile, each desired plan carrying its
+// own install. Doing it once here covers both, and no node installs twice.
+//
+// The installer is invoked with the distro's start suppressed (see installInstruction's
+// INSTALL_<RUNTIME>_SKIP_START), so it lays down binaries and leaves the service alone: the
+// system-agent installer image exits before its `systemctl restart` when that is set. It is also
+// ordered ahead of the killall rather than after it, so that anything the installer did bring up is
+// taken down again by the shutdown that follows.
 func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	// Clear any prior idempotency tracking under the restore key before starting; subsequent
 	// reconciles see the cleanup already applied and skip it.
 	instructions := []plan.OneTimeInstruction{
 		ops.GenerateIdempotencyCleanupInstruction(provisioningDir, idempotencyKey),
-		{
+	}
+
+	if install, ok := s.adapter.InstallInstruction(secret); ok {
+		instructions = append(instructions, install)
+	}
+
+	instructions = append(instructions,
+		plan.OneTimeInstruction{
 			CommonInstruction: plan.CommonInstruction{
 				Name:    "shutdown",
 				Command: "/bin/sh",
@@ -1677,7 +1662,7 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 				},
 			},
 		},
-	}
+	)
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" {
 		instructions = append(instructions, plan.OneTimeInstruction{
@@ -1705,6 +1690,64 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) *plan.Plan {
 		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
 		OneTimeInstructions: instructions,
 	}
+}
+
+// buildRestartPlan assembles the plan that brings a node back up after the restore: it restarts the
+// service and manages the temporary `server:` drop-in that points the non-leader nodes at the node
+// etcd was reset on.
+//
+// The node is already carrying the right distro version — the Shutdown step installed it on every
+// node before anything was torn down (see buildShutdownPlan) — so this only has to start what is
+// there. That is also why the restart is a plain `systemctl restart` rather than an install with a
+// restart stamp, the way the legacy planner's full reconcile does it.
+//
+// initialPass distinguishes the two restart passes the operation makes — InitialRestartCluster, which
+// stands the cluster back up around the restored etcd, and the final RestartCluster once the node
+// cleanup has run. The initial pass writes the `server:` drop-in on every node other than the leader,
+// so they rejoin through it rather than through whatever endpoint they were using; the final pass
+// removes it again, on the leader too.
+func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, value string, initialPass bool) (*plan.Plan, error) {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+
+	probes, err := s.adapter.RenderProbes(secret, false)
+	if err != nil {
+		return nil, err
+	}
+
+	unit := s.adapter.ServerUnit()
+	if !ops.IsEtcd(secret) && !ops.IsControlPlane(secret) {
+		unit = s.adapter.RuntimeCommand() + "-agent"
+	}
+
+	instructions := []plan.OneTimeInstruction{
+		ops.IdempotentInstruction(
+			provisioningDir, idempotencyKey+"/restart", value, "systemctl", []string{"restart", unit}, nil),
+	}
+
+	nodePlan := &plan.Plan{
+		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
+		OneTimeInstructions: instructions,
+		Probes:              probes,
+	}
+
+	serverArgPath := path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml")
+
+	if initialPass && secret.UID != initSecret.UID {
+		nodePlan.Files = append(nodePlan.Files, plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret)))),
+			Path:    serverArgPath,
+		})
+	} else if !initialPass {
+		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
+			CommonInstruction: plan.CommonInstruction{
+				Name:    "remove-server-arg",
+				Command: "rm",
+				Args:    []string{"-rf", serverArgPath},
+			},
+		})
+	}
+
+	return nodePlan, nil
 }
 
 // buildPostRestoreNodeCleanupPlan assembles the plan that runs the node-cleanup script on the init
@@ -1747,33 +1790,21 @@ func buildRestorePlan(s *scope, secret *corev1.Secret, snapshot *rkev1.ETCDSnaps
 		files = append(files, s3Files...)
 	}
 
-	var instructions []plan.OneTimeInstruction
-
-	// Install the configured Kubernetes version before resetting, so a snapshot taken on an older
-	// version is restored by that version's binary — a newer server cannot --cluster-reset onto
-	// older etcd data. This is what makes a downgrade-on-restore work, mirroring the
-	// install-with-skip-start in the legacy planner's restore plan. The RestoreClusterConfig step
-	// has already written the snapshot's version onto the cluster and waited for it to propagate, so
-	// "the configured version" here is the version being restored to.
-	if install, ok := s.adapter.InstallInstruction(secret); ok {
-		instructions = append(instructions, ops.ConvertToIdempotentInstruction(
-			provisioningDir, idempotencyKey+"/install", value, install))
-	}
-
-	instructions = append(instructions,
-		ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
-			CommonInstruction: plan.CommonInstruction{
-				Name:    "remove-etcd-db-dir",
-				Command: "rm",
-				Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
-			},
-		}),
-		ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
-	)
-
+	// Nothing is installed here: the Shutdown step put the version this snapshot needs on every node
+	// while nothing was running (see buildShutdownPlan), so the reset below is already being executed
+	// by the right binary.
 	return &plan.Plan{
-		Files:               files,
-		OneTimeInstructions: instructions,
+		Files: files,
+		OneTimeInstructions: []plan.OneTimeInstruction{
+			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
+				CommonInstruction: plan.CommonInstruction{
+					Name:    "remove-etcd-db-dir",
+					Command: "rm",
+					Args:    []string{"-rf", path.Join(s.adapter.DistroDataDirectory(secret), "server/db/etcd")},
+				},
+			}),
+			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
+		},
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 )
@@ -184,6 +185,103 @@ func TestImportedAdapterInstallInstruction(t *testing.T) {
 			assert.True(t, strings.HasSuffix(install.Image, tt.wantVersion), "image = %q, want suffix %q", install.Image, tt.wantVersion)
 		})
 	}
+}
+
+func TestInstallInstructionNodeRole(t *testing.T) {
+	t.Parallel()
+
+	// The install lays down a server or an agent depending on the node's roles, and the choice has to
+	// match the unit the caller restarts afterwards.
+	tests := []struct {
+		name      string
+		labels    map[string]string
+		wantAgent bool
+	}{
+		{
+			name:      "etcd and control plane",
+			labels:    map[string]string{capr.EtcdRoleLabel: "true", capr.ControlPlaneRoleLabel: "true"},
+			wantAgent: false,
+		},
+		{
+			name:      "etcd only",
+			labels:    map[string]string{capr.EtcdRoleLabel: "true"},
+			wantAgent: false,
+		},
+		{
+			name:      "control plane only",
+			labels:    map[string]string{capr.ControlPlaneRoleLabel: "true"},
+			wantAgent: false,
+		},
+		{
+			name:      "worker only",
+			labels:    map[string]string{capr.WorkerRoleLabel: "true"},
+			wantAgent: true,
+		},
+		{
+			// An etcd/control-plane node that also carries the worker role is still a server.
+			name:      "all three roles",
+			labels:    map[string]string{capr.EtcdRoleLabel: "true", capr.ControlPlaneRoleLabel: "true", capr.WorkerRoleLabel: "true"},
+			wantAgent: false,
+		},
+		{
+			name:      "no role labels",
+			labels:    nil,
+			wantAgent: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			a := &CAPRAdapter{
+				controlPlane: &rkev1.RKEControlPlane{
+					Spec: rkev1.RKEControlPlaneSpec{KubernetesVersion: "v1.33.0+rke2r1"},
+				},
+			}
+
+			install, ok := a.InstallInstruction(&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "plan", Namespace: "fleet-default", Labels: tt.labels},
+			})
+			require.True(t, ok)
+
+			if tt.wantAgent {
+				assert.Contains(t, install.Env, "INSTALL_RKE2_EXEC=agent")
+			} else {
+				assert.NotContains(t, install.Env, "INSTALL_RKE2_EXEC=agent")
+			}
+		})
+	}
+
+	t.Run("a nil secret installs the server", func(t *testing.T) {
+		t.Parallel()
+
+		// Nothing in production passes nil; the fallback just must not silently mean "agent".
+		a := &ImportedAdapter{cluster: &mgmtv3.Cluster{
+			Spec:   mgmtv3.ClusterSpec{Rke2Config: &mgmtv3.Rke2Config{Version: "v1.33.0+rke2r1"}},
+			Status: mgmtv3.ClusterStatus{Driver: mgmtv3.ClusterDriverRke2},
+		}}
+
+		install, ok := a.InstallInstruction(nil)
+		require.True(t, ok)
+		assert.NotContains(t, install.Env, "INSTALL_RKE2_EXEC=agent")
+	})
+
+	t.Run("the agent flag follows the k3s runtime", func(t *testing.T) {
+		t.Parallel()
+
+		a := &CAPRAdapter{
+			controlPlane: &rkev1.RKEControlPlane{
+				Spec: rkev1.RKEControlPlaneSpec{KubernetesVersion: "v1.33.0+k3s1"},
+			},
+		}
+
+		install, ok := a.InstallInstruction(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{capr.WorkerRoleLabel: "true"}},
+		})
+		require.True(t, ok)
+		assert.Contains(t, install.Env, "INSTALL_K3S_EXEC=agent")
+	})
 }
 
 // --- WaitForRestoreTarget -------------------------------------------------------------------

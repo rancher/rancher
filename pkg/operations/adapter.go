@@ -174,9 +174,15 @@ type Adapter interface {
 	// type's distro version is not managed by Rancher and so cannot be reinstalled.
 	//
 	// A restore of a snapshot taken on an older Kubernetes version has to run against that version's
-	// binary — a newer server cannot `--cluster-reset` onto older etcd data. Reinstalling here is
-	// what makes a downgrade-on-restore work, mirroring the install-with-skip-start the legacy CAPR
-	// planner puts in its restore plan (see pkg/capr/planner/etcdrestore.go).
+	// binary — a newer server cannot `--cluster-reset` onto older etcd data — and every other node
+	// has to come back on that same version rather than a minor ahead of the control plane it
+	// rejoins. Reinstalling is what makes a downgrade-on-restore work; the etcd snapshot restore does
+	// it once per node while the cluster is shut down. The legacy CAPR planner splits the same work
+	// between its restore plan and the full reconcile it runs afterwards (see
+	// pkg/capr/planner/etcdrestore.go).
+	//
+	// secret identifies the node, which decides whether the server or the agent is installed, so
+	// callers must pass the plan secret of the node the instruction is destined for.
 	InstallInstruction(secret *corev1.Secret) (plan.OneTimeInstruction, bool)
 
 	// WaitForRegister waits for all machine-plan secrets to be created, ensuring the system-agent has checked in for
