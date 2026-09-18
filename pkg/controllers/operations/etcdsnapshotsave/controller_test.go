@@ -486,23 +486,26 @@ func TestUpdateStatusByPhase(t *testing.T) {
 			},
 		},
 		{
-			name:  "succeeded clears Pending+InProgress+Failed",
+			// A terminal phase on its own is not an outcome: the operation still holds its beacon,
+			// so the result is reported as finalizing progress and nothing is asserted yet.
+			name:  "succeeded but not terminated finalizes",
 			phase: opv1alpha1.OperationPhaseSucceeded,
 			check: func(t *testing.T, s opv1alpha1.ETCDSnapshotSaveStatus) {
-				assert.Equal(t, "False", opv1alpha1.PendingCondition.GetStatus(&s))
-				assert.Equal(t, "False", opv1alpha1.InProgressCondition.GetStatus(&s))
-				assert.Equal(t, "False", opv1alpha1.FailedCondition.GetStatus(&s))
-				assert.Equal(t, opv1alpha1.NotFailedReason, opv1alpha1.FailedCondition.GetReason(&s))
+				assert.Equal(t, "True", opv1alpha1.InProgressCondition.GetStatus(&s))
+				assert.Equal(t, opv1alpha1.FinalizingReason, opv1alpha1.InProgressCondition.GetReason(&s))
+				assert.Equal(t, "Unknown", opv1alpha1.SucceededCondition.GetStatus(&s))
+				assert.Equal(t, "False", opv1alpha1.FinalizedCondition.GetStatus(&s))
+				assert.Equal(t, opv1alpha1.FinalizingReason, opv1alpha1.FinalizedCondition.GetReason(&s))
 			},
 		},
 		{
-			name:  "failed clears Pending+InProgress+Succeeded",
+			name:  "failed but not terminated finalizes",
 			phase: opv1alpha1.OperationPhaseFailed,
 			check: func(t *testing.T, s opv1alpha1.ETCDSnapshotSaveStatus) {
-				assert.Equal(t, "False", opv1alpha1.PendingCondition.GetStatus(&s))
-				assert.Equal(t, "False", opv1alpha1.InProgressCondition.GetStatus(&s))
-				assert.Equal(t, "False", opv1alpha1.SucceededCondition.GetStatus(&s))
-				assert.Equal(t, opv1alpha1.NotSuccessfulReason, opv1alpha1.SucceededCondition.GetReason(&s))
+				assert.Equal(t, "True", opv1alpha1.InProgressCondition.GetStatus(&s))
+				assert.Equal(t, opv1alpha1.FinalizingReason, opv1alpha1.InProgressCondition.GetReason(&s))
+				assert.Equal(t, "Unknown", opv1alpha1.FailedCondition.GetStatus(&s))
+				assert.Equal(t, "False", opv1alpha1.FinalizedCondition.GetStatus(&s))
 			},
 		},
 	}
@@ -516,6 +519,113 @@ func TestUpdateStatusByPhase(t *testing.T) {
 				OperationStatus: opv1alpha1.OperationStatus{Phase: tc.phase},
 			})
 			tc.check(t, status)
+		})
+	}
+}
+
+// TestUpdateStatusTerminatedOutcome covers the other half of the outcome contract: once terminal
+// handling is recorded, the matching outcome condition goes True while keeping the reason the phase
+// handler gave it, the competing outcomes go False, Finalized summarises all three, and the progress
+// conditions are cleared.
+func TestUpdateStatusTerminatedOutcome(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		phase   opv1alpha1.OperationPhase
+		reason  string
+		outcome condition.Cond
+		others  []condition.Cond
+	}{
+		{
+			name:    "succeeded",
+			phase:   opv1alpha1.OperationPhaseSucceeded,
+			reason:  opv1alpha1.FinishedReason,
+			outcome: opv1alpha1.SucceededCondition,
+			others:  []condition.Cond{opv1alpha1.FailedCondition, opv1alpha1.CanceledCondition},
+		},
+		{
+			name:    "failed",
+			phase:   opv1alpha1.OperationPhaseFailed,
+			reason:  opv1alpha1.PlanFailedReason,
+			outcome: opv1alpha1.FailedCondition,
+			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.CanceledCondition},
+		},
+		{
+			name:    "canceled",
+			phase:   opv1alpha1.OperationPhaseCanceled,
+			reason:  opv1alpha1.OperationDeletedReason,
+			outcome: opv1alpha1.CanceledCondition,
+			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.FailedCondition},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			initial := opv1alpha1.ETCDSnapshotSaveStatus{
+				OperationStatus: opv1alpha1.OperationStatus{
+					Phase:        tc.phase,
+					TerminatedAt: metav1.Now(),
+				},
+			}
+			// What the phase handler recorded at decision time, which must survive to the end.
+			tc.outcome.Reason(&initial, tc.reason)
+			tc.outcome.Message(&initial, "the operative detail")
+
+			got := updateStatus(newOp(), initial)
+
+			assert.Equal(t, "True", tc.outcome.GetStatus(&got))
+			assert.Equal(t, tc.reason, tc.outcome.GetReason(&got), "the decision-time reason must not be overwritten")
+			assert.Equal(t, "the operative detail", tc.outcome.GetMessage(&got))
+
+			for _, other := range tc.others {
+				assert.Equal(t, "False", other.GetStatus(&got), "%s must be denied once another outcome is asserted", other)
+			}
+
+			assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&got))
+			assert.Equal(t, opv1alpha1.FinishedReason, opv1alpha1.FinalizedCondition.GetReason(&got))
+			assert.Equal(t, "False", opv1alpha1.PendingCondition.GetStatus(&got))
+			assert.Equal(t, "False", opv1alpha1.InProgressCondition.GetStatus(&got))
+		})
+	}
+}
+
+// TestUpdateStatusOutcomeAssertedOnlyOnceTerminated is the property a `kubectl wait
+// --for=condition=Succeeded` depends on: no outcome condition may read True until the operation is
+// terminated, so a waiter never unblocks while the beacon is still held or a terminal phase hook is
+// still delegated.
+func TestUpdateStatusOutcomeAssertedOnlyOnceTerminated(t *testing.T) {
+	t.Parallel()
+
+	outcomes := []condition.Cond{
+		opv1alpha1.SucceededCondition,
+		opv1alpha1.FailedCondition,
+		opv1alpha1.CanceledCondition,
+		opv1alpha1.FinalizedCondition,
+	}
+
+	for _, phase := range []opv1alpha1.OperationPhase{
+		opv1alpha1.OperationPhasePending,
+		opv1alpha1.OperationPhaseInProgress,
+		opv1alpha1.OperationPhaseSucceeded,
+		opv1alpha1.OperationPhaseFailed,
+		opv1alpha1.OperationPhaseCanceled,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			t.Parallel()
+
+			// Every phase, with the terminal marker deliberately absent — including the terminal
+			// phases, which is the window a deletion would cancel.
+			got := updateStatus(newOp(), opv1alpha1.ETCDSnapshotSaveStatus{
+				OperationStatus: opv1alpha1.OperationStatus{Phase: phase},
+			})
+
+			for _, cond := range outcomes {
+				assert.NotEqual(t, "True", cond.GetStatus(&got),
+					"%s must not be asserted before terminal handling completes", cond)
+			}
 		})
 	}
 }
@@ -1269,7 +1379,8 @@ func TestOnChange_DeletionPreservesTerminatedOutcome(t *testing.T) {
 	status, err := h.OnChange(op, op.Status)
 	assert.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase, "a terminated operation must not be demoted to Canceled")
-	assert.Empty(t, opv1alpha1.CanceledCondition.GetStatus(&status), "the Canceled condition must not be raised")
+	assert.Equal(t, "True", opv1alpha1.SucceededCondition.GetStatus(&status), "the outcome it finished with must be asserted")
+	assert.Equal(t, "False", opv1alpha1.CanceledCondition.GetStatus(&status), "the Canceled condition must be denied, not raised")
 	if assert.Len(t, controller.updates, 1, "terminal handling was already complete, so the finalizer can go immediately") {
 		assert.NotContains(t, controller.updates[0].Finalizers, Finalizer)
 	}
