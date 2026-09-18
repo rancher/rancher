@@ -28,16 +28,28 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 		return v3.Principal{}, nil, apierror.NewAPIError(validation.MissingRequired, "password not provided")
 	}
 
-	sAMAccountName := credentials.Username
-	if strings.Contains(credentials.Username, `\`) {
-		sAMAccountName = strings.SplitN(credentials.Username, `\`, 2)[1]
+	lookupUsername := credentials.Username
+	var bindIdentity *ntlmIdentity
+
+	if config.BindMechanism == bindMechanismNTLM {
+		// Resolve the identity before any directory I/O so an unsupported form
+		// fails with a readable message instead of an unauthorized result from
+		// a search that could never have matched.
+		domain, user, err := splitNTLMIdentity(credentials.Username, config.DefaultLoginDomain)
+		if err != nil {
+			return v3.Principal{}, nil, err
+		}
+		lookupUsername = user
+		bindIdentity = &ntlmIdentity{Domain: domain, Username: user}
+	} else if strings.Contains(credentials.Username, `\`) {
+		lookupUsername = strings.SplitN(credentials.Username, `\`, 2)[1]
 	}
 
-	err := ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountUsername, config.DefaultLoginDomain, lConn)
-	if err != nil {
-		return v3.Principal{}, nil, err
+	if err := p.bindServiceAccount(lConn, config); err != nil {
+		return v3.Principal{}, nil, classifyServiceAccountBindError(err)
 	}
 
+	var err error
 	if config.UserLoginFilter != "" {
 		// Make sure user login filter contains a valid LDAP query expression
 		// before interpolating it into the search filter.
@@ -49,7 +61,7 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 	filter := fmt.Sprintf(
 		"(&(%s=%s)%s)",
 		ldap.SanitizeAttr(config.UserLoginAttribute),
-		ldapv3.EscapeFilter(sAMAccountName),
+		ldapv3.EscapeFilter(lookupUsername),
 		config.UserLoginFilter,
 	)
 	logrus.Debugf("LDAP Search query: {%s}", filter)
@@ -73,11 +85,22 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 	}
 
 	logrus.Debug("Binding username password")
-	externalID := ldap.GetUserExternalID(credentials.Username, config.DefaultLoginDomain)
-	err = lConn.Bind(externalID, password)
+	err = p.bindUser(lConn, config, bindIdentity, credentials.Username, password)
 	if err != nil {
+		if classifyBindFailure(err) != bindFailureNone {
+			// A channel binding rejection, or a malformed token, arrives as
+			// invalidCredentials even though it is not a wrong password.
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.ServerError, mapBindError(err).Error())
+		}
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
 			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
+		}
+		if apierror.IsAPIError(err) {
+			// bindAs reports the failures it detects itself (see its doc) as
+			// APIErrors carrying actionable messages. Re-wrapping would
+			// replace the message with the generic one, because WrapAPIError
+			// drops the cause from the response.
+			return v3.Principal{}, nil, err
 		}
 		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.ServerError, "server error while authenticating")
 	}
@@ -99,20 +122,24 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 }
 
 func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	config, caPool, err := p.getActiveDirectoryConfig()
+	config, caPool, err := p.configOrDefault()
 	if err != nil {
 		return nil, err
 	}
 
-	lConn, err := p.ldapConnection(config, caPool)
+	lConn, err := p.ldapConnectionOrDefault(config, caPool)
 	if err != nil {
 		return nil, err
 	}
 	defer lConn.Close()
 
-	err = ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountUsername, config.DefaultLoginDomain, lConn)
+	return p.refetchGroupPrincipalsOnConn(lConn, config, principalID)
+}
+
+func (p *adProvider) refetchGroupPrincipalsOnConn(lConn ldapv3.Client, config *v3.ActiveDirectoryConfig, principalID string) ([]v3.Principal, error) {
+	err := p.bindServiceAccount(lConn, config)
 	if err != nil {
-		return nil, err
+		return nil, classifyServiceAccountBindError(err)
 	}
 
 	externalID, _, err := p.getDNAndScopeFromPrincipalID(principalID)
@@ -273,10 +300,14 @@ func (p *adProvider) getGroupPrincipalsFromSearch(
 		config.GetGroupSearchAttributes(ObjectClass),
 	)
 
-	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
-	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
-
+	err := p.bindServiceAccount(lConn, config)
 	if err != nil {
+		if classifyBindFailure(err) != bindFailureNone {
+			// Not a rotated password. Degrading here would mask a channel
+			// binding misconfiguration, or a malformed message,
+			// behind partial group data.
+			return nilPrincipal, mapBindError(err)
+		}
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) && config.Enabled {
 			// If bind fails because service account password has changed, just return identities formed from groups in `memberOf`
 			groupList := []v3.Principal{}
@@ -316,6 +347,16 @@ func (p *adProvider) getGroupPrincipalsFromSearch(
 }
 
 func (p *adProvider) getPrincipal(distinguishedName string, scope string, config *v3.ActiveDirectoryConfig, caPool *x509.CertPool) (*v3.Principal, error) {
+	lConn, err := p.ldapConnectionOrDefault(config, caPool)
+	if err != nil {
+		return nil, err
+	}
+	defer lConn.Close()
+
+	return p.getPrincipalOnConn(lConn, distinguishedName, scope, config)
+}
+
+func (p *adProvider) getPrincipalOnConn(lConn ldapv3.Client, distinguishedName, scope string, config *v3.ActiveDirectoryConfig) (*v3.Principal, error) {
 	var search *ldapv3.SearchRequest
 	var filter string
 	if !slice.ContainsString(scopes, scope) {
@@ -346,16 +387,16 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	}
 
 	logrus.Debugf("Query for getPrincipal(%s): %s", distinguishedName, filter)
-	lConn, err := p.ldapConnection(config, caPool)
-	if err != nil {
-		return nil, err
-	}
-	defer lConn.Close()
 	// Bind before query
 	// If service account bind fails, and auth is on, return principal formed using DN
-	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
-	err = lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
+	err = p.bindServiceAccount(lConn, config)
 	if err != nil {
+		if classifyBindFailure(err) != bindFailureNone {
+			// Not a rotated password. Degrading here would mask a channel
+			// binding misconfiguration, or a malformed message,
+			// behind a DN-formed principal.
+			return nil, mapBindError(err)
+		}
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) && config.Enabled {
 			var kind string
 			if strings.EqualFold(UserScope, scope) {
@@ -415,7 +456,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	return principal, nil
 }
 
-func (p *adProvider) searchPrincipals(name, principalType string, config *v3.ActiveDirectoryConfig, lConn *ldapv3.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchPrincipals(name, principalType string, config *v3.ActiveDirectoryConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
 	var principals []v3.Principal
 
 	if principalType == "" || principalType == "user" {
@@ -437,7 +478,7 @@ func (p *adProvider) searchPrincipals(name, principalType string, config *v3.Act
 	return principals, nil
 }
 
-func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, lConn *ldapv3.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
 	if config.UserSearchFilter != "" {
 		// Make sure user search filter contains a valid LDAP query expression
 		// before interpolating it into the search filter.
@@ -459,7 +500,7 @@ func (p *adProvider) searchUser(name string, config *v3.ActiveDirectoryConfig, l
 	return p.searchLdap(query, UserScope, config, lConn)
 }
 
-func (p *adProvider) searchGroup(name string, config *v3.ActiveDirectoryConfig, lConn *ldapv3.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchGroup(name string, config *v3.ActiveDirectoryConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
 	if config.GroupSearchFilter != "" {
 		// Make sure group search filter contains a valid LDAP query expression
 		// before interpolating it into the search filter.
@@ -482,7 +523,7 @@ func (p *adProvider) searchGroup(name string, config *v3.ActiveDirectoryConfig, 
 	return p.searchLdap(query, GroupScope, config, lConn)
 }
 
-func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDirectoryConfig, lConn *ldapv3.Conn) ([]v3.Principal, error) {
+func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDirectoryConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var search *ldapv3.SearchRequest
 
@@ -505,10 +546,9 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 	}
 
 	// Bind before query
-	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
-	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
+	err := p.bindServiceAccount(lConn, config)
 	if err != nil {
-		return nil, fmt.Errorf("activedirectory: error binding service account: %w", err)
+		return nil, fmt.Errorf("activedirectory: error binding service account: %w", mapBindError(err))
 	}
 
 	results, err := lConn.SearchWithPaging(search, 1000)
