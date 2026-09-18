@@ -66,6 +66,7 @@
   },
   "status": {
     "failureMessage": "",
+    "message": "",
     "phase": "",
     "rbacEnabled": null
   }

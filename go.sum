@@ -625,10 +625,10 @@ github.com/prometheus/otlptranslator v1.0.0 h1:s0LJW/iN9dkIH+EnhiD3BlkkP5QVIUVEo
 github.com/prometheus/otlptranslator v1.0.0/go.mod h1:vRYWnXvI6aWGpsdY/mOT/cbeVRBlPWtBNDb7kGR3uKM=
 github.com/prometheus/procfs v0.20.1 h1:XwbrGOIplXW/AU3YhIhLODXMJYyC1isLFfYCsTEycfc=
 github.com/prometheus/procfs v0.20.1/go.mod h1:o9EMBZGRyvDrSPH1RqdxhojkuXstoe4UlK79eF5TGGo=
-github.com/rancher/aks-operator v1.15.2 h1:1aiZlCGVrB+hTpX5Ck5aK7PcHhRWAA3NqbUizpXqevU=
-github.com/rancher/aks-operator v1.15.2/go.mod h1:q1D2q/KyPv5gyK2Hp8p9trXAogHMd7IlPeatkkxUvus=
-github.com/rancher/ali-operator v1.15.1 h1:diFSU5kgHjCvUqJ2O+oRymvtvsDfFzJWoXGZQhhsacE=
-github.com/rancher/ali-operator v1.15.1/go.mod h1:VZVDmLBZd1RUpbHck3LQzrSqOtyvUrgjjrLTSmZ/0sE=
+github.com/rancher/aks-operator v1.15.3-rc.1 h1:kMiF3e9OMUGpJfsEtmeWLTA8+Y6UA/dtbEf7C024R5I=
+github.com/rancher/aks-operator v1.15.3-rc.1/go.mod h1:jg2HrvQe/czh5Q8C4fDM0DzRlIgG1p5dtWLN4l0rnbg=
+github.com/rancher/ali-operator v1.15.2-rc.1 h1:mdk987IOHuMb48vQh+Qp42h6tgq1Tq/XaGhfKJ76Hjw=
+github.com/rancher/ali-operator v1.15.2-rc.1/go.mod h1:VZVDmLBZd1RUpbHck3LQzrSqOtyvUrgjjrLTSmZ/0sE=
 github.com/rancher/apiserver v0.9.10 h1:lqSb7Wd1GfQRUgXuEUsRiUfIOPaagQiSHxly5LbRUyU=
 github.com/rancher/apiserver v0.9.10/go.mod h1:8Q7zNdlbm/Su9khLIls0PU3wyqEQrBd+0RXQdbXUcxI=
 github.com/rancher/channelserver v0.11.0 h1:R1oRG2SkGkC0EKHsa+VgBuLKHzEGVE1NMJeP/6c5vPo=
@@ -641,8 +641,8 @@ github.com/rancher/eks-operator v1.15.3-rc.1 h1:UcfwGV2UXaxVvkLqO9LAEW1hEcgaqUg/
 github.com/rancher/eks-operator v1.15.3-rc.1/go.mod h1:DvUtmuHcpYRlX6llHLjERKhxCgKDXb5Bdj7yfqhSTpo=
 github.com/rancher/fleet/pkg/apis v0.16.3-beta.1 h1:xXIffJOdVNJC038R5ZRPlF5WkxTLAt7JfJ9ecxh7XGw=
 github.com/rancher/fleet/pkg/apis v0.16.3-beta.1/go.mod h1:kCxm83CnFoZ1JOdBKGeQLXsMmtteoXH/ASW1RTdv1y8=
-github.com/rancher/gke-operator v1.15.3 h1:Ag61jhP4rRwQFuD0pq2EsUk0i5UXQYGG0q0gX10Q/48=
-github.com/rancher/gke-operator v1.15.3/go.mod h1:fXkjQpeG9jpr71IjlsSNLpW5yvweoZ5cUfsVsMUABc0=
+github.com/rancher/gke-operator v1.15.4-rc.1 h1:6VkvLCVQq6jAXdMO8xlIIvPvHSjVaRVFiO2T7Z4BnXw=
+github.com/rancher/gke-operator v1.15.4-rc.1/go.mod h1:3qWuXP178nWQVChXTf9oL22gndd6cSnzvB5kfvs3wGY=
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1 h1:vRtxuvIF0UarXIAwGYNwSFoRYJadVnOrD8kx2qrZyN8=
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1/go.mod h1:xavYr3cNyyAeA72nMVB60+q/EJ8Anu+loQWFJyXOeP8=
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379 h1:/DKzOm5Du2jPLE5rXPGhsb0XeT68kWEIRi6jnzMeyGk=
