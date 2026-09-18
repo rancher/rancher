@@ -26,7 +26,7 @@ runs:
     - name: Push server image
       shell: bash
       run: |
-        image_id=$(docker load --input "/tmp/rancher-${OS}-${ARCH}.tar" 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        image_id=$(docker load --input "/tmp/rancher-server-${OS}-${ARCH}.tar" 2>&1 | grep "Loaded image" | awk '{print $NF}')
         if [ -z "$image_id" ]; then
           echo "Error: Failed to load image from tarball!"
           exit 1
