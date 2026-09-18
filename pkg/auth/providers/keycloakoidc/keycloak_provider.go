@@ -378,6 +378,11 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 
 	if !ldapConfigProvided {
 		config.OpenLdapConfig = storedConfig.OpenLdapConfig
+	} else if reflect.DeepEqual(config.OpenLdapConfig, apiv3.LdapFields{}) &&
+		strings.HasPrefix(storedConfig.OpenLdapConfig.ServiceAccountPassword, common.SecretsNamespace+":") {
+		if err := common.DeleteSecret(k.Secrets, config.Type, client.LdapConfigFieldServiceAccountPassword); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 	if config.OpenLdapConfig.ServiceAccountPassword != "" {
 		name, err := common.CreateOrUpdateSecrets(
@@ -439,15 +444,8 @@ func (k *keyCloakOIDCProvider) searchGroupPrincipals(searchValue string, token a
 }
 
 func (k *keyCloakOIDCProvider) searchLDAPGroupPrincipals(searchValue string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	if k.ldapProvider == nil {
-		return nil, nil
-	}
-
-	principals, err := k.ldapProvider.SearchPrincipals(searchValue, GroupType, token)
+	principals, err := k.fetchLDAPGroupPrincipals(searchValue, token)
 	if err != nil {
-		if ldapprovider.IsNotConfigured(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
 
@@ -466,18 +464,44 @@ func (k *keyCloakOIDCProvider) searchLDAPGroupPrincipals(searchValue string, tok
 	return dedupePrincipals(normalized), nil
 }
 
+func (k *keyCloakOIDCProvider) fetchLDAPGroupPrincipals(searchValue string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	if k.ldapProvider == nil {
+		return nil, nil
+	}
+
+	principals, err := k.ldapProvider.SearchPrincipals(searchValue, GroupType, token)
+	if err != nil {
+		if ldapprovider.IsNotConfigured(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return principals, nil
+}
+
 func (k *keyCloakOIDCProvider) getLDAPGroupPrincipal(groupName string, token accessor.TokenAccessor) (apiv3.Principal, bool, error) {
-	principals, err := k.searchLDAPGroupPrincipals(groupName, token)
+	principals, err := k.fetchLDAPGroupPrincipals(groupName, token)
 	if err != nil {
 		return apiv3.Principal{}, false, err
 	}
 
+	var matches []string
 	for _, principal := range principals {
 		if principal.ObjectMeta.Name == k.GetName()+"_"+GroupType+"://"+groupName ||
 			principal.DisplayName == groupName ||
 			principal.LoginName == groupName {
-			return principal, true, nil
+			matchName := strings.TrimSpace(principal.DisplayName)
+			if matchName == "" {
+				matchName = strings.TrimSpace(principal.LoginName)
+			}
+			if matchName == "" {
+				continue
+			}
+			matches = append(matches, matchName)
 		}
+	}
+	if len(matches) == 1 {
+		return k.groupToPrincipal(matches[0], token), true, nil
 	}
 
 	return apiv3.Principal{}, false, nil
@@ -499,12 +523,12 @@ func (k *keyCloakOIDCProvider) groupToPrincipal(groupName string, token accessor
 
 func dedupePrincipals(principals []apiv3.Principal) []apiv3.Principal {
 	deduped := make([]apiv3.Principal, 0, len(principals))
+	seen := make(map[string]struct{}, len(principals))
 	for _, principal := range principals {
-		if slices.ContainsFunc(deduped, func(existing apiv3.Principal) bool {
-			return existing.ObjectMeta.Name == principal.ObjectMeta.Name
-		}) {
+		if _, ok := seen[principal.ObjectMeta.Name]; ok {
 			continue
 		}
+		seen[principal.ObjectMeta.Name] = struct{}{}
 		deduped = append(deduped, principal)
 	}
 	return deduped

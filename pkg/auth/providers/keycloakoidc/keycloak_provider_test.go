@@ -233,6 +233,31 @@ func TestKeycloakOIDCProvider_GetPrincipalLDAPGroup(t *testing.T) {
 	}, result)
 }
 
+func TestKeycloakOIDCProvider_GetLDAPGroupPrincipalAmbiguous(t *testing.T) {
+	g := &keyCloakOIDCProvider{
+		ldapProvider: fakeAuthProvider{
+			searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+				return []apiv3.Principal{
+					{
+						ObjectMeta:  metav1.ObjectMeta{Name: "keycloakoidc_group://cn=rancher-admin,ou=one,dc=example,dc=com"},
+						DisplayName: "rancher-admin",
+						LoginName:   "rancher-admin",
+					},
+					{
+						ObjectMeta:  metav1.ObjectMeta{Name: "keycloakoidc_group://cn=rancher-admin,ou=two,dc=example,dc=com"},
+						DisplayName: "rancher-admin",
+						LoginName:   "rancher-admin",
+					},
+				}, nil
+			},
+		},
+	}
+
+	_, found, err := g.getLDAPGroupPrincipal("rancher-admin", nil)
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
 func TestKeycloakOIDCProvider_TestAndApplyInvalidScopes(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v3/authConfigs/keycloakoidc?action=testAndApply",
 		io.NopCloser(strings.NewReader(`{
