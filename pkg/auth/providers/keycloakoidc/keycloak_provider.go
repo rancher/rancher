@@ -408,7 +408,7 @@ func (k *keyCloakOIDCProvider) searchKeycloakPrincipals(searchValue, principalTy
 	if err != nil {
 		return principals, err
 	}
-	if principalType == GroupType && (config.GroupSearchEnabled == nil || !*config.GroupSearchEnabled) {
+	if principalType == GroupType && config.GroupSearchEnabled != nil && !*config.GroupSearchEnabled {
 		return principals, nil
 	}
 	keyCloakClient, err := k.newClient(config, token)
