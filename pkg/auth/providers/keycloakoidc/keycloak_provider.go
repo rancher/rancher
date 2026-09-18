@@ -127,7 +127,16 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 		}
 		return fmt.Errorf("[keycloak oidc]: failed to parse the issuer URL while authenticating: %w", err)
 	}
+	if issuerURL.Scheme == "" || issuerURL.Host == "" {
+		return fmt.Errorf("[keycloak oidc]: issuer must be an absolute URL")
+	}
 	oidcConfig.Issuer = issuerURL.String()
+	if oidcConfig.Scopes == "" {
+		storedConfig, err := k.getKeyCloakOIDCConfig()
+		if err == nil {
+			k.mergeStoredConfigDefaults(&oidcConfig, storedConfig, ldapConfigProvided)
+		}
+	}
 
 	oidcLogin := &apiv3.OIDCLogin{Code: oidcConfigApplyInput.Code}
 	userPrincipal, groupPrincipals, providerToken, _, err := k.LoginUser(
@@ -352,6 +361,7 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	if err != nil {
 		return err
 	}
+	k.mergeStoredConfigDefaults(config, storedConfig, ldapConfigProvided)
 	if !validateScopes(config.Scopes) {
 		return fmt.Errorf("scopes are invalid: scopes must be space delimited and openid is a required scope. %s", config.Scopes)
 	}
@@ -360,10 +370,6 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.KeyCloakOIDCConfigType
 	config.ObjectMeta = storedConfig.ObjectMeta
-	if config.GroupSearchEnabled == nil {
-		config.GroupSearchEnabled = storedConfig.GroupSearchEnabled
-	}
-
 	if config.PrivateKey != "" {
 		name, err := common.CreateOrUpdateSecrets(k.Secrets, config.PrivateKey, strings.ToLower(client.KeyCloakOIDCConfigFieldPrivateKey), strings.ToLower(config.Type))
 		if err != nil {
@@ -378,9 +384,13 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	}
 	config.ClientSecret = name
 
-	if !ldapConfigProvided {
-		config.OpenLdapConfig = storedConfig.OpenLdapConfig
-	} else if reflect.DeepEqual(config.OpenLdapConfig, apiv3.LdapFields{}) &&
+	if ldapConfigProvided && config.OpenLdapConfig.ServiceAccountPassword == "" &&
+		strings.HasPrefix(storedConfig.OpenLdapConfig.ServiceAccountPassword, common.SecretsNamespace+":") {
+		if err := common.DeleteSecret(k.Secrets, config.Type, client.LdapConfigFieldServiceAccountPassword); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	if ldapConfigProvided && reflect.DeepEqual(config.OpenLdapConfig, apiv3.LdapFields{}) &&
 		strings.HasPrefix(storedConfig.OpenLdapConfig.ServiceAccountPassword, common.SecretsNamespace+":") {
 		if err := k.cleanupEmbeddedLDAPSecrets(config.Type); err != nil {
 			return err
@@ -550,6 +560,18 @@ func validateScopes(input string) bool {
 	}
 	values := strings.Fields(input)
 	return slices.Contains(values, "openid")
+}
+
+func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *apiv3.KeyCloakOIDCConfig, ldapConfigProvided bool) {
+	if config.Scopes == "" {
+		config.Scopes = storedConfig.Scopes
+	}
+	if config.GroupSearchEnabled == nil {
+		config.GroupSearchEnabled = storedConfig.GroupSearchEnabled
+	}
+	if !ldapConfigProvided {
+		config.OpenLdapConfig = storedConfig.OpenLdapConfig
+	}
 }
 
 func (k *keyCloakOIDCProvider) cleanupEmbeddedLDAPSecrets(configType string) error {

@@ -329,6 +329,43 @@ func TestKeycloakOIDCProvider_TestAndApplyInvalidScopes(t *testing.T) {
 	assert.Contains(t, err.Error(), "scopes are invalid")
 }
 
+func TestKeycloakOIDCProvider_TestAndApplyInvalidIssuer(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/v3/authConfigs/keycloakoidc?action=testAndApply",
+		io.NopCloser(strings.NewReader(`{
+		"oidcConfig": {
+			"issuer": "relative-issuer",
+			"clientId": "client-id",
+			"clientSecret": "secret",
+			"rancherUrl": "https://rancher.example.com/verify-auth",
+			"scope": "openid profile"
+		}
+	}`)))
+	apiContext := &types.APIContext{Request: req, Response: httptest.NewRecorder()}
+
+	provider := &keyCloakOIDCProvider{}
+
+	err := provider.TestAndApply(apiContext)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "issuer must be an absolute URL")
+}
+
+func TestKeycloakOIDCProvider_MergeStoredConfigDefaultsPreservesScopes(t *testing.T) {
+	provider := &keyCloakOIDCProvider{}
+	config := &apiv3.KeyCloakOIDCConfig{}
+	stored := &apiv3.KeyCloakOIDCConfig{
+		OIDCConfig: apiv3.OIDCConfig{
+			Scopes:             "openid profile",
+			GroupSearchEnabled: ptrTo(true),
+		},
+	}
+
+	provider.mergeStoredConfigDefaults(config, stored, false)
+
+	assert.Equal(t, "openid profile", config.Scopes)
+	require.NotNil(t, config.GroupSearchEnabled)
+	assert.True(t, *config.GroupSearchEnabled)
+}
+
 func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {
 	tests := map[string]struct {
 		authConfig map[string]any
