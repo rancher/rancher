@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/crewjam/saml"
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -26,10 +28,15 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
+	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 )
@@ -73,6 +80,130 @@ func TestConfiguredGenericSAMLProviderHasNoLdap(t *testing.T) {
 
 	assert.False(t, provider.hasLdapGroupSearch(), "Generic SAML provider must not have LDAP group search")
 	assert.Nil(t, provider.ldapProvider, "Generic SAML provider must not receive a child LDAP provider")
+}
+
+func TestCombineSamlAndLdapConfigStoresLDAPPasswordInSecret(t *testing.T) {
+	originalGetLDAPConfig := getLDAPConfig
+	t.Cleanup(func() {
+		getLDAPConfig = originalGetLDAPConfig
+	})
+
+	getLDAPConfig = func(common.AuthProvider) (*apiv3.LdapConfig, *x509.CertPool, error) {
+		return &apiv3.LdapConfig{
+			LdapFields: apiv3.LdapFields{
+				ServiceAccountPassword: "test-password",
+			},
+		}, nil, nil
+	}
+
+	tests := []struct {
+		name           string
+		providerName   string
+		configType     string
+		wantSecretName string
+	}{
+		{
+			name:           "okta",
+			providerName:   OKTAName,
+			configType:     client.OKTAConfigType,
+			wantSecretName: "oktaconfig-serviceaccountpassword",
+		},
+		{
+			name:           "shibboleth",
+			providerName:   ShibbolethName,
+			configType:     client.ShibbolethConfigType,
+			wantSecretName: "shibbolethconfig-serviceaccountpassword",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			secretCache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			secretController.EXPECT().Cache().Return(secretCache)
+			secretCache.EXPECT().Get(common.SecretsNamespace, tt.wantSecretName).Return(nil, apierrors.NewNotFound(schema.GroupResource{Resource: "secrets"}, tt.wantSecretName))
+			secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+				assert.Equal(t, tt.wantSecretName, secret.Name)
+				assert.Equal(t, common.SecretsNamespace, secret.Namespace)
+				assert.Equal(t, map[string]string{
+					"serviceaccountpassword": "test-password",
+				}, secret.StringData)
+
+				return secret, nil
+			})
+
+			provider := &Provider{
+				name:         tt.providerName,
+				secrets:      secretController,
+				ldapProvider: &mockLdapProvider{providerName: tt.providerName},
+			}
+
+			config, err := provider.combineSamlAndLdapConfig(&apiv3.SamlConfig{
+				AuthConfig: apiv3.AuthConfig{
+					Type: tt.configType,
+				},
+			})
+			require.NoError(t, err)
+
+			wantSecretRef := common.SecretsNamespace + ":" + tt.wantSecretName
+
+			switch typedConfig := config.(type) {
+			case *apiv3.OKTAConfig:
+				assert.Equal(t, wantSecretRef, typedConfig.OpenLdapConfig.ServiceAccountPassword)
+				assert.True(t, apiv3.AuthConfigOKTAPasswordMigrated.IsTrue(&typedConfig.SamlConfig))
+			case *apiv3.ShibbolethConfig:
+				assert.Equal(t, wantSecretRef, typedConfig.OpenLdapConfig.ServiceAccountPassword)
+				assert.True(t, apiv3.AuthConfigConditionSecretsMigrated.IsTrue(&typedConfig.SamlConfig))
+			default:
+				t.Fatalf("unexpected config type %T", config)
+			}
+		})
+	}
+}
+
+func TestSaveSamlConfigReturnsErrorWhenLDAPPasswordSecretSaveFails(t *testing.T) {
+	originalGetLDAPConfig := getLDAPConfig
+	t.Cleanup(func() {
+		getLDAPConfig = originalGetLDAPConfig
+	})
+
+	getLDAPConfig = func(common.AuthProvider) (*apiv3.LdapConfig, *x509.CertPool, error) {
+		return &apiv3.LdapConfig{
+			LdapFields: apiv3.LdapFields{
+				ServiceAccountPassword: "test-password",
+			},
+		}, nil, nil
+	}
+
+	ctrl := gomock.NewController(t)
+	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretCache := wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secretController.EXPECT().Cache().Return(secretCache)
+	secretCache.EXPECT().Get(common.SecretsNamespace, "oktaconfig-serviceaccountpassword").Return(nil, assert.AnError)
+
+	provider := &Provider{
+		name:         OKTAName,
+		secrets:      secretController,
+		ldapProvider: &mockLdapProvider{providerName: OKTAName},
+		authConfigs: &fakes.AuthConfigInterfaceMock{
+			ObjectClientFunc: func() *objectclient.ObjectClient {
+				t.Fatal("auth config update should not be attempted when saving the LDAP password secret fails")
+				return nil
+			},
+		},
+		getSamlConfig: func() (*apiv3.SamlConfig, error) {
+			return &apiv3.SamlConfig{
+				AuthConfig: apiv3.AuthConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "okta"},
+				},
+			}, nil
+		},
+	}
+
+	err := provider.saveSamlConfig(&apiv3.SamlConfig{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to save ldap service account password")
 }
 
 func TestSearchPrincipals(t *testing.T) {
