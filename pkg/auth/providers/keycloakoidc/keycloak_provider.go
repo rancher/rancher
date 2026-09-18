@@ -45,10 +45,15 @@ type keyCloakOIDCProvider struct {
 	ldapProvider common.AuthProvider
 }
 
+type keyCloakOIDCConfigInput struct {
+	apiv3.OIDCConfig `json:",inline"`
+	OpenLdapConfig   *apiv3.LdapFields `json:"openLdapConfig,omitempty"`
+}
+
 type keyCloakOIDCApplyInput struct {
-	OIDCConfig apiv3.KeyCloakOIDCConfig `json:"oidcConfig,omitempty"`
-	Code       string                   `json:"code,omitempty"`
-	Enabled    bool                     `json:"enabled,omitempty"`
+	OIDCConfig keyCloakOIDCConfigInput `json:"oidcConfig,omitempty"`
+	Code       string                  `json:"code,omitempty"`
+	Enabled    bool                    `json:"enabled,omitempty"`
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -104,7 +109,13 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 			fmt.Sprintf("[keycloak oidc] testAndApply: failed to parse body: %v", err))
 	}
 
-	oidcConfig := oidcConfigApplyInput.OIDCConfig
+	oidcConfig := apiv3.KeyCloakOIDCConfig{
+		OIDCConfig: oidcConfigApplyInput.OIDCConfig.OIDCConfig,
+	}
+	ldapConfigProvided := oidcConfigApplyInput.OIDCConfig.OpenLdapConfig != nil
+	if ldapConfigProvided {
+		oidcConfig.OpenLdapConfig = *oidcConfigApplyInput.OIDCConfig.OpenLdapConfig
+	}
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
 		oidcConfig.GroupSearchEnabled = ptr.To(false)
 	}
@@ -137,7 +148,7 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 		return err
 	}
 
-	if err := k.saveKeyCloakOIDCConfig(&oidcConfig); err != nil {
+	if err := k.saveKeyCloakOIDCConfig(&oidcConfig, ldapConfigProvided); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[keycloak oidc]: failed to save oidc config: %v", err))
 	}
 
@@ -329,7 +340,7 @@ func (k *keyCloakOIDCProvider) getKeyCloakOIDCConfig() (*apiv3.KeyCloakOIDCConfi
 			storedConfig.ClientSecret = string(v)
 		}
 	}
-	if storedConfig.OpenLdapConfig.ServiceAccountPassword != "" {
+	if strings.HasPrefix(storedConfig.OpenLdapConfig.ServiceAccountPassword, common.SecretsNamespace+":") {
 		value, err := common.ReadFromSecret(k.Secrets, storedConfig.OpenLdapConfig.ServiceAccountPassword, strings.ToLower(client.LdapConfigFieldServiceAccountPassword))
 		if err != nil {
 			return nil, err
@@ -340,7 +351,7 @@ func (k *keyCloakOIDCProvider) getKeyCloakOIDCConfig() (*apiv3.KeyCloakOIDCConfi
 	return storedConfig, nil
 }
 
-func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDCConfig) error {
+func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDCConfig, ldapConfigProvided bool) error {
 	storedConfig, err := k.getKeyCloakOIDCConfig()
 	if err != nil {
 		return err
@@ -365,7 +376,7 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	}
 	config.ClientSecret = name
 
-	if isEmptyLDAPConfig(config.OpenLdapConfig) {
+	if !ldapConfigProvided {
 		config.OpenLdapConfig = storedConfig.OpenLdapConfig
 	}
 	if config.OpenLdapConfig.ServiceAccountPassword != "" {
@@ -497,10 +508,6 @@ func dedupePrincipals(principals []apiv3.Principal) []apiv3.Principal {
 		deduped = append(deduped, principal)
 	}
 	return deduped
-}
-
-func isEmptyLDAPConfig(config apiv3.LdapFields) bool {
-	return reflect.DeepEqual(config, apiv3.LdapFields{})
 }
 
 func validateScopes(input string) bool {

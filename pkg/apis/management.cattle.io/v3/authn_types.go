@@ -828,7 +828,7 @@ type GenericOIDCApplyInput struct {
 	OIDCApplyInput `json:",inline" mapstructure:",squash"`
 }
 
-// KeyCloakOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
+// KeyCloakOIDCConfig holds the Keycloak OIDC configuration together with optional embedded LDAP group-search settings.
 type KeyCloakOIDCConfig struct {
 	OIDCConfig     `json:",inline" mapstructure:",squash"`
 	OpenLdapConfig LdapFields `json:"openLdapConfig,omitempty"`
