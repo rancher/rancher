@@ -331,7 +331,7 @@ func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1
 	gvk := schema.FromAPIVersionAndKind(op.Spec.ClusterRef.APIVersion, op.Spec.ClusterRef.Kind)
 	ref, err := h.dynamic.Get(gvk, op.Spec.ClusterRef.Namespace, op.Spec.ClusterRef.Name)
 	if apierrors.IsNotFound(err) {
-		key := clusterRefKey(op.Spec.ClusterRef)
+		key := opv1alpha1.ClusterRefKey(op.Spec.ClusterRef)
 
 		// The beacon lives alongside the cluster, so a deleted operation whose cluster is gone has
 		// nothing left to release or unpause: terminal handling is trivially complete and the
@@ -431,15 +431,6 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.EncryptionKeyRotatio
 	markFailed(&status, opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
 
 	return status, nil
-}
-
-// clusterRefKey renders a cluster reference for logs and status messages.
-func clusterRefKey(ref *corev1.ObjectReference) string {
-	key := fmt.Sprintf("apiVersion=%s, kind=%s", ref.APIVersion, ref.Kind)
-	if ref.Namespace != "" {
-		key += fmt.Sprintf(", namespace=%s", ref.Namespace)
-	}
-	return key + fmt.Sprintf(", name=%s", ref.Name)
 }
 
 type scope struct {
@@ -1165,7 +1156,7 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 		return status
 	}
 
-	outcome, summary := outcomeConditionFor(status.Phase)
+	outcome, summary := opv1alpha1.OutcomeConditionFor(status.Phase)
 
 	// The outcome is asserted as soon as the terminal phase is reached: the work is over and the
 	// result will not change. The reason and message the phase handler recorded are left in place —
@@ -1207,7 +1198,7 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 
 		// Read the delegate back off the operation rather than remembering it on a condition: the
 		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
-		if _, delegate := lifecycleHookDelegate(op, terminalPhaseHookPrefixFor(status.Phase)); delegate != "" {
+		if _, delegate := lifecycleHookDelegate(op, ops.TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
 			opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.FinalizedCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
 		} else {
@@ -1223,35 +1214,6 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 	opv1alpha1.FinalizedCondition.Message(&status, summary)
 
 	return status
-}
-
-// terminalPhaseHookPrefixFor returns the lifecycle-hook label prefix whose delegate can defer the
-// terminal handling of the given phase, or "" for a phase that has no terminal hook. Note there is
-// deliberately no hook for Finalized: hooks gate phases, and Finalized is a condition, not a phase.
-func terminalPhaseHookPrefixFor(phase opv1alpha1.OperationPhase) string {
-	switch phase {
-	case opv1alpha1.OperationPhaseSucceeded:
-		return planv1alpha1.SucceededPhaseHookLabelPrefix
-	case opv1alpha1.OperationPhaseFailed:
-		return planv1alpha1.FailedPhaseHookLabelPrefix
-	case opv1alpha1.OperationPhaseCanceled:
-		return planv1alpha1.CanceledPhaseHookLabelPrefix
-	}
-	return ""
-}
-
-// outcomeConditionFor maps a terminal phase to the condition that reports it, along with the
-// one-line summary used as the message on every condition that merely reflects the outcome rather
-// than explaining it. Only ever called for a terminal phase.
-func outcomeConditionFor(phase opv1alpha1.OperationPhase) (condition.Cond, string) {
-	switch phase {
-	case opv1alpha1.OperationPhaseSucceeded:
-		return opv1alpha1.SucceededCondition, "Operation completed successfully"
-	case opv1alpha1.OperationPhaseCanceled:
-		return opv1alpha1.CanceledCondition, "Operation canceled"
-	default:
-		return opv1alpha1.FailedCondition, "Operation failed"
-	}
 }
 
 // beaconOwnerKey returns the per-operation beacon owner key used for

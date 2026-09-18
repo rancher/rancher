@@ -136,6 +136,25 @@ const (
 	OperationDeletedReason = "OperationDeleted"
 )
 
+// OutcomeConditionFor maps a terminal phase to the outcome condition that reports it, along with
+// the one-line summary to use as the message on conditions that merely reflect the outcome rather
+// than explaining it. The reason and message on the returned condition itself belong to whichever
+// handler decided the outcome, and should not be overwritten with the summary.
+//
+// A non-terminal phase has no outcome, so it maps to FailedCondition: callers are expected to check
+// the phase is terminal first, and treating an unrecognised phase as a failure matches how the
+// operation controllers handle one.
+func OutcomeConditionFor(phase OperationPhase) (condition.Cond, string) {
+	switch phase {
+	case OperationPhaseSucceeded:
+		return SucceededCondition, "Operation completed successfully"
+	case OperationPhaseCanceled:
+		return CanceledCondition, "Operation canceled"
+	default:
+		return FailedCondition, "Operation failed"
+	}
+}
+
 func WaitingForDelegateMessage(beacon *planv1alpha1.Beacon) string {
 	if beacon == nil {
 		return ""
