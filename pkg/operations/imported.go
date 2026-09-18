@@ -195,13 +195,13 @@ func (a *ImportedAdapter) WaitForRestoreTarget() (bool, error) {
 // `--cluster-reset` has to run against the snapshot's own binary. Installing it here puts the right
 // version in place before the reset, and leaves the upgrade controller with nothing to do because
 // the nodes already match the desired version.
-func (a *ImportedAdapter) InstallInstruction(_ *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {
+func (a *ImportedAdapter) InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {
 	version := a.kubernetesVersion()
 	if version == "" {
 		return plan.OneTimeInstruction{}, false
 	}
 
-	return installInstruction(version, dataDir, nil, a.cluster.Spec.AgentEnvVars), true
+	return installInstruction(version, dataDir, nil, a.cluster.Spec.AgentEnvVars, secret), true
 }
 
 // kubernetesVersion returns the version the mgmt cluster is configured for, preferring the distro

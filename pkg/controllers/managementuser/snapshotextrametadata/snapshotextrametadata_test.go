@@ -32,6 +32,12 @@ const (
 	capiClusterName    = "downstream"
 	capiClusterNS      = "fleet-default"
 	rke2ControlPlaneCP = "RKE2ControlPlane"
+
+	// configMapName is the name the extra-metadata ConfigMap takes for an RKE2 cluster, which is
+	// what every fixture in TestOnChange builds. The production name is per-distro — see the
+	// adapters' configMapName, covered by TestImportedAdapterDistro — so it is spelled out here
+	// rather than derived from the code under test.
+	configMapName = "rke2-etcd-snapshot-extra-metadata"
 )
 
 // dynamicClientFake is a stand-in for lasso's dynamic controller. Mirrors the fake in

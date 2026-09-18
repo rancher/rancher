@@ -31,8 +31,6 @@ import (
 )
 
 const (
-	configMapName = "rke2-etcd-snapshot-extra-metadata"
-
 	resourcesKey    = rkev1.SnapshotMetadataResourcesKey
 	restoreModesKey = rkev1.SnapshotMetadataRestoreModesKey
 
@@ -120,12 +118,12 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 		return nil, err
 	}
 
-	cm, err := h.configMap.Get(metav1.NamespaceSystem, configMapName, metav1.GetOptions{})
+	cm, err := h.configMap.Get(metav1.NamespaceSystem, a.configMapName(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = h.configMap.Create(&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: metav1.NamespaceSystem,
-				Name:      configMapName,
+				Name:      a.configMapName(),
 			},
 			Data: data,
 		})
