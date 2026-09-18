@@ -401,6 +401,10 @@ var (
 	// UIContentEndpoint - configure custom endpoint for UI Dynamic Content data
 	UIContentEndpoint = NewSetting("ui-content-endpoint", "")
 
+	// UIAppCoEnabled - configure whether the UI shows SUSE Application Collection features
+	// ("true" always, "false" never, "" falls back to the system-catalog setting)
+	UIAppCoEnabled = NewSetting("ui-appco-enabled", "")
+
 	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", "")
