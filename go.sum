@@ -639,8 +639,8 @@ github.com/rancher/dynamiclistener v0.9.3 h1:hhiwFy51FqH+1zc9pmq9WQqDGIVoIL6aMoc
 github.com/rancher/dynamiclistener v0.9.3/go.mod h1:8vf06Xo75ioz6zIUAKIdrIGK2bsg/8sblbf6A9n5x3s=
 github.com/rancher/eks-operator v1.15.2 h1:qkjCD0X1DigdJItvByLkF7lXDSOCZXuzkLcQP4AcWOs=
 github.com/rancher/eks-operator v1.15.2/go.mod h1:DvUtmuHcpYRlX6llHLjERKhxCgKDXb5Bdj7yfqhSTpo=
-github.com/rancher/fleet/pkg/apis v0.16.1 h1:oH07GjrC35eyf0yoYSzjrx/lqE5ZTI+35jj3kYWd4Fo=
-github.com/rancher/fleet/pkg/apis v0.16.1/go.mod h1:cQknAZ8JALpXeU9oG2vui2FKrCtBK3/x1OERX1iKFAc=
+github.com/rancher/fleet/pkg/apis v0.16.2 h1:zWslN+/+etlTigJWS/T5+n9wJ7zBdEqA+IlRJ4q1q7c=
+github.com/rancher/fleet/pkg/apis v0.16.2/go.mod h1:qGALgh+35vrH8Qx21RVwZqu7cNsSENOO53jHbfqy9hI=
 github.com/rancher/gke-operator v1.15.3 h1:Ag61jhP4rRwQFuD0pq2EsUk0i5UXQYGG0q0gX10Q/48=
 github.com/rancher/gke-operator v1.15.3/go.mod h1:fXkjQpeG9jpr71IjlsSNLpW5yvweoZ5cUfsVsMUABc0=
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1 h1:vRtxuvIF0UarXIAwGYNwSFoRYJadVnOrD8kx2qrZyN8=
@@ -659,8 +659,8 @@ github.com/rancher/norman v0.9.11 h1:Yc06fyPIMZuO8iW469YfJKEgaV85AUge+BVkt+5iJVQ
 github.com/rancher/norman v0.9.11/go.mod h1:4qkaDOXCsSpbsHAb+w9NPJuhjHsjpYivYXDtdAeqb2M=
 github.com/rancher/remotedialer v0.6.1 h1:smq2sHKJn+NxxIeQ8To9CGGkz8l6Ir7EPzfAdjUTt2s=
 github.com/rancher/remotedialer v0.6.1/go.mod h1:0+dmsw9TPjcqNUPrgAVFZpvbxy1r/fRaGPpVa84OMjU=
-github.com/rancher/remotedialer-proxy v0.8.2-rc.2 h1:mbbp6QnbFq6g4RHc6SQP2/ANpPtrKl166GjN8/mfwvc=
-github.com/rancher/remotedialer-proxy v0.8.2-rc.2/go.mod h1:5COqTa9QtMbBdk0YtrTWKemXVoTqBhSBMK/9PQvwniM=
+github.com/rancher/remotedialer-proxy v0.8.2 h1:q2kh6iE4INPS9kwN5lvkDNl+w6ZgJFzUvt5TArYD3TM=
+github.com/rancher/remotedialer-proxy v0.8.2/go.mod h1:5COqTa9QtMbBdk0YtrTWKemXVoTqBhSBMK/9PQvwniM=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20260610155525-6d926c75d49a h1://lhZJ7E6znLttBO9b2+V/Xl51iw3bDspjiH8W5MxMk=
