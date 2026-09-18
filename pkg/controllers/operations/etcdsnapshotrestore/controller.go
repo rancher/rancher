@@ -584,15 +584,19 @@ func (s *scope) idempotencyValue() string {
 // lifecycleHookDelegate returns (suffix, delegate) for the first label on the operation whose key
 // starts with prefix. Returns ("", "") when no such label is set. The suffix is informational —
 // only the delegate value is consulted to drive the beacon push.
-func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string) {
-	if s.op.Labels == nil {
+func lifecycleHookDelegate(op *opv1alpha1.ETCDSnapshotRestore, prefix string) (string, string) {
+	// An empty prefix would match every label, and so would report a delegate for a phase that has
+	// no hook at all.
+	if prefix == "" || op.Labels == nil {
 		return "", ""
 	}
-	for k, v := range s.op.Labels {
+
+	for k, v := range op.Labels {
 		if strings.HasPrefix(k, prefix) {
 			return strings.TrimPrefix(k, prefix), v
 		}
 	}
+
 	return "", ""
 }
 
@@ -627,7 +631,7 @@ func (h *handler) delegate(s *scope, name, delegate string) error {
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 	logrus.Tracef("[etcdsnapshotrestore] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
 
-	if name, delegate := h.lifecycleHookDelegate(s, prefix); delegate != "" {
+	if name, delegate := lifecycleHookDelegate(s.op, prefix); delegate != "" {
 		err := h.delegate(s, name, delegate)
 		return true, err
 	}
@@ -1713,7 +1717,6 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 // terminalPhase describes what is specific to one terminal phase: the condition it reports through,
 // the lifecycle hook that can defer its completion, and any work to run once the beacon is back.
 type terminalPhase struct {
-	cond condition.Cond
 	hook string
 
 	// onRelease, when set, runs after the beacon has been released. owning reports whether this
@@ -1737,7 +1740,11 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 	if err != nil {
 		return status, err
 	} else if delegated {
-		setWaitingForDelegate(phase.cond, &status, s.beacon)
+		// The delegate drives the beacon on this operation's behalf from here. Nothing is written
+		// to the outcome condition: it already reports the outcome with the reason the phase handler
+		// gave it, and that reason must survive the delegation. updateStatus reports the delegate on
+		// Finalized for as long as the hook label is present, so the wait resolves on its own once
+		// the delegate clears the label rather than being left behind on a condition.
 		return status, nil
 	}
 
@@ -1774,7 +1781,6 @@ func (h *handler) releaseBeacon(s *scope) (bool, error) {
 // cancel-vs-fail distinction is that an external party cancels whereas the operation fails itself.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		cond: opv1alpha1.CanceledCondition,
 		hook: planv1alpha1.CanceledPhaseHookLabelPrefix,
 	})
 }
@@ -1784,7 +1790,6 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 // leftover scripts on nodes) can hold the beacon before the next operation acquires it.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		cond: opv1alpha1.FailedCondition,
 		hook: planv1alpha1.FailedPhaseHookLabelPrefix,
 	})
 }
@@ -1796,7 +1801,6 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 // only the owner does so, since only the owner terminating implies downstream work.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		cond: opv1alpha1.SucceededCondition,
 		hook: planv1alpha1.SucceededPhaseHookLabelPrefix,
 		onRelease: func(s *scope, owning bool) {
 			if !owning {
@@ -1809,8 +1813,9 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 	})
 }
 
-// markSucceeded moves the operation into the Succeeded terminal phase. The condition is asserted
-// later, by updateStatus, once terminal handling has completed.
+// markSucceeded moves the operation into the Succeeded terminal phase, asserting the outcome: the
+// work is over and the result will not change. Whether the controller is finished with the
+// operation is reported separately, by the Finalized condition.
 func markSucceeded(status *opv1alpha1.ETCDSnapshotRestoreStatus) {
 	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
 
@@ -1871,22 +1876,20 @@ func setWaitingForSinglePlan(status *opv1alpha1.ETCDSnapshotRestoreStatus, planS
 //
 // Division of labour for the outcome conditions (Succeeded / Failed / Canceled): a phase handler
 // records *why* the operation ended, by setting the reason and message on the condition matching
-// the phase it moves to — markFailed and markCanceled do exactly that. This function decides
-// *when* that outcome is asserted, and is the only place that sets the status of an outcome
-// condition or of Finalized. A handler that sets its condition True (which the terminal handlers do
-// while waiting on a delegate) is therefore normalised here, not taken at face value.
+// the phase it moves to — markSucceeded, markFailed and markCanceled do exactly that. This function
+// asserts that outcome and denies the competing two, and owns the Finalized condition outright.
 //
 // The three states, in order:
 //
-//   - not terminal: the operation is still running. Progress conditions report where it is;
-//     Finalized is False with NotFinalizedReason and no outcome is asserted.
-//   - terminal but not terminated: the outcome is known and readable from the phase and from the
-//     matching condition's reason, but terminal handling (phase hook, beacon release) is still
-//     outstanding, so nothing is final. InProgress stays True with FinalizingReason, Finalized is
-//     False with the same, and the matching outcome condition is Unknown.
-//   - terminated: the operation is over. The matching outcome condition goes True, keeping the
-//     reason and message it was given at decision time; the other two go False; Finalized goes
-//     True; and the progress conditions are cleared.
+//   - not terminal: the operation is still running. Progress conditions report where it is and
+//     Finalized is False with NotFinalizedReason.
+//   - terminal: the work is over and its outcome will not change, so the matching outcome condition
+//     goes True (keeping the reason and message it was given at decision time) and the other two go
+//     False. The progress conditions are cleared.
+//   - terminal and terminated: the controller is done with the operation too — the terminal phase
+//     hook was satisfied and the beacon released — so Finalized goes True. Until then it stays
+//     False with FinalizingReason, which is the only difference between this state and the one
+//     above.
 func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnapshotRestoreStatus) opv1alpha1.ETCDSnapshotRestoreStatus {
 	logrus.Tracef("[etcdsnapshotrestore] %s/%s: updating conditions", op.Namespace, op.Name)
 
@@ -1919,41 +1922,9 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnap
 
 	outcome, summary := outcomeConditionFor(status.Phase)
 
-	if !ops.IsTerminated(&status.OperationStatus) {
-		// The operation is no longer doing the work it was asked to do, but it is not done with
-		// itself either: it still holds (or has delegated) the beacon. Report that as progress
-		// rather than as an outcome, so nothing observes a result that could still be superseded —
-		// a deletion in this window cancels the operation, see cancelForDeletion.
-		opv1alpha1.PendingCondition.False(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinalizingReason)
-		opv1alpha1.PendingCondition.Message(&status, summary)
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinalizingReason)
-		opv1alpha1.InProgressCondition.Message(&status, summary)
-
-		opv1alpha1.FinalizedCondition.False(&status)
-		opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinalizingReason)
-		opv1alpha1.FinalizedCondition.Message(&status, summary)
-
-		// Unknown, not False: the outcome is known, it just is not final. The reason and message
-		// the phase handler recorded are deliberately left in place — they are the only record of
-		// why the operation ended, and they carry over unchanged when this flips to True.
-		outcome.Unknown(&status)
-
-		return status
-	}
-
-	opv1alpha1.PendingCondition.False(&status)
-	opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
-	opv1alpha1.PendingCondition.Message(&status, summary)
-	opv1alpha1.InProgressCondition.False(&status)
-	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
-	opv1alpha1.InProgressCondition.Message(&status, summary)
-
-	opv1alpha1.FinalizedCondition.True(&status)
-	opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinishedReason)
-	opv1alpha1.FinalizedCondition.Message(&status, summary)
-
+	// The outcome is asserted as soon as the terminal phase is reached: the work is over and the
+	// result will not change. The reason and message the phase handler recorded are left in place —
+	// they are the record of why the operation ended.
 	outcome.True(&status)
 
 	for cond, reason := range map[condition.Cond]string{
@@ -1969,7 +1940,59 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnap
 		cond.Message(&status, summary)
 	}
 
+	// Terminated is the separate question of whether the controller is done with the operation, so
+	// it is the only thing the terminal marker gates. Note that an operation is still cancellable in
+	// this window even though its outcome is already asserted — see cancelForDeletion.
+	terminated := ops.IsTerminated(&status.OperationStatus)
+
+	progressReason := opv1alpha1.FinalizingReason
+	if terminated {
+		progressReason = opv1alpha1.FinishedReason
+	}
+
+	opv1alpha1.PendingCondition.False(&status)
+	opv1alpha1.PendingCondition.Reason(&status, progressReason)
+	opv1alpha1.PendingCondition.Message(&status, summary)
+	opv1alpha1.InProgressCondition.False(&status)
+	opv1alpha1.InProgressCondition.Reason(&status, progressReason)
+	opv1alpha1.InProgressCondition.Message(&status, summary)
+
+	if !terminated {
+		opv1alpha1.FinalizedCondition.False(&status)
+
+		// Read the delegate back off the operation rather than remembering it on a condition: the
+		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
+		if _, delegate := lifecycleHookDelegate(op, terminalPhaseHookPrefixFor(status.Phase)); delegate != "" {
+			opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+			opv1alpha1.FinalizedCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
+		} else {
+			opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinalizingReason)
+			opv1alpha1.FinalizedCondition.Message(&status, "waiting for terminal handling to complete")
+		}
+
+		return status
+	}
+
+	opv1alpha1.FinalizedCondition.True(&status)
+	opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinishedReason)
+	opv1alpha1.FinalizedCondition.Message(&status, summary)
+
 	return status
+}
+
+// terminalPhaseHookPrefixFor returns the lifecycle-hook label prefix whose delegate can defer the
+// terminal handling of the given phase, or "" for a phase that has no terminal hook. Note there is
+// deliberately no hook for Finalized: hooks gate phases, and Finalized is a condition, not a phase.
+func terminalPhaseHookPrefixFor(phase opv1alpha1.OperationPhase) string {
+	switch phase {
+	case opv1alpha1.OperationPhaseSucceeded:
+		return planv1alpha1.SucceededPhaseHookLabelPrefix
+	case opv1alpha1.OperationPhaseFailed:
+		return planv1alpha1.FailedPhaseHookLabelPrefix
+	case opv1alpha1.OperationPhaseCanceled:
+		return planv1alpha1.CanceledPhaseHookLabelPrefix
+	}
+	return ""
 }
 
 // outcomeConditionFor maps a terminal phase to the condition that reports it, along with the

@@ -857,9 +857,19 @@ func TestHandleTerminal_DelegatedDefersTermination(t *testing.T) {
 			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
 			s := newScope(op, newBeacon(testOwnerKey, true))
 
-			got, err := tc.handle(h, s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+			// The outcome the phase handler recorded before delegating. It is the only record of
+			// why the operation ended, so delegating must not overwrite it — the delegate is
+			// reported on Finalized by updateStatus instead.
+			status := opv1alpha1.ETCDSnapshotRestoreStatus{}
+			tc.cond.True(&status)
+			tc.cond.Reason(&status, opv1alpha1.PlanFailedReason)
+			tc.cond.Message(&status, "the operative detail")
+
+			got, err := tc.handle(h, s, status)
 			assert.NoError(t, err)
-			assert.Equal(t, opv1alpha1.WaitingForDelegateReason, tc.cond.GetReason(&got))
+			assert.Equal(t, opv1alpha1.PlanFailedReason, tc.cond.GetReason(&got),
+				"the outcome reason must survive the delegation")
+			assert.Equal(t, "the operative detail", tc.cond.GetMessage(&got))
 			assert.True(t, got.TerminatedAt.IsZero(),
 				"terminal handling is still delegated, so it must not be recorded as complete")
 			if assert.Len(t, beacons.statusUpdates, 1, "the hook must push its delegate onto the beacon") {
@@ -949,7 +959,12 @@ func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 	status, err := h.OnChange(op, op.Status)
 	assert.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseCanceled, status.Phase)
-	assert.Equal(t, opv1alpha1.WaitingForDelegateReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	// The cancellation reason is the operation's outcome and must not be displaced by the delegate;
+	// the delegate is reported on Finalized, which is the thing still outstanding.
+	assert.Equal(t, opv1alpha1.OperationDeletedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	assert.Equal(t, "False", opv1alpha1.FinalizedCondition.GetStatus(&status))
+	assert.Equal(t, opv1alpha1.WaitingForDelegateReason, opv1alpha1.FinalizedCondition.GetReason(&status))
+	assert.Contains(t, opv1alpha1.FinalizedCondition.GetMessage(&status), "delegate-a")
 	assert.True(t, status.TerminatedAt.IsZero())
 	assert.Empty(t, controller.updates)
 
@@ -968,6 +983,10 @@ func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 	status, err = h.OnChange(op, op.Status)
 	assert.NoError(t, err)
 	assert.False(t, status.TerminatedAt.IsZero(), "the beacon has been released, so termination is recorded")
+	assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&status), "the delegate is gone, so the wait must resolve")
+	assert.Equal(t, opv1alpha1.FinishedReason, opv1alpha1.FinalizedCondition.GetReason(&status))
+	assert.Equal(t, opv1alpha1.OperationDeletedReason, opv1alpha1.CanceledCondition.GetReason(&status),
+		"the outcome reason must still be the one recorded at cancellation")
 	assert.NotEmpty(t, beacons.statusUpdates)
 	assert.Empty(t, controller.updates, "the terminal status is persisted before the finalizer is dropped")
 
@@ -1254,19 +1273,13 @@ func TestUpdateStatusTerminatedOutcome(t *testing.T) {
 	}
 }
 
-// TestUpdateStatusOutcomeAssertedOnlyOnceTerminated is the property a `kubectl wait
-// --for=condition=Succeeded` depends on: no outcome condition may read True until the operation is
-// terminated, so a waiter never unblocks while the beacon is still held or a terminal phase hook is
-// still delegated.
-func TestUpdateStatusOutcomeAssertedOnlyOnceTerminated(t *testing.T) {
+// TestUpdateStatusFinalizedOnlyOnceTerminated pins the split between the two questions a waiter
+// can ask. The outcome is asserted the moment the operation reaches its terminal phase, so
+// `kubectl wait --for=condition=Succeeded` unblocks as soon as the work is done; Finalized is the
+// one that waits for the controller to be finished with the operation, so pairing the two means
+// "succeeded and fully wrapped up".
+func TestUpdateStatusFinalizedOnlyOnceTerminated(t *testing.T) {
 	t.Parallel()
-
-	outcomes := []condition.Cond{
-		opv1alpha1.SucceededCondition,
-		opv1alpha1.FailedCondition,
-		opv1alpha1.CanceledCondition,
-		opv1alpha1.FinalizedCondition,
-	}
 
 	for _, phase := range []opv1alpha1.OperationPhase{
 		opv1alpha1.OperationPhasePending,
@@ -1284,10 +1297,16 @@ func TestUpdateStatusOutcomeAssertedOnlyOnceTerminated(t *testing.T) {
 				OperationStatus: opv1alpha1.OperationStatus{Phase: phase},
 			})
 
-			for _, cond := range outcomes {
-				assert.NotEqual(t, "True", cond.GetStatus(&got),
-					"%s must not be asserted before terminal handling completes", cond)
+			assert.NotEqual(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&got),
+				"Finalized must not be asserted before terminal handling completes")
+
+			if !ops.IsTerminal(phase) {
+				return
 			}
+
+			outcome, _ := outcomeConditionFor(phase)
+			assert.Equal(t, "True", outcome.GetStatus(&got),
+				"%s must be asserted as soon as the terminal phase is reached", outcome)
 		})
 	}
 }
