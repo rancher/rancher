@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"reflect"
 	"slices"
@@ -50,10 +51,22 @@ type keyCloakOIDCConfigInput struct {
 	OpenLdapConfig   *apiv3.LdapFields `json:"openLdapConfig,omitempty"`
 }
 
+type keyCloakOIDCConfigPresence struct {
+	ClientAuthenticatedSearch *bool `json:"clientAuthenticatedSearch,omitempty"`
+	Enabled                   *bool `json:"enabled,omitempty"`
+	LogoutAllEnabled          *bool `json:"logoutAllEnabled,omitempty"`
+	LogoutAllForced           *bool `json:"logoutAllForced,omitempty"`
+	LogoutAllSupported        *bool `json:"logoutAllSupported,omitempty"`
+}
+
 type keyCloakOIDCApplyInput struct {
 	OIDCConfig keyCloakOIDCConfigInput `json:"oidcConfig,omitempty"`
 	Code       string                  `json:"code,omitempty"`
 	Enabled    bool                    `json:"enabled,omitempty"`
+}
+
+type keyCloakOIDCApplyPresence struct {
+	OIDCConfig keyCloakOIDCConfigPresence `json:"oidcConfig,omitempty"`
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -103,8 +116,19 @@ func (k *keyCloakOIDCProvider) ActionHandler(actionName string, action *types.Ac
 }
 
 func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
+	body, err := io.ReadAll(request.Request.Body)
+	if err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			fmt.Sprintf("[keycloak oidc] testAndApply: failed to read body: %v", err))
+	}
+
 	oidcConfigApplyInput := &keyCloakOIDCApplyInput{}
-	if err := json.NewDecoder(request.Request.Body).Decode(oidcConfigApplyInput); err != nil {
+	if err := json.Unmarshal(body, oidcConfigApplyInput); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			fmt.Sprintf("[keycloak oidc] testAndApply: failed to parse body: %v", err))
+	}
+	presence := &keyCloakOIDCApplyPresence{}
+	if err := json.Unmarshal(body, presence); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("[keycloak oidc] testAndApply: failed to parse body: %v", err))
 	}
@@ -133,7 +157,7 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 	oidcConfig.Issuer = issuerURL.String()
 	storedConfig, err := k.getKeyCloakOIDCConfig()
 	if err == nil {
-		k.mergeStoredConfigDefaults(&oidcConfig, storedConfig, ldapConfigProvided)
+		k.mergeStoredConfigDefaults(&oidcConfig, storedConfig, ldapConfigProvided, &presence.OIDCConfig)
 	}
 
 	oidcLogin := &apiv3.OIDCLogin{Code: oidcConfigApplyInput.Code}
@@ -151,7 +175,7 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 		return err
 	}
 
-	if err := k.saveKeyCloakOIDCConfig(&oidcConfig, ldapConfigProvided); err != nil {
+	if err := k.saveKeyCloakOIDCConfig(&oidcConfig, ldapConfigProvided, &presence.OIDCConfig); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[keycloak oidc]: failed to save oidc config: %v", err))
 	}
 
@@ -354,12 +378,12 @@ func (k *keyCloakOIDCProvider) getKeyCloakOIDCConfig() (*apiv3.KeyCloakOIDCConfi
 	return storedConfig, nil
 }
 
-func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDCConfig, ldapConfigProvided bool) error {
+func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDCConfig, ldapConfigProvided bool, presence *keyCloakOIDCConfigPresence) error {
 	storedConfig, err := k.getKeyCloakOIDCConfig()
 	if err != nil {
 		return err
 	}
-	k.mergeStoredConfigDefaults(config, storedConfig, ldapConfigProvided)
+	k.mergeStoredConfigDefaults(config, storedConfig, ldapConfigProvided, presence)
 	if !validateScopes(config.Scopes) {
 		return fmt.Errorf("scopes are invalid: scopes must be space delimited and openid is a required scope. %s", config.Scopes)
 	}
@@ -542,7 +566,7 @@ func validateScopes(input string) bool {
 	return slices.Contains(values, "openid")
 }
 
-func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *apiv3.KeyCloakOIDCConfig, ldapConfigProvided bool) {
+func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *apiv3.KeyCloakOIDCConfig, ldapConfigProvided bool, presence *keyCloakOIDCConfigPresence) {
 	if config.AccessMode == "" {
 		config.AccessMode = storedConfig.AccessMode
 	}
@@ -561,7 +585,7 @@ func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *a
 	if config.Certificate == "" {
 		config.Certificate = storedConfig.Certificate
 	}
-	if !config.ClientAuthenticatedSearch {
+	if presence == nil || presence.ClientAuthenticatedSearch == nil {
 		config.ClientAuthenticatedSearch = storedConfig.ClientAuthenticatedSearch
 	}
 	if config.ClientID == "" {
@@ -576,7 +600,7 @@ func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *a
 	if config.EndSessionEndpoint == "" {
 		config.EndSessionEndpoint = storedConfig.EndSessionEndpoint
 	}
-	if config.Enabled == false {
+	if presence == nil || presence.Enabled == nil {
 		config.Enabled = storedConfig.Enabled
 	}
 	if config.Scopes == "" {
@@ -597,13 +621,13 @@ func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *a
 	if len(config.Labels) == 0 {
 		config.Labels = storedConfig.Labels
 	}
-	if !config.LogoutAllEnabled {
+	if presence == nil || presence.LogoutAllEnabled == nil {
 		config.LogoutAllEnabled = storedConfig.LogoutAllEnabled
 	}
-	if !config.LogoutAllForced {
+	if presence == nil || presence.LogoutAllForced == nil {
 		config.LogoutAllForced = storedConfig.LogoutAllForced
 	}
-	if !config.LogoutAllSupported {
+	if presence == nil || presence.LogoutAllSupported == nil {
 		config.LogoutAllSupported = storedConfig.LogoutAllSupported
 	}
 	if config.NameClaim == "" {

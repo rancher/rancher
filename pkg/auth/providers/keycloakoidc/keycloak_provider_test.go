@@ -366,7 +366,7 @@ func TestKeycloakOIDCProvider_MergeStoredConfigDefaultsPreservesScopes(t *testin
 		},
 	}
 
-	provider.mergeStoredConfigDefaults(config, stored, false)
+	provider.mergeStoredConfigDefaults(config, stored, false, &keyCloakOIDCConfigPresence{})
 
 	assert.Equal(t, "openid email", config.Scopes)
 	require.NotNil(t, config.GroupSearchEnabled)
@@ -383,7 +383,7 @@ func TestKeycloakOIDCProvider_MergeStoredConfigDefaultsRestoresOmittedScopes(t *
 		},
 	}
 
-	provider.mergeStoredConfigDefaults(config, stored, false)
+	provider.mergeStoredConfigDefaults(config, stored, false, &keyCloakOIDCConfigPresence{})
 
 	assert.Equal(t, "openid profile", config.Scopes)
 }
