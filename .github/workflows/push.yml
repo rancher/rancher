@@ -14,8 +14,9 @@ env:
   DOCKERIO_REGISTRY: "docker.io"
   AWS_DEFAULT_REGION: "us-east-1"
   REPOSITORY_OWNER: ${{ github.repository_owner }}
-  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE: ${{ github.repository_owner }}/rancher-server
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  IMAGE_DEMO: ${{ github.repository_owner }}/rancher
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   REGISTRY: "docker.io"
 jobs:
@@ -154,6 +155,10 @@ jobs:
       - name: merge agent manifests
         with:
           image: "${{ env.IMAGE_AGENT }}"
+        uses: ./.github/actions/merge-manifests
+      - name: merge demo manifests
+        with:
+          image: "${{ env.IMAGE_DEMO }}"
         uses: ./.github/actions/merge-manifests
       - name: merge installer manifests
         with:

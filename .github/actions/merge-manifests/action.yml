@@ -2,7 +2,7 @@ name: "Merge images manifests"
 description: "Merge docker amd64 and arm64 images manifest into a single multi-arch manifest"
 inputs:
   image:
-    description: "repository and image name e.g: rancher/rancher"
+    description: "repository and image name e.g: rancher/rancher-server"
     required: true
 runs:
   using: "composite"
