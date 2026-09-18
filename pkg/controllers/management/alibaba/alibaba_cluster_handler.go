@@ -137,6 +137,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	// get ali Cluster Config's phase
 	status, _ := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase := status["phase"]
+	message, _ := status["message"].(string)
 	failureMessage, _ := status["failureMessage"].(string)
 	if strings.Contains(failureMessage, "403") {
 		failureMessage = fmt.Sprintf("cannot access alibaba cloud, check cloud credential: %s", failureMessage)
@@ -155,7 +156,13 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster ACK [%s] to finish creating", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			if message != "" {
+				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, message)
+				if err != nil {
+					return cluster, err
+				}
+			}
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, message)
 		}
 		logrus.Infof("waiting for cluster ACK [%s] create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -244,33 +251,31 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster ACK [%s] to update", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		}
 		logrus.Infof("waiting for cluster ACK [%s] update failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionUpdated, failureMessage)
 	default:
-		if cluster.Spec.AliConfig.Imported {
-			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
-			if err != nil {
-				return cluster, err
+		statusMessage := message
+		if statusMessage == "" {
+			if cluster.Spec.AliConfig.Imported {
+				statusMessage = fmt.Sprintf("Waiting for cluster import [%s] to start", cluster.Name)
+			} else {
+				statusMessage = fmt.Sprintf("Waiting for cluster creation [%s] to start", cluster.Name)
 			}
-			logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-		} else {
-			logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
 		}
 
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-		if failureMessage == "" {
-			if cluster.Spec.AliConfig.Imported {
-				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
-				if err != nil {
-					return cluster, err
-				}
-				logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-			} else {
-				logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
+		if cluster.Spec.AliConfig.Imported {
+			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, statusMessage)
+			if err != nil {
+				return cluster, err
 			}
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			logrus.Infof("%s", statusMessage)
+		}
+
+		if failureMessage == "" {
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, statusMessage)
 		}
 		logrus.Infof("waiting for cluster ACK [%s] pre-create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -335,13 +340,15 @@ func (e *aliOperatorController) updateAliClusterConfig(cluster *apimgmtv3.Cluste
 		case event := <-w.ResultChan():
 			aliClusterConfigDynamic = event.Object.(*unstructured.Unstructured)
 			status, _ := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
-			if status["phase"] == "active" {
+			phase := status["phase"]
+			message, _ := status["message"].(string)
+			if phase == "active" {
 				continue
 			}
 
 			// this enqueue is necessary to ensure that the controller is reentered with the updating phase
 			e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		case <-timeout.C:
 			return cluster, nil
 		}

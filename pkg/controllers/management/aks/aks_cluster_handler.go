@@ -130,6 +130,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
+	message, _ := status["message"].(string)
 
 	switch phase {
 	case "creating":
@@ -140,7 +141,13 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster AKS [%s] to finish creating", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			if message != "" {
+				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionWaiting, message)
+				if err != nil {
+					return cluster, err
+				}
+			}
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, message)
 		}
 		logrus.Infof("waiting for cluster AKS [%s] create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -237,33 +244,32 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 		if failureMessage == "" {
 			logrus.Infof("waiting for cluster AKS [%s] to update", cluster.Name)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		}
 		logrus.Infof("waiting for cluster AKS [%s] update failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionUpdated, failureMessage)
 	default:
-		if cluster.Spec.AKSConfig.Imported {
-			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
-			if err != nil {
-				return cluster, err
+		statusMessage := message
+		if statusMessage == "" {
+			if cluster.Spec.AKSConfig.Imported {
+				statusMessage = fmt.Sprintf("Waiting for cluster import [%s] to start", cluster.Name)
+			} else {
+				statusMessage = fmt.Sprintf("Waiting for cluster creation [%s] to start", cluster.Name)
 			}
-			logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-		} else {
-			logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
 		}
 
 		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-		if failureMessage == "" {
-			if cluster.Spec.AKSConfig.Imported {
-				cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, "")
-				if err != nil {
-					return cluster, err
-				}
-				logrus.Infof("waiting for cluster import [%s] to start", cluster.Name)
-			} else {
-				logrus.Infof("waiting for cluster create [%s] to start", cluster.Name)
+
+		if cluster.Spec.AKSConfig.Imported {
+			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, statusMessage)
+			if err != nil {
+				return cluster, err
 			}
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, "")
+			logrus.Infof("%s", statusMessage)
+		}
+
+		if failureMessage == "" {
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, statusMessage)
 		}
 		logrus.Infof("waiting for cluster AKS [%s] pre-create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
@@ -309,13 +315,14 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *apimgmtv3.Cluste
 				return cluster, fmt.Errorf("unexpected nil cluster config")
 			}
 			status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
+			message, _ := status["message"].(string)
 			if status["phase"] == "active" {
 				continue
 			}
 
 			// this enqueue is necessary to ensure that the controller is reentered with the updating phase
 			e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
+			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, message)
 		case <-timeout.C:
 			cluster, err = e.recordAppliedSpec(cluster)
 			if err != nil {
