@@ -126,6 +126,8 @@ sources:
           printf 'wins'
         elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = true ]; then
           printf 'system-agent'
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = false ]; then
+          printf 'none'
         else
           printf 'wins and system-agent'
         fi
@@ -148,6 +150,8 @@ sources:
           printf '%s' "$wins_part"
         elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = true ]; then
           printf '%s' "$system_agent_part"
+        elif [ "$wins_changed" = false ] && [ "$system_agent_changed" = false ]; then
+          printf 'none'
         else
           printf '%s and %s' "$wins_part" "$system_agent_part"
         fi
