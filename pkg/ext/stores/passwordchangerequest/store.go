@@ -147,6 +147,11 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest("password cannot be the same as the username")
 	}
 
+	// A user changing their own password must choose a different password.
+	if userInfo.GetName() == req.Spec.UserID && req.Spec.NewPassword == req.Spec.CurrentPassword {
+		return nil, apierrors.NewBadRequest("new password must not be the same as the current password")
+	}
+
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
 	if dryRun {
