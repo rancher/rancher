@@ -388,8 +388,7 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 			return err
 		}
 	}
-	if ldapConfigProvided && reflect.DeepEqual(config.OpenLdapConfig, apiv3.LdapFields{}) &&
-		strings.HasPrefix(storedConfig.OpenLdapConfig.ServiceAccountPassword, common.SecretsNamespace+":") {
+	if ldapConfigProvided && reflect.DeepEqual(config.OpenLdapConfig, apiv3.LdapFields{}) {
 		if err := k.cleanupEmbeddedLDAPSecrets(config.Type); err != nil {
 			return err
 		}
@@ -496,33 +495,11 @@ func (k *keyCloakOIDCProvider) getLDAPGroupPrincipal(groupName string, token acc
 		return apiv3.Principal{}, false, err
 	}
 
-	matchSet := map[string]struct{}{}
-	matched := false
 	for _, principal := range principals {
 		if principal.ObjectMeta.Name == k.GetName()+"_"+GroupType+"://"+groupName ||
 			principal.DisplayName == groupName ||
 			principal.LoginName == groupName {
 			return k.groupToPrincipal(groupName, token), true, nil
-		}
-
-		matchName := strings.TrimSpace(principal.DisplayName)
-		if matchName == "" {
-			matchName = strings.TrimSpace(principal.LoginName)
-		}
-		if matchName == "" {
-			continue
-		}
-		if strings.Contains(matchName, groupName) {
-			matched = true
-			matchSet[matchName] = struct{}{}
-		}
-	}
-	if matched && len(matchSet) == 0 {
-		return k.groupToPrincipal(groupName, token), true, nil
-	}
-	if len(matchSet) == 1 {
-		for matchName := range matchSet {
-			return k.groupToPrincipal(matchName, token), true, nil
 		}
 	}
 
