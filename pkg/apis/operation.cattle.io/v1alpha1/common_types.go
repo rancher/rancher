@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +28,16 @@ type OperationSpec struct {
 	// A value == 0 expires immediately.
 	// +optional
 	TTL int64 `json:"ttl,omitempty"`
+}
+
+// ClusterRefKey renders a cluster reference for logs and status messages, omitting the namespace
+// for cluster-scoped references.
+func ClusterRefKey(ref *corev1.ObjectReference) string {
+	key := fmt.Sprintf("apiVersion=%s, kind=%s", ref.APIVersion, ref.Kind)
+	if ref.Namespace != "" {
+		key += fmt.Sprintf(", namespace=%s", ref.Namespace)
+	}
+	return key + fmt.Sprintf(", name=%s", ref.Name)
 }
 
 // OperationPhase represents the current phase of the operation.

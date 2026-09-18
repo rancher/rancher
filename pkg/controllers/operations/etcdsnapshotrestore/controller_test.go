@@ -1304,7 +1304,7 @@ func TestUpdateStatusFinalizedOnlyOnceTerminated(t *testing.T) {
 				return
 			}
 
-			outcome, _ := outcomeConditionFor(phase)
+			outcome, _ := opv1alpha1.OutcomeConditionFor(phase)
 			assert.Equal(t, "True", outcome.GetStatus(&got),
 				"%s must be asserted as soon as the terminal phase is reached", outcome)
 		})

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -46,6 +47,37 @@ func TestIsTerminated(t *testing.T) {
 
 			assert.Equal(t, tc.want, IsTerminated(&tc.status))
 		})
+	}
+}
+
+// TestTerminalPhaseHookPrefix covers the mapping the operation controllers use to report which
+// delegate is holding up finalization. The empty result for a non-terminal phase is load-bearing:
+// the callers feed it to a label-prefix lookup, and an empty prefix matches every label — so a
+// phase that has no terminal hook must not resolve to one.
+func TestTerminalPhaseHookPrefix(t *testing.T) {
+	t.Parallel()
+
+	cases := map[opv1alpha1.OperationPhase]string{
+		opv1alpha1.OperationPhaseSucceeded:  planv1alpha1.SucceededPhaseHookLabelPrefix,
+		opv1alpha1.OperationPhaseFailed:     planv1alpha1.FailedPhaseHookLabelPrefix,
+		opv1alpha1.OperationPhaseCanceled:   planv1alpha1.CanceledPhaseHookLabelPrefix,
+		opv1alpha1.OperationPhasePending:    "",
+		opv1alpha1.OperationPhaseInProgress: "",
+		"":                                  "",
+	}
+
+	for phase, want := range cases {
+		t.Run(string(phase), func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, want, TerminalPhaseHookPrefix(phase))
+		})
+	}
+
+	for phase := range cases {
+		if cases[phase] != "" {
+			assert.True(t, IsTerminal(phase), "every phase with a terminal hook must be terminal")
+		}
 	}
 }
 
