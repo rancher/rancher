@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -82,17 +83,13 @@ func TestWithOperationEnv(t *testing.T) {
 		t.Error("WithOperationEnv should return the plan it was given so it can wrap an AssignPlan argument")
 	}
 
-	// Every instruction which can carry environment must be scoped, and pre-existing entries must
-	// survive — the shutdown instruction relies on its data-directory variable.
-	if got := p.OneTimeInstructions[0].Env; len(got) != 2 || got[0] != env[0] || got[1] != env[1] {
-		t.Errorf("instruction without env = %v, want %v", got, env)
-	}
-	if got := p.OneTimeInstructions[1].Env; len(got) != 3 || got[0] != "RKE2_DATA_DIR=/var/lib/rancher/rke2" || got[1] != env[0] {
-		t.Errorf("instruction with existing env = %v, want its own entry followed by %v", got, env)
-	}
-	if got := p.PeriodicInstructions[0].Env; len(got) != 2 || got[0] != env[0] {
-		t.Errorf("periodic instruction env = %v, want %v", got, env)
-	}
+	assert.Equal(t, env, p.OneTimeInstructions[0].Env)
+	assert.Equal(t, []string{
+		"RKE2_DATA_DIR=/var/lib/rancher/rke2",
+		env[0],
+		env[1],
+	}, p.OneTimeInstructions[1].Env)
+	assert.Equal(t, env, p.PeriodicInstructions[0].Env)
 }
 
 func TestWithOperationEnvChangesPlanBytes(t *testing.T) {

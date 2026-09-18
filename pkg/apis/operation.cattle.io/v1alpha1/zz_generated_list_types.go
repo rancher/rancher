@@ -26,6 +26,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CertificateRotationList is a list of CertificateRotation resources
+type CertificateRotationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []CertificateRotation `json:"items"`
+}
+
+func NewCertificateRotation(namespace, name string, obj CertificateRotation) *CertificateRotation {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CertificateRotation").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ETCDSnapshotRestoreList is a list of ETCDSnapshotRestore resources
 type ETCDSnapshotRestoreList struct {
 	metav1.TypeMeta `json:",inline"`

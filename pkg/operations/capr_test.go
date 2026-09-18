@@ -76,6 +76,104 @@ func TestCAPRAdapter_ServerUnit(t *testing.T) {
 	}
 }
 
+func TestDistroManifestPaths(t *testing.T) {
+	t.Parallel()
+
+	rke2 := DistroManifestPaths(capr.RuntimeRKE2, "/custom/rke2")
+	assert.Equal(t, "/custom/rke2/agent/pod-manifests", rke2.StaticPodManifestDirectory)
+	assert.Equal(t, "/custom/rke2/server/manifests", rke2.GeneratedManifestDirectory)
+	assert.Equal(t, []string{"rke2-*.yaml"}, rke2.GeneratedManifestPatterns)
+
+	assert.Equal(t, ManifestPaths{}, DistroManifestPaths(capr.RuntimeK3S, "/custom/k3s"))
+}
+
+func TestDistroServices_RuntimeSpecificNamesDoNotCross(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+
+	rke2 := DistroServices(capr.RuntimeRKE2, controlPlane)
+	assert.Contains(t, rke2, "rke2-server")
+	assert.Contains(t, rke2, "rke2-controller")
+	assert.NotContains(t, rke2, "k3s-server", "RKE2 nodes must not expose K3s-specific service names")
+	assert.NotContains(t, rke2, "k3s-controller", "RKE2 nodes must not expose K3s-specific service names")
+
+	k3s := DistroServices(capr.RuntimeK3S, controlPlane)
+	assert.Contains(t, k3s, "k3s-server")
+	assert.Contains(t, k3s, "k3s-controller")
+	assert.NotContains(t, k3s, "rke2-server", "K3s nodes must not expose RKE2-specific service names")
+	assert.NotContains(t, k3s, "rke2-controller", "K3s nodes must not expose RKE2-specific service names")
+}
+
+func TestDistroServices_RoleSpecificAvailability(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"})
+	etcd := newSecret(map[string]string{capr.EtcdRoleLabel: "true"})
+	worker := newSecret(map[string]string{capr.WorkerRoleLabel: "true"})
+
+	// Worker-only nodes never run control-plane or etcd services. rke2-server is a logical
+	// certificate-rotation identifier here: it makes the worker restart its runtime agent after
+	// server certificates change; it does not mean an RKE2 server runs on the worker.
+	workerServices := DistroServices(capr.RuntimeRKE2, worker)
+	assert.Contains(t, workerServices, "rke2-server")
+	assert.NotContains(t, workerServices, "scheduler")
+	assert.NotContains(t, workerServices, "etcd")
+
+	// Control-plane nodes own the API server components but not etcd.
+	controlPlaneServices := DistroServices(capr.RuntimeRKE2, controlPlane)
+	assert.Contains(t, controlPlaneServices, "scheduler")
+	assert.Contains(t, controlPlaneServices, "controller-manager")
+	assert.NotContains(t, controlPlaneServices, "etcd")
+
+	// Etcd nodes own etcd but not the API server components.
+	etcdServices := DistroServices(capr.RuntimeRKE2, etcd)
+	assert.Contains(t, etcdServices, "etcd")
+	assert.NotContains(t, etcdServices, "scheduler")
+}
+
+func TestCAPRAdapter_RuntimeService(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		k8sVersion string
+		secret     *corev1.Secret
+		want       string
+	}{
+		{"rke2 control-plane", "v1.28.5+rke2r1", newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}), "rke2-server"},
+		{"rke2 etcd", "v1.28.5+rke2r1", newSecret(map[string]string{capr.EtcdRoleLabel: "true"}), "rke2-server"},
+		{"rke2 worker-only", "v1.28.5+rke2r1", newSecret(map[string]string{capr.WorkerRoleLabel: "true"}), "rke2-agent"},
+		{"k3s control-plane", "v1.28.5+k3s1", newSecret(map[string]string{capr.ControlPlaneRoleLabel: "true"}), "k3s"},
+		{"k3s worker-only", "v1.28.5+k3s1", newSecret(map[string]string{capr.WorkerRoleLabel: "true"}), "k3s-agent"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &CAPRAdapter{
+				controlPlane: &rkev1.RKEControlPlane{
+					Spec: rkev1.RKEControlPlaneSpec{
+						KubernetesVersion: tc.k8sVersion,
+					},
+				},
+			}
+			got := a.RuntimeService(tc.secret)
+			assert.Equal(t, tc.want, got, "RuntimeService mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestCAPRAdapter_ComponentTLSSettings_RenderConfigError(t *testing.T) {
+	t.Parallel()
+
+	adapter := &CAPRAdapter{
+		controlPlane: &rkev1.RKEControlPlane{},
+	}
+
+	_, err := adapter.ComponentTLSSettings(&corev1.Secret{}, KubeControllerManagerProbeName)
+	assert.Error(t, err)
+}
+
 // --- WaitForRegister ------------------------------------------------------------------------
 
 func newMachinePlanSecret(name, machineName string) *corev1.Secret {
@@ -86,11 +184,11 @@ func newMachinePlanSecret(name, machineName string) *corev1.Secret {
 			UID:       types.UID(name + "-uid"),
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "cluster.x-k8s.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				planv1alpha1.MachineLifecycleGroupLabel: "cluster.x-k8s.io",
-				planv1alpha1.MachineLifecycleKindLabel: "Machine",
-				planv1alpha1.MachineLifecycleNameLabel: machineName,
+				planv1alpha1.MachineLifecycleKindLabel:  "Machine",
+				planv1alpha1.MachineLifecycleNameLabel:  machineName,
 			},
 		},
 		Type: capr.SecretTypeMachinePlan,
@@ -240,8 +338,8 @@ func TestCAPRAdapter_WaitForRegister_MissingMachineNameLabel(t *testing.T) {
 			Namespace: "fleet-default",
 			Labels: map[string]string{
 				planv1alpha1.ClusterLifecycleGroupLabel: "management.cattle.io",
-				planv1alpha1.ClusterLifecycleKindLabel: "Cluster",
-				planv1alpha1.ClusterLifecycleNameLabel: "c-mine",
+				planv1alpha1.ClusterLifecycleKindLabel:  "Cluster",
+				planv1alpha1.ClusterLifecycleNameLabel:  "c-mine",
 				// No MachineNameLabel
 			},
 		},
@@ -487,6 +585,90 @@ func TestFilterField(t *testing.T) {
 			if tc.wantOK {
 				assert.Equal(t, tc.wantVal, gotVal, "value mismatch")
 			}
+		})
+	}
+}
+
+// --- ComponentTLSSettings ------------------------------------------------
+
+func TestComponentTLSSettingsFromRenderedConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		config    map[string]any
+		component string
+		want      ComponentTLSSettings
+	}{
+		{
+			name: "scheduler with []any config",
+			config: map[string]any{
+				KubeSchedulerArg: []any{
+					"secure-port=10262",
+					"tls-cert-file=/custom/ks.crt",
+					"tls-private-key-file=/custom/ks.key",
+				},
+			},
+			component: KubeSchedulerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10262",
+				TLSCertFile:       "/custom/ks.crt",
+				TLSPrivateKeyFile: "/custom/ks.key",
+			},
+		},
+		{
+			name: "controller-manager with []string config",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{
+					"secure-port=10261",
+					"tls-cert-file=/custom/kcm.crt",
+					"tls-private-key-file=/custom/kcm.key",
+				},
+			},
+			component: KubeControllerManagerProbeName,
+			want: ComponentTLSSettings{
+				SecurePort:        "10261",
+				TLSCertFile:       "/custom/kcm.crt",
+				TLSPrivateKeyFile: "/custom/kcm.key",
+			},
+		},
+		{
+			name: "string config value",
+			config: map[string]any{
+				KubeSchedulerArg: "secure-port=10262",
+			},
+			component: KubeSchedulerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10262"},
+		},
+		{
+			name: "cert-dir is ignored",
+			config: map[string]any{
+				KubeControllerManagerArg: []string{
+					"cert-dir=/custom",
+					"secure-port=10261",
+				},
+			},
+			component: KubeControllerManagerProbeName,
+			want:      ComponentTLSSettings{SecurePort: "10261"},
+		},
+		{
+			name:      "missing config key returns empty",
+			config:    map[string]any{},
+			component: KubeSchedulerProbeName,
+		},
+		{
+			name: "nil config value returns empty",
+			config: map[string]any{
+				KubeSchedulerArg: nil,
+			},
+			component: KubeSchedulerProbeName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := componentTLSSettingsFromRenderedConfig(tt.config, tt.component)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
