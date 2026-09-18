@@ -526,7 +526,8 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
         arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
         *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
     esac && \
-    curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
+    # Rancher's SSL_CERT_DIR interfers with curl
+    SSL_CERT_DIR= curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
     printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
     sha256sum -c etcd.sha256 && \
     rm etcd.sha256 && \
