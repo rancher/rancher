@@ -686,6 +686,7 @@ func principalDedupKey(principal apiv3.Principal) string {
 	if name == "" {
 		name = principal.ObjectMeta.Name
 	}
+	name = strings.ToLower(name)
 
 	return principal.Provider + "|" + principal.PrincipalType + "|" + name
 }
