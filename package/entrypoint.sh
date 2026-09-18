@@ -48,10 +48,7 @@ if [ -e /var/lib/rancher/k3s/server/db/etcd ]; then
   fi
   set -e
 fi
-if [ -x "$(command -v update-ca-certificates)" ]; then
-  update-ca-certificates
-fi
-if [ -x "$(command -v c_rehash)" ]; then
-  c_rehash
-fi
+
+update-ca-certificates
+
 exec catatonit -- rancher --http-listen-port=80 --https-listen-port=443 --audit-log-path=${AUDIT_LOG_PATH} --audit-level=${AUDIT_LEVEL} --audit-log-maxage=${AUDIT_LOG_MAXAGE} --audit-log-maxbackup=${AUDIT_LOG_MAXBACKUP} --audit-log-maxsize=${AUDIT_LOG_MAXSIZE} "${@}"
