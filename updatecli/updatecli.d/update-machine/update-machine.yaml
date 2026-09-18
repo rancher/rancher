@@ -59,7 +59,7 @@ sources:
             { echo "Rancher Machine tag does not exist: ${MACHINE_RELEASE_TAG}" >&2; exit 1; }
           printf '%s\n' "${MACHINE_RELEASE_TAG}"
         else
-          git ls-remote --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git | cut -f2 | sed -E "s#refs/tags/##; s/\\^\\{\\}$//" | sort -u | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+-rancher[0-9]+(\\.[0-9]+)?$" | sort -V | tail -n1
+          git ls-remote --tags https://github.com/{{ .repos.machine.owner }}/{{ .repos.machine.repo }}.git | cut -f2 | sed -E "s#refs/tags/##; s/\\^\\{\\}$//" | sort -u | grep -E "^v0.15.0-rancher137\\.([0-9]+)+.*$" | sort -V | tail -1
         fi
 
   machine-checksum-amd64:
