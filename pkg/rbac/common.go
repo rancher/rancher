@@ -43,6 +43,7 @@ const (
 	ClusterRoleOwnerLabel             = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
 	promotedSuffix                    = "promoted"
+	clusterScopedSuffix               = "cluster-scoped"
 	namespaceSuffix                   = "namespaces"
 	clusterManagementPlaneSuffix      = "cluster-mgmt"
 	projectManagementPlaneSuffix      = "project-mgmt"
@@ -673,6 +674,11 @@ func PromotedClusterRoleNameFor(s string) string {
 // NamespaceClusterRoleNameFor appends the namespace suffix to a string safely (ie <= 63 characters)
 func NamespaceClusterRoleNameFor(s string) string {
 	return wranglerName.SafeConcatName(s, namespaceSuffix)
+}
+
+// ClusterScopedClusterRoleNameFor appends the cluster scoped suffix to a string safely (ie <= 63 characters)
+func ClusterScopedClusterRoleNameFor(s string) string {
+	return wranglerName.SafeConcatName(s, clusterScopedSuffix)
 }
 
 // AggregatedClusterRoleNameFor appends the aggregation suffix to a string safely (ie <= 63 characters)

@@ -33,34 +33,51 @@ var (
 	errNotFound    = apierrors.NewNotFound(schema.GroupResource{}, "error")
 )
 
-func TestPRTBHandlerDoesRoleTemplateHavePromotedRules(t *testing.T) {
+func TestPRTBHandlerDoesRoleTemplateHaveRules(t *testing.T) {
 	tests := []struct {
-		name      string
-		rt        *v3.RoleTemplate
-		getCRFunc func() (*rbacv1.ClusterRole, error)
-		want      bool
-		wantErr   bool
+		name       string
+		rt         *v3.RoleTemplate
+		nameFunc   func(string) string
+		expectedCR string
+		getCRFunc  func() (*rbacv1.ClusterRole, error)
+		want       bool
+		wantErr    bool
 	}{
 		{
-			name:      "error getting cluster role",
-			rt:        defaultRT.DeepCopy(),
-			getCRFunc: func() (*rbacv1.ClusterRole, error) { return nil, errDefault },
-			want:      false,
-			wantErr:   true,
+			name:       "error getting cluster role",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.PromotedClusterRoleNameFor,
+			expectedCR: promotedCRName,
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return nil, errDefault },
+			want:       false,
+			wantErr:    true,
 		},
 		{
-			name:      "cluster role not found",
-			rt:        defaultRT.DeepCopy(),
-			getCRFunc: func() (*rbacv1.ClusterRole, error) { return nil, errNotFound },
-			want:      false,
-			wantErr:   false,
+			name:       "cluster role not found",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.PromotedClusterRoleNameFor,
+			expectedCR: promotedCRName,
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return nil, errNotFound },
+			want:       false,
+			wantErr:    false,
 		},
 		{
-			name:      "cluster role found",
-			rt:        defaultRT.DeepCopy(),
-			getCRFunc: func() (*rbacv1.ClusterRole, error) { return &rbacv1.ClusterRole{}, nil },
-			want:      true,
-			wantErr:   false,
+			name:       "promoted cluster role found",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.PromotedClusterRoleNameFor,
+			expectedCR: promotedCRName,
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return &rbacv1.ClusterRole{}, nil },
+			want:       true,
+			wantErr:    false,
+		},
+		{
+			name:       "cluster scoped cluster role found",
+			rt:         defaultRT.DeepCopy(),
+			nameFunc:   rbac.ClusterScopedClusterRoleNameFor,
+			expectedCR: "test-rt-cluster-scoped-aggregator",
+			getCRFunc:  func() (*rbacv1.ClusterRole, error) { return &rbacv1.ClusterRole{}, nil },
+			want:       true,
+			wantErr:    false,
 		},
 	}
 	for _, tt := range tests {
@@ -68,21 +85,21 @@ func TestPRTBHandlerDoesRoleTemplateHavePromotedRules(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.getCRFunc != nil {
-				crController.EXPECT().Get(promotedCRName, metav1.GetOptions{}).Return(tt.getCRFunc())
+				crController.EXPECT().Get(tt.expectedCR, metav1.GetOptions{}).Return(tt.getCRFunc())
 			}
 
 			p := &prtbHandler{
 				crClient: crController,
 			}
 
-			got, err := p.doesRoleTemplateHavePromotedRules(tt.rt)
+			got, err := p.doesRoleTemplateHaveRules(tt.rt, tt.nameFunc)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("prtbHandler.doesRoleTemplateHavePromotedRules() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("prtbHandler.doesRoleTemplateHaveRules() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("prtbHandler.doesRoleTemplateHavePromotedRules() = %v, want %v", got, tt.want)
+				t.Errorf("prtbHandler.doesRoleTemplateHaveRules() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -106,6 +123,83 @@ var (
 		RoleRef:  roleRef,
 	}
 )
+
+func TestPRTBHandlerReconcileClusterRoleBindingsWithClusterScopedRules(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
+	crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+	crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+
+	// ClusterScopedRules is set here to model a realistic RoleTemplate. The reconcile path itself keys off the presence
+	// of the aggregating cluster role (mocked below), not off the field, so the mocked Gets drive the behavior.
+	rt := defaultRT.DeepCopy()
+	rt.ClusterScopedRules = []rbacv1.PolicyRule{{
+		Verbs:     []string{"get"},
+		Resources: []string{"nodes"},
+	}}
+	rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(rt, nil)
+	crController.EXPECT().Get(promotedCRName, metav1.GetOptions{}).Return(nil, errNotFound)
+	crController.EXPECT().Get("test-rt-cluster-scoped-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+	crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+	crbController.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+	crbController.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+
+	expectedCRB, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(defaultPRTB.DeepCopy(), "test-rt-cluster-scoped")
+	if err != nil {
+		t.Fatalf("failed to build expected cluster role binding: %v", err)
+	}
+	AddAggregationFeatureLabel(expectedCRB)
+	crbController.EXPECT().Create(expectedCRB).Return(expectedCRB, nil)
+
+	p := &prtbHandler{
+		crClient:  crController,
+		crbClient: crbController,
+		rtClient:  rtController,
+	}
+	if err := p.reconcileClusterRoleBindings(defaultPRTB.DeepCopy()); err != nil {
+		t.Fatalf("reconcileClusterRoleBindings() error = %v", err)
+	}
+}
+
+// TestPRTBHandlerReconcileClusterRoleBindingsWithPromotedAndClusterScopedRules verifies that when a RoleTemplate has
+// both promoted and cluster scoped aggregating cluster roles, a ClusterRoleBinding is created for each of them.
+func TestPRTBHandlerReconcileClusterRoleBindingsWithPromotedAndClusterScopedRules(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
+	crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+	crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+
+	rtController.EXPECT().Get(defaultPRTB.RoleTemplateName, metav1.GetOptions{}).Return(defaultRT.DeepCopy(), nil)
+	// Both the promoted and cluster scoped aggregating cluster roles exist for this RoleTemplate.
+	crController.EXPECT().Get(promotedCRName, metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+	crController.EXPECT().Get("test-rt-cluster-scoped-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+	crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
+	crbController.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+	crbController.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+
+	expectedPromotedCRB, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(defaultPRTB.DeepCopy(), "test-rt-promoted")
+	if err != nil {
+		t.Fatalf("failed to build expected promoted cluster role binding: %v", err)
+	}
+	AddAggregationFeatureLabel(expectedPromotedCRB)
+	crbController.EXPECT().Create(expectedPromotedCRB).Return(expectedPromotedCRB, nil)
+
+	expectedClusterScopedCRB, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(defaultPRTB.DeepCopy(), "test-rt-cluster-scoped")
+	if err != nil {
+		t.Fatalf("failed to build expected cluster scoped cluster role binding: %v", err)
+	}
+	AddAggregationFeatureLabel(expectedClusterScopedCRB)
+	crbController.EXPECT().Create(expectedClusterScopedCRB).Return(expectedClusterScopedCRB, nil)
+
+	p := &prtbHandler{
+		crClient:  crController,
+		crbClient: crbController,
+		rtClient:  rtController,
+	}
+	if err := p.reconcileClusterRoleBindings(defaultPRTB.DeepCopy()); err != nil {
+		t.Fatalf("reconcileClusterRoleBindings() error = %v", err)
+	}
+}
 
 func TestPRTBHandlerEnsureOnlyDesiredRoleBindingsExist(t *testing.T) {
 	tests := []struct {
