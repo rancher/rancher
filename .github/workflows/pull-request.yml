@@ -17,7 +17,7 @@ env:
   HEAD_TAG: "head"
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
-  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE: ${{ github.repository_owner }}/rancher-server
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
