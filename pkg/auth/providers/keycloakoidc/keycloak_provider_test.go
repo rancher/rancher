@@ -351,19 +351,41 @@ func TestKeycloakOIDCProvider_TestAndApplyInvalidIssuer(t *testing.T) {
 
 func TestKeycloakOIDCProvider_MergeStoredConfigDefaultsPreservesScopes(t *testing.T) {
 	provider := &keyCloakOIDCProvider{}
-	config := &apiv3.KeyCloakOIDCConfig{}
+	config := &apiv3.KeyCloakOIDCConfig{
+		OIDCConfig: apiv3.OIDCConfig{
+			Scopes: "openid email",
+		},
+	}
 	stored := &apiv3.KeyCloakOIDCConfig{
 		OIDCConfig: apiv3.OIDCConfig{
 			Scopes:             "openid profile",
 			GroupSearchEnabled: ptrTo(true),
+		},
+		OpenLdapConfig: apiv3.LdapFields{
+			Servers: []string{"ldap.example.com"},
+		},
+	}
+
+	provider.mergeStoredConfigDefaults(config, stored, false)
+
+	assert.Equal(t, "openid email", config.Scopes)
+	require.NotNil(t, config.GroupSearchEnabled)
+	assert.True(t, *config.GroupSearchEnabled)
+	assert.Equal(t, []string{"ldap.example.com"}, config.OpenLdapConfig.Servers)
+}
+
+func TestKeycloakOIDCProvider_MergeStoredConfigDefaultsRestoresOmittedScopes(t *testing.T) {
+	provider := &keyCloakOIDCProvider{}
+	config := &apiv3.KeyCloakOIDCConfig{}
+	stored := &apiv3.KeyCloakOIDCConfig{
+		OIDCConfig: apiv3.OIDCConfig{
+			Scopes: "openid profile",
 		},
 	}
 
 	provider.mergeStoredConfigDefaults(config, stored, false)
 
 	assert.Equal(t, "openid profile", config.Scopes)
-	require.NotNil(t, config.GroupSearchEnabled)
-	assert.True(t, *config.GroupSearchEnabled)
 }
 
 func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {

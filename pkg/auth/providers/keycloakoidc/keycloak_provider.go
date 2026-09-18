@@ -131,11 +131,9 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 		return fmt.Errorf("[keycloak oidc]: issuer must be an absolute URL")
 	}
 	oidcConfig.Issuer = issuerURL.String()
-	if oidcConfig.Scopes == "" {
-		storedConfig, err := k.getKeyCloakOIDCConfig()
-		if err == nil {
-			k.mergeStoredConfigDefaults(&oidcConfig, storedConfig, ldapConfigProvided)
-		}
+	storedConfig, err := k.getKeyCloakOIDCConfig()
+	if err == nil {
+		k.mergeStoredConfigDefaults(&oidcConfig, storedConfig, ldapConfigProvided)
 	}
 
 	oidcLogin := &apiv3.OIDCLogin{Code: oidcConfigApplyInput.Code}
@@ -504,14 +502,18 @@ func (k *keyCloakOIDCProvider) getLDAPGroupPrincipal(groupName string, token acc
 		if principal.ObjectMeta.Name == k.GetName()+"_"+GroupType+"://"+groupName ||
 			principal.DisplayName == groupName ||
 			principal.LoginName == groupName {
+			return k.groupToPrincipal(groupName, token), true, nil
+		}
+
+		matchName := strings.TrimSpace(principal.DisplayName)
+		if matchName == "" {
+			matchName = strings.TrimSpace(principal.LoginName)
+		}
+		if matchName == "" {
+			continue
+		}
+		if strings.Contains(matchName, groupName) {
 			matched = true
-			matchName := strings.TrimSpace(principal.DisplayName)
-			if matchName == "" {
-				matchName = strings.TrimSpace(principal.LoginName)
-			}
-			if matchName == "" {
-				continue
-			}
 			matchSet[matchName] = struct{}{}
 		}
 	}
