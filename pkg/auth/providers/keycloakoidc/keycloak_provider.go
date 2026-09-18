@@ -524,10 +524,11 @@ func dedupePrincipals(principals []apiv3.Principal) []apiv3.Principal {
 	deduped := make([]apiv3.Principal, 0, len(principals))
 	seen := make(map[string]struct{}, len(principals))
 	for _, principal := range principals {
-		if _, ok := seen[principal.ObjectMeta.Name]; ok {
+		key := principalDedupKey(principal)
+		if _, ok := seen[key]; ok {
 			continue
 		}
-		seen[principal.ObjectMeta.Name] = struct{}{}
+		seen[key] = struct{}{}
 		deduped = append(deduped, principal)
 	}
 	return deduped
@@ -542,15 +543,109 @@ func validateScopes(input string) bool {
 }
 
 func (k *keyCloakOIDCProvider) mergeStoredConfigDefaults(config, storedConfig *apiv3.KeyCloakOIDCConfig, ldapConfigProvided bool) {
+	if config.AccessMode == "" {
+		config.AccessMode = storedConfig.AccessMode
+	}
+	if config.AcrValue == "" {
+		config.AcrValue = storedConfig.AcrValue
+	}
+	if len(config.AllowedPrincipalIDs) == 0 {
+		config.AllowedPrincipalIDs = storedConfig.AllowedPrincipalIDs
+	}
+	if len(config.Annotations) == 0 {
+		config.Annotations = storedConfig.Annotations
+	}
+	if config.AuthEndpoint == "" {
+		config.AuthEndpoint = storedConfig.AuthEndpoint
+	}
+	if config.Certificate == "" {
+		config.Certificate = storedConfig.Certificate
+	}
+	if !config.ClientAuthenticatedSearch {
+		config.ClientAuthenticatedSearch = storedConfig.ClientAuthenticatedSearch
+	}
+	if config.ClientID == "" {
+		config.ClientID = storedConfig.ClientID
+	}
+	if config.ClientSecret == "" {
+		config.ClientSecret = storedConfig.ClientSecret
+	}
+	if config.EmailClaim == "" {
+		config.EmailClaim = storedConfig.EmailClaim
+	}
+	if config.EndSessionEndpoint == "" {
+		config.EndSessionEndpoint = storedConfig.EndSessionEndpoint
+	}
+	if config.Enabled == false {
+		config.Enabled = storedConfig.Enabled
+	}
 	if config.Scopes == "" {
 		config.Scopes = storedConfig.Scopes
+	}
+	if config.GroupsClaim == "" {
+		config.GroupsClaim = storedConfig.GroupsClaim
 	}
 	if config.GroupSearchEnabled == nil {
 		config.GroupSearchEnabled = storedConfig.GroupSearchEnabled
 	}
+	if config.Issuer == "" {
+		config.Issuer = storedConfig.Issuer
+	}
+	if config.JWKSUrl == "" {
+		config.JWKSUrl = storedConfig.JWKSUrl
+	}
+	if len(config.Labels) == 0 {
+		config.Labels = storedConfig.Labels
+	}
+	if !config.LogoutAllEnabled {
+		config.LogoutAllEnabled = storedConfig.LogoutAllEnabled
+	}
+	if !config.LogoutAllForced {
+		config.LogoutAllForced = storedConfig.LogoutAllForced
+	}
+	if !config.LogoutAllSupported {
+		config.LogoutAllSupported = storedConfig.LogoutAllSupported
+	}
+	if config.NameClaim == "" {
+		config.NameClaim = storedConfig.NameClaim
+	}
+	if config.PKCEMethod == "" {
+		config.PKCEMethod = storedConfig.PKCEMethod
+	}
+	if config.PrivateKey == "" {
+		config.PrivateKey = storedConfig.PrivateKey
+	}
+	if config.RancherAPIHost == "" {
+		config.RancherAPIHost = storedConfig.RancherAPIHost
+	}
+	if config.RancherURL == "" {
+		config.RancherURL = storedConfig.RancherURL
+	}
+	if config.TokenEndpoint == "" {
+		config.TokenEndpoint = storedConfig.TokenEndpoint
+	}
+	if config.UserInfoEndpoint == "" {
+		config.UserInfoEndpoint = storedConfig.UserInfoEndpoint
+	}
 	if !ldapConfigProvided {
 		config.OpenLdapConfig = storedConfig.OpenLdapConfig
 	}
+}
+
+func principalDedupKey(principal apiv3.Principal) string {
+	if principal.PrincipalType != GroupType {
+		return principal.ObjectMeta.Name
+	}
+
+	name := strings.TrimSpace(principal.LoginName)
+	if name == "" {
+		name = strings.TrimSpace(principal.DisplayName)
+	}
+	if name == "" {
+		name = principal.ObjectMeta.Name
+	}
+
+	return principal.Provider + "|" + principal.PrincipalType + "|" + name
 }
 
 func (k *keyCloakOIDCProvider) cleanupEmbeddedLDAPSecrets(configType string) error {
