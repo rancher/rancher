@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -116,10 +115,6 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 	if ldapConfigProvided {
 		oidcConfig.OpenLdapConfig = *oidcConfigApplyInput.OIDCConfig.OpenLdapConfig
 	}
-	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
-		oidcConfig.GroupSearchEnabled = ptr.To(false)
-	}
-
 	if !validateScopes(oidcConfig.Scopes) {
 		return fmt.Errorf("scopes are invalid: scopes must be space delimited and openid is a required scope. %s", oidcConfig.Scopes)
 	}
@@ -361,6 +356,9 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.KeyCloakOIDCConfigType
 	config.ObjectMeta = storedConfig.ObjectMeta
+	if config.GroupSearchEnabled == nil {
+		config.GroupSearchEnabled = storedConfig.GroupSearchEnabled
+	}
 
 	if config.PrivateKey != "" {
 		name, err := common.CreateOrUpdateSecrets(k.Secrets, config.PrivateKey, strings.ToLower(client.KeyCloakOIDCConfigFieldPrivateKey), strings.ToLower(config.Type))
@@ -485,7 +483,7 @@ func (k *keyCloakOIDCProvider) getLDAPGroupPrincipal(groupName string, token acc
 		return apiv3.Principal{}, false, err
 	}
 
-	var matches []string
+	matchSet := map[string]struct{}{}
 	for _, principal := range principals {
 		if principal.ObjectMeta.Name == k.GetName()+"_"+GroupType+"://"+groupName ||
 			principal.DisplayName == groupName ||
@@ -497,11 +495,13 @@ func (k *keyCloakOIDCProvider) getLDAPGroupPrincipal(groupName string, token acc
 			if matchName == "" {
 				continue
 			}
-			matches = append(matches, matchName)
+			matchSet[matchName] = struct{}{}
 		}
 	}
-	if len(matches) == 1 {
-		return k.groupToPrincipal(matches[0], token), true, nil
+	if len(matchSet) == 1 {
+		for matchName := range matchSet {
+			return k.groupToPrincipal(matchName, token), true, nil
+		}
 	}
 
 	return apiv3.Principal{}, false, nil
