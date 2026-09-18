@@ -76,9 +76,24 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 	if !ok {
 		return
 	}
-	logrus.Infof("Stopping cluster agent for %s", obj.(*record).cluster.ClusterName)
-	obj.(*record).cancel()
-	m.controllers.Delete(cluster.UID)
+	m.stopRecord(obj.(*record))
+}
+
+// stopRecord stops r and removes it from the manager, but only if it is still the active record for
+// its cluster. Callbacks held by a record can outlive it - a deferred start reports a failure long
+// after it began - and tearing down whichever record happens to be current would stop controllers
+// that are working fine. The check and the removal have to be atomic, otherwise a replacement
+// installed in between would be the one deleted.
+//
+// Bailing out leaves nothing behind. The entry for a cluster only changes through this function and
+// through the LoadOrStore in start, which only fills an empty one, so a record that is no longer
+// the active one was already cancelled by whoever removed it.
+func (m *Manager) stopRecord(r *record) {
+	if !m.controllers.CompareAndDelete(r.clusterRec.UID, r) {
+		return
+	}
+	logrus.Infof("Stopping cluster agent for %s", r.cluster.ClusterName)
+	r.cancel()
 }
 
 func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
@@ -136,6 +151,11 @@ func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, control
 	}
 
 	obj, _ = m.controllers.LoadOrStore(cluster.UID, clusterRecord)
+	if obj.(*record) != clusterRecord {
+		// Another goroutine installed a record for this cluster first. The one just built was never
+		// started, but it holds a cancel func that would otherwise live as long as the manager.
+		clusterRecord.cancel()
+	}
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
 		m.markUnavailable(cluster.Name)
 		return nil, err
@@ -381,6 +401,17 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 		clusterRec: cluster,
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
+
+	clusterContext.OnDeferredStartError = func() {
+		logrus.Errorf("failed to start deferred controllers for cluster %s, stopping cluster agent so they are started again", cluster.Name)
+		// Dropping the record has to come first: it is what makes the next start build a new
+		// UserContext instead of finding this one and leaving it alone.
+		m.stopRecord(s)
+		// Ask for that start rather than waiting up to 30 seconds for the ownership reconcile to
+		// come round, which is documented as a temporary measure anyway. Only this path enqueues -
+		// an expected stop is followed by a start the caller is already making.
+		m.clusters.Controller().Enqueue("", cluster.Name)
+	}
 
 	return s, nil
 }
