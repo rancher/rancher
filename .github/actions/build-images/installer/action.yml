@@ -10,7 +10,7 @@ runs:
           echo "ARCH=amd64" >> $GITHUB_ENV
         fi
     - name: Setup Environment Variables
-      uses: ./.github/actions/setup-tag-env
+      uses: $/.github/actions/setup-tag-env
     - name: Docker meta
       id: meta
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0

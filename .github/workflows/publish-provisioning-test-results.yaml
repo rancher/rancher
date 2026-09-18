@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
 
       - name: Publish Test Results
-        uses: ./.github/actions/publish-provisioning-test-results
+        uses: $/.github/actions/publish-provisioning-test-results
         with:
           commit: ${{ github.event.workflow_run.head_sha }}
           event-name: ${{ github.event.workflow_run.event }}

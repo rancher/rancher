@@ -34,7 +34,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
+        uses: $/.github/actions/build-images/server
   build-agent:
     strategy:
       matrix:
@@ -52,7 +52,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: $/.github/actions/build-images/agent
   build-installer:
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
@@ -81,12 +81,12 @@ jobs:
     permissions:
       contents: read
     needs: [build-server, build-agent]
-    uses: ./.github/workflows/integration-tests.yml
+    uses: $/.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
       contents: read
     needs: [build-server, build-agent]
-    uses: ./.github/workflows/provisioning-tests.yml
+    uses: $/.github/workflows/provisioning-tests.yml
     with:
       EXPLICIT_SCOPES: "nightly"
 
@@ -111,7 +111,7 @@ jobs:
           persist-credentials: false
 
       - name: Publish Test Results
-        uses: ./.github/actions/publish-provisioning-test-results
+        uses: $/.github/actions/publish-provisioning-test-results
         with:
           commit: ${{ github.sha }}
           event-name: ${{ github.event_name }}
