@@ -352,6 +352,9 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	if err != nil {
 		return err
 	}
+	if !validateScopes(config.Scopes) {
+		return fmt.Errorf("scopes are invalid: scopes must be space delimited and openid is a required scope. %s", config.Scopes)
+	}
 
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
@@ -382,6 +385,7 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 		if err := k.cleanupEmbeddedLDAPSecrets(config.Type); err != nil {
 			return err
 		}
+		config.OpenLdapConfig = apiv3.LdapFields{}
 	}
 	if config.OpenLdapConfig.ServiceAccountPassword != "" {
 		name, err := common.CreateOrUpdateSecrets(
