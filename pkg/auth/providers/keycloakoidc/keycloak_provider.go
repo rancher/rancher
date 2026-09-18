@@ -53,7 +53,7 @@ type keyCloakOIDCApplyInput struct {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	p := &keyCloakOIDCProvider{
-		oidc.OpenIDCProvider{
+		OpenIDCProvider: oidc.OpenIDCProvider{
 			Name:        Name,
 			Type:        client.KeyCloakOIDCConfigType,
 			CTX:         ctx,

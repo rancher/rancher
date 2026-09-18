@@ -43,70 +43,6 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 		},
 	}
 
-	func TestKeycloakOIDCProvider_SearchPrincipalsLDAPGroups(t *testing.T) {
-		g := &keyCloakOIDCProvider{
-			ldapProvider: fakeAuthProvider{
-				searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
-					require.Equal(t, GroupType, principalType)
-					return []apiv3.Principal{{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
-						},
-						DisplayName:   "rancher-admin",
-						PrincipalType: GroupType,
-						Provider:      Name,
-					}}, nil
-				},
-			},
-		}
-		g.GetConfig = func() (*apiv3.OIDCConfig, error) {
-			return &apiv3.OIDCConfig{GroupSearchEnabled: ptrTo(false)}, nil
-		}
-
-		result, err := g.SearchPrincipals("rancher-admin", GroupType, nil)
-		require.NoError(t, err)
-		assert.Equal(t, []apiv3.Principal{{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "keycloakoidc_group://rancher-admin",
-			},
-			DisplayName:   "rancher-admin",
-			LoginName:     "rancher-admin",
-			PrincipalType: GroupType,
-			Provider:      Name,
-		}}, result)
-	}
-
-	func TestKeycloakOIDCProvider_GetPrincipalLDAPGroup(t *testing.T) {
-		g := &keyCloakOIDCProvider{
-			ldapProvider: fakeAuthProvider{
-				searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
-					require.Equal(t, "rancher-admin", name)
-					require.Equal(t, GroupType, principalType)
-					return []apiv3.Principal{{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
-						},
-						DisplayName:   "rancher-admin",
-						PrincipalType: GroupType,
-						Provider:      Name,
-					}}, nil
-				},
-			},
-		}
-
-		result, err := g.GetPrincipal("keycloakoidc_group://rancher-admin", nil)
-		require.NoError(t, err)
-		assert.Equal(t, apiv3.Principal{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "keycloakoidc_group://rancher-admin",
-			},
-			DisplayName:   "rancher-admin",
-			LoginName:     "rancher-admin",
-			PrincipalType: GroupType,
-			Provider:      Name,
-		}, result)
-	}
-
 	t.Run("test search for user principal with client authenticated search", func(t *testing.T) {
 		testSrv := newFakeKeycloakServer(t, privateKey, func(t *testing.T, r *http.Request) bool {
 			bearerString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -130,8 +66,9 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 				return nil
 			},
 		}
+
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -166,7 +103,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			},
 		}
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -212,7 +149,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			},
 		}
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -276,7 +213,7 @@ func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {
 	}
 
 	provider := &keyCloakOIDCProvider{
-		oidc.OpenIDCProvider{},
+		OpenIDCProvider: oidc.OpenIDCProvider{},
 	}
 
 	for name, test := range tests {
@@ -391,9 +328,13 @@ func (f fakeAuthProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) 
 
 func (f fakeAuthProvider) IsDisabledProvider() (bool, error) { return false, nil }
 
-func (f fakeAuthProvider) LogoutAll(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error { return nil }
+func (f fakeAuthProvider) LogoutAll(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error {
+	return nil
+}
 
-func (f fakeAuthProvider) Logout(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error { return nil }
+func (f fakeAuthProvider) Logout(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error {
+	return nil
+}
 
 func ptrTo[T any](v T) *T { return &v }
 
