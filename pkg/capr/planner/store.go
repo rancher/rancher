@@ -293,7 +293,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	// source of truth for convergence.  For "pending" (and for secrets where the key is
 	// absent entirely) fall back to checksum comparison so that older agents which apply
 	// the plan and update applied-checksum without ever writing plan-state are still
-	// recognised as InSync.
+	// recognized as InSync.
 	switch result.PlanState {
 	case planapi.PlanStateSucceeded:
 		result.InSync = true

@@ -346,7 +346,7 @@ func encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPla
 	}
 }
 
-// encryptionKeyRotationRestartNodes restarts the leader's server service, extracting the current stage afterwards.
+// encryptionKeyRotationRestartNodes restarts the leader's server service, extracting the current stage afterward.
 // The followers (if any exist) are subsequently restarted. Notably, if the encryption key rotation leader is not the init node,
 // it will restart the init node, then restart the encryption key rotation leader,
 // then finalize walking through etcd nodes (that are not controlplane), then finally controlplane nodes.
