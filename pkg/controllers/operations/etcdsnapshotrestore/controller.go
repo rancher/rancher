@@ -951,7 +951,24 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
 	} else {
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
-		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
+
+		// The snapshot records where it was written but never how to authenticate, so the adapter
+		// merges it with the cluster's own S3 configuration. The secret key is passed in the
+		// environment to keep it out of the restore command line.
+		s3Args, s3Env, s3Files, err := s.adapter.ToS3ArgsEnvAndFiles(secret, snapshot.SnapshotFile.S3, "etcd-", true)
+		if err != nil {
+			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: error rendering s3 configuration for snapshot %s/%s: %v",
+				s.op.Namespace, s.op.Name, snapshot.Namespace, snapshot.Name, err)
+
+			status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+			opv1alpha1.FailedCondition.True(&status)
+			opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.PlanFailedReason)
+			opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("error rendering s3 configuration for snapshot %s/%s: %v", snapshot.Namespace, snapshot.Name, err))
+
+			return status, nil
+		}
+
 		args = append(args, s3Args...)
 		env = append(env, s3Env...)
 		files = append(files, s3Files...)

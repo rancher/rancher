@@ -26,6 +26,10 @@ type stubSecretController struct {
 	cache generic.CacheInterface[*corev1.Secret]
 }
 
+func (s *stubSecretController) Cache() generic.CacheInterface[*corev1.Secret] {
+	return s.cache
+}
+
 func (s *stubSecretController) List(namespace string, opts metav1.ListOptions) (*corev1.SecretList, error) {
 	secrets, err := s.cache.List(namespace, nil)
 	if err != nil {

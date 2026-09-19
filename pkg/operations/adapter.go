@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -197,7 +198,26 @@ type Adapter interface {
 
 	LoopbackAddress(secret *corev1.Secret) string
 
-	ToS3ArgsEnvAndFiles(secret *corev1.Secret) ([]string, []string, []plan.File)
+	// ETCDSnapshotS3 returns the cluster's own etcd snapshot S3 configuration, or nil when the
+	// cluster does not snapshot to S3.
+	//
+	// For CAPR and imported clusters this is the S3 block of the cluster spec verbatim. CAPRKE2
+	// models S3 with secret references rather than a cloud credential, so its adapter returns the
+	// location fields only — credentials are resolved by ToS3ArgsEnvAndFiles, never here.
+	ETCDSnapshotS3() *rkev1.ETCDSnapshotS3
+
+	// ToS3ArgsEnvAndFiles renders the distro arguments, environment variables, and plan files
+	// needed to reach the S3 location described by s3, which is either the S3 block recorded on a
+	// snapshot being restored or (typically via ETCDSnapshotS3) the cluster's own configuration.
+	// A nil s3 falls back to the cluster's configuration entirely.
+	//
+	// Credentials always come from the cluster's configuration, because a snapshot only ever
+	// records where it was written, never how to authenticate.
+	//
+	// prefix is prepended to each argument name ("etcd-" yields --etcd-s3-bucket). Set
+	// secretKeyInEnv to keep the secret key out of the command line of anything that runs as an
+	// instruction; leave it unset when the arguments are folded into a config file.
+	ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error)
 }
 
 // NewAdapter returns an Adapter for the given cluster object.

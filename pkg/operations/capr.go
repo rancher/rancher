@@ -54,8 +54,32 @@ func (a *CAPRAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	return &unstructured.Unstructured{Object: ustr}, nil
 }
 
-func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(_ *corev1.Secret) (args []string, env []string, files []plan.File) {
-	return nil, nil, nil
+// ETCDSnapshotS3 returns the RKEControlPlane's etcd S3 configuration.
+func (a *CAPRAdapter) ETCDSnapshotS3() *rkev1.ETCDSnapshotS3 {
+	if a.controlPlane.Spec.ETCD == nil {
+		return nil
+	}
+	return a.controlPlane.Spec.ETCD.S3
+}
+
+// ToS3ArgsEnvAndFiles resolves s3 against the control plane's own S3 configuration and the cloud
+// credential either of them references. Rendered endpoint CA files land in the same location the
+// CAPR planner writes them to, so a CA the planner already placed on the node resolves to the
+// path the snapshot recorded.
+func (a *CAPRAdapter) ToS3ArgsEnvAndFiles(secret *corev1.Secret, s3 *rkev1.ETCDSnapshotS3, prefix string, secretKeyInEnv bool) ([]string, []string, []plan.File, error) {
+	target, err := ResolveS3Target(
+		a.clients.Core.Secret().Cache(),
+		s3,
+		a.ETCDSnapshotS3(),
+		a.controlPlane.Namespace,
+		path.Join(a.DistroDataDirectory(secret), EndpointCADirectory),
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	args, env, files := RenderS3(target, prefix, secretKeyInEnv)
+	return args, env, files, nil
 }
 
 func (a *CAPRAdapter) LoopbackAddress(_ *corev1.Secret) string {
