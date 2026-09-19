@@ -7,10 +7,10 @@ runs:
       shell: bash
       run: zypper install -y aws-cli
     - name: Setup Tag Env Variables
-      uses: ./.github/actions/setup-tag-env
+      uses: $/.github/actions/setup-tag-env
     - id: env
       name: Setup Dependencies Env Variables
-      uses: ./.github/actions/setup-build-env
+      uses: $/.github/actions/setup-build-env
     - name: Install Helm dependencies
       env:
          HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
