@@ -33,17 +33,15 @@ FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
 
 FROM registry.suse.com/bci/bci-micro:16.0 AS final
-RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
+FROM registry.suse.com/bci/bci-base:16.0 AS base-builder
 
-# Temporary build stage image
-FROM registry.suse.com/bci/bci-base:16.0 AS chroot-builder
+# Extend bci-nano base image by creating a chroot
+FROM base-builder AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
+RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ] # Assert that builder matches the target OS version
 
-# Assert that builder matches the target OS version
-RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ]
-
-# Install some packages with zypper in the chroot of the final micro image
+# Packages used in both images
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
       catatonit curl util-linux ca-certificates ca-certificates-mozilla findutils xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
@@ -63,294 +61,16 @@ RUN zypper --installroot /chroot -n in --no-recommends \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 
-FROM final AS builder
-COPY --from=chroot-builder-server /chroot/ /
-
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.26.6 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
 ENV GOCACHE=/root/.cache/go/cache
 
-FROM builder AS kdm
+FROM base-builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
-
-
-# Main stage using bci-micro as the base image
-FROM final AS base
-# Copy binaries and configuration files from builder to micro
-COPY --from=chroot-builder-server /chroot/ /
-
-# Test that some of the dependency binaries were copied
-# and are working on the target image.
-RUN /usr/bin/unshare --version && \
-    /usr/bin/mount --version && \
-    /usr/bin/umount --version && \
-    /usr/bin/nsenter --version
-
-# pkg/jailer expects /etc/nsswitch.conf; SLES 16 only ships it under /usr/etc.
-RUN cp /usr/etc/nsswitch.conf /etc/nsswitch.conf
-
-RUN useradd rancher && \
-    groupadd jail-accessors && \
-    usermod -aG jail-accessors rancher && \
-    mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
-    chgrp jail-accessors /var/lib/rancher /var/lib/cattle /usr/local/bin && \
-    chmod 750            /var/lib/rancher /var/lib/cattle /usr/local/bin && \
-    chmod g+s            /var/lib/rancher /var/lib/cattle /usr/local/bin
-
-RUN mkdir /root/.kube && \
-    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
-    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config && \
-    ln -s /usr/bin/rancher /usr/bin/reset-password && \
-    ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
-WORKDIR /var/lib/rancher
-
-ARG ARCH
-ARG ETCD_UNSUPPORTED_ARCH
-ARG IMAGE_REPO=rancher
-ARG IMAGE_NAME=rancher
-ARG CHART_DEFAULT_BRANCH
-ARG PARTNER_CHART_DEFAULT_BRANCH
-ARG RKE2_CHART_DEFAULT_BRANCH
-ARG CATTLE_KDM_BRANCH
-
-ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
-ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
-ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.4
-ENV CATTLE_MACHINE_CHECKSUM_amd64=1d961c67b3dfe0d7d7bdcae1256b96277f5948cf48e68a8c2eebd60baf9b9bc7
-ENV CATTLE_MACHINE_CHECKSUM_arm64=8e85bf417ace7a43b0f8b04ceb10065c8d92ddcd295ea9707018956b0202b2c5
-ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
-ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION=v3.6.12
-ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
-ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
-# For displaying Helm version in the UI only.
-ENV CATTLE_HELM_VERSION=v4.2.0
-# make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.9
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=159ec4d8c0d9dae8e322e7ddff64c0a5837c3dc209ae2e345128d4d5cb32279d
-ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=32a2d906bae047884c30dfd5370f83458edfc77e016b631dcdd46c9f98610951
-ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.5
-ENV CATTLE_WINS_AGENT_CHECKSUM=48ff26bd222f577f8963a019287d5611d5337c3b90f9bd76cc07145b7c5e5dc2
-ENV CATTLE_WINS_AGENT_CHECKSUM_install=551ab55e30f0fad203bedbee819662e198ba567f76cd0d31f71fc07dc309d45a
-ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=af543484cfd5c72556dedc677569e3eec5c537b011f9c96ca8974be6090869f7
-ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
-ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
-ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
-ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
-ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
-# make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.1
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=bfec66bf7146bd17a1c88b4fa789fe844db23ccf41a0ee210960b2f3663c53cf
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=fd88313c2a7a3374f0e28421499ce3f270594072515dc595b33af60701a9d8f8
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=8dbf0013663a08c31d31e8ebff4d94a6ac8fc6e986091356c23bd3ea165e7e01
-ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
-ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
-ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
-ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE=rancher/system-agent-installer-
-# make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
-ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
-ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
-ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION=110.0.0
-
-# AKS,EKS,GKE Operator charts versions
-ARG CATTLE_AKS_OPERATOR_VERSION
-ENV CATTLE_AKS_OPERATOR_VERSION=$CATTLE_AKS_OPERATOR_VERSION
-ARG CATTLE_EKS_OPERATOR_VERSION
-ENV CATTLE_EKS_OPERATOR_VERSION=$CATTLE_EKS_OPERATOR_VERSION
-ARG CATTLE_GKE_OPERATOR_VERSION
-ENV CATTLE_GKE_OPERATOR_VERSION=$CATTLE_GKE_OPERATOR_VERSION
-ARG CATTLE_ALI_OPERATOR_VERSION
-ENV CATTLE_ALI_OPERATOR_VERSION=$CATTLE_ALI_OPERATOR_VERSION
-
-
-RUN case "${ARCH}" in \
-        amd64) CATTLE_MACHINE_CHECKSUM="${CATTLE_MACHINE_CHECKSUM_amd64}" ;; \
-        arm64) CATTLE_MACHINE_CHECKSUM="${CATTLE_MACHINE_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz"  > /tmp/rancher-machine.tar.gz && \
-    printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
-    sha256sum -c machine.sha256 && \
-    rm machine.sha256 && \
-    tar xvzf /tmp/rancher-machine.tar.gz -C /usr/bin && \
-    rm /tmp/rancher-machine.tar.gz && \
-    chown root:root /usr/bin/rancher-machine
-
-RUN case "${ARCH}" in \
-        amd64) DOCKER_MACHINE_HARVESTER_CHECKSUM="${DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64}" ;; \
-        arm64) DOCKER_MACHINE_HARVESTER_CHECKSUM="${DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://github.com/harvester/docker-machine-driver-harvester/releases/download/${DOCKER_MACHINE_HARVESTER_VERSION}/docker-machine-driver-harvester-${ARCH}.tar.gz"  > /tmp/docker-machine-driver-harvester.tar.gz && \
-    printf "%s  %s\n" "${DOCKER_MACHINE_HARVESTER_CHECKSUM}" "/tmp/docker-machine-driver-harvester.tar.gz" > machine-harvester.sha256 && \
-    sha256sum -c machine-harvester.sha256 && \
-    rm machine-harvester.sha256 && \
-    tar xvzf /tmp/docker-machine-driver-harvester.tar.gz -C /opt/drivers/management-state/bin && \
-    mkdir -p /usr/share/rancher/ui-dashboard/assets/ && \
-    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
-    rm /tmp/docker-machine-driver-harvester.tar.gz
-
-
-# Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.4-k3s1 \
-    /bin/blkid \
-    /bin/bandwidth \
-    /bin/cni \
-    /bin/conntrack \
-    /bin/containerd \
-    /bin/containerd-shim-runc-v2 \
-    /bin/ethtool \
-    /bin/firewall \
-    /bin/ip \
-    /bin/ipset \
-    /bin/k3s \
-    /bin/losetup \
-    /bin/pigz \
-    /bin/runc \
-    /bin/which \
-    /bin/aux/iptables-apply \
-    /bin/aux/iptables-detect.sh \
-    /bin/aux/nft \
-    /bin/aux/xtables-set-mode.sh \
-    /bin/aux/xtables-legacy-multi \
-    /bin/aux/xtables-nft-multi \
-    /usr/bin/
-
-RUN ln -s /usr/bin/cni /usr/bin/bridge && \
-    ln -s /usr/bin/cni /usr/bin/flannel && \
-    ln -s /usr/bin/cni /usr/bin/host-local && \
-    ln -s /usr/bin/cni /usr/bin/loopback && \
-    ln -s /usr/bin/cni /usr/bin/portmap && \
-    ln -s /usr/bin/k3s /usr/bin/crictl && \
-    ln -s /usr/bin/k3s /usr/bin/ctr && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-    ln -s /usr/bin/k3s /usr/bin/kubectl && \
-    ln -s /usr/bin/pigz /usr/bin/unpigz && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
-    ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-save && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-restore-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-save && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-restore-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
-
-RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    case "${ARCH}" in \
-        amd64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_amd64}" ;; \
-        arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
-    printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
-    sha256sum -c etcd.sha256 && \
-    rm etcd.sha256 && \
-    tar xvzf /tmp/etcd.tar.gz --strip-components=1 --no-same-owner -C /usr/bin/ "etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl" && \
-    mkdir -p /var/lib/rancher-data/driver-metadata && \
-    rm /tmp/etcd.tar.gz
-
-ENV CATTLE_DASHBOARD_UI_VERSION=master
-
-ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
-
-# Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
-ENV CATTLE_BASE_UI_BRAND=
-
-# RKE2 Prime provisioning default, only set in prime installs
-ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=
-
-# Cluster Autoscaler related settings, only set in prime installs
-ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
-ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=
-
-# Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION=1.1.11
-
-RUN mkdir -p /var/log/auditlog
-ENV AUDIT_LOG_PATH=/var/log/auditlog/rancher-api-audit.log
-ENV AUDIT_LOG_MAXAGE=10
-ENV AUDIT_LOG_MAXBACKUP=10
-ENV AUDIT_LOG_MAXSIZE=100
-ENV AUDIT_LEVEL=0
-
-RUN mkdir -p /usr/share/rancher/ui-dashboard/api-ui && \
-    cd /usr/share/rancher/ui-dashboard/api-ui && \
-    curl -sL "https://releases.rancher.com/api-ui/${CATTLE_API_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=1 && \
-    mkdir -p /usr/share/rancher/ui-dashboard/dashboard && \
-    cd /usr/share/rancher/ui-dashboard/dashboard && \
-    curl -sL "https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=2 && \
-    ln -s dashboard/index.html ../index.html && \
-    ln -s dashboard/robots.txt ../robots.txt && \
-    ln -s dashboard/humans.txt ../humans.txt && \
-    ln -s dashboard/VERSION.txt ../VERSION.txt && \
-    cd ../assets && \
-    curl -sfL "${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64" -O && \
-    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_arm64}" "rancher-system-agent-arm64" > rancher-system-agent-arm64.sha256 && \
-    sha256sum -c rancher-system-agent-arm64.sha256 && \
-    rm rancher-system-agent-arm64.sha256 && \
-    curl -sfL "${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64" -O && \
-    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_amd64}" "rancher-system-agent-amd64" > rancher-system-agent-amd64.sha256 && \
-    sha256sum -c rancher-system-agent-amd64.sha256 && \
-    rm rancher-system-agent-amd64.sha256 && \
-    curl -sfL "${CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT}" -o system-agent-install.sh && \
-    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_install}" "system-agent-install.sh" > system-agent-install.sha256 && \
-    sha256sum -c system-agent-install.sha256 && \
-    rm system-agent-install.sha256 && \
-    curl -sfL "${CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT}" -o system-agent-uninstall.sh && \
-    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall}" "system-agent-uninstall.sh" > system-agent-uninstall.sha256 && \
-    sha256sum -c system-agent-uninstall.sha256 && \
-    rm system-agent-uninstall.sha256 && \
-    curl -sfL "https://github.com/rancher/wins/releases/download/${CATTLE_WINS_AGENT_VERSION}/wins.exe" -O && \
-    printf "%s  %s\n" "${CATTLE_WINS_AGENT_CHECKSUM}" "wins.exe" > wins.sha256 && \
-    sha256sum -c wins.sha256 && \
-    rm wins.sha256 && \
-    curl -sfL "https://acs-mirror.azureedge.net/csi-proxy/${CATTLE_CSI_PROXY_AGENT_VERSION}/binaries/csi-proxy-${CATTLE_CSI_PROXY_AGENT_VERSION}.tar.gz" -O && \
-    printf "%s  %s\n" "${CATTLE_CSI_PROXY_AGENT_CHECKSUM}" "csi-proxy-${CATTLE_CSI_PROXY_AGENT_VERSION}.tar.gz" > csi-proxy.sha256 && \
-    sha256sum -c csi-proxy.sha256 && \
-    rm csi-proxy.sha256 && \
-    curl -sfL "${CATTLE_WINS_AGENT_INSTALL_SCRIPT}" -o wins-agent-install.ps1 && \
-    printf "%s  %s\n" "${CATTLE_WINS_AGENT_CHECKSUM_install}" "wins-agent-install.ps1" > wins-install.sha256 && \
-    sha256sum -c wins-install.sha256 && \
-    rm wins-install.sha256 && \
-    curl -sfL "${CATTLE_WINS_AGENT_UNINSTALL_SCRIPT}" -o wins-agent-uninstall.ps1 && \
-    printf "%s  %s\n" "${CATTLE_WINS_AGENT_CHECKSUM_uninstall}" "wins-agent-uninstall.ps1" > wins-agent-uninstall.sha256 && \
-    sha256sum -c wins-agent-uninstall.sha256 && \
-    rm wins-agent-uninstall.sha256
-
-ENV CATTLE_CLI_URL_DARWIN=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
-ENV CATTLE_CLI_URL_LINUX=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
-ENV CATTLE_CLI_URL_WINDOWS=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
-
-COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
-
-ENV ETCDCTL_API=3
-
-ENV SSL_CERT_DIR=/etc/rancher/ssl
-ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 
 
 # Enable exporting of the k3s images as part of the build process.
@@ -432,7 +152,192 @@ COPY pkg/ pkg/
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
 
-FROM base AS server
+# Extract server chroot
+FROM scratch AS server
+COPY --from=chroot-builder-server /chroot/ /
+
+# Test that some of the dependency binaries were copied
+# and are working on the target image.
+RUN /usr/bin/unshare --version && \
+    /usr/bin/mount --version && \
+    /usr/bin/umount --version && \
+    /usr/bin/nsenter --version
+
+# pkg/jailer expects /etc/nsswitch.conf; SLES 16 only ships it under /usr/etc.
+RUN cp /usr/etc/nsswitch.conf /etc/nsswitch.conf
+
+RUN useradd rancher && \
+    groupadd jail-accessors && \
+    usermod -aG jail-accessors rancher && \
+    mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
+    chgrp jail-accessors /var/lib/rancher /var/lib/cattle /usr/local/bin && \
+    chmod 750            /var/lib/rancher /var/lib/cattle /usr/local/bin && \
+    chmod g+s            /var/lib/rancher /var/lib/cattle /usr/local/bin
+RUN ln -s /usr/bin/rancher /usr/bin/reset-password && \
+    ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
+WORKDIR /var/lib/rancher
+
+ARG ARCH
+ARG IMAGE_REPO=rancher
+ARG IMAGE_NAME=rancher-server
+ARG CHART_DEFAULT_BRANCH
+ARG PARTNER_CHART_DEFAULT_BRANCH
+ARG RKE2_CHART_DEFAULT_BRANCH
+ARG CATTLE_KDM_BRANCH
+
+ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
+ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
+ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.4
+ENV CATTLE_MACHINE_CHECKSUM_amd64=1d961c67b3dfe0d7d7bdcae1256b96277f5948cf48e68a8c2eebd60baf9b9bc7
+ENV CATTLE_MACHINE_CHECKSUM_arm64=8e85bf417ace7a43b0f8b04ceb10065c8d92ddcd295ea9707018956b0202b2c5
+ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
+ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
+# For displaying Helm version in the UI only.
+ENV CATTLE_HELM_VERSION=v4.2.0
+# make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.9
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64=159ec4d8c0d9dae8e322e7ddff64c0a5837c3dc209ae2e345128d4d5cb32279d
+ENV DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64=32a2d906bae047884c30dfd5370f83458edfc77e016b631dcdd46c9f98610951
+ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
+ENV CATTLE_WINS_AGENT_VERSION=v0.16.0-rc.5
+ENV CATTLE_WINS_AGENT_CHECKSUM=48ff26bd222f577f8963a019287d5611d5337c3b90f9bd76cc07145b7c5e5dc2
+ENV CATTLE_WINS_AGENT_CHECKSUM_install=551ab55e30f0fad203bedbee819662e198ba567f76cd0d31f71fc07dc309d45a
+ENV CATTLE_WINS_AGENT_CHECKSUM_uninstall=af543484cfd5c72556dedc677569e3eec5c537b011f9c96ca8974be6090869f7
+ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
+ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
+ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
+ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
+ENV CATTLE_CSI_PROXY_AGENT_CHECKSUM=e87a56f9317b73a6cce98a071b8482f27eae07e8bbd3932ab33cb00b13693b73
+# make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.16.0-rc.1
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_amd64=bfec66bf7146bd17a1c88b4fa789fe844db23ccf41a0ee210960b2f3663c53cf
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_arm64=fd88313c2a7a3374f0e28421499ce3f270594072515dc595b33af60701a9d8f8
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_install=8dbf0013663a08c31d31e8ebff4d94a6ac8fc6e986091356c23bd3ea165e7e01
+ENV CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall=ded6af4d28ab396dadf3f7c5871aa06c723275f9d7a4ec2d50d0fad9f52988d3
+ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
+ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
+ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE=rancher/system-agent-installer-
+# make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
+ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
+ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
+ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION=110.0.0
+
+# AKS,EKS,GKE Operator charts versions
+ARG CATTLE_AKS_OPERATOR_VERSION
+ENV CATTLE_AKS_OPERATOR_VERSION=$CATTLE_AKS_OPERATOR_VERSION
+ARG CATTLE_EKS_OPERATOR_VERSION
+ENV CATTLE_EKS_OPERATOR_VERSION=$CATTLE_EKS_OPERATOR_VERSION
+ARG CATTLE_GKE_OPERATOR_VERSION
+ENV CATTLE_GKE_OPERATOR_VERSION=$CATTLE_GKE_OPERATOR_VERSION
+ARG CATTLE_ALI_OPERATOR_VERSION
+ENV CATTLE_ALI_OPERATOR_VERSION=$CATTLE_ALI_OPERATOR_VERSION
+
+
+RUN case "${ARCH}" in \
+        amd64) CATTLE_MACHINE_CHECKSUM="${CATTLE_MACHINE_CHECKSUM_amd64}" ;; \
+        arm64) CATTLE_MACHINE_CHECKSUM="${CATTLE_MACHINE_CHECKSUM_arm64}" ;; \
+        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz"  > /tmp/rancher-machine.tar.gz && \
+    printf "%s  %s\n" "${CATTLE_MACHINE_CHECKSUM}" "/tmp/rancher-machine.tar.gz" > machine.sha256 && \
+    sha256sum -c machine.sha256 && \
+    rm machine.sha256 && \
+    tar xvzf /tmp/rancher-machine.tar.gz -C /usr/bin && \
+    rm /tmp/rancher-machine.tar.gz && \
+    chown root:root /usr/bin/rancher-machine
+
+RUN case "${ARCH}" in \
+        amd64) DOCKER_MACHINE_HARVESTER_CHECKSUM="${DOCKER_MACHINE_HARVESTER_CHECKSUM_amd64}" ;; \
+        arm64) DOCKER_MACHINE_HARVESTER_CHECKSUM="${DOCKER_MACHINE_HARVESTER_CHECKSUM_arm64}" ;; \
+        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/harvester/docker-machine-driver-harvester/releases/download/${DOCKER_MACHINE_HARVESTER_VERSION}/docker-machine-driver-harvester-${ARCH}.tar.gz"  > /tmp/docker-machine-driver-harvester.tar.gz && \
+    printf "%s  %s\n" "${DOCKER_MACHINE_HARVESTER_CHECKSUM}" "/tmp/docker-machine-driver-harvester.tar.gz" > machine-harvester.sha256 && \
+    sha256sum -c machine-harvester.sha256 && \
+    rm machine-harvester.sha256 && \
+    tar xvzf /tmp/docker-machine-driver-harvester.tar.gz -C /opt/drivers/management-state/bin && \
+    mkdir -p /usr/share/rancher/ui-dashboard/assets/ && \
+    ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
+    rm /tmp/docker-machine-driver-harvester.tar.gz
+
+
+ENV CATTLE_DASHBOARD_UI_VERSION=master
+
+ENV CATTLE_CLI_VERSION=v2.15.0-rc.1
+
+# Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
+ENV CATTLE_BASE_UI_BRAND=
+
+# RKE2 Prime provisioning default, only set in prime installs
+ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=
+
+# Cluster Autoscaler related settings, only set in prime installs
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY=
+ENV CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE=
+
+# Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
+ENV CATTLE_API_UI_VERSION=1.1.11
+
+RUN mkdir -p /var/log/auditlog
+ENV AUDIT_LOG_PATH=/var/log/auditlog/rancher-api-audit.log
+ENV AUDIT_LOG_MAXAGE=10
+ENV AUDIT_LOG_MAXBACKUP=10
+ENV AUDIT_LOG_MAXSIZE=100
+ENV AUDIT_LEVEL=0
+
+RUN mkdir -p /usr/share/rancher/ui-dashboard/api-ui && \
+    cd /usr/share/rancher/ui-dashboard/api-ui && \
+    curl -sL "https://releases.rancher.com/api-ui/${CATTLE_API_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=1 && \
+    mkdir -p /usr/share/rancher/ui-dashboard/dashboard && \
+    cd /usr/share/rancher/ui-dashboard/dashboard && \
+    curl -sL "https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz" | tar xvzf - --strip-components=2 && \
+    ln -s dashboard/index.html ../index.html && \
+    ln -s dashboard/robots.txt ../robots.txt && \
+    ln -s dashboard/humans.txt ../humans.txt && \
+    ln -s dashboard/VERSION.txt ../VERSION.txt && \
+    cd ../assets && \
+    curl -sfL "${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64" -O && \
+    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_arm64}" "rancher-system-agent-arm64" > rancher-system-agent-arm64.sha256 && \
+    sha256sum -c rancher-system-agent-arm64.sha256 && \
+    rm rancher-system-agent-arm64.sha256 && \
+    curl -sfL "${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64" -O && \
+    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_amd64}" "rancher-system-agent-amd64" > rancher-system-agent-amd64.sha256 && \
+    sha256sum -c rancher-system-agent-amd64.sha256 && \
+    rm rancher-system-agent-amd64.sha256 && \
+    curl -sfL "${CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT}" -o system-agent-install.sh && \
+    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_install}" "system-agent-install.sh" > system-agent-install.sha256 && \
+    sha256sum -c system-agent-install.sha256 && \
+    rm system-agent-install.sha256 && \
+    curl -sfL "${CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT}" -o system-agent-uninstall.sh && \
+    printf "%s  %s\n" "${CATTLE_SYSTEM_AGENT_CHECKSUM_uninstall}" "system-agent-uninstall.sh" > system-agent-uninstall.sha256 && \
+    sha256sum -c system-agent-uninstall.sha256 && \
+    rm system-agent-uninstall.sha256 && \
+    curl -sfL "https://github.com/rancher/wins/releases/download/${CATTLE_WINS_AGENT_VERSION}/wins.exe" -O && \
+    printf "%s  %s\n" "${CATTLE_WINS_AGENT_CHECKSUM}" "wins.exe" > wins.sha256 && \
+    sha256sum -c wins.sha256 && \
+    rm wins.sha256 && \
+    curl -sfL "https://acs-mirror.azureedge.net/csi-proxy/${CATTLE_CSI_PROXY_AGENT_VERSION}/binaries/csi-proxy-${CATTLE_CSI_PROXY_AGENT_VERSION}.tar.gz" -O && \
+    printf "%s  %s\n" "${CATTLE_CSI_PROXY_AGENT_CHECKSUM}" "csi-proxy-${CATTLE_CSI_PROXY_AGENT_VERSION}.tar.gz" > csi-proxy.sha256 && \
+    sha256sum -c csi-proxy.sha256 && \
+    rm csi-proxy.sha256 && \
+    curl -sfL "${CATTLE_WINS_AGENT_INSTALL_SCRIPT}" -o wins-agent-install.ps1 && \
+    printf "%s  %s\n" "${CATTLE_WINS_AGENT_CHECKSUM_install}" "wins-agent-install.ps1" > wins-install.sha256 && \
+    sha256sum -c wins-install.sha256 && \
+    rm wins-install.sha256 && \
+    curl -sfL "${CATTLE_WINS_AGENT_UNINSTALL_SCRIPT}" -o wins-agent-uninstall.ps1 && \
+    printf "%s  %s\n" "${CATTLE_WINS_AGENT_CHECKSUM_uninstall}" "wins-agent-uninstall.ps1" > wins-agent-uninstall.sha256 && \
+    sha256sum -c wins-agent-uninstall.sha256 && \
+    rm wins-agent-uninstall.sha256
+
+ENV CATTLE_CLI_URL_DARWIN=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_LINUX=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_WINDOWS=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
+
+COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
+
+ENV SSL_CERT_DIR=/etc/rancher/ssl
+
 ARG VERSION
 ARG BASE_REGISTRY
 ARG BASE_UI_BRAND
@@ -457,16 +362,12 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
-    --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
-COPY --chown=root:root --chmod=0755 \
     package/loglevel \
     package/entrypoint.sh \
     package/jailer.sh /usr/bin/
 
 VOLUME /var/lib/rancher-data/local-catalogs
 VOLUME /var/lib/rancher
-VOLUME /var/lib/kubelet
-VOLUME /var/lib/cni
 VOLUME /var/log
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
@@ -475,14 +376,12 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
     "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
     "org.opencontainers.image.version"=${VERSION} \
-    "org.opensuse.reference"=rancher/rancher:${VERSION}
+    "org.opensuse.reference"=${IMAGE_REPO}/${IMAGE_NAME}:${VERSION}
 ENTRYPOINT ["entrypoint.sh"]
 
 
-# Main stage using bci-micro as the base image.
-FROM final AS agent
-
-# Copy binaries and configuration files from zypper to micro.
+# Extract agent chroot
+FROM scratch AS agent
 COPY --from=chroot-builder-agent /chroot/ /
 
 # Test that some of the dependency binaries were copied
@@ -534,3 +433,107 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
 
 ENTRYPOINT ["run.sh"]
+
+
+FROM server AS demo
+ARG ETCD_UNSUPPORTED_ARCH
+
+ENV CATTLE_SERVER_IMAGE=${IMAGE_REPO}/rancher
+ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
+ENV ETCDCTL_API=3
+
+LABEL "org.opensuse.reference"=rancher/rancher:${VERSION}
+
+# Replace entrypoint
+COPY --chown=root:root --chmod=0755 \
+    package/entrypoint-demo.sh /usr/bin/entrypoint-demo.sh
+
+COPY --chown=root:root --chmod=0755 \
+    --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+#
+# Set up K3s: copy the necessary binaries from the K3s image.
+COPY --from=rancher/k3s:v1.36.4-k3s1 \
+    /bin/blkid \
+    /bin/bandwidth \
+    /bin/cni \
+    /bin/conntrack \
+    /bin/containerd \
+    /bin/containerd-shim-runc-v2 \
+    /bin/ethtool \
+    /bin/firewall \
+    /bin/ip \
+    /bin/ipset \
+    /bin/k3s \
+    /bin/losetup \
+    /bin/pigz \
+    /bin/runc \
+    /bin/which \
+    /bin/aux/iptables-apply \
+    /bin/aux/iptables-detect.sh \
+    /bin/aux/nft \
+    /bin/aux/xtables-set-mode.sh \
+    /bin/aux/xtables-legacy-multi \
+    /bin/aux/xtables-nft-multi \
+    /usr/bin/
+
+RUN ln -s /usr/bin/cni /usr/bin/bridge && \
+    ln -s /usr/bin/cni /usr/bin/flannel && \
+    ln -s /usr/bin/cni /usr/bin/host-local && \
+    ln -s /usr/bin/cni /usr/bin/loopback && \
+    ln -s /usr/bin/cni /usr/bin/portmap && \
+    ln -s /usr/bin/k3s /usr/bin/crictl && \
+    ln -s /usr/bin/k3s /usr/bin/ctr && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+    ln -s /usr/bin/k3s /usr/bin/kubectl && \
+    ln -s /usr/bin/pigz /usr/bin/unpigz && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
+    ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-save && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-restore-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-save && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-restore-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
+
+RUN mkdir /root/.kube && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config
+
+ENV CATTLE_ETCD_VERSION=v3.6.12
+ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
+ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
+RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
+    case "${ARCH}" in \
+        amd64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_amd64}" ;; \
+        arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
+        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
+    esac && \
+    # Rancher's SSL_CERT_DIR interfers with curl
+    SSL_CERT_DIR= curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
+    printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
+    sha256sum -c etcd.sha256 && \
+    rm etcd.sha256 && \
+    tar xvzf /tmp/etcd.tar.gz --strip-components=1 --no-same-owner -C /usr/bin/ "etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl" && \
+    mkdir -p /var/lib/rancher-data/driver-metadata && \
+    rm /tmp/etcd.tar.gz
+
+VOLUME /var/lib/kubelet
+VOLUME /var/lib/cni

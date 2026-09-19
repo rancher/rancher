@@ -14,30 +14,15 @@ env:
   DOCKERIO_REGISTRY: "docker.io"
   AWS_DEFAULT_REGION: "us-east-1"
   REPOSITORY_OWNER: ${{ github.repository_owner }}
-  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE: ${{ github.repository_owner }}/rancher-server
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  IMAGE_DEMO: ${{ github.repository_owner }}/rancher
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
   REGISTRY: "docker.io"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
-  build-server:
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
-    strategy:
-      matrix:
-        os: [linux]
-        arch: [x64, arm64]
-    env:
-      ARCH: ${{ matrix.arch }}
-      OS: ${{ matrix.os }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: setup and build
-        uses: ./.github/actions/build-images/server
-  build-agent:
+  build-images:
     strategy:
       matrix:
         os: [linux]
@@ -52,9 +37,9 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: ./.github/actions/build-images
   push-images:
-    needs: [unit-tests, build-server, build-agent]
+    needs: [unit-tests, build-images]
     strategy:
       matrix:
         os: [linux]
@@ -137,7 +122,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: build
-        uses: ./.github/actions/build-images/installer
+        uses: ./.github/actions/build-installer-image
   merge-server-agent-installer-manifests:
     needs: [push-images, build-installer]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -170,6 +155,10 @@ jobs:
       - name: merge agent manifests
         with:
           image: "${{ env.IMAGE_AGENT }}"
+        uses: ./.github/actions/merge-manifests
+      - name: merge demo manifests
+        with:
+          image: "${{ env.IMAGE_DEMO }}"
         uses: ./.github/actions/merge-manifests
       - name: merge installer manifests
         with:
