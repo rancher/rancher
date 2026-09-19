@@ -407,7 +407,13 @@ func TestClusterCustomization(t *testing.T) {
 func TestAssignWorkspace(t *testing.T) {
 	require := require.New(t)
 
-	h := &handler{}
+	ctrl := gomock.NewController(t)
+	nsClient := fake.NewMockNonNamespacedClientInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+	nsClient.EXPECT().Create(gomock.Any()).Return(&corev1.Namespace{}, nil).AnyTimes()
+
+	h := &handler{
+		namespacesClient: nsClient,
+	}
 
 	tests := []struct {
 		name    string

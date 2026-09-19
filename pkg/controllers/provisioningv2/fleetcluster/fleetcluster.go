@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -54,6 +55,7 @@ type handler struct {
 	clustersCache             v3.ClusterCache
 	hostGetter                ClusterHostGetter
 	secretsController         corecontrollers.SecretController
+	namespacesClient          corecontrollers.NamespaceClient
 	nodesController           corecontrollers.NodeController
 	fleetClusters             fleetcontrollers.ClusterController
 	getPrivateRepoURL         func(*provv1.Cluster, *apimgmtv3.Cluster) string
@@ -72,6 +74,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		clustersCache:             clients.Mgmt.Cluster().Cache(),
 		hostGetter:                fleetHostGetter{},
 		secretsController:         clients.Core.Secret(),
+		namespacesClient:          clients.Core.Namespace(),
 		nodesController:           clients.Core.Node(),
 		fleetClusters:             clients.Fleet.Cluster(),
 		getPrivateRepoPullSecrets: getPrivateRepoSecrets,
@@ -160,12 +163,33 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 			return cluster, nil
 		}
 
+		if err := h.ensureNamespace(def); err != nil {
+			return cluster, err
+		}
 		newCluster := cluster.DeepCopy()
 		newCluster.Spec.FleetWorkspaceName = def
 		return h.clusters.Update(newCluster)
 	}
 
+	if cluster.Spec.FleetWorkspaceName != "" {
+		if err := h.ensureNamespace(cluster.Spec.FleetWorkspaceName); err != nil {
+			return cluster, err
+		}
+	}
+
 	return cluster, nil
+}
+
+func (h *handler) ensureNamespace(name string) error {
+	_, err := h.namespacesClient.Create(&corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	})
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
 }
 
 func (h *handler) ensureAgentMigrated(key string, cluster *fleet.Cluster) (*fleet.Cluster, error) {
