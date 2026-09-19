@@ -34,6 +34,9 @@ const (
 	// BeaconLostReason surfaces when an operation fails because the beacon is lost.
 	BeaconLostReason = "BeaconLost"
 
+	// CanceledReason surfaces when an operation is canceled by an external actor.
+	CanceledReason = "Canceled"
+
 	// UnknownStepReason surfaces when an operation fails because the step is unknown.
 	UnknownStepReason = "UnknownStep"
 
