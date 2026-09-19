@@ -170,6 +170,28 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			wantCaPool: x509.NewCertPool(),
 			wantErr:    false,
 		},
+		{
+			name: "keycloak oidc nested ldap config is read",
+			fields: fields{
+				providerName: "keycloakoidc",
+				caPool:       x509.NewCertPool(),
+				certs:        DummyCerts,
+			},
+			objectMap: map[string]any{
+				"openLdapConfig": map[string]any{
+					"Certificate": DummyCerts,
+					"servers":     []string{"server1"},
+				},
+			},
+			wantStoredLdapConfig: &v3.LdapConfig{
+				LdapFields: v3.LdapFields{
+					Servers:     []string{"server1"},
+					Certificate: DummyCerts,
+				},
+			},
+			wantCaPool: x509.NewCertPool(),
+			wantErr:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -66,8 +67,9 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 				return nil
 			},
 		}
+
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -102,7 +104,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			},
 		}
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -148,7 +150,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			},
 		}
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -165,6 +167,248 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 		require.NoError(t, err, "SearchPrincipals() returned an error")
 		assert.Equal(t, result, expectedResult)
 	})
+}
+
+func TestKeycloakOIDCProvider_SearchPrincipalsLDAPGroups(t *testing.T) {
+	g := &keyCloakOIDCProvider{
+		ldapProvider: fakeAuthProvider{
+			searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+				require.Equal(t, GroupType, principalType)
+				return []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
+					},
+					DisplayName:   "rancher-admin",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				}}, nil
+			},
+		},
+	}
+	g.GetConfig = func() (*apiv3.OIDCConfig, error) {
+		return &apiv3.OIDCConfig{GroupSearchEnabled: ptrTo(false)}, nil
+	}
+
+	result, err := g.SearchPrincipals("rancher-admin", GroupType, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []apiv3.Principal{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "keycloakoidc_group://rancher-admin",
+		},
+		DisplayName:   "rancher-admin",
+		LoginName:     "rancher-admin",
+		PrincipalType: GroupType,
+		Provider:      Name,
+	}}, result)
+}
+
+func TestKeycloakOIDCProvider_SearchPrincipalsDedupesLDAPAndKeycloakGroups(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	testSrv := newFakeKeycloakServer(t, privateKey, func(t *testing.T, r *http.Request) bool {
+		bearerString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		claims := jwt.MapClaims{}
+		_, err := jwt.ParseWithClaims(bearerString, &claims, nil)
+		return errors.Is(err, jwt.ErrTokenUnverifiable) && claims["auth_provider"] == nil
+	})
+
+	g := &keyCloakOIDCProvider{
+		OpenIDCProvider: oidc.OpenIDCProvider{
+			Name: Name,
+			Type: client.KeyCloakOIDCConfigType,
+			TokenMgr: &fakeTokenManager{
+				getSecretFunc: func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
+					return "", apierrors.NewNotFound(core.Resource("Secret"), "cattle-tokens/"+provider)
+				},
+				createSecretFunc: func(userID, provider, secret string) error {
+					return nil
+				},
+			},
+		},
+		ldapProvider: fakeAuthProvider{
+			searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+				return []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
+					},
+					DisplayName:   "rancher-admin",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				}}, nil
+			},
+		},
+	}
+	g.GetConfig = func() (*apiv3.OIDCConfig, error) {
+		return testOIDCConfig(testSrv.URL, func(o *v3.OIDCConfig) {
+			o.ClientAuthenticatedSearch = true
+			o.GroupSearchEnabled = ptrTo(true)
+		}), nil
+	}
+
+	result, err := g.SearchPrincipals("rancher-admin", GroupType, nil)
+	require.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.Equal(t, "keycloakoidc_group://rancher-admin", result[0].ObjectMeta.Name)
+}
+
+func TestKeycloakOIDCProvider_GetPrincipalLDAPGroup(t *testing.T) {
+	g := &keyCloakOIDCProvider{
+		ldapProvider: fakeAuthProvider{
+			searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+				require.Equal(t, "rancher-admin", name)
+				require.Equal(t, GroupType, principalType)
+				return []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
+					},
+					DisplayName:   "rancher-admin",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				}}, nil
+			},
+		},
+	}
+
+	result, err := g.GetPrincipal("keycloakoidc_group://rancher-admin", nil)
+	require.NoError(t, err)
+	assert.Equal(t, apiv3.Principal{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "keycloakoidc_group://rancher-admin",
+		},
+		DisplayName:   "rancher-admin",
+		LoginName:     "rancher-admin",
+		PrincipalType: GroupType,
+		Provider:      Name,
+	}, result)
+}
+
+func TestKeycloakOIDCProvider_GetPrincipalLDAPGroupUnescapesName(t *testing.T) {
+	g := &keyCloakOIDCProvider{
+		ldapProvider: fakeAuthProvider{
+			searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+				require.Equal(t, "rancher/admin", name)
+				require.Equal(t, GroupType, principalType)
+				return []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "keycloakoidc_group://cn=rancher-admin,ou=groups,dc=example,dc=com",
+					},
+					DisplayName:   "rancher/admin",
+					PrincipalType: GroupType,
+					Provider:      Name,
+				}}, nil
+			},
+		},
+	}
+
+	result, err := g.GetPrincipal("keycloakoidc_group://rancher%2Fadmin", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "keycloakoidc_group://rancher/admin", result.ObjectMeta.Name)
+}
+
+func TestKeycloakOIDCProvider_GetLDAPGroupPrincipalDedupesEquivalentMatches(t *testing.T) {
+	g := &keyCloakOIDCProvider{
+		ldapProvider: fakeAuthProvider{
+			searchPrincipalsFunc: func(name, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
+				return []apiv3.Principal{
+					{
+						ObjectMeta:  metav1.ObjectMeta{Name: "keycloakoidc_group://cn=rancher-admin,ou=one,dc=example,dc=com"},
+						DisplayName: "rancher-admin",
+						LoginName:   "rancher-admin",
+					},
+					{
+						ObjectMeta:  metav1.ObjectMeta{Name: "keycloakoidc_group://cn=rancher-admin,ou=two,dc=example,dc=com"},
+						DisplayName: "rancher-admin",
+						LoginName:   "rancher-admin",
+					},
+				}, nil
+			},
+		},
+	}
+
+	principal, found, err := g.getLDAPGroupPrincipal("rancher-admin", nil)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "keycloakoidc_group://rancher-admin", principal.ObjectMeta.Name)
+}
+
+func TestKeycloakOIDCProvider_TestAndApplyInvalidScopes(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/v3/authConfigs/keycloakoidc?action=testAndApply",
+		io.NopCloser(strings.NewReader(`{
+		"oidcConfig": {
+			"issuer": "https://issuer.example.com/realms/test",
+			"clientId": "client-id",
+			"clientSecret": "secret",
+			"rancherUrl": "https://rancher.example.com/verify-auth",
+			"scope": "profile,email,openid"
+		}
+	}`)))
+	apiContext := &types.APIContext{Request: req, Response: httptest.NewRecorder()}
+
+	provider := &keyCloakOIDCProvider{}
+
+	err := provider.TestAndApply(apiContext)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "scopes are invalid")
+}
+
+func TestKeycloakOIDCProvider_TestAndApplyInvalidIssuer(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/v3/authConfigs/keycloakoidc?action=testAndApply",
+		io.NopCloser(strings.NewReader(`{
+		"oidcConfig": {
+			"issuer": "relative-issuer",
+			"clientId": "client-id",
+			"clientSecret": "secret",
+			"rancherUrl": "https://rancher.example.com/verify-auth",
+			"scope": "openid profile"
+		}
+	}`)))
+	apiContext := &types.APIContext{Request: req, Response: httptest.NewRecorder()}
+
+	provider := &keyCloakOIDCProvider{}
+
+	err := provider.TestAndApply(apiContext)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "issuer must be an absolute URL")
+}
+
+func TestKeycloakOIDCProvider_MergeStoredConfigDefaultsPreservesScopes(t *testing.T) {
+	provider := &keyCloakOIDCProvider{}
+	config := &apiv3.KeyCloakOIDCConfig{
+		OIDCConfig: apiv3.OIDCConfig{
+			Scopes: "openid email",
+		},
+	}
+	stored := &apiv3.KeyCloakOIDCConfig{
+		OIDCConfig: apiv3.OIDCConfig{
+			Scopes:             "openid profile",
+			GroupSearchEnabled: ptrTo(true),
+		},
+		OpenLdapConfig: apiv3.LdapFields{
+			Servers: []string{"ldap.example.com"},
+		},
+	}
+
+	provider.mergeStoredConfigDefaults(config, stored, false, &keyCloakOIDCConfigPresence{})
+
+	assert.Equal(t, "openid email", config.Scopes)
+	require.NotNil(t, config.GroupSearchEnabled)
+	assert.True(t, *config.GroupSearchEnabled)
+	assert.Equal(t, []string{"ldap.example.com"}, config.OpenLdapConfig.Servers)
+}
+
+func TestKeycloakOIDCProvider_MergeStoredConfigDefaultsRestoresOmittedScopes(t *testing.T) {
+	provider := &keyCloakOIDCProvider{}
+	config := &apiv3.KeyCloakOIDCConfig{}
+	stored := &apiv3.KeyCloakOIDCConfig{
+		OIDCConfig: apiv3.OIDCConfig{
+			Scopes: "openid profile",
+		},
+	}
+
+	provider.mergeStoredConfigDefaults(config, stored, false, &keyCloakOIDCConfigPresence{})
+
+	assert.Equal(t, "openid profile", config.Scopes)
 }
 
 func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {
@@ -212,7 +456,7 @@ func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {
 	}
 
 	provider := &keyCloakOIDCProvider{
-		oidc.OpenIDCProvider{},
+		OpenIDCProvider: oidc.OpenIDCProvider{},
 	}
 
 	for name, test := range tests {
@@ -281,6 +525,61 @@ func (m *fakeTokenManager) UpdateSecret(userID, provider, secret string) error {
 
 	return m.updateSecretFunc(userID, provider, secret)
 }
+
+type fakeAuthProvider struct {
+	searchPrincipalsFunc func(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error)
+}
+
+func (f fakeAuthProvider) GetName() string { return Name }
+
+func (f fakeAuthProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	return apiv3.Principal{}, nil, "", nil
+}
+
+func (f fakeAuthProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	if f.searchPrincipalsFunc == nil {
+		return nil, nil
+	}
+	return f.searchPrincipalsFunc(name, principalType, myToken)
+}
+
+func (f fakeAuthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	return apiv3.Principal{}, nil
+}
+
+func (f fakeAuthProvider) CustomizeSchema(schema *types.Schema) {}
+
+func (f fakeAuthProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
+	return authConfig, nil
+}
+
+func (f fakeAuthProvider) UsesUserSecrets() bool { return false }
+
+func (f fakeAuthProvider) CanRefreshPrincipals() bool { return false }
+
+func (f fakeAuthProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	return nil, nil
+}
+
+func (f fakeAuthProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []apiv3.Principal) (bool, error) {
+	return false, nil
+}
+
+func (f fakeAuthProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
+	return nil
+}
+
+func (f fakeAuthProvider) IsDisabledProvider() (bool, error) { return false, nil }
+
+func (f fakeAuthProvider) LogoutAll(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error {
+	return nil
+}
+
+func (f fakeAuthProvider) Logout(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error {
+	return nil
+}
+
+func ptrTo[T any](v T) *T { return &v }
 
 func TestGetRefreshAndUpdateTokenInvalidGrant(t *testing.T) {
 	t.Parallel()

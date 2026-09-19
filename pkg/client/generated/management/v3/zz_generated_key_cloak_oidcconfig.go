@@ -26,6 +26,7 @@ const (
 	KeyCloakOIDCConfigFieldLogoutAllSupported        = "logoutAllSupported"
 	KeyCloakOIDCConfigFieldName                      = "name"
 	KeyCloakOIDCConfigFieldNameClaim                 = "nameClaim"
+	KeyCloakOIDCConfigFieldOpenLdapConfig            = "openLdapConfig"
 	KeyCloakOIDCConfigFieldOwnerReferences           = "ownerReferences"
 	KeyCloakOIDCConfigFieldPKCEMethod                = "pkceMethod"
 	KeyCloakOIDCConfigFieldPrivateKey                = "privateKey"
@@ -65,6 +66,7 @@ type KeyCloakOIDCConfig struct {
 	LogoutAllSupported        bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                      string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NameClaim                 string            `json:"nameClaim,omitempty" yaml:"nameClaim,omitempty"`
+	OpenLdapConfig            *LdapFields       `json:"openLdapConfig,omitempty" yaml:"openLdapConfig,omitempty"`
 	OwnerReferences           []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PKCEMethod                string            `json:"pkceMethod,omitempty" yaml:"pkceMethod,omitempty"`
 	PrivateKey                string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`

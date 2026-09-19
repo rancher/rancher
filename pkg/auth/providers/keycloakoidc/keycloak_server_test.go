@@ -48,16 +48,25 @@ func newFakeKeycloakServer(t *testing.T, privateKey *rsa.PrivateKey, verifyFunc 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp.searchResults)
 	})
+	mux.HandleFunc("/admin/realms/testing/groups", func(w http.ResponseWriter, r *http.Request) {
+		if !verifyFunc(t, r) {
+			http.Error(w, "Failed to verify request", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp.groupSearchResults)
+	})
 
 	return server
 }
 
 type fakeOIDCResponses struct {
-	user          string
-	config        providerJSON
-	jwks          jsonWebKeySet
-	token         *Token
-	searchResults any
+	user               string
+	config             providerJSON
+	jwks               jsonWebKeySet
+	token              *Token
+	searchResults      any
+	groupSearchResults any
 }
 
 type Token struct {
@@ -129,6 +138,12 @@ func newOIDCResponses(t *testing.T, privateKey *rsa.PrivateKey, addr string) fak
 				"enabled":   true,
 				"firstName": "Testing",
 				"lastName":  "User",
+			},
+		},
+		groupSearchResults: []map[string]any{
+			{
+				"id":   "5d8f1b7a-2c6d-44c5-8a7b-fcb0bc3ac5a1",
+				"name": "rancher-admin",
 			},
 		},
 	}

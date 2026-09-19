@@ -53,6 +53,7 @@ var (
 		OpenLdapName:   "",
 		ShibbolethName: client.ShibbolethConfigFieldOpenLdapConfig,
 		OKTAName:       client.OKTAConfigFieldOpenLdapConfig,
+		"keycloakoidc": client.KeyCloakOIDCConfigFieldOpenLdapConfig,
 	}
 )
 
@@ -258,7 +259,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 	storedLdapConfigMap := u.UnstructuredContent()
 	storedLdapConfig := &v3.LdapConfig{}
 
-	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {
+	if p.usesEmbeddedLDAPConfig() && ldapConfigKey[p.providerName] != "" {
 		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
 		if !ok || subLdapConfig == nil {
 			return nil, nil, ErrorNotConfigured{}
@@ -327,6 +328,10 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 // if provider only enabled for search by a SAML provider
 func (p *ldapProvider) samlSearchProvider() bool {
 	return ShibbolethName == p.providerName || OKTAName == p.providerName
+}
+
+func (p *ldapProvider) usesEmbeddedLDAPConfig() bool {
+	return p.samlSearchProvider() || p.providerName == "keycloakoidc"
 }
 
 func (p *ldapProvider) samlSearchGetPrincipal(
