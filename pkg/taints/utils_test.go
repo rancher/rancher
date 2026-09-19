@@ -77,6 +77,57 @@ func TestMergeTaints(t *testing.T) {
 	}
 }
 
+func TestIsTransient(t *testing.T) {
+	testCases := []struct {
+		key      string
+		expected bool
+	}{
+		// node lifecycle taints, added and removed by a controller
+		{key: "node.kubernetes.io/not-ready", expected: true},
+		{key: "node.kubernetes.io/unreachable", expected: true},
+		{key: "node.kubernetes.io/memory-pressure", expected: true},
+		{key: "node.kubernetes.io/unschedulable", expected: true},
+		{key: "node.cloudprovider.kubernetes.io/uninitialized", expected: true},
+		{key: "node.cloudprovider.kubernetes.io/shutdown", expected: true},
+		// durable taints, set by the role configuration or an administrator
+		{key: "node-role.kubernetes.io/control-plane", expected: false},
+		{key: "node-role.kubernetes.io/controlplane", expected: false},
+		{key: "node-role.kubernetes.io/etcd", expected: false},
+		{key: "node.cilium.io/agent-not-ready", expected: false},
+		{key: "dedicated", expected: false},
+		// the prefixes must not match partial path segments
+		{key: "node.kubernetes.iofoo/bar", expected: false},
+		{key: "node.cloudprovider.kubernetes.iofoo/bar", expected: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.key, func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsTransient(v1.Taint{Key: tc.key, Effect: v1.TaintEffectNoSchedule}))
+		})
+	}
+}
+
+func TestSort(t *testing.T) {
+	taints := []v1.Taint{
+		{Key: "b", Value: "v2", Effect: v1.TaintEffectNoSchedule},
+		{Key: "a", Value: "", Effect: v1.TaintEffectNoExecute},
+		{Key: "b", Value: "v1", Effect: v1.TaintEffectNoSchedule},
+		{Key: "a", Value: "", Effect: v1.TaintEffectNoSchedule},
+	}
+	expected := []v1.Taint{
+		{Key: "a", Value: "", Effect: v1.TaintEffectNoExecute},
+		{Key: "a", Value: "", Effect: v1.TaintEffectNoSchedule},
+		{Key: "b", Value: "v1", Effect: v1.TaintEffectNoSchedule},
+		{Key: "b", Value: "v2", Effect: v1.TaintEffectNoSchedule},
+	}
+
+	Sort(taints)
+	assert.Equal(t, expected, taints)
+
+	// sorting is idempotent, whatever the input order
+	Sort(taints)
+	assert.Equal(t, expected, taints)
+}
+
 func getUniqueSet(set map[string]int) map[string]struct{} {
 	rtn := make(map[string]struct{}, len(set))
 	for key := range set {

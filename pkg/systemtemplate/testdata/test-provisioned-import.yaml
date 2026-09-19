@@ -160,6 +160,8 @@ spec:
       - effect: PreferNoSchedule
         key: key2
         operator: Exists
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: "Exists"
       initContainers:
       - name: rancher-charts-copy
         image: 
