@@ -114,6 +114,22 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 	if config.GroupMemberMappingAttribute != "" && !ldap.IsValidAttr(config.GroupMemberMappingAttribute) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupMemberMappingAttribute")
 	}
+	if config.UserIDAttribute != "" && !ldap.IsValidAttr(config.UserIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userIDAttribute")
+	}
+	if config.GroupIDAttribute != "" && !ldap.IsValidAttr(config.GroupIDAttribute) {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid groupIDAttribute")
+	}
+
+	storedADConfig, _, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		return err
+	}
+	if storedADConfig.Enabled && configApplyInput.Enabled {
+		if err := validateIDAttributesUnchanged(storedADConfig, config); err != nil {
+			return err
+		}
+	}
 
 	if config.UserLoginFilter != "" {
 		if _, err := ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
@@ -186,6 +202,18 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// validateIDAttributesUnchanged rejects changes to the principal identifier attributes of an enabled provider.
+// Changing them would orphan every binding that references the old principal names.
+func validateIDAttributesUnchanged(stored, incoming *v32.ActiveDirectoryConfig) error {
+	if incoming.UserIDAttribute != stored.UserIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "userIDAttribute cannot be changed on an enabled provider")
+	}
+	if incoming.GroupIDAttribute != stored.GroupIDAttribute {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "groupIDAttribute cannot be changed on an enabled provider")
 	}
 	return nil
 }
