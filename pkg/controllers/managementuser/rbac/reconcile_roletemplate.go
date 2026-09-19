@@ -104,36 +104,50 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		return nil, nil
 	}
 
-	var roleVerb, roleSuffix string
+	var hasCreate, hasEdit, hasDelete bool
 	for _, r := range rts {
 		for _, rule := range r.Rules {
 			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
 			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
-			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
-				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
-					roleVerb = "*"
-					roles.Insert("create-ns")
-					if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
-						createNSRT, err := m.rtLister.Get("create-ns")
-						if err != nil {
-							return nil, err
-						}
-						if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
-							return nil, err
-						}
-					}
-					break
-				}
+			if !hasNamespaceGroup || !hasNamespaceResources || len(rule.ResourceNames) != 0 {
+				continue
 			}
 
+			ruleVerbs := sets.New(rule.Verbs...)
+			if ruleVerbs.HasAny("*", "create") {
+				hasCreate = true
+			}
+			if ruleVerbs.HasAny("*", "patch", "update") {
+				hasEdit = true
+			}
+			if ruleVerbs.HasAny("*", "delete", "deletecollection") {
+				hasDelete = true
+			}
 		}
 	}
-	if roleVerb == "" {
-		roleVerb = "get"
+
+	if hasCreate {
+		roles.Insert("create-ns")
+		if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
+			createNSRT, err := m.rtLister.Get("create-ns")
+			if err != nil {
+				return nil, err
+			}
+			if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
+				return nil, err
+			}
+		}
 	}
-	roleSuffix = projectNSVerbToSuffix[roleVerb]
-	role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
-	roles.Insert(role)
+
+	// Every project member gets read access to the project's namespaces regardless of which
+	// write verbs (if any) their RoleTemplate grants.
+	roles.Insert(fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix[getVerb]))
+	if hasEdit {
+		roles.Insert(fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix[editVerb]))
+	}
+	if hasDelete {
+		roles.Insert(fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix[deleteVerb]))
+	}
 
 	for _, rt := range rts {
 		// Get the rules of the RoleTemplate
