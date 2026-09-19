@@ -9,12 +9,41 @@ metadata:
   labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
-  {{- /*
-  If service.type is not provided this attribute is ommitted and k8s default of ClusterIP is used.
-  */}} 
   {{- if .Values.service.type }}
   type: {{ .Values.service.type }}
   {{- end }}
+  {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
+  {{- if not (default .Values.service.disableHTTP false) }}
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+    {{- if .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+    {{- if .Values.service.nodePortHttps }}
+    nodePort: {{ .Values.service.nodePortHttps }}
+    {{- else if .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
+  {{- else }}
+  ports:
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+    {{- if .Values.service.nodePortHttps }}
+    nodePort: {{ .Values.service.nodePortHttps }}
+    {{- else if .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
+  {{- end }}
+  {{- else }}
   ports:
   {{- if not (default .Values.service.disableHTTP false) }}
   - port: 80
@@ -26,6 +55,7 @@ spec:
     targetPort: 443
     protocol: TCP
     name: https
+  {{- end }}
   selector:
     app: {{ template "rancher.fullname" . }}
 

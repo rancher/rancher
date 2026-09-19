@@ -137,6 +137,19 @@ gateway:
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP
 service:
   type: ""
+
+  # NodePort for HTTP (port 80)
+  # Only applies when service.type is NodePort
+  # Range: 30000-32767
+  # If not specified, Kubernetes will auto-assign
+  nodePort: 30006
+
+  # NodePort for HTTPS (port 443)
+  # Only applies when service.type is NodePort
+  # Allows separate nodePorts for HTTP and HTTPS
+  # If not specified, falls back to nodePort value
+  nodePortHttps: 30007
+
   annotations: {}
   # An optional security setting to disables the HTTP port of the rancher service
   # When set true, you must also set `ingress.servicePort` to 443 and the appropriate ingress annotation to use HTTPS
