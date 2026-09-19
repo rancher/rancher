@@ -59,6 +59,7 @@ type Interface interface {
 	KontainerDriver() KontainerDriverController
 	LocalProvider() LocalProviderController
 	ManagedChart() ManagedChartController
+	Migration() MigrationController
 	Node() NodeController
 	NodeDriver() NodeDriverController
 	OIDCClient() OIDCClientController
@@ -201,6 +202,10 @@ func (v *version) LocalProvider() LocalProviderController {
 
 func (v *version) ManagedChart() ManagedChartController {
 	return generic.NewController[*v3.ManagedChart, *v3.ManagedChartList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, v.controllerFactory)
+}
+
+func (v *version) Migration() MigrationController {
+	return generic.NewNonNamespacedController[*v3.Migration, *v3.MigrationList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Migration"}, "migrations", v.controllerFactory)
 }
 
 func (v *version) Node() NodeController {
