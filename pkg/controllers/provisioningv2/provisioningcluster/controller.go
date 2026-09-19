@@ -79,6 +79,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		clients.Apply.
 			// Because capi wants to own objects we don't set ownerreference with apply
 			WithDynamicLookup().
+			WithNullSafePatch(rkev1.SchemeGroupVersion.WithKind("RKEControlPlane")).
 			WithCacheTypes(
 				clients.CAPI.Cluster(),
 				clients.CAPI.MachineDeployment(),
