@@ -287,6 +287,11 @@ type KubeconfigSpec struct {
 	// When false, the entry is omitted.
 	// +optional
 	IncludeDefaultEntry *bool `json:"includeDefaultEntry,omitempty"`
+	// DefaultContextType specifies which context endpoint to use as the default in the generated kubeconfig.
+	// Valid values are "ace" (default) and "proxy".
+	// +kubebuilder:validation:Enum=ace;proxy
+	// +optional
+	DefaultContextType string `json:"defaultContextType,omitempty"`
 }
 
 // KubeconfigStatus defines the most recently observed status of the Kubeconfig.
