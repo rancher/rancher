@@ -572,32 +572,38 @@ func (e *eksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3.Clu
 func (e *eksOperatorController) getAWSConfig(ctx context.Context, cluster *mgmtv3.Cluster) (aws.Config, error) {
 	eksConfig := cluster.Spec.EKSConfig
 
-	awsConfig, err := awsconfig.LoadDefaultConfig(ctx)
-	if err != nil {
-		return awsConfig, fmt.Errorf("error getting new aws config: %w", err)
-	}
+	var opts []func(*awsconfig.LoadOptions) error
 
 	if region := eksConfig.Region; region != "" {
-		awsConfig.Region = region
+		opts = append(opts, awsconfig.WithRegion(region))
+	} else {
+		logrus.Warnf("cluster [%s] has no region configured, falling back to the default AWS region resolution", cluster.Name)
 	}
 
 	if amazonCredentialSecret := eksConfig.AmazonCredentialSecret; amazonCredentialSecret != "" {
 		ns, id := utils.Parse(amazonCredentialSecret)
 		secret, err := e.SecretsCache.Get(ns, id)
 		if err != nil {
-			return awsConfig, fmt.Errorf("error getting secret %s/%s: %w", ns, id, err)
+			return aws.Config{}, fmt.Errorf("error getting secret %s/%s: %w", ns, id, err)
 		}
 
 		accessKeyBytes := secret.Data["amazonec2credentialConfig-accessKey"]
 		secretKeyBytes := secret.Data["amazonec2credentialConfig-secretKey"]
 		if accessKeyBytes == nil || secretKeyBytes == nil {
-			return awsConfig, fmt.Errorf("invalid aws cloud credential")
+			return aws.Config{}, fmt.Errorf("invalid aws cloud credential")
 		}
 
 		accessKey := string(accessKeyBytes)
 		secretKey := string(secretKeyBytes)
 
-		awsConfig.Credentials = credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")
+		// Providing the credentials directly here, rather than overwriting awsConfig.Credentials
+		// after the fact, means LoadDefaultConfig never builds the ambient default credential chain.
+		opts = append(opts, awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")))
+	}
+
+	awsConfig, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return awsConfig, fmt.Errorf("error getting new aws config: %w", err)
 	}
 
 	return awsConfig, nil

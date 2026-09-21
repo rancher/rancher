@@ -281,9 +281,6 @@ up on the config are the identity Rancher authenticates to the downstream cluste
 tests pin that the cluster's own cloud credential wins over the ambient credential chain.
 */
 func Test_getAWSConfig(t *testing.T) {
-	// Keep the ambient credential chain out of the assertions below.
-	isolateAWSEnv(t)
-
 	const (
 		accessKey = "test-access-key"
 		secretKey = "test-secret-key"
@@ -368,27 +365,6 @@ func newTestEKSController(secrets *fake.MockCacheInterface[*corev1.Secret]) *eks
 	return &eksOperatorController{
 		OperatorController: clusteroperator.OperatorController{SecretsCache: secrets},
 	}
-}
-
-// isolateAWSEnv stops any AWS configuration present on the machine running the tests from
-// leaking into the config built by the SDK's default credential chain.
-func isolateAWSEnv(t *testing.T) {
-	t.Helper()
-
-	for _, key := range []string{
-		"AWS_ACCESS_KEY_ID",
-		"AWS_SECRET_ACCESS_KEY",
-		"AWS_SESSION_TOKEN",
-		"AWS_PROFILE",
-		"AWS_REGION",
-		"AWS_DEFAULT_REGION",
-	} {
-		t.Setenv(key, "")
-	}
-
-	t.Setenv("AWS_CONFIG_FILE", "testdata/does-not-exist")
-	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "testdata/does-not-exist")
-	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 }
 
 /*
