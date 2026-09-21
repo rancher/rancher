@@ -218,6 +218,20 @@ func TestLocalCluster(t *testing.T) {
 			desiredResponseCode:    defaultResponseCode,
 			desiredResponseMessage: defaultResponseMessage,
 		},
+		{
+			name:                   "core api root is served, not redirected",
+			requestPath:            "/api",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
+		{
+			name:                   "group api root is served, not redirected",
+			requestPath:            "/apis",
+			userCanAccessLocal:     false,
+			desiredResponseCode:    defaultResponseCode,
+			desiredResponseMessage: defaultResponseMessage,
+		},
 	}
 
 	for _, test := range tests {
@@ -260,6 +274,57 @@ func TestLocalCluster(t *testing.T) {
 
 			assert.Equal(t, test.desiredResponseCode, recorder.Code, "actual response code was different than expected")
 			assert.Equal(t, test.desiredResponseMessage, recorder.Body.String(), "body was different than expected")
+		})
+	}
+}
+
+// TestClusterAPIRootIsProxied guards against the cluster Steve API root regressing to a trailing-slash redirect.
+func TestClusterAPIRootIsProxied(t *testing.T) {
+	t.Parallel()
+	const defaultToken = "01020305081321345589"
+	const testUserUsername = "test-user"
+	const testClusterID = "c-test-cluster"
+
+	for _, requestPath := range []string{
+		"/k8s/clusters/" + testClusterID + "/v1",
+		"/k8s/clusters/" + testClusterID + "/v1/",
+	} {
+		t.Run(requestPath, func(t *testing.T) {
+			responder := DefaultHandler{
+				ResponseCode:    http.StatusOK,
+				ResponseMessage: "proxied successfully",
+			}
+			localHandler := DefaultHandler{
+				ResponseCode:    http.StatusNotFound,
+				ResponseMessage: "local cluster routed",
+			}
+
+			reviewer := testReviewer{}
+			reviewer.AddPermissionForUser(testUserUsername, "get", "", testClusterID, schema.GroupVersionResource{
+				Group:    managementv3.GroupName,
+				Version:  managementv3.Version,
+				Resource: "clusters",
+			})
+
+			// Note: Grants must be added before this next call
+			server, err := NewSARServer(&reviewer, "/webhook")
+			assert.NoError(t, err, "error when creating sar server")
+			client, err := RestClientForURL(server.URL, defaultToken)
+			assert.NoError(t, err, "error when creating rest client")
+			sarWrapper := Authv1ClientInterface{Client: client}
+
+			proxyMiddleware, err := proxy.NewProxyMiddleware(&sarWrapper, defaultDialer, nil, true, &localHandler)
+			assert.NoError(t, err, "unable to construct proxy middleware")
+
+			testHandler := proxyMiddleware(&responder)
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest("get", requestPath, bytes.NewReader([]byte{}))
+			request = addUserToRequest(testUserUsername, request)
+			testHandler.ServeHTTP(recorder, request)
+
+			assert.Empty(t, recorder.Header().Get("Location"), "request must not be redirected")
+			assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+			assert.Contains(t, recorder.Body.String(), "unable to construct dialer")
 		})
 	}
 }

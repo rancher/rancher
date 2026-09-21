@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/apiserver/pkg/parse"
+	"github.com/rancher/rancher/internal/http/route"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/api/norman/customization/aks"
 	"github.com/rancher/rancher/pkg/api/norman/customization/alibaba"
@@ -109,8 +110,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		return h
 	}
 	saAuthed := http.NewServeMux()
-	saAuthed.Handle("/k8s/clusters/{clusterID}/", saAuthedMW(k8sProxy))
-	saAuthed.Handle("/k8s/proxy/{clusterID}/", saAuthedMW(k8sProxy))
+	route.HandleSubtree(saAuthed, "/k8s/clusters/{clusterID}", saAuthedMW(k8sProxy))
+	route.HandleSubtree(saAuthed, "/k8s/proxy/{clusterID}", saAuthedMW(k8sProxy))
 
 	unauthed.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" && parse.MatchNotBrowser(r) {
@@ -140,13 +141,13 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	unauthed.Handle("/rancherversion", version.NewVersionHandler())
 	unauthed.Handle("/v1-k3s-release/", channelserver)
 	unauthed.Handle("/v1-rke2-release/", channelserver)
-	unauthed.Handle("/v1-saml/", saml.AuthHandler())
+	route.HandleSubtree(unauthed, "/v1-saml", saml.AuthHandler())
 	if features.V3Public.Enabled() {
-		unauthed.Handle("/v3-public/", v3PublicAPI)
+		route.HandleSubtree(unauthed, "/v3-public", v3PublicAPI)
 	}
-	unauthed.Handle("/v1-public/", v1PublicAPI)
+	route.HandleSubtree(unauthed, "/v1-public", v1PublicAPI)
 	if features.SCIM.Enabled() {
-		unauthed.Handle(fmt.Sprint(scim.URLPrefix, "/"), scim.NewHandler(scaledContext))
+		route.HandleSubtree(unauthed, scim.URLPrefix, scim.NewHandler(scaledContext))
 	}
 
 	// Setup middlewares for the metrics route.
@@ -190,7 +191,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	authed.Handle("POST /v3/tokenreview", authedMW(&webhook.TokenReviewer{}))
 	authed.Handle(supportconfigs.Endpoint, authedMW(&supportConfigGenerator))
 	authed.Handle("/meta/proxy/", authedMW(metaProxy))
-	authed.Handle("/v3/", authedMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	route.HandleSubtree(authed, "/v3", authedMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v3/identit") || strings.HasPrefix(r.URL.Path, "/v3/token") {
 			tokenAPI.ServeHTTP(w, r)
 		} else {
