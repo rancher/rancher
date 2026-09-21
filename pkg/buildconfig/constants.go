@@ -6,7 +6,7 @@ const (
 	ChartAuditLogImage       = "rancher/mirrored-bci-micro:15.6.24.2"
 	CspAdapterMinVersion     = "107.0.0+up7.0.0"
 	DefaultSccOperatorImage  = "rancher/scc-operator:v0.5.2-rc.3"
-	DefaultShellVersion      = "rancher/shell:v0.5.4-rc.2"
+	DefaultShellVersion      = "rancher/shell:v0.5.4"
 	FleetVersion             = "107.0.16+up0.13.16"
 	ProvisioningCAPIVersion  = "107.0.0+up0.8.0"
 	RemoteDialerProxyVersion = "106.0.3+up0.5.2"
