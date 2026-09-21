@@ -59,6 +59,8 @@ replace (
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.5
 )
 
+exclude go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0
+
 require (
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/tests/actions v0.0.0-20250322025624-67c9988afa52
@@ -259,7 +261,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.45.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.45.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
