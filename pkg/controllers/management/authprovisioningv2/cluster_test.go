@@ -1,12 +1,16 @@
 package authprovisioningv2
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/rancher/kubernetes-provider-detector/providers"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -18,8 +22,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestOnCluster(t *testing.T) {
@@ -83,6 +90,7 @@ func TestOnCluster(t *testing.T) {
 		setupHandler       func(*handler)
 		expectedErr        error
 		expectedFinalizers []string
+		assertResult       func(*testing.T, *v1.Cluster)
 	}{
 		"nil cluster no-op": {
 			cluster:     nil,
@@ -366,6 +374,146 @@ func TestOnCluster(t *testing.T) {
 			expectedErr:        nil,
 			expectedFinalizers: nil,
 		},
+		// The S3 ETCDSnapshot regression: snapshots are owned by the provisioning cluster, so
+		// they can only be garbage-collected once the cluster object is gone. Waiting on them
+		// deadlocks the finalizer against the GC that would satisfy it.
+		"deleting cluster ignores cluster-indexed resources it owns": {
+			cluster: deletingCluster(),
+			roleBindingMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) wranglerrbacv1.RoleBindingController {
+				mock := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+				mock.EXPECT().List(cluster.Namespace, metav1.ListOptions{}).Return(&rbacv1.RoleBindingList{}, nil)
+				return mock
+			},
+			clusterMock: func(ctrl *gomock.Controller, _ *v1.Cluster) provisioningcontrollers.ClusterController {
+				mock := fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
+				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
+					assert.Empty(t, updated.Finalizers)
+					return updated, nil
+				})
+				return mock
+			},
+			setupHandler: func(h *handler) {
+				h.indexGetter = fakeIndexGetter{objs: map[schema.GroupVersionKind][]runtime.Object{
+					etcdSnapshotGVK:  {ownedObject(etcdSnapshotGVK, "s3-snapshot", testClusterUID)},
+					machineConfigGVK: {ownedObject(machineConfigGVK, "nc-cluster-pool", testClusterUID)},
+				}}
+				h.resourcesList = []resourceMatch{
+					{GVK: etcdSnapshotGVK, Resource: "etcdsnapshots"},
+					{GVK: machineConfigGVK, Resource: "digitaloceanconfigs"},
+				}
+			},
+			expectedErr:        nil,
+			expectedFinalizers: []string{},
+		},
+		"deleting cluster waits on cluster-indexed resources it does not own": {
+			cluster: deletingCluster(),
+			clusterMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) provisioningcontrollers.ClusterController {
+				mock := fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
+				mock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
+					return updated, nil
+				})
+				mock.EXPECT().EnqueueAfter(cluster.Namespace, cluster.Name, reenqueueTime)
+				return mock
+			},
+			setupHandler: func(h *handler) {
+				h.indexGetter = fakeIndexGetter{objs: map[schema.GroupVersionKind][]runtime.Object{
+					// A local snapshot is owned by a mgmt v3 Node, not by the cluster, so it is
+					// not collected along with the cluster object and must still be waited on.
+					etcdSnapshotGVK: {ownedObject(etcdSnapshotGVK, "local-snapshot", "some-node-uid")},
+					// An orphan with no owner at all.
+					machineTemplateGVK: {&unstructured.Unstructured{Object: map[string]any{
+						"apiVersion": machineTemplateGVK.GroupVersion().String(),
+						"kind":       machineTemplateGVK.Kind,
+						"metadata":   map[string]any{"name": "orphan-template", "namespace": "fleet-default"},
+					}}},
+				}}
+				h.resourcesList = []resourceMatch{
+					{GVK: etcdSnapshotGVK, Resource: "etcdsnapshots"},
+					{GVK: machineTemplateGVK, Resource: "digitaloceanmachinetemplates"},
+				}
+			},
+			expectedErr:        nil,
+			expectedFinalizers: []string{capiResourcesCleanupFinalizer},
+			assertResult: func(t *testing.T, result *v1.Cluster) {
+				assert.True(t, capr.Removed.IsUnknown(result))
+				assert.Equal(t, removedWaitingReason, capr.Removed.GetReason(result))
+				assert.Equal(t,
+					removedWaitingMessagePrefix+": "+
+						"DigitaloceanMachineTemplate fleet-default/orphan-template, "+
+						"ETCDSnapshot fleet-default/local-snapshot",
+					capr.Removed.GetMessage(result))
+			},
+		},
+		"deleting cluster clears its own stale Removed message before removing the finalizer": {
+			cluster: func() *v1.Cluster {
+				cluster := deletingCluster()
+				capr.Removed.SetStatus(cluster, "Unknown")
+				capr.Removed.Reason(cluster, removedWaitingReason)
+				capr.Removed.Message(cluster, removedWaitingMessagePrefix+": ETCDSnapshot fleet-default/local-snapshot")
+				return cluster
+			}(),
+			roleBindingMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) wranglerrbacv1.RoleBindingController {
+				mock := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+				mock.EXPECT().List(cluster.Namespace, metav1.ListOptions{}).Return(&rbacv1.RoleBindingList{}, nil)
+				return mock
+			},
+			clusterMock: func(ctrl *gomock.Controller, _ *v1.Cluster) provisioningcontrollers.ClusterController {
+				mock := fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
+				mock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
+					assert.True(t, capr.Removed.IsTrue(updated))
+					assert.Empty(t, capr.Removed.GetReason(updated))
+					assert.Empty(t, capr.Removed.GetMessage(updated))
+					return updated, nil
+				})
+				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
+					assert.Empty(t, updated.Finalizers)
+					return updated, nil
+				})
+				return mock
+			},
+			setupHandler: func(h *handler) {
+				h.indexGetter = fakeIndexGetter{}
+				h.resourcesList = []resourceMatch{{GVK: etcdSnapshotGVK, Resource: "etcdsnapshots"}}
+			},
+			expectedErr:        nil,
+			expectedFinalizers: []string{},
+		},
+		// Removed is shared with the provisioning cluster remove handler, which parks it on
+		// Unknown/Waiting while it tears down machines. Unblocking here must not declare that
+		// handler's removal finished on its behalf.
+		"deleting cluster leaves another handler's Removed message alone": {
+			cluster: func() *v1.Cluster {
+				cluster := deletingCluster()
+				capr.Removed.SetStatus(cluster, "Unknown")
+				capr.Removed.Reason(cluster, removedWaitingReason)
+				capr.Removed.Message(cluster, "waiting for machine [cluster-pool-abc] to delete")
+				return cluster
+			}(),
+			roleBindingMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) wranglerrbacv1.RoleBindingController {
+				mock := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+				mock.EXPECT().List(cluster.Namespace, metav1.ListOptions{}).Return(&rbacv1.RoleBindingList{}, nil)
+				return mock
+			},
+			clusterMock: func(ctrl *gomock.Controller, _ *v1.Cluster) provisioningcontrollers.ClusterController {
+				mock := fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
+				// No UpdateStatus: the condition isn't ours to clear.
+				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
+					assert.Empty(t, updated.Finalizers)
+					return updated, nil
+				})
+				return mock
+			},
+			setupHandler: func(h *handler) {
+				h.indexGetter = fakeIndexGetter{}
+				h.resourcesList = []resourceMatch{{GVK: etcdSnapshotGVK, Resource: "etcdsnapshots"}}
+			},
+			expectedErr:        nil,
+			expectedFinalizers: []string{},
+			assertResult: func(t *testing.T, result *v1.Cluster) {
+				assert.True(t, capr.Removed.IsUnknown(result))
+				assert.Equal(t, "waiting for machine [cluster-pool-abc] to delete", capr.Removed.GetMessage(result))
+			},
+		},
 		"missing finalizer updates cluster before role handling": {
 			cluster: &v1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -461,6 +609,214 @@ func TestOnCluster(t *testing.T) {
 				return
 			}
 			assert.Equal(t, test.expectedFinalizers, result.Finalizers)
+			if test.assertResult != nil {
+				test.assertResult(t, result)
+			}
 		})
 	}
+}
+
+const testClusterUID = types.UID("3daa73db-80a2-483b-ba23-3e36fb68dc09")
+
+var (
+	etcdSnapshotGVK    = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "ETCDSnapshot"}
+	machineConfigGVK   = schema.GroupVersionKind{Group: dynamicschema.MachineConfigAPIGroup, Version: "v1", Kind: "DigitaloceanConfig"}
+	machineTemplateGVK = schema.GroupVersionKind{Group: "rke-machine.cattle.io", Version: "v1", Kind: "DigitaloceanMachineTemplate"}
+)
+
+// fakeIndexGetter serves objects from the clusterIndexed index per GVK, and records the queries it
+// was asked to serve.
+type fakeIndexGetter struct {
+	objs    map[schema.GroupVersionKind][]runtime.Object
+	err     error
+	queries *[]string
+}
+
+func (f fakeIndexGetter) GetByIndex(gvk schema.GroupVersionKind, indexName, key string) ([]runtime.Object, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.queries != nil {
+		*f.queries = append(*f.queries, fmt.Sprintf("%s|%s|%s", gvk, indexName, key))
+	}
+	return f.objs[gvk], nil
+}
+
+func deletingCluster() *v1.Cluster {
+	return &v1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v1.SchemeGroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "cluster",
+			Namespace:         "fleet-default",
+			UID:               testClusterUID,
+			Finalizers:        []string{capiResourcesCleanupFinalizer},
+			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+			Labels: map[string]string{
+				kubernetesprovider.ProviderKey: providers.K3s, // distro is irrelevant here
+			},
+		},
+	}
+}
+
+func ownedObject(gvk schema.GroupVersionKind, name string, ownerUID types.UID) runtime.Object {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": gvk.GroupVersion().String(),
+		"kind":       gvk.Kind,
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": "fleet-default",
+			"ownerReferences": []any{map[string]any{
+				"apiVersion": v1.SchemeGroupVersion.String(),
+				"kind":       "Cluster",
+				"name":       "cluster",
+				"uid":        string(ownerUID),
+			}},
+		},
+	}}
+}
+
+func Test_blockingClusterIndexedResources(t *testing.T) {
+	provisioningClusterGVK := schema.GroupVersionKind{
+		Group:   v1.SchemeGroupVersion.Group,
+		Version: v1.SchemeGroupVersion.Version,
+		Kind:    "Cluster",
+	}
+	cluster := deletingCluster()
+	indexErr := errors.NewServiceUnavailable("index unavailable")
+
+	tests := map[string]struct {
+		objs     map[schema.GroupVersionKind][]runtime.Object
+		err      error
+		expected []string
+		wantErr  error
+	}{
+		"nothing indexed": {
+			objs:     nil,
+			expected: nil,
+		},
+		"S3 snapshot owned by the cluster does not block": {
+			objs: map[schema.GroupVersionKind][]runtime.Object{
+				etcdSnapshotGVK: {
+					ownedObject(etcdSnapshotGVK, "s3-snapshot-a", testClusterUID),
+					ownedObject(etcdSnapshotGVK, "s3-snapshot-b", testClusterUID),
+				},
+			},
+			expected: nil,
+		},
+		"machine config owned by the cluster does not block": {
+			objs: map[schema.GroupVersionKind][]runtime.Object{
+				machineConfigGVK: {ownedObject(machineConfigGVK, "nc-cluster-pool", testClusterUID)},
+			},
+			expected: nil,
+		},
+		"snapshot owned by another object blocks": {
+			objs: map[schema.GroupVersionKind][]runtime.Object{
+				etcdSnapshotGVK: {ownedObject(etcdSnapshotGVK, "local-snapshot", "some-node-uid")},
+			},
+			expected: []string{"ETCDSnapshot fleet-default/local-snapshot"},
+		},
+		"owner name matches but UID does not, so it blocks": {
+			objs: map[schema.GroupVersionKind][]runtime.Object{
+				// Same cluster name, different incarnation: this object belongs to a previous
+				// cluster and will not be collected with the current one.
+				etcdSnapshotGVK: {ownedObject(etcdSnapshotGVK, "stale-snapshot", "a-previous-cluster-uid")},
+			},
+			expected: []string{"ETCDSnapshot fleet-default/stale-snapshot"},
+		},
+		"object with no owner references blocks": {
+			objs: map[schema.GroupVersionKind][]runtime.Object{
+				machineTemplateGVK: {&unstructured.Unstructured{Object: map[string]any{
+					"apiVersion": machineTemplateGVK.GroupVersion().String(),
+					"kind":       machineTemplateGVK.Kind,
+					"metadata":   map[string]any{"name": "orphan", "namespace": "fleet-default"},
+				}}},
+			},
+			expected: []string{"DigitaloceanMachineTemplate fleet-default/orphan"},
+		},
+		"the provisioning cluster GVK is skipped": {
+			// The cluster being deleted is in its own index and is blocked by this handler's
+			// finalizer, so counting it would deadlock the finalizer against itself.
+			objs: map[schema.GroupVersionKind][]runtime.Object{
+				provisioningClusterGVK: {cluster},
+			},
+			expected: nil,
+		},
+		"results are sorted and only include unowned objects": {
+			objs: map[schema.GroupVersionKind][]runtime.Object{
+				etcdSnapshotGVK: {
+					ownedObject(etcdSnapshotGVK, "zzz-unowned", "other"),
+					ownedObject(etcdSnapshotGVK, "aaa-owned", testClusterUID),
+					ownedObject(etcdSnapshotGVK, "mmm-unowned", "other"),
+				},
+				machineTemplateGVK: {ownedObject(machineTemplateGVK, "template", "other")},
+			},
+			expected: []string{
+				"DigitaloceanMachineTemplate fleet-default/template",
+				"ETCDSnapshot fleet-default/mmm-unowned",
+				"ETCDSnapshot fleet-default/zzz-unowned",
+			},
+		},
+		"index errors are propagated": {
+			err:     indexErr,
+			wantErr: indexErr,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var queries []string
+			h := handler{
+				provisioningClusterGVK: provisioningClusterGVK,
+				indexGetter:            fakeIndexGetter{objs: test.objs, err: test.err, queries: &queries},
+				resourcesList: []resourceMatch{
+					{GVK: provisioningClusterGVK, Resource: "clusters"},
+					{GVK: etcdSnapshotGVK, Resource: "etcdsnapshots"},
+					{GVK: machineConfigGVK, Resource: "digitaloceanconfigs"},
+					{GVK: machineTemplateGVK, Resource: "digitaloceanmachinetemplates"},
+				},
+			}
+
+			got, err := h.blockingClusterIndexedResources(cluster)
+
+			assert.Equal(t, test.wantErr, err)
+			if test.wantErr != nil {
+				return
+			}
+			assert.Equal(t, test.expected, got)
+			// The provisioning cluster GVK is short-circuited before the index is consulted;
+			// every other candidate type is queried with the cluster's index key.
+			assert.Equal(t, []string{
+				fmt.Sprintf("%s|%s|%s", etcdSnapshotGVK, clusterIndexed, clusterIndexKey(cluster)),
+				fmt.Sprintf("%s|%s|%s", machineConfigGVK, clusterIndexed, clusterIndexKey(cluster)),
+				fmt.Sprintf("%s|%s|%s", machineTemplateGVK, clusterIndexed, clusterIndexKey(cluster)),
+			}, queries)
+		})
+	}
+}
+
+func Test_blockingResourcesMessage(t *testing.T) {
+	blocking := make([]string, 0, maxBlockingResourcesInMessage+2)
+	for i := range maxBlockingResourcesInMessage + 2 {
+		blocking = append(blocking, fmt.Sprintf("ETCDSnapshot fleet-default/snapshot-%02d", i))
+	}
+
+	assert.Equal(t,
+		removedWaitingMessagePrefix+": ETCDSnapshot fleet-default/snapshot-00",
+		blockingResourcesMessage(blocking[:1]))
+
+	// Over the cap the list is truncated so a cluster with many leftovers can't produce an
+	// unbounded condition message.
+	assert.Equal(t,
+		removedWaitingMessagePrefix+": "+
+			strings.Join(blocking[:maxBlockingResourcesInMessage], ", ")+" and 2 more",
+		blockingResourcesMessage(blocking))
+
+	// clearRemovedWaiting keys off the prefix to tell its own message apart from one written by
+	// the provisioning cluster remove handler, so every message must carry it.
+	assert.True(t, strings.HasPrefix(blockingResourcesMessage(blocking), removedWaitingMessagePrefix))
 }
