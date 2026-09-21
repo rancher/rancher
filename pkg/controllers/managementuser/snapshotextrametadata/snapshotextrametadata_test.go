@@ -29,6 +29,7 @@ import (
 const (
 	clusterName        = "c-m-12345678"
 	kubernetesVersion  = "v1.32.5+rke2r1"
+	configMapName      = "rke2-etcd-snapshot-extra-metadata"
 	capiClusterName    = "downstream"
 	capiClusterNS      = "fleet-default"
 	rke2ControlPlaneCP = "RKE2ControlPlane"
