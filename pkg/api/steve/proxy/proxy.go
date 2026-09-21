@@ -9,6 +9,7 @@ import (
 	"time"
 
 	httprequest "github.com/rancher/rancher/internal/http/request"
+	"github.com/rancher/rancher/internal/http/route"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -89,8 +90,8 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 			}
 			next.ServeHTTP(rw, req)
 		})
-		mux.Handle("/api/", apiHandler)
-		mux.Handle("/apis/", apiHandler)
+		route.HandleSubtree(mux, "/api", apiHandler)
+		route.HandleSubtree(mux, "/apis", apiHandler)
 		mux.HandleFunc("/v1/management.cattle.io.clusters/{clusterID}", func(rw http.ResponseWriter, req *http.Request) {
 			if req.URL.Query().Get("link") == "shell" {
 				routeToShellProxy("link", "shell", localSupport, localCluster, next, proxyHandler)(rw, req)
@@ -107,7 +108,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 				next.ServeHTTP(rw, req)
 			}
 		})
-		mux.Handle("/k8s/clusters/{clusterID}/v1/", proxyHandler)
+		route.HandleSubtree(mux, "/k8s/clusters/{clusterID}/v1", proxyHandler)
 		mux.Handle("/", next)
 
 		return mux
