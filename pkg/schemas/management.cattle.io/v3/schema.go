@@ -539,16 +539,18 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions = map[string]types.Action{
 				"disable": {},
 				"configureTest": {
-					Input:  "keyCloakOidcConfig",
-					Output: "keyCloakOidcTestOutput",
+					Input:  "keyCloakOIDCConfig",
+					Output: "keyCloakOIDCTestOutput",
 				},
 				"testAndApply": {
-					Input: "keyCloakOidcApplyInput",
+					Input: "keyCloakOIDCApplyInput",
 				},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
-		})
+		}).
+		MustImport(&Version, v3.KeyCloakOIDCApplyInput{}).
+		MustImport(&Version, v3.KeyCloakOIDCTestOutput{})
 }
 
 // Common SAML schema configuration

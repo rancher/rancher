@@ -830,7 +830,20 @@ type GenericOIDCApplyInput struct {
 
 // KeyCloakOIDCConfig is the wrapper for the Generic OIDC provider to hold the OIDC Configuration
 type KeyCloakOIDCConfig struct {
-	OIDCConfig `json:",inline" mapstructure:",squash"`
+	OIDCConfig     `json:",inline" mapstructure:",squash"`
+	OpenLdapConfig LdapFields `json:"openLdapConfig"`
+}
+
+// KeyCloakOIDCTestOutput is the wrapper for the Keycloak OIDC provider to hold the OIDC test output object.
+type KeyCloakOIDCTestOutput struct {
+	OIDCTestOutput `json:",inline" mapstructure:",squash"`
+}
+
+// KeyCloakOIDCApplyInput is the wrapper for the input used to enable or activate the Keycloak OIDC auth provider.
+type KeyCloakOIDCApplyInput struct {
+	OIDCConfig KeyCloakOIDCConfig `json:"oidcConfig,omitempty"`
+	Code       string             `json:"code,omitempty"`
+	Enabled    bool               `json:"enabled,omitempty"`
 }
 
 // GenericOIDCConfig is a wrapper for the AWS Cognito provider holding the OIDC Configuration
