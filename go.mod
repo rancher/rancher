@@ -11,13 +11,6 @@ replace (
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	github.com/rancher/rancher/pkg/plan => ./pkg/plan
 	github.com/stretchr/testify => github.com/stretchr/testify v1.12.1
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0
-	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.46.0
-	go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v1.46.0
-	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.46.0
-	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.46.0
-	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v1.11.0
 	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
 
 	k8s.io/api => k8s.io/api v0.36.4
