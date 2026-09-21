@@ -22,7 +22,7 @@ env:
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
   unit-tests:
-    uses: ./.github/workflows/unit-test.yml
+    uses: $/.github/workflows/unit-test.yml
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
@@ -34,7 +34,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/rancher-chart/build
+        uses: $/.github/actions/rancher-chart/build
   # Tests only consume the linux/amd64 images, so the amd64 builds gate tests
   # while the arm64 builds run as separate, non-gating jobs below.
   build-server-amd64:
@@ -52,7 +52,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
+        uses: $/.github/actions/build-images/server
   build-agent-amd64:
     # 8cpu for the same reason as build-server-amd64.
     runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -67,7 +67,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: $/.github/actions/build-images/agent
   # arm64 builds validate that the images compile for arm64. Nothing downstream
   # depends on them, so they run in parallel, off the critical path.
   build-server-arm64:
@@ -83,7 +83,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/server
+        uses: $/.github/actions/build-images/server
   build-agent-arm64:
     runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
     env:
@@ -97,7 +97,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: ./.github/actions/build-images/agent
+        uses: $/.github/actions/build-images/agent
   build-installer:
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
@@ -126,9 +126,9 @@ jobs:
     permissions:
       contents: read
     needs: [build-chart, build-server-amd64, build-agent-amd64]
-    uses: ./.github/workflows/integration-tests.yml
+    uses: $/.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
       contents: read
     needs: [build-server-amd64, build-agent-amd64]
-    uses: ./.github/workflows/provisioning-tests.yml
+    uses: $/.github/workflows/provisioning-tests.yml

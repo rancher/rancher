@@ -8,7 +8,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Environment Variables
-      uses: ./.github/actions/setup-tag-env
+      uses: $/.github/actions/setup-tag-env
     - name: Create manifest list and push
       shell: bash
       env:
