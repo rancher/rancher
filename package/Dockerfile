@@ -119,37 +119,24 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod down
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
 
 
-FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
+FROM --platform=$BUILDPLATFORM rancher-go-builder AS rancher-build
 ARG VERSION
 ARG COMMIT
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
-ARG GCFLAGS
-ARG TARGETOS
-ARG TARGETARCH
-COPY internal/ internal/
-COPY pkg/ pkg/
-COPY main.go ./
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
-
-# Output just the server binary
-FROM scratch AS server-binary
-COPY --from=server-build /app/rancher /bin/rancher
-
-
-FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
-ARG VERSION
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
 ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY pkg/ pkg/
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
+COPY main.go ./
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "-X main.VERSION=${VERSION} ${LINKFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
+
+# Output just the server binary
+FROM scratch AS server-binary
+COPY --from=rancher-build /app/rancher /bin/rancher
 
 
 # Extract server chroot
@@ -360,7 +347,7 @@ ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=$CATTLE_BASE_RKE2_PROVISIONING_P
 RUN mkdir -p /var/lib/rancher-data/local-catalogs
 
 COPY --chown=root:root --chmod=0755 \
-    --from=server-build /app/rancher /usr/bin/
+    --from=rancher-build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
     package/loglevel \
     package/entrypoint.sh \
@@ -415,7 +402,7 @@ ENV AGENT_IMAGE=${RANCHER_REPO}/rancher-agent:${VERSION}
 
 ENV SSL_CERT_DIR=/etc/kubernetes/ssl/certs
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
-COPY --from=agent-build /app/agent /usr/bin/
+COPY --from=rancher-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
