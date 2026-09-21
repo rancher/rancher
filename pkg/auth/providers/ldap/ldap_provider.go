@@ -25,11 +25,12 @@ import (
 )
 
 const (
-	OpenLdapName   = "openldap"
-	FreeIpaName    = "freeipa"
-	ShibbolethName = "shibboleth"
-	ObjectClass    = "objectClass"
-	OKTAName       = "okta"
+	OpenLdapName     = "openldap"
+	FreeIpaName      = "freeipa"
+	ShibbolethName   = "shibboleth"
+	ObjectClass      = "objectClass"
+	OKTAName         = "okta"
+	KeyCloakOIDCName = "keycloakoidc"
 )
 
 // An ErrorNotConfigured indicates that the requested LDAP operation
@@ -49,10 +50,11 @@ var (
 
 	// empty string for inline
 	ldapConfigKey = map[string]string{
-		FreeIpaName:    "",
-		OpenLdapName:   "",
-		ShibbolethName: client.ShibbolethConfigFieldOpenLdapConfig,
-		OKTAName:       client.OKTAConfigFieldOpenLdapConfig,
+		FreeIpaName:      "",
+		OpenLdapName:     "",
+		ShibbolethName:   client.ShibbolethConfigFieldOpenLdapConfig,
+		OKTAName:         client.OKTAConfigFieldOpenLdapConfig,
+		KeyCloakOIDCName: client.KeyCloakOIDCConfigFieldOpenLdapConfig,
 	}
 )
 
@@ -218,7 +220,7 @@ func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAcce
 	}
 
 	var principal *v3.Principal
-	if p.samlSearchProvider() {
+	if p.inlineLDAPConfigProvider() {
 		principal, err = p.samlSearchGetPrincipal(externalID, scope, config, caPool)
 	} else {
 		principal, err = p.getPrincipal(externalID, scope, config, caPool)
@@ -258,7 +260,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 	storedLdapConfigMap := u.UnstructuredContent()
 	storedLdapConfig := &v3.LdapConfig{}
 
-	if p.samlSearchProvider() && ldapConfigKey[p.providerName] != "" {
+	if p.inlineLDAPConfigProvider() && ldapConfigKey[p.providerName] != "" {
 		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
 		if !ok || subLdapConfig == nil {
 			return nil, nil, ErrorNotConfigured{}
@@ -324,9 +326,10 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 	return externalID, scope, nil
 }
 
-// if provider only enabled for search by a SAML provider
-func (p *ldapProvider) samlSearchProvider() bool {
-	return ShibbolethName == p.providerName || OKTAName == p.providerName
+// inlineLDAPConfigProvider reports whether a provider keeps its LDAP config nested
+// inside a non-LDAP auth provider config.
+func (p *ldapProvider) inlineLDAPConfigProvider() bool {
+	return ShibbolethName == p.providerName || OKTAName == p.providerName || KeyCloakOIDCName == p.providerName
 }
 
 func (p *ldapProvider) samlSearchGetPrincipal(

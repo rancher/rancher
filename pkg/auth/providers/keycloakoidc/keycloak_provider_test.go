@@ -14,19 +14,42 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rancher/norman/types"
+
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+func TestConfiguredKeycloakOIDCProviderContainsLdapProvider(t *testing.T) {
+	ctx := t.Context()
+	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
+	require.NoError(t, err, "Failed to create NewScaledContext")
+	mgmtCtx.RunContext = ctx
+
+	wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{})
+	require.NoError(t, err, "Failed to create wranglerContext")
+	mgmtCtx.Wrangler = wranglerContext
+
+	tokenMGR := tokens.NewManager(wranglerContext)
+	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR).(*keyCloakOIDCProvider)
+	require.True(t, ok, "Failed to Configure a valid Keycloak OIDC provider")
+
+	assert.NotNil(t, provider.ldapProvider, "Configured Keycloak OIDC provider did not receive child LDAP provider")
+}
 
 func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -42,6 +65,90 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			Provider:      Name,
 		},
 	}
+
+	t.Run("test search uses ldap when configured", func(t *testing.T) {
+		expectedLDAPResult := []apiv3.Principal{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "keycloakoidc_user://alice",
+				},
+				DisplayName:   "Alice",
+				LoginName:     "alice",
+				PrincipalType: common.UserPrincipalType,
+				Me:            true,
+				Provider:      Name,
+			},
+		}
+
+		g := &keyCloakOIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
+				Name: Name,
+				Type: client.KeyCloakOIDCConfigType,
+			},
+			ldapProvider: &mockLdapProvider{
+				providerName:     Name,
+				isLdapConfigured: true,
+			},
+		}
+
+		result, err := g.SearchPrincipals("user1", UserType, &apiv3.Token{})
+		require.NoError(t, err, "SearchPrincipals() returned an error")
+		assert.Equal(t, expectedLDAPResult, result)
+	})
+
+	t.Run("test search falls back to keycloak when ldap is not configured", func(t *testing.T) {
+		testSrv := newFakeKeycloakServer(t, privateKey, func(t *testing.T, r *http.Request) bool {
+			bearerString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			claims := jwt.MapClaims{}
+			_, err := jwt.ParseWithClaims(bearerString, &claims, nil)
+			return errors.Is(err, jwt.ErrTokenUnverifiable) && claims["auth_provider"] == "auth-provider"
+		})
+		oidcConfig := testOIDCConfig(testSrv.URL, func(o *v3.OIDCConfig) {
+			o.ClientAuthenticatedSearch = false
+		})
+		fakeAccessToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+			"aud":           []interface{}{"client-id"},
+			"exp":           float64(time.Now().Add(10 * time.Hour).Unix()),
+			"iss":           oidcConfig.Issuer,
+			"iat":           float64(time.Now().Unix()),
+			"sub":           "test-user",
+			"auth_provider": "auth-provider",
+			"scope":         []string{"openid", "profile"},
+		})
+		fakeAccessTokenString, err := fakeAccessToken.SignedString(privateKey)
+		require.NoError(t, err, "Failed to sign fake access token")
+		createTokenManager := &fakeTokenManager{
+			getSecretFunc: func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
+				b, err := json.Marshal(map[string]string{
+					"access_token": fakeAccessTokenString,
+				})
+
+				return string(b), err
+			},
+		}
+		g := &keyCloakOIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
+				Name:     Name,
+				Type:     client.KeyCloakOIDCConfigType,
+				TokenMgr: createTokenManager,
+			},
+			ldapProvider: &mockLdapProvider{
+				providerName:     Name,
+				isLdapConfigured: false,
+			},
+		}
+		g.GetConfig = func() (*apiv3.OIDCConfig, error) {
+			return oidcConfig, nil
+		}
+
+		result, err := g.SearchPrincipals("user1", UserType, &apiv3.Token{
+			ProviderInfo: map[string]string{
+				"access_token": fakeAccessTokenString,
+			},
+		})
+		require.NoError(t, err, "SearchPrincipals() returned an error")
+		assert.Equal(t, expectedResult, result)
+	})
 
 	t.Run("test search for user principal with client authenticated search", func(t *testing.T) {
 		testSrv := newFakeKeycloakServer(t, privateKey, func(t *testing.T, r *http.Request) bool {
@@ -67,7 +174,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			},
 		}
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -102,7 +209,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			},
 		}
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -148,7 +255,7 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 			},
 		}
 		g := &keyCloakOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:     Name,
 				Type:     client.KeyCloakOIDCConfigType,
 				TokenMgr: createTokenManager,
@@ -212,7 +319,7 @@ func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {
 	}
 
 	provider := &keyCloakOIDCProvider{
-		oidc.OpenIDCProvider{},
+		OpenIDCProvider: oidc.OpenIDCProvider{},
 	}
 
 	for name, test := range tests {
@@ -223,6 +330,83 @@ func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {
 			assert.Equal(t, test.expected, result)
 		})
 	}
+}
+
+type mockLdapProvider struct {
+	providerName     string
+	isLdapConfigured bool
+}
+
+func (p *mockLdapProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
+	panic("not implemented")
+}
+
+func (p *mockLdapProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
+	panic("not implemented")
+}
+
+func (p *mockLdapProvider) GetName() string {
+	return p.providerName
+}
+
+func (p *mockLdapProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	panic("AuthenticateUser Unimplemented!")
+}
+
+func (p *mockLdapProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	if !p.isLdapConfigured {
+		return nil, ldap.ErrorNotConfigured{}
+	}
+
+	return []apiv3.Principal{{
+		ObjectMeta:    metav1.ObjectMeta{Name: p.providerName + "_" + principalType + "://alice"},
+		DisplayName:   "Alice",
+		LoginName:     "alice",
+		PrincipalType: common.UserPrincipalType,
+		Me:            true,
+		Provider:      p.providerName,
+	}}, nil
+}
+
+func (p *mockLdapProvider) CustomizeSchema(schema *types.Schema) {
+	panic("CustomizeSchema Unimplemented!")
+}
+
+func (p *mockLdapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	if !p.isLdapConfigured {
+		return apiv3.Principal{}, ldap.ErrorNotConfigured{}
+	}
+
+	return apiv3.Principal{
+		ObjectMeta:    metav1.ObjectMeta{Name: principalID},
+		DisplayName:   "Alice",
+		LoginName:     "alice",
+		PrincipalType: common.UserPrincipalType,
+		Provider:      p.providerName,
+	}, nil
+}
+
+func (p *mockLdapProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
+	panic("TransformToAuthProvider Unimplemented!")
+}
+
+func (p *mockLdapProvider) UsesUserSecrets() bool      { return false }
+func (p *mockLdapProvider) CanRefreshPrincipals() bool { return true }
+
+func (p *mockLdapProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	panic("RefetchGroupPrincipals Unimplemented!")
+}
+
+func (p *mockLdapProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []apiv3.Principal) (bool, error) {
+	panic("CanAccessWithGroupProviders Unimplemented!")
+}
+
+func (p *mockLdapProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
+	panic("GetUserExtraAttributes Unimplemented!")
+}
+
+func (p *mockLdapProvider) IsDisabledProvider() (bool, error) {
+	panic("IsDisabledProvider Unimplemented!")
 }
 
 func testOIDCConfig(baseURL string, opts ...func(*v3.OIDCConfig)) *v3.OIDCConfig {

@@ -12,6 +12,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -33,6 +34,7 @@ const (
 
 type keyCloakOIDCProvider struct {
 	oidc.OpenIDCProvider
+	ldapProvider common.AuthProvider
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -46,6 +48,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 			UserMGR:     userMGR,
 			TokenMgr:    tokenMGR,
 		},
+		ldap.Configure(mgmtCtx, userMGR, tokenMGR, Name),
 	}
 
 	p.GetConfig = p.GetOIDCConfig
@@ -94,6 +97,13 @@ func (k *keyCloakOIDCProvider) newClient(config *apiv3.OIDCConfig, token accesso
 func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	var principals []apiv3.Principal
 	var err error
+
+	if k.ldapProvider != nil {
+		principals, err = k.ldapProvider.SearchPrincipals(searchValue, principalType, token)
+		if !ldap.IsNotConfigured(err) {
+			return principals, err
+		}
+	}
 
 	config, err := k.GetConfig()
 	if err != nil {
@@ -157,6 +167,13 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 }
 
 func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	if k.ldapProvider != nil {
+		principal, err := k.ldapProvider.GetPrincipal(principalID, token)
+		if !ldap.IsNotConfigured(err) {
+			return principal, err
+		}
+	}
+
 	config, err := k.GetOIDCConfig()
 	if err != nil {
 		return apiv3.Principal{}, err

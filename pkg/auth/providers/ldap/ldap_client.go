@@ -482,7 +482,7 @@ func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapCon
 		externalID := results.Entries[i].DN
 		entry := results.Entries[i]
 
-		if p.samlSearchProvider() {
+		if p.inlineLDAPConfigProvider() {
 			if strings.EqualFold("user", entityType) {
 				userLoginValues := ldap.GetAttributeValuesByName(entry.Attributes, config.UserLoginAttribute)
 				if len(userLoginValues) > 0 {
