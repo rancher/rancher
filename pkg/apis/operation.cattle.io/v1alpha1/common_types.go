@@ -23,6 +23,10 @@ type OperationSpec struct {
 
 	// Cancel requests the operation to stop permanently. Unlike Paused, it is terminal and cannot be unset.
 	// Recover by deleting and recreating the operation.
+	// Paused takes precedence: a paused operation halts reconciliation entirely, so the cancellation
+	// is only observed once the pause is lifted.
+	// Cancelling an operation the controller has already finished with (Finalized) does nothing —
+	// there is no longer any work to call off, and the phase it ended in stands.
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:XValidation:rule="self || !oldSelf",message="cancel cannot be unset once true"
 	// +optional

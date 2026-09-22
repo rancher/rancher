@@ -34,6 +34,32 @@ func TestIsPaused(t *testing.T) {
 	}
 }
 
+// --- cancel.go ------------------------------------------------------------------------------
+
+func TestIsCanceled(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		spec   *opv1alpha1.OperationSpec
+		expect bool
+	}{
+		{"cancel true", &opv1alpha1.OperationSpec{Cancel: true}, true},
+		{"cancel false", &opv1alpha1.OperationSpec{Cancel: false}, false},
+		{"zero-value spec", &opv1alpha1.OperationSpec{}, false},
+		// Cancel is reported independently of Paused; the caller applies the precedence between
+		// them (paused wins, so the cancellation waits for the pause to lift).
+		{"cancel and paused", &opv1alpha1.OperationSpec{Cancel: true, Paused: true}, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := IsCanceled(tc.spec)
+			assert.Equal(t, tc.expect, got, "IsCanceled mismatch")
+		})
+	}
+}
+
 // --- phase.go -------------------------------------------------------------------------------
 
 func TestIsTerminal(t *testing.T) {

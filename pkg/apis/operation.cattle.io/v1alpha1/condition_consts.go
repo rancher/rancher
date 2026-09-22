@@ -144,6 +144,10 @@ const (
 	// OperationDeletedReason surfaces when an operation was canceled because it was deleted before
 	// terminal handling for it completed.
 	OperationDeletedReason = "OperationDeleted"
+
+	// CancelRequestedReason surfaces when an operation was canceled because OperationSpec.Cancel
+	// was set, by the user or by another controller that needed the operation to stop.
+	CancelRequestedReason = "CancelRequested"
 )
 
 // OutcomeConditionFor maps a terminal phase to the outcome condition that reports it, along with
