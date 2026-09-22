@@ -88,7 +88,8 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 			fmt.Sprintf("[keycloak oidc] testAndApply: failed to parse body: %v", err))
 	}
 
-	oidcConfig = oidcConfigApplyInput.OIDCConfig
+oidcConfig = oidcConfigApplyInput.OIDCConfig
+	oidcConfig.Enabled = oidcConfigApplyInput.Enabled
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
 		oidcConfig.GroupSearchEnabled = ptr.To(false)
 	}
