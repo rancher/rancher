@@ -8,9 +8,9 @@ import (
 )
 
 // The conditions below split into three kinds: progress conditions (Pending, InProgress, Paused)
-// report what an operation is doing right now; outcome conditions (Succeeded, Failed, Canceled)
-// report how the work ended; and Finalized reports whether the controller is done with the
-// operation altogether.
+// report what an operation is doing right now; outcome conditions (Succeeded, Failed, Aborted,
+// Canceled) report how the work ended; and Finalized reports whether the controller is done with
+// the operation altogether.
 //
 // An outcome condition goes True as soon as the operation reaches the matching terminal phase. At
 // that point the work it was asked to do is over and its result will not change — but the
@@ -44,7 +44,14 @@ var (
 	// controller has finished with it.
 	FailedCondition = condition.Cond("Failed")
 
-	// CanceledCondition represents the condition state for a task or process that has been canceled.
+	// AbortedCondition represents the condition state for a task or process that called its own
+	// work off, having found a condition it cannot proceed past.
+	// True once the operation reaches the Aborted phase; see FinalizedCondition for whether the
+	// controller has finished with it.
+	AbortedCondition = condition.Cond("Aborted")
+
+	// CanceledCondition represents the condition state for a task or process that has been canceled
+	// from outside — by the user, by another controller, or by being deleted mid-flight.
 	// True once the operation reaches the Canceled phase; see FinalizedCondition for whether the
 	// controller has finished with it.
 	CanceledCondition = condition.Cond("Canceled")
@@ -52,8 +59,8 @@ var (
 	// FinalizedCondition reports that the controller is done with the operation and nothing about it
 	// will change again: it reached a terminal phase, its terminal phase hook has been satisfied,
 	// any cluster it paused has been unpaused, and its beacon has been released. It is the summary
-	// of the three outcome conditions above, so an observer which does not care how the operation
-	// turned out can wait on this one condition instead of racing two.
+	// of the outcome conditions above, so an observer which does not care how the operation turned
+	// out can wait on this one condition instead of racing several.
 	FinalizedCondition = condition.Cond("Finalized")
 
 	// PausedCondition represents the condition state for a task or process that has been paused.
@@ -105,6 +112,9 @@ const (
 	// NotSuccessfulReason surfaces when an operation has not completed successfully.
 	NotSuccessfulReason = "NotSuccessful"
 
+	// NotAbortedReason surfaces when an operation did not abort itself.
+	NotAbortedReason = "NotAborted"
+
 	// NotCanceledReason surfaces when an operation was not canceled.
 	NotCanceledReason = "NotCanceled"
 
@@ -148,6 +158,8 @@ func OutcomeConditionFor(phase OperationPhase) (condition.Cond, string) {
 	switch phase {
 	case OperationPhaseSucceeded:
 		return SucceededCondition, "Operation completed successfully"
+	case OperationPhaseAborted:
+		return AbortedCondition, "Operation aborted"
 	case OperationPhaseCanceled:
 		return CanceledCondition, "Operation canceled"
 	default:

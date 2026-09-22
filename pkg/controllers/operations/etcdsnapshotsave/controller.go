@@ -435,6 +435,8 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		return h.handlePending(s, status)
 	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
+	case opv1alpha1.OperationPhaseAborted:
+		return h.handleAborted(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
 		return h.handleCanceled(s, status)
 	case opv1alpha1.OperationPhaseFailed:
@@ -642,9 +644,9 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSav
 	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
-		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as canceled: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+		logrus.Errorf("[etcdsnapshotsave] %s/%s: aborting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markCanceled(&status, opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		markAborted(&status, opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -916,9 +918,17 @@ func (h *handler) releaseBeacon(s *scope) (bool, error) {
 	return owning, plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
 }
 
-// handleCanceled handles the Canceled terminal phase.
-// The difference between canceled and failed operations is that an operation fails itself, whereas
-// another controller cancels an operation, or it is deleted before its terminal handling completed.
+// handleAborted handles the Aborted terminal phase, reached when the operation called its own work
+// off rather than attempting it and losing — which is what separates it from Failed.
+func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
+	return h.handleTerminal(s, status, terminalPhase{
+		hook: planv1alpha1.AbortedPhaseHookLabelPrefix,
+	})
+}
+
+// handleCanceled handles the Canceled terminal phase, reached when the operation was called off from
+// outside: spec.Cancel was set, another controller needed it to stop, or it was deleted before its
+// terminal handling completed.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
 		hook: planv1alpha1.CanceledPhaseHookLabelPrefix,
@@ -973,8 +983,19 @@ func markFailed(status *opv1alpha1.ETCDSnapshotSaveStatus, reason, message strin
 	opv1alpha1.FailedCondition.Message(status, message)
 }
 
+// markAborted moves the operation into the Aborted terminal phase, for work the operation called off
+// itself after finding a condition it cannot proceed past — a failed preflight check, say. The
+// caller supplies the reason and message.
+func markAborted(status *opv1alpha1.ETCDSnapshotSaveStatus, reason, message string) {
+	status.SetPhase(opv1alpha1.OperationPhaseAborted)
+
+	opv1alpha1.AbortedCondition.True(status)
+	opv1alpha1.AbortedCondition.Reason(status, reason)
+	opv1alpha1.AbortedCondition.Message(status, message)
+}
+
 // markCanceled moves the operation into the Canceled terminal phase, for work that was called off
-// rather than attempted and lost — a failed preflight check, or a deletion that raced the operation.
+// from outside the operation — spec.Cancel being set, or a deletion that raced the operation.
 func markCanceled(status *opv1alpha1.ETCDSnapshotSaveStatus, reason, message string) {
 	status.SetPhase(opv1alpha1.OperationPhaseCanceled)
 
@@ -1060,6 +1081,7 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapsho
 	for cond, reason := range map[condition.Cond]string{
 		opv1alpha1.SucceededCondition: opv1alpha1.NotSuccessfulReason,
 		opv1alpha1.FailedCondition:    opv1alpha1.NotFailedReason,
+		opv1alpha1.AbortedCondition:   opv1alpha1.NotAbortedReason,
 		opv1alpha1.CanceledCondition:  opv1alpha1.NotCanceledReason,
 	} {
 		if cond == outcome {

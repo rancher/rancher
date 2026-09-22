@@ -65,6 +65,12 @@ func TestOutcomeConditionFor(t *testing.T) {
 			wantSummary: "Operation failed",
 		},
 		{
+			name:        "aborted",
+			phase:       OperationPhaseAborted,
+			wantCond:    AbortedCondition,
+			wantSummary: "Operation aborted",
+		},
+		{
 			name:        "canceled",
 			phase:       OperationPhaseCanceled,
 			wantCond:    CanceledCondition,

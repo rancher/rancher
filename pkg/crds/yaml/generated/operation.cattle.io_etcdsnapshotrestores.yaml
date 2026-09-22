@@ -163,9 +163,9 @@ spec:
               conditions:
                 description: |-
                   Conditions represent the latest available observations of an operation's current state.
-                  Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, Finalized, and
-                  Paused.
-                  Succeeded, Failed and Canceled report how the operation ended, and the one matching the
+                  Known condition types are Pending, InProgress, Succeeded, Failed, Aborted, Canceled,
+                  Finalized, and Paused.
+                  Succeeded, Failed, Aborted and Canceled report how the operation ended, and the one matching the
                   terminal phase goes True as soon as that phase is reached. Finalized reports the separate
                   question of whether the controller has finished with the operation — terminal phase hook
                   satisfied, beacon released (see TerminatedAt) — and is True whenever any outcome condition is
@@ -223,12 +223,14 @@ spec:
                   An InProgress operation is one that is currently executing.
                   A Succeeded operation is one that completed successfully.
                   A Failed operation is one that failed to complete successfully.
-                  A Canceled operation is one that was canceled by the user or system.
+                  An Aborted operation is one that called its own work off, having found it cannot proceed.
+                  A Canceled operation is one that was called off from outside, by the user or the system.
                 enum:
                 - Pending
                 - InProgress
                 - Succeeded
                 - Failed
+                - Aborted
                 - Canceled
                 type: string
               step:

@@ -420,6 +420,8 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		return h.handlePending(s, status)
 	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
+	case opv1alpha1.OperationPhaseAborted:
+		return h.handleAborted(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
 		return h.handleCanceled(s, status)
 	case opv1alpha1.OperationPhaseFailed:
@@ -1018,10 +1020,20 @@ func (h *handler) releaseBeacon(s *scope) (bool, error) {
 	return owning, plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
 }
 
+// handleAborted handles the Aborted terminal phase, reached when the operation called its own work
+// off rather than attempting it and losing — which is what separates it from Failed. Its phase hook
+// runs first so a delegate can observe why the operation stopped.
+func (h *handler) handleAborted(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	return h.handleTerminal(s, status, terminalPhase{
+		hook: planv1alpha1.AbortedPhaseHookLabelPrefix,
+	})
+}
+
 // handleCanceled handles the Canceled terminal phase, which is reached when an external controller
 // cancels the operation or it is deleted before its terminal handling completed. Its phase hook
-// runs first so a delegate can observe the cancellation. The cancel-vs-fail distinction is that an
-// external party cancels whereas the operation fails itself — neither implies the other.
+// runs first so a delegate can observe the cancellation. What separates cancellation from the other
+// outcomes is that it comes from outside the operation, where Failed means the work was attempted
+// and lost and Aborted means the operation called it off itself — none implies another.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
 		hook: planv1alpha1.CanceledPhaseHookLabelPrefix,
@@ -1078,8 +1090,19 @@ func markFailed(status *opv1alpha1.EncryptionKeyRotationStatus, reason, message 
 	opv1alpha1.FailedCondition.Message(status, message)
 }
 
+// markAborted moves the operation into the Aborted terminal phase, for work the operation called off
+// itself after finding a condition it cannot proceed past — a failed preflight check, say. The
+// caller supplies the reason and message.
+func markAborted(status *opv1alpha1.EncryptionKeyRotationStatus, reason, message string) {
+	status.SetPhase(opv1alpha1.OperationPhaseAborted)
+
+	opv1alpha1.AbortedCondition.True(status)
+	opv1alpha1.AbortedCondition.Reason(status, reason)
+	opv1alpha1.AbortedCondition.Message(status, message)
+}
+
 // markCanceled moves the operation into the Canceled terminal phase, for work that was called off
-// rather than attempted and lost — a failed preflight check, or a deletion that raced the operation.
+// from outside the operation — spec.Cancel being set, or a deletion that raced the operation.
 func markCanceled(status *opv1alpha1.EncryptionKeyRotationStatus, reason, message string) {
 	status.SetPhase(opv1alpha1.OperationPhaseCanceled)
 
@@ -1166,6 +1189,7 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 	for cond, reason := range map[condition.Cond]string{
 		opv1alpha1.SucceededCondition: opv1alpha1.NotSuccessfulReason,
 		opv1alpha1.FailedCondition:    opv1alpha1.NotFailedReason,
+		opv1alpha1.AbortedCondition:   opv1alpha1.NotAbortedReason,
 		opv1alpha1.CanceledCondition:  opv1alpha1.NotCanceledReason,
 	} {
 		if cond == outcome {

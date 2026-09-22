@@ -63,16 +63,25 @@ const (
 	// OperationPhaseFailed indicates the operation was unsuccessful.
 	OperationPhaseFailed OperationPhase = "Failed"
 
-	// OperationPhaseCanceled indicates the operation was canceled by the user or system.
+	// OperationPhaseAborted indicates the operation called its own work off, having found a
+	// condition it cannot proceed past — a failed preflight check, for instance. Nothing outside
+	// the operation asked it to stop, and nothing it was asked to do was attempted and lost, which
+	// is what separates Aborted from Canceled and Failed respectively.
+	OperationPhaseAborted OperationPhase = "Aborted"
+
+	// OperationPhaseCanceled indicates the operation was called off from outside: the user set
+	// Cancel, another controller needed it to stop, or it was deleted before its terminal handling
+	// completed. The work it had already dispatched is no longer tracked by anything, so it can be
+	// reported neither as succeeded nor as failed.
 	OperationPhaseCanceled OperationPhase = "Canceled"
 )
 
 // OperationStatus defines the observed state of an operation.
 type OperationStatus struct {
 	// Conditions represent the latest available observations of an operation's current state.
-	// Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, Finalized, and
-	// Paused.
-	// Succeeded, Failed and Canceled report how the operation ended, and the one matching the
+	// Known condition types are Pending, InProgress, Succeeded, Failed, Aborted, Canceled,
+	// Finalized, and Paused.
+	// Succeeded, Failed, Aborted and Canceled report how the operation ended, and the one matching the
 	// terminal phase goes True as soon as that phase is reached. Finalized reports the separate
 	// question of whether the controller has finished with the operation — terminal phase hook
 	// satisfied, beacon released (see TerminatedAt) — and is True whenever any outcome condition is
@@ -106,8 +115,9 @@ type OperationStatus struct {
 	// An InProgress operation is one that is currently executing.
 	// A Succeeded operation is one that completed successfully.
 	// A Failed operation is one that failed to complete successfully.
-	// A Canceled operation is one that was canceled by the user or system.
-	// +kubebuilder:validation:Enum=Pending;InProgress;Succeeded;Failed;Canceled
+	// An Aborted operation is one that called its own work off, having found it cannot proceed.
+	// A Canceled operation is one that was called off from outside, by the user or the system.
+	// +kubebuilder:validation:Enum=Pending;InProgress;Succeeded;Failed;Aborted;Canceled
 	// +optional
 	Phase OperationPhase `json:"phase,omitempty"`
 
