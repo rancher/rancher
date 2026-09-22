@@ -39,7 +39,8 @@ const (
 // Phase hook label prefixes are the shared "<phase>.phase.hook.operation.cattle.io/" namespace used
 // to gate operation progression at phase boundaries. They are common to every operation type
 // (ETCDSnapshotSave, ETCDSnapshotRestore, EncryptionKeyRotation, …) because every operation goes
-// through the same phase state machine (Pending → InProgress → Succeeded | Failed | Canceled).
+// through the same phase state machine (Pending → InProgress → Succeeded | Failed | Aborted, with
+// Canceled reachable from any phase the controller has not finished handling yet).
 // Step-level hooks are operation-specific and live alongside their controller.
 //
 // Semantics: when an Operation carries a label whose key starts with one of these prefixes, the
@@ -72,9 +73,20 @@ const (
 	// step prefix individually.
 	InProgressPhaseHookLabelPrefix = "in-progress.phase.hook.operation.cattle.io/"
 
+	// AbortedPhaseHookLabelPrefix gates the Aborted phase, before the controller releases the
+	// beacon and runs any operation-type-specific cleanup (e.g. unpausing the CAPI cluster on
+	// encryption-key-rotation). Lets a delegate inspect / react to the reason the operation called
+	// its own work off.
+	AbortedPhaseHookLabelPrefix = "aborted.phase.hook.operation.cattle.io/"
+
 	// CanceledPhaseHookLabelPrefix gates the Canceled phase, before the controller releases the
 	// beacon and runs any operation-type-specific cleanup (e.g. unpausing the CAPI cluster on
 	// encryption-key-rotation). Lets a delegate inspect / react to the cancellation cause.
+	//
+	// Unlike the other phase hooks this one is honoured but not guaranteed: cancellation is driven
+	// from outside the operation, often by whoever wants the beacon next, so the operation may no
+	// longer hold the beacon by the time the hook would run. A controller which finds it holds no
+	// claim on the beacon has no authority to delegate and skips the hook.
 	CanceledPhaseHookLabelPrefix = "canceled.phase.hook.operation.cattle.io/"
 
 	// FailedPhaseHookLabelPrefix gates the Failed phase, before the controller releases the
