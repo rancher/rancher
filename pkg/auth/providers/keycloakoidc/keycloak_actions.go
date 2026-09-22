@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -88,7 +89,7 @@ func (k *keyCloakOIDCProvider) TestAndApply(request *types.APIContext) error {
 			fmt.Sprintf("[keycloak oidc] testAndApply: failed to parse body: %v", err))
 	}
 
-oidcConfig = oidcConfigApplyInput.OIDCConfig
+	oidcConfig = oidcConfigApplyInput.OIDCConfig
 	oidcConfig.Enabled = oidcConfigApplyInput.Enabled
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
 		oidcConfig.GroupSearchEnabled = ptr.To(false)
@@ -167,13 +168,44 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	}
 	config.ClientSecret = name
 
-	if config.OpenLdapConfig.ServiceAccountPassword != "" {
-		name, err := common.SavePasswordSecret(k.Secrets, config.OpenLdapConfig.ServiceAccountPassword, client.LdapConfigFieldServiceAccountPassword, config.Type)
-		if err != nil {
+	// integrate (a possibly pre-existing) ldap config with the keycloak config
+	ldapConfig, _, err := ldap.GetLDAPConfig(k.ldapProvider)
+
+	// can be misconfigured but still want it saved
+	if err != nil {
+		logrus.Warnf("error pulling %s ldap configs: %s\n", k.Name, err)
+		// if the config subkey is not in the crd
+		if ldapConfig == nil {
+			logrus.Debugf("[keycloak oidc] saveKeyCloakOIDCConfig: updating config")
+			_, err = k.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 			return err
 		}
-		config.OpenLdapConfig.ServiceAccountPassword = name
+
+		// only return the keycloak config on other errors
+		// if not configured it might have data in it we want to keep
+		if !ldap.IsNotConfigured(err) {
+			logrus.Debugf("[keycloak oidc] saveKeyCloakOIDCConfig: updating config")
+			_, err = k.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
+			return err
+		}
 	}
+
+	if config.OpenLdapConfig.ServiceAccountPassword != "" {
+		secretName, err := common.SavePasswordSecret(
+			k.Secrets,
+			config.OpenLdapConfig.ServiceAccountPassword,
+			client.LdapConfigFieldServiceAccountPassword,
+			config.Type)
+		if err != nil {
+			return fmt.Errorf("unable to save ldap service account password: %w", err)
+		}
+
+		// update ldap configuration with secret
+		ldapConfig.LdapFields.ServiceAccountPassword = secretName
+	}
+
+	// update keycloak with (possibly changed) ldap configuration
+	config.OpenLdapConfig = ldapConfig.LdapFields
 
 	logrus.Debugf("[keycloak oidc] saveKeyCloakOIDCConfig: updating config")
 	_, err = k.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
