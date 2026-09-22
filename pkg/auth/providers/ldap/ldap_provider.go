@@ -220,7 +220,7 @@ func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAcce
 	}
 
 	var principal *v3.Principal
-	if p.inlineLDAPConfigProvider() {
+	if p.providerHasLDAPSearch() {
 		principal, err = p.samlSearchGetPrincipal(externalID, scope, config, caPool)
 	} else {
 		principal, err = p.getPrincipal(externalID, scope, config, caPool)
@@ -260,7 +260,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 	storedLdapConfigMap := u.UnstructuredContent()
 	storedLdapConfig := &v3.LdapConfig{}
 
-	if p.inlineLDAPConfigProvider() && ldapConfigKey[p.providerName] != "" {
+	if p.providerHasLDAPSearch() && ldapConfigKey[p.providerName] != "" {
 		subLdapConfig, ok := storedLdapConfigMap[ldapConfigKey[p.providerName]]
 		if !ok || subLdapConfig == nil {
 			return nil, nil, ErrorNotConfigured{}
@@ -326,9 +326,9 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 	return externalID, scope, nil
 }
 
-// inlineLDAPConfigProvider reports whether a provider keeps its LDAP config nested
-// inside a non-LDAP auth provider config.
-func (p *ldapProvider) inlineLDAPConfigProvider() bool {
+// providerHasLDAPSearch reports whether a provider supports LDAP-backed search,
+// including providers that keep the LDAP config nested inside another auth config.
+func (p *ldapProvider) providerHasLDAPSearch() bool {
 	return ShibbolethName == p.providerName || OKTAName == p.providerName || KeyCloakOIDCName == p.providerName
 }
 
