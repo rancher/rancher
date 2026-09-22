@@ -1954,6 +1954,11 @@ var terminalHandlers = map[string]struct {
 	cond   condition.Cond
 	hook   string
 }{
+	"aborted": {
+		handle: (*handler).handleAborted,
+		cond:   opv1alpha1.AbortedCondition,
+		hook:   planv1alpha1.AbortedPhaseHookLabelPrefix,
+	},
 	"canceled": {
 		handle: (*handler).handleCanceled,
 		cond:   opv1alpha1.CanceledCondition,
@@ -2376,21 +2381,28 @@ func TestUpdateStatusTerminatedOutcome(t *testing.T) {
 			phase:   opv1alpha1.OperationPhaseSucceeded,
 			reason:  opv1alpha1.FinishedReason,
 			outcome: opv1alpha1.SucceededCondition,
-			others:  []condition.Cond{opv1alpha1.FailedCondition, opv1alpha1.CanceledCondition},
+			others:  []condition.Cond{opv1alpha1.FailedCondition, opv1alpha1.AbortedCondition, opv1alpha1.CanceledCondition},
 		},
 		{
 			name:    "failed",
 			phase:   opv1alpha1.OperationPhaseFailed,
 			reason:  opv1alpha1.PlanFailedReason,
 			outcome: opv1alpha1.FailedCondition,
-			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.CanceledCondition},
+			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.AbortedCondition, opv1alpha1.CanceledCondition},
 		},
 		{
 			name:    "canceled",
 			phase:   opv1alpha1.OperationPhaseCanceled,
 			reason:  opv1alpha1.OperationDeletedReason,
 			outcome: opv1alpha1.CanceledCondition,
-			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.FailedCondition},
+			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.FailedCondition, opv1alpha1.AbortedCondition},
+		},
+		{
+			name:    "aborted",
+			phase:   opv1alpha1.OperationPhaseAborted,
+			reason:  opv1alpha1.PreflightCheckFailedReason,
+			outcome: opv1alpha1.AbortedCondition,
+			others:  []condition.Cond{opv1alpha1.SucceededCondition, opv1alpha1.FailedCondition, opv1alpha1.CanceledCondition},
 		},
 	}
 
@@ -2439,6 +2451,7 @@ func TestUpdateStatusFinalizedOnlyOnceTerminated(t *testing.T) {
 		opv1alpha1.OperationPhaseInProgress,
 		opv1alpha1.OperationPhaseSucceeded,
 		opv1alpha1.OperationPhaseFailed,
+		opv1alpha1.OperationPhaseAborted,
 		opv1alpha1.OperationPhaseCanceled,
 	} {
 		t.Run(string(phase), func(t *testing.T) {

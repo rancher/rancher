@@ -220,6 +220,11 @@ func TestHasActiveLifecycleHook(t *testing.T) {
 			want:   true,
 		},
 		{
+			name:   "aborted phase hook",
+			labels: map[string]string{AbortedPhaseHookLabelPrefix + "test": "delegate-a"},
+			want:   true,
+		},
+		{
 			name:   "canceled phase hook",
 			labels: map[string]string{CanceledPhaseHookLabelPrefix + "test": "delegate-a"},
 			want:   true,

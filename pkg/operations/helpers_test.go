@@ -47,6 +47,7 @@ func TestIsTerminal(t *testing.T) {
 		{opv1alpha1.OperationPhaseInProgress, false},
 		{opv1alpha1.OperationPhaseSucceeded, true},
 		{opv1alpha1.OperationPhaseFailed, true},
+		{opv1alpha1.OperationPhaseAborted, true},
 		{opv1alpha1.OperationPhaseCanceled, true},
 		{"", false}, // empty phase is not terminal
 		{"Unknown", false},
