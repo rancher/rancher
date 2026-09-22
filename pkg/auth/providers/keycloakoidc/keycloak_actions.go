@@ -213,7 +213,7 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 		config.OpenLdapConfig.ServiceAccountPassword = secretName
 	} else {
 		// keep previous secret, if any
-		config.OpenLdapConfig.ServiceAccountPassword = ldapConfig.LdapFields.ServiceAccountPassword
+		config.OpenLdapConfig.ServiceAccountPassword = ldapConfig.SAPSecretName
 	}
 
 	logrus.Debugf("[keycloak oidc] saveKeyCloakOIDCConfig: updating config")
