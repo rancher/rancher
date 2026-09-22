@@ -94,8 +94,10 @@ spec:
                   Recover by deleting and recreating the operation.
                   Paused takes precedence: a paused operation halts reconciliation entirely, so the cancellation
                   is only observed once the pause is lifted.
-                  Cancelling an operation the controller has already finished with (Finalized) does nothing —
-                  there is no longer any work to call off, and the phase it ended in stands.
+                  Cancelling an operation which has already reached a terminal phase does nothing: there is no
+                  work left to call off, so the phase it ended in stands and the Canceled condition reports that
+                  the request was declined. Deleting such an operation does still stop it, which is the remedy
+                  for one whose terminal phase hook is never answered.
                 type: boolean
                 x-kubernetes-validations:
                 - message: cancel cannot be unset once true

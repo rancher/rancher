@@ -11,9 +11,11 @@ import opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alp
 //
 //   - Paused is checked first. A paused operation halts reconciliation entirely, so its
 //     cancellation is only observed once the pause is lifted. See IsPaused.
-//   - Termination closes the window. Cancellation applies for as long as the controller has not
-//     finished handling the operation, which includes a terminal phase still waiting on its
-//     lifecycle hook; once terminated there is nothing left to call off. See IsTerminated.
+//   - A terminal phase closes the window. Cancellation stops work in flight, and an operation whose
+//     outcome is already asserted has none left, so the request is declined and reported rather
+//     than acted on. See IsTerminal. Deletion is the one thing that still stops an operation in
+//     that state, because it has to; controllers must not rely on Cancel to reclaim a beacon from
+//     an operation which has already finished its work.
 func IsCanceled(spec *opv1alpha1.OperationSpec) bool {
 	return spec.Cancel
 }
