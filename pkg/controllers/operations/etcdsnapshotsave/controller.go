@@ -307,6 +307,8 @@ func (h *handler) onChange(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ET
 		status.SetPhase(opv1alpha1.OperationPhasePending)
 	}
 
+	status = cancelForRequest(op, status)
+
 	s, status, err := h.resolveScope(op, status)
 	if err != nil || s == nil {
 		return status, err
@@ -331,6 +333,34 @@ func cancelForDeletion(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSn
 	logrus.Infof("[etcdsnapshotsave] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, status.Phase, status.Step)
 
 	markCanceled(&status, opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
+
+	return status
+}
+
+// cancelForRequest marks an operation whose spec.Cancel is set as Canceled: the work was called off
+// from outside, so it can be reported neither as succeeded nor as failed.
+//
+// The window it applies in is the same one cancelForDeletion uses, and for the same reason. Until
+// terminal handling completes the operation still has something to call off — it is holding the
+// beacon, on its own behalf or a delegate's, and its lifecycle hook is still owed an answer — so a
+// cancellation lands even on an operation whose outcome is already asserted, abandoning the hook of
+// the phase it had reached. Once terminated there is nothing left to stop and the phase it finished
+// in stands. An operation already in Canceled keeps the reason it was canceled for.
+//
+// Note this runs after the paused check in onChange, so a paused operation is not canceled until it
+// is resumed.
+func cancelForRequest(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapshotSaveStatus) opv1alpha1.ETCDSnapshotSaveStatus {
+	if !ops.IsCanceled(&op.Spec.OperationSpec) {
+		return status
+	}
+
+	if ops.IsTerminated(&status.OperationStatus) || status.Phase == opv1alpha1.OperationPhaseCanceled {
+		return status
+	}
+
+	logrus.Infof("[etcdsnapshotsave] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, status.Phase, status.Step)
+
+	markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 	return status
 }
@@ -862,6 +892,14 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 type terminalPhase struct {
 	hook string
 
+	// beaconOptional marks a phase whose operation may no longer hold the beacon by the time it is
+	// handled. Cancellation is the only one: it is driven from outside the operation, often by
+	// whoever wants the beacon next, so finding the beacon in another controller's hands is an
+	// expected outcome rather than a failure. For such a phase a lost beacon means there is no
+	// authority to run the hook against and nothing to release, so terminal handling is trivially
+	// complete; every other phase still holds the beacon by construction.
+	beaconOptional bool
+
 	// onRelease, when set, runs after the beacon has been released. owning reports whether this
 	// operation was the beacon's primary owner rather than a delegate acting on its behalf.
 	onRelease func(s *scope, owning bool)
@@ -878,6 +916,17 @@ type terminalPhase struct {
 // deleting. A terminal phase handler that returns early therefore cannot forget to withhold it.
 func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus, phase terminalPhase) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
+
+	if phase.beaconOptional && !holdsBeacon(s) {
+		// Nothing to hand the hook to and nothing to give back: whoever holds the beacon now is
+		// entitled to it, and clearing it — or pushing a delegate onto it — would be reaching into
+		// another controller's operation.
+		logrus.Debugf("[etcdsnapshotsave] %s/%s: %s without holding the beacon, leaving it untouched", s.op.Namespace, s.op.Name, status.Phase)
+
+		status.SetTerminated()
+
+		return status, nil
+	}
 
 	delegated, err := h.handleHook(s, phase.hook)
 	if err != nil {
@@ -910,12 +959,19 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 // delegate chain at any position otherwise. Reports whether we were the primary owner; the
 // owner-vs-chain guard just avoids a no-op call.
 func (h *handler) releaseBeacon(s *scope) (bool, error) {
-	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
-	if !owning && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+	if !holdsBeacon(s) {
 		return false, nil
 	}
 
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
+
 	return owning, plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
+}
+
+// holdsBeacon reports whether the operation still has a claim on the beacon, either as its primary
+// owner or from anywhere in the delegate chain.
+func holdsBeacon(s *scope) bool {
+	return plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey)
 }
 
 // handleAborted handles the Aborted terminal phase, reached when the operation called its own work
@@ -931,7 +987,8 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 // terminal handling completed.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook: planv1alpha1.CanceledPhaseHookLabelPrefix,
+		hook:           planv1alpha1.CanceledPhaseHookLabelPrefix,
+		beaconOptional: true,
 	})
 }
 
