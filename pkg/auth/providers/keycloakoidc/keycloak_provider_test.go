@@ -79,6 +79,20 @@ func TestConfigureTest(t *testing.T) {
 				"redirect_uri=https://example.com/callback",
 			},
 		},
+		{
+			name: "keycloak oidc configure test preserves unescaped redirect values",
+			authConfig: map[string]any{
+				"accessMode":   "unrestricted",
+				"enabled":      false,
+				"clientId":     "client123",
+				"clientSecret": "secret123",
+				"rancherUrl":   "https://example.com/callback?state=a+b c",
+				"issuer":       "https://ranchertest.io/issuer",
+				"authEndpoint": "https://ranchertest.io/auth?extra=param",
+				"scope":        "openid profile+email",
+			},
+			expectedRedirectURL: "https://ranchertest.io/auth?extra=param?client_id=client123&response_type=code&redirect_uri=https://example.com/callback?state=a+b c",
+		},
 	}
 
 	for _, test := range tests {
