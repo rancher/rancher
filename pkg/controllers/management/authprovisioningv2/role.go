@@ -391,8 +391,14 @@ type indexGetter interface {
 	GetByIndex(gvk schema.GroupVersionKind, indexName, key string) ([]runtime.Object, error)
 }
 
+// clusterIndexKey returns the clusterIndexed index key for the given cluster. It must stay in
+// sync with the keys produced by indexByCluster.
+func clusterIndexKey(cluster *v1.Cluster) string {
+	return fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name)
+}
+
 func getResourceNames(indexer indexGetter, resourceMatch resourceMatch, cluster *v1.Cluster) ([]string, error) {
-	objs, err := indexer.GetByIndex(resourceMatch.GVK, clusterIndexed, fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name))
+	objs, err := indexer.GetByIndex(resourceMatch.GVK, clusterIndexed, clusterIndexKey(cluster))
 	if err != nil {
 		return nil, err
 	}

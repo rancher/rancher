@@ -49,13 +49,16 @@ type handler struct {
 	mgmtClusters                         mgmtcontrollers.ClusterCache
 	crdCache                             apiextcontrollers.CustomResourceDefinitionCache
 	dynamic                              *dynamic.Controller
-	resources                            map[schema.GroupVersionKind]resourceMatch
-	knownResources                       map[schema.GroupVersionKind]bool
-	resourcesList                        []resourceMatch
-	resourcesLock                        sync.RWMutex
-	apply                                apply.Apply
-	roleBindingApply                     apply.Apply
-	provisioningClusterGVK               schema.GroupVersionKind
+	// indexGetter reads the clusterIndexed index. It is normally the same object as
+	// dynamic, held behind an interface so tests can substitute a fake.
+	indexGetter            indexGetter
+	resources              map[schema.GroupVersionKind]resourceMatch
+	knownResources         map[schema.GroupVersionKind]bool
+	resourcesList          []resourceMatch
+	resourcesLock          sync.RWMutex
+	apply                  apply.Apply
+	roleBindingApply       apply.Apply
+	provisioningClusterGVK schema.GroupVersionKind
 }
 
 func Register(ctx context.Context, clients *wrangler.Context, management *config.ManagementContext) error {
@@ -84,6 +87,7 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 		mgmtClusters:                         clients.Mgmt.Cluster().Cache(),
 		crdCache:                             clients.CRD.CustomResourceDefinition().Cache(),
 		dynamic:                              clients.Dynamic,
+		indexGetter:                          clients.Dynamic,
 		apply: clients.Apply.WithCacheTypes(
 			clients.Mgmt.RoleTemplate(),
 			clients.RBAC.Role()),
