@@ -14,7 +14,7 @@ permissions:
 env:
   GOARCH: amd64
   CGO_ENABLED: 0
-  SETUP_GO_VERSION: '1.26.*'
+  SETUP_GO_VERSION: '1.27.*'
 
 jobs:
   check-changes:
