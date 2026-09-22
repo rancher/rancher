@@ -1,6 +1,10 @@
 package namespace
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -44,8 +48,30 @@ func (m *Mutator) mutate(ns *corev1.Namespace) bool {
 	return updated
 }
 
-func SetMutator(m Mutator) {
+func SetMutator(m Mutator) error {
+	var offending []string
+	for key := range m.Labels {
+		if isRancherKey(key) {
+			offending = append(offending, fmt.Sprintf("label %q", key))
+		}
+	}
+	for key := range m.Annotations {
+		if key != AnnotationManagedNamespace && isRancherKey(key) {
+			offending = append(offending, fmt.Sprintf("annotation %q", key))
+		}
+	}
+	if len(offending) > 0 {
+		sort.Strings(offending)
+		return fmt.Errorf("rancher namespace mutator cannot set Rancher labels or annotations: %s", strings.Join(offending, ", "))
+	}
+
 	mutator = m
+	return nil
+}
+
+func isRancherKey(key string) bool {
+	domain, _, ok := strings.Cut(key, "/")
+	return ok && (domain == "rancher.io" || domain == "cattle.io" || strings.HasSuffix(domain, ".cattle.io"))
 }
 
 func GetMutator() Mutator {
