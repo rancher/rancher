@@ -3,18 +3,23 @@ package keycloakoidc
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 )
@@ -41,6 +46,34 @@ func (k *keyCloakOIDCProvider) actionHandler(actionName string, action *types.Ac
 	default:
 		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
+}
+
+func (k *keyCloakOIDCProvider) ConfigureTest(request *types.APIContext) error {
+	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
+		k.Type))
+	if err != nil {
+		return err
+	}
+
+	pkceMethod := input[client.KeyCloakOIDCConfigFieldPKCEMethod]
+	if pkceMethod != "" {
+		logrus.Debugf("KeyCloakOIDCProvider: PKCE enabled: %v", pkceMethod)
+	}
+
+	var pkceVerifier string
+	if pkceMethod != "" {
+		pkceVerifier = oauth2.GenerateVerifier()
+		oidc.SetPKCEVerifier(request.Request, request.Response, pkceVerifier)
+	}
+
+	data := map[string]any{
+		"redirectUrl": oidc.GetOIDCRedirectionURL(input, pkceVerifier, &orderedValues{}),
+		"type":        client.KeyCloakOIDCTestOutputType,
+	}
+
+	request.WriteResponse(http.StatusOK, data)
+
+	return nil
 }
 
 // TestAndApply validates the correctness of the Keycloak OIDC configuration
@@ -157,4 +190,34 @@ func validateScopes(input string) bool {
 		}
 	}
 	return false
+}
+
+// This is used instead of url.Values to avoid URL encoding the values.
+// It preserves insertion order when building the redirect query string.
+type orderedValues []string
+
+func (v *orderedValues) Add(key, value string) {
+	*v = append(*v, key, value)
+}
+
+func (v orderedValues) Encode() string {
+	if len(v) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	for i := 0; i < len(v); i += 2 {
+		if len(v)-i < 2 {
+			break
+		}
+		key, value := v[i], v[i+1]
+		if buf.Len() > 0 {
+			buf.WriteByte('&')
+		}
+		buf.WriteString(key)
+		buf.WriteByte('=')
+		buf.WriteString(value)
+	}
+
+	return buf.String()
 }

@@ -1,6 +1,7 @@
 package keycloakoidc
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -13,8 +14,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rancher/norman/api/writer"
 	"github.com/rancher/norman/types"
-
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
@@ -23,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +35,99 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+func TestConfigureTest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                string
+		authConfig          map[string]any
+		expectedRedirectURL string
+		contains            []string
+	}{
+		{
+			name: "keycloak oidc configure test",
+			authConfig: map[string]any{
+				"accessMode":   "unrestricted",
+				"enabled":      false,
+				"clientId":     "client123",
+				"clientSecret": "secret123",
+				"rancherUrl":   "https://example.com/callback",
+				"issuer":       "https://ranchertest.io/issuer",
+				"authEndpoint": "https://ranchertest.io/auth",
+				"scope":        "openid profile email",
+			},
+			expectedRedirectURL: "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
+		},
+		{
+			name: "keycloak oidc configure test with pkce",
+			authConfig: map[string]any{
+				"accessMode":   "unrestricted",
+				"enabled":      false,
+				"clientId":     "client123",
+				"clientSecret": "secret123",
+				"rancherUrl":   "https://example.com/callback",
+				"issuer":       "https://ranchertest.io/issuer",
+				"authEndpoint": "https://ranchertest.io/auth",
+				"scope":        "openid profile email",
+				"pkceMethod":   oidc.PKCES256Method,
+			},
+			contains: []string{
+				"https://ranchertest.io/auth?client_id=client123&response_type=code",
+				"code_challenge=",
+				"code_challenge_method=S256",
+				"redirect_uri=https://example.com/callback",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body, err := json.Marshal(test.authConfig)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/v3/keyCloakOIDCConfigs/keycloakoidc?action=configureTest", bytes.NewReader(body))
+
+			schemas := types.NewSchemas()
+			schemas.AddSchemas(managementschema.AuthSchemas)
+
+			rw := &writer.EncodingResponseWriter{
+				ContentType: "application/json",
+				Encoder:     types.JSONEncoder,
+			}
+			rr := httptest.NewRecorder()
+			r := &types.APIContext{
+				Schemas:        schemas,
+				Request:        req,
+				Response:       rr,
+				ResponseWriter: rw,
+				Version:        &managementschema.Version,
+			}
+
+			provider := keyCloakOIDCProvider{
+				OpenIDCProvider: oidc.OpenIDCProvider{
+					Name: Name,
+					Type: client.KeyCloakOIDCConfigType,
+				},
+			}
+			err = provider.ConfigureTest(r)
+			require.NoError(t, err)
+
+			res := rr.Result()
+			defer res.Body.Close()
+
+			var output v3.KeyCloakOIDCTestOutput
+			err = json.NewDecoder(res.Body).Decode(&output)
+			require.NoError(t, err)
+			if test.expectedRedirectURL != "" {
+				assert.Equal(t, test.expectedRedirectURL, output.RedirectURL)
+			}
+			for _, expected := range test.contains {
+				assert.Contains(t, output.RedirectURL, expected)
+			}
+		})
+	}
+}
 
 func TestConfiguredKeycloakOIDCProviderContainsLdapProvider(t *testing.T) {
 	ctx := t.Context()
