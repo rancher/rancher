@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -657,13 +658,7 @@ func TestOnMachineChange(t *testing.T) {
 // machine event to trigger a reconcile.
 func TestOnNodeChange(t *testing.T) {
 	now := metav1.Now()
-	node := func(annotations map[string]string) *corev1.Node {
-		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", Annotations: annotations}}
-	}
-	linkedNode := node(map[string]string{
-		capi.MachineAnnotation:          "machine-1",
-		capi.ClusterNamespaceAnnotation: testCAPIClusterNS,
-	})
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}
 	machine := &capi.Machine{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "machine-1",
@@ -685,59 +680,77 @@ func TestOnNodeChange(t *testing.T) {
 	tests := []struct {
 		name              string
 		node              *corev1.Node
-		machine           *capi.Machine
-		machineErr        error
-		expectMachineLook bool
+		machines          []*capi.Machine
+		machineListErr    error
+		expectMachineList bool
 		expectUpdate      bool
+		expectError       bool
 	}{
 		{
-			name:              "node linked to a machine of this cluster is reconciled",
-			node:              linkedNode,
-			machine:           machine,
-			expectMachineLook: true,
+			name:              "node claimed by a machine of this cluster is reconciled",
+			node:              node,
+			machines:          []*capi.Machine{machine},
+			expectMachineList: true,
 			expectUpdate:      true,
 		},
 		{
-			name: "node without the machine annotation is ignored",
-			node: node(nil),
-		},
-		{
-			name: "node annotated for another cluster namespace is ignored",
-			node: node(map[string]string{
-				capi.MachineAnnotation:          "machine-1",
-				capi.ClusterNamespaceAnnotation: "fleet-other",
-			}),
-		},
-		{
-			name:              "missing machine is skipped",
-			node:              linkedNode,
-			machineErr:        apierrors.NewNotFound(schema.GroupResource{Resource: "machines"}, "machine-1"),
-			expectMachineLook: true,
-		},
-		{
-			name: "machine of another cluster is ignored",
-			node: linkedNode,
-			machine: func() *capi.Machine {
+			// The node is up before CAPI has set NodeRef; the machine handler covers it later.
+			name: "node not claimed by any machine is skipped",
+			node: node,
+			machines: []*capi.Machine{func() *capi.Machine {
 				m := machine.DeepCopy()
-				m.Labels[capi.ClusterNameLabel] = "another-cluster"
+				m.Status.NodeRef = capi.MachineNodeReference{}
 				return m
-			}(),
-			expectMachineLook: true,
+			}()},
+			expectMachineList: true,
+		},
+		{
+			name: "machine pointing at another node is ignored",
+			node: node,
+			machines: []*capi.Machine{func() *capi.Machine {
+				m := machine.DeepCopy()
+				m.Status.NodeRef = capi.MachineNodeReference{Name: "node-2"}
+				return m
+			}()},
+			expectMachineList: true,
+		},
+		{
+			name:              "no machines in the cluster namespace is skipped",
+			node:              node,
+			machines:          []*capi.Machine{},
+			expectMachineList: true,
+		},
+		{
+			name: "machine being deleted is ignored",
+			node: node,
+			machines: []*capi.Machine{func() *capi.Machine {
+				m := machine.DeepCopy()
+				m.DeletionTimestamp = &now
+				return m
+			}()},
+			expectMachineList: true,
 		},
 		{
 			name: "machine whose infrastructure is not ready is skipped",
-			node: linkedNode,
-			machine: func() *capi.Machine {
+			node: node,
+			machines: []*capi.Machine{func() *capi.Machine {
 				m := machine.DeepCopy()
 				m.Status.Conditions = nil
 				return m
-			}(),
-			expectMachineLook: true,
+			}()},
+			expectMachineList: true,
+		},
+		{
+			name:              "list error is propagated",
+			node:              node,
+			machineListErr:    fmt.Errorf("cache not synced"),
+			expectMachineList: true,
+			expectError:       true,
 		},
 		{
 			name: "deleted node is skipped",
 			node: func() *corev1.Node {
-				n := linkedNode.DeepCopy()
+				n := node.DeepCopy()
 				n.DeletionTimestamp = &now
 				return n
 			}(),
@@ -752,8 +765,10 @@ func TestOnNodeChange(t *testing.T) {
 			rkeControlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
 			nodeClient := fake.NewMockNonNamespacedClientInterface[*corev1.Node, *corev1.NodeList](ctrl)
 
-			if tt.expectMachineLook {
-				machineCache.EXPECT().Get(testCAPIClusterNS, "machine-1").Return(tt.machine, tt.machineErr)
+			if tt.expectMachineList {
+				machineCache.EXPECT().
+					List(testCAPIClusterNS, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: testCAPIClusterName})).
+					Return(tt.machines, tt.machineListErr)
 			}
 			if tt.expectUpdate {
 				capiClusterCache.EXPECT().Get(testCAPIClusterNS, testCAPIClusterName).Return(&capi.Cluster{
@@ -784,6 +799,10 @@ func TestOnNodeChange(t *testing.T) {
 			}
 
 			_, err := h.OnNodeChange("", tt.node)
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
 			assert.NoError(t, err)
 		})
 	}

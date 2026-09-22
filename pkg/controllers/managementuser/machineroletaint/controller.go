@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -158,25 +159,13 @@ func (h *handler) OnNodeChange(_ string, node *corev1.Node) (*corev1.Node, error
 		return node, nil
 	}
 
-	machineName := node.Annotations[capi.MachineAnnotation]
-	machineNS := node.Annotations[capi.ClusterNamespaceAnnotation]
-	if machineName == "" || machineNS != h.capiCluster.Namespace {
-		// CAPI has not linked this node to a machine yet, or the link points somewhere
-		// this handler does not own.
-		return node, nil
-	}
-
-	machine, err := h.machineCache.Get(machineNS, machineName)
+	machine, err := h.machineForNode(node.Name)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return node, nil
-		}
-		return node, fmt.Errorf("failed to get machine %s/%s: %w", machineNS, machineName, err)
+		return node, err
 	}
-
-	if machine.DeletionTimestamp != nil ||
-		machine.Labels[capi.ClusterNameLabel] != h.capiCluster.Name ||
-		!capr.InfrastructureReady.IsTrue(machine) {
+	if machine == nil || !capr.InfrastructureReady.IsTrue(machine) {
+		// No machine claims this node yet. Whichever of the two handlers observes the link
+		// last does the reconcile.
 		return node, nil
 	}
 
@@ -190,6 +179,26 @@ func (h *handler) OnNodeChange(_ string, node *corev1.Node) (*corev1.Node, error
 	}
 
 	return node, nil
+}
+
+// machineForNode returns the machine of this cluster whose NodeRef points at the given node, or
+// nil when no machine has claimed it yet. NodeRef is the same link the machine handler uses, which
+// keeps the two handlers consistent and avoids depending on the CAPI node annotations.
+func (h *handler) machineForNode(nodeName string) (*capi.Machine, error) {
+	machines, err := h.machineCache.List(h.capiCluster.Namespace, labels.SelectorFromSet(labels.Set{
+		capi.ClusterNameLabel: h.capiCluster.Name,
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to list machines for cluster %s: %w", h.capiCluster, err)
+	}
+
+	for _, machine := range machines {
+		if machine.DeletionTimestamp == nil && machine.Status.NodeRef.IsDefined() && machine.Status.NodeRef.Name == nodeName {
+			return machine, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // clusterRuntime returns the runtime (rke2/k3s) of this cluster. The second return value is false
