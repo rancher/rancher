@@ -1593,3 +1593,177 @@ func TestOnChange_ExpiredTerminalOperationIsCollectedOnceTerminated(t *testing.T
 	assert.ErrorIs(t, err, generic.ErrSkip, "the collected operation must not be processed further")
 	assert.Equal(t, 1, controller.deleteCalls)
 }
+
+// --- cancellation ----------------------------------------------------------------------------
+
+// TestOnChange_CancelRequestedCancelsInFlightOperation covers the core of the cancellation
+// contract, which mirrors the deletion one: an operation canceled while it is still running stops
+// where it is, releases the beacon, and reports why it was canceled.
+func TestOnChange_CancelRequestedCancelsInFlightOperation(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newOp(), "test")
+	op.Spec.Cancel = true
+	op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.ETCDSnapshotSaveStepSave,
+	}
+
+	h, _, beacons := newOnChangeHandler(newBeacon(testOwnerKey, true))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseCanceled, status.Phase)
+	assert.Equal(t, "True", opv1alpha1.CanceledCondition.GetStatus(&status))
+	assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	assert.False(t, status.TerminatedAt.IsZero(), "handleCanceled ran to completion, so it must be recorded")
+	assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&status))
+	if assert.Len(t, beacons.statusUpdates, 1, "the beacon must be released") {
+		assert.Equal(t, "", beacons.statusUpdates[0].Status.Owner)
+		assert.False(t, beacons.statusUpdates[0].Status.Active)
+	}
+}
+
+// TestOnChange_CancelRequestedInTerminalPhaseAbandonsItsHook is the interesting half of the window
+// rule. An operation which reached a terminal phase but is still waiting on that phase's lifecycle
+// hook has not finished: it is holding the beacon on a delegate's behalf, and nothing else can run
+// until the delegate returns it. Cancelling such an operation abandons the hook it was waiting on
+// and frees the beacon, which is what stops a wedged delegate from blocking the cluster forever.
+func TestOnChange_CancelRequestedInTerminalPhaseAbandonsItsHook(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newOp(), "test")
+	op.Spec.Cancel = true
+	// The operation succeeded, then handed the beacon to a delegate that never gave it back.
+	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
+	op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
+		Step:            opv1alpha1.ETCDSnapshotSaveStepRestart,
+	}
+
+	beacon := newBeacon(testOwnerKey, true)
+	beacon.Status.Delegates = []string{"delegate-a"}
+	h, _, beacons := newOnChangeHandler(beacon)
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseCanceled, status.Phase,
+		"a terminal phase which has not finished being handled is still cancellable")
+	assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	assert.Equal(t, "False", opv1alpha1.SucceededCondition.GetStatus(&status),
+		"the outcome it was about to be finalized with is superseded")
+	assert.False(t, status.TerminatedAt.IsZero())
+	if assert.Len(t, beacons.statusUpdates, 1, "the beacon must be freed despite the abandoned hook") {
+		assert.Equal(t, "", beacons.statusUpdates[0].Status.Owner)
+		assert.Empty(t, beacons.statusUpdates[0].Status.Delegates,
+			"the delegate the abandoned hook pushed must not be left on the beacon")
+	}
+}
+
+// TestOnChange_CancelRequestedAfterTerminationKeepsOutcome guards the other end of the window: once
+// the controller is finished with an operation there is nothing left to call off, so the phase it
+// ended in stands.
+func TestOnChange_CancelRequestedAfterTerminationKeepsOutcome(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newOp(), "test")
+	op.Spec.Cancel = true
+	// A TTL that never expires, so the terminal operation lingers instead of being collected —
+	// what is under test is the phase, not the garbage collection that eventually removes it.
+	op.Spec.TTL = -1
+	op.Status = updateStatus(op, opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase:        opv1alpha1.OperationPhaseSucceeded,
+			TerminatedAt: metav1.Now(),
+		},
+		Step: opv1alpha1.ETCDSnapshotSaveStepRestart,
+	})
+
+	h, _, beacons := newOnChangeHandler(newBeacon("", false))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase, "a terminated operation must not be demoted to Canceled")
+	assert.Equal(t, "True", opv1alpha1.SucceededCondition.GetStatus(&status))
+	assert.Equal(t, "False", opv1alpha1.CanceledCondition.GetStatus(&status), "the Canceled condition must be denied, not raised")
+	assert.Empty(t, beacons.statusUpdates, "there is nothing left to release")
+}
+
+// TestOnChange_PausedBlocksCancel pins the documented precedence: Paused halts reconciliation
+// outright, so a cancellation requested on a paused operation is not acted on until it is resumed.
+func TestOnChange_PausedBlocksCancel(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newOp(), "test")
+	op.Spec.Paused = true
+	op.Spec.Cancel = true
+	op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.ETCDSnapshotSaveStepSave,
+	}
+
+	h, controller, beacons := newOnChangeHandler(newBeacon(testOwnerKey, true))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, status.Phase, "a paused operation must not transition on cancel")
+	assert.Equal(t, "", opv1alpha1.CanceledCondition.GetStatus(&status), "the Canceled condition must not be reported while paused")
+	assert.Equal(t, "True", opv1alpha1.PausedCondition.GetStatus(&status))
+	assert.Empty(t, beacons.statusUpdates, "the beacon must be left as the pause found it")
+	assert.Empty(t, controller.updates, "a paused operation is not finalized, so it takes no finalizer")
+}
+
+// TestHandleCanceled_BeaconHeldByAnotherIsNotTouched covers what makes the Canceled phase different
+// from every other terminal phase: cancellation is driven from outside, often by whoever wants the
+// beacon next, so the operation may already have lost it. That is an accepted outcome — the
+// operation still finishes, and the beacon (now someone else's) is left exactly as it is, including
+// not having the canceled phase hook's delegate pushed onto it.
+func TestHandleCanceled_BeaconHeldByAnotherIsNotTouched(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Labels = map[string]string{planv1alpha1.CanceledPhaseHookLabelPrefix + "cleanup": "delegate-a"}
+
+	beacons := &fakeBeaconClient{}
+	h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
+	s := newScope(op, newBeacon("another-controller", true), defaultAdapter())
+
+	status := opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseCanceled},
+	}
+
+	got, err := h.handleCanceled(s, status)
+	assert.NoError(t, err)
+	assert.False(t, got.TerminatedAt.IsZero(), "with no beacon to release, terminal handling is trivially complete")
+	assert.Empty(t, beacons.statusUpdates, "a beacon held by another controller must not be modified")
+	assert.Empty(t, beacons.updates)
+}
+
+// The beacon-optional rule is specific to cancellation: every other terminal phase is reached by
+// the operation itself while it still holds the beacon, so a missing claim there is not something
+// to paper over by declaring the operation finished.
+func TestHandleTerminal_BeaconOptionalOnlyForCancellation(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range terminalHandlers {
+		if name == "canceled" {
+			continue
+		}
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			op := newOp()
+			op.Labels = map[string]string{tc.hook + "cleanup": "delegate-a"}
+
+			beacons := &fakeBeaconClient{}
+			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
+			s := newScope(op, newBeacon("another-controller", true), defaultAdapter())
+
+			got, err := tc.handle(h, s, opv1alpha1.ETCDSnapshotSaveStatus{})
+			assert.NoError(t, err)
+			assert.True(t, got.TerminatedAt.IsZero(), "the hook is still owed an answer, so handling is not complete")
+			assert.NotEmpty(t, beacons.statusUpdates, "the hook's delegate is pushed as usual")
+		})
+	}
+}
