@@ -148,6 +148,12 @@ const (
 	// CancelRequestedReason surfaces when an operation was canceled because OperationSpec.Cancel
 	// was set, by the user or by another controller that needed the operation to stop.
 	CancelRequestedReason = "CancelRequested"
+
+	// CancellationDeclinedReason surfaces on the Canceled condition when OperationSpec.Cancel was
+	// set on an operation which had already reached a terminal phase. Cancellation stops work in
+	// flight and there is none left, so the phase the operation ended in stands. It is reported
+	// rather than passed over so that setting the field never goes unacknowledged.
+	CancellationDeclinedReason = "CancellationDeclined"
 )
 
 // OutcomeConditionFor maps a terminal phase to the outcome condition that reports it, along with
