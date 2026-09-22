@@ -172,7 +172,7 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	//
 	// notes
 	//
-	// - a previously existing secret is kept if it is not overriden through
+	// - a previously existing secret is kept if it is not overridden through
 	//   a new password in the incoming config
 	//
 	// - for everything else the data in the incoming config unconditionally
