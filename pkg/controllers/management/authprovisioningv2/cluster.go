@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/rbac"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,20 +20,6 @@ import (
 
 const (
 	capiResourcesCleanupFinalizer = "auth.cattle.io/capi-resources-cleanup"
-
-	// removedWaitingReason is the Removed condition reason used while a removal is waiting on
-	// dependents. It matches the reason capr.DoRemoveAndUpdateStatus uses so that the two
-	// writers of this condition read as one.
-	removedWaitingReason = "Waiting"
-
-	// removedWaitingMessagePrefix prefixes the Removed condition message this handler writes. It
-	// is how clearRemovedWaiting recognises its own message and avoids clobbering a Removed
-	// condition that the provisioning cluster remove handler owns.
-	removedWaitingMessagePrefix = "waiting for cluster-indexed resources to be deleted"
-
-	// maxBlockingResourcesInMessage caps how many resource references are named in the Removed
-	// condition message, so that a cluster with many leftovers doesn't produce an unbounded status.
-	maxBlockingResourcesInMessage = 10
 )
 
 // OnCluster creates the roles required for users to be able to see/manage the
@@ -54,29 +39,18 @@ func (h *handler) OnCluster(key string, cluster *v1.Cluster) (*v1.Cluster, error
 	}
 
 	if cluster.DeletionTimestamp != nil {
-		// Cluster is being deleted — check if any cluster-indexed resources still exist
+		// Cluster is being deleted, check if any cluster-indexed resources still exist
 		blocking, err := h.blockingClusterIndexedResources(cluster)
 		if err != nil {
 			return cluster, err
 		}
 		if len(blocking) > 0 {
-			// Record what is holding the deletion up so it can be diagnosed from the
-			// cluster object, then re-enqueue to keep checking; this keeps the crt-*
-			// Role alive via the finalizer blocking GC on the cluster object
-			cluster, err = h.setRemovedWaiting(cluster, blocking)
-			if err != nil {
-				return cluster, err
-			}
 			h.clusterController.EnqueueAfter(cluster.Namespace, cluster.Name, reenqueueTime)
 			return cluster, nil
 		}
 
 		// No cluster-indexed resources remain — safe to proceed with deletion
 		if err := h.cleanClusterAdminRoleBindings(cluster); err != nil {
-			return cluster, err
-		}
-
-		if cluster, err = h.clearRemovedWaiting(cluster); err != nil {
 			return cluster, err
 		}
 
@@ -242,58 +216,4 @@ func ownedBy(obj metav1.Object, ownerUID types.UID) bool {
 	return slices.ContainsFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
 		return ref.UID == ownerUID
 	})
-}
-
-// setRemovedWaiting records on the Removed condition which resources are blocking the cluster's
-// deletion, in the same Unknown/Waiting shape capr.DoRemoveAndUpdateStatus uses when a removal is
-// waiting on dependents. It is a no-op if the condition already says the same thing, so that the
-// deletion re-enqueue loop does not write to the API server every reenqueueTime.
-func (h *handler) setRemovedWaiting(cluster *v1.Cluster, blocking []string) (*v1.Cluster, error) {
-	message := blockingResourcesMessage(blocking)
-	if capr.Removed.IsUnknown(cluster) &&
-		capr.Removed.GetReason(cluster) == removedWaitingReason &&
-		capr.Removed.GetMessage(cluster) == message {
-		return cluster, nil
-	}
-
-	clusterCopy := cluster.DeepCopy()
-	capr.Removed.SetStatus(clusterCopy, "Unknown")
-	capr.Removed.Reason(clusterCopy, removedWaitingReason)
-	capr.Removed.Message(clusterCopy, message)
-
-	updated, err := h.clusterController.UpdateStatus(clusterCopy)
-	if err != nil {
-		return cluster, err
-	}
-	return updated, nil
-}
-
-// clearRemovedWaiting reverts a Removed condition this handler parked on Unknown, so a cluster
-// which lingers on some other controller's finalizer doesn't keep reporting a blockage that no
-// longer exists. It only acts on a message it wrote itself, leaving the provisioning cluster
-// remove handler's own Removed bookkeeping alone.
-func (h *handler) clearRemovedWaiting(cluster *v1.Cluster) (*v1.Cluster, error) {
-	if !strings.HasPrefix(capr.Removed.GetMessage(cluster), removedWaitingMessagePrefix) {
-		return cluster, nil
-	}
-
-	clusterCopy := cluster.DeepCopy()
-	capr.Removed.SetStatusBool(clusterCopy, true)
-	capr.Removed.Reason(clusterCopy, "")
-	capr.Removed.Message(clusterCopy, "")
-
-	updated, err := h.clusterController.UpdateStatus(clusterCopy)
-	if err != nil {
-		return cluster, err
-	}
-	return updated, nil
-}
-
-func blockingResourcesMessage(blocking []string) string {
-	shown, extra := blocking, ""
-	if len(shown) > maxBlockingResourcesInMessage {
-		shown = shown[:maxBlockingResourcesInMessage]
-		extra = fmt.Sprintf(" and %d more", len(blocking)-maxBlockingResourcesInMessage)
-	}
-	return fmt.Sprintf("%s: %s%s", removedWaitingMessagePrefix, strings.Join(shown, ", "), extra)
 }

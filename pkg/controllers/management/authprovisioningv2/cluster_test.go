@@ -2,14 +2,12 @@ package authprovisioningv2
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/rancher/kubernetes-provider-detector/providers"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/kubernetesprovider"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -409,9 +407,6 @@ func TestOnCluster(t *testing.T) {
 			cluster: deletingCluster(),
 			clusterMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) provisioningcontrollers.ClusterController {
 				mock := fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
-				mock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
-					return updated, nil
-				})
 				mock.EXPECT().EnqueueAfter(cluster.Namespace, cluster.Name, reenqueueTime)
 				return mock
 			},
@@ -434,85 +429,6 @@ func TestOnCluster(t *testing.T) {
 			},
 			expectedErr:        nil,
 			expectedFinalizers: []string{capiResourcesCleanupFinalizer},
-			assertResult: func(t *testing.T, result *v1.Cluster) {
-				assert.True(t, capr.Removed.IsUnknown(result))
-				assert.Equal(t, removedWaitingReason, capr.Removed.GetReason(result))
-				assert.Equal(t,
-					removedWaitingMessagePrefix+": "+
-						"DigitaloceanMachineTemplate fleet-default/orphan-template, "+
-						"ETCDSnapshot fleet-default/local-snapshot",
-					capr.Removed.GetMessage(result))
-			},
-		},
-		"deleting cluster clears its own stale Removed message before removing the finalizer": {
-			cluster: func() *v1.Cluster {
-				cluster := deletingCluster()
-				capr.Removed.SetStatus(cluster, "Unknown")
-				capr.Removed.Reason(cluster, removedWaitingReason)
-				capr.Removed.Message(cluster, removedWaitingMessagePrefix+": ETCDSnapshot fleet-default/local-snapshot")
-				return cluster
-			}(),
-			roleBindingMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) wranglerrbacv1.RoleBindingController {
-				mock := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
-				mock.EXPECT().List(cluster.Namespace, metav1.ListOptions{}).Return(&rbacv1.RoleBindingList{}, nil)
-				return mock
-			},
-			clusterMock: func(ctrl *gomock.Controller, _ *v1.Cluster) provisioningcontrollers.ClusterController {
-				mock := fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
-				mock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
-					assert.True(t, capr.Removed.IsTrue(updated))
-					assert.Empty(t, capr.Removed.GetReason(updated))
-					assert.Empty(t, capr.Removed.GetMessage(updated))
-					return updated, nil
-				})
-				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
-					assert.Empty(t, updated.Finalizers)
-					return updated, nil
-				})
-				return mock
-			},
-			setupHandler: func(h *handler) {
-				h.indexGetter = fakeIndexGetter{}
-				h.resourcesList = []resourceMatch{{GVK: etcdSnapshotGVK, Resource: "etcdsnapshots"}}
-			},
-			expectedErr:        nil,
-			expectedFinalizers: []string{},
-		},
-		// Removed is shared with the provisioning cluster remove handler, which parks it on
-		// Unknown/Waiting while it tears down machines. Unblocking here must not declare that
-		// handler's removal finished on its behalf.
-		"deleting cluster leaves another handler's Removed message alone": {
-			cluster: func() *v1.Cluster {
-				cluster := deletingCluster()
-				capr.Removed.SetStatus(cluster, "Unknown")
-				capr.Removed.Reason(cluster, removedWaitingReason)
-				capr.Removed.Message(cluster, "waiting for machine [cluster-pool-abc] to delete")
-				return cluster
-			}(),
-			roleBindingMock: func(ctrl *gomock.Controller, cluster *v1.Cluster) wranglerrbacv1.RoleBindingController {
-				mock := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
-				mock.EXPECT().List(cluster.Namespace, metav1.ListOptions{}).Return(&rbacv1.RoleBindingList{}, nil)
-				return mock
-			},
-			clusterMock: func(ctrl *gomock.Controller, _ *v1.Cluster) provisioningcontrollers.ClusterController {
-				mock := fake.NewMockControllerInterface[*v1.Cluster, *v1.ClusterList](ctrl)
-				// No UpdateStatus: the condition isn't ours to clear.
-				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(updated *v1.Cluster) (*v1.Cluster, error) {
-					assert.Empty(t, updated.Finalizers)
-					return updated, nil
-				})
-				return mock
-			},
-			setupHandler: func(h *handler) {
-				h.indexGetter = fakeIndexGetter{}
-				h.resourcesList = []resourceMatch{{GVK: etcdSnapshotGVK, Resource: "etcdsnapshots"}}
-			},
-			expectedErr:        nil,
-			expectedFinalizers: []string{},
-			assertResult: func(t *testing.T, result *v1.Cluster) {
-				assert.True(t, capr.Removed.IsUnknown(result))
-				assert.Equal(t, "waiting for machine [cluster-pool-abc] to delete", capr.Removed.GetMessage(result))
-			},
 		},
 		"missing finalizer updates cluster before role handling": {
 			cluster: &v1.Cluster{
@@ -797,26 +713,4 @@ func Test_blockingClusterIndexedResources(t *testing.T) {
 			}, queries)
 		})
 	}
-}
-
-func Test_blockingResourcesMessage(t *testing.T) {
-	blocking := make([]string, 0, maxBlockingResourcesInMessage+2)
-	for i := range maxBlockingResourcesInMessage + 2 {
-		blocking = append(blocking, fmt.Sprintf("ETCDSnapshot fleet-default/snapshot-%02d", i))
-	}
-
-	assert.Equal(t,
-		removedWaitingMessagePrefix+": ETCDSnapshot fleet-default/snapshot-00",
-		blockingResourcesMessage(blocking[:1]))
-
-	// Over the cap the list is truncated so a cluster with many leftovers can't produce an
-	// unbounded condition message.
-	assert.Equal(t,
-		removedWaitingMessagePrefix+": "+
-			strings.Join(blocking[:maxBlockingResourcesInMessage], ", ")+" and 2 more",
-		blockingResourcesMessage(blocking))
-
-	// clearRemovedWaiting keys off the prefix to tell its own message apart from one written by
-	// the provisioning cluster remove handler, so every message must carry it.
-	assert.True(t, strings.HasPrefix(blockingResourcesMessage(blocking), removedWaitingMessagePrefix))
 }
