@@ -72,6 +72,21 @@ ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
+ARG ARCH
+ENV KUBECTL_VERSION=v1.36.0
+ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
+ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
+
+RUN case "${ARCH}" in \
+        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
+        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
+        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
+    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
+    sha256sum -c kubectl.sha256 && \
+    rm kubectl.sha256 && \
+    chmod +x /usr/bin/kubectl
 
 # Enable exporting of the k3s images as part of the build process.
 FROM --platform=$BUILDPLATFORM go-builder AS images
@@ -139,6 +154,9 @@ COPY --from=rancher-build /app/rancher /bin/rancher
 # Extract server chroot
 FROM scratch AS server
 COPY --from=chroot-builder-server /chroot/ /
+
+# TODO: remove `kubectl` usage from Go code
+COPY --from=downloads /usr/bin/kubectl /usr/bin/
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
@@ -368,28 +386,14 @@ ENTRYPOINT ["entrypoint.sh"]
 FROM scratch AS agent
 COPY --from=chroot-builder-agent /chroot/ /
 
+COPY --from=downloads /usr/bin/kubectl /usr/bin/
+
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
 RUN /usr/bin/unshare --version && \
     /usr/bin/mount --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
-
-ARG ARCH
-ENV KUBECTL_VERSION=v1.36.0
-ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
-ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
-
-RUN case "${ARCH}" in \
-        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
-        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
-    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
-    sha256sum -c kubectl.sha256 && \
-    rm kubectl.sha256 && \
-    chmod +x /usr/bin/kubectl
 
 LABEL io.cattle.agent=true
 
@@ -470,7 +474,6 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
     ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
     ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-    ln -s /usr/bin/k3s /usr/bin/kubectl && \
     ln -s /usr/bin/pigz /usr/bin/unpigz && \
     ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
     ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
