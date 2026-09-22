@@ -591,7 +591,7 @@ type LdapFields struct {
 type LdapConfig struct {
 	AuthConfig    `json:",inline" mapstructure:",squash"`
 	LdapFields    `json:",inline" mapstructure:",squash"`
-	SAPSecretName string `json: "-" mapstructure:"-"`
+	SAPSecretName string `json:"-" mapstructure:"-"`
 }
 
 func (c *LdapConfig) GetUserSearchAttributes(searchAttributes ...string) []string {
