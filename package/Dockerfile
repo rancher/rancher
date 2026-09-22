@@ -47,7 +47,14 @@ RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends coreutils-single && \
     zypper --installroot /chroot -n in --no-recommends \
       catatonit curl util-linux ca-certificates findutils xz gzip tar gawk vim-small \
-      ca-certificates-mozilla `# the -prebuilt package in the base image is not sufficient, as we are running update-ca-certificates in the entrypoint`
+      ca-certificates-mozilla `# the -prebuilt package in the base image is not sufficient, as we are running update-ca-certificates in the entrypoint` && \
+    zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
+    zypper --installroot /chroot -n in -r pkgs kubectl-1.37
+
+# The symbolic link target has no /chroot prefix.
+# TODO: remove `kubectl` usage from Go code
+RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 
 
 FROM chroot-builder AS chroot-builder-server
@@ -60,13 +67,8 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
       sed grep jq hostname iproute2 less bash-completion bind-utils acl sysstat && \
-    zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
-    rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
-    zypper --installroot /chroot -n in -r pkgs kubectl-1.37 && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
-# The symbolic link target has no /chroot prefix.
-RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 
 
 FROM --platform=$BUILDPLATFORM registry.suse.com/rancher/appco-go:1.27.3 AS go-builder
@@ -461,7 +463,6 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
     ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
     ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
     ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-    ln -s /usr/bin/k3s /usr/bin/kubectl && \
     ln -s /usr/bin/pigz /usr/bin/unpigz && \
     ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
     ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
