@@ -124,8 +124,8 @@ require (
 	github.com/rancher/cluster-api-provider-rke2 v0.25.2
 	github.com/rancher/dynamiclistener v0.9.0
 	github.com/rancher/eks-operator v1.15.1
-	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
-	github.com/rancher/fleet/pkg/helmvalues v0.16.1
+	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.4
+	github.com/rancher/fleet/pkg/helmvalues v0.17.0-alpha.4
 	github.com/rancher/gke-operator v1.15.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
@@ -141,7 +141,7 @@ require (
 	github.com/rancher/shepherd v0.0.0-20260921153737-8e09fea6aaaf
 	github.com/rancher/steve v0.10.4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
-	github.com/rancher/wrangler/v3 v3.7.1
+	github.com/rancher/wrangler/v3 v3.7.2
 	github.com/robfig/cron v1.2.0
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/sirupsen/logrus v1.10.2
@@ -172,7 +172,7 @@ require (
 	k8s.io/cli-runtime v0.36.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kube-aggregator v0.36.4
-	k8s.io/kube-openapi v0.0.0-20260821135717-be32def86098
+	k8s.io/kube-openapi v0.0.0-20260911184034-7970a1e230da
 	k8s.io/kubectl v0.36.4
 	k8s.io/kubernetes v1.36.4
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
@@ -265,7 +265,7 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fluxcd/cli-utils v1.2.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -416,7 +416,7 @@ require (
 	k8s.io/component-helpers v0.36.4 // indirect
 	k8s.io/controller-manager v0.0.0 // indirect
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
-	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
+	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kms v0.36.4 // indirect
 	k8s.io/streaming v0.36.4 // indirect
@@ -426,8 +426,9 @@ require (
 	modernc.org/sqlite v1.57.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
-	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
+	sigs.k8s.io/json v0.0.0-20260909141634-11ed52e25bc5 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v7 v7.0.0 // indirect
 )

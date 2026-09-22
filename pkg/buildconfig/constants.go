@@ -8,7 +8,7 @@ const (
 	DefaultAssetsImage        = "rancher/rancher-assets:v2.16-20260914T2041Z-dev"
 	DefaultSccOperatorImage   = "rancher/scc-operator:v0.5.2"
 	DefaultShellVersion       = "rancher/shell:v0.8.1"
-	FleetVersion              = "111.0.0+up0.17.0-alpha.3"
+	FleetVersion              = "111.0.0+up0.17.0-alpha.4"
 	PartnerChartDefaultBranch = "main"
 	RemoteDialerProxyVersion  = "111.0.0+up0.9.0-rc.3"
 	Rke2ChartDefaultBranch    = "main"
