@@ -2049,6 +2049,20 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 type terminalPhase struct {
 	hook string
 
+	// beaconOptional marks a phase an operation can reach without holding the beacon, which is
+	// every outcome but success:
+	//
+	//   - Failed, which handleInProgress reaches precisely because the beacon was lost;
+	//   - Aborted, where the operation called its own work off and may since have been overtaken;
+	//   - Canceled, driven from outside the operation and often by whoever wants the beacon next.
+	//
+	// For those a missing claim is an expected outcome rather than a failure, so the phase's hook
+	// is passed over — without a claim there is no authority to delegate — and the beacon is left
+	// untouched. Succeeded is deliberately not one of them: an operation cannot have finished its
+	// work without holding the beacon throughout, so a missing claim there is an anomaly rather
+	// than a state to paper over.
+	beaconOptional bool
+
 	// onRelease, when set, runs after the beacon has been released. owning reports whether this
 	// operation was the beacon's primary owner rather than a delegate acting on its behalf.
 	onRelease func(s *scope, owning bool)
@@ -2063,19 +2077,34 @@ type terminalPhase struct {
 // satisfied, after the release succeeded — is what keeps the marker honest, since that marker is
 // what makes the operation eligible for TTL collection and lets a deleted operation finish
 // deleting. A terminal phase handler that returns early therefore cannot forget to withhold it.
+//
+// An operation which no longer holds the beacon has none of that left to do: see
+// beaconOptional. It terminates without the beacon being written to at all, which is what
+// keeps an operation that lost its claim from reaching into whichever one holds it now.
 func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus, phase terminalPhase) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
 
-	delegated, err := h.handleHook(s, phase.hook)
-	if err != nil {
-		return status, err
-	} else if delegated {
-		// The delegate drives the beacon on this operation's behalf from here. Nothing is written
-		// to the outcome condition: it already reports the outcome with the reason the phase handler
-		// gave it, and that reason must survive the delegation. updateStatus reports the delegate on
-		// Finalized for as long as the hook label is present, so the wait resolves on its own once
-		// the delegate clears the label rather than being left behind on a condition.
-		return status, nil
+	// A phase whose beacon claim is optional passes over its hook once that claim is gone: there is
+	// no authority left to delegate, and pushing a delegate onto a beacon another controller now
+	// holds would be reaching into its operation. Everything after the hook is either a no-op
+	// without a claim (releaseBeacon) or owed regardless of one, so the operation still terminates
+	// — which is what lets it be collected, or lets a deleted one retire its finalizer.
+	honourHook := !phase.beaconOptional || holdsBeacon(s)
+
+	if honourHook {
+		delegated, err := h.handleHook(s, phase.hook)
+		if err != nil {
+			return status, err
+		} else if delegated {
+			// The delegate drives the beacon on this operation's behalf from here. Nothing is written
+			// to the outcome condition: it already reports the outcome with the reason the phase handler
+			// gave it, and that reason must survive the delegation. updateStatus reports the delegate on
+			// Finalized for as long as the hook label is present, so the wait resolves on its own once
+			// the delegate clears the label rather than being left behind on a condition.
+			return status, nil
+		}
+	} else {
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: %s with no claim on the beacon, leaving it untouched", s.op.Namespace, s.op.Name, status.Phase)
 	}
 
 	owning, err := h.releaseBeacon(s)
@@ -2097,12 +2126,19 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 // delegate chain at any position otherwise. Reports whether we were the primary owner; the
 // owner-vs-chain guard just avoids a no-op call.
 func (h *handler) releaseBeacon(s *scope) (bool, error) {
-	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
-	if !owning && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+	if !holdsBeacon(s) {
 		return false, nil
 	}
 
+	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
+
 	return owning, plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
+}
+
+// holdsBeacon reports whether the operation still has a claim on the beacon, either as its primary
+// owner or from anywhere in the delegate chain.
+func holdsBeacon(s *scope) bool {
+	return plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey)
 }
 
 // handleAborted handles the Aborted terminal phase, reached when the operation called its own work
@@ -2110,7 +2146,8 @@ func (h *handler) releaseBeacon(s *scope) (bool, error) {
 // runs first so a delegate can observe why the operation stopped.
 func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook: planv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:           planv1alpha1.AbortedPhaseHookLabelPrefix,
+		beaconOptional: true,
 	})
 }
 
@@ -2121,7 +2158,8 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 // Failed means the work was attempted and lost and Aborted means the operation called it off.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook: planv1alpha1.CanceledPhaseHookLabelPrefix,
+		hook:           planv1alpha1.CanceledPhaseHookLabelPrefix,
+		beaconOptional: true,
 	})
 }
 
@@ -2130,7 +2168,8 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 // leftover scripts on nodes) can hold the beacon before the next operation acquires it.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook: planv1alpha1.FailedPhaseHookLabelPrefix,
+		hook:           planv1alpha1.FailedPhaseHookLabelPrefix,
+		beaconOptional: true,
 	})
 }
 

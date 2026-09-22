@@ -1999,6 +1999,40 @@ func TestHandleTerminal_RecordsTermination(t *testing.T) {
 	}
 }
 
+// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers every outcome an operation can
+// reach without holding the beacon — Failed after losing it, Aborted after being overtaken,
+// Canceled by whoever wanted it next. In all three the operation still finishes, and the beacon
+// (now someone else's) is left exactly as it is: not cleared, and not carrying the phase hook's
+// delegate, which is the write that would otherwise reach into another controller's operation.
+// Succeeded is excluded: it cannot be reached without holding the beacon throughout.
+func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range terminalHandlers {
+		if name == "succeeded" {
+			continue
+		}
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			op := newOp()
+			op.Labels = map[string]string{tc.hook + "cleanup": "delegate-a"}
+
+			beacons := &fakeBeaconClient{}
+			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
+			s := newScope(op, newBeacon("another-controller", true))
+
+			got, err := tc.handle(h, s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+			assert.NoError(t, err)
+			assert.False(t, got.TerminatedAt.IsZero(),
+				"with no beacon to release, terminal handling is trivially complete")
+			assert.Empty(t, beacons.statusUpdates, "a beacon held by another controller must not be modified")
+			assert.Empty(t, beacons.updates)
+		})
+	}
+}
+
 // TestHandleTerminal_DelegatedDefersTermination is the counterpart: while a terminal phase hook is
 // still delegated the handler has not finished, the beacon is still held on the operation's behalf,
 // and nothing may be recorded — that marker is what releases the operation for deletion and for TTL
