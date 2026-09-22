@@ -168,7 +168,16 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 	}
 	config.ClientSecret = name
 
-	// integrate (a possibly pre-existing) ldap config with the keycloak config
+	// integrate (a possibly pre-existing) ldap config with the incoming keycloak config
+	//
+	// notes
+	//
+	// - a previously existing secret is kept if it is not overriden through
+	//   a new password in the incoming config
+	//
+	// - for everything else the data in the incoming config unconditionally
+	//   replaces the stored data
+
 	ldapConfig, _, err := ldap.GetLDAPConfig(k.ldapProvider)
 
 	// can be misconfigured but still want it saved
@@ -200,12 +209,12 @@ func (k *keyCloakOIDCProvider) saveKeyCloakOIDCConfig(config *apiv3.KeyCloakOIDC
 			return fmt.Errorf("unable to save ldap service account password: %w", err)
 		}
 
-		// update ldap configuration with secret
-		ldapConfig.LdapFields.ServiceAccountPassword = secretName
+		// save new secret
+		config.OpenLdapConfig.ServiceAccountPassword = secretName
+	} else {
+		// keep previous secret, if any
+		config.OpenLdapConfig.ServiceAccountPassword = ldapConfig.LdapFields.ServiceAccountPassword
 	}
-
-	// update keycloak with (possibly changed) ldap configuration
-	config.OpenLdapConfig = ldapConfig.LdapFields
 
 	logrus.Debugf("[keycloak oidc] saveKeyCloakOIDCConfig: updating config")
 	_, err = k.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
