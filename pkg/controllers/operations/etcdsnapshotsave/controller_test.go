@@ -1747,40 +1747,16 @@ func TestOnChange_PausedBlocksCancel(t *testing.T) {
 	assert.Empty(t, controller.updates, "a paused operation is not finalized, so it takes no finalizer")
 }
 
-// TestHandleCanceled_BeaconHeldByAnotherIsNotTouched covers what makes the Canceled phase different
-// from every other terminal phase: cancellation is driven from outside, often by whoever wants the
-// beacon next, so the operation may already have lost it. That is an accepted outcome — the
-// operation still finishes, and the beacon (now someone else's) is left exactly as it is, including
-// not having the canceled phase hook's delegate pushed onto it.
-func TestHandleCanceled_BeaconHeldByAnotherIsNotTouched(t *testing.T) {
-	t.Parallel()
-
-	op := newOp()
-	op.Labels = map[string]string{planv1alpha1.CanceledPhaseHookLabelPrefix + "cleanup": "delegate-a"}
-
-	beacons := &fakeBeaconClient{}
-	h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
-	s := newScope(op, newBeacon("another-controller", true), defaultAdapter())
-
-	status := opv1alpha1.ETCDSnapshotSaveStatus{
-		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseCanceled},
-	}
-
-	got, err := h.handleCanceled(s, status)
-	assert.NoError(t, err)
-	assert.False(t, got.TerminatedAt.IsZero(), "with no beacon to release, terminal handling is trivially complete")
-	assert.Empty(t, beacons.statusUpdates, "a beacon held by another controller must not be modified")
-	assert.Empty(t, beacons.updates)
-}
-
-// The beacon-optional rule is specific to cancellation: every other terminal phase is reached by
-// the operation itself while it still holds the beacon, so a missing claim there is not something
-// to paper over by declaring the operation finished.
-func TestHandleTerminal_BeaconOptionalOnlyForCancellation(t *testing.T) {
+// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers every outcome an operation can
+// reach without holding the beacon — Failed after losing it, Aborted after being overtaken,
+// Canceled by whoever wanted it next. In all three the operation still finishes, and the beacon
+// (now someone else's) is left exactly as it is: not cleared, and not carrying the phase hook's
+// delegate, which is the write that would otherwise reach into another controller's operation.
+func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 	t.Parallel()
 
 	for name, tc := range terminalHandlers {
-		if name == "canceled" {
+		if name == "succeeded" {
 			continue
 		}
 
@@ -1788,6 +1764,8 @@ func TestHandleTerminal_BeaconOptionalOnlyForCancellation(t *testing.T) {
 			t.Parallel()
 
 			op := newOp()
+			// A hook on the phase being handled, which must be passed over rather than delegated:
+			// with no claim on the beacon there is no authority to hand to a delegate.
 			op.Labels = map[string]string{tc.hook + "cleanup": "delegate-a"}
 
 			beacons := &fakeBeaconClient{}
@@ -1796,9 +1774,60 @@ func TestHandleTerminal_BeaconOptionalOnlyForCancellation(t *testing.T) {
 
 			got, err := tc.handle(h, s, opv1alpha1.ETCDSnapshotSaveStatus{})
 			assert.NoError(t, err)
-			assert.True(t, got.TerminatedAt.IsZero(), "the hook is still owed an answer, so handling is not complete")
-			assert.NotEmpty(t, beacons.statusUpdates, "the hook's delegate is pushed as usual")
+			assert.False(t, got.TerminatedAt.IsZero(),
+				"with no beacon to release, terminal handling is trivially complete")
+			assert.Empty(t, beacons.statusUpdates, "a beacon held by another controller must not be modified")
+			assert.Empty(t, beacons.updates)
 		})
+	}
+}
+
+// Succeeded is deliberately excluded: an operation cannot have finished its work without holding
+// the beacon throughout, so a missing claim there is an anomaly rather than a state to paper over
+// by declaring the operation finished.
+func TestHandleSucceeded_WithoutBeaconClaimStillHonoursItsHook(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "cleanup": "delegate-a"}
+
+	beacons := &fakeBeaconClient{}
+	h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
+	s := newScope(op, newBeacon("another-controller", true), defaultAdapter())
+
+	got, err := h.handleSucceeded(s, opv1alpha1.ETCDSnapshotSaveStatus{})
+	assert.NoError(t, err)
+	assert.True(t, got.TerminatedAt.IsZero(), "the hook is still owed an answer, so handling is not complete")
+	assert.NotEmpty(t, beacons.statusUpdates, "the hook's delegate is pushed as usual")
+}
+
+// TestHandleTerminal_WithoutBeaconClaimReleasesForDeletion ties the rule to why it matters: an
+// operation that lost its beacon and is on its way out records termination, which is the marker
+// handleDeletion waits on before it retires the finalizer. Without it such an operation would hold
+// its finalizer forever and never finish deleting.
+func TestHandleTerminal_WithoutBeaconClaimReleasesForDeletion(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newDeletingOp(), "test")
+	op.Labels = map[string]string{planv1alpha1.FailedPhaseHookLabelPrefix + "cleanup": "delegate-a"}
+	// Pre-computed through updateStatus so the status is already settled: handleDeletion retires the
+	// finalizer only once the terminal status has been persisted for observers to see.
+	op.Status = updateStatus(op, opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase:        opv1alpha1.OperationPhaseFailed,
+			TerminatedAt: metav1.Now(),
+		},
+		Step: opv1alpha1.ETCDSnapshotSaveStepSave,
+	})
+	// The operation failed because the beacon was lost, and it is now held by another controller.
+	h, controller, beacons := newOnChangeHandler(newBeacon("another-controller", true))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseFailed, status.Phase, "a terminated operation keeps the phase it ended in")
+	assert.Empty(t, beacons.statusUpdates, "the beacon belongs to another controller and must not be touched")
+	if assert.Len(t, controller.updates, 1, "termination was already recorded, so the finalizer can go") {
+		assert.NotContains(t, controller.updates[0].Finalizers, Finalizer)
 	}
 }
 
