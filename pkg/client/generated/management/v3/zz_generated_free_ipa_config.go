@@ -24,7 +24,6 @@ const (
 	FreeIpaConfigFieldOwnerReferences                 = "ownerReferences"
 	FreeIpaConfigFieldPort                            = "port"
 	FreeIpaConfigFieldRemoved                         = "removed"
-	FreeIpaConfigFieldSAPSecretName                   = "sapSecretName"
 	FreeIpaConfigFieldSearchUsingServiceAccount       = "searchUsingServiceAccount"
 	FreeIpaConfigFieldServers                         = "servers"
 	FreeIpaConfigFieldServiceAccountDistinguishedName = "serviceAccountDistinguishedName"
@@ -69,7 +68,6 @@ type FreeIpaConfig struct {
 	OwnerReferences                 []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Port                            int64             `json:"port,omitempty" yaml:"port,omitempty"`
 	Removed                         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	SAPSecretName                   string            `json:"sapSecretName,omitempty" yaml:"sapSecretName,omitempty"`
 	SearchUsingServiceAccount       bool              `json:"searchUsingServiceAccount,omitempty" yaml:"searchUsingServiceAccount,omitempty"`
 	Servers                         []string          `json:"servers,omitempty" yaml:"servers,omitempty"`
 	ServiceAccountDistinguishedName string            `json:"serviceAccountDistinguishedName,omitempty" yaml:"serviceAccountDistinguishedName,omitempty"`
