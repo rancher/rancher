@@ -589,8 +589,9 @@ type LdapFields struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type LdapConfig struct {
-	AuthConfig `json:",inline" mapstructure:",squash"`
-	LdapFields `json:",inline" mapstructure:",squash"`
+	AuthConfig    `json:",inline" mapstructure:",squash"`
+	LdapFields    `json:",inline" mapstructure:",squash"`
+	SAPSecretName string `json: "-" mapstructure:"-"`
 }
 
 func (c *LdapConfig) GetUserSearchAttributes(searchAttributes ...string) []string {

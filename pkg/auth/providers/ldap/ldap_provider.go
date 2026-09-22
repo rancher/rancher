@@ -296,6 +296,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 		if err != nil {
 			return nil, nil, err
 		}
+		storedLdapConfig.SAPSecretName = storedLdapConfig.ServiceAccountPassword
 		storedLdapConfig.ServiceAccountPassword = value
 	}
 
