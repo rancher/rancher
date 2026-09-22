@@ -129,6 +129,34 @@ targets:
       matchpattern: 'github\.com/rancher/machine v\S+/go\.mod h1:\S+'
       replacepattern: 'github.com/rancher/machine {{ source "machine-release" }}/go.mod {{ source "machine-go-mod-sum" }}'
 
+  tidy-go-modules:
+    name: 'Run go mod tidy after updating Rancher Machine'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    dependson:
+      - 'update-go-mod-machine-version'
+      - 'update-go-sum-machine-module-hash'
+      - 'update-go-sum-machine-go-mod-hash'
+    spec:
+      command: 'GOTOOLCHAIN=auto go mod tidy'
+      environments:
+        - name: HOME
+        - name: PATH
+
+  tidy-pkg-apis-go-modules:
+    name: 'Run go mod tidy in pkg/apis after updating Rancher Machine'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    dependson:
+      - 'tidy-go-modules'
+    spec:
+      command: 'cd pkg/apis && GOTOOLCHAIN=auto go mod tidy'
+      environments:
+        - name: HOME
+        - name: PATH
+
   update-dockerfile-runtime-machine-version:
     name: 'Update ENV CATTLE_MACHINE_VERSION to {{ source "machine-release" }} in Dockerfile.runtime'
     kind: file
