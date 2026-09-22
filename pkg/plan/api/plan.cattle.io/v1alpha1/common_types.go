@@ -58,6 +58,13 @@ const (
 // of the delegate pushed onto the beacon chain — a cooperating controller subscribes to that
 // delegate name to know when its turn arrives, and pops itself off the chain when finished.
 //
+// A hook on a terminal phase holds the beacon for as long as its delegate does not return it, and
+// the beacon gates every operation on the cluster — so a delegate which never finishes blocks the
+// next operation indefinitely, whatever its urgency. The operation reports which delegate it is
+// waiting on through its Finalized condition. Setting spec.Cancel will not break the deadlock, as
+// cancellation does not apply to an operation which has already reached a terminal phase; deleting
+// the operation does, and is the supported remedy.
+//
 // Use these prefixes when adding cross-cutting hooks that should run at the same phase point
 // across every operation type. For operation-type-specific gating (e.g. between snapshot Save and
 // Restart, or between EKR Rotate and Restart) use the step-level prefixes exported by the
