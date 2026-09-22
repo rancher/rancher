@@ -1328,6 +1328,45 @@ func TestHandleTerminal_RecordsTerminationAndUnpauses(t *testing.T) {
 	}
 }
 
+// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers every outcome an operation can
+// reach without holding the beacon — Failed after losing it, Aborted after being overtaken,
+// Canceled by whoever wanted it next. In all three the operation still finishes, and the beacon
+// (now someone else's) is left exactly as it is. The cluster is still unpaused, though: the
+// rotation paused it, so leaving it paused would strand the cluster whoever holds the beacon now.
+// Succeeded is excluded: it cannot be reached without holding the beacon throughout.
+func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
+	for name, tc := range terminalHandlers {
+		if name == "succeeded" {
+			continue
+		}
+
+		t.Run(name, func(t *testing.T) {
+			op := newOp()
+			op.Labels = map[string]string{tc.hook + "cleanup": "delegate-a"}
+
+			beacons := &fakeBeaconClient{}
+			adapter := &stubAdapter{}
+			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
+			s := newScope(op, newBeacon("another-controller", true), adapter)
+
+			got, err := tc.handle(h, s, opv1alpha1.EncryptionKeyRotationStatus{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.TerminatedAt.IsZero() {
+				t.Fatal("with no beacon to release, terminal handling is trivially complete")
+			}
+			if len(beacons.statusUpdates) != 0 || len(beacons.updates) != 0 {
+				t.Fatalf("a beacon held by another controller must not be modified, got %d status updates",
+					len(beacons.statusUpdates))
+			}
+			if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
+				t.Fatalf("the cluster must still be unpaused, got PauseCluster calls %v", adapter.pauseCalls)
+			}
+		})
+	}
+}
+
 // TestHandleTerminal_DelegatedDefersTermination is the counterpart: while a terminal phase hook is
 // still delegated the handler has not finished, the beacon is still held on the operation's behalf,
 // the cluster stays paused, and nothing may be recorded — that marker is what releases the
