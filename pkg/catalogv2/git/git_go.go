@@ -511,8 +511,12 @@ func (g *gitGo) reset(rev string) error {
 		}
 		hash = head.Hash()
 	} else if len(rev) == 40 && isHexString(rev) {
-		// Commit hash
+		// Commit hash - verify it exists
 		hash = plumbing.NewHash(rev)
+		_, err := repo.CommitObject(hash)
+		if err != nil {
+			return fmt.Errorf("commit %s not found: %w", rev, err)
+		}
 	} else {
 		// Try as branch name
 		ref, err := repo.Reference(plumbing.NewBranchReferenceName(rev), true)
