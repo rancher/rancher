@@ -2,18 +2,15 @@ package telemetry
 
 import (
 	"errors"
-	"fmt"
 	"iter"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
 	v3ctrl "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -221,26 +218,13 @@ var _ RancherManagerTelemetry = (*rancherTelemetryImpl)(nil)
 type clusterTelemetryImpl struct {
 	*v3.Cluster
 	associatedNodes []*v3.Node
-
-	ctrl wcorev1.SecretController
 }
 
 var _ ClusterTelemetry = (*clusterTelemetryImpl)(nil)
 
 func (c *clusterTelemetryImpl) AifNVIDIARegistrySecretPresent() (bool, error) {
-	// [3]
 	// TODO: Check if secret is present...
 	// FIXME: Should this function return an error or not?
-
-	list, err := c.ctrl.List("aif-operator", metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=aif-operator"})
-	if err != nil {
-		return false, err
-	}
-
-	for _, v := range list.Items {
-		fmt.Println(v)
-	}
-
 	return true, nil
 }
 
