@@ -187,7 +187,8 @@ func TestSystemStoreCreateNamespaceAndSecretFailures(t *testing.T) {
 		h.secretCache.EXPECT().
 			List(CredentialNamespace, gomock.Any()).
 			Return(([]*corev1.Secret)(nil), nil)
-		h.namespaceCache.EXPECT().Get(CredentialNamespace).Return(nil, fmt.Errorf(genericErr))
+		// this is due to a backoff that we need .AnyTimes()
+		h.namespaceCache.EXPECT().Get(CredentialNamespace).Return(nil, fmt.Errorf(genericErr)).AnyTimes()
 
 		_, err := h.store.SystemStore.Create(context.Background(), credential, nil, adminUser)
 		require.Error(t, err)

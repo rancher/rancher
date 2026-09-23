@@ -143,8 +143,15 @@ type DynamicSchemaSpec struct {
 	// CloudCredential.Status.PublicData. Fields not listed here are treated
 	// as private/sensitive by default.
 	//
-	// Populated by Rancher from node driver annotations when credential
-	// config DynamicSchemas are created or updated.
+	// This is the source of truth for the public/private classification of
+	// credential config fields: values set here are preserved by Rancher.
+	// It is seeded from node driver annotations when the credential config
+	// DynamicSchema is first created (or when migrating schemas created
+	// before these fields existed), and the node driver annotations are
+	// kept in sync with it for backward compatibility. Virtual fields
+	// defined by Rancher itself (e.g. "defaultRegion" on the amazonec2
+	// credential config schema) are always re-applied here and cannot be
+	// removed.
 	// +listType=set
 	// +optional
 	PublicFields []string `json:"publicFields,omitempty"`
@@ -155,8 +162,14 @@ type DynamicSchemaSpec struct {
 	// passwords. The UI can use this list to mask or hide fields
 	// appropriately.
 	//
-	// Populated by Rancher from node driver annotations when credential
-	// config DynamicSchemas are created or updated.
+	// This is the source of truth for the public/private classification of
+	// credential config fields: values set here are preserved by Rancher.
+	// It is seeded from node driver annotations when the credential config
+	// DynamicSchema is first created (or when migrating schemas created
+	// before these fields existed), and the node driver annotations are
+	// kept in sync with it for backward compatibility. Virtual fields
+	// defined by Rancher itself are always re-applied here and cannot be
+	// removed.
 	// +listType=set
 	// +optional
 	PrivateFields []string `json:"privateFields,omitempty"`
