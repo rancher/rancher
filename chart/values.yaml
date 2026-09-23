@@ -301,6 +301,30 @@ extraTolerations: {}
 #      - us-north-42
 extraNodeSelectorTerms: {}
 
+podDisruptionBudget:
+  enabled: false
+  minAvailable: ""
+  maxUnavailable: ""
+  unhealthyPodEvictionPolicy: ""
+
+  # Optional: Add extra labels to the default selector
+  # These are merged with the standard selectorLabels (app: rancher)
+  extraMatchLabels: {}
+  #   tier: frontend
+  #   environment: production
+
+  # Advanced: Completely override the selector with custom logic
+  # When set, this replaces the default selector entirely (extraMatchLabels ignored)
+  # Use this for complex selectors with matchExpressions
+  selector: {}
+  #   matchLabels:
+  #     app: rancher
+  #     custom-label: value
+  #   matchExpressions:
+  #     - key: environment
+  #       operator: In
+  #       values: [prod, staging]
+
 livenessProbe:
   timeoutSeconds: 5
   periodSeconds: 30
