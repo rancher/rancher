@@ -134,6 +134,25 @@ func HasActiveLifecycleHook(obj metav1.Object) bool {
 	return false
 }
 
+// LifecycleHookDelegate returns the hook identifier and the delegate named by the first label on obj
+// whose key begins with prefix, or "", "" when there is none.
+//
+// An empty prefix returns nothing rather than matching every label: a phase with no hook at all must
+// not be reported as having a delegate.
+func LifecycleHookDelegate(obj metav1.Object, prefix string) (string, string) {
+	if obj == nil || prefix == "" {
+		return "", ""
+	}
+
+	for k, v := range obj.GetLabels() {
+		if after, ok := strings.CutPrefix(k, prefix); ok {
+			return after, v
+		}
+	}
+
+	return "", ""
+}
+
 // HasStepHookLabel reports whether obj carries at least one label whose key begins with the given
 // step-hook prefix (e.g. "rotate.step.hook.operation.cattle.io/"). Callers use this to detect
 // that the operation is in the middle of a step-scoped delegation and thus the operation may not

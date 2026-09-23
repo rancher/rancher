@@ -286,7 +286,11 @@ func (h *handler) reconcileActive(op *opv1alpha1.ETCDSnapshotRestore, status opv
 		status.SetPhase(opv1alpha1.OperationPhasePending)
 	}
 
-	status, err := h.advance(op, cancelForRequest(op, status))
+	if previous, canceled := ops.CancelForRequest(&op.Spec.OperationSpec, &status.OperationStatus); canceled {
+		logrus.Infof("[etcdsnapshotrestore] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, previous, status.Step)
+	}
+
+	status, err := h.advance(op, status)
 	if err != nil {
 		return status, err
 	}
@@ -299,7 +303,7 @@ func (h *handler) reconcileActive(op *opv1alpha1.ETCDSnapshotRestore, status opv
 		return status, nil
 	}
 
-	if collectable(op, &status) {
+	if ops.Collectable(op, &op.Spec.OperationSpec, &status.OperationStatus) {
 		if err := h.etcdsnapshotrestores.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{}); err != nil {
 			return status, err
 		}
@@ -329,7 +333,11 @@ func (h *handler) reconcileDeleting(op *opv1alpha1.ETCDSnapshotRestore, status o
 
 	// cancelForDeletion always leaves a phase behind, so unlike reconcileActive there is no unset
 	// phase to default here.
-	status, err := h.advance(op, cancelForDeletion(op, status))
+	if previous, canceled := ops.CancelForDeletion(&status.OperationStatus); canceled {
+		logrus.Infof("[etcdsnapshotrestore] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, previous, status.Step)
+	}
+
+	status, err := h.advance(op, status)
 	if err != nil {
 		return status, err
 	}
@@ -369,20 +377,6 @@ func (h *handler) advance(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.
 	}
 
 	return h.dispatchPhase(s, status)
-}
-
-// collectable reports whether a settled operation can be garbage collected: it reached a terminal
-// phase, the controller finished handling that phase, its TTL has elapsed, and no lifecycle hook
-// delegate is still expected to look at it.
-//
-// The last two conditions are what stop an operation waiting on a terminal phase hook from being
-// deleted the moment its TTL passes, which would strand the delegate holding its beacon and bury
-// the phase it actually finished in behind the cancellation that deletion performs.
-func collectable(op *opv1alpha1.ETCDSnapshotRestore, status *opv1alpha1.ETCDSnapshotRestoreStatus) bool {
-	return ops.IsTerminal(status.Phase) &&
-		ops.IsTerminated(&status.OperationStatus) &&
-		ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
-		!planv1alpha1.HasActiveLifecycleHook(op)
 }
 
 // hasFinalizer reports whether the operation still carries our finalizer, i.e. whether its teardown
@@ -439,64 +433,6 @@ func (h *handler) removeFinalizer(op *opv1alpha1.ETCDSnapshotRestore) error {
 	*op = *updated
 
 	return nil
-}
-
-// cancelForDeletion marks an operation deleted before its terminal handling completed as Canceled:
-// the work it dispatched is no longer tracked by anything, so it can neither be reported as
-// succeeded nor as failed. The terminal handler for the Canceled phase then runs as usual —
-// honoring any canceled phase hook, releasing the beacon — before OnChange drops the finalizer.
-//
-// Note that cancelling a restore does not roll it back: whatever the restore already did to the
-// cluster (shut down server units, reset etcd on the leader) stays done. Cancellation only records
-// that the operation stopped being driven, and frees the beacon for whoever picks up the pieces.
-//
-// An operation which is already terminated keeps the phase it finished in; only the window before
-// that counts as racing the operation, and in that window its beacon is still held, on its own
-// behalf or a delegate's. An operation already in Canceled keeps the reason it was canceled for.
-func cancelForDeletion(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnapshotRestoreStatus) opv1alpha1.ETCDSnapshotRestoreStatus {
-	if ops.IsTerminated(&status.OperationStatus) || status.Phase == opv1alpha1.OperationPhaseCanceled {
-		return status
-	}
-
-	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, status.Phase, status.Step)
-
-	status.MarkCanceled(opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
-
-	return status
-}
-
-// cancelForRequest marks an operation whose spec.Cancel is set as Canceled: the work was called off
-// from outside, so it can be reported neither as succeeded nor as failed.
-//
-// Cancellation stops work in flight, and an operation which has reached a terminal phase has none
-// left — its outcome is asserted and will not change, so the phase it ended in stands and the
-// request is declined. updateStatus reports the declined request on the Canceled condition, so
-// setting the field is never silently ignored. The terminal check covers the already-Canceled case
-// too, Canceled being terminal itself.
-//
-// This is deliberately narrower than cancelForDeletion, which acts on a terminal phase whose
-// handling has not completed. The asymmetry is forced: a deleted operation has to release the beacon
-// and retire its finalizer whatever phase it is in, or it would wait on a lifecycle hook that
-// nothing will ever answer and never finish deleting. So the two verbs differ in scope — cancel
-// stops the work, deletion removes the object and accepts what that implies — and deleting the
-// operation is the remedy for a terminal phase hook whose delegate never returns the beacon.
-//
-// Note this runs from reconcileActive, which a paused operation never reaches, so a paused
-// operation is not canceled until it is resumed.
-func cancelForRequest(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnapshotRestoreStatus) opv1alpha1.ETCDSnapshotRestoreStatus {
-	if !ops.IsCanceled(&op.Spec.OperationSpec) {
-		return status
-	}
-
-	if ops.IsTerminal(status.Phase) {
-		return status
-	}
-
-	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, status.Phase, status.Step)
-
-	status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
-
-	return status
 }
 
 // resolveScope gathers everything the phase handlers work from: the parent cluster, the Adapter for
@@ -634,25 +570,6 @@ func (s *scope) idempotencyValue() string {
 	return string(s.op.UID)
 }
 
-// lifecycleHookDelegate returns (suffix, delegate) for the first label on the operation whose key
-// starts with prefix. Returns ("", "") when no such label is set. The suffix is informational —
-// only the delegate value is consulted to drive the beacon push.
-func lifecycleHookDelegate(op *opv1alpha1.ETCDSnapshotRestore, prefix string) (string, string) {
-	// An empty prefix would match every label, and so would report a delegate for a phase that has
-	// no hook at all.
-	if prefix == "" || op.Labels == nil {
-		return "", ""
-	}
-
-	for k, v := range op.Labels {
-		if after, ok := strings.CutPrefix(k, prefix); ok {
-			return after, v
-		}
-	}
-
-	return "", ""
-}
-
 // delegate pushes delegate onto the beacon's delegate chain if it is not already there. It is a
 // no-op when the delegate is already present, which keeps the call idempotent across the many
 // reconciles that may occur while a hook is held.
@@ -684,7 +601,7 @@ func (h *handler) delegate(s *scope, name, delegate string) error {
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 	logrus.Tracef("[etcdsnapshotrestore] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
 
-	if name, delegate := lifecycleHookDelegate(s.op, prefix); delegate != "" {
+	if name, delegate := planv1alpha1.LifecycleHookDelegate(s.op, prefix); delegate != "" {
 		err := h.delegate(s, name, delegate)
 		return true, err
 	}
@@ -2146,7 +2063,7 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 	// holds would be reaching into its operation. Everything after the hook is either a no-op
 	// without a claim (releaseBeacon) or owed regardless of one, so the operation still terminates
 	// — which is what lets it be collected, or lets a deleted one retire its finalizer.
-	honourHook := !phase.beaconOptional || holdsBeacon(s)
+	honourHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
 
 	if honourHook {
 		delegated, err := h.handleHook(s, phase.hook)
@@ -2164,7 +2081,7 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 		logrus.Debugf("[etcdsnapshotrestore] %s/%s: %s with no claim on the beacon, leaving it untouched", s.op.Namespace, s.op.Name, status.Phase)
 	}
 
-	owning, err := h.releaseBeacon(s)
+	owning, err := plan.ReleaseBeaconIfHeld(s.beacon, h.beacons, s.ownerKey)
 	if err != nil {
 		return status, err
 	}
@@ -2176,26 +2093,6 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 	status.SetTerminated()
 
 	return status, nil
-}
-
-// releaseBeacon hands the beacon back if this operation still holds it: ReleaseBeacon clears it
-// outright (Active + Owner + Delegates) for the primary owner, or removes our slot from the
-// delegate chain at any position otherwise. Reports whether we were the primary owner; the
-// owner-vs-chain guard just avoids a no-op call.
-func (h *handler) releaseBeacon(s *scope) (bool, error) {
-	if !holdsBeacon(s) {
-		return false, nil
-	}
-
-	owning := plan.IsOwningBeaconHolder(s.beacon, s.ownerKey)
-
-	return owning, plan.ReleaseBeacon(s.beacon, h.beacons, s.ownerKey)
-}
-
-// holdsBeacon reports whether the operation still has a claim on the beacon, either as its primary
-// owner or from anywhere in the delegate chain.
-func holdsBeacon(s *scope) bool {
-	return plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) || plan.IsInDelegateChain(s.beacon, s.ownerKey)
 }
 
 // handleAborted handles the Aborted terminal phase, reached when the operation called its own work
@@ -2378,7 +2275,7 @@ func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnap
 
 		// Read the delegate back off the operation rather than remembering it on a condition: the
 		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
-		if _, delegate := lifecycleHookDelegate(op, ops.TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
+		if _, delegate := planv1alpha1.LifecycleHookDelegate(op, ops.TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
 			opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.FinalizedCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
 		} else {
