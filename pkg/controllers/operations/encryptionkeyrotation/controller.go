@@ -893,6 +893,25 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 		}
 	}
 
+	return h.finishRotation(s, status)
+}
+
+// finishRotation hands the cluster back to the planner and records the rotation as successful. Both
+// belong to the same moment and are done together so that neither can happen without the other.
+//
+// It is reached only from the end of reconcileRestart, once every server node has restarted and
+// converged, which makes it the one place a rotation unpauses. A rotation which does not get this
+// far has left the cluster mid-rotation, with some nodes on the new key and some on the old, and
+// letting the planner roll nodes in that state would be unsafe — so it stays paused, deliberately,
+// for an administrator to resolve. That is what its failure messages already ask for, and it is why
+// terminal handling does not unpause either.
+func (h *handler) finishRotation(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	// Unpause before asserting the outcome: a rotation reported successful while its cluster is
+	// still paused would look finished and leave the cluster frozen.
+	if err := s.adapter.PauseCluster(false); err != nil {
+		return status, err
+	}
+
 	logrus.Infof("[encryptionkeyrotation] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
 	markSucceeded(&status)
@@ -1022,13 +1041,15 @@ type terminalPhase struct {
 // operation is recorded as terminated.
 //
 // Reaching a terminal phase is not the end of the operation's handling: the phase's lifecycle hook
-// may hand the beacon to a delegate first, the cluster this operation paused has to be unpaused,
-// and the beacon has to be released so the next operation in line can acquire it. Recording
-// termination in this one place — after the hook is satisfied, after the cluster is unpaused, after
-// the release succeeded — is what keeps the marker honest, since that marker is what makes the
-// operation eligible for TTL collection and lets a deleted operation finish deleting. A terminal
-// phase handler that returns early therefore cannot forget to withhold it, and cannot leave the
-// cluster paused behind it.
+// may hand the beacon to a delegate first, and the beacon has to be released afterwards so the next
+// operation in line can acquire it. Recording termination in this one place — after the hook is
+// satisfied, after the release succeeded — is what keeps the marker honest, since that marker is
+// what makes the operation eligible for TTL collection and lets a deleted operation finish
+// deleting. A terminal phase handler that returns early therefore cannot forget to withhold it.
+//
+// Unpausing the cluster is deliberately not part of this. Only a rotation which restarted every
+// node has left the cluster in a state fit to hand back to the planner, so reconcileRestart does it
+// and no terminal path undoes it — see there.
 //
 // An operation which no longer holds the beacon has none of that left to do: see
 // beaconOptional. It terminates without the beacon being written to at all, which is what
@@ -1058,12 +1079,6 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.EncryptionKeyRotati
 		}
 	} else {
 		logrus.Debugf("[encryptionkeyrotation] %s/%s: %s with no claim on the beacon, leaving it untouched", s.op.Namespace, s.op.Name, status.Phase)
-	}
-
-	// reconcileRotate pauses the cluster for the duration of the rotation, so every terminal path
-	// has to undo that. PauseCluster is idempotent, so paths that never paused just no-op.
-	if err := s.adapter.PauseCluster(false); err != nil {
-		return status, err
 	}
 
 	owning, err := h.releaseBeacon(s)

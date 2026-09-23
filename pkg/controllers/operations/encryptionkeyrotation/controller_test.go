@@ -34,6 +34,7 @@ type stubAdapter struct {
 	waitForRegisterOK  bool
 	waitForRegisterErr error
 	pauseCalls         []bool
+	pauseErr           error
 }
 
 func (a *stubAdapter) BeaconRef() (string, string) { return "test-namespace", "test-cluster" }
@@ -100,6 +101,9 @@ func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret,
 }
 
 func (a *stubAdapter) PauseCluster(paused bool) error {
+	if a.pauseErr != nil {
+		return a.pauseErr
+	}
 	a.pauseCalls = append(a.pauseCalls, paused)
 	return nil
 }
@@ -625,7 +629,7 @@ func TestUpdateStatusByPhase(t *testing.T) {
 	}
 }
 
-func TestHandleFailed_HoldingBeaconReleasesAndUnpauses(t *testing.T) {
+func TestHandleFailed_HoldingBeaconReleasesAndLeavesClusterPaused(t *testing.T) {
 	op := newOp()
 	adapter := &stubAdapter{waitForRegisterOK: true}
 	beacons := &fakeBeaconClient{}
@@ -638,8 +642,10 @@ func TestHandleFailed_HoldingBeaconReleasesAndUnpauses(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
+	// A rotation which failed left the cluster mid-rotation, so it stays paused for an
+	// administrator to resolve. Only reconcileRestart, having restarted every node, unpauses.
+	if len(adapter.pauseCalls) != 0 {
+		t.Fatalf("terminal handling must not unpause the cluster, got %+v", adapter.pauseCalls)
 	}
 	// ReleaseBeacon writes to UpdateStatus (Status.Owner is the source of truth for beacon
 	// ownership); the legacy main-resource Update is no longer used.
@@ -671,8 +677,10 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
+	// reconcileRestart has already unpaused the cluster by the time an operation succeeds, so
+	// terminal handling has nothing to undo.
+	if len(adapter.pauseCalls) != 0 {
+		t.Fatalf("terminal handling must not unpause the cluster, got %+v", adapter.pauseCalls)
 	}
 	// ReleaseBeacon on the owner path clears Active + Owner + Delegates in a single
 	// UpdateStatus call — no separate ToggleBeacon is needed.
@@ -698,7 +706,7 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 	}
 }
 
-func TestHandleSucceeded_NotHoldingOnlyUnpauses(t *testing.T) {
+func TestHandleSucceeded_NotHoldingIsANoOp(t *testing.T) {
 	op := newOp()
 	adapter := &stubAdapter{waitForRegisterOK: true}
 	beacons := &fakeBeaconClient{}
@@ -715,8 +723,8 @@ func TestHandleSucceeded_NotHoldingOnlyUnpauses(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-		t.Fatalf("expected PauseCluster(false), got %+v", adapter.pauseCalls)
+	if len(adapter.pauseCalls) != 0 {
+		t.Fatalf("terminal handling must not unpause the cluster, got %+v", adapter.pauseCalls)
 	}
 	if len(beacons.statusUpdates) != 0 {
 		t.Fatalf("expected no beacon status updates, got %d", len(beacons.statusUpdates))
@@ -1330,7 +1338,7 @@ var terminalHandlers = map[string]struct {
 	},
 }
 
-func TestHandleTerminal_RecordsTerminationAndUnpauses(t *testing.T) {
+func TestHandleTerminal_RecordsTermination(t *testing.T) {
 	for name, tc := range terminalHandlers {
 		t.Run(name, func(t *testing.T) {
 			op := newOp()
@@ -1346,10 +1354,10 @@ func TestHandleTerminal_RecordsTerminationAndUnpauses(t *testing.T) {
 			if got.TerminatedAt.IsZero() {
 				t.Fatal("terminal handling completed, so it must be recorded on the status")
 			}
-			// The rotation pauses the cluster; every terminal path has to undo that before it can
-			// call itself done.
-			if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-				t.Fatalf("expected exactly one PauseCluster(false), got %v", adapter.pauseCalls)
+			// Unpausing is reconcileRestart's job, not terminal handling's: only a rotation which
+			// restarted every node has left the cluster fit to hand back to the planner.
+			if len(adapter.pauseCalls) != 0 {
+				t.Fatalf("terminal handling must not unpause the cluster, got %v", adapter.pauseCalls)
 			}
 			if len(beacons.statusUpdates) != 1 {
 				t.Fatalf("expected one beacon status update (release), got %d", len(beacons.statusUpdates))
@@ -1364,8 +1372,8 @@ func TestHandleTerminal_RecordsTerminationAndUnpauses(t *testing.T) {
 // TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers every outcome an operation can
 // reach without holding the beacon — Failed after losing it, Aborted after being overtaken,
 // Canceled by whoever wanted it next. In all three the operation still finishes, and the beacon
-// (now someone else's) is left exactly as it is. The cluster is still unpaused, though: the
-// rotation paused it, so leaving it paused would strand the cluster whoever holds the beacon now.
+// (now someone else's) is left exactly as it is. The cluster stays paused: a rotation which did not
+// restart every node has left it mid-rotation, and unpausing is reconcileRestart's job alone.
 // Succeeded is excluded: it cannot be reached without holding the beacon throughout.
 func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 	for name, tc := range terminalHandlers {
@@ -1393,8 +1401,8 @@ func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 				t.Fatalf("a beacon held by another controller must not be modified, got %d status updates",
 					len(beacons.statusUpdates))
 			}
-			if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
-				t.Fatalf("the cluster must still be unpaused, got PauseCluster calls %v", adapter.pauseCalls)
+			if len(adapter.pauseCalls) != 0 {
+				t.Fatalf("terminal handling must not unpause the cluster, got %v", adapter.pauseCalls)
 			}
 		})
 	}
@@ -2154,4 +2162,51 @@ func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
 			t.Fatalf("expected the cancellation reason to survive, got %q", opv1alpha1.CanceledCondition.GetReason(&got))
 		}
 	})
+}
+
+// TestFinishRotation covers the one place a rotation unpauses the cluster. reconcileRestart reaches
+// it only after every server node has restarted and converged, and the unpause and the success
+// marker are done together, so a rotation cannot report success while leaving the cluster frozen —
+// nor unpause without having succeeded. Every terminal handler is covered for the opposite by
+// TestHandleTerminal_RecordsTermination.
+func TestFinishRotation(t *testing.T) {
+	adapter := &stubAdapter{}
+	h := &handler{}
+	s := newScope(newOp(), newBeacon(beaconOwnerKey(newOp()), true), adapter)
+
+	status, err := h.finishRotation(s, opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.EncryptionKeyRotationStepRestart,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
+		t.Fatalf("expected exactly one PauseCluster(false), got %v", adapter.pauseCalls)
+	}
+	if status.Phase != opv1alpha1.OperationPhaseSucceeded {
+		t.Fatalf("expected phase Succeeded, got %q", status.Phase)
+	}
+	if string(opv1alpha1.SucceededCondition.GetStatus(&status)) != "True" {
+		t.Fatal("the outcome must be asserted")
+	}
+}
+
+// A cluster that cannot be unpaused leaves the rotation in progress to be retried, rather than
+// reported successful with the cluster still frozen.
+func TestFinishRotation_UnpauseFailureDoesNotSucceed(t *testing.T) {
+	adapter := &stubAdapter{pauseErr: errors.New("boom")}
+	h := &handler{}
+	s := newScope(newOp(), newBeacon(beaconOwnerKey(newOp()), true), adapter)
+
+	status, err := h.finishRotation(s, opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.EncryptionKeyRotationStepRestart,
+	})
+	if err == nil {
+		t.Fatal("expected the unpause failure to be returned")
+	}
+	if status.Phase == opv1alpha1.OperationPhaseSucceeded {
+		t.Fatal("the rotation must not be reported successful while the cluster is still paused")
+	}
 }
