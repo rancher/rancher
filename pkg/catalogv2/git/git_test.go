@@ -213,6 +213,10 @@ func TestGitClientErrorHandling(t *testing.T) {
 			name:    "gitCLI",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
 		},
+		{
+			name:    "gitGo",
+			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
+		},
 	}
 
 	for _, impl := range implementations {
@@ -283,6 +287,10 @@ func TestGitClientCredentials(t *testing.T) {
 		{
 			name:    "gitCLI",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
+		},
+		{
+			name:    "gitGo",
+			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
 		},
 	}
 
@@ -503,6 +511,10 @@ func TestGitClientOptionsHandling(t *testing.T) {
 			name:    "gitCLI",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
 		},
+		{
+			name:    "gitGo",
+			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
+		},
 	}
 
 	for _, impl := range implementations {
@@ -623,6 +635,10 @@ func TestGitClientUpdateEdgeCases(t *testing.T) {
 			name:    "gitCLI",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
 		},
+		{
+			name:    "gitGo",
+			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
+		},
 	}
 
 	for _, impl := range implementations {
@@ -706,6 +722,10 @@ func TestGitClientRealWorldFlows(t *testing.T) {
 		{
 			name:    "gitCLI",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
+		},
+		{
+			name:    "gitGo",
+			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
 		},
 	}
 
