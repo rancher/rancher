@@ -25,42 +25,34 @@ import (
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 )
 
-type Options struct {
-	Credential        *corev1.Secret
-	CABundle          []byte
-	InsecureTLSVerify bool
-	Headers           map[string]string
+type gitCLI struct {
+	commonGitFields
+	agent *agent.Agent
 }
 
-type git struct {
-	URL               string
-	Directory         string
-	password          string
-	agent             *agent.Agent
-	caBundle          []byte
-	insecureTLSVerify bool
-	secret            *corev1.Secret
-	headers           map[string]string
-	knownHosts        []byte
-}
+var _ gitClient = (*gitCLI)(nil)
 
-func newGit(directory, url string, opts *Options) (*git, error) {
+// newGitCLI creates a new gitCLI instance with the given configuration
+func newGitCLI(directory, repoURL string, opts *Options) (*gitCLI, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
 
-	g := &git{
-		URL:               url,
-		Directory:         directory,
-		caBundle:          opts.CABundle,
-		insecureTLSVerify: opts.InsecureTLSVerify,
-		secret:            opts.Credential,
-		headers:           opts.Headers,
+	g := &gitCLI{
+		commonGitFields: commonGitFields{
+			URL:               repoURL,
+			Directory:         directory,
+			caBundle:          opts.CABundle,
+			insecureTLSVerify: opts.InsecureTLSVerify,
+			secret:            opts.Credential,
+			headers:           opts.Headers,
+		},
 	}
 	return g, g.setCredential(opts.Credential)
 }
 
-func (g *git) setCredential(cred *corev1.Secret) error {
+// setCredential configures authentication credentials for git operations
+func (g *gitCLI) setCredential(cred *corev1.Secret) error {
 	if cred == nil {
 		return nil
 	}
@@ -98,134 +90,16 @@ func (g *git) setCredential(cred *corev1.Secret) error {
 	return nil
 }
 
-func (g *git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
-	r, err := randomtoken.Generate()
-	if err != nil {
-		return nil, err
-	}
-
-	tmpDir, err := os.MkdirTemp("", "ssh-agent")
-	if err != nil {
-		return nil, err
-	}
-
-	addr := &net.UnixAddr{
-		Name: filepath.Join(tmpDir, r),
-		Net:  "unix",
-	}
-
-	l, err := net.ListenUnix(addr.Net, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
-
-	go func() {
-		defer os.RemoveAll(tmpDir)
-		defer l.Close()
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				if !k8snet.IsProbableEOF(err) {
-					logrus.Errorf("failed to accept ssh-agent client connection: %v", err)
-				}
-				return
-			}
-			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
-				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
-			}
-		}
-	}()
-
-	return l, nil
-}
-
-func (g *git) httpClientWithCreds() (*http.Client, error) {
-	var (
-		username  string
-		password  string
-		tlsConfig tls.Config
-	)
-
-	if g.secret != nil {
-		switch g.secret.Type {
-		case corev1.SecretTypeBasicAuth:
-			username = string(g.secret.Data[corev1.BasicAuthUsernameKey])
-			password = string(g.secret.Data[corev1.BasicAuthPasswordKey])
-		case corev1.SecretTypeTLS:
-			cert, err := tls.X509KeyPair(g.secret.Data[corev1.TLSCertKey], g.secret.Data[corev1.TLSPrivateKeyKey])
-			if err != nil {
-				return nil, err
-			}
-			tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
-		}
-	}
-
-	if len(g.caBundle) > 0 {
-		cert, err := x509.ParseCertificate(g.caBundle)
-		if err != nil {
-			return nil, err
-		}
-		pool, err := x509.SystemCertPool()
-		if err != nil {
-			logrus.Debugf("getting system cert pool failed with %s", err)
-			pool = x509.NewCertPool()
-		}
-		pool.AddCert(cert)
-		tlsConfig.RootCAs = pool
-	}
-
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tlsConfig
-	transport.TLSClientConfig.InsecureSkipVerify = g.insecureTLSVerify
-	transport.Proxy = http.ProxyFromEnvironment
-
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   30 * time.Second,
-	}
-
-	// Wrap the transport with a custom RoundTripper to set the User-Agent header
-	client.Transport = &roundtripper.UserAgent{
-		UserAgent: roundtripper.BuildUserAgent("go", "(Git-based Helm Repository)"),
-		Next:      client.Transport,
-	}
-
-	if username != "" || password != "" {
-		client.Transport = &basicRoundTripper{
-			username: username,
-			password: password,
-			next:     client.Transport,
-		}
-	}
-
-	return client, nil
-}
-
 // Clone runs git clone with depth 1
-func (g *git) Clone(branch string) error {
+func (g *gitCLI) Clone(branch string) error {
 	if branch == "" {
 		return g.git("clone", "--depth=1", "-n", "--", g.URL, g.Directory)
 	}
 	return g.git("clone", "--depth=1", "-n", "--branch="+branch, "--", g.URL, g.Directory)
 }
 
-func (g *git) clone(branch string) error {
-	gitDir := filepath.Join(g.Directory, ".git")
-	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
-		return nil
-	}
-
-	if err := os.RemoveAll(g.Directory); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
-	}
-
-	return g.Clone(branch)
-}
-
 // Update updates git repo if remote sha has changed.
-func (g *git) Update(branch string) (string, error) {
+func (g *gitCLI) Update(branch string) (string, error) {
 	if err := g.clone(branch); err != nil {
 		return "", err
 	}
@@ -250,22 +124,26 @@ func (g *git) Update(branch string) (string, error) {
 	return g.currentCommit()
 }
 
-func (g *git) fetchAndReset(rev string) error {
+func (g *gitCLI) fetchAndReset(rev string) error {
 	if err := g.git("-C", g.Directory, "fetch", "origin", "--", rev); err != nil {
 		return err
 	}
 	return g.reset("FETCH_HEAD")
 }
 
-func (g *git) reset(rev string) error {
+func (g *gitCLI) reset(rev string) error {
 	return g.git("-C", g.Directory, "reset", "--hard", rev)
 }
 
-func (g *git) currentCommit() (string, error) {
+func (g *gitCLI) currentCommit() (string, error) {
 	return g.gitOutput("-C", g.Directory, "rev-parse", "HEAD")
 }
 
-func (g *git) remoteSHAChanged(branch, sha string) (bool, error) {
+func (g *gitCLI) getDirectory() string {
+	return g.Directory
+}
+
+func (g *gitCLI) remoteSHAChanged(branch, sha string) (bool, error) {
 	formattedURL := formatGitURL(g.URL, branch)
 	if formattedURL == "" {
 		return true, nil
@@ -308,7 +186,22 @@ func (g *git) remoteSHAChanged(branch, sha string) (bool, error) {
 	return true, nil
 }
 
-func (g *git) git(args ...string) error {
+// clone ensures the repository is cloned
+func (g *gitCLI) clone(branch string) error {
+	gitDir := filepath.Join(g.Directory, ".git")
+	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
+		return nil
+	}
+
+	if err := os.RemoveAll(g.Directory); err != nil {
+		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
+	}
+
+	return g.Clone(branch)
+}
+
+// git executes a git command
+func (g *gitCLI) git(args ...string) error {
 	var output io.Writer
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		output = os.Stdout
@@ -316,13 +209,15 @@ func (g *git) git(args ...string) error {
 	return g.gitCmd(output, args...)
 }
 
-func (g *git) gitOutput(args ...string) (string, error) {
+// gitOutput executes a git command and returns its output
+func (g *gitCLI) gitOutput(args ...string) (string, error) {
 	output := &bytes.Buffer{}
 	err := g.gitCmd(output, args...)
 	return strings.TrimSpace(output.String()), err
 }
 
-func (g *git) gitCmd(output io.Writer, args ...string) error {
+// gitCmd is the core git command execution logic
+func (g *gitCLI) gitCmd(output io.Writer, args ...string) error {
 	kv := fmt.Sprintf("credential.helper=%s", `/bin/sh -c 'echo "password=$GIT_PASSWORD"'`)
 	cmd := exec.Command("git", append([]string{"-c", kv}, args...)...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_PASSWORD=%s", g.password))
@@ -388,4 +283,111 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 		return fmt.Errorf("git %s error: %w, detail: %v", strings.Join(args, " "), err, stderrBuf.String())
 	}
 	return nil
+}
+
+// injectAgent sets up an SSH agent for git operations
+func (g *gitCLI) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
+	r, err := randomtoken.Generate()
+	if err != nil {
+		return nil, err
+	}
+
+	tmpDir, err := os.MkdirTemp("", "ssh-agent")
+	if err != nil {
+		return nil, err
+	}
+
+	addr := &net.UnixAddr{
+		Name: filepath.Join(tmpDir, r),
+		Net:  "unix",
+	}
+
+	l, err := net.ListenUnix(addr.Net, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
+
+	go func() {
+		defer os.RemoveAll(tmpDir)
+		defer l.Close()
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				if !k8snet.IsProbableEOF(err) {
+					logrus.Errorf("failed to accept ssh-agent client connection: %v", err)
+				}
+				return
+			}
+			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
+				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
+			}
+		}
+	}()
+
+	return l, nil
+}
+
+// httpClientWithCreds creates an HTTP client with credentials configured
+func (g *gitCLI) httpClientWithCreds() (*http.Client, error) {
+	var (
+		username  string
+		password  string
+		tlsConfig tls.Config
+	)
+
+	if g.secret != nil {
+		switch g.secret.Type {
+		case corev1.SecretTypeBasicAuth:
+			username = string(g.secret.Data[corev1.BasicAuthUsernameKey])
+			password = string(g.secret.Data[corev1.BasicAuthPasswordKey])
+		case corev1.SecretTypeTLS:
+			cert, err := tls.X509KeyPair(g.secret.Data[corev1.TLSCertKey], g.secret.Data[corev1.TLSPrivateKeyKey])
+			if err != nil {
+				return nil, err
+			}
+			tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
+		}
+	}
+
+	if len(g.caBundle) > 0 {
+		cert, err := x509.ParseCertificate(g.caBundle)
+		if err != nil {
+			return nil, err
+		}
+		pool, err := x509.SystemCertPool()
+		if err != nil {
+			logrus.Debugf("getting system cert pool failed with %s", err)
+			pool = x509.NewCertPool()
+		}
+		pool.AddCert(cert)
+		tlsConfig.RootCAs = pool
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tlsConfig
+	transport.TLSClientConfig.InsecureSkipVerify = g.insecureTLSVerify
+	transport.Proxy = http.ProxyFromEnvironment
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
+	}
+
+	// Wrap the transport with a custom RoundTripper to set the User-Agent header
+	client.Transport = &roundtripper.UserAgent{
+		UserAgent: roundtripper.BuildUserAgent("go", "(Git-based Helm Repository)"),
+		Next:      client.Transport,
+	}
+
+	if username != "" || password != "" {
+		client.Transport = &basicRoundTripper{
+			username: username,
+			password: password,
+			next:     client.Transport,
+		}
+	}
+
+	return client, nil
 }

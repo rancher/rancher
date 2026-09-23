@@ -158,7 +158,7 @@ type fixture struct {
 	dir        string
 	mockRemote string
 	commits    map[string]string
-	git        *git
+	git        *gitCLI
 }
 
 // newWorkspace moves the test into a temporary working directory - so that the relative directories
@@ -178,7 +178,7 @@ func newWorkspace(t *testing.T) *fixture {
 	g := createBundledGitDirectory(t)
 
 	f := &fixture{
-		dir:        g.Directory,
+		dir:        g.getDirectory(),
 		mockRemote: filepath.Join(root, "upstream"),
 		commits:    map[string]string{},
 		git:        g,
@@ -191,14 +191,14 @@ func newWorkspace(t *testing.T) *fixture {
 	return f
 }
 
-func createBundledGitDirectory(t *testing.T) *git {
+func createBundledGitDirectory(t *testing.T) *gitCLI {
 	require.NoError(t, os.MkdirAll(filepath.Join(localDir, bundledNamespace, bundledName, Hash(bundledURL)), 0o755))
 	g, err := gitForRepo(nil, bundledNamespace, bundledName, bundledURL, false, nil)
 	require.NoError(t, err)
-	require.True(t, IsBundled(g.Directory))
-	require.Equal(t, filepath.Join(localDir, bundledName, Hash(bundledURL)), g.Directory)
+	require.True(t, IsBundled(g.getDirectory()))
+	require.Equal(t, filepath.Join(localDir, bundledName, Hash(bundledURL)), g.getDirectory())
 
-	return g
+	return g.(*gitCLI)
 }
 
 // newFixture clones the upstream the way package/Dockerfile does, with --no-checkout and
