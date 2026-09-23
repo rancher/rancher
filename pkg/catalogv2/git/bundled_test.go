@@ -1,8 +1,11 @@
 package git
 
 import (
+	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/settings"
@@ -106,7 +109,7 @@ func Test_Ensure_Bundled_UpgradeScenario_ShallowClone(t *testing.T) {
 
 	f.commits["v2"] = f.mockCommitRemote(t, "v2")
 
-	require.NoError(t, f.git.gitCmd(nil, "clone", "--no-checkout", "--depth", "1", "--branch", "main",
+	require.NoError(t, gitCmd("clone", "--no-checkout", "--depth", "1", "--branch", "main",
 		"--", "file://"+f.mockRemote, f.dir))
 
 	require.Equal(t, f.commits["v2"], f.headCommit(t, f.dir), "should have v2 after clone")
@@ -133,12 +136,12 @@ func Test_Ensure_Bundled_UpgradeScenario_FullClone(t *testing.T) {
 
 	f.commits["v2"] = f.mockCommitRemote(t, "v2")
 
-	require.NoError(t, f.git.gitCmd(nil, "clone", "--no-checkout", "--branch", "main",
+	require.NoError(t, gitCmd("clone", "--no-checkout", "--branch", "main",
 		"--", "file://"+f.mockRemote, f.dir))
 
 	require.Equal(t, f.commits["v2"], f.headCommit(t, f.dir), "should have v2 as HEAD after clone")
 
-	_, err := f.git.gitOutput("-C", f.dir, "rev-parse", f.commits["v1"])
+	_, err := gitOutput("-C", f.dir, "rev-parse", f.commits["v1"])
 	require.NoError(t, err, "v1 should exist in bundled repo history")
 
 	require.NoError(t, os.RemoveAll(f.mockRemote))
@@ -158,7 +161,6 @@ type fixture struct {
 	dir        string
 	mockRemote string
 	commits    map[string]string
-	git        *gitCLI
 }
 
 // newWorkspace moves the test into a temporary working directory - so that the relative directories
@@ -175,30 +177,29 @@ func newWorkspace(t *testing.T) *fixture {
 	require.NoError(t, os.MkdirAll(work, 0o755))
 	t.Chdir(work)
 
-	g := createBundledGitDirectory(t)
+	dir := createBundledGitDirectory(t)
 
 	f := &fixture{
-		dir:        g.getDirectory(),
+		dir:        dir,
 		mockRemote: filepath.Join(root, "upstream"),
 		commits:    map[string]string{},
-		git:        g,
 	}
 	require.NoError(t, os.MkdirAll(f.mockRemote, 0o755))
-	require.NoError(t, f.git.gitCmd(nil, "-C", f.mockRemote, "init", "-b", "main"))
+	require.NoError(t, gitCmd("-C", f.mockRemote, "init", "-b", "main"))
 	f.commits["missing-commit"] = f.mockCommitRemote(t, "missing-commit")
 	f.commits["v1"] = f.mockCommitRemote(t, "v1")
 
 	return f
 }
 
-func createBundledGitDirectory(t *testing.T) *gitCLI {
+func createBundledGitDirectory(t *testing.T) string {
 	require.NoError(t, os.MkdirAll(filepath.Join(localDir, bundledNamespace, bundledName, Hash(bundledURL)), 0o755))
 	g, err := gitForRepo(nil, bundledNamespace, bundledName, bundledURL, false, nil)
 	require.NoError(t, err)
 	require.True(t, IsBundled(g.getDirectory()))
 	require.Equal(t, filepath.Join(localDir, bundledName, Hash(bundledURL)), g.getDirectory())
 
-	return g.(*gitCLI)
+	return g.getDirectory()
 }
 
 // newFixture clones the upstream the way package/Dockerfile does, with --no-checkout and
@@ -208,10 +209,10 @@ func newFixture(t *testing.T) *fixture {
 	f := newWorkspace(t)
 
 	// a file:// URL rather than a path, git ignores --depth on a plain local clone
-	require.NoError(t, f.git.gitCmd(nil, "clone", "--no-checkout", "--depth", "1", "--branch", "main",
+	require.NoError(t, gitCmd("clone", "--no-checkout", "--depth", "1", "--branch", "main",
 		"--", "file://"+f.mockRemote, f.dir))
 	require.NoFileExists(t, filepath.Join(f.dir, "chart.yaml"), "the clone should have no working tree")
-	depth, err := f.git.gitOutput("-C", f.dir, "rev-list", "--count", "HEAD")
+	depth, err := gitOutput("-C", f.dir, "rev-list", "--count", "HEAD")
 	require.NoError(t, err)
 	require.Equal(t, "1", depth, `the clone should hold "v1" and nothing else`)
 	require.NoError(t, os.RemoveAll(f.mockRemote))
@@ -223,8 +224,8 @@ func newFixture(t *testing.T) *fixture {
 func (f *fixture) mockCommitRemote(t *testing.T, name string) string {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(f.mockRemote, "chart.yaml"), []byte(name), 0o644))
-	require.NoError(t, f.git.gitCmd(nil, "-C", f.mockRemote, "add", "chart.yaml"))
-	require.NoError(t, f.git.gitCmd(nil, "-C", f.mockRemote, "-c", "user.name=rancher",
+	require.NoError(t, gitCmd("-C", f.mockRemote, "add", "chart.yaml"))
+	require.NoError(t, gitCmd("-C", f.mockRemote, "-c", "user.name=rancher",
 		"-c", "user.email=rancher@suse.com", "-c", "commit.gpgsign=false", "commit", "-m", name))
 	return f.headCommit(t, f.mockRemote)
 }
@@ -232,7 +233,7 @@ func (f *fixture) mockCommitRemote(t *testing.T, name string) string {
 // headCommit returns the commit checked out in dir.
 func (f *fixture) headCommit(t *testing.T, dir string) string {
 	t.Helper()
-	commit, err := f.git.gitOutput("-C", dir, "rev-parse", "HEAD")
+	commit, err := gitOutput("-C", dir, "rev-parse", "HEAD")
 	require.NoError(t, err)
 	return commit
 }
@@ -244,4 +245,26 @@ func setSystemCatalog(t *testing.T, value string) {
 	t.Cleanup(func() {
 		require.NoError(t, settings.SystemCatalog.Set(previous))
 	})
+}
+
+// gitCmd runs a git command for test fixtures
+func gitCmd(args ...string) error {
+	cmd := exec.Command("git", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// gitOutput runs a git command and returns its output
+func gitOutput(args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }

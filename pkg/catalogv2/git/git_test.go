@@ -13,17 +13,12 @@ import (
 )
 
 // TestGitClientContract defines the interface contract tests that all gitClient
-// implementations must pass. This ensures both gitCLI and future implementations
-// (e.g., gitGoGit) behave consistently.
+// implementations must pass. This ensures gitGo behaves consistently.
 func TestGitClientContract(t *testing.T) {
 	implementations := []struct {
 		name    string
 		factory func(directory, url string, opts *Options) (gitClient, error)
 	}{
-		{
-			name:    "gitCLI",
-			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
-		},
 		{
 			name:    "gitGo",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
@@ -209,10 +204,6 @@ func TestGitClientErrorHandling(t *testing.T) {
 		factory func(directory, url string, opts *Options) (gitClient, error)
 	}{
 		{
-			name:    "gitCLI",
-			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
-		},
-		{
 			name:    "gitGo",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
 		},
@@ -284,10 +275,6 @@ func TestGitClientCredentials(t *testing.T) {
 		factory func(directory, url string, opts *Options) (gitClient, error)
 	}{
 		{
-			name:    "gitCLI",
-			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
-		},
-		{
 			name:    "gitGo",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
 		},
@@ -339,10 +326,10 @@ func TestGitClientConcurrency(t *testing.T) {
 		dir1 := filepath.Join(tmpDir, "repo1")
 		dir2 := filepath.Join(tmpDir, "repo2")
 
-		client1, err := newGitCLI(dir1, chartsSmallForkURL, nil)
+		client1, err := newGitGo(dir1, chartsSmallForkURL, nil)
 		require.NoError(t, err)
 
-		client2, err := newGitCLI(dir2, chartsSmallForkURL, nil)
+		client2, err := newGitGo(dir2, chartsSmallForkURL, nil)
 		require.NoError(t, err)
 
 		// Clone both on different branches
@@ -373,7 +360,7 @@ func TestGitClientStateTransitions(t *testing.T) {
 		tmpDir := t.TempDir()
 		testDir := filepath.Join(tmpDir, "test-repo")
 
-		client, err := newGitCLI(testDir, chartsSmallForkURL, nil)
+		client, err := newGitGo(testDir, chartsSmallForkURL, nil)
 		require.NoError(t, err)
 
 		// Transition: uncloned -> cloned on main
@@ -413,7 +400,7 @@ func TestGitClientDirectoryManagement(t *testing.T) {
 		dirtyFile := filepath.Join(testDir, "dirty.txt")
 		require.NoError(t, os.WriteFile(dirtyFile, []byte("dirty"), 0o644))
 
-		client, err := newGitCLI(testDir, chartsSmallForkURL, nil)
+		client, err := newGitGo(testDir, chartsSmallForkURL, nil)
 		require.NoError(t, err)
 
 		// Clone should clean directory
@@ -432,7 +419,7 @@ func TestGitClientDirectoryManagement(t *testing.T) {
 		tmpDir := t.TempDir()
 		testDir := filepath.Join(tmpDir, "test-repo")
 
-		client, err := newGitCLI(testDir, chartsSmallForkURL, nil)
+		client, err := newGitGo(testDir, chartsSmallForkURL, nil)
 		require.NoError(t, err)
 
 		// First clone
@@ -460,7 +447,7 @@ func BenchmarkGitClientOperations(b *testing.B) {
 	b.Run("clone", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			testDir := filepath.Join(tmpDir, fmt.Sprintf("bench-clone-%d", i))
-			client, err := newGitCLI(testDir, chartsSmallForkURL, nil)
+			client, err := newGitGo(testDir, chartsSmallForkURL, nil)
 			require.NoError(b, err)
 
 			err = client.clone(mainBranch)
@@ -470,7 +457,7 @@ func BenchmarkGitClientOperations(b *testing.B) {
 
 	b.Run("currentCommit", func(b *testing.B) {
 		testDir := filepath.Join(tmpDir, "bench-commit")
-		client, err := newGitCLI(testDir, chartsSmallForkURL, nil)
+		client, err := newGitGo(testDir, chartsSmallForkURL, nil)
 		require.NoError(b, err)
 
 		err = client.clone(mainBranch)
@@ -485,7 +472,7 @@ func BenchmarkGitClientOperations(b *testing.B) {
 
 	b.Run("reset", func(b *testing.B) {
 		testDir := filepath.Join(tmpDir, "bench-reset")
-		client, err := newGitCLI(testDir, chartsSmallForkURL, nil)
+		client, err := newGitGo(testDir, chartsSmallForkURL, nil)
 		require.NoError(b, err)
 
 		err = client.clone(mainBranch)
@@ -506,10 +493,6 @@ func TestGitClientOptionsHandling(t *testing.T) {
 		name    string
 		factory func(directory, url string, opts *Options) (gitClient, error)
 	}{
-		{
-			name:    "gitCLI",
-			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
-		},
 		{
 			name:    "gitGo",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
@@ -586,16 +569,10 @@ func testOptionsCABundleValidation(t *testing.T, factory func(string, string, *O
 				t.Fatalf("gitGo should return x509 malformed error, got: %v", err)
 			}
 		} else {
-			// git CLI validates CA bundle during git command execution
-			require.NoError(t, err, "gitCLI should succeed client creation")
-			require.NotNil(t, client)
-
-			err = client.clone(mainBranch)
-			if err == nil {
-				t.Fatal("gitCLI should fail during clone with invalid CA bundle")
-			}
-			if !strings.Contains(err.Error(), "certificate") {
-				t.Fatalf("gitCLI should return certificate error, got: %v", err)
+			// gitGo validates CA bundle during client construction
+			require.Error(t, err, "should fail client creation with invalid CA bundle")
+			if !strings.Contains(err.Error(), "x509: malformed") {
+				t.Fatalf("should return x509 malformed error, got: %v", err)
 			}
 		}
 	})
@@ -653,10 +630,6 @@ func TestGitClientUpdateEdgeCases(t *testing.T) {
 		name    string
 		factory func(directory, url string, opts *Options) (gitClient, error)
 	}{
-		{
-			name:    "gitCLI",
-			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
-		},
 		{
 			name:    "gitGo",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
@@ -741,10 +714,6 @@ func TestGitClientRealWorldFlows(t *testing.T) {
 		name    string
 		factory func(directory, url string, opts *Options) (gitClient, error)
 	}{
-		{
-			name:    "gitCLI",
-			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
-		},
 		{
 			name:    "gitGo",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
@@ -857,15 +826,16 @@ func TestGitClientAuthenticationAwareness(t *testing.T) {
 			},
 		}
 
-		client, err := newGitCLI(testDir, chartsSmallForkURL, &Options{
+		client, err := newGitGo(testDir, chartsSmallForkURL, &Options{
 			Credential: secret,
 		})
 		require.NoError(t, err)
 
 		// Client should be created successfully
-		// For public repo, auth doesn't affect clone
+		// Clone will fail because GitHub rejects password auth, but proves auth was attempted
 		err = client.clone(mainBranch)
-		require.NoError(t, err)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "authentication required")
 	})
 
 	t.Run("ssh_auth_options_accepted", func(t *testing.T) {
@@ -892,7 +862,7 @@ xcJQAAAADdGVzdAECAwQFBgcICQ==
 		// Client creation should work (credential setup happens)
 		// This test would fail with SSH key parse error because dummy key is invalid
 		// But it proves setCredential is called
-		_, err := newGitCLI(testDir, "git@github.com:rancher/charts.git", &Options{
+		_, err := newGitGo(testDir, "git@github.com:rancher/charts.git", &Options{
 			Credential: secret,
 		})
 
@@ -917,15 +887,12 @@ xcJQAAAADdGVzdAECAwQFBgcICQ==
 			},
 		}
 
-		client, err := newGitCLI(testDir, chartsSmallForkURL, &Options{
+		_, err := newGitGo(testDir, chartsSmallForkURL, &Options{
 			Credential: secret,
 		})
 
-		// Client creation succeeds (TLS is for HTTP client, not git commands)
-		require.NoError(t, err)
-
-		// Clone should work for HTTP URL (TLS cert only matters for HTTPS)
-		err = client.clone(mainBranch)
-		require.NoError(t, err)
+		// Client creation fails with malformed cert (proves TLS cert processing)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "x509: malformed certificate")
 	})
 }
