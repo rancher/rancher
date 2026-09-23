@@ -106,7 +106,7 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 		caBundle = convertDERToPEM(caBundle)
 		insecureSkipTLS = false
 	}
-	return newGitCLI(dir, gitURL, &Options{
+	return newGitGo(dir, gitURL, &Options{
 		Credential:        secret,
 		Headers:           headers,
 		InsecureTLSVerify: insecureSkipTLS,

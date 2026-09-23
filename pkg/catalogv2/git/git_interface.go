@@ -15,7 +15,7 @@ type Options struct {
 // public package functions (Ensure, Head, Update) which handle
 // higher-level concerns like bundled mode and error wrapping.
 //
-// Implementations: gitCLI (exec git commands), gitGoGit (go-git library)
+// Implementation: gitGo (go-git library)
 type gitClient interface {
 	// === Idempotent/Atomic Operations ===
 

@@ -599,7 +599,7 @@ func (g *gitGo) remoteSHAChanged(branch, sha string) (bool, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		// Return timeout errors so caller can decide whether or not to proceed with updating the repo
-		// This follows the same pattern as gitCLI
+		// On network errors, return true to allow update attempt
 		return true, nil
 	}
 	defer resp.Body.Close()
