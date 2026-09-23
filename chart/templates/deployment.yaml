@@ -14,7 +14,7 @@ spec:
 {{- end  }}
   selector:
     matchLabels:
-      app: {{ template "rancher.fullname" . }}
+{{ include "rancher.selectorLabels" . | indent 6 }}
   strategy:
     rollingUpdate:
       maxSurge: 1
@@ -27,7 +27,7 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ template "rancher.fullname" . }}
+{{ include "rancher.selectorLabels" . | indent 8 }}
         release: {{ .Release.Name }}
     spec:
       priorityClassName: {{ .Values.priorityClassName }}
