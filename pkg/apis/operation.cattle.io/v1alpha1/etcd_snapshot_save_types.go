@@ -51,14 +51,6 @@ type ETCDSnapshotSaveStatus struct {
 	Step ETCDSnapshotSaveStep `json:"step,omitempty"`
 }
 
-func (s *ETCDSnapshotSaveStatus) SetPhase(phase OperationPhase) {
-	if s.Phase == phase {
-		return
-	}
-	s.Phase = phase
-	s.LastUpdated = metav1.Now()
-}
-
 func (s *ETCDSnapshotSaveStatus) SetStep(step ETCDSnapshotSaveStep) {
 	if s.Step == step {
 		return

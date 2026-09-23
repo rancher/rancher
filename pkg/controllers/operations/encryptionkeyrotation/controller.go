@@ -327,7 +327,7 @@ func cancelForDeletion(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.E
 
 	logrus.Infof("[encryptionkeyrotation] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, status.Phase, status.Step)
 
-	markCanceled(&status, opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
+	status.MarkCanceled(opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
 
 	return status
 }
@@ -361,7 +361,7 @@ func cancelForRequest(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.En
 
 	logrus.Infof("[encryptionkeyrotation] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, status.Phase, status.Step)
 
-	markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+	status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 	return status
 }
@@ -393,7 +393,7 @@ func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1
 
 		logrus.Errorf("[encryptionkeyrotation]: %s/%s failed to find cluster for %s", op.Namespace, op.Name, key)
 
-		markFailed(&status, opv1alpha1.ClusterNotFoundReason, fmt.Sprintf("cluster %s not found", key))
+		status.MarkFailed(opv1alpha1.ClusterNotFoundReason, fmt.Sprintf("cluster %s not found", key))
 
 		// This failure is terminated here rather than by handleFailed: the beacon is resolved
 		// through the cluster's adapter, so with no cluster there is no beacon to release and every
@@ -477,7 +477,7 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		return h.handleSucceeded(s, status)
 	}
 
-	markFailed(&status, opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
+	status.MarkFailed(opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
 
 	return status, nil
 }
@@ -617,7 +617,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 			setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
 			return status, nil
 		}
-		markFailed(&status, opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
 
 		return status, nil
 	}
@@ -648,7 +648,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 			setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
 			return status, nil
 		}
-		markFailed(&status, opv1alpha1.BeaconLostReason, "beacon acquired by another controller, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon acquired by another controller, aborting")
 
 		return status, nil
 	}
@@ -660,7 +660,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 		return h.reconcileRestart(s, status)
 	}
 
-	markFailed(&status, opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [%q] is unknown, expected one of: [%q, %q]",
+	status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [%q] is unknown, expected one of: [%q, %q]",
 		status.Step, opv1alpha1.EncryptionKeyRotationStepRotate, opv1alpha1.EncryptionKeyRotationStepRestart))
 
 	return status, nil
@@ -755,7 +755,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 
 	if planStatus.Failure() {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: rotate-keys plan failed to execute on leader %s", s.op.Namespace, s.op.Name, leader.Name)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encryption key rotation plan failed for leader %s/%s", leader.Namespace, leader.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encryption key rotation plan failed for leader %s/%s", leader.Namespace, leader.Name))
 		return status, nil
 	}
 
@@ -791,7 +791,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	}
 	if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: corrupt rotate-keys output on leader %s: %v", s.op.Namespace, s.op.Name, leader.Name, err)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt rotate-keys output on leader %s", leader.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt rotate-keys output on leader %s", leader.Name))
 		return status, nil
 	}
 
@@ -802,7 +802,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 			logrus.Warnf("[encryptionkeyrotation] %s/%s: rotate-keys CLI timed out on leader %s; continuing to observe periodic status", s.op.Namespace, s.op.Name, leader.Name)
 		} else {
 			logrus.Errorf("[encryptionkeyrotation] %s/%s: rotate-keys failed on leader %s with exit code %d", s.op.Namespace, s.op.Name, leader.Name, result.exitCode)
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("secrets-encrypt rotate-keys failed on leader %s (exit code %d); please perform an etcd restore", leader.Name, result.exitCode))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("secrets-encrypt rotate-keys failed on leader %s (exit code %d); please perform an etcd restore", leader.Name, result.exitCode))
 			return status, nil
 		}
 	}
@@ -811,7 +811,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	waitMsg, err := convergenceWaitMessage(leader, false)
 	if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: convergence check failed on leader %s: %v", s.op.Namespace, s.op.Name, leader.Name, err)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on leader %s; please perform an etcd restore", leader.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on leader %s; please perform an etcd restore", leader.Name))
 		return status, nil
 	}
 	if waitMsg != "" {
@@ -858,12 +858,12 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 		return status, err
 	} else if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: no control-plane nodes found at restart step", s.op.Namespace, s.op.Name)
-		markFailed(&status, opv1alpha1.UnknownStepReason, "no control-plane nodes found; cannot verify post-restart encryption status")
+		status.MarkFailed(opv1alpha1.UnknownStepReason, "no control-plane nodes found; cannot verify post-restart encryption status")
 		return status, nil
 	}
 	if !ops.IsControlPlane(secrets[len(secrets)-1]) {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: nodes are not correctly ordered at restart step", s.op.Namespace, s.op.Name)
-		markFailed(&status, opv1alpha1.UnknownStepReason, "last control plane node not found; cannot verify hash convergence after restart")
+		status.MarkFailed(opv1alpha1.UnknownStepReason, "last control plane node not found; cannot verify hash convergence after restart")
 		return status, nil
 	}
 
@@ -908,7 +908,7 @@ func (h *handler) finishRotation(s *scope, status opv1alpha1.EncryptionKeyRotati
 
 	logrus.Infof("[encryptionkeyrotation] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
-	markSucceeded(&status)
+	status.MarkSucceeded()
 
 	return status, nil
 }
@@ -979,7 +979,7 @@ func (h *handler) reconcileRestartNode(
 
 	if planStatus.Failure() {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: restart plan failed for %s", s.op.Namespace, s.op.Name, secret.Name)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s; please perform an etcd restore", secret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s; please perform an etcd restore", secret.Name))
 		return status, false, nil
 	}
 
@@ -993,7 +993,7 @@ func (h *handler) reconcileRestartNode(
 		waitMsg, err := convergenceWaitMessage(secret, requireHashMatch)
 		if err != nil {
 			logrus.Errorf("[encryptionkeyrotation] %s/%s: convergence check failed on %s: %v", s.op.Namespace, s.op.Name, secret.Name, err)
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on %s; please perform an etcd restore", secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on %s; please perform an etcd restore", secret.Name))
 			return status, false, nil
 		}
 		if waitMsg != "" {
@@ -1159,48 +1159,6 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotat
 			_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
 		},
 	})
-}
-
-// markSucceeded moves the operation into the Succeeded terminal phase, asserting the outcome: the
-// work is over and the result will not change. Whether the controller is finished with the
-// operation is reported separately, by the Finalized condition.
-func markSucceeded(status *opv1alpha1.EncryptionKeyRotationStatus) {
-	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
-
-	opv1alpha1.SucceededCondition.True(status)
-	opv1alpha1.SucceededCondition.Reason(status, opv1alpha1.FinishedReason)
-	opv1alpha1.SucceededCondition.Message(status, "Operation completed successfully")
-}
-
-// markFailed moves the operation into the Failed terminal phase. Failed is what the operation
-// reports when it gave up on its own work; the caller supplies the reason and message.
-func markFailed(status *opv1alpha1.EncryptionKeyRotationStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-	opv1alpha1.FailedCondition.True(status)
-	opv1alpha1.FailedCondition.Reason(status, reason)
-	opv1alpha1.FailedCondition.Message(status, message)
-}
-
-// markAborted moves the operation into the Aborted terminal phase, for work the operation called off
-// itself after finding a condition it cannot proceed past — a failed preflight check, say. The
-// caller supplies the reason and message.
-func markAborted(status *opv1alpha1.EncryptionKeyRotationStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseAborted)
-
-	opv1alpha1.AbortedCondition.True(status)
-	opv1alpha1.AbortedCondition.Reason(status, reason)
-	opv1alpha1.AbortedCondition.Message(status, message)
-}
-
-// markCanceled moves the operation into the Canceled terminal phase, for work that was called off
-// from outside the operation — spec.Cancel being set, or a deletion that raced the operation.
-func markCanceled(status *opv1alpha1.EncryptionKeyRotationStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseCanceled)
-
-	opv1alpha1.CanceledCondition.True(status)
-	opv1alpha1.CanceledCondition.Reason(status, reason)
-	opv1alpha1.CanceledCondition.Message(status, message)
 }
 
 // setWaitingForDelegate reports, through the condition belonging to the phase currently being

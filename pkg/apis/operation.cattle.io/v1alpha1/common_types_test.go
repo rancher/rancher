@@ -98,3 +98,95 @@ func TestOutcomeConditionFor(t *testing.T) {
 		})
 	}
 }
+
+// TestMarkOutcome covers the transitions the operation controllers make when an operation ends. The
+// phase and the condition that reports it are asserted together, so a status can never claim one
+// outcome by its phase and another by its conditions.
+func TestMarkOutcome(t *testing.T) {
+	cases := []struct {
+		name       string
+		mark       func(s *OperationStatus)
+		wantPhase  OperationPhase
+		wantCond   string
+		wantReason string
+		wantMsg    string
+	}{
+		{
+			name:       "succeeded",
+			mark:       func(s *OperationStatus) { s.MarkSucceeded() },
+			wantPhase:  OperationPhaseSucceeded,
+			wantCond:   "Succeeded",
+			wantReason: FinishedReason,
+			wantMsg:    "Operation completed successfully",
+		},
+		{
+			name:       "failed",
+			mark:       func(s *OperationStatus) { s.MarkFailed(PlanFailedReason, "the operative detail") },
+			wantPhase:  OperationPhaseFailed,
+			wantCond:   "Failed",
+			wantReason: PlanFailedReason,
+			wantMsg:    "the operative detail",
+		},
+		{
+			name:       "aborted",
+			mark:       func(s *OperationStatus) { s.MarkAborted(PreflightCheckFailedReason, "the operative detail") },
+			wantPhase:  OperationPhaseAborted,
+			wantCond:   "Aborted",
+			wantReason: PreflightCheckFailedReason,
+			wantMsg:    "the operative detail",
+		},
+		{
+			name:       "canceled",
+			mark:       func(s *OperationStatus) { s.MarkCanceled(CancelRequestedReason, "cancellation requested") },
+			wantPhase:  OperationPhaseCanceled,
+			wantCond:   "Canceled",
+			wantReason: CancelRequestedReason,
+			wantMsg:    "cancellation requested",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			status := &OperationStatus{}
+			tc.mark(status)
+
+			if status.Phase != tc.wantPhase {
+				t.Fatalf("phase = %q, want %q", status.Phase, tc.wantPhase)
+			}
+			if status.LastUpdated.IsZero() {
+				t.Fatal("the transition must be recorded on LastUpdated")
+			}
+
+			outcome, _ := OutcomeConditionFor(status.Phase)
+			if string(outcome) != tc.wantCond {
+				t.Fatalf("outcome condition = %q, want %q", outcome, tc.wantCond)
+			}
+			if got := outcome.GetStatus(status); got != "True" {
+				t.Fatalf("%s = %q, want True", outcome, got)
+			}
+			if got := outcome.GetReason(status); got != tc.wantReason {
+				t.Fatalf("reason = %q, want %q", got, tc.wantReason)
+			}
+			if got := outcome.GetMessage(status); got != tc.wantMsg {
+				t.Fatalf("message = %q, want %q", got, tc.wantMsg)
+			}
+		})
+	}
+}
+
+// SetPhase keeps LastUpdated pointing at the moment the operation actually moved, which is what the
+// operation controllers depend on to tell a status that has settled from one that is still moving.
+func TestSetPhaseIsIdempotent(t *testing.T) {
+	status := &OperationStatus{}
+	status.SetPhase(OperationPhaseInProgress)
+
+	moved := status.LastUpdated
+	if moved.IsZero() {
+		t.Fatal("the transition must be recorded")
+	}
+
+	status.SetPhase(OperationPhaseInProgress)
+	if !status.LastUpdated.Equal(&moved) {
+		t.Fatal("setting the phase it is already in must not move LastUpdated")
+	}
+}

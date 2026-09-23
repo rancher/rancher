@@ -1892,7 +1892,7 @@ func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
 		status := opv1alpha1.EncryptionKeyRotationStatus{
 			OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseCanceled},
 		}
-		markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+		status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 		got := updateStatus(op, status)
 		if string(opv1alpha1.CanceledCondition.GetStatus(&got)) != "True" {

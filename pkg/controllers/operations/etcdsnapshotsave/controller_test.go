@@ -1902,7 +1902,7 @@ func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
 		status := opv1alpha1.ETCDSnapshotSaveStatus{
 			OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseCanceled},
 		}
-		markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+		status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 		got := updateStatus(op, status)
 		assert.Equal(t, "True", opv1alpha1.CanceledCondition.GetStatus(&got))

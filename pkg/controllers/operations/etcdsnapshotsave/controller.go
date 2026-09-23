@@ -341,7 +341,7 @@ func cancelForDeletion(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSn
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, status.Phase, status.Step)
 
-	markCanceled(&status, opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
+	status.MarkCanceled(opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
 
 	return status
 }
@@ -375,7 +375,7 @@ func cancelForRequest(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSna
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, status.Phase, status.Step)
 
-	markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+	status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 	return status
 }
@@ -406,7 +406,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha
 
 		logrus.Errorf("[etcdsnapshotsave]: %s/%s failed to find cluster for %s", op.Namespace, op.Name, key)
 
-		markFailed(&status, opv1alpha1.ClusterNotFoundReason, fmt.Sprintf("cluster %s not found", key))
+		status.MarkFailed(opv1alpha1.ClusterNotFoundReason, fmt.Sprintf("cluster %s not found", key))
 
 		// This failure is terminated here rather than by handleFailed: the beacon is resolved
 		// through the cluster's adapter, so with no cluster there is no beacon to release and every
@@ -490,7 +490,7 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		return h.handleSucceeded(s, status)
 	}
 
-	markFailed(&status, opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
+	status.MarkFailed(opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
 
 	return status, nil
 }
@@ -623,7 +623,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			return status, nil
 		}
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon reassigned, aborting", s.op.Namespace, s.op.Name)
-		markFailed(&status, opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
 
 		return status, nil
 	}
@@ -652,7 +652,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			return status, nil
 		}
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
-		markFailed(&status, opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, aborting")
 
 		return status, nil
 	}
@@ -665,7 +665,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	case opv1alpha1.ETCDSnapshotSaveStepRestart:
 		return h.reconcileRestart(s, status)
 	default:
-		markFailed(&status, opv1alpha1.UnknownStepReason, fmt.Sprintf(
+		status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf(
 			"current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\"]",
 			status.Step,
 			opv1alpha1.ETCDSnapshotSaveStepPreflight,
@@ -700,7 +700,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSav
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: aborting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markAborted(&status, opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkAborted(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -744,7 +744,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -789,7 +789,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("etcd snapshot save failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("etcd snapshot save failed for %s/%s", secret.Namespace, secret.Name))
 
 			return status, nil
 		}
@@ -844,7 +844,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -883,7 +883,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name))
 
 			return status, nil
 		}
@@ -906,7 +906,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 
 	logrus.Infof("[etcdsnapshotsave] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
-	markSucceeded(&status)
+	status.MarkSucceeded()
 
 	return status, nil
 }
@@ -1053,48 +1053,6 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveSt
 			_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
 		},
 	})
-}
-
-// markSucceeded moves the operation into the Succeeded terminal phase, asserting the outcome: the
-// work is over and the result will not change. Whether the controller is finished with the
-// operation is reported separately, by the Finalized condition.
-func markSucceeded(status *opv1alpha1.ETCDSnapshotSaveStatus) {
-	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
-
-	opv1alpha1.SucceededCondition.True(status)
-	opv1alpha1.SucceededCondition.Reason(status, opv1alpha1.FinishedReason)
-	opv1alpha1.SucceededCondition.Message(status, "Operation completed successfully")
-}
-
-// markFailed moves the operation into the Failed terminal phase. Failed is what the operation
-// reports when it gave up on its own work; the caller supplies the reason and message.
-func markFailed(status *opv1alpha1.ETCDSnapshotSaveStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-	opv1alpha1.FailedCondition.True(status)
-	opv1alpha1.FailedCondition.Reason(status, reason)
-	opv1alpha1.FailedCondition.Message(status, message)
-}
-
-// markAborted moves the operation into the Aborted terminal phase, for work the operation called off
-// itself after finding a condition it cannot proceed past — a failed preflight check, say. The
-// caller supplies the reason and message.
-func markAborted(status *opv1alpha1.ETCDSnapshotSaveStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseAborted)
-
-	opv1alpha1.AbortedCondition.True(status)
-	opv1alpha1.AbortedCondition.Reason(status, reason)
-	opv1alpha1.AbortedCondition.Message(status, message)
-}
-
-// markCanceled moves the operation into the Canceled terminal phase, for work that was called off
-// from outside the operation — spec.Cancel being set, or a deletion that raced the operation.
-func markCanceled(status *opv1alpha1.ETCDSnapshotSaveStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseCanceled)
-
-	opv1alpha1.CanceledCondition.True(status)
-	opv1alpha1.CanceledCondition.Reason(status, reason)
-	opv1alpha1.CanceledCondition.Message(status, message)
 }
 
 // setWaitingForDelegate reports, through the condition belonging to the phase currently being

@@ -138,6 +138,59 @@ type OperationStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// SetPhase moves the operation to phase, recording when the transition happened. Setting the phase
+// the operation is already in is a no-op, so LastUpdated keeps pointing at the moment the operation
+// actually moved however many times it is reconciled afterwards.
+//
+// The phase and its outcome condition are asserted together by the Mark* methods below; this is for
+// the non-terminal transitions, which have no outcome to report.
+func (s *OperationStatus) SetPhase(phase OperationPhase) {
+	if s.Phase == phase {
+		return
+	}
+
+	s.Phase = phase
+	s.LastUpdated = metav1.Now()
+}
+
+// MarkSucceeded moves the operation to the Succeeded terminal phase, asserting the outcome: the work
+// is over and the result will not change. Whether the controller is finished with the operation is
+// reported separately, by the Finalized condition.
+func (s *OperationStatus) MarkSucceeded() {
+	s.markOutcome(OperationPhaseSucceeded, FinishedReason, "Operation completed successfully")
+}
+
+// MarkFailed moves the operation to the Failed terminal phase. Failed is what an operation reports
+// when it gave up on its own work; the caller supplies the reason and message.
+func (s *OperationStatus) MarkFailed(reason, message string) {
+	s.markOutcome(OperationPhaseFailed, reason, message)
+}
+
+// MarkAborted moves the operation to the Aborted terminal phase, for work the operation called off
+// itself after finding a condition it cannot proceed past — a failed preflight check, say.
+func (s *OperationStatus) MarkAborted(reason, message string) {
+	s.markOutcome(OperationPhaseAborted, reason, message)
+}
+
+// MarkCanceled moves the operation to the Canceled terminal phase, for work that was called off
+// from outside the operation — spec.Cancel being set, or a deletion that raced the operation.
+func (s *OperationStatus) MarkCanceled(reason, message string) {
+	s.markOutcome(OperationPhaseCanceled, reason, message)
+}
+
+// markOutcome moves the operation to a terminal phase and records why on the condition that reports
+// that phase. Doing both here is what keeps a phase and its outcome from disagreeing: the reason and
+// message recorded at decision time are the operation's account of how it ended, and the controllers
+// leave them alone from here on.
+func (s *OperationStatus) markOutcome(phase OperationPhase, reason, message string) {
+	s.SetPhase(phase)
+
+	outcome, _ := OutcomeConditionFor(phase)
+	outcome.True(s)
+	outcome.Reason(s, reason)
+	outcome.Message(s, message)
+}
+
 // SetTerminated records that terminal handling for the operation has completed. Operation
 // controllers must only call this once the terminal phase is fully handled — i.e. the terminal
 // phase hook has been satisfied and the beacon has been released — as it is what makes the
