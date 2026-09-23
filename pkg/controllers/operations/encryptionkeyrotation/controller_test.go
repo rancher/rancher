@@ -1921,3 +1921,204 @@ func TestOnChange_ExpiredTerminalOperationIsCollectedOnceTerminated(t *testing.T
 		t.Fatalf("expected the expired terminated operation to be collected once, got %d", controller.deleteCalls)
 	}
 }
+
+// --- cancellation ----------------------------------------------------------------------------
+
+// TestOnChange_CancelRequestedCancelsInFlightOperation covers the core of the cancellation
+// contract, which mirrors the deletion one: an operation canceled while it is still running stops
+// where it is, releases the beacon, and reports why it was canceled. The cluster the rotation
+// paused is unpaused on the way out, which TestHandleTerminal_RecordsTerminationAndUnpauses covers
+// for every terminal phase including this one.
+func TestOnChange_CancelRequestedCancelsInFlightOperation(t *testing.T) {
+	op := newOnChangeOp()
+	op.Spec.Cancel = true
+	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
+	}
+
+	h, _, beacons, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Phase != opv1alpha1.OperationPhaseCanceled {
+		t.Fatalf("expected phase Canceled, got %q", status.Phase)
+	}
+	if opv1alpha1.CanceledCondition.GetReason(&status) != opv1alpha1.CancelRequestedReason {
+		t.Fatalf("expected reason %q, got %q", opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	}
+	if status.TerminatedAt.IsZero() {
+		t.Fatal("handleCanceled ran to completion, so it must be recorded")
+	}
+	if len(beacons.statusUpdates) == 0 || beacons.statusUpdates[len(beacons.statusUpdates)-1].Status.Owner != "" {
+		t.Fatalf("the beacon must be released, got %+v", beacons.statusUpdates)
+	}
+}
+
+// TestOnChange_CancelRequestedInTerminalPhaseIsDeclined covers the edge of the window: the
+// operation's work is over and its outcome asserted, so there is nothing for a cancellation to
+// stop, even though its terminal phase hook is still holding the beacon. Deleting the operation is
+// what breaks that deadlock.
+func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
+	op := newOnChangeOp()
+	op.Spec.Cancel = true
+	op.Spec.TTL = -1
+	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
+	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
+		Step:            opv1alpha1.EncryptionKeyRotationStepRestart,
+	}
+
+	beacon := newBeacon(beaconOwnerKey(op), true)
+	beacon.Status.Delegates = []string{"delegate-a"}
+	h, _, beacons, _ := newOnChangeHandler(beacon)
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Phase != opv1alpha1.OperationPhaseSucceeded {
+		t.Fatalf("the operation had already concluded, so it keeps the phase it ended in: got %q", status.Phase)
+	}
+	if string(opv1alpha1.SucceededCondition.GetStatus(&status)) != "True" {
+		t.Fatal("its outcome must survive the request")
+	}
+	if opv1alpha1.CanceledCondition.GetReason(&status) != opv1alpha1.CancellationDeclinedReason {
+		t.Fatalf("a declined cancellation must be acknowledged, got reason %q", opv1alpha1.CanceledCondition.GetReason(&status))
+	}
+	if !status.TerminatedAt.IsZero() {
+		t.Fatal("the hook is still owed an answer, so handling is not complete")
+	}
+	for _, update := range beacons.statusUpdates {
+		if update.Status.Owner != beaconOwnerKey(op) {
+			t.Fatalf("the beacon must stay with the operation and its delegate, got owner %q", update.Status.Owner)
+		}
+	}
+}
+
+// TestOnChange_CancelRequestedAfterTerminationKeepsOutcome is the same rule for an operation the
+// controller has fully finished with: nothing left to call off, and by then nothing left to release
+// either.
+func TestOnChange_CancelRequestedAfterTerminationKeepsOutcome(t *testing.T) {
+	op := newOnChangeOp()
+	op.Spec.Cancel = true
+	op.Spec.TTL = -1
+	op.Status = updateStatus(op, opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase:        opv1alpha1.OperationPhaseSucceeded,
+			TerminatedAt: metav1.Now(),
+		},
+		Step: opv1alpha1.EncryptionKeyRotationStepRestart,
+	})
+
+	h, _, beacons, _ := newOnChangeHandler(newBeacon("", false))
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Phase != opv1alpha1.OperationPhaseSucceeded {
+		t.Fatalf("a terminated operation must not be demoted to Canceled, got %q", status.Phase)
+	}
+	if opv1alpha1.CanceledCondition.GetReason(&status) != opv1alpha1.CancellationDeclinedReason {
+		t.Fatalf("expected the request to be acknowledged, got reason %q", opv1alpha1.CanceledCondition.GetReason(&status))
+	}
+	if len(beacons.statusUpdates) != 0 {
+		t.Fatal("there is nothing left to release")
+	}
+}
+
+// TestOnChange_PausedBlocksCancel pins the documented precedence: Paused halts reconciliation
+// outright, so a cancellation requested on a paused operation is not acted on until it is resumed.
+func TestOnChange_PausedBlocksCancel(t *testing.T) {
+	op := newOnChangeOp()
+	op.Spec.Paused = true
+	op.Spec.Cancel = true
+	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
+	}
+
+	h, controller, beacons, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Phase != opv1alpha1.OperationPhaseInProgress {
+		t.Fatalf("a paused operation must not transition on cancel, got %q", status.Phase)
+	}
+	if opv1alpha1.CanceledCondition.GetStatus(&status) != "" {
+		t.Fatal("the Canceled condition must not be reported while paused")
+	}
+	if string(opv1alpha1.PausedCondition.GetStatus(&status)) != "True" {
+		t.Fatal("the operation must report that it is paused")
+	}
+	if len(beacons.statusUpdates) != 0 {
+		t.Fatal("the beacon must be left as the pause found it")
+	}
+	if len(controller.updates) != 0 {
+		t.Fatal("a paused operation is not finalized, so it takes no finalizer")
+	}
+}
+
+// TestUpdateStatusReportsDeclinedCancellation covers the acknowledgement on its own, across every
+// outcome an operation can end in.
+func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
+	for _, phase := range []opv1alpha1.OperationPhase{
+		opv1alpha1.OperationPhaseSucceeded,
+		opv1alpha1.OperationPhaseFailed,
+		opv1alpha1.OperationPhaseAborted,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			initial := opv1alpha1.EncryptionKeyRotationStatus{
+				OperationStatus: opv1alpha1.OperationStatus{Phase: phase},
+			}
+
+			op := newOp()
+			got := updateStatus(op, initial)
+			if opv1alpha1.CanceledCondition.GetReason(&got) != opv1alpha1.NotCanceledReason {
+				t.Fatalf("with no request to report the denial stays generic, got %q", opv1alpha1.CanceledCondition.GetReason(&got))
+			}
+
+			op.Spec.Cancel = true
+			got = updateStatus(op, initial)
+			if string(opv1alpha1.CanceledCondition.GetStatus(&got)) != "False" {
+				t.Fatal("the operation was not canceled, so the condition stays denied")
+			}
+			if opv1alpha1.CanceledCondition.GetReason(&got) != opv1alpha1.CancellationDeclinedReason {
+				t.Fatalf("expected reason %q, got %q", opv1alpha1.CancellationDeclinedReason, opv1alpha1.CanceledCondition.GetReason(&got))
+			}
+			if !strings.Contains(opv1alpha1.CanceledCondition.GetMessage(&got), string(phase)) {
+				t.Fatalf("the message should say which phase was already reached, got %q", opv1alpha1.CanceledCondition.GetMessage(&got))
+			}
+
+			outcome, _ := opv1alpha1.OutcomeConditionFor(phase)
+			if string(outcome.GetStatus(&got)) != "True" {
+				t.Fatal("the request must not disturb the outcome")
+			}
+		})
+	}
+
+	// An operation which really was canceled keeps the reason it was canceled for: the
+	// acknowledgement is for requests that were *not* acted on.
+	t.Run("canceled keeps its own reason", func(t *testing.T) {
+		op := newOp()
+		op.Spec.Cancel = true
+
+		status := opv1alpha1.EncryptionKeyRotationStatus{
+			OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseCanceled},
+		}
+		markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+
+		got := updateStatus(op, status)
+		if string(opv1alpha1.CanceledCondition.GetStatus(&got)) != "True" {
+			t.Fatal("the operation was canceled, so the condition must be raised")
+		}
+		if opv1alpha1.CanceledCondition.GetReason(&got) != opv1alpha1.CancelRequestedReason {
+			t.Fatalf("expected the cancellation reason to survive, got %q", opv1alpha1.CanceledCondition.GetReason(&got))
+		}
+	})
+}

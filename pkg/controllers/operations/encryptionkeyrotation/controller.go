@@ -150,7 +150,7 @@ func (h *handler) reconcileActive(op *opv1alpha1.EncryptionKeyRotation, status o
 		status.SetPhase(opv1alpha1.OperationPhasePending)
 	}
 
-	status, err := h.advance(op, status)
+	status, err := h.advance(op, cancelForRequest(op, status))
 	if err != nil {
 		return status, err
 	}
@@ -325,6 +325,40 @@ func cancelForDeletion(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.E
 	logrus.Infof("[encryptionkeyrotation] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, status.Phase, status.Step)
 
 	markCanceled(&status, opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
+
+	return status
+}
+
+// cancelForRequest marks an operation whose spec.Cancel is set as Canceled: the work was called off
+// from outside, so it can be reported neither as succeeded nor as failed.
+//
+// Cancellation stops work in flight, and an operation which has reached a terminal phase has none
+// left — its outcome is asserted and will not change, so the phase it ended in stands and the
+// request is declined. updateStatus reports the declined request on the Canceled condition, so
+// setting the field is never silently ignored. The terminal check covers the already-Canceled case
+// too, Canceled being terminal itself.
+//
+// This is deliberately narrower than cancelForDeletion, which acts on a terminal phase whose
+// handling has not completed. The asymmetry is forced: a deleted operation has to release the beacon
+// and retire its finalizer whatever phase it is in, or it would wait on a lifecycle hook that
+// nothing will ever answer and never finish deleting. So the two verbs differ in scope — cancel
+// stops the work, deletion removes the object and accepts what that implies — and deleting the
+// operation is the remedy for a terminal phase hook whose delegate never returns the beacon.
+//
+// Note this runs from reconcileActive, which a paused operation never reaches, so a paused
+// operation is not canceled until it is resumed.
+func cancelForRequest(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) opv1alpha1.EncryptionKeyRotationStatus {
+	if !ops.IsCanceled(&op.Spec.OperationSpec) {
+		return status
+	}
+
+	if ops.IsTerminal(status.Phase) {
+		return status
+	}
+
+	logrus.Infof("[encryptionkeyrotation] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, status.Phase, status.Step)
+
+	markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 	return status
 }
@@ -1249,9 +1283,19 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 		cond.Message(&status, summary)
 	}
 
+	// A cancellation requested after the operation reached a terminal phase changes nothing: there
+	// is no work left to call off. Report it on the denied Canceled condition — which is where an
+	// observer looks to find out what became of the request — so that setting spec.Cancel is
+	// acknowledged rather than silently passed over. See cancelForRequest for why it is declined,
+	// and note that deleting the operation is what does act in this window.
+	if outcome != opv1alpha1.CanceledCondition && ops.IsCanceled(&op.Spec.OperationSpec) {
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.CancellationDeclinedReason)
+		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("cancellation requested, but the operation had already reached the %s phase", status.Phase))
+	}
+
 	// Terminated is the separate question of whether the controller is done with the operation, so
-	// it is the only thing the terminal marker gates. Note that an operation is still cancellable in
-	// this window even though its outcome is already asserted — see cancelForDeletion.
+	// it is the only thing the terminal marker gates. An operation in this window is past being
+	// cancellable, but is still canceled on its way out if it is deleted — see cancelForDeletion.
 	terminated := ops.IsTerminated(&status.OperationStatus)
 
 	progressReason := opv1alpha1.FinalizingReason
