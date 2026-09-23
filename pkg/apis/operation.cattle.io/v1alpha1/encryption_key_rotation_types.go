@@ -57,6 +57,7 @@ func (s *EncryptionKeyRotationStatus) SetStep(step EncryptionKeyRotationStep) {
 // +kubebuilder:resource:path=encryptionkeyrotations,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:validation:XValidation:rule="!self.spec.cancel || oldSelf.spec.cancel || !has(self.status) || !has(self.status.phase) || !(self.status.phase in ['Succeeded','Failed','Aborted','Canceled'])",message="cancel cannot be set once the operation has reached a terminal phase; delete the operation instead"
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
