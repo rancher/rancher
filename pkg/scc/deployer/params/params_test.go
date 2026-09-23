@@ -112,6 +112,13 @@ func TestPreparePodSpec_BasicConfiguration(t *testing.T) {
 	// Verify basic pod spec configuration
 	assert.Equal(t, "rancher-scc-operator-sa", podSpec.ServiceAccountName, "Service account should be rancher-scc-operator-sa")
 	assert.Len(t, podSpec.Containers, 1, "Should have one container")
+	assert.NotNil(t, podSpec.SecurityContext.RunAsNonRoot, "RunAsNonRoot should be set")
+	assert.True(t, *podSpec.SecurityContext.RunAsNonRoot, "RunAsNonRoot should be true")
+	assert.NotNil(t, podSpec.SecurityContext.RunAsUser, "RunAsUser should be set")
+	assert.Equal(t, int64(1000), *podSpec.SecurityContext.RunAsUser, "RunAsUser should be 1000")
+	assert.NotNil(t, podSpec.SecurityContext.RunAsGroup, "RunAsGroup should be set")
+	assert.Equal(t, int64(1000), *podSpec.SecurityContext.RunAsGroup, "RunAsGroup should be 1000")
+	assert.NotNil(t, podSpec.SecurityContext.SeccompProfile, "SeccompProfile should be set")
 
 	container := podSpec.Containers[0]
 	assert.Equal(t, "scc-operator", container.Name, "Container name should be scc-operator")
