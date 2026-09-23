@@ -3,7 +3,6 @@ package plan
 import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // AcquireBeacon acquires a beacon if it is not already owned by the desired owner.
@@ -199,17 +198,4 @@ func PopDelegate(beacon *planv1alpha1.Beacon, delegate string, beacons plancontr
 	beacon.Status.Delegates = beacon.Status.Delegates[:len(beacon.Status.Delegates)-1]
 	beacon, err := beacons.UpdateStatus(beacon)
 	return beacon, err
-}
-
-func ControllerOwnerKey(obj metav1.Object, prefix string) string {
-	if obj == nil {
-		return ""
-	}
-
-	key := obj.GetName()
-	if namespace := obj.GetNamespace(); namespace != "" {
-		key = namespace + "/" + key
-	}
-
-	return prefix + "/" + key
 }

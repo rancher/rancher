@@ -34,7 +34,10 @@ import (
 // ControllerOwnerKey is the shared operation-type key for encryption key rotation coordination.
 // Beacon ownership uses a per-operation key derived from the operation UID.
 const ControllerOwnerKey = "encryption-key-rotation"
-const beaconOwnerRefAnnotation = "rke.cattle.io/operation-owner-ref"
+
+// OperationKind is this operation's kind, as it appears in the beacon claims the controller writes.
+// See ops.BeaconOwnerKey.
+const OperationKind = "EncryptionKeyRotation"
 
 const Finalizer = "encryptionkeyrotation.operation.cattle.io"
 
@@ -446,7 +449,7 @@ func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1
 	}
 
 	return &scope{
-		ownerKey:   beaconOwnerKey(op),
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
@@ -542,6 +545,17 @@ func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 }
 
 func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	// A beacon still carrying a claim from an earlier incarnation of this operation's name is
+	// reclaimed before anything is attempted: that claim is provably dead, and leaving it would
+	// either block this operation forever or, worse, be mistaken for its own.
+	beacon, err := ops.ReclaimSupersededBeacon(s.beacon, h.beacons, s.ownerKey)
+	if err != nil {
+		return status, err
+	}
+	s.beacon = beacon
+
+	// Any other stale claim of this kind needs its object resolved; the cheap rule above has
+	// already dealt with our own name, so this only reaches a claim of some other rotation.
 	if err := h.reclaimStaleBeaconOwnerIfNeeded(s); err != nil {
 		return status, err
 	}
@@ -564,22 +578,8 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		s.beacon = acquired
 	}
 
-	desiredOwnerRef := fmt.Sprintf("%s/%s/%s", s.op.Namespace, s.op.Name, s.op.UID)
-	if s.beacon.Annotations == nil || s.beacon.Annotations[beaconOwnerRefAnnotation] != desiredOwnerRef {
-		beacon := s.beacon.DeepCopy()
-		if beacon.Annotations == nil {
-			beacon.Annotations = map[string]string{}
-		}
-		beacon.Annotations[beaconOwnerRefAnnotation] = desiredOwnerRef
-		updated, err := h.beacons.Update(beacon)
-		if err != nil {
-			return status, err
-		}
-		s.beacon = updated
-	}
-
-	// Pending-phase hook fires after beacon acquisition + owner-ref tagging so a delegate can
-	// inspect the recorded ownership before the controller starts driving the rotation.
+	// Pending-phase hook fires after beacon acquisition so a delegate can inspect the recorded
+	// ownership before the controller starts driving the rotation.
 	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
@@ -1348,82 +1348,62 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 	return status
 }
 
-// beaconOwnerKey returns the per-operation beacon owner key used for
-// beacon ownership checks and lifecycle cleanup.
-func beaconOwnerKey(op *opv1alpha1.EncryptionKeyRotation) string {
-	if op == nil {
-		return ControllerOwnerKey
-	}
-	if op.UID != "" {
-		return fmt.Sprintf("%s-%s", ControllerOwnerKey, op.UID)
-	}
-	return fmt.Sprintf("%s-%s-%s", ControllerOwnerKey, op.Namespace, op.Name)
-}
 
-// reclaimStaleBeaconOwnerIfNeeded clears stale beacon ownership when the recorded owner reference
-// is invalid, missing, deleted, or belongs to an operation the controller has finished with.
-// Non-matching owners are left untouched so this controller only reclaims its own
-// operation type.
+// reclaimStaleBeaconOwnerIfNeeded clears a beacon claim whose rotation no longer exists, or which
+// the controller has already finished with. It resolves the claim's own reference, so unlike
+// ops.ReclaimSupersededBeacon — which proves a claim dead from the name alone and runs first — it
+// can recover a beacon from a rotation of some *other* name.
 //
-// "Finished with" is termination, not merely a terminal phase. An operation which has reached a
-// terminal phase may still be holding the beacon legitimately, on behalf of a delegate running its
-// terminal phase hook, and reclaiming it there would both cut the delegate off and leave the old
-// operation pushing hook delegates onto a beacon that is no longer its own.
+// It reaches this controller's own kind only. Proving another operation type's claim dead would
+// mean resolving an object this controller does not watch, and a claim which is not an operation's
+// at all — a handler holding the beacon under its own name, the imported-day2ops-disable key — is
+// held for reasons this controller cannot see and must be left alone.
+//
+// "Finished with" is termination, not merely a terminal phase: a rotation waiting on its terminal
+// phase hook is holding the beacon legitimately, on behalf of the delegate running that hook.
 func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 	if s.beacon == nil {
 		return nil
 	}
 
-	currentOwnerKey := s.beacon.Status.Owner
-	newOwnerKey := beaconOwnerKey(s.op)
-	// No owner, or we already own it
-	if currentOwnerKey == "" || currentOwnerKey == newOwnerKey {
+	recorded := s.beacon.Status.Owner
+	if recorded == "" || recorded == s.ownerKey {
 		return nil
 	}
-	// Another controller type owns it
-	if currentOwnerKey != ControllerOwnerKey && !strings.HasPrefix(currentOwnerKey, ControllerOwnerKey+"-") {
+
+	held, ok := ops.ParseBeaconOwner(recorded)
+	if !ok || held.Kind != OperationKind {
 		return nil
 	}
 
 	reclaim := false
 
-	ownerRef := ""
-	if s.beacon.Annotations != nil {
-		ownerRef = s.beacon.Annotations[beaconOwnerRefAnnotation]
-	}
-	parts := strings.SplitN(ownerRef, "/", 3)
-	// Missing or broken owner ref means we cannot trust this owner
-	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+	currentOp, err := h.encryptionkeyrotations.Get(held.Namespace, held.Name, metav1.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		// The rotation that claimed the beacon is gone.
 		reclaim = true
-	} else {
-		currentOp, err := h.encryptionkeyrotations.Get(parts[0], parts[1], metav1.GetOptions{})
-		// Owner object is gone
-		if apierrors.IsNotFound(err) {
-			reclaim = true
-		} else if err != nil {
-			return err
-			// UID changed, or the controller is done with the owner
-		} else if string(currentOp.UID) != parts[2] || ops.IsTerminated(&currentOp.Status.OperationStatus) {
-			reclaim = true
-		}
+	case err != nil:
+		return err
+	default:
+		// A different object now holds that name, or the controller is done with the one that does.
+		reclaim = string(currentOp.UID) != held.UID || ops.IsTerminated(&currentOp.Status.OperationStatus)
 	}
+
 	if !reclaim {
 		return nil
 	}
 
-	beacon := s.beacon.DeepCopy()
-	beacon.Status.Owner = ""
-	updated, err := h.beacons.Update(beacon)
-	if err != nil {
-		return err
-	}
-	s.beacon = updated
+	logrus.Infof("[encryptionkeyrotation] %s/%s: reclaiming beacon %s/%s from stale claim %q", s.op.Namespace, s.op.Name, s.beacon.Namespace, s.beacon.Name, recorded)
 
-	beacon = s.beacon.DeepCopy()
-	if beacon.Annotations != nil {
-		delete(beacon.Annotations, beaconOwnerRefAnnotation)
-	}
-	updated, err = h.beacons.Update(beacon)
+	beacon := s.beacon.DeepCopy()
+	beacon.Status.Active = false
+	beacon.Status.Owner = ""
+	beacon.Status.Delegates = nil
+
+	// Ownership lives in the beacon's status, which has its own subresource — clearing it through
+	// the main resource would be silently dropped.
+	updated, err := h.beacons.UpdateStatus(beacon)
 	if err != nil {
 		return err
 	}

@@ -37,6 +37,10 @@ import (
 const (
 	ControllerOwnerKey = "etcd-snapshot-restore"
 
+	// OperationKind is this operation's kind, as it appears in the beacon claims the controller
+	// writes. See ops.BeaconOwnerKey.
+	OperationKind = "ETCDSnapshotRestore"
+
 	Finalizer = "etcdsnapshotrestore.operation.cattle.io"
 
 	// Step hook label prefixes for the etcdsnapshotrestore operation. Each prefix gates a single
@@ -577,7 +581,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 	}
 
 	return &scope{
-		ownerKey:   plan.ControllerOwnerKey(op, ControllerOwnerKey),
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
@@ -732,6 +736,15 @@ func nonWindowsSecret(secret *corev1.Secret) bool {
 }
 
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
+	// A beacon still carrying a claim from an earlier incarnation of this operation's name is
+	// reclaimed before anything is attempted: that claim is provably dead, and leaving it would
+	// either block this operation forever or, worse, be mistaken for its own.
+	beacon, err := ops.ReclaimSupersededBeacon(s.beacon, h.beacons, s.ownerKey)
+	if err != nil {
+		return status, err
+	}
+	s.beacon = beacon
+
 	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
 	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
 	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise, attempt to acquire;
