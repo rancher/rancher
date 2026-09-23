@@ -100,6 +100,26 @@ func AuthorizedForBeacon(beacon *planv1alpha1.Beacon, desired string) bool {
 	return IsOwningBeaconHolder(beacon, desired)
 }
 
+// HoldsBeacon reports whether desired has a claim on the beacon, either as its primary owner or
+// from anywhere in the delegate chain. It is the question "may I still act on this beacon", which
+// is broader than AuthorizedForBeacon: a holder part-way down the chain has handed authority to a
+// delegate but has not given the beacon up, and still has its own slot to release.
+func HoldsBeacon(beacon *planv1alpha1.Beacon, desired string) bool {
+	return IsOwningBeaconHolder(beacon, desired) || IsInDelegateChain(beacon, desired)
+}
+
+// ReleaseBeaconIfHeld hands the beacon back when expected still holds it, and reports whether it was
+// the primary owner rather than a delegate acting on its behalf — which is what callers use to
+// decide whether their own termination implies downstream work. Releasing a beacon held by anybody
+// else is a no-op, so the guard also spares the caller an update it does not need.
+func ReleaseBeaconIfHeld(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, expected string) (bool, error) {
+	if !HoldsBeacon(beacon, expected) {
+		return false, nil
+	}
+
+	return IsOwningBeaconHolder(beacon, expected), ReleaseBeacon(beacon, beacons, expected)
+}
+
 func IsOwningBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
 	if beacon == nil {
 		return desired == ""
