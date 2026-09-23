@@ -92,7 +92,7 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/invopop/jsonschema v0.14.0
-	github.com/k3s-io/api v0.1.4
+	github.com/k3s-io/api v0.2.1
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/microsoft/kiota-abstractions-go v1.10.1
