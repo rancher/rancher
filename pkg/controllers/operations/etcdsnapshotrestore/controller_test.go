@@ -2525,3 +2525,173 @@ func TestUpdateStatusFinalizedOnlyOnceTerminated(t *testing.T) {
 		})
 	}
 }
+
+// --- cancellation ----------------------------------------------------------------------------
+
+// TestOnChange_CancelRequestedCancelsInFlightOperation covers the core of the cancellation
+// contract, which mirrors the deletion one: an operation canceled while it is still running stops
+// where it is, releases the beacon, and reports why it was canceled.
+func TestOnChange_CancelRequestedCancelsInFlightOperation(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Cancel = true
+	op.Status = opv1alpha1.ETCDSnapshotRestoreStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.ETCDSnapshotRestoreStepShutdown,
+	}
+
+	h, _, beacons := newOnChangeHandler(newBeacon(testOwnerKey, true))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseCanceled, status.Phase)
+	assert.Equal(t, "True", opv1alpha1.CanceledCondition.GetStatus(&status))
+	assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	assert.False(t, status.TerminatedAt.IsZero(), "handleCanceled ran to completion, so it must be recorded")
+	assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&status))
+	if assert.Len(t, beacons.statusUpdates, 1, "the beacon must be released") {
+		assert.Equal(t, "", beacons.statusUpdates[0].Status.Owner)
+		assert.False(t, beacons.statusUpdates[0].Status.Active)
+	}
+}
+
+// TestOnChange_CancelRequestedInTerminalPhaseIsDeclined covers the edge of the window: the
+// operation's work is over and its outcome asserted, so there is nothing for a cancellation to
+// stop, even though its terminal phase hook is still holding the beacon. Deleting the operation is
+// what breaks that deadlock.
+func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Cancel = true
+	op.Spec.TTL = -1
+	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
+	op.Status = opv1alpha1.ETCDSnapshotRestoreStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
+		Step:            opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,
+	}
+
+	beacon := newBeacon(testOwnerKey, true)
+	beacon.Status.Delegates = []string{"delegate-a"}
+	h, _, beacons := newOnChangeHandler(beacon)
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase,
+		"the operation had already concluded, so the phase it ended in stands")
+	assert.Equal(t, "True", opv1alpha1.SucceededCondition.GetStatus(&status), "its outcome must survive the request")
+	assert.Equal(t, "False", opv1alpha1.CanceledCondition.GetStatus(&status))
+	assert.Equal(t, opv1alpha1.CancellationDeclinedReason, opv1alpha1.CanceledCondition.GetReason(&status),
+		"a declined cancellation must be acknowledged, not silently passed over")
+	assert.True(t, status.TerminatedAt.IsZero(), "the hook is still owed an answer, so handling is not complete")
+	for _, update := range beacons.statusUpdates {
+		assert.Equal(t, testOwnerKey, update.Status.Owner, "the beacon must stay with the operation and its delegate")
+	}
+}
+
+// TestOnChange_CancelRequestedAfterTerminationKeepsOutcome is the same rule for an operation the
+// controller has fully finished with: nothing left to call off, and by then nothing left to release
+// either.
+func TestOnChange_CancelRequestedAfterTerminationKeepsOutcome(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Cancel = true
+	op.Spec.TTL = -1
+	op.Status = updateStatus(op, opv1alpha1.ETCDSnapshotRestoreStatus{
+		OperationStatus: opv1alpha1.OperationStatus{
+			Phase:        opv1alpha1.OperationPhaseSucceeded,
+			TerminatedAt: metav1.Now(),
+		},
+		Step: opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,
+	})
+
+	h, _, beacons := newOnChangeHandler(newBeacon("", false))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase, "a terminated operation must not be demoted to Canceled")
+	assert.Equal(t, "True", opv1alpha1.SucceededCondition.GetStatus(&status))
+	assert.Equal(t, "False", opv1alpha1.CanceledCondition.GetStatus(&status), "the Canceled condition must be denied, not raised")
+	assert.Equal(t, opv1alpha1.CancellationDeclinedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	assert.Empty(t, beacons.statusUpdates, "there is nothing left to release")
+}
+
+// TestOnChange_PausedBlocksCancel pins the documented precedence: Paused halts reconciliation
+// outright, so a cancellation requested on a paused operation is not acted on until it is resumed.
+func TestOnChange_PausedBlocksCancel(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	op.Spec.Paused = true
+	op.Spec.Cancel = true
+	op.Status = opv1alpha1.ETCDSnapshotRestoreStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.ETCDSnapshotRestoreStepShutdown,
+	}
+
+	h, controller, beacons := newOnChangeHandler(newBeacon(testOwnerKey, true))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, status.Phase, "a paused operation must not transition on cancel")
+	assert.Equal(t, "", opv1alpha1.CanceledCondition.GetStatus(&status), "the Canceled condition must not be reported while paused")
+	assert.Equal(t, "True", opv1alpha1.PausedCondition.GetStatus(&status))
+	assert.Empty(t, beacons.statusUpdates, "the beacon must be left as the pause found it")
+	assert.Empty(t, controller.updates, "a paused operation is not finalized, so it takes no finalizer")
+}
+
+// TestUpdateStatusReportsDeclinedCancellation covers the acknowledgement on its own, across every
+// outcome an operation can end in.
+func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
+	t.Parallel()
+
+	for _, phase := range []opv1alpha1.OperationPhase{
+		opv1alpha1.OperationPhaseSucceeded,
+		opv1alpha1.OperationPhaseFailed,
+		opv1alpha1.OperationPhaseAborted,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			t.Parallel()
+
+			initial := opv1alpha1.ETCDSnapshotRestoreStatus{
+				OperationStatus: opv1alpha1.OperationStatus{Phase: phase},
+			}
+
+			op := newOp()
+			got := updateStatus(op, initial)
+			assert.Equal(t, opv1alpha1.NotCanceledReason, opv1alpha1.CanceledCondition.GetReason(&got),
+				"with no request to report, the denial stays generic")
+
+			op.Spec.Cancel = true
+			got = updateStatus(op, initial)
+			assert.Equal(t, "False", opv1alpha1.CanceledCondition.GetStatus(&got),
+				"the operation was not canceled, so the condition stays denied")
+			assert.Equal(t, opv1alpha1.CancellationDeclinedReason, opv1alpha1.CanceledCondition.GetReason(&got))
+			assert.Contains(t, opv1alpha1.CanceledCondition.GetMessage(&got), string(phase),
+				"the message should say which phase the operation had already reached")
+
+			outcome, _ := opv1alpha1.OutcomeConditionFor(phase)
+			assert.Equal(t, "True", outcome.GetStatus(&got), "the request must not disturb the outcome")
+		})
+	}
+
+	// An operation which really was canceled keeps the reason it was canceled for: the
+	// acknowledgement is for requests that were *not* acted on.
+	t.Run("canceled keeps its own reason", func(t *testing.T) {
+		t.Parallel()
+
+		op := newOp()
+		op.Spec.Cancel = true
+
+		status := opv1alpha1.ETCDSnapshotRestoreStatus{
+			OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseCanceled},
+		}
+		markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+
+		got := updateStatus(op, status)
+		assert.Equal(t, "True", opv1alpha1.CanceledCondition.GetStatus(&got))
+		assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&got))
+	})
+}
