@@ -4,7 +4,6 @@ import (
 	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
-	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 )
 
 // IsTerminal returns true when the operation has reached a terminal phase: Succeeded, Failed,
@@ -38,13 +37,13 @@ func IsTerminated(status *opv1alpha1.OperationStatus) bool {
 func TerminalPhaseHookPrefix(phase opv1alpha1.OperationPhase) string {
 	switch phase {
 	case opv1alpha1.OperationPhaseSucceeded:
-		return planv1alpha1.SucceededPhaseHookLabelPrefix
+		return opv1alpha1.SucceededPhaseHookLabelPrefix
 	case opv1alpha1.OperationPhaseFailed:
-		return planv1alpha1.FailedPhaseHookLabelPrefix
+		return opv1alpha1.FailedPhaseHookLabelPrefix
 	case opv1alpha1.OperationPhaseAborted:
-		return planv1alpha1.AbortedPhaseHookLabelPrefix
+		return opv1alpha1.AbortedPhaseHookLabelPrefix
 	case opv1alpha1.OperationPhaseCanceled:
-		return planv1alpha1.CanceledPhaseHookLabelPrefix
+		return opv1alpha1.CanceledPhaseHookLabelPrefix
 	}
 	return ""
 }

@@ -108,6 +108,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	operationcontrollers.RegisterETCDSnapshotSaveStatusHandler(ctx, clients.Operation.ETCDSnapshotSave(), "", "etcd-snapshot-create-handler", h.OnChange)
 }
+
 // OnChange is the status handler entrypoint invoked by the wrangler-registered controller, and the
 // whole of one reconcile. It decides whether the operation should be reconciled at all, and if so
 // hands it to whichever of the two drivers applies:
@@ -440,7 +441,7 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
 
-	delegated, beacon, err := plan.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
+	delegated, beacon, err := ops.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
 	s.beacon = beacon
 
 	return delegated, err
@@ -481,7 +482,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		s.beacon = acquired
 	}
 
-	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.PendingPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -526,7 +527,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
 	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
@@ -542,7 +543,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		return status, err
 	}
 
-	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.InProgressPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -555,7 +556,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	// is still active on the op, treat the missing-top state as an intentional delegation and
 	// wait; otherwise this is a genuine beacon loss and we fail.
 	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
@@ -900,7 +901,7 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 // off rather than attempting it and losing — which is what separates it from Failed.
 func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.AbortedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -910,7 +911,7 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 // terminal handling completed.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.CanceledPhaseHookLabelPrefix,
+		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -920,7 +921,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 // flag accurately reflects whether any operation is currently running.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.FailedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -931,7 +932,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 // periodic resync. Only the owner does so, since only the owner terminating implies downstream work.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook: planv1alpha1.SucceededPhaseHookLabelPrefix,
+		hook: opv1alpha1.SucceededPhaseHookLabelPrefix,
 		onRelease: func(s *scope, owning bool) {
 			if !owning {
 				return
