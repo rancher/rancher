@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 ARCH=${ARCH:-"amd64"}
 CHART_REPO_DIR=build/charts
-CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.14"}
+CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"release-v2.14"}
 
 REGISTRY=${REGISTRY/:-""}
 IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
