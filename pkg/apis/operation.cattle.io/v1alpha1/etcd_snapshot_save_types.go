@@ -4,7 +4,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-
 // ETCDSnapshotSaveArgs contains parameters for saving an ETCD snapshot.
 // Name specifies the name of the snapshot file.
 type ETCDSnapshotSaveArgs struct {

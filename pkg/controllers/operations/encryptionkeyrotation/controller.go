@@ -103,6 +103,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	operationcontrollers.RegisterEncryptionKeyRotationStatusHandler(ctx, clients.Operation.EncryptionKeyRotation(), "", "encryption-key-rotation-handler", h.OnChange)
 }
+
 // OnChange is the status handler entrypoint invoked by the wrangler-registered controller, and the
 // whole of one reconcile. It decides whether the operation should be reconciled at all, and if so
 // hands it to whichever of the two drivers applies:
@@ -435,7 +436,7 @@ type scope struct {
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 	logrus.Tracef("[encryptionkeyrotation] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
 
-	delegated, beacon, err := plan.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
+	delegated, beacon, err := ops.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
 	s.beacon = beacon
 
 	return delegated, err
@@ -470,7 +471,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 
 	// Pending-phase hook fires after beacon acquisition so a delegate can inspect the recorded
 	// ownership before the controller starts driving the rotation.
-	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.PendingPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -509,7 +510,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
 	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
@@ -527,7 +528,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	// InProgress-phase hook fires on every InProgress reconcile, ahead of step dispatch — useful
 	// for delegates that need to gate ALL step work uniformly without subscribing to each
 	// individual step prefix.
-	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.InProgressPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -540,7 +541,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	// is still active on the op, treat the missing-top state as an intentional delegation and
 	// wait; otherwise this is a genuine beacon loss and we fail.
 	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
@@ -608,33 +609,33 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			// 1. Run rotate-keys via wrapper that always exits 0; captures real exit code in output.
 			{
-					Name:    rotateKeysInstructionName,
-					Command: "/bin/sh",
-					Args:    []string{"-c", rotateKeysScript(runtime)},
+				Name:       rotateKeysInstructionName,
+				Command:    "/bin/sh",
+				Args:       []string{"-c", rotateKeysScript(runtime)},
 				SaveOutput: true,
 			},
 			// 2. Poll until secrets-encrypt status responds; gates planStatus.Applied until
 			// the encryption server is reachable after key reload.
 			{
-					Name:    waitForStatusInstructionName,
-					Command: "/bin/sh",
-					Args:    []string{"-c", waitForStatusScript(runtime)},
+				Name:    waitForStatusInstructionName,
+				Command: "/bin/sh",
+				Args:    []string{"-c", waitForStatusScript(runtime)},
 			},
 			// 3. One-time status snapshot captured when the plan is applied; provides an
 			// observability anchor and confirms the endpoint is stable.
 			{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
+				Name:       statusPeriodicName,
+				Command:    runtime,
+				Args:       []string{"secrets-encrypt", "status"},
 				SaveOutput: true,
 			},
 		},
 		PeriodicInstructions: []plan.PeriodicInstruction{
 			// Runs every 5s independently; used for stage/hash convergence checking.
 			{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
+				Name:          statusPeriodicName,
+				Command:       runtime,
+				Args:          []string{"secrets-encrypt", "status"},
 				PeriodSeconds: 5,
 			},
 		},
@@ -829,14 +830,14 @@ func (h *handler) reconcileRestartNode(
 
 	oneTimeInstructions := []plan.OneTimeInstruction{
 		{
-				Name:    "restart",
-				Command: "systemctl",
-				Args:    []string{"restart", serverUnit},
+			Name:    "restart",
+			Command: "systemctl",
+			Args:    []string{"restart", serverUnit},
 		},
 		{
-				Name:    "wait-for-systemctl-status",
-				Command: "/bin/sh",
-				Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
+			Name:    "wait-for-systemctl-status",
+			Command: "/bin/sh",
+			Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
 		},
 	}
 
@@ -847,22 +848,22 @@ func (h *handler) reconcileRestartNode(
 	if ops.IsControlPlane(secret) {
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions,
 			plan.OneTimeInstruction{
-					Name:    waitForStatusInstructionName,
-					Command: "/bin/sh",
-					Args:    []string{"-c", waitForStatusScript(runtime)},
+				Name:    waitForStatusInstructionName,
+				Command: "/bin/sh",
+				Args:    []string{"-c", waitForStatusScript(runtime)},
 			},
 			plan.OneTimeInstruction{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
+				Name:       statusPeriodicName,
+				Command:    runtime,
+				Args:       []string{"secrets-encrypt", "status"},
 				SaveOutput: true,
 			},
 		)
 		nodePlan.PeriodicInstructions = []plan.PeriodicInstruction{
 			{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
+				Name:          statusPeriodicName,
+				Command:       runtime,
+				Args:          []string{"secrets-encrypt", "status"},
 				PeriodSeconds: 5,
 			},
 		}
@@ -990,7 +991,7 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.EncryptionKeyRotati
 // runs first so a delegate can observe why the operation stopped.
 func (h *handler) handleAborted(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.AbortedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -1002,7 +1003,7 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.EncryptionKeyRotatio
 // and lost and Aborted means the operation called it off itself — none implies another.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.CanceledPhaseHookLabelPrefix,
+		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -1012,7 +1013,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.EncryptionKeyRotati
 // process) before the cluster is unpaused and the beacon released.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.FailedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -1025,7 +1026,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotation
 // terminating implies downstream work.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook: planv1alpha1.SucceededPhaseHookLabelPrefix,
+		hook: opv1alpha1.SucceededPhaseHookLabelPrefix,
 		onRelease: func(s *scope, owning bool) {
 			if !owning {
 				return
@@ -1047,6 +1048,7 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 
 	return status
 }
+
 // errRotateKeysOutputNotYet is returned by readRotateKeysResult when the rotate-keys output
 // or exit-code line is not yet written to the plan secret. Callers should wait and retry.
 // Corrupt/unparse-able exit codes return a different error so callers can fail the operation.

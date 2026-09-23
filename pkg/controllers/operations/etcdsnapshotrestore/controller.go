@@ -574,7 +574,7 @@ func (s *scope) idempotencyValue() string {
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 	logrus.Tracef("[etcdsnapshotrestore] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
 
-	delegated, beacon, err := plan.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
+	delegated, beacon, err := ops.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
 	s.beacon = beacon
 
 	return delegated, err
@@ -658,7 +658,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 	// The Pending-phase hook fires after the beacon has been acquired so external delegates can
 	// inspect the cluster (machine-plan secrets, beacon ownership) before the controller starts
 	// the actual restore workflow.
-	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.PendingPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -701,7 +701,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
 	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
@@ -719,7 +719,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	// InProgress-phase hook fires on every InProgress reconcile, ahead of step dispatch. This is
 	// the broadest hook in the restore lifecycle — useful for delegates that need to gate ALL
 	// step work uniformly without subscribing to each individual step prefix.
-	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.InProgressPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -732,7 +732,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	// is still active on the op, treat the missing-top state as an intentional delegation and
 	// wait; otherwise this is a genuine beacon loss and we fail.
 	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
@@ -2072,7 +2072,7 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 // runs first so a delegate can observe why the operation stopped.
 func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.AbortedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -2084,7 +2084,7 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 // Failed means the work was attempted and lost and Aborted means the operation called it off.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.CanceledPhaseHookLabelPrefix,
+		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -2094,7 +2094,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 // leftover scripts on nodes) can hold the beacon before the next operation acquires it.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           planv1alpha1.FailedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -2106,7 +2106,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 // only the owner does so, since only the owner terminating implies downstream work.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook: planv1alpha1.SucceededPhaseHookLabelPrefix,
+		hook: opv1alpha1.SucceededPhaseHookLabelPrefix,
 		onRelease: func(s *scope, owning bool) {
 			if !owning {
 				return

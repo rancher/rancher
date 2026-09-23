@@ -1964,22 +1964,22 @@ var terminalHandlers = map[string]struct {
 	"aborted": {
 		handle: (*handler).handleAborted,
 		cond:   opv1alpha1.AbortedCondition,
-		hook:   planv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:   opv1alpha1.AbortedPhaseHookLabelPrefix,
 	},
 	"canceled": {
 		handle: (*handler).handleCanceled,
 		cond:   opv1alpha1.CanceledCondition,
-		hook:   planv1alpha1.CanceledPhaseHookLabelPrefix,
+		hook:   opv1alpha1.CanceledPhaseHookLabelPrefix,
 	},
 	"failed": {
 		handle: (*handler).handleFailed,
 		cond:   opv1alpha1.FailedCondition,
-		hook:   planv1alpha1.FailedPhaseHookLabelPrefix,
+		hook:   opv1alpha1.FailedPhaseHookLabelPrefix,
 	},
 	"succeeded": {
 		handle: (*handler).handleSucceeded,
 		cond:   opv1alpha1.SucceededCondition,
-		hook:   planv1alpha1.SucceededPhaseHookLabelPrefix,
+		hook:   opv1alpha1.SucceededPhaseHookLabelPrefix,
 	},
 }
 
@@ -2149,7 +2149,7 @@ func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 	t.Parallel()
 
 	op := newDeletingOp()
-	op.Labels = map[string]string{planv1alpha1.CanceledPhaseHookLabelPrefix + "test": "delegate-a"}
+	op.Labels = map[string]string{opv1alpha1.CanceledPhaseHookLabelPrefix + "test": "delegate-a"}
 	op.Status = opv1alpha1.ETCDSnapshotRestoreStatus{
 		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
 		Step:            opv1alpha1.ETCDSnapshotRestoreStepRestore,
@@ -2380,7 +2380,7 @@ func TestOnChange_ExpiredTerminalOperationIsCollectedOnceTerminated(t *testing.T
 	op := newOp()
 	op.Finalizers = []string{Finalizer}
 	op.Spec.TTL = 0 // expire as soon as the operation is terminal
-	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "test": "delegate-a"}
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "test": "delegate-a"}
 	op.Status = opv1alpha1.ETCDSnapshotRestoreStatus{
 		Phase:       opv1alpha1.OperationPhaseSucceeded,
 		LastUpdated: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
@@ -2573,7 +2573,7 @@ func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
 	op := newOp()
 	op.Spec.Cancel = true
 	op.Spec.TTL = -1
-	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
 	op.Status = opv1alpha1.ETCDSnapshotRestoreStatus{
 		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
 		Step:            opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,

@@ -14,7 +14,6 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/operations/certificaterotation"
-	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
@@ -357,7 +356,7 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 		delegateName = "v2prov-e2e-test-delegate"
 	)
 	rotateHookKey := certificaterotation.RotateStepHookLabelPrefix + hookName
-	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
+	succeededHookKey := opv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
 	// Gate both the Rotate step and Succeeded phase.
 	op := CreateCertificateRotationOp(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationLabels(map[string]string{

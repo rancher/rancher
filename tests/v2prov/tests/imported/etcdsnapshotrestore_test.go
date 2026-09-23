@@ -8,7 +8,6 @@ import (
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotrestore"
-	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -257,7 +256,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotRestoreLifecycleHook(t *te
 		{"PostRestoreNodeCleanup", etcdsnapshotrestore.PostRestoreNodeCleanupStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup},
 		{"RestartCluster", etcdsnapshotrestore.RestartClusterStepHookLabelPrefix + hookName, opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotRestoreStepRestartCluster},
 	}
-	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
+	succeededHookKey := opv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
 	// Attach every hook up front. Each prefix is scoped to a specific handler so they don't
 	// interfere — the controller only consults the relevant prefix when it enters that

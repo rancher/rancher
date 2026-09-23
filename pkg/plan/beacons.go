@@ -3,7 +3,6 @@ package plan
 import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // AcquireBeacon acquires a beacon if it is not already owned by the desired owner.
@@ -219,29 +218,4 @@ func PopDelegate(beacon *planv1alpha1.Beacon, delegate string, beacons plancontr
 	beacon.Status.Delegates = beacon.Status.Delegates[:len(beacon.Status.Delegates)-1]
 	beacon, err := beacons.UpdateStatus(beacon)
 	return beacon, err
-}
-
-// DelegateForHook pushes the delegate named by obj's lifecycle-hook label for prefix onto the
-// beacon's delegate chain, and reports whether there was one to push. A hook that has already been
-// delegated is reported without touching the beacon again, so the caller can keep calling this for
-// as long as the label is present.
-//
-// The returned beacon is always usable — the one passed in when nothing changed or the push failed,
-// the updated one otherwise — so a caller can assign it back unconditionally.
-func DelegateForHook(obj metav1.Object, beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, prefix string) (bool, *planv1alpha1.Beacon, error) {
-	_, delegate := planv1alpha1.LifecycleHookDelegate(obj, prefix)
-	if delegate == "" {
-		return false, beacon, nil
-	}
-
-	if IsInDelegateChain(beacon, delegate) {
-		return true, beacon, nil
-	}
-
-	updated, err := PushDelegate(beacon, delegate, beacons)
-	if err != nil {
-		return true, beacon, err
-	}
-
-	return true, updated, nil
 }
