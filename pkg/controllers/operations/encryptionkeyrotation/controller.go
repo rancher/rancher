@@ -554,12 +554,6 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 	}
 	s.beacon = beacon
 
-	// Any other stale claim of this kind needs its object resolved; the cheap rule above has
-	// already dealt with our own name, so this only reaches a claim of some other rotation.
-	if err := h.reclaimStaleBeaconOwnerIfNeeded(s); err != nil {
-		return status, err
-	}
-
 	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
 	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
 	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise, attempt to acquire;
@@ -1348,69 +1342,6 @@ func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.Encryp
 	return status
 }
 
-
-// reclaimStaleBeaconOwnerIfNeeded clears a beacon claim whose rotation no longer exists, or which
-// the controller has already finished with. It resolves the claim's own reference, so unlike
-// ops.ReclaimSupersededBeacon — which proves a claim dead from the name alone and runs first — it
-// can recover a beacon from a rotation of some *other* name.
-//
-// It reaches this controller's own kind only. Proving another operation type's claim dead would
-// mean resolving an object this controller does not watch, and a claim which is not an operation's
-// at all — a handler holding the beacon under its own name, the imported-day2ops-disable key — is
-// held for reasons this controller cannot see and must be left alone.
-//
-// "Finished with" is termination, not merely a terminal phase: a rotation waiting on its terminal
-// phase hook is holding the beacon legitimately, on behalf of the delegate running that hook.
-func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
-	if s.beacon == nil {
-		return nil
-	}
-
-	recorded := s.beacon.Status.Owner
-	if recorded == "" || recorded == s.ownerKey {
-		return nil
-	}
-
-	held, ok := ops.ParseBeaconOwner(recorded)
-	if !ok || held.Kind != OperationKind {
-		return nil
-	}
-
-	reclaim := false
-
-	currentOp, err := h.encryptionkeyrotations.Get(held.Namespace, held.Name, metav1.GetOptions{})
-	switch {
-	case apierrors.IsNotFound(err):
-		// The rotation that claimed the beacon is gone.
-		reclaim = true
-	case err != nil:
-		return err
-	default:
-		// A different object now holds that name, or the controller is done with the one that does.
-		reclaim = string(currentOp.UID) != held.UID || ops.IsTerminated(&currentOp.Status.OperationStatus)
-	}
-
-	if !reclaim {
-		return nil
-	}
-
-	logrus.Infof("[encryptionkeyrotation] %s/%s: reclaiming beacon %s/%s from stale claim %q", s.op.Namespace, s.op.Name, s.beacon.Namespace, s.beacon.Name, recorded)
-
-	beacon := s.beacon.DeepCopy()
-	beacon.Status.Active = false
-	beacon.Status.Owner = ""
-	beacon.Status.Delegates = nil
-
-	// Ownership lives in the beacon's status, which has its own subresource — clearing it through
-	// the main resource would be silently dropped.
-	updated, err := h.beacons.UpdateStatus(beacon)
-	if err != nil {
-		return err
-	}
-	s.beacon = updated
-
-	return nil
-}
 
 // errRotateKeysOutputNotYet is returned by readRotateKeysResult when the rotate-keys output
 // or exit-code line is not yet written to the plan secret. Callers should wait and retry.
