@@ -15,7 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v8"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v9"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v11"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v12"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/subscription/armsubscription"
 	"github.com/Azure/go-autorest/autorest/to"
