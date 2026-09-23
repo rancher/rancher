@@ -2220,8 +2220,10 @@ func TestOnChange_DeletionPreservesTerminatedOutcome(t *testing.T) {
 	}
 }
 
-// TestOnChange_DeletionOfPausedOperation covers a paused operation being deleted: pausing halts
-// execution, but it must not wedge a deletion behind the finalizer.
+// TestOnChange_DeletionOfPausedOperation covers a paused operation being deleted. Pausing stops the
+// controller touching the operation at all, and tearing it down is no exception: its beacon is left
+// alone and its finalizer stays, so the deletion waits for the pause to lift. Resuming the
+// operation is what lets it finish deleting.
 func TestOnChange_DeletionOfPausedOperation(t *testing.T) {
 	t.Parallel()
 
@@ -2236,14 +2238,26 @@ func TestOnChange_DeletionOfPausedOperation(t *testing.T) {
 
 	status, err := h.OnChange(op, op.Status)
 	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, status.Phase, "a paused operation is not reconciled, even to cancel it")
+	assert.Equal(t, "True", opv1alpha1.PausedCondition.GetStatus(&status), "its conditions are still refreshed")
+	assert.Empty(t, beacons.statusUpdates, "the beacon must be left exactly as the pause found it")
+	assert.Empty(t, controller.updates, "the finalizer must stay until the operation is resumed")
+	assert.Zero(t, controller.enqueueCalls, "a paused operation is not polled")
+
+	// Resumed, the deletion proceeds as it would have in the first place.
+	op.Spec.Paused = false
+	op.Status = status
+
+	status, err = h.OnChange(op, op.Status)
+	assert.NoError(t, err)
 	assert.Equal(t, opv1alpha1.OperationPhaseCanceled, status.Phase)
-	assert.NotEmpty(t, beacons.statusUpdates, "the beacon must be released even though the operation is paused")
+	assert.NotEmpty(t, beacons.statusUpdates, "the beacon is released once the operation is resumed")
 
 	op.Status = status
 
 	_, err = h.OnChange(op, op.Status)
 	assert.NoError(t, err)
-	if assert.Len(t, controller.updates, 1, "a paused operation must still be releasable for deletion") {
+	if assert.Len(t, controller.updates, 1, "the finalizer goes once terminal handling completes") {
 		assert.NotContains(t, controller.updates[0].Finalizers, Finalizer)
 	}
 }
@@ -2329,9 +2343,10 @@ func TestOnChange_TakesFinalizer(t *testing.T) {
 	assert.Len(t, controller.updates, 1, "taking the finalizer must be idempotent")
 }
 
-// TestOnChange_PausedOperationDoesNotTakeFinalizer documents the deliberate exception: a paused
-// operation has dispatched nothing since it was paused, so taking the finalizer would only stand
-// between the user and deleting it.
+// TestOnChange_PausedOperationDoesNotTakeFinalizer follows from a paused operation not being
+// reconciled at all. It matters most for one which was paused before it ever ran: having dispatched
+// nothing, it has nothing to tear down, and a finalizer would only stand between the user and
+// deleting it.
 func TestOnChange_PausedOperationDoesNotTakeFinalizer(t *testing.T) {
 	t.Parallel()
 
