@@ -129,10 +129,11 @@ func (g *gitGo) setCredential(cred *corev1.Secret) error {
 			tmpFile.Close()
 
 			callback, err := knownhosts.New(tmpPath)
-			os.Remove(tmpPath) // Clean up immediately after parsing
 			if err != nil {
+				os.Remove(tmpPath)
 				return err
 			}
+			os.Remove(tmpPath) // Clean up immediately after parsing
 			publicKeys.HostKeyCallback = callback
 		} else {
 			publicKeys.HostKeyCallback = ssh.InsecureIgnoreHostKey()
@@ -382,10 +383,10 @@ func (g *gitGo) fetchAndReset(rev string) error {
 	return g.reset(rev)
 }
 
-// isHexString checks if a string contains only hexadecimal characters
+// isHexString checks if a string contains only lowercase hexadecimal characters (git SHAs are lowercase)
 func isHexString(s string) bool {
 	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return false
 		}
 	}
