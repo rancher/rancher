@@ -14,7 +14,6 @@ import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
@@ -436,31 +435,15 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	return status, nil
 }
 
-func (h *handler) delegate(s *scope, name, delegate string) error {
-	logrus.Tracef("[etcdsnapshotsave] %s/%s: delegating ownership of beacon to %s on behalf of %s", s.op.Namespace, s.op.Name, delegate, name)
-
-	if plan.IsInDelegateChain(s.beacon, delegate) {
-		return nil
-	}
-
-	beacon, err := plan.PushDelegate(s.beacon, delegate, h.beacons)
-	if err != nil {
-		return err
-	}
-
-	s.beacon = beacon
-
-	return nil
-}
-
+// handleHook pushes the delegate named by the operation's hook label for prefix onto the beacon, and
+// reports whether there was one — in which case the caller stops where it is and waits.
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
 
-	if name, delegate := planv1alpha1.LifecycleHookDelegate(s.op, prefix); delegate != "" {
-		err := h.delegate(s, name, delegate)
-		return true, err
-	}
-	return false, nil
+	delegated, beacon, err := plan.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
+	s.beacon = beacon
+
+	return delegated, err
 }
 
 // handlePending advances a Pending operation through the prerequisite checks: acquire the
@@ -502,7 +485,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	if err != nil {
 		return status, err
 	} else if delegated {
-		setWaitingForDelegate(opv1alpha1.PendingCondition, &status, s.beacon)
+		ops.SetWaitingForDelegate(opv1alpha1.PendingCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -544,7 +527,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	// have popped us in service of the hook and will restore ownership when the hook clears.
 	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
 		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
-			setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
+			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon reassigned, aborting", s.op.Namespace, s.op.Name)
@@ -563,7 +546,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	if err != nil {
 		return status, err
 	} else if delegated {
-		setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -573,7 +556,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	// wait; otherwise this is a genuine beacon loss and we fail.
 	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
 		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
-			setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
+			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
 		logrus.Errorf("[etcdsnapshotsave] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
@@ -611,7 +594,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotSav
 	if err != nil {
 		return status, err
 	} else if delegated {
-		setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -654,7 +637,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	if err != nil {
 		return status, err
 	} else if delegated {
-		setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -730,7 +713,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	}
 
 	if concurrency < len(secrets) {
-		setWaitingForPlan(&status, results)
+		ops.SetWaitingForPlan(&status.OperationStatus, status.Step, results)
 
 		return status, nil
 	}
@@ -754,7 +737,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	if err != nil {
 		return status, err
 	} else if delegated {
-		setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -824,7 +807,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	}
 
 	if concurrency < 1 {
-		setWaitingForPlan(&status, results)
+		ops.SetWaitingForPlan(&status.OperationStatus, status.Step, results)
 
 		return status, nil
 	}
@@ -960,140 +943,13 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotSaveSt
 	})
 }
 
-// setWaitingForDelegate reports, through the condition belonging to the phase currently being
-// handled, that the operation's beacon has been handed to a lifecycle-hook delegate and the
-// controller is waiting for it to finish. The phase itself does not move: the operation is still
-// where it was, it just isn't the one driving the beacon.
-func setWaitingForDelegate(cond condition.Cond, status *opv1alpha1.ETCDSnapshotSaveStatus, beacon *planv1alpha1.Beacon) {
-	cond.True(status)
-	cond.Reason(status, opv1alpha1.WaitingForDelegateReason)
-	cond.Message(status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(beacon)))
-}
-
-// setWaitingForPlan reports that the current step's plans have been handed to the system-agents and
-// the controller is now waiting on their feedback.
-func setWaitingForPlan(status *opv1alpha1.ETCDSnapshotSaveStatus, results []plan.PlanStatus) {
-	opv1alpha1.InProgressCondition.True(status)
-	opv1alpha1.InProgressCondition.Reason(status, opv1alpha1.WaitingForPlanAppliedReason)
-	opv1alpha1.InProgressCondition.Message(status, fmt.Sprintf("Waiting in step %s: %s", status.Step, plan.Message(results)))
-}
-
 // updateStatus refreshes ObservedGeneration and every condition that is not the one the current
-// phase handler owns.
-//
-// Division of labor for the outcome conditions (Succeeded / Failed / Canceled): a phase handler
-// records *why* the operation ended, by setting the reason and message on the condition matching
-// the phase it moves to — markSucceeded, markFailed and markCanceled do exactly that. This function
-// asserts that outcome and denies the competing two, and owns the Finalized condition outright.
-//
-// The three states, in order:
-//
-//   - not terminal: the operation is still running. Progress conditions report where it is and
-//     Finalized is False with NotFinalizedReason.
-//   - terminal: the work is over and its outcome will not change, so the matching outcome condition
-//     goes True (keeping the reason and message it was given at decision time) and the other two go
-//     False. The progress conditions are cleared.
-//   - terminal and terminated: the controller is done with the operation too — the terminal phase
-//     hook was satisfied and the beacon released — so Finalized goes True. Until then it stays
-//     False with FinalizingReason, which is the only difference between this state and the one
-//     above.
+// phase handler owns. Every operation type reports its progress identically, so the work itself is
+// shared — see ops.UpdateStatus.
 func updateStatus(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha1.ETCDSnapshotSaveStatus) opv1alpha1.ETCDSnapshotSaveStatus {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: updating conditions", op.Namespace, op.Name)
 
-	status.ObservedGeneration = op.Generation
-	if op.Spec.Paused {
-		opv1alpha1.PausedCondition.True(&status)
-		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.PausedReason)
-		opv1alpha1.PausedCondition.Message(&status, "Operation is paused")
-	} else {
-		opv1alpha1.PausedCondition.False(&status)
-		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.NotPausedReason)
-		opv1alpha1.PausedCondition.Message(&status, "")
-	}
-
-	if !ops.IsTerminal(status.Phase) {
-		opv1alpha1.FinalizedCondition.False(&status)
-		opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.NotFinalizedReason)
-		opv1alpha1.FinalizedCondition.Message(&status, "")
-
-		if status.Phase == opv1alpha1.OperationPhasePending {
-			opv1alpha1.PendingCondition.True(&status)
-		} else if status.Phase == opv1alpha1.OperationPhaseInProgress {
-			opv1alpha1.PendingCondition.False(&status)
-			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.InProgressReason)
-			opv1alpha1.PendingCondition.Message(&status, "Operation now in progress")
-		}
-
-		return status
-	}
-
-	outcome, summary := opv1alpha1.OutcomeConditionFor(status.Phase)
-
-	// The outcome is asserted as soon as the terminal phase is reached: the work is over and the
-	// result will not change. The reason and message the phase handler recorded are left in place —
-	// they are the record of why the operation ended.
-	outcome.True(&status)
-
-	for cond, reason := range map[condition.Cond]string{
-		opv1alpha1.SucceededCondition: opv1alpha1.NotSuccessfulReason,
-		opv1alpha1.FailedCondition:    opv1alpha1.NotFailedReason,
-		opv1alpha1.AbortedCondition:   opv1alpha1.NotAbortedReason,
-		opv1alpha1.CanceledCondition:  opv1alpha1.NotCanceledReason,
-	} {
-		if cond == outcome {
-			continue
-		}
-		cond.False(&status)
-		cond.Reason(&status, reason)
-		cond.Message(&status, summary)
-	}
-
-	// A cancellation requested after the operation reached a terminal phase changes nothing: there
-	// is no work left to call off. Report it on the denied Canceled condition — which is where an
-	// observer looks to find out what became of the request — so that setting spec.Cancel is
-	// acknowledged rather than silently passed over. See cancelForRequest for why it is declined,
-	// and note that deleting the operation is what does act in this window.
-	if outcome != opv1alpha1.CanceledCondition && ops.IsCanceled(&op.Spec.OperationSpec) {
-		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.CancellationDeclinedReason)
-		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("cancellation requested, but the operation had already reached the %s phase", status.Phase))
-	}
-
-	// Terminated is the separate question of whether the controller is done with the operation, so
-	// it is the only thing the terminal marker gates. An operation in this window is past being
-	// cancellable, but is still canceled on its way out if it is deleted — see cancelForDeletion.
-	terminated := ops.IsTerminated(&status.OperationStatus)
-
-	progressReason := opv1alpha1.FinalizingReason
-	if terminated {
-		progressReason = opv1alpha1.FinishedReason
-	}
-
-	opv1alpha1.PendingCondition.False(&status)
-	opv1alpha1.PendingCondition.Reason(&status, progressReason)
-	opv1alpha1.PendingCondition.Message(&status, summary)
-	opv1alpha1.InProgressCondition.False(&status)
-	opv1alpha1.InProgressCondition.Reason(&status, progressReason)
-	opv1alpha1.InProgressCondition.Message(&status, summary)
-
-	if !terminated {
-		opv1alpha1.FinalizedCondition.False(&status)
-
-		// Read the delegate back off the operation rather than remembering it on a condition: the
-		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
-		if _, delegate := planv1alpha1.LifecycleHookDelegate(op, ops.TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
-			opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-			opv1alpha1.FinalizedCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
-		} else {
-			opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinalizingReason)
-			opv1alpha1.FinalizedCondition.Message(&status, "waiting for terminal handling to complete")
-		}
-
-		return status
-	}
-
-	opv1alpha1.FinalizedCondition.True(&status)
-	opv1alpha1.FinalizedCondition.Reason(&status, opv1alpha1.FinishedReason)
-	opv1alpha1.FinalizedCondition.Message(&status, summary)
+	ops.UpdateStatus(op, &op.Spec.OperationSpec, &status.OperationStatus)
 
 	return status
 }

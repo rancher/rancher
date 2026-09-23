@@ -1,8 +1,12 @@
 package operations
 
 import (
+	"fmt"
+
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	"github.com/rancher/wrangler/v3/pkg/condition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -71,4 +75,148 @@ func Collectable(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1a
 		IsTerminated(status) &&
 		IsExpired(spec, status) &&
 		!planv1alpha1.HasActiveLifecycleHook(op)
+}
+
+// UpdateStatus refreshes ObservedGeneration and every condition that is not the one the current
+// phase handler owns. Every operation type reports its progress the same way, so they all share
+// this; what is specific to an operation is the step it is on, and no condition here reports that.
+//
+// Division of labour for the outcome conditions (Succeeded / Failed / Aborted / Canceled): a phase
+// handler records *why* the operation ended, by setting the reason and message on the condition
+// matching the phase it moves to — the MarkSucceeded, MarkFailed, MarkAborted and MarkCanceled
+// methods on OperationStatus do exactly that. This function asserts that outcome and denies the
+// competing three, and owns the Finalized condition outright.
+//
+// The three states, in order:
+//
+//   - not terminal: the operation is still running. Progress conditions report where it is and
+//     Finalized is False with NotFinalizedReason.
+//   - terminal: the work is over and its outcome will not change, so the matching outcome condition
+//     goes True (keeping the reason and message it was given at decision time) and the others go
+//     False. The progress conditions are cleared.
+//   - terminal and terminated: the controller is done with the operation too — the terminal phase
+//     hook was satisfied and the beacon released — so Finalized goes True. Until then it stays
+//     False with FinalizingReason, which is the only difference between this state and the one
+//     above.
+func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) {
+	status.ObservedGeneration = op.GetGeneration()
+	if spec.Paused {
+		opv1alpha1.PausedCondition.True(status)
+		opv1alpha1.PausedCondition.Reason(status, opv1alpha1.PausedReason)
+		opv1alpha1.PausedCondition.Message(status, "Operation is paused")
+	} else {
+		opv1alpha1.PausedCondition.False(status)
+		opv1alpha1.PausedCondition.Reason(status, opv1alpha1.NotPausedReason)
+		opv1alpha1.PausedCondition.Message(status, "")
+	}
+
+	if !IsTerminal(status.Phase) {
+		opv1alpha1.FinalizedCondition.False(status)
+		opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.NotFinalizedReason)
+		opv1alpha1.FinalizedCondition.Message(status, "")
+
+		if status.Phase == opv1alpha1.OperationPhasePending {
+			opv1alpha1.PendingCondition.True(status)
+		} else if status.Phase == opv1alpha1.OperationPhaseInProgress {
+			opv1alpha1.PendingCondition.False(status)
+			opv1alpha1.PendingCondition.Reason(status, opv1alpha1.InProgressReason)
+			opv1alpha1.PendingCondition.Message(status, "Operation now in progress")
+		}
+
+		return
+	}
+
+	outcome, summary := opv1alpha1.OutcomeConditionFor(status.Phase)
+
+	// The outcome is asserted as soon as the terminal phase is reached: the work is over and the
+	// result will not change. The reason and message the phase handler recorded are left in place —
+	// they are the record of why the operation ended.
+	outcome.True(status)
+
+	for cond, reason := range map[condition.Cond]string{
+		opv1alpha1.SucceededCondition: opv1alpha1.NotSuccessfulReason,
+		opv1alpha1.FailedCondition:    opv1alpha1.NotFailedReason,
+		opv1alpha1.AbortedCondition:   opv1alpha1.NotAbortedReason,
+		opv1alpha1.CanceledCondition:  opv1alpha1.NotCanceledReason,
+	} {
+		if cond == outcome {
+			continue
+		}
+		cond.False(status)
+		cond.Reason(status, reason)
+		cond.Message(status, summary)
+	}
+
+	// A cancellation requested after the operation reached a terminal phase changes nothing: there
+	// is no work left to call off. Report it on the denied Canceled condition — which is where an
+	// observer looks to find out what became of the request — so that setting spec.Cancel is
+	// acknowledged rather than silently passed over. See CancelForRequest for why it is declined,
+	// and note that deleting the operation is what does act in this window.
+	if outcome != opv1alpha1.CanceledCondition && IsCanceled(spec) {
+		opv1alpha1.CanceledCondition.Reason(status, opv1alpha1.CancellationDeclinedReason)
+		opv1alpha1.CanceledCondition.Message(status, fmt.Sprintf("cancellation requested, but the operation had already reached the %s phase", status.Phase))
+	}
+
+	// Terminated is the separate question of whether the controller is done with the operation, so
+	// it is the only thing the terminal marker gates. An operation in this window is past being
+	// cancellable, but is still canceled on its way out if it is deleted — see CancelForDeletion.
+	terminated := IsTerminated(status)
+
+	progressReason := opv1alpha1.FinalizingReason
+	if terminated {
+		progressReason = opv1alpha1.FinishedReason
+	}
+
+	opv1alpha1.PendingCondition.False(status)
+	opv1alpha1.PendingCondition.Reason(status, progressReason)
+	opv1alpha1.PendingCondition.Message(status, summary)
+	opv1alpha1.InProgressCondition.False(status)
+	opv1alpha1.InProgressCondition.Reason(status, progressReason)
+	opv1alpha1.InProgressCondition.Message(status, summary)
+
+	if !terminated {
+		opv1alpha1.FinalizedCondition.False(status)
+
+		// Read the delegate back off the operation rather than remembering it on a condition: the
+		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
+		if _, delegate := planv1alpha1.LifecycleHookDelegate(op, TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
+			opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.WaitingForDelegateReason)
+			opv1alpha1.FinalizedCondition.Message(status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
+		} else {
+			opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.FinalizingReason)
+			opv1alpha1.FinalizedCondition.Message(status, "waiting for terminal handling to complete")
+		}
+
+		return
+	}
+
+	opv1alpha1.FinalizedCondition.True(status)
+	opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.FinishedReason)
+	opv1alpha1.FinalizedCondition.Message(status, summary)
+}
+
+// SetWaitingForDelegate reports, through the condition belonging to the phase currently being
+// handled, that the operation's beacon has been handed to a lifecycle-hook delegate and the
+// controller is waiting for it to finish. The phase itself does not move: the operation is still
+// where it was, it just isn't the one driving the beacon.
+func SetWaitingForDelegate(cond condition.Cond, status *opv1alpha1.OperationStatus, beacon *planv1alpha1.Beacon) {
+	cond.True(status)
+	cond.Reason(status, opv1alpha1.WaitingForDelegateReason)
+	cond.Message(status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(beacon)))
+}
+
+// SetWaitingForPlan reports that the current step's plans have been handed to the system-agents and
+// the controller is now waiting on their feedback.
+func SetWaitingForPlan[S ~string](status *opv1alpha1.OperationStatus, step S, results []planapi.PlanStatus) {
+	opv1alpha1.InProgressCondition.True(status)
+	opv1alpha1.InProgressCondition.Reason(status, opv1alpha1.WaitingForPlanAppliedReason)
+	opv1alpha1.InProgressCondition.Message(status, fmt.Sprintf("Waiting in step %s: %s", step, planapi.Message(results)))
+}
+
+// SetWaitingForSinglePlan is SetWaitingForPlan for the steps which walk nodes one at a time, where
+// the plan's own message names the node it is waiting on and the step adds nothing.
+func SetWaitingForSinglePlan(status *opv1alpha1.OperationStatus, planStatus *planapi.PlanStatus) {
+	opv1alpha1.InProgressCondition.True(status)
+	opv1alpha1.InProgressCondition.Reason(status, opv1alpha1.WaitingForPlanAppliedReason)
+	opv1alpha1.InProgressCondition.Message(status, planapi.Message([]planapi.PlanStatus{*planStatus}))
 }
