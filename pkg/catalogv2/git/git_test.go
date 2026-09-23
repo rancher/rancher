@@ -24,11 +24,10 @@ func TestGitClientContract(t *testing.T) {
 			name:    "gitCLI",
 			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitCLI(dir, url, opts) },
 		},
-		// Future implementations will be added here:
-		// {
-		//     name:    "gitGoGit",
-		//     factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGoGit(dir, url, opts) },
-		// },
+		{
+			name:    "gitGo",
+			factory: func(dir, url string, opts *Options) (gitClient, error) { return newGitGo(dir, url, opts) },
+		},
 	}
 
 	for _, impl := range implementations {
