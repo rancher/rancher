@@ -1601,8 +1601,10 @@ func TestOnChange_DeletionPreservesTerminatedOutcome(t *testing.T) {
 	}
 }
 
-// TestOnChange_DeletionOfPausedOperation covers a paused operation being deleted: pausing halts
-// execution, but it must not wedge a deletion behind the finalizer.
+// TestOnChange_DeletionOfPausedOperation covers a paused operation being deleted. Pausing stops the
+// controller touching the operation at all, and tearing it down is no exception: its beacon is left
+// alone and its finalizer stays, so the deletion waits for the pause to lift. Resuming the
+// operation is what lets it finish deleting.
 func TestOnChange_DeletionOfPausedOperation(t *testing.T) {
 	op := newDeletingOp()
 	op.Spec.Paused = true
@@ -1617,20 +1619,41 @@ func TestOnChange_DeletionOfPausedOperation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if status.Phase != opv1alpha1.OperationPhaseInProgress {
+		t.Fatalf("a paused operation is not reconciled, even to cancel it: phase is %q", status.Phase)
+	}
+	if string(opv1alpha1.PausedCondition.GetStatus(&status)) != "True" {
+		t.Fatal("its conditions are still refreshed")
+	}
+	if len(beacons.statusUpdates) != 0 {
+		t.Fatal("the beacon must be left exactly as the pause found it")
+	}
+	if len(controller.updates) != 0 {
+		t.Fatal("the finalizer must stay until the operation is resumed")
+	}
+
+	// Resumed, the deletion proceeds as it would have in the first place.
+	op.Spec.Paused = false
+	op.Status = status
+
+	status, err = h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error once resumed: %v", err)
+	}
 	if status.Phase != opv1alpha1.OperationPhaseCanceled {
-		t.Fatalf("expected phase Canceled, got %q", status.Phase)
+		t.Fatalf("expected phase Canceled once resumed, got %q", status.Phase)
 	}
 	if len(beacons.statusUpdates) == 0 {
-		t.Fatal("the beacon must be released even though the operation is paused")
+		t.Fatal("the beacon is released once the operation is resumed")
 	}
 
 	op.Status = status
 
 	if _, err := h.OnChange(op, op.Status); err != nil {
-		t.Fatalf("unexpected error on second pass: %v", err)
+		t.Fatalf("unexpected error on the final pass: %v", err)
 	}
 	if len(controller.updates) != 1 || slices.Contains(controller.updates[0].Finalizers, Finalizer) {
-		t.Fatal("a paused operation must still be releasable for deletion")
+		t.Fatal("the finalizer goes once terminal handling completes")
 	}
 }
 
@@ -1698,9 +1721,10 @@ func TestOnChange_TakesFinalizer(t *testing.T) {
 	}
 }
 
-// TestOnChange_PausedOperationDoesNotTakeFinalizer documents the deliberate exception: a paused
-// operation has dispatched nothing since it was paused, so taking the finalizer would only stand
-// between the user and deleting it.
+// TestOnChange_PausedOperationDoesNotTakeFinalizer follows from a paused operation not being
+// reconciled at all. It matters most for one which was paused before it ever ran: having dispatched
+// nothing, it has nothing to tear down, and a finalizer would only stand between the user and
+// deleting it.
 func TestOnChange_PausedOperationDoesNotTakeFinalizer(t *testing.T) {
 	op := newOnChangeOp()
 	op.Spec.Paused = true
