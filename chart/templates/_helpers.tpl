@@ -95,11 +95,21 @@ Render Values in configurationSnippet
 {{- end -}}
 
 {{/*
-Generate the labels.
+Selector labels.
+Used in Deployment spec.selector, Service spec.selector, PDB spec.selector.
+Keep this minimal and stable over time!
+*/}}
+{{- define "rancher.selectorLabels" -}}
+app: {{ include "rancher.fullname" . }}
+{{- end }}
+
+{{/*
+Common labels.
+Used in metadata.labels on ALL resources (metadata only, never immutable selectors).
 */}}
 {{- define "rancher.labels" -}}
-app: {{ template "rancher.fullname" . }}
-chart: {{ template "rancher.chartname" . }}
+{{ include "rancher.selectorLabels" . }}
+chart: {{ include "rancher.chartname" . }}
 heritage: {{ .Release.Service }}
 release: {{ .Release.Name }}
 {{- end }}
