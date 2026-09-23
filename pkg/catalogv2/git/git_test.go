@@ -547,34 +547,13 @@ func testOptionsCABundleValidation(t *testing.T, factory func(string, string, *O
 		// Dummy CA bundle (invalid cert - would fail if actually used)
 		caBundle := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----")
 
-		client, err := factory(testDir, chartsSmallForkURL, &Options{
+		_, err := factory(testDir, chartsSmallForkURL, &Options{
 			CABundle: caBundle,
 		})
 
-		// Determine which implementation we're testing
-		var isGoGit bool
-		if client != nil {
-			_, isGoGit = client.(*gitGo)
-		} else if err != nil {
-			// If client is nil due to error, check error for go-git signature
-			isGoGit = strings.Contains(err.Error(), "x509: malformed")
-		}
-
-		if isGoGit {
-			// go-git validates CA bundle during client creation
-			if err == nil {
-				t.Fatal("gitGo should fail during construction with invalid CA bundle")
-			}
-			if !strings.Contains(err.Error(), "x509: malformed") {
-				t.Fatalf("gitGo should return x509 malformed error, got: %v", err)
-			}
-		} else {
-			// gitGo validates CA bundle during client construction
-			require.Error(t, err, "should fail client creation with invalid CA bundle")
-			if !strings.Contains(err.Error(), "x509: malformed") {
-				t.Fatalf("should return x509 malformed error, got: %v", err)
-			}
-		}
+		// gitGo validates CA bundle during client construction
+		require.Error(t, err, "should fail client creation with invalid CA bundle")
+		require.Contains(t, err.Error(), "x509: malformed")
 	})
 }
 
