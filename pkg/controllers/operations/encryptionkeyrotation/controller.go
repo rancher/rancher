@@ -1345,10 +1345,15 @@ func beaconOwnerKey(op *opv1alpha1.EncryptionKeyRotation) string {
 	return fmt.Sprintf("%s-%s-%s", ControllerOwnerKey, op.Namespace, op.Name)
 }
 
-// reclaimStaleBeaconOwnerIfNeeded clears stale beacon ownership when the
-// recorded owner reference is invalid, missing, deleted, or terminal.
+// reclaimStaleBeaconOwnerIfNeeded clears stale beacon ownership when the recorded owner reference
+// is invalid, missing, deleted, or belongs to an operation the controller has finished with.
 // Non-matching owners are left untouched so this controller only reclaims its own
 // operation type.
+//
+// "Finished with" is termination, not merely a terminal phase. An operation which has reached a
+// terminal phase may still be holding the beacon legitimately, on behalf of a delegate running its
+// terminal phase hook, and reclaiming it there would both cut the delegate off and leave the old
+// operation pushing hook delegates onto a beacon that is no longer its own.
 func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 	if s.beacon == nil {
 		return nil
@@ -1382,8 +1387,8 @@ func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
 			reclaim = true
 		} else if err != nil {
 			return err
-			// UID changed or owner finished
-		} else if string(currentOp.UID) != parts[2] || ops.IsTerminal(currentOp.Status.Phase) {
+			// UID changed, or the controller is done with the owner
+		} else if string(currentOp.UID) != parts[2] || ops.IsTerminated(&currentOp.Status.OperationStatus) {
 			reclaim = true
 		}
 	}
