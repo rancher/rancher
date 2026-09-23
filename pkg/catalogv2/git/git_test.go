@@ -27,7 +27,7 @@ func TestGitClientContract(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			testGetDirectory(t, impl.factory)
+			testDirectory(t, impl.factory)
 			testCloneIdempotent(t, impl.factory)
 			testCloneWithBranch(t, impl.factory)
 			testResetToCommit(t, impl.factory)
@@ -38,16 +38,16 @@ func TestGitClientContract(t *testing.T) {
 	}
 }
 
-// testGetDirectory verifies getDirectory returns the configured directory
-func testGetDirectory(t *testing.T, factory func(string, string, *Options) (gitClient, error)) {
-	t.Run("getDirectory", func(t *testing.T) {
+// testDirectory verifies directory returns the configured directory
+func testDirectory(t *testing.T, factory func(string, string, *Options) (gitClient, error)) {
+	t.Run("directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testDir := filepath.Join(tmpDir, "test-repo")
 
 		client, err := factory(testDir, chartsSmallForkURL, nil)
 		require.NoError(t, err)
 
-		assert.Equal(t, testDir, client.getDirectory())
+		assert.Equal(t, testDir, client.directory())
 	})
 }
 
@@ -350,7 +350,7 @@ func TestGitClientConcurrency(t *testing.T) {
 		assert.NotEqual(t, c1, c2, "different clients on different branches should have different commits")
 
 		// Verify directories are independent
-		assert.NotEqual(t, client1.getDirectory(), client2.getDirectory())
+		assert.NotEqual(t, client1.directory(), client2.directory())
 	})
 }
 

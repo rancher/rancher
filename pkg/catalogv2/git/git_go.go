@@ -233,8 +233,8 @@ func (h *headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 	return h.next.RoundTrip(req)
 }
 
-// getDirectory returns the repository directory path
-func (g *gitGo) getDirectory() string {
+// directory returns the repository directory path
+func (g *gitGo) directory() string {
 	return g.Directory
 }
 

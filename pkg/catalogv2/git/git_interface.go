@@ -27,9 +27,9 @@ type gitClient interface {
 	// Read-only: no side effects
 	currentCommit() (string, error)
 
-	// getDirectory returns the local directory path
+	// directory returns the local directory path
 	// Pure: deterministic, no side effects
-	getDirectory() string
+	directory() string
 
 	// === Stateful/Composite Operations ===
 

@@ -18,7 +18,7 @@ func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insec
 
 	// If the repositories are rancher managed and if bundled is set
 	// don't fetch anything from upstream.
-	if IsBundled(git.getDirectory()) && settings.SystemCatalog.Get() == "bundled" {
+	if IsBundled(git.directory()) && settings.SystemCatalog.Get() == "bundled" {
 		if err := git.reset("HEAD"); err != nil {
 			return fmt.Errorf("ensure failure: %w", err)
 		}
@@ -73,12 +73,12 @@ func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insec
 	if err != nil {
 		return "", fmt.Errorf("update failure: %w", err)
 	}
-	if IsBundled(git.getDirectory()) && settings.SystemCatalog.Get() == "bundled" {
+	if IsBundled(git.directory()) && settings.SystemCatalog.Get() == "bundled" {
 		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
 	commit, err := git.Update(branch)
-	if err != nil && IsBundled(git.getDirectory()) {
+	if err != nil && IsBundled(git.directory()) {
 		// We don't report an error unless the branch is invalid
 		// The reason being it would break airgap environments in downstream
 		// cluster. A new issue is created to tackle this in the forthcoming.

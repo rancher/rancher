@@ -196,10 +196,10 @@ func createBundledGitDirectory(t *testing.T) string {
 	require.NoError(t, os.MkdirAll(filepath.Join(localDir, bundledNamespace, bundledName, Hash(bundledURL)), 0o755))
 	g, err := gitForRepo(nil, bundledNamespace, bundledName, bundledURL, false, nil)
 	require.NoError(t, err)
-	require.True(t, IsBundled(g.getDirectory()))
-	require.Equal(t, filepath.Join(localDir, bundledName, Hash(bundledURL)), g.getDirectory())
+	require.True(t, IsBundled(g.directory()))
+	require.Equal(t, filepath.Join(localDir, bundledName, Hash(bundledURL)), g.directory())
 
-	return g.getDirectory()
+	return g.directory()
 }
 
 // newFixture clones the upstream the way package/Dockerfile does, with --no-checkout and
