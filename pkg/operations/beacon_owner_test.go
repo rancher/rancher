@@ -3,6 +3,7 @@ package operations
 import (
 	"testing"
 
+	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -200,6 +201,105 @@ func TestReclaimSupersededBeacon(t *testing.T) {
 		got, err := ReclaimSupersededBeacon(nil, beacons, mine)
 		assert.NoError(t, err)
 		assert.Nil(t, got)
+		assert.Empty(t, beacons.statusUpdates)
+	})
+}
+
+func TestHoldsBeacon(t *testing.T) {
+	t.Parallel()
+
+	const mine = "operation.cattle.io/ETCDSnapshotSave/fleet-default/nightly/9f2c"
+
+	cases := []struct {
+		name   string
+		beacon *planv1alpha1.Beacon
+		want   bool
+	}{
+		{name: "no beacon"},
+		{
+			name:   "primary owner",
+			beacon: &planv1alpha1.Beacon{Status: planv1alpha1.BeaconStatus{Owner: mine}},
+			want:   true,
+		},
+		{
+			// Part-way down the chain: authority is a delegate's, but the slot is still ours to
+			// release, which is what makes this broader than AuthorizedForBeacon.
+			name: "mid-chain delegate",
+			beacon: &planv1alpha1.Beacon{Status: planv1alpha1.BeaconStatus{
+				Owner:     "somebody-else",
+				Delegates: []string{mine, "delegate-b"},
+			}},
+			want: true,
+		},
+		{
+			name: "held by another",
+			beacon: &planv1alpha1.Beacon{Status: planv1alpha1.BeaconStatus{
+				Owner:     "somebody-else",
+				Delegates: []string{"delegate-b"},
+			}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, planapi.HoldsBeacon(tc.beacon, mine))
+		})
+	}
+}
+
+// TestReleaseBeaconIfHeld covers what the terminal handlers rely on: the owner is reported back so
+// only it runs the follow-up work its termination implies, and a beacon held by anybody else is not
+// written to at all.
+func TestReleaseBeaconIfHeld(t *testing.T) {
+	t.Parallel()
+
+	const mine = "operation.cattle.io/ETCDSnapshotSave/fleet-default/nightly/9f2c"
+
+	t.Run("owner releases and is reported as owning", func(t *testing.T) {
+		t.Parallel()
+
+		beacons := &fakeBeaconClient{}
+		owning, err := planapi.ReleaseBeaconIfHeld(&planv1alpha1.Beacon{
+			Status: planv1alpha1.BeaconStatus{Owner: mine, Active: true, Delegates: []string{"delegate-a"}},
+		}, beacons, mine)
+
+		assert.NoError(t, err)
+		assert.True(t, owning)
+		if assert.Len(t, beacons.statusUpdates, 1) {
+			assert.Equal(t, "", beacons.statusUpdates[0].Status.Owner)
+			assert.False(t, beacons.statusUpdates[0].Status.Active)
+			assert.Empty(t, beacons.statusUpdates[0].Status.Delegates)
+		}
+	})
+
+	t.Run("mid-chain delegate releases its slot only", func(t *testing.T) {
+		t.Parallel()
+
+		beacons := &fakeBeaconClient{}
+		owning, err := planapi.ReleaseBeaconIfHeld(&planv1alpha1.Beacon{
+			Status: planv1alpha1.BeaconStatus{Owner: "somebody-else", Active: true, Delegates: []string{mine, "delegate-b"}},
+		}, beacons, mine)
+
+		assert.NoError(t, err)
+		assert.False(t, owning, "a delegate must not be reported as the owner")
+		if assert.Len(t, beacons.statusUpdates, 1) {
+			assert.Equal(t, "somebody-else", beacons.statusUpdates[0].Status.Owner, "the owner's claim must survive")
+			assert.Equal(t, []string{"delegate-b"}, beacons.statusUpdates[0].Status.Delegates)
+		}
+	})
+
+	t.Run("held by another is left alone", func(t *testing.T) {
+		t.Parallel()
+
+		beacons := &fakeBeaconClient{}
+		owning, err := planapi.ReleaseBeaconIfHeld(&planv1alpha1.Beacon{
+			Status: planv1alpha1.BeaconStatus{Owner: "somebody-else", Active: true},
+		}, beacons, mine)
+
+		assert.NoError(t, err)
+		assert.False(t, owning)
 		assert.Empty(t, beacons.statusUpdates)
 	})
 }
