@@ -895,7 +895,43 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 			wantRefCleared:   true,
 		},
 		{
-			name: "terminal owner reclaims beacon",
+			name: "terminated owner reclaims beacon",
+			beacon: &planv1alpha1.Beacon{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fleet-default",
+					Namespace: "fleet-default",
+					Annotations: map[string]string{
+						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
+					},
+				},
+				Status: planv1alpha1.BeaconStatus{
+					Owner: "encryption-key-rotation-old-owner",
+				},
+			},
+			getFn: func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
+				return &opv1alpha1.EncryptionKeyRotation{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      name,
+						UID:       "old-uid",
+					},
+					Status: opv1alpha1.EncryptionKeyRotationStatus{
+						OperationStatus: opv1alpha1.OperationStatus{
+							Phase:        opv1alpha1.OperationPhaseSucceeded,
+							TerminatedAt: metav1.Now(),
+						},
+					},
+				}, nil
+			},
+			wantUpdate:       true,
+			wantOwnerCleared: true,
+			wantRefCleared:   true,
+		},
+		{
+			// Reaching a terminal phase is not the same as the controller being done: the owner may
+			// still be holding the beacon for a delegate running its terminal phase hook, and
+			// reclaiming it here would cut that delegate off mid-hook.
+			name: "terminal but unterminated owner does not reclaim",
 			beacon: &planv1alpha1.Beacon{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "fleet-default",
@@ -920,9 +956,6 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 					},
 				}, nil
 			},
-			wantUpdate:       true,
-			wantOwnerCleared: true,
-			wantRefCleared:   true,
 		},
 		{
 			name: "active matching owner does not reclaim",
