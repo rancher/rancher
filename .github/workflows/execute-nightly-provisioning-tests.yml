@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: get-branches
+      - name: Get Branches Which Support Nightly Tests
         id: get-branches
         run: |
           branches=$(yq -o=json '.explicit[] | select(.name == "nightly") | .meta.branches' .github/scripts/provisioning-test-scopes.yaml | jq -c '.')
@@ -36,10 +36,28 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      id-token: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_BRANCH: ${{ matrix.release-branch }}
     steps:
-      - name: invoke-nightly-test-workflow
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/nightly-dispatcher/app-credentials appId | APP_ID;
+            secret/data/github/repo/${{ github.repository }}/github/nightly-dispatcher/app-credentials privateKey | APP_PRIVATE_KEY
+
+      - name: Create App Token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.APP_PRIVATE_KEY }}
+          permission-actions: write
+
+      - name: Restart Nightly Suite
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           gh workflow run nightly-provisioning-tests.yml --repo rancher/rancher --ref "${RELEASE_BRANCH}"
