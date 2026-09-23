@@ -28,7 +28,7 @@ func TestSccPayloadVersion(t *testing.T) {
 	}
 	for _, tc := range cases {
 		rancherT := newTelemetryImpl(tc.input, "", "", "", "", &v3.Cluster{}, nil, nil, nil)
-		payload, err := GenerateSCCPayload(rancherT)
+		payload, err := GenerateSCCPayload(rancherT, true)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.expected, payload.Version, "input: %s", tc.input)
 	}
@@ -71,7 +71,7 @@ func TestSccPayload(t *testing.T) {
 					},
 				},
 				managedNodes: map[ClusterID][]*v3.Node{
-					ClusterID("c-pkjsf"): []*v3.Node{
+					ClusterID("c-pkjsf"): {
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-klawl",
@@ -107,7 +107,7 @@ func TestSccPayload(t *testing.T) {
 							},
 						},
 					},
-					ClusterID("c-kwerk"): []*v3.Node{
+					ClusterID("c-kwerk"): {
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-sadfk",
@@ -160,7 +160,7 @@ func TestSccPayload(t *testing.T) {
 							},
 						},
 					},
-					ClusterID("c-kwpow"): []*v3.Node{
+					ClusterID("c-kwpow"): {
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-sadfk",
@@ -213,7 +213,7 @@ func TestSccPayload(t *testing.T) {
 							},
 						},
 					},
-					ClusterID("c-weoriyu"): []*v3.Node{
+					ClusterID("c-weoriyu"): {
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-sadfk",
@@ -314,22 +314,19 @@ func TestSccPayload(t *testing.T) {
 			},
 			expectedClusters: []SccCluster{
 				{
-					Count:                       1,
-					Upstream:                    true,
-					Nodes:                       0,
-					NVIDIARegistrySecretPresent: true,
+					Count:    1,
+					Upstream: true,
+					Nodes:    0,
 				},
 				{
-					Count:                       1,
-					Upstream:                    false,
-					Nodes:                       2,
-					NVIDIARegistrySecretPresent: true,
+					Count:    1,
+					Upstream: false,
+					Nodes:    2,
 				},
 				{
-					Count:                       3,
-					Upstream:                    false,
-					Nodes:                       3,
-					NVIDIARegistrySecretPresent: true,
+					Count:    3,
+					Upstream: false,
+					Nodes:    3,
 				},
 			},
 			err: nil,
@@ -348,7 +345,7 @@ func TestSccPayload(t *testing.T) {
 			tc.input.managedClusters,
 			tc.input.managedNodes,
 		)
-		payload, err := GenerateSCCPayload(rancherT)
+		payload, err := GenerateSCCPayload(rancherT, true)
 		assert.Equal(err, tc.err)
 		assert.ElementsMatch(tc.expectedClusters, payload.ManagedClusters)
 		assert.ElementsMatch(tc.expectedSystems, payload.ManagedSystems)

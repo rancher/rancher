@@ -20,12 +20,13 @@ const (
 
 // SccPayload represents the canonical golang implementation of `schemas/scc-RMSSubscription.json`
 type SccPayload struct {
-	Version         string          `json:"version" jsonschema:"pattern=^\\d+\\.\\d+\\.\\d+$,description=Product Version normalized for SCC - must be semver. https://semver.org/"`
-	Subscription    SccSubscription `json:"subscription"`
-	FeatureFlags    []string        `json:"feature_flags,omitempty" jsonschema:"description=Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags"`
-	ManagedSystems  []SccSystem     `json:"managedSystems" jsonschema:"description=Active systems under management and their details; to be expanded"`
-	ManagedClusters []SccCluster    `json:"managedClusters"`
-	Timestamp       time.Time       `json:"timestamp"`
+	Version                     string          `json:"version" jsonschema:"pattern=^\\d+\\.\\d+\\.\\d+$,description=Product Version normalized for SCC - must be semver. https://semver.org/"`
+	Subscription                SccSubscription `json:"subscription"`
+	FeatureFlags                []string        `json:"feature_flags,omitempty" jsonschema:"description=Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags"`
+	ManagedSystems              []SccSystem     `json:"managedSystems" jsonschema:"description=Active systems under management and their details; to be expanded"`
+	ManagedClusters             []SccCluster    `json:"managedClusters"`
+	NVIDIARegistrySecretPresent bool            `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=FIXME,default=false"`
+	Timestamp                   time.Time       `json:"timestamp"`
 }
 
 type SccSubscription struct {
@@ -46,11 +47,6 @@ type SccSystem struct {
 	Upstream bool   `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself"`
 }
 
-type clusterMapKey struct {
-	NodesCount                  int
-	NVIDIARegistrySecretPresent bool
-}
-
 // JSONSchemaExtend allows SccSystem to accept additional properties
 func (SccSystem) JSONSchemaExtend(schema *jsonschema.Schema) {
 	schema.AdditionalProperties = jsonschema.TrueSchema
@@ -64,10 +60,9 @@ type sccSystemKey struct {
 }
 
 type SccCluster struct {
-	Count                       int  `json:"count" jsonschema:"minimum=1,description=De-duplication of identical clusters"`
-	Nodes                       int  `json:"nodes" jsonschema:"minimum=0"`
-	Upstream                    bool `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself,default=false"`
-	NVIDIARegistrySecretPresent bool `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=FIXME,default=false"`
+	Count    int  `json:"count" jsonschema:"minimum=1,description=De-duplication of identical clusters"`
+	Nodes    int  `json:"nodes" jsonschema:"minimum=0"`
+	Upstream bool `json:"upstream,omitempty" jsonschema:"description=Identifies the cluster hosting RMS itself,default=false"`
 }
 
 // JSONSchemaExtend allows SccCluster to accept additional properties
@@ -87,20 +82,16 @@ func bytesToMiBRounded(bytes int) int {
 	return (bytes + MiB - 1) / MiB
 }
 
-func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
+type nodeCount int
+
+func GenerateSCCPayload(telG RancherManagerTelemetry, isNVIDIARegistryPresent bool) (*SccPayload, error) {
 	now := time.Now()
 	systemsMap := map[sccSystemKey]int{}
-	clustersMap := map[clusterMapKey]int{}
+	clustersMap := map[nodeCount]int{}
 	var systems []SccSystem
 	var clusters []SccCluster
 
 	localCluster := telG.LocalClusterTelemetry()
-	// [2]
-	isNVIDIARegistryPresent, err := localCluster.AifNVIDIARegistrySecretPresent()
-	// FIXME: Should we return an error here or not?
-	if err != nil {
-		return nil, err
-	}
 	localNodeCount := 0
 	for _, localNode := range localCluster.PerNodeTelemetry() {
 		localNodeCount++
@@ -119,10 +110,9 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	}
 
 	clusters = append(clusters, SccCluster{
-		Nodes:                       localNodeCount,
-		Upstream:                    true,
-		Count:                       1,
-		NVIDIARegistrySecretPresent: isNVIDIARegistryPresent,
+		Nodes:    localNodeCount,
+		Upstream: true,
+		Count:    1,
 	})
 
 	for _, cluster := range telG.PerManagedClusterTelemetry() {
@@ -142,19 +132,10 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 			nCount++
 		}
 
-		isNVIDIARegistryPresent, err := cluster.AifNVIDIARegistrySecretPresent()
-		// FIXME: Should we return a error here?
-		if err != nil {
-			return nil, err
+		if _, ok := clustersMap[nodeCount(nCount)]; !ok {
+			clustersMap[nodeCount(nCount)] = 0
 		}
-		clusterKey := clusterMapKey{
-			NodesCount:                  nCount,
-			NVIDIARegistrySecretPresent: isNVIDIARegistryPresent,
-		}
-		if _, ok := clustersMap[clusterKey]; !ok {
-			clustersMap[clusterKey] = 0
-		}
-		clustersMap[clusterKey]++
+		clustersMap[nodeCount(nCount)]++
 
 	}
 	for system, count := range systemsMap {
@@ -169,10 +150,9 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 
 	for cl, count := range clustersMap {
 		clusters = append(clusters, SccCluster{
-			Nodes:                       cl.NodesCount,
-			Upstream:                    false,
-			Count:                       count,
-			NVIDIARegistrySecretPresent: cl.NVIDIARegistrySecretPresent,
+			Nodes:    int(cl),
+			Upstream: false,
+			Count:    count,
 		})
 	}
 
@@ -187,10 +167,11 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	}
 
 	return &SccPayload{
-		Version:         productVersion,
-		FeatureFlags:    telG.FeatureFlags(),
-		ManagedSystems:  systems,
-		ManagedClusters: clusters,
+		Version:                     productVersion,
+		FeatureFlags:                telG.FeatureFlags(),
+		ManagedSystems:              systems,
+		ManagedClusters:             clusters,
+		NVIDIARegistrySecretPresent: isNVIDIARegistryPresent,
 		Subscription: SccSubscription{
 			InstallUUID: telG.InstallUUID(),
 			ClusterUUID: telG.ClusterUUID(),
