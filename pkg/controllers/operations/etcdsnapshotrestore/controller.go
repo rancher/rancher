@@ -236,6 +236,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	operationcontrollers.RegisterETCDSnapshotRestoreStatusHandler(ctx, clients.Operation.ETCDSnapshotRestore(), "", "etcd-snapshot-restore-handler", h.OnChange)
 }
+
 // OnChange is the status handler entrypoint invoked by the wrangler-registered controller, and the
 // whole of one reconcile. It decides whether the operation should be reconciled at all, and if so
 // hands it to whichever of the two drivers applies:
@@ -383,6 +384,7 @@ func collectable(op *opv1alpha1.ETCDSnapshotRestore, status *opv1alpha1.ETCDSnap
 		ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
 		!planv1alpha1.HasActiveLifecycleHook(op)
 }
+
 // hasFinalizer reports whether the operation still carries our finalizer, i.e. whether its teardown
 // is ours to drive.
 func hasFinalizer(op *opv1alpha1.ETCDSnapshotRestore) bool {
@@ -438,6 +440,7 @@ func (h *handler) removeFinalizer(op *opv1alpha1.ETCDSnapshotRestore) error {
 
 	return nil
 }
+
 // cancelForDeletion marks an operation deleted before its terminal handling completed as Canceled:
 // the work it dispatched is no longer tracked by anything, so it can neither be reported as
 // succeeded nor as failed. The terminal handler for the Canceled phase then runs as usual —
@@ -457,7 +460,7 @@ func cancelForDeletion(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETC
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, status.Phase, status.Step)
 
-	markCanceled(&status, opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
+	status.MarkCanceled(opv1alpha1.OperationDeletedReason, "operation deleted before terminal handling completed")
 
 	return status
 }
@@ -491,7 +494,7 @@ func cancelForRequest(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCD
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, status.Phase, status.Step)
 
-	markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+	status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 	return status
 }
@@ -522,7 +525,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 
 		logrus.Errorf("[etcdsnapshotrestore]: %s/%s failed to find cluster for %s", op.Namespace, op.Name, key)
 
-		markFailed(&status, opv1alpha1.ClusterNotFoundReason, fmt.Sprintf("cluster %s not found", key))
+		status.MarkFailed(opv1alpha1.ClusterNotFoundReason, fmt.Sprintf("cluster %s not found", key))
 
 		// This failure is terminated here rather than by handleFailed: the beacon is resolved
 		// through the cluster's adapter, so with no cluster there is no beacon to release and every
@@ -608,7 +611,7 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 		return h.handleSucceeded(s, status)
 	}
 
-	markFailed(&status, opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
+	status.MarkFailed(opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
 
 	return status, nil
 }
@@ -813,7 +816,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 			setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
 			return status, nil
 		}
-		markFailed(&status, opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
 
 		return status, nil
 	}
@@ -844,7 +847,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 			setWaitingForDelegate(opv1alpha1.InProgressCondition, &status, s.beacon)
 			return status, nil
 		}
-		markFailed(&status, opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, aborting")
 
 		return status, nil
 	}
@@ -868,9 +871,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return h.reconcileRestartCluster(s, status, "")
 	}
 
-	status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-	markFailed(&status, opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
+	status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
 		status.Step,
 		opv1alpha1.ETCDSnapshotRestoreStepPreflight,
 		opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
@@ -905,7 +906,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: aborting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markAborted(&status, opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkAborted(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -947,7 +948,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: aborting operation: preflight check failed for %s/%s",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-				markAborted(&status, opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
+				status.MarkAborted(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
 
 				return status, nil
 			}
@@ -970,7 +971,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: could not read preflight check output for %s/%s",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-				markFailed(&status, opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("could not read preflight check output for %s/%s", secret.Namespace, secret.Name))
+				status.MarkFailed(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("could not read preflight check output for %s/%s", secret.Namespace, secret.Name))
 
 				return status, nil
 			}
@@ -981,7 +982,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check output for %s/%s does not match snapshot token hash",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-				markFailed(&status, opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
+				status.MarkFailed(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
 
 				return status, nil
 			}
@@ -1266,7 +1267,7 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -1291,7 +1292,7 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: shutdown failed for %s/%s",
 				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("shutdown failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("shutdown failed for %s/%s", secret.Namespace, secret.Name))
 
 			return status, nil
 		}
@@ -1333,7 +1334,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 	if snapshotName == "" {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: snapshot name is required for etcd restore", s.op.Namespace, s.op.Name)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, "snapshot name is required for etcd restore")
+		status.MarkFailed(opv1alpha1.PlanFailedReason, "snapshot name is required for etcd restore")
 
 		return status, nil
 	}
@@ -1357,7 +1358,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		if machineName == "" {
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: cannot correlate machine for snapshot %s/%s (no lifecycle label, no owner reference)", s.op.Namespace, s.op.Name, snapshot.Namespace, snapshot.Name)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, "machine correlation is required for local etcd restore")
+			status.MarkFailed(opv1alpha1.PlanFailedReason, "machine correlation is required for local etcd restore")
 
 			return status, nil
 		}
@@ -1374,13 +1375,13 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 
 		return status, nil
 	} else if secret == nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, "no eligible etcd leader for restore")
+		status.MarkFailed(opv1alpha1.PlanFailedReason, "no eligible etcd leader for restore")
 
 		return status, nil
 	}
@@ -1401,7 +1402,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: etcd restore failed for %s/%s",
 			s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("etcd restore failed for %s/%s", secret.Namespace, secret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("etcd restore failed for %s/%s", secret.Namespace, secret.Name))
 
 		return status, nil
 	}
@@ -1435,13 +1436,13 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 
 		return status, nil
 	} else if etcdSecret == nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restore", s.op.Namespace, s.op.Name)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, "no eligible etcd leader for restore")
+		status.MarkFailed(opv1alpha1.PlanFailedReason, "no eligible etcd leader for restore")
 
 		return status, nil
 	}
@@ -1460,13 +1461,13 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		} else if err != nil {
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 
 			return status, nil
 		} else if len(secrets) == 0 {
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 
 			return status, nil
 		}
@@ -1580,7 +1581,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
 				s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
 
 			return status, nil
 		}
@@ -1608,7 +1609,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
 			s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
 
 		return status, nil
 	}
@@ -1650,7 +1651,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -1672,12 +1673,12 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	} else if initSecret == nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: no eligible etcd leader for restart", s.op.Namespace, s.op.Name)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, "no eligible etcd leader for restart")
+		status.MarkFailed(opv1alpha1.PlanFailedReason, "no eligible etcd leader for restart")
 
 		return status, nil
 	}
@@ -1704,7 +1705,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: restart failed for %s/%s",
 				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name))
 
 			return status, nil
 		}
@@ -1733,7 +1734,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
-	markSucceeded(&status)
+	status.MarkSucceeded()
 
 	return status, nil
 }
@@ -2038,7 +2039,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -2056,7 +2057,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 	} else if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
@@ -2081,7 +2082,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: node cleanup failed for %s/%s",
 			s.op.Namespace, s.op.Name, initSecret.Namespace, initSecret.Name)
 
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore node cleanup failed for %s/%s", initSecret.Namespace, initSecret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore node cleanup failed for %s/%s", initSecret.Namespace, initSecret.Name))
 
 		return status, nil
 	}
@@ -2246,48 +2247,6 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 			_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
 		},
 	})
-}
-
-// markSucceeded moves the operation into the Succeeded terminal phase, asserting the outcome: the
-// work is over and the result will not change. Whether the controller is finished with the
-// operation is reported separately, by the Finalized condition.
-func markSucceeded(status *opv1alpha1.ETCDSnapshotRestoreStatus) {
-	status.SetPhase(opv1alpha1.OperationPhaseSucceeded)
-
-	opv1alpha1.SucceededCondition.True(status)
-	opv1alpha1.SucceededCondition.Reason(status, opv1alpha1.FinishedReason)
-	opv1alpha1.SucceededCondition.Message(status, "Operation completed successfully")
-}
-
-// markFailed moves the operation into the Failed terminal phase. Failed is what the operation
-// reports when it gave up on its own work; the caller supplies the reason and message.
-func markFailed(status *opv1alpha1.ETCDSnapshotRestoreStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-	opv1alpha1.FailedCondition.True(status)
-	opv1alpha1.FailedCondition.Reason(status, reason)
-	opv1alpha1.FailedCondition.Message(status, message)
-}
-
-// markAborted moves the operation into the Aborted terminal phase, for work the operation called off
-// itself after finding a condition it cannot proceed past — a failed preflight check, say. The
-// caller supplies the reason and message.
-func markAborted(status *opv1alpha1.ETCDSnapshotRestoreStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseAborted)
-
-	opv1alpha1.AbortedCondition.True(status)
-	opv1alpha1.AbortedCondition.Reason(status, reason)
-	opv1alpha1.AbortedCondition.Message(status, message)
-}
-
-// markCanceled moves the operation into the Canceled terminal phase, for work that was called off
-// from outside the operation — spec.Cancel being set, or a deletion that raced the operation.
-func markCanceled(status *opv1alpha1.ETCDSnapshotRestoreStatus, reason, message string) {
-	status.SetPhase(opv1alpha1.OperationPhaseCanceled)
-
-	opv1alpha1.CanceledCondition.True(status)
-	opv1alpha1.CanceledCondition.Reason(status, reason)
-	opv1alpha1.CanceledCondition.Message(status, message)
 }
 
 // setWaitingForDelegate reports, through the condition belonging to the phase currently being

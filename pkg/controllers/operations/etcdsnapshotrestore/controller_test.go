@@ -2382,9 +2382,9 @@ func TestOnChange_ExpiredTerminalOperationIsCollectedOnceTerminated(t *testing.T
 	op.Spec.TTL = 0 // expire as soon as the operation is terminal
 	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "test": "delegate-a"}
 	op.Status = opv1alpha1.ETCDSnapshotRestoreStatus{
-			Phase:       opv1alpha1.OperationPhaseSucceeded,
-			LastUpdated: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
-		Step: opv1alpha1.ETCDSnapshotRestoreStepRestartCluster,
+		Phase:       opv1alpha1.OperationPhaseSucceeded,
+		LastUpdated: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
+		Step:        opv1alpha1.ETCDSnapshotRestoreStepRestartCluster,
 	}
 
 	h, controller, _ := newOnChangeHandler(newBeacon(testOwnerKey, true))
@@ -2695,7 +2695,7 @@ func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
 		status := opv1alpha1.ETCDSnapshotRestoreStatus{
 			OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseCanceled},
 		}
-		markCanceled(&status, opv1alpha1.CancelRequestedReason, "cancellation requested")
+		status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
 
 		got := updateStatus(op, status)
 		assert.Equal(t, "True", opv1alpha1.CanceledCondition.GetStatus(&got))

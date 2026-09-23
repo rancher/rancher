@@ -31,6 +31,10 @@ const (
 	// ControllerOwnerKey identifies certificate rotation beacon ownership.
 	ControllerOwnerKey = "certificate-rotation"
 
+	// OperationKind is this operation's kind, as it appears in the beacon claims the controller
+	// writes. See ops.BeaconOwnerKey.
+	OperationKind = "CertificateRotation"
+
 	// RotateStepHookLabelPrefix gates the Rotate step so delegates can short-circuit the
 	// step work while still observing pre-pause state.
 	RotateStepHookLabelPrefix = "rotate.step.hook.operation.cattle.io/"
@@ -177,7 +181,7 @@ func (h *handler) onChange(op *opv1alpha1.CertificateRotation, status opv1alpha1
 	}
 
 	s := &scope{
-		ownerKey:   plan.ControllerOwnerKey(op, ControllerOwnerKey),
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		namespace:  namespace,
 		beacon:     beacon,
