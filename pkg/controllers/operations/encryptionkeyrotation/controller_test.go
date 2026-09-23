@@ -190,8 +190,8 @@ func newScope(op *opv1alpha1.EncryptionKeyRotation, beacon *planv1alpha1.Beacon,
 	cluster.SetName("test")
 	return &scope{
 		// The ownerKey the real controller computes in resolveScope, so beacon fixtures created
-		// with beaconOwnerKey(op) are recognised as ours by the ownership and delegate checks.
-		ownerKey:   beaconOwnerKey(op),
+		// with ops.BeaconOwnerKey(OperationKind, op) are recognised as ours by the ownership and delegate checks.
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		beacon:     beacon,
 		namespace:  "fleet-default",
@@ -251,13 +251,21 @@ func (f *fakeBeaconClient) Get(namespace, name string, _ metav1.GetOptions) (*pl
 	return f.beacon.DeepCopy(), nil
 }
 
+// Update models the main-resource endpoint: Beacon has a status subresource, so a status change
+// sent here is silently dropped. Keeping the fake honest about that is what stops a handler which
+// clears beacon ownership through Update — as the stale-owner reclaim once did — from passing.
 func (f *fakeBeaconClient) Update(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
 	f.updateCalls++
-	f.updates = append(f.updates, beacon.DeepCopy())
-	if f.updateErr == nil {
-		f.beacon = beacon.DeepCopy()
+
+	updated := beacon.DeepCopy()
+	if f.beacon != nil {
+		updated.Status = f.beacon.Status
 	}
-	return beacon, f.updateErr
+	f.updates = append(f.updates, updated.DeepCopy())
+	if f.updateErr == nil {
+		f.beacon = updated.DeepCopy()
+	}
+	return updated, f.updateErr
 }
 
 func (f *fakeBeaconClient) UpdateStatus(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
@@ -635,7 +643,7 @@ func TestHandleFailed_HoldingBeaconReleasesAndLeavesClusterPaused(t *testing.T) 
 	beacons := &fakeBeaconClient{}
 
 	h := &handler{beacons: beacons}
-	s := newScope(op, newBeacon(beaconOwnerKey(op), true), adapter)
+	s := newScope(op, newBeacon(ops.BeaconOwnerKey(OperationKind, op), true), adapter)
 
 	_, err := h.handleFailed(s, opv1alpha1.EncryptionKeyRotationStatus{})
 	if err != nil {
@@ -670,7 +678,7 @@ func TestHandleSucceeded_HoldingBeaconTogglesReleasesAndEnqueues(t *testing.T) {
 		beacons: beacons,
 		dynamic: dynamic,
 	}
-	s := newScope(op, newBeacon(beaconOwnerKey(op), true), adapter)
+	s := newScope(op, newBeacon(ops.BeaconOwnerKey(OperationKind, op), true), adapter)
 
 	_, err := h.handleSucceeded(s, opv1alpha1.EncryptionKeyRotationStatus{})
 	if err != nil {
@@ -762,7 +770,7 @@ func TestHandleInProgress_UnknownStep(t *testing.T) {
 	beacons := &fakeBeaconClient{}
 	h := &handler{beacons: beacons}
 
-	s := newScope(op, newBeacon(beaconOwnerKey(op), false), nil)
+	s := newScope(op, newBeacon(ops.BeaconOwnerKey(OperationKind, op), false), nil)
 	got, err := h.handleInProgress(s, opv1alpha1.EncryptionKeyRotationStatus{Step: "mystery-step"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -781,6 +789,14 @@ func TestHandleInProgress_UnknownStep(t *testing.T) {
 	}
 }
 
+// TestReclaimStaleBeaconOwnerIfNeeded covers the lookup half of beacon reclamation: a claim whose
+// rotation no longer exists, or which the controller has already finished with. The claim carries
+// its own reference — kind, namespace, name and uid — so there is nothing to cross-check against a
+// separate annotation.
+//
+// What it must not touch is as important as what it clears. A claim that is not an operation's is
+// held for reasons this controller cannot see, and another operation type's claim would need an
+// object this controller does not watch to resolve.
 func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 	currentOp := &opv1alpha1.EncryptionKeyRotation{
 		ObjectMeta: metav1.ObjectMeta{
@@ -789,208 +805,102 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 			UID:       types.UID("current-uid"),
 		},
 	}
+	// The claim of a rotation called ekr-old, which the cases below resolve through getFn.
+	oldClaim := ops.BeaconOwnerKey(OperationKind, &opv1alpha1.EncryptionKeyRotation{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "ekr-old", UID: types.UID("old-uid")},
+	})
+
+	beaconHeldBy := func(owner string) *planv1alpha1.Beacon {
+		return &planv1alpha1.Beacon{
+			ObjectMeta: metav1.ObjectMeta{Name: "fleet-default", Namespace: "fleet-default"},
+			Status: planv1alpha1.BeaconStatus{
+				Owner:     owner,
+				Active:    true,
+				Delegates: []string{"delegate-a"},
+			},
+		}
+	}
+	oldOp := func(uid string, status opv1alpha1.OperationStatus) func(string, string, metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
+		return func(namespace, name string, _ metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
+			return &opv1alpha1.EncryptionKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name, UID: types.UID(uid)},
+				Status:     opv1alpha1.EncryptionKeyRotationStatus{OperationStatus: status},
+			}, nil
+		}
+	}
 
 	tests := []struct {
-		name             string
-		beacon           *planv1alpha1.Beacon
-		getFn            func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error)
-		wantUpdate       bool
-		wantErr          bool
-		wantOwnerCleared bool
-		wantRefCleared   bool
+		name        string
+		beacon      *planv1alpha1.Beacon
+		getFn       func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error)
+		wantReclaim bool
+		wantErr     bool
 	}{
 		{
-			name: "no owner label does not reclaim",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-					Labels:    map[string]string{},
-				},
-			},
+			name:   "unclaimed beacon is left alone",
+			beacon: beaconHeldBy(""),
 		},
 		{
-			name: "current op owner key does not reclaim",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: beaconOwnerKey(currentOp),
-				},
-			},
+			name:   "our own claim is left alone",
+			beacon: beaconHeldBy(ops.BeaconOwnerKey(OperationKind, currentOp)),
 		},
 		{
-			name: "non matching owner does not reclaim",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: "etcd-snapshot-save",
-				},
-			},
+			// A handler operating on the cluster directly, or the imported-day2ops-disable key: not
+			// an operation, so not this controller's business.
+			name:   "a claim which is not an operation's is left alone",
+			beacon: beaconHeldBy("imported-day2ops-disable"),
 		},
 		{
-			name: "malformed owner ref reclaims beacon",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-					Annotations: map[string]string{
-						beaconOwnerRefAnnotation: "bad-owner-ref",
-					},
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: "encryption-key-rotation-old-owner",
-				},
-			},
-			wantUpdate:       true,
-			wantOwnerCleared: true,
-			wantRefCleared:   true,
+			// Resolvable, but by a controller that watches saves. Reclaiming across types needs a
+			// resolver this controller does not have.
+			name: "another operation type's claim is left alone",
+			beacon: beaconHeldBy(ops.BeaconOwnerKey("ETCDSnapshotSave", &opv1alpha1.EncryptionKeyRotation{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "save-1", UID: types.UID("save-uid")},
+			})),
 		},
 		{
-			name: "missing owner object reclaims beacon",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-					Annotations: map[string]string{
-						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
-					},
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: "encryption-key-rotation-old-owner",
-				},
+			name:   "missing owner object reclaims beacon",
+			beacon: beaconHeldBy(oldClaim),
+			getFn: func(_, _ string, _ metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
+				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "encryptionkeyrotations"}, "ekr-old")
 			},
-			getFn: func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
-				return nil, apierrors.NewNotFound(schema.GroupResource{Group: "operation.cattle.io", Resource: "encryptionkeyrotations"}, name)
-			},
-			wantUpdate:       true,
-			wantOwnerCleared: true,
-			wantRefCleared:   true,
+			wantReclaim: true,
 		},
 		{
-			name: "uid mismatch reclaims beacon",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-					Annotations: map[string]string{
-						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
-					},
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: "encryption-key-rotation-old-owner",
-				},
-			},
-			getFn: func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
-				return &opv1alpha1.EncryptionKeyRotation{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      name,
-						UID:       "different-uid",
-					},
-					Status: opv1alpha1.EncryptionKeyRotationStatus{
-						OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
-					},
-				}, nil
-			},
-			wantUpdate:       true,
-			wantOwnerCleared: true,
-			wantRefCleared:   true,
+			// The name was reused: whatever holds it now is a different object, so the claim is dead.
+			name:        "uid mismatch reclaims beacon",
+			beacon:      beaconHeldBy(oldClaim),
+			getFn:       oldOp("different-uid", opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress}),
+			wantReclaim: true,
 		},
 		{
-			name: "terminated owner reclaims beacon",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-					Annotations: map[string]string{
-						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
-					},
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: "encryption-key-rotation-old-owner",
-				},
-			},
-			getFn: func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
-				return &opv1alpha1.EncryptionKeyRotation{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      name,
-						UID:       "old-uid",
-					},
-					Status: opv1alpha1.EncryptionKeyRotationStatus{
-						OperationStatus: opv1alpha1.OperationStatus{
-							Phase:        opv1alpha1.OperationPhaseSucceeded,
-							TerminatedAt: metav1.Now(),
-						},
-					},
-				}, nil
-			},
-			wantUpdate:       true,
-			wantOwnerCleared: true,
-			wantRefCleared:   true,
+			name:   "terminated owner reclaims beacon",
+			beacon: beaconHeldBy(oldClaim),
+			getFn: oldOp("old-uid", opv1alpha1.OperationStatus{
+				Phase:        opv1alpha1.OperationPhaseSucceeded,
+				TerminatedAt: metav1.Now(),
+			}),
+			wantReclaim: true,
 		},
 		{
 			// Reaching a terminal phase is not the same as the controller being done: the owner may
-			// still be holding the beacon for a delegate running its terminal phase hook, and
-			// reclaiming it here would cut that delegate off mid-hook.
-			name: "terminal but unterminated owner does not reclaim",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-					Annotations: map[string]string{
-						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
-					},
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: "encryption-key-rotation-old-owner",
-				},
-			},
-			getFn: func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
-				return &opv1alpha1.EncryptionKeyRotation{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      name,
-						UID:       "old-uid",
-					},
-					Status: opv1alpha1.EncryptionKeyRotationStatus{
-						OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
-					},
-				}, nil
-			},
+			// still be holding the beacon for a delegate running its terminal phase hook.
+			name:   "terminal but unterminated owner does not reclaim",
+			beacon: beaconHeldBy(oldClaim),
+			getFn:  oldOp("old-uid", opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded}),
 		},
 		{
-			name: "active matching owner does not reclaim",
-			beacon: &planv1alpha1.Beacon{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fleet-default",
-					Namespace: "fleet-default",
-					Annotations: map[string]string{
-						beaconOwnerRefAnnotation: "fleet-default/ekr-old/old-uid",
-					},
-				},
-				Status: planv1alpha1.BeaconStatus{
-					Owner: "encryption-key-rotation-old-owner",
-				},
+			name:   "active matching owner does not reclaim",
+			beacon: beaconHeldBy(oldClaim),
+			getFn:  oldOp("old-uid", opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress}),
+		},
+		{
+			name:   "lookup failure is returned",
+			beacon: beaconHeldBy(oldClaim),
+			getFn: func(_, _ string, _ metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
+				return nil, errors.New("boom")
 			},
-			getFn: func(namespace, name string, opts metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
-				return &opv1alpha1.EncryptionKeyRotation{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      name,
-						UID:       "old-uid",
-					},
-					Status: opv1alpha1.EncryptionKeyRotationStatus{
-						OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
-					},
-				}, nil
-			},
+			wantErr: true,
 		},
 	}
 
@@ -1003,15 +913,16 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 				encryptionkeyrotations: controller,
 			}
 			s := &scope{
-				op:     currentOp,
-				beacon: tt.beacon.DeepCopy(),
+				op:       currentOp,
+				ownerKey: ops.BeaconOwnerKey(OperationKind, currentOp),
+				beacon:   tt.beacon.DeepCopy(),
 			}
 
 			err := h.reclaimStaleBeaconOwnerIfNeeded(s)
 
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("expected error, got nil")
+					t.Fatal("expected the lookup failure to be returned")
 				}
 				return
 			}
@@ -1019,28 +930,27 @@ func TestReclaimStaleBeaconOwnerIfNeeded(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if tt.wantUpdate && beaconClient.updateCalls == 0 {
-				t.Fatalf("expected beacon update")
-			}
-			if !tt.wantUpdate && beaconClient.updateCalls > 0 {
-				t.Fatalf("did not expect beacon update")
-			}
-			if !tt.wantUpdate {
+			if !tt.wantReclaim {
+				if len(beaconClient.statusUpdates) != 0 || len(beaconClient.updates) != 0 {
+					t.Fatalf("the beacon must be left exactly as it was, got %d status updates", len(beaconClient.statusUpdates))
+				}
 				return
 			}
 
-			owner := s.beacon.Status.Owner
-			if tt.wantOwnerCleared && owner != "" {
-				t.Fatalf("expected owner label cleared, got %q", owner)
+			// Ownership lives in the beacon's status, which has its own subresource: clearing it
+			// through the main resource would be silently dropped.
+			if len(beaconClient.statusUpdates) != 1 {
+				t.Fatalf("expected the claim to be cleared through the status subresource, got %d status updates and %d updates",
+					len(beaconClient.statusUpdates), len(beaconClient.updates))
 			}
-			if s.beacon.Annotations == nil {
-				if tt.wantRefCleared {
-					return
-				}
-				t.Fatalf("expected annotations map present")
+			if s.beacon.Status.Owner != "" {
+				t.Fatalf("expected the claim to be cleared, got %q", s.beacon.Status.Owner)
 			}
-			if tt.wantRefCleared && s.beacon.Annotations[beaconOwnerRefAnnotation] != "" {
-				t.Fatalf("expected owner ref annotation cleared")
+			// A dead claim's delegates were pushed to gate hooks that died with the object, so
+			// nothing will ever pop them.
+			if s.beacon.Status.Active || len(s.beacon.Status.Delegates) != 0 {
+				t.Fatalf("expected the claim to be cleared in full, got active=%v delegates=%v",
+					s.beacon.Status.Active, s.beacon.Status.Delegates)
 			}
 		})
 	}
@@ -1345,7 +1255,7 @@ func TestHandleTerminal_RecordsTermination(t *testing.T) {
 			beacons := &fakeBeaconClient{}
 			adapter := &stubAdapter{}
 			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
-			s := newScope(op, newBeacon(beaconOwnerKey(op), true), adapter)
+			s := newScope(op, newBeacon(ops.BeaconOwnerKey(OperationKind, op), true), adapter)
 
 			got, err := tc.handle(h, s, opv1alpha1.EncryptionKeyRotationStatus{})
 			if err != nil {
@@ -1421,7 +1331,7 @@ func TestHandleTerminal_DelegatedDefersTermination(t *testing.T) {
 			beacons := &fakeBeaconClient{}
 			adapter := &stubAdapter{}
 			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
-			s := newScope(op, newBeacon(beaconOwnerKey(op), true), adapter)
+			s := newScope(op, newBeacon(ops.BeaconOwnerKey(OperationKind, op), true), adapter)
 
 			// The outcome the phase handler recorded before delegating. It is the only record of
 			// why the operation ended, so delegating must not overwrite it — the delegate is
@@ -1457,7 +1367,7 @@ func TestOnChange_DeletingWithoutOurFinalizerIsSkipped(t *testing.T) {
 	op := newDeletingOp()
 	op.Finalizers = nil
 
-	h, controller, beacons, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, beacons, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	if _, err := h.OnChange(op, op.Status); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1484,7 +1394,7 @@ func TestOnChange_DeletionCancelsInFlightOperation(t *testing.T) {
 		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
 	}
 
-	h, controller, beacons, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, beacons, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	status, err := h.OnChange(op, op.Status)
 	if err != nil {
@@ -1539,7 +1449,7 @@ func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
 	}
 
-	h, controller, _, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, _, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	status, err := h.OnChange(op, op.Status)
 	if err != nil {
@@ -1654,7 +1564,7 @@ func TestOnChange_DeletionOfPausedOperation(t *testing.T) {
 		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
 	}
 
-	h, controller, beacons, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, beacons, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	status, err := h.OnChange(op, op.Status)
 	if err != nil {
@@ -1738,7 +1648,7 @@ func TestOnChange_TakesFinalizer(t *testing.T) {
 	// system-agents to register) rather than dispatching plans the fake has no secrets for.
 	op := newOnChangeOp()
 
-	h, controller, _, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, _, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	if _, err := h.OnChange(op, op.Status); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1770,7 +1680,7 @@ func TestOnChange_PausedOperationDoesNotTakeFinalizer(t *testing.T) {
 	op := newOnChangeOp()
 	op.Spec.Paused = true
 
-	h, controller, _, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, _, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	if _, err := h.OnChange(op, op.Status); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1915,7 +1825,7 @@ func TestOnChange_ExpiredTerminalOperationIsCollectedOnceTerminated(t *testing.T
 		Step: opv1alpha1.EncryptionKeyRotationStepRestart,
 	}
 
-	h, controller, _, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, _, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	// handleSucceeded is delegated, so termination is not recorded and the expired operation stays.
 	status, err := h.OnChange(op, op.Status)
@@ -1978,7 +1888,7 @@ func TestOnChange_CancelRequestedCancelsInFlightOperation(t *testing.T) {
 		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
 	}
 
-	h, _, beacons, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, _, beacons, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	status, err := h.OnChange(op, op.Status)
 	if err != nil {
@@ -2012,7 +1922,7 @@ func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
 		Step:            opv1alpha1.EncryptionKeyRotationStepRestart,
 	}
 
-	beacon := newBeacon(beaconOwnerKey(op), true)
+	beacon := newBeacon(ops.BeaconOwnerKey(OperationKind, op), true)
 	beacon.Status.Delegates = []string{"delegate-a"}
 	h, _, beacons, _ := newOnChangeHandler(beacon)
 
@@ -2033,7 +1943,7 @@ func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
 		t.Fatal("the hook is still owed an answer, so handling is not complete")
 	}
 	for _, update := range beacons.statusUpdates {
-		if update.Status.Owner != beaconOwnerKey(op) {
+		if update.Status.Owner != ops.BeaconOwnerKey(OperationKind, op) {
 			t.Fatalf("the beacon must stay with the operation and its delegate, got owner %q", update.Status.Owner)
 		}
 	}
@@ -2082,7 +1992,7 @@ func TestOnChange_PausedBlocksCancel(t *testing.T) {
 		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
 	}
 
-	h, controller, beacons, _ := newOnChangeHandler(newBeacon(beaconOwnerKey(op), true))
+	h, controller, beacons, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
 
 	status, err := h.OnChange(op, op.Status)
 	if err != nil {
@@ -2172,7 +2082,7 @@ func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
 func TestFinishRotation(t *testing.T) {
 	adapter := &stubAdapter{}
 	h := &handler{}
-	s := newScope(newOp(), newBeacon(beaconOwnerKey(newOp()), true), adapter)
+	s := newScope(newOp(), newBeacon(ops.BeaconOwnerKey(OperationKind, newOp()), true), adapter)
 
 	status, err := h.finishRotation(s, opv1alpha1.EncryptionKeyRotationStatus{
 		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
@@ -2197,7 +2107,7 @@ func TestFinishRotation(t *testing.T) {
 func TestFinishRotation_UnpauseFailureDoesNotSucceed(t *testing.T) {
 	adapter := &stubAdapter{pauseErr: errors.New("boom")}
 	h := &handler{}
-	s := newScope(newOp(), newBeacon(beaconOwnerKey(newOp()), true), adapter)
+	s := newScope(newOp(), newBeacon(ops.BeaconOwnerKey(OperationKind, newOp()), true), adapter)
 
 	status, err := h.finishRotation(s, opv1alpha1.EncryptionKeyRotationStatus{
 		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
@@ -2208,5 +2118,45 @@ func TestFinishRotation_UnpauseFailureDoesNotSucceed(t *testing.T) {
 	}
 	if status.Phase == opv1alpha1.OperationPhaseSucceeded {
 		t.Fatal("the rotation must not be reported successful while the cluster is still paused")
+	}
+}
+
+// TestHandlePending_ReclaimsSupersededClaim covers the wiring of the no-lookup reclaim. A beacon
+// still carrying a claim from an earlier object of this operation's name would otherwise leave the
+// operation waiting on a holder that no longer exists, and the delegate that claim left behind —
+// pushed to gate a hook that died with the object, so nothing will ever pop it — would be handed to
+// the operation that acquires next.
+func TestHandlePending_ReclaimsSupersededClaim(t *testing.T) {
+	op := newOp()
+	superseded := ops.BeaconOwnerKey(OperationKind, &opv1alpha1.EncryptionKeyRotation{
+		ObjectMeta: metav1.ObjectMeta{Namespace: op.Namespace, Name: op.Name, UID: "dead-uid"},
+	})
+
+	beacon := newBeacon(superseded, true)
+	beacon.Status.Delegates = []string{"dead-delegate"}
+
+	beacons := &fakeBeaconClient{beacon: beacon}
+	h := &handler{
+		beacons: beacons,
+		// The lookup reclaim must not be needed here: the claim carries this operation's own name
+		// under a dead uid, which is provable without asking the API server anything. A Get would
+		// mean the cheap rule had not run first.
+		encryptionkeyrotations: &fakeEncryptionKeyRotationController{
+			getFn: func(namespace, name string, _ metav1.GetOptions) (*opv1alpha1.EncryptionKeyRotation, error) {
+				t.Fatalf("unexpected lookup of %s/%s", namespace, name)
+				return nil, nil
+			},
+		},
+	}
+	s := newScope(op, beacon, &stubAdapter{})
+
+	if _, err := h.handlePending(s, opv1alpha1.EncryptionKeyRotationStatus{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.beacon.Status.Owner != ops.BeaconOwnerKey(OperationKind, op) {
+		t.Fatalf("the operation must end up holding the beacon, got %q", s.beacon.Status.Owner)
+	}
+	if len(s.beacon.Status.Delegates) != 0 {
+		t.Fatalf("the dead claim's delegate must not be inherited, got %v", s.beacon.Status.Delegates)
 	}
 }

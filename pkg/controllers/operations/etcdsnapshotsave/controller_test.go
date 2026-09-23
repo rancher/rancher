@@ -148,7 +148,7 @@ func defaultAdapter() *stubAdapter {
 }
 
 // newScope wires together the common per-reconcile context for the tests. The ownerKey mirrors
-// what the real controller computes in resolveScope (plan.ControllerOwnerKey(op, ControllerOwnerKey))
+// what the real controller computes in resolveScope (ops.BeaconOwnerKey(OperationKind, op))
 // so beacon fixtures created with `testOwnerKey` will match ownership + delegate checks.
 func newScope(op *opv1alpha1.ETCDSnapshotSave, beacon *planv1alpha1.Beacon, adapter *stubAdapter) *scope {
 	cluster := &unstructured.Unstructured{}
@@ -157,7 +157,7 @@ func newScope(op *opv1alpha1.ETCDSnapshotSave, beacon *planv1alpha1.Beacon, adap
 	cluster.SetAPIVersion("provisioning.cattle.io/v1")
 	cluster.SetKind("Cluster")
 	return &scope{
-		ownerKey:   planapi.ControllerOwnerKey(op, ControllerOwnerKey),
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		beacon:     beacon,
 		namespace:  "fleet-default",
@@ -169,7 +169,7 @@ func newScope(op *opv1alpha1.ETCDSnapshotSave, beacon *planv1alpha1.Beacon, adap
 // testOwnerKey is the fully-qualified beacon owner key for the canonical `newOp()` operation.
 // Tests that want to build a beacon owned by "us" pass this to newBeacon, instead of the plain
 // ControllerOwnerKey prefix which no longer matches what the handler computes at reconcile time.
-var testOwnerKey = planapi.ControllerOwnerKey(newOp(), ControllerOwnerKey)
+var testOwnerKey = ops.BeaconOwnerKey(OperationKind, newOp())
 
 func newOp() *opv1alpha1.ETCDSnapshotSave {
 	return &opv1alpha1.ETCDSnapshotSave{
@@ -304,9 +304,16 @@ func (f *fakeBeaconClient) Get(namespace, name string, _ metav1.GetOptions) (*pl
 	return f.beacon.DeepCopy(), nil
 }
 
+// Update models the main-resource endpoint: Beacon has a status subresource, so a status change
+// sent here is silently dropped. Keeping the fake honest about that is what stops a handler which
+// clears beacon ownership through Update — as the stale-owner reclaim once did — from passing.
 func (f *fakeBeaconClient) Update(b *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
-	f.updates = append(f.updates, b.DeepCopy())
-	return b, f.updateErr
+	updated := b.DeepCopy()
+	if f.beacon != nil {
+		updated.Status = f.beacon.Status
+	}
+	f.updates = append(f.updates, updated.DeepCopy())
+	return updated, f.updateErr
 }
 
 func (f *fakeBeaconClient) UpdateStatus(b *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
@@ -1901,4 +1908,30 @@ func TestUpdateStatusReportsDeclinedCancellation(t *testing.T) {
 		assert.Equal(t, "True", opv1alpha1.CanceledCondition.GetStatus(&got))
 		assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&got))
 	})
+}
+
+// TestHandlePending_ReclaimsSupersededClaim covers the wiring of the no-lookup reclaim. A beacon
+// still carrying a claim from an earlier object of this operation's name would otherwise leave the
+// operation waiting on a holder that no longer exists, and the delegate that claim left behind —
+// pushed to gate a hook that died with the object, so nothing will ever pop it — would be handed to
+// the operation that acquires next.
+func TestHandlePending_ReclaimsSupersededClaim(t *testing.T) {
+	t.Parallel()
+
+	op := newOp()
+	superseded := ops.BeaconOwnerKey(OperationKind, &opv1alpha1.ETCDSnapshotSave{
+		ObjectMeta: metav1.ObjectMeta{Namespace: op.Namespace, Name: op.Name, UID: "dead-uid"},
+	})
+
+	beacon := newBeacon(superseded, true)
+	beacon.Status.Delegates = []string{"dead-delegate"}
+
+	beacons := &fakeBeaconClient{beacon: beacon}
+	h := &handler{beacons: beacons}
+	s := newScope(op, beacon, defaultAdapter())
+
+	_, err := h.handlePending(s, opv1alpha1.ETCDSnapshotSaveStatus{})
+	assert.NoError(t, err)
+	assert.Equal(t, testOwnerKey, s.beacon.Status.Owner, "the operation must end up holding the beacon")
+	assert.Empty(t, s.beacon.Status.Delegates, "the dead claim's delegate must not be inherited")
 }
