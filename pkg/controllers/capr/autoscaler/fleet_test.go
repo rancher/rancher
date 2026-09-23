@@ -293,7 +293,7 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
 	result := s.h.chartVersionsForCluster(cluster)
-	s.Equal("1.34.0-3.4", result.imageTag)
+	s.Equal("1.34.5-15.1", result.imageTag)
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
