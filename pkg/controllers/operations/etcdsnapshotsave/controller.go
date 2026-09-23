@@ -31,6 +31,10 @@ const (
 	// ControllerOwnerKey is the value used to identify the etcd-snapshot-save handler currently owns the beacon.
 	ControllerOwnerKey = "etcd-snapshot-save"
 
+	// OperationKind is this operation's kind, as it appears in the beacon claims the controller
+	// writes. See ops.BeaconOwnerKey.
+	OperationKind = "ETCDSnapshotSave"
+
 	Finalizer = "etcdsnapshotsave.operation.cattle.io"
 
 	// Step hook label prefixes for the etcdsnapshotsave operation. They follow the shared label
@@ -459,7 +463,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotSave, status opv1alpha
 	}
 
 	return &scope{
-		ownerKey:   plan.ControllerOwnerKey(op, ControllerOwnerKey),
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
@@ -541,6 +545,15 @@ func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 // registration).
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling pending", s.op.Namespace, s.op.Name)
+
+	// A beacon still carrying a claim from an earlier incarnation of this operation's name is
+	// reclaimed before anything is attempted: that claim is provably dead, and leaving it would
+	// either block this operation forever or, worse, be mistaken for its own.
+	beacon, err := ops.ReclaimSupersededBeacon(s.beacon, h.beacons, s.ownerKey)
+	if err != nil {
+		return status, err
+	}
+	s.beacon = beacon
 
 	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
 	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
