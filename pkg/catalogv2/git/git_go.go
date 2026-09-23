@@ -324,9 +324,9 @@ func (g *gitGo) fetchAndReset(rev string) error {
 		return err
 	}
 
-	// For branch/tag refs, use specific refspec
-	// Note: This should NOT be called with commit hashes, as git servers
-	// don't allow fetching arbitrary commits. Always pass a branch/tag name.
+	// Determine if rev is a commit hash or a branch/tag
+	isCommitHash := len(rev) == 40 && isHexString(rev)
+
 	fetchOpts := &gogit.FetchOptions{
 		RemoteName: "origin",
 		Auth:       g.auth,
@@ -334,9 +334,21 @@ func (g *gitGo) fetchAndReset(rev string) error {
 		// Depth will be set by doFetchWithVerify
 	}
 
-	// If rev is specified, fetch that specific branch/tag
-	// If rev is empty, fetch the default branch (no refspec needed)
-	if rev != "" {
+	// If rev is a commit hash, we can't fetch it directly (servers don't allow it)
+	// Instead, fetch the default branch with deeper history to try to find the commit
+	if isCommitHash {
+		// Check if commit already exists locally
+		hash := plumbing.NewHash(rev)
+		if _, err := repo.CommitObject(hash); err == nil {
+			// Commit exists locally, just reset to it
+			return g.reset(rev)
+		}
+
+		// Commit not found locally - fetch with deeper history
+		// We fetch the default branch (no refspec = all refs) with depth to find the commit
+		fetchOpts.Depth = 100 // Reasonable default for finding recent commits
+	} else if rev != "" {
+		// Branch/tag name - fetch it specifically
 		fetchOpts.RefSpecs = []config.RefSpec{
 			config.RefSpec(fmt.Sprintf("+%s:%s", rev, rev)),
 		}
