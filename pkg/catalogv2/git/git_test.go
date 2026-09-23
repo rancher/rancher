@@ -568,14 +568,37 @@ func testOptionsCABundleValidation(t *testing.T, factory func(string, string, *O
 		client, err := factory(testDir, chartsSmallForkURL, &Options{
 			CABundle: caBundle,
 		})
-		require.NoError(t, err)
-		assert.NotNil(t, client)
 
-		// Clone with invalid CA bundle will fail (proves it's being used)
-		err = client.clone(mainBranch)
-		// Expect error because the dummy CA bundle is invalid
-		assert.Error(t, err, "invalid CA bundle should cause git to fail")
-		assert.Contains(t, err.Error(), "certificate", "error should mention certificate issue")
+		// Determine which implementation we're testing
+		var isGoGit bool
+		if client != nil {
+			_, isGoGit = client.(*gitGo)
+		} else if err != nil {
+			// If client is nil due to error, check error for go-git signature
+			isGoGit = strings.Contains(err.Error(), "x509: malformed")
+		}
+
+		if isGoGit {
+			// go-git validates CA bundle during client creation
+			if err == nil {
+				t.Fatal("gitGo should fail during construction with invalid CA bundle")
+			}
+			if !strings.Contains(err.Error(), "x509: malformed") {
+				t.Fatalf("gitGo should return x509 malformed error, got: %v", err)
+			}
+		} else {
+			// git CLI validates CA bundle during git command execution
+			require.NoError(t, err, "gitCLI should succeed client creation")
+			require.NotNil(t, client)
+
+			err = client.clone(mainBranch)
+			if err == nil {
+				t.Fatal("gitCLI should fail during clone with invalid CA bundle")
+			}
+			if !strings.Contains(err.Error(), "certificate") {
+				t.Fatalf("gitCLI should return certificate error, got: %v", err)
+			}
+		}
 	})
 }
 
