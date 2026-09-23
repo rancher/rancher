@@ -1059,22 +1059,22 @@ var terminalHandlers = map[string]struct {
 	"aborted": {
 		handle: (*handler).handleAborted,
 		cond:   opv1alpha1.AbortedCondition,
-		hook:   planv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:   opv1alpha1.AbortedPhaseHookLabelPrefix,
 	},
 	"canceled": {
 		handle: (*handler).handleCanceled,
 		cond:   opv1alpha1.CanceledCondition,
-		hook:   planv1alpha1.CanceledPhaseHookLabelPrefix,
+		hook:   opv1alpha1.CanceledPhaseHookLabelPrefix,
 	},
 	"failed": {
 		handle: (*handler).handleFailed,
 		cond:   opv1alpha1.FailedCondition,
-		hook:   planv1alpha1.FailedPhaseHookLabelPrefix,
+		hook:   opv1alpha1.FailedPhaseHookLabelPrefix,
 	},
 	"succeeded": {
 		handle: (*handler).handleSucceeded,
 		cond:   opv1alpha1.SucceededCondition,
-		hook:   planv1alpha1.SucceededPhaseHookLabelPrefix,
+		hook:   opv1alpha1.SucceededPhaseHookLabelPrefix,
 	},
 }
 
@@ -1273,7 +1273,7 @@ func TestOnChange_DeletionCancelsInFlightOperation(t *testing.T) {
 // be kept alive — the delegate's ownership is anchored to it — until the delegate is done.
 func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 	op := newDeletingOp()
-	op.Labels = map[string]string{planv1alpha1.CanceledPhaseHookLabelPrefix + "test": "delegate-a"}
+	op.Labels = map[string]string{opv1alpha1.CanceledPhaseHookLabelPrefix + "test": "delegate-a"}
 	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
 		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
 		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
@@ -1646,7 +1646,7 @@ func TestOnChange_ExpiredTerminalOperationIsCollectedOnceTerminated(t *testing.T
 	op := newOnChangeOp()
 	op.Finalizers = []string{Finalizer}
 	op.Spec.TTL = 0 // expire as soon as the operation is terminal
-	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "test": "delegate-a"}
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "test": "delegate-a"}
 	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
 		OperationStatus: opv1alpha1.OperationStatus{
 			Phase:       opv1alpha1.OperationPhaseSucceeded,
@@ -1746,7 +1746,7 @@ func TestOnChange_CancelRequestedInTerminalPhaseIsDeclined(t *testing.T) {
 	op := newOnChangeOp()
 	op.Spec.Cancel = true
 	op.Spec.TTL = -1
-	op.Labels = map[string]string{planv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "wedged": "delegate-a"}
 	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
 		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
 		Step:            opv1alpha1.EncryptionKeyRotationStepRestart,

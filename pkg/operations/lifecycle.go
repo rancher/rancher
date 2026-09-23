@@ -74,7 +74,7 @@ func Collectable(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1a
 	return IsTerminal(status.Phase) &&
 		IsTerminated(status) &&
 		IsExpired(spec, status) &&
-		!planv1alpha1.HasActiveLifecycleHook(op)
+		!HasActiveLifecycleHook(op)
 }
 
 // UpdateStatus refreshes ObservedGeneration and every condition that is not the one the current
@@ -179,7 +179,7 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 
 		// Read the delegate back off the operation rather than remembering it on a condition: the
 		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
-		if _, delegate := planv1alpha1.LifecycleHookDelegate(op, TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
+		if _, delegate := LifecycleHookDelegate(op, TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
 			opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.FinalizedCondition.Message(status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
 		} else {

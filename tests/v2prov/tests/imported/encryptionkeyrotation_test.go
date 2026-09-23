@@ -11,7 +11,6 @@ import (
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/operations/encryptionkeyrotation"
-	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
@@ -146,7 +145,7 @@ func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook(t *
 	)
 	rotateHookKey := encryptionkeyrotation.RotateStepHookLabelPrefix + hookName
 	restartHookKey := encryptionkeyrotation.RestartStepHookLabelPrefix + hookName
-	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
+	succeededHookKey := opv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
 	// Attach all hooks up front. Each prefix is scoped to a specific handler so they don't
 	// interfere — the controller only consults the relevant prefix when it enters that

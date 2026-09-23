@@ -96,7 +96,7 @@ func (h *handler) OnChange(op *opv1alpha1.CertificateRotation, status opv1alpha1
 	if equality.Semantic.DeepEqual(op.Status, status) {
 		if ops.IsTerminal(status.Phase) &&
 			ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
-			!planv1alpha1.HasActiveLifecycleHook(op) {
+			!ops.HasActiveLifecycleHook(op) {
 			err = h.certificateRotations.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				return status, err
@@ -231,7 +231,7 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.CertificateRotationS
 		s.beacon = acquired
 	}
 
-	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.PendingPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -271,7 +271,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
 	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, RotateStepHookLabelPrefix) {
+		if ops.HasStepHookLabel(s.op, RotateStepHookLabelPrefix) {
 			opv1alpha1.InProgressCondition.True(&status)
 			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
@@ -293,7 +293,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 	}
 
 	// InProgress-phase hook fires on every InProgress reconcile, ahead of step dispatch.
-	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.InProgressPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -308,7 +308,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 	// is still active on the op, treat the missing-top state as an intentional delegation and
 	// wait; otherwise this is a genuine beacon loss and we fail.
 	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, RotateStepHookLabelPrefix) {
+		if ops.HasStepHookLabel(s.op, RotateStepHookLabelPrefix) {
 			opv1alpha1.InProgressCondition.True(&status)
 			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
@@ -342,7 +342,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, planv1alpha1.CanceledPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.CanceledPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -371,7 +371,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotation
 func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, planv1alpha1.FailedPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.FailedPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -400,7 +400,7 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationSt
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	logrus.Debugf("[certificaterotation] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
 
-	delegated, err := h.handleHook(s, planv1alpha1.SucceededPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.SucceededPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
