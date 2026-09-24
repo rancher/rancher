@@ -137,7 +137,7 @@ func getFullStateFromK8s(ctx context.Context, k8sClient kubernetes.Interface) (*
 		return true, nil
 	}
 
-	// Retry until success or backoff.Steps has been reached or ctx is cancelled.
+	// Retry until success or backoff.Steps has been reached or ctx is canceled.
 	err := wait.ExponentialBackoffWithContext(ctx, backoff, getState)
 	return &fullState, err
 }

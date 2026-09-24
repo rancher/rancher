@@ -10,9 +10,9 @@ import (
 )
 
 // BeaconOwnerKeyPrefix opens the key namespace operations claim beacons under. A beacon's owner is
-// an opaque string and the holder need not be an object at all — a handler which operates on a
+// an opaque string and the holder need not be an object at all (a handler which operates on a
 // cluster directly holds it under its own name, a lifecycle hook delegate holds it under the name
-// its label carries — so this prefix is what lets operations recognise their own claims and leave
+// its label carries), so this prefix is what lets operations recognize their own claims and leave
 // everybody else's alone.
 const BeaconOwnerKeyPrefix = "operation.cattle.io"
 
@@ -38,7 +38,7 @@ type BeaconOwner struct {
 // with it, that claim cannot be mistaken for the new operation's own (see SupersedesBeaconOwner).
 //
 // It is also the identity the operation's plans already carry, since OperationEnv stamps the same
-// UID into every plan it assigns — so a claim on the beacon and the plan content written under it
+// UID into every plan it assigns: so a claim on the beacon and the plan content written under it
 // name the same object.
 func BeaconOwnerKey(kind string, op metav1.Object) string {
 	if op == nil {
@@ -60,7 +60,7 @@ func BeaconOwnerKey(kind string, op metav1.Object) string {
 // this package cannot see, and must be left exactly as it is.
 //
 // Every segment is required. A claim missing one is not one this package wrote, so it is reported as
-// unparseable rather than partially trusted — the whole point of the key is to identify one object,
+// unparseable rather than partially trusted: the whole point of the key is to identify one object,
 // and a claim which cannot do that must never be taken for a live operation's nor cleared as a dead
 // one's.
 func ParseBeaconOwner(key string) (BeaconOwner, bool) {
@@ -83,7 +83,7 @@ func ParseBeaconOwner(key string) (BeaconOwner, bool) {
 //
 // That makes the recorded claimant provably gone, with nothing to look up. Two objects cannot hold
 // one name in one namespace at the same time, so an operation which finds its own name on a beacon
-// under a different UID is looking at the remains of an object that no longer exists — whether it
+// under a different UID is looking at the remains of an object that no longer exists: whether it
 // was deleted without its finalizer running, or rolled back out of existence by an etcd restore of
 // the cluster it lived in. Either way the claim is dead and the operation now holding the name is
 // entitled to clear it.
@@ -109,12 +109,12 @@ func SupersedesBeaconOwner(mine, recorded string) bool {
 
 // ReclaimSupersededBeacon clears a beacon whose claim was left behind by an earlier incarnation of
 // ownerKey's operation, so the operation holding that name now can acquire it cleanly. Any other
-// claim — a live operation's, another operation's, or a holder which is not an operation at all —
+// claim (a live operation's, another operation's, or a holder which is not an operation at all)
 // is left untouched, and the caller finds the beacon unavailable as it would have anyway.
 //
 // The claim is cleared in full rather than just handed over. The delegates on a dead operation's
 // beacon were pushed on its behalf to gate its lifecycle hooks, and those hooks went with the object
-// they were labelled on, so nothing will ever pop them; leaving them would hand the new operation a
+// they were labeled on, so nothing will ever pop them; leaving them would hand the new operation a
 // beacon it is not authorized to drive. Active goes the same way: it described the dead operation's
 // work.
 func ReclaimSupersededBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, ownerKey string) (*planv1alpha1.Beacon, error) {

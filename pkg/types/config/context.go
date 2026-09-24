@@ -311,7 +311,7 @@ func (w *UserContext) deferredStart(ctx context.Context, f func() error) func() 
 				}
 				return true, nil
 			})
-			// A cancelled context means the cluster is already being torn down, so there is nothing
+			// A canceled context means the cluster is already being torn down, so there is nothing
 			// left to recover.
 			if err == nil || ctx.Err() != nil {
 				return

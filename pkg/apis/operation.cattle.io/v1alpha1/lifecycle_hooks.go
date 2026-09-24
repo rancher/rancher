@@ -19,11 +19,11 @@ package v1alpha1
 //
 // The label-key suffix after the prefix is the hook's identifier (e.g.
 // "<prefix>/my-cleanup-hook"); the controller does not interpret it. The label VALUE is the name
-// of the delegate pushed onto the beacon chain — a cooperating controller subscribes to that
+// of the delegate pushed onto the beacon chain; a cooperating controller subscribes to that
 // delegate name to know when its turn arrives, and pops itself off the chain when finished.
 //
 // A hook on a terminal phase holds the beacon for as long as its delegate does not return it, and
-// the beacon gates every operation on the cluster — so a delegate which never finishes blocks the
+// the beacon gates every operation on the cluster. A delegate which never finishes blocks the
 // next operation indefinitely, whatever its urgency. The operation reports which delegate it is
 // waiting on through its Finalized condition. Setting spec.Cancel will not break the deadlock, as
 // cancellation does not apply to an operation which has already reached a terminal phase; deleting
@@ -35,7 +35,7 @@ package v1alpha1
 // respective controller package.
 const (
 	// PendingPhaseHookLabelPrefix gates the Pending phase, after the controller has acquired the
-	// cluster beacon but before it waits for system-agents to register. A delegate hooked here
+	// cluster beacon, but before it waits for system-agents to register. A delegate hooked here
 	// observes the cluster in its pre-operation state.
 	PendingPhaseHookLabelPrefix = "pending.phase.hook.operation.cattle.io/"
 
@@ -54,7 +54,7 @@ const (
 	// beacon and runs any operation-type-specific cleanup (e.g. unpausing the CAPI cluster on
 	// encryption-key-rotation). Lets a delegate inspect / react to the cancellation cause.
 	//
-	// Unlike the other phase hooks this one is honoured but not guaranteed: cancellation is driven
+	// Unlike the other phase hooks this one is honored but not guaranteed: cancellation is driven
 	// from outside the operation, often by whoever wants the beacon next, so the operation may no
 	// longer hold the beacon by the time the hook would run. A controller which finds it holds no
 	// claim on the beacon has no authority to delegate and skips the hook.
@@ -74,6 +74,6 @@ const (
 
 // LifecycleHookLabelMarker is the substring shared by every phase-hook and step-hook label key.
 // Detecting it is enough to know "some delegate has posted a hook here" without enumerating every
-// registered prefix — an operation-type-specific step prefix declared in a controller package still
-// matches. See ops.HasActiveLifecycleHook.
+// registered prefix (an operation-type-specific step prefix declared in a controller package still
+// matches). See ops.HasActiveLifecycleHook.
 const LifecycleHookLabelMarker = ".hook.operation.cattle.io/"

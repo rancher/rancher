@@ -25,7 +25,7 @@ type OperationSpec struct {
 	// Recover by deleting and recreating the operation.
 	// Paused takes precedence: a paused operation halts reconciliation entirely, so the cancellation
 	// is only observed once the pause is lifted.
-	// Cancelling an operation which has already reached a terminal phase does nothing: there is no
+	// Canceling an operation which has already reached a terminal phase does nothing: there is no
 	// work left to call off, so the phase it ended in stands and the Canceled condition reports that
 	// the request was declined. Deleting such an operation does still stop it, which is the remedy
 	// for one whose terminal phase hook is never answered.
@@ -75,7 +75,7 @@ const (
 	OperationPhaseFailed OperationPhase = "Failed"
 
 	// OperationPhaseAborted indicates the operation called its own work off, having found a
-	// condition it cannot proceed past — a failed preflight check, for instance. Nothing outside
+	// condition it cannot proceed past (e.g. a failed preflight check). Nothing outside
 	// the operation asked it to stop, and nothing it was asked to do was attempted and lost, which
 	// is what separates Aborted from Canceled and Failed respectively.
 	OperationPhaseAborted OperationPhase = "Aborted"
@@ -94,8 +94,8 @@ type OperationStatus struct {
 	// Finalized, and Paused.
 	// Succeeded, Failed, Aborted and Canceled report how the operation ended, and the one matching the
 	// terminal phase goes True as soon as that phase is reached. Finalized reports the separate
-	// question of whether the controller has finished with the operation — terminal phase hook
-	// satisfied, beacon released (see TerminatedAt) — and is True whenever any outcome condition is
+	// question of whether the controller has finished with the operation (terminal phase hook
+	// satisfied, beacon released (see TerminatedAt)) and is True whenever any outcome condition is
 	// and that work is done, so an observer that only needs to know the operation is over can wait
 	// on it alone.
 	// Operations may have additional conditions of their own.
@@ -140,7 +140,7 @@ type OperationStatus struct {
 
 // SetPhase moves the operation to phase, recording when the transition happened. Setting the phase
 // the operation is already in is a no-op, so LastUpdated keeps pointing at the moment the operation
-// actually moved however many times it is reconciled afterwards.
+// actually moved however many times it is reconciled afterward.
 //
 // The phase and its outcome condition are asserted together by the Mark* methods below; this is for
 // the non-terminal transitions, which have no outcome to report.
@@ -167,13 +167,15 @@ func (s *OperationStatus) MarkFailed(reason, message string) {
 }
 
 // MarkAborted moves the operation to the Aborted terminal phase, for work the operation called off
-// itself after finding a condition it cannot proceed past — a failed preflight check, say.
+// itself after finding a condition it cannot proceed past (e.g. a failed preflight check).
+// The corresponding downstream cluster must be in a healthy state, either equal or comparable to
+// the state pre-operation.
 func (s *OperationStatus) MarkAborted(reason, message string) {
 	s.markOutcome(OperationPhaseAborted, reason, message)
 }
 
 // MarkCanceled moves the operation to the Canceled terminal phase, for work that was called off
-// from outside the operation — spec.Cancel being set, or a deletion that raced the operation.
+// from outside the operation: spec.Cancel being set, or a deletion that raced the operation.
 func (s *OperationStatus) MarkCanceled(reason, message string) {
 	s.markOutcome(OperationPhaseCanceled, reason, message)
 }
@@ -192,8 +194,8 @@ func (s *OperationStatus) markOutcome(phase OperationPhase, reason, message stri
 }
 
 // SetTerminated records that terminal handling for the operation has completed. Operation
-// controllers must only call this once the terminal phase is fully handled — i.e. the terminal
-// phase hook has been satisfied and the beacon has been released — as it is what makes the
+// controllers must only call this once the terminal phase is fully handled (e.g. the terminal
+// phase hook has been satisfied and the beacon has been released) as it is what makes the
 // operation eligible for TTL garbage collection and what distinguishes a deletion that races
 // terminal handling (canceled) from one that follows it (left as-is).
 //
