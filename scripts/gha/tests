@@ -14,7 +14,7 @@ cd $(dirname $0)/../..
 
 # Integration packages to run. Defaults to the whole suite; the
 # integration-tests.yml matrix overrides this per shard.
-INTEGRATION_TEST_PACKAGES="${INTEGRATION_TEST_PACKAGES:-./tests/v2/integration/...}"
+INTEGRATION_TEST_PACKAGES="${INTEGRATION_TEST_PACKAGES:-./tests/e2e/...}"
 # Optional -run regex, used by the catalogv2 shards to select specific suites.
 INTEGRATION_TEST_RUN="${INTEGRATION_TEST_RUN:-}"
 
@@ -85,7 +85,7 @@ trap cleanup exit
 # background while we wait for Rancher's deployments to roll out below, keeping
 # the cold `go build`/module download off the critical path. integrationsetup is
 # built first so it warms the build cache the test binaries reuse; it mirrors
-# tests/v2/integration/scripts/build-integration-setup but uses $GOBIN since
+# tests/e2e/scripts/build-integration-setup but uses $GOBIN since
 # under sudo `go` is not on secure_path.
 #
 # `go test -c` compiles each package's test binary (including its _test.go files)
@@ -94,9 +94,9 @@ echo "Building integrationsetup + pre-compiling integration test binaries in the
 PRECOMPILE_LOG=$(mktemp)
 (
   set -e
-  mkdir -p tests/v2/integration/bin
+  mkdir -p tests/e2e/bin
   CGO_ENABLED=0 go build -tags containers_image_openpgp,integrationsetup \
-    -o tests/v2/integration/bin/integrationsetup ./tests/v2/integration/setup
+    -o tests/e2e/bin/integrationsetup ./tests/e2e/setup
   for pkg in $(go list $INTEGRATION_TEST_PACKAGES); do
     go test -c -o /dev/null "$pkg"
   done
@@ -132,7 +132,7 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
     && kubectl rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
 
 echo Running integrationsetup
-export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by integration tests and test setup
+export CATTLE_TEST_CONFIG=$(pwd)/tests/e2e/config.yaml # used by integration tests and test setup
 # Wait for the background build to finish before using integrationsetup and the
 # precompiled test binaries. It usually completed during the waits above. On
 # failure we log but don't abort: `go test` below will recompile and surface the
@@ -141,7 +141,7 @@ if [ -n "${PRECOMPILE_PID:-}" ]; then
   echo "Waiting for background integrationsetup build + test compilation to finish"
   wait "$PRECOMPILE_PID" || { echo "background build/compilation reported an error:"; cat "${PRECOMPILE_LOG}" || true; }
 fi
-./tests/v2/integration/bin/integrationsetup || {
+./tests/e2e/bin/integrationsetup || {
   dump_rancher_logs
   exit 1
 }
