@@ -61,6 +61,7 @@ type Provider struct {
 }
 
 var SamlProviders = make(map[string]*Provider)
+var getLDAPConfig = ldap.GetLDAPConfig
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
 	provider := &Provider{
@@ -342,7 +343,7 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 	if s.hasLdapGroupSearch() {
 		combinedConfig, err := s.combineSamlAndLdapConfig(config)
 		if err != nil {
-			logrus.Warnf("problem combining saml and ldap config, saving partial configuration %s", err.Error())
+			return err
 		}
 		_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, combinedConfig)
 		if err != nil {
@@ -509,7 +510,7 @@ func splitPrincipalID(principalID string) (string, string) {
 
 func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.Object, error) {
 	// if errors we might not want to turn on ldap
-	ldapConfig, _, err := ldap.GetLDAPConfig(s.ldapProvider)
+	ldapConfig, _, err := getLDAPConfig(s.ldapProvider)
 
 	// can be misconfigured but still want it saved
 	if err != nil {
@@ -550,6 +551,19 @@ func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.O
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
 	case OKTAName:
+		secretName, err := common.SavePasswordSecret(
+			s.secrets,
+			ldapConfig.LdapFields.ServiceAccountPassword,
+			client.LdapConfigFieldServiceAccountPassword,
+			samlConfig.Type,
+		)
+		if err != nil {
+			return config, fmt.Errorf("unable to save ldap service account password: %w", err)
+		}
+
+		ldapConfig.LdapFields.ServiceAccountPassword = secretName
+		// Set the status for OKTA password migration to True so it doesn't get re-migrated
+		apiv3.AuthConfigOKTAPasswordMigrated.SetStatus(&samlConfig, "True")
 		fullConfig = &apiv3.OKTAConfig{
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
