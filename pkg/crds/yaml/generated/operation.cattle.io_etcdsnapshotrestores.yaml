@@ -261,9 +261,11 @@ spec:
               terminatedAt:
                 description: |-
                   TerminatedAt identifies when the controller finished handling the terminal phase of the
-                  Operation: the terminal-phase lifecycle hook (if any) ran to completion and the beacon was
-                  released. It is set once and never cleared, and is only ever set on an Operation which has
-                  reached a terminal phase.
+                  Operation, meaning nothing is owed on it any more. Ordinarily the terminal-phase lifecycle
+                  hook (if any) ran to completion and the beacon was released; it also covers an Operation with
+                  no beacon left to release, and one being deleted, whose hooks are abandoned along with it.
+                  It is set once and never cleared, and is only ever set on an Operation which has reached a
+                  terminal phase.
                   An Operation which reached a terminal phase is not necessarily terminated: terminal handling
                   may still be delegated to another controller. An Operation deleted before it is terminated is
                   canceled, as the work it dispatched is no longer tracked by anything.

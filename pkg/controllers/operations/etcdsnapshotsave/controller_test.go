@@ -933,7 +933,7 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	adapter := defaultAdapter()
 
 	// Pre-populate so the test traverses the "applied" branch without needing additional poll
-	// cycles — we're asserting on the *plan content* not the wait behaviour here.
+	// cycles — we're asserting on the *plan content* not the wait behavior here.
 	expectedPlan := expectedSavePlan(op, adapter)
 	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedPlan)
 	h := &handler{
@@ -1807,7 +1807,7 @@ func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 // Succeeded is deliberately excluded: an operation cannot have finished its work without holding
 // the beacon throughout, so a missing claim there is an anomaly rather than a state to paper over
 // by declaring the operation finished.
-func TestHandleSucceeded_WithoutBeaconClaimStillHonoursItsHook(t *testing.T) {
+func TestHandleSucceeded_WithoutBeaconClaimStillHonorsItsHook(t *testing.T) {
 	t.Parallel()
 
 	op := newOp()
@@ -1934,4 +1934,278 @@ func TestHandlePending_ReclaimsSupersededClaim(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, testOwnerKey, s.beacon.Status.Owner, "the operation must end up holding the beacon")
 	assert.Empty(t, s.beacon.Status.Delegates, "the dead claim's delegate must not be inherited")
+}
+
+// --- a missing cluster or beacon for an operation which has already concluded ------------------
+
+// TestOnChange_CancelWithMissingClusterKeepsOutcome covers the sequence that motivated this rule:
+// cancellation is applied before the scope is resolved, so a canceled operation whose cluster is
+// gone reaches the missing-cluster branch already terminal. Failing it there would report the
+// user's cancellation as a failure.
+func TestOnChange_CancelWithMissingClusterKeepsOutcome(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newOp(), "gone")
+	op.Spec.Cancel = true
+	op.Spec.TTL = -1
+	op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.ETCDSnapshotSaveStepSave,
+	}
+
+	h, _, _ := newOnChangeHandler(newBeacon(testOwnerKey, true))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseCanceled, status.Phase, "the cancellation must not be reported as a failure")
+	assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	assert.Equal(t, "False", opv1alpha1.FailedCondition.GetStatus(&status))
+	assert.NotEqual(t, opv1alpha1.ClusterNotFoundReason, opv1alpha1.FailedCondition.GetReason(&status))
+	assert.False(t, status.TerminatedAt.IsZero(), "with no cluster there is nothing to release")
+	assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&status))
+}
+
+// The same rule protects an operation which concluded on an earlier reconcile: deleting the cluster
+// inside the operation's TTL must not rewrite what it ended with.
+func TestOnChange_MissingClusterKeepsConcludedOutcome(t *testing.T) {
+	t.Parallel()
+
+	for _, phase := range []opv1alpha1.OperationPhase{
+		opv1alpha1.OperationPhaseSucceeded,
+		opv1alpha1.OperationPhaseFailed,
+		opv1alpha1.OperationPhaseAborted,
+		opv1alpha1.OperationPhaseCanceled,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			t.Parallel()
+
+			op := withClusterRef(newOp(), "gone")
+			op.Spec.TTL = -1
+
+			initial := opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepRestart}
+			initial.SetPhase(phase)
+			op.Status = initial
+
+			h, _, _ := newOnChangeHandler(newBeacon("", false))
+
+			status, err := h.OnChange(op, op.Status)
+			assert.NoError(t, err)
+			assert.Equal(t, phase, status.Phase, "the phase the operation ended in must stand")
+
+			outcome, _ := opv1alpha1.OutcomeConditionFor(phase)
+			assert.Equal(t, "True", outcome.GetStatus(&status))
+			assert.False(t, status.TerminatedAt.IsZero(), "with no cluster there is nothing to release")
+		})
+	}
+}
+
+// TestOnChange_MissingClusterWithOwedHookDefersTermination is the other half of the rule. The
+// operation cannot be handed a beacon that is not there, but its terminal phase hook is still
+// labelled: the delegate has not had its turn, so recording termination would claim it had.
+func TestOnChange_MissingClusterWithOwedHookDefersTermination(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newOp(), "gone")
+	op.Spec.TTL = -1
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "verify": "delegate-a"}
+
+	initial := opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepRestart}
+	initial.MarkSucceeded()
+	op.Status = initial
+
+	h, _, _ := newOnChangeHandler(newBeacon("", false))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase)
+	assert.True(t, status.TerminatedAt.IsZero(), "the delegate has not had its turn, so nothing may be recorded")
+	assert.Equal(t, "False", opv1alpha1.FinalizedCondition.GetStatus(&status))
+	assert.Equal(t, opv1alpha1.WaitingForDelegateReason, opv1alpha1.FinalizedCondition.GetReason(&status),
+		"the wait must be reported against the delegate holding it up")
+}
+
+// A deleting operation is the deliberate exception: it is being discarded and its hooks go with it,
+// so it terminates at once rather than holding its finalizer open for a delegate that will never
+// be handed anything.
+func TestOnChange_DeletionWithMissingClusterAbandonsOwedHook(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newDeletingOp(), "gone")
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "verify": "delegate-a"}
+	op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
+		Step:            opv1alpha1.ETCDSnapshotSaveStepRestart,
+	}
+
+	h, controller, _ := newOnChangeHandler(newBeacon("", false))
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.False(t, status.TerminatedAt.IsZero(), "a deletion abandons the hook rather than waiting on it")
+
+	op.Status = status
+
+	_, err = h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	if assert.Len(t, controller.updates, 1, "the finalizer must not be held for an abandoned hook") {
+		assert.NotContains(t, controller.updates[0].Finalizers, Finalizer)
+	}
+}
+
+// TestOnChange_MissingBeaconDisposition covers what an operation does when the beacon it needs is
+// not there. What it should do depends entirely on what it still owes: an outcome which dispatched
+// work owes a release and complains that it cannot make one, while an outcome which dispatched
+// nothing owes nothing and finishes.
+func TestOnChange_MissingBeaconDisposition(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		// phase the operation is in when its beacon turns up missing.
+		phase opv1alpha1.OperationPhase
+		// terminated is whether it had already recorded terminal handling as complete.
+		terminated bool
+
+		wantErr        bool
+		wantPhase      opv1alpha1.OperationPhase
+		wantReason     string
+		wantTerminated bool
+	}{
+		{
+			// Aborted called its own work off, so there is nothing a beacon would have wound down.
+			name:           "aborted finishes",
+			phase:          opv1alpha1.OperationPhaseAborted,
+			wantPhase:      opv1alpha1.OperationPhaseAborted,
+			wantTerminated: true,
+		},
+		{
+			// Cancellation is usually driven by whoever wants the beacon next, so a beacon that is
+			// not there is no surprise at all.
+			name:           "canceled finishes",
+			phase:          opv1alpha1.OperationPhaseCanceled,
+			wantPhase:      opv1alpha1.OperationPhaseCanceled,
+			wantTerminated: true,
+		},
+		{
+			// Work was dispatched under the beacon's authority and never handed back: the state
+			// serializing writes to this cluster went missing while this operation still had a claim
+			// on it. It stays stuck, and says so, rather than recording itself as wrapped up.
+			name:      "succeeded complains and sticks",
+			phase:     opv1alpha1.OperationPhaseSucceeded,
+			wantErr:   true,
+			wantPhase: opv1alpha1.OperationPhaseSucceeded,
+		},
+		{
+			name:      "failed complains and sticks",
+			phase:     opv1alpha1.OperationPhaseFailed,
+			wantErr:   true,
+			wantPhase: opv1alpha1.OperationPhaseFailed,
+		},
+		{
+			// Already released whatever it held, so a beacon collected afterwards is none of its
+			// business, and it must still be collectable.
+			name:           "succeeded and already terminated settles",
+			phase:          opv1alpha1.OperationPhaseSucceeded,
+			terminated:     true,
+			wantPhase:      opv1alpha1.OperationPhaseSucceeded,
+			wantTerminated: true,
+		},
+		{
+			// Still in flight: the beacon was taken out from under it, which is the same fault
+			// handleInProgress reports when it finds the beacon reassigned.
+			name:           "in progress fails",
+			phase:          opv1alpha1.OperationPhaseInProgress,
+			wantPhase:      opv1alpha1.OperationPhaseFailed,
+			wantReason:     opv1alpha1.BeaconLostReason,
+			wantTerminated: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			op := withClusterRef(newOp(), "test")
+			op.Spec.TTL = -1
+
+			initial := opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepRestart}
+			initial.SetPhase(tc.phase)
+			if tc.terminated {
+				initial.SetTerminated()
+			}
+			op.Status = initial
+
+			h, _, _ := newOnChangeHandler(nil)
+
+			status, err := h.OnChange(op, op.Status)
+			if tc.wantErr {
+				assert.Error(t, err, "the operation must complain about a beacon it cannot release")
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// A handler which returns an error has its status reverted by the generated status
+			// handler, so only the phase it was already in is observable on that path.
+			assert.Equal(t, tc.wantPhase, status.Phase)
+			if tc.wantReason != "" {
+				outcome, _ := opv1alpha1.OutcomeConditionFor(status.Phase)
+				assert.Equal(t, tc.wantReason, outcome.GetReason(&status))
+			}
+			assert.Equal(t, tc.wantTerminated, !status.TerminatedAt.IsZero(),
+				"termination is recorded only when nothing is owed")
+		})
+	}
+}
+
+// A Pending operation has not acquired the beacon yet, so its absence is "not created" rather than
+// "lost" — the system-agent controller creates one once the cluster can take operations — and the
+// operation waits rather than failing.
+func TestOnChange_MissingBeaconWhilePendingWaits(t *testing.T) {
+	t.Parallel()
+
+	op := withClusterRef(newOp(), "test")
+	op.Spec.TTL = -1
+	op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhasePending},
+	}
+
+	h, _, _ := newOnChangeHandler(nil)
+
+	status, err := h.OnChange(op, op.Status)
+	assert.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhasePending, status.Phase, "a beacon yet to be created is not a failure")
+	assert.Equal(t, opv1alpha1.WaitingForBeaconReason, opv1alpha1.PendingCondition.GetReason(&status))
+	assert.True(t, status.TerminatedAt.IsZero())
+}
+
+// TestOnChange_MissingClusterStillFailsRunningOperation guards the rule from over-reaching: for an
+// operation which still has work to dispatch, a missing cluster is exactly the failure it always
+// was.
+func TestOnChange_MissingClusterStillFailsRunningOperation(t *testing.T) {
+	t.Parallel()
+
+	for _, phase := range []opv1alpha1.OperationPhase{
+		opv1alpha1.OperationPhasePending,
+		opv1alpha1.OperationPhaseInProgress,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			t.Parallel()
+
+			op := withClusterRef(newOp(), "gone")
+			op.Spec.TTL = -1
+			op.Status = opv1alpha1.ETCDSnapshotSaveStatus{
+				OperationStatus: opv1alpha1.OperationStatus{Phase: phase},
+				Step:            opv1alpha1.ETCDSnapshotSaveStepSave,
+			}
+
+			h, _, _ := newOnChangeHandler(newBeacon("", false))
+
+			status, err := h.OnChange(op, op.Status)
+			assert.NoError(t, err)
+			assert.Equal(t, opv1alpha1.OperationPhaseFailed, status.Phase)
+			assert.Equal(t, opv1alpha1.ClusterNotFoundReason, opv1alpha1.FailedCondition.GetReason(&status))
+			assert.False(t, status.TerminatedAt.IsZero(),
+				"there is no beacon to release, so the failure must not be left uncollectable")
+		})
+	}
 }

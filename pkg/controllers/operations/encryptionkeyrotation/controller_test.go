@@ -141,10 +141,19 @@ type fakeDynamic struct {
 	enqueueCalls []enqueueCall
 }
 
-func (d *fakeDynamic) Get(_ schema.GroupVersionKind, _, _ string) (runtime.Object, error) {
+// Get honors the requested name, so a test can point an operation at a cluster which is not there:
+// what the reconcile sees once a cluster has been deleted underneath an operation. Without that a
+// missing-cluster test resolves a scope as usual and asserts against the wrong code path.
+func (d *fakeDynamic) Get(_ schema.GroupVersionKind, _, name string) (runtime.Object, error) {
 	if d.getErr != nil {
 		return nil, d.getErr
 	}
+
+	obj, ok := d.getObj.(metav1.Object)
+	if !ok || obj.GetName() != name {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
+	}
+
 	return d.getObj, nil
 }
 
@@ -190,7 +199,7 @@ func newScope(op *opv1alpha1.EncryptionKeyRotation, beacon *planv1alpha1.Beacon,
 	cluster.SetName("test")
 	return &scope{
 		// The ownerKey the real controller computes in resolveScope, so beacon fixtures created
-		// with ops.BeaconOwnerKey(OperationKind, op) are recognised as ours by the ownership and delegate checks.
+		// with ops.BeaconOwnerKey(OperationKind, op) are recognized as ours by the ownership and delegate checks.
 		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		beacon:     beacon,
@@ -1987,5 +1996,318 @@ func TestHandlePending_ReclaimsSupersededClaim(t *testing.T) {
 	}
 	if len(s.beacon.Status.Delegates) != 0 {
 		t.Fatalf("the dead claim's delegate must not be inherited, got %v", s.beacon.Status.Delegates)
+	}
+}
+
+// missingClusterOp points an operation at a cluster the dynamic resolver does not serve, which is
+// what the reconcile sees once a cluster has been deleted underneath an operation.
+func missingClusterOp(op *opv1alpha1.EncryptionKeyRotation) *opv1alpha1.EncryptionKeyRotation {
+	op.Spec.ClusterRef.Name = "gone"
+	return op
+}
+
+// --- a missing cluster or beacon for an operation which has already concluded ------------------
+
+// TestOnChange_CancelWithMissingClusterKeepsOutcome covers the sequence that motivated this rule:
+// cancellation is applied before the scope is resolved, so a canceled operation whose cluster is
+// gone reaches the missing-cluster branch already terminal. Failing it there would report the
+// user's cancellation as a failure.
+func TestOnChange_CancelWithMissingClusterKeepsOutcome(t *testing.T) {
+	op := missingClusterOp(newOnChangeOp())
+	op.Spec.Cancel = true
+	op.Spec.TTL = -1
+	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseInProgress},
+		Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
+	}
+
+	h, _, _, _ := newOnChangeHandler(newBeacon(ops.BeaconOwnerKey(OperationKind, op), true))
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Phase != opv1alpha1.OperationPhaseCanceled {
+		t.Fatalf("the cancellation must not be reported as a failure, got phase %q", status.Phase)
+	}
+	if opv1alpha1.CanceledCondition.GetReason(&status) != opv1alpha1.CancelRequestedReason {
+		t.Fatalf("expected reason %q, got %q", opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(&status))
+	}
+	if opv1alpha1.FailedCondition.GetReason(&status) == opv1alpha1.ClusterNotFoundReason {
+		t.Fatal("the missing cluster must not be recorded as the outcome")
+	}
+	if status.TerminatedAt.IsZero() {
+		t.Fatal("with no cluster there is nothing to release")
+	}
+	if string(opv1alpha1.FinalizedCondition.GetStatus(&status)) != "True" {
+		t.Fatal("nothing is owed, so the operation is finalized")
+	}
+}
+
+// The same rule protects an operation which concluded on an earlier reconcile: deleting the cluster
+// inside the operation's TTL must not rewrite what it ended with.
+func TestOnChange_MissingClusterKeepsConcludedOutcome(t *testing.T) {
+	for _, phase := range []opv1alpha1.OperationPhase{
+		opv1alpha1.OperationPhaseSucceeded,
+		opv1alpha1.OperationPhaseFailed,
+		opv1alpha1.OperationPhaseAborted,
+		opv1alpha1.OperationPhaseCanceled,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			op := missingClusterOp(newOnChangeOp())
+			op.Spec.TTL = -1
+
+			initial := opv1alpha1.EncryptionKeyRotationStatus{Step: opv1alpha1.EncryptionKeyRotationStepRestart}
+			initial.SetPhase(phase)
+			op.Status = initial
+
+			h, _, _, _ := newOnChangeHandler(newBeacon("", false))
+
+			status, err := h.OnChange(op, op.Status)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if status.Phase != phase {
+				t.Fatalf("the phase the operation ended in must stand, got %q", status.Phase)
+			}
+			outcome, _ := opv1alpha1.OutcomeConditionFor(phase)
+			if string(outcome.GetStatus(&status)) != "True" {
+				t.Fatalf("expected %s to be asserted", outcome)
+			}
+			if status.TerminatedAt.IsZero() {
+				t.Fatal("with no cluster there is nothing to release")
+			}
+		})
+	}
+}
+
+// TestOnChange_MissingClusterWithOwedHookDefersTermination is the other half of the rule. The
+// operation cannot be handed a beacon that is not there, but its terminal phase hook is still
+// labelled: the delegate has not had its turn, so recording termination would claim it had.
+func TestOnChange_MissingClusterWithOwedHookDefersTermination(t *testing.T) {
+	op := missingClusterOp(newOnChangeOp())
+	op.Spec.TTL = -1
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "verify": "delegate-a"}
+
+	initial := opv1alpha1.EncryptionKeyRotationStatus{Step: opv1alpha1.EncryptionKeyRotationStepRestart}
+	initial.MarkSucceeded()
+	op.Status = initial
+
+	h, _, _, _ := newOnChangeHandler(newBeacon("", false))
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Phase != opv1alpha1.OperationPhaseSucceeded {
+		t.Fatalf("expected the outcome to stand, got %q", status.Phase)
+	}
+	if !status.TerminatedAt.IsZero() {
+		t.Fatal("the delegate has not had its turn, so nothing may be recorded")
+	}
+	if opv1alpha1.FinalizedCondition.GetReason(&status) != opv1alpha1.WaitingForDelegateReason {
+		t.Fatalf("the wait must be reported against the delegate holding it up, got %q",
+			opv1alpha1.FinalizedCondition.GetReason(&status))
+	}
+}
+
+// A deleting operation is the deliberate exception: it is being discarded and its hooks go with it,
+// so it terminates at once rather than holding its finalizer open for a delegate that will never be
+// handed anything.
+func TestOnChange_DeletionWithMissingClusterAbandonsOwedHook(t *testing.T) {
+	op := missingClusterOp(newDeletingOp())
+	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "verify": "delegate-a"}
+	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhaseSucceeded},
+		Step:            opv1alpha1.EncryptionKeyRotationStepRestart,
+	}
+
+	h, controller, _, _ := newOnChangeHandler(newBeacon("", false))
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.TerminatedAt.IsZero() {
+		t.Fatal("a deletion abandons the hook rather than waiting on it")
+	}
+
+	op.Status = status
+
+	if _, err := h.OnChange(op, op.Status); err != nil {
+		t.Fatalf("unexpected error on the second pass: %v", err)
+	}
+	if len(controller.updates) != 1 || slices.Contains(controller.updates[0].Finalizers, Finalizer) {
+		t.Fatal("the finalizer must not be held for an abandoned hook")
+	}
+}
+
+// TestOnChange_MissingBeaconDisposition covers what an operation does when the beacon it needs is
+// not there. What it should do depends entirely on what it still owes: an outcome which dispatched
+// work owes a release and complains that it cannot make one, while an outcome which dispatched
+// nothing owes nothing and finishes.
+func TestOnChange_MissingBeaconDisposition(t *testing.T) {
+	cases := []struct {
+		name string
+		// phase the operation is in when its beacon turns up missing.
+		phase opv1alpha1.OperationPhase
+		// terminated is whether it had already recorded terminal handling as complete.
+		terminated bool
+
+		wantErr        bool
+		wantPhase      opv1alpha1.OperationPhase
+		wantReason     string
+		wantTerminated bool
+	}{
+		{
+			// Aborted called its own work off, so there is nothing a beacon would have wound down.
+			name:           "aborted finishes",
+			phase:          opv1alpha1.OperationPhaseAborted,
+			wantPhase:      opv1alpha1.OperationPhaseAborted,
+			wantTerminated: true,
+		},
+		{
+			// Cancellation is usually driven by whoever wants the beacon next, so a beacon that is
+			// not there is no surprise at all.
+			name:           "canceled finishes",
+			phase:          opv1alpha1.OperationPhaseCanceled,
+			wantPhase:      opv1alpha1.OperationPhaseCanceled,
+			wantTerminated: true,
+		},
+		{
+			// Work was dispatched under the beacon's authority and never handed back: the state
+			// serializing writes to this cluster went missing while this operation still had a claim
+			// on it. It stays stuck, and says so, rather than recording itself as wrapped up.
+			name:      "succeeded complains and sticks",
+			phase:     opv1alpha1.OperationPhaseSucceeded,
+			wantErr:   true,
+			wantPhase: opv1alpha1.OperationPhaseSucceeded,
+		},
+		{
+			name:      "failed complains and sticks",
+			phase:     opv1alpha1.OperationPhaseFailed,
+			wantErr:   true,
+			wantPhase: opv1alpha1.OperationPhaseFailed,
+		},
+		{
+			// Already released whatever it held, so a beacon collected afterwards is none of its
+			// business, and it must still be collectable.
+			name:           "succeeded and already terminated settles",
+			phase:          opv1alpha1.OperationPhaseSucceeded,
+			terminated:     true,
+			wantPhase:      opv1alpha1.OperationPhaseSucceeded,
+			wantTerminated: true,
+		},
+		{
+			// Still in flight: the beacon was taken out from under it, which is the same fault
+			// handleInProgress reports when it finds the beacon reassigned.
+			name:           "in progress fails",
+			phase:          opv1alpha1.OperationPhaseInProgress,
+			wantPhase:      opv1alpha1.OperationPhaseFailed,
+			wantReason:     opv1alpha1.BeaconLostReason,
+			wantTerminated: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := newOnChangeOp()
+			op.Spec.TTL = -1
+
+			initial := opv1alpha1.EncryptionKeyRotationStatus{Step: opv1alpha1.EncryptionKeyRotationStepRestart}
+			initial.SetPhase(tc.phase)
+			if tc.terminated {
+				initial.SetTerminated()
+			}
+			op.Status = initial
+
+			h, _, _, _ := newOnChangeHandler(nil)
+
+			status, err := h.OnChange(op, op.Status)
+			if tc.wantErr && err == nil {
+				t.Fatal("the operation must complain about a beacon it cannot release")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// A handler which returns an error has its status reverted by the generated status
+			// handler, so only the phase it was already in is observable on that path.
+			if status.Phase != tc.wantPhase {
+				t.Fatalf("phase = %q, want %q", status.Phase, tc.wantPhase)
+			}
+			if tc.wantReason != "" {
+				outcome, _ := opv1alpha1.OutcomeConditionFor(status.Phase)
+				if outcome.GetReason(&status) != tc.wantReason {
+					t.Fatalf("reason = %q, want %q", outcome.GetReason(&status), tc.wantReason)
+				}
+			}
+			if terminated := !status.TerminatedAt.IsZero(); terminated != tc.wantTerminated {
+				t.Fatalf("terminated = %v, want %v: termination is recorded only when nothing is owed",
+					terminated, tc.wantTerminated)
+			}
+		})
+	}
+}
+
+// A Pending operation has not acquired the beacon yet, so its absence is "not created" rather than
+// "lost" — the system-agent controller creates one once the cluster can take operations — and the
+// operation waits rather than failing.
+func TestOnChange_MissingBeaconWhilePendingWaits(t *testing.T) {
+	op := newOnChangeOp()
+	op.Spec.TTL = -1
+	op.Status = opv1alpha1.EncryptionKeyRotationStatus{
+		OperationStatus: opv1alpha1.OperationStatus{Phase: opv1alpha1.OperationPhasePending},
+	}
+
+	h, _, _, _ := newOnChangeHandler(nil)
+
+	status, err := h.OnChange(op, op.Status)
+	if err != nil {
+		t.Fatalf("a beacon yet to be created is not a failure: %v", err)
+	}
+	if status.Phase != opv1alpha1.OperationPhasePending {
+		t.Fatalf("phase = %q, want Pending", status.Phase)
+	}
+	if opv1alpha1.PendingCondition.GetReason(&status) != opv1alpha1.WaitingForBeaconReason {
+		t.Fatalf("reason = %q, want %q", opv1alpha1.PendingCondition.GetReason(&status), opv1alpha1.WaitingForBeaconReason)
+	}
+	if !status.TerminatedAt.IsZero() {
+		t.Fatal("nothing has been handled yet, so nothing may be recorded")
+	}
+}
+
+// TestOnChange_MissingClusterStillFailsRunningOperation guards the rule from over-reaching: for an
+// operation which still has work to dispatch, a missing cluster is exactly the failure it always
+// was.
+func TestOnChange_MissingClusterStillFailsRunningOperation(t *testing.T) {
+	for _, phase := range []opv1alpha1.OperationPhase{
+		opv1alpha1.OperationPhasePending,
+		opv1alpha1.OperationPhaseInProgress,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			op := missingClusterOp(newOnChangeOp())
+			op.Spec.TTL = -1
+			op.Status = opv1alpha1.EncryptionKeyRotationStatus{
+				OperationStatus: opv1alpha1.OperationStatus{Phase: phase},
+				Step:            opv1alpha1.EncryptionKeyRotationStepRotate,
+			}
+
+			h, _, _, _ := newOnChangeHandler(newBeacon("", false))
+
+			status, err := h.OnChange(op, op.Status)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if status.Phase != opv1alpha1.OperationPhaseFailed {
+				t.Fatalf("expected phase Failed, got %q", status.Phase)
+			}
+			if opv1alpha1.FailedCondition.GetReason(&status) != opv1alpha1.ClusterNotFoundReason {
+				t.Fatalf("expected reason %q, got %q", opv1alpha1.ClusterNotFoundReason, opv1alpha1.FailedCondition.GetReason(&status))
+			}
+			if status.TerminatedAt.IsZero() {
+				t.Fatal("there is no beacon to release, so the failure must not be left uncollectable")
+			}
+		})
 	}
 }

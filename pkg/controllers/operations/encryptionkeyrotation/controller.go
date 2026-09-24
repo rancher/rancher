@@ -316,14 +316,21 @@ func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1
 	if apierrors.IsNotFound(err) {
 		key := opv1alpha1.ClusterRefKey(op.Spec.ClusterRef)
 
-		// The beacon lives alongside the cluster, so a deleted operation whose cluster is gone has
-		// nothing left to release or unpause: terminal handling is trivially complete and the
-		// operation is free to finish deleting. Failing it here instead would both overwrite the
-		// Canceled phase and, for a cluster deleted mid-operation, wedge the deletion behind our
-		// finalizer.
-		if deleting {
+		// A missing cluster is only a failure for an operation which still has work to dispatch. One
+		// which is deleting, or which has already concluded, has none: with no cluster there is no
+		// adapter, and so no way to reach a beacon to release. Failing it here would overwrite the
+		// outcome the operation ended with — the phase a cancellation just recorded, or a success
+		// from an earlier reconcile — and, for a cluster deleted mid-operation, wedge the deletion
+		// behind our finalizer.
+		if deleting || ops.IsTerminal(status.Phase) {
 			logrus.Infof("[encryptionkeyrotation] %s/%s: cluster %s is gone, nothing to release", op.Namespace, op.Name, key)
-			status.SetTerminated()
+
+			// A terminal phase hook may still be owed, in which case the operation is left
+			// un-terminated: its delegate has not had its turn, and recording termination would
+			// claim that it had. UpdateStatus reports that wait, and deleting the operation is the
+			// remedy if the delegate never clears its label.
+			ops.TerminateUnlessHookOwed(op, &status.OperationStatus)
+
 			return nil, status, nil
 		}
 
@@ -365,22 +372,62 @@ func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1
 	namespace, beaconName := adapter.BeaconRef()
 
 	beacon, err := h.beacons.Get(namespace, beaconName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) && deleting {
-		// As above: no beacon means nothing to release, so let the deletion proceed rather than
-		// requeueing a NotFound forever.
-		logrus.Infof("[encryptionkeyrotation] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
-		status.SetTerminated()
-		return nil, status, nil
-	} else if apierrors.IsNotFound(err) && status.Phase == opv1alpha1.OperationPhasePending {
-		logrus.Warnf("[encryptionkeyrotation]: %s/%s failed to find beacon %s/%s (clusterRef apiVersion=%s kind=%s name=%s)",
-			op.Namespace, op.Name, namespace, beaconName, ustr.GetAPIVersion(), ustr.GetKind(), ustr.GetName())
+	if apierrors.IsNotFound(err) {
+		switch {
+		// Nothing is owed on the beacon. A deleting operation is discarded along with its hooks;
+		// an Aborted one called its own work off; a Canceled one was called off from outside, often
+		// by whoever wanted the beacon next, so the beacon was never guaranteed to still be this
+		// operation's. None of them are worse off for it being gone.
+		case deleting,
+			status.Phase == opv1alpha1.OperationPhaseAborted,
+			status.Phase == opv1alpha1.OperationPhaseCanceled:
+			logrus.Infof("[encryptionkeyrotation] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
 
-		opv1alpha1.PendingCondition.True(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
-		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+			ops.TerminateUnlessHookOwed(op, &status.OperationStatus)
 
-		return nil, status, nil
-	} else if err != nil {
+			return nil, status, nil
+
+		// Already released whatever it held, so a beacon collected afterwards is no concern of this
+		// operation's. Let the reconcile settle so TTL collection can take it.
+		case ops.IsTerminated(&status.OperationStatus):
+			return nil, status, nil
+
+		// Succeeded and Failed both dispatched work to the cluster under the beacon's authority and
+		// have not yet handed that authority back. A beacon which has gone missing in that window
+		// means the state serializing writes to this cluster was destroyed while an operation still
+		// had a claim on it — so complain, and keep complaining, rather than quietly recording the
+		// operation as wrapped up. It stays stuck until an administrator looks at it; deleting the
+		// operation is the way out, and cancels it on the way.
+		case ops.IsTerminal(status.Phase):
+			return nil, status, fmt.Errorf("beacon %s/%s is gone while %s/%s has yet to release it: %w",
+				namespace, beaconName, op.Namespace, op.Name, err)
+
+		// Pending has not acquired the beacon yet, so its absence is "not created" rather than
+		// "lost": the system-agent controller creates one once the cluster can take operations.
+		case status.Phase == opv1alpha1.OperationPhasePending, status.Phase == "":
+			logrus.Warnf("[encryptionkeyrotation]: %s/%s failed to find beacon %s/%s (clusterRef apiVersion=%s kind=%s name=%s)",
+				op.Namespace, op.Name, namespace, beaconName, ustr.GetAPIVersion(), ustr.GetKind(), ustr.GetName())
+
+			opv1alpha1.PendingCondition.True(&status)
+			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
+			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+
+			return nil, status, nil
+
+		// Anything still in flight has had the beacon taken out from under it, which is the fault
+		// handleInProgress reports when it finds the beacon reassigned. There is nothing left to
+		// release, so the failure is terminated here for the same reason the missing-cluster failure
+		// above is: no later reconcile would reach a terminal handler to do it.
+		default:
+			logrus.Errorf("[encryptionkeyrotation] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
+
+			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("beacon %s/%s not found", namespace, beaconName))
+			ops.TerminateUnlessHookOwed(op, &status.OperationStatus)
+
+			return nil, status, nil
+		}
+	}
+	if err != nil {
 		return nil, status, err
 	}
 

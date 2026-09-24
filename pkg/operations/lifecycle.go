@@ -94,10 +94,11 @@ func Collectable(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1a
 //   - terminal: the work is over and its outcome will not change, so the matching outcome condition
 //     goes True (keeping the reason and message it was given at decision time) and the others go
 //     False. The progress conditions are cleared.
-//   - terminal and terminated: the controller is done with the operation too, the terminal phase
-//     hook was satisfied and the beacon released, so Finalized goes True. Until then, it stays
-//     False with FinalizingReason, which is the only difference between this state and the one
-//     above.
+//   - terminal and terminated: the controller is done with the operation too, so Finalized goes
+//     True. Until then, it stays False with FinalizingReason, which is the only difference between
+//     this state and the one above. "Done with" means nothing is owed: the terminal phase hook was
+//     satisfied, or there was never anything to hand it, or the operation is being deleted and its
+//     hooks are abandoned with it.
 func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) {
 	status.ObservedGeneration = op.GetGeneration()
 	if spec.Paused {
@@ -179,7 +180,7 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 
 		// Read the delegate back off the operation rather than remembering it on a condition: the
 		// hook label is the source of truth, so when the delegate clears it this reverts by itself.
-		if _, delegate := LifecycleHookDelegate(op, TerminalPhaseHookPrefix(status.Phase)); delegate != "" {
+		if delegate := TerminalHookDelegate(op, status.Phase); delegate != "" {
 			opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.WaitingForDelegateReason)
 			opv1alpha1.FinalizedCondition.Message(status, fmt.Sprintf("Waiting for delegates to finish: %v", delegate))
 		} else {
