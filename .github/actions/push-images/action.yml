@@ -43,3 +43,13 @@ runs:
         fi
         docker tag "$image_agent_id" "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher-agent:${TAG}-${ARCH}"
         docker push "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher-agent:${TAG}-${ARCH}"
+    - name: Push installer image
+      shell: bash
+      run: |
+        image_installer_id=$(docker load --input "/tmp/system-agent-installer-rancher-${OS}-${ARCH}.tar" 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        if [ -z "$image_installer_id" ]; then
+          echo "Error: Failed to load image from tarball!"
+          exit 1
+        fi
+        docker tag "$image_installer_id" "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/system-agent-installer-rancher:${TAG}-${ARCH}"
+        docker push "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/system-agent-installer-rancher:${TAG}-${ARCH}"
