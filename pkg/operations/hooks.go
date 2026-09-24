@@ -50,6 +50,31 @@ func LifecycleHookDelegate(obj metav1.Object, prefix string) (string, string) {
 	return "", ""
 }
 
+// TerminalHookDelegate returns the delegate the operation's terminal phase hook is still waiting on,
+// or "" when none is owed.
+//
+// A terminal operation is not finished with while that label is present: the delegate has not had
+// its turn on the beacon, so neither the controller nor anything reading Finalized may treat the
+// operation as wrapped up. A non-terminal phase has no terminal hook and so owes nothing.
+func TerminalHookDelegate(op metav1.Object, phase opv1alpha1.OperationPhase) string {
+	_, delegate := LifecycleHookDelegate(op, TerminalPhaseHookPrefix(phase))
+
+	return delegate
+}
+
+// TerminateUnlessHookOwed records terminal handling as complete unless the operation's terminal
+// phase hook is still owed a turn. Callers use it where there is nothing left to hand a delegate —
+// no cluster, or no beacon — so the operation would otherwise be recorded as wrapped up while its
+// delegate had never been given the beacon it was promised.
+//
+// A deleting operation is the exception: it is discarded along with its hooks, so it terminates at
+// once rather than holding its finalizer open for a delegate that will never be handed anything.
+func TerminateUnlessHookOwed(op metav1.Object, status *opv1alpha1.OperationStatus) {
+	if op.GetDeletionTimestamp() != nil || TerminalHookDelegate(op, status.Phase) == "" {
+		status.SetTerminated()
+	}
+}
+
 // HasStepHookLabel reports whether obj carries at least one label whose key begins with the given
 // step-hook prefix (e.g. "rotate.step.hook.operation.cattle.io/"). Callers use this to detect
 // that the operation is in the middle of a step-scoped delegation and thus the operation may not

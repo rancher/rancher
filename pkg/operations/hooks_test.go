@@ -79,7 +79,7 @@ func TestHasActiveLifecycleHook(t *testing.T) {
 		{
 			name: "step hook not exported by this package",
 			// Step prefixes live in the operation-controller packages (e.g. save.step.hook.…,
-			// rotate.step.hook.…). The predicate must still recognise them via the shared
+			// rotate.step.hook.…). The predicate must still recognize them via the shared
 			// marker so a controller-defined step hook keeps its op alive.
 			labels: map[string]string{"save.step.hook.operation.cattle.io/my-hook": "delegate-a"},
 			want:   true,

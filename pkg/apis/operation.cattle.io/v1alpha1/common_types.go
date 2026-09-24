@@ -112,9 +112,11 @@ type OperationStatus struct {
 	LastUpdated metav1.Time `json:"lastUpdated,omitempty,omitzero"`
 
 	// TerminatedAt identifies when the controller finished handling the terminal phase of the
-	// Operation: the terminal-phase lifecycle hook (if any) ran to completion and the beacon was
-	// released. It is set once and never cleared, and is only ever set on an Operation which has
-	// reached a terminal phase.
+	// Operation, meaning nothing is owed on it any more. Ordinarily the terminal-phase lifecycle
+	// hook (if any) ran to completion and the beacon was released; it also covers an Operation with
+	// no beacon left to release, and one being deleted, whose hooks are abandoned along with it.
+	// It is set once and never cleared, and is only ever set on an Operation which has reached a
+	// terminal phase.
 	// An Operation which reached a terminal phase is not necessarily terminated: terminal handling
 	// may still be delegated to another controller. An Operation deleted before it is terminated is
 	// canceled, as the work it dispatched is no longer tracked by anything.
@@ -194,10 +196,11 @@ func (s *OperationStatus) markOutcome(phase OperationPhase, reason, message stri
 }
 
 // SetTerminated records that terminal handling for the operation has completed. Operation
-// controllers must only call this once the terminal phase is fully handled (e.g. the terminal
-// phase hook has been satisfied and the beacon has been released) as it is what makes the
-// operation eligible for TTL garbage collection and what distinguishes a deletion that races
-// terminal handling (canceled) from one that follows it (left as-is).
+// controllers must only call this once nothing is owed on the operation (its terminal phase hook
+// has been satisfied, or there is nothing left to hand one, or the operation is being deleted and
+// its hooks go with it) and the beacon has been released. It is what makes the operation eligible
+// for TTL garbage collection, and what distinguishes a deletion that races terminal handling
+// (canceled) from one that follows it (left as-is).
 //
 // The timestamp is only written on the first call so it keeps pointing at the moment terminal
 // handling actually completed, no matter how many times the operation is reconciled afterward.
