@@ -15,7 +15,7 @@ const (
 	// (or a downstream Node). Only Group + Kind + Name are stamped:
 	//   - Version is omitted because a GroupKind uniquely identifies a resource; the API server
 	//     serves whichever version it stores in when a caller uses a discovery-mapped client.
-	//   - Namespace is omitted deliberately — the caller's own context namespace is authoritative
+	//   - Namespace is omitted deliberately: the caller's own context namespace is authoritative
 	//     for resolving the reference. Encoding the namespace in a label would let a plan-secret
 	//     value point at a resource in a different namespace than the secret itself, which is a
 	//     cross-tenant spoofing vector.
@@ -100,9 +100,9 @@ func ResolveKindStorageVersion(mapper meta.RESTMapper, gk schema.GroupKind) (sch
 }
 
 // MachineLifecycleLabelsToObjectReference parses the machine-lifecycle labels on obj into an
-// ObjectReference. The Namespace field of the returned reference is ALWAYS contextNamespace —
-// the caller supplies its own authoritative namespace; this is what prevents cross-namespace
-// spoofing through label values. The APIVersion is resolved from the labelled Group via the
+// ObjectReference. The Namespace field of the returned reference is ALWAYS contextNamespace
+// (the caller supplies its own authoritative namespace); this is what prevents cross-namespace
+// spoofing through label values. The APIVersion is resolved from the labeled Group via the
 // RESTMapper.
 func MachineLifecycleLabelsToObjectReference(obj metav1.Object, contextNamespace string, mapper meta.RESTMapper) (*corev1.ObjectReference, error) {
 	return lifecycleLabelsToObjectReference(obj, contextNamespace, mapper,
@@ -110,7 +110,7 @@ func MachineLifecycleLabelsToObjectReference(obj metav1.Object, contextNamespace
 }
 
 // ClusterLifecycleLabelsToObjectReference is the cluster-lifecycle analogue of
-// MachineLifecycleLabelsToObjectReference. When the resolved scope is Root (cluster-scoped —
+// MachineLifecycleLabelsToObjectReference. When the resolved scope is Root (cluster-scoped
 // e.g. management.cattle.io/v3 Cluster) the returned reference has Namespace = "" regardless of
 // contextNamespace.
 func ClusterLifecycleLabelsToObjectReference(obj metav1.Object, contextNamespace string, mapper meta.RESTMapper) (*corev1.ObjectReference, error) {

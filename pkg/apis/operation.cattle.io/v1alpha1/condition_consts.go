@@ -13,15 +13,15 @@ import (
 // the operation altogether.
 //
 // An outcome condition goes True as soon as the operation reaches the matching terminal phase. At
-// that point the work it was asked to do is over and its result will not change — but the
+// that point the work it was asked to do is over and its result will not change, but the
 // controller is not necessarily finished: the terminal phase hook may still be delegated, the
 // cluster may still be paused, and the beacon may still be held. Finalized covers that last stretch
 // and goes True once it is complete (see OperationStatus.TerminatedAt).
 //
 // So the two questions an observer can ask are answered separately:
 //
-//   - "how did it turn out?" — the outcome conditions, available as early as possible;
-//   - "is the controller done with it?" — Finalized, which is also the single target for
+//   - "how did it turn out?" - the outcome conditions, available as early as possible;
+//   - "is the controller done with it?" - Finalized, which is also the single target for
 //     "it is over, whatever happened", since kubectl cannot wait on a disjunction of conditions.
 //
 // Waiting on an outcome plus Finalized together means "succeeded and fully wrapped up". Note that
@@ -51,7 +51,7 @@ var (
 	AbortedCondition = condition.Cond("Aborted")
 
 	// CanceledCondition represents the condition state for a task or process that has been canceled
-	// from outside — by the user, by another controller, or by being deleted mid-flight.
+	// from outside: by the user, by another controller, or by being deleted mid-flight.
 	// True once the operation reaches the Canceled phase; see FinalizedCondition for whether the
 	// controller has finished with it.
 	CanceledCondition = condition.Cond("Canceled")
@@ -100,8 +100,8 @@ const (
 	// cannot have been finalized.
 	NotFinalizedReason = "NotFinalized"
 
-	// FinalizingReason surfaces when an operation has reached a terminal phase — its outcome is
-	// asserted and will not change — but the controller has not finished with it: the terminal
+	// FinalizingReason surfaces when an operation has reached a terminal phase (its outcome is
+	// asserted and will not change) but the controller has not finished with it: the terminal
 	// phase hook may still be delegated, the cluster may still be paused, and the beacon may still
 	// be held.
 	FinalizingReason = "Finalizing"
@@ -162,7 +162,7 @@ const (
 // handler decided the outcome, and should not be overwritten with the summary.
 //
 // A non-terminal phase has no outcome, so it maps to FailedCondition: callers are expected to check
-// the phase is terminal first, and treating an unrecognised phase as a failure matches how the
+// the phase is terminal first, and treating an unrecognized phase as a failure matches how the
 // operation controllers handle one.
 func OutcomeConditionFor(phase OperationPhase) (condition.Cond, string) {
 	switch phase {

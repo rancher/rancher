@@ -1,6 +1,8 @@
 package plan
 
 import (
+	"slices"
+
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 )
@@ -35,7 +37,7 @@ func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 //     Delegates=nil).
 //   - Otherwise, if `expected` appears anywhere in the delegate chain, it is removed from the
 //     chain. This is broader than PopDelegate (which only pops the top) because a terminating
-//     operation may hold a mid-chain slot — its dependent delegates should already have popped
+//     operation may hold a mid-chain slot: its dependent delegates should already have popped
 //     themselves off by the time we run cleanup, but if they haven't we still need to prevent
 //     leaking our own reference.
 //   - If `expected` is neither the owner nor in the chain, no action is taken.
@@ -109,7 +111,7 @@ func HoldsBeacon(beacon *planv1alpha1.Beacon, desired string) bool {
 }
 
 // ReleaseBeaconIfHeld hands the beacon back when expected still holds it, and reports whether it was
-// the primary owner rather than a delegate acting on its behalf — which is what callers use to
+// the primary owner rather than a delegate acting on its behalf which is what callers use to
 // decide whether their own termination implies downstream work. Releasing a beacon held by anybody
 // else is a no-op, so the guard also spares the caller an update it does not need.
 func ReleaseBeaconIfHeld(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, expected string) (bool, error) {
@@ -126,24 +128,6 @@ func IsOwningBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
 	}
 
 	return beacon.Status.Owner == desired
-}
-
-func IsActiveBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
-	if beacon == nil {
-		return false
-	}
-
-	if beacon.Status.Owner == desired {
-		return true
-	}
-
-	if len(beacon.Status.Delegates) > 0 {
-		if beacon.Status.Delegates[len(beacon.Status.Delegates)-1] == desired {
-			return true
-		}
-	}
-
-	return false
 }
 
 func IsDelegateBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
@@ -167,13 +151,7 @@ func IsInDelegateChain(beacon *planv1alpha1.Beacon, desired string) bool {
 		return false
 	}
 
-	for _, delegate := range beacon.Status.Delegates {
-		if delegate == desired {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(beacon.Status.Delegates, desired)
 }
 
 func PushDelegate(beacon *planv1alpha1.Beacon, delegate string, beacons plancontrollers.BeaconClient) (*planv1alpha1.Beacon, error) {

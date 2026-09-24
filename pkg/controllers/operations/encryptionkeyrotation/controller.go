@@ -932,7 +932,7 @@ type terminalPhase struct {
 // operation is recorded as terminated.
 //
 // Reaching a terminal phase is not the end of the operation's handling: the phase's lifecycle hook
-// may hand the beacon to a delegate first, and the beacon has to be released afterwards so the next
+// may hand the beacon to a delegate first, and the beacon has to be released afterward so the next
 // operation in line can acquire it. Recording termination in this one place — after the hook is
 // satisfied, after the release succeeded — is what keeps the marker honest, since that marker is
 // what makes the operation eligible for TTL collection and lets a deleted operation finish
@@ -953,9 +953,9 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.EncryptionKeyRotati
 	// holds would be reaching into its operation. Everything after the hook is either a no-op
 	// without a claim (releaseBeacon) or owed regardless of one, so the operation still terminates
 	// — which is what lets it be collected, or lets a deleted one retire its finalizer.
-	honourHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
+	honorHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
 
-	if honourHook {
+	if honorHook {
 		delegated, err := h.handleHook(s, phase.hook)
 		if err != nil {
 			return status, err

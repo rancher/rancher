@@ -865,9 +865,9 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 	// holds would be reaching into its operation. Everything after the hook is either a no-op
 	// without a claim (releaseBeacon) or owed regardless of one, so the operation still terminates
 	// — which is what lets it be collected, or lets a deleted one retire its finalizer.
-	honourHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
+	honorHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
 
-	if honourHook {
+	if honorHook {
 		delegated, err := h.handleHook(s, phase.hook)
 		if err != nil {
 			return status, err
@@ -917,7 +917,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 }
 
 // handleFailed handles the Failed terminal phase, releasing the beacon so the next operation in
-// line can acquire it. The toggle-off pairs with handleSucceeded's behaviour so the beacon's Active
+// line can acquire it. The toggle-off pairs with handleSucceeded's behavior so the beacon's Active
 // flag accurately reflects whether any operation is currently running.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
