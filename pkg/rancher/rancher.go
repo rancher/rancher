@@ -445,13 +445,22 @@ func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int)
 
 func (r *Rancher) Start(ctx context.Context) error {
 	if r.opts.LocalUserPasswordsNamespace {
-		// ensure namespace for storing local users password is created
-		if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: pbkdf2.LocalUserPasswordsNamespace},
-		}); err != nil && !apierrors.IsAlreadyExists(err) {
+		// ensure namespace for storing local users password is created, retrying on transient errors
+		// instead of failing Rancher startup outright (e.g. API server not fully ready yet).
+		if err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 3*time.Minute, true, func(context.Context) (bool, error) {
+			_, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: pbkdf2.LocalUserPasswordsNamespace},
+			})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				logrus.WithError(err).Warnf("creating namespace %s failed; retrying", pbkdf2.LocalUserPasswordsNamespace)
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
 			return err
 		}
 	}
+
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
