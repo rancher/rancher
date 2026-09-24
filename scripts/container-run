@@ -100,13 +100,7 @@ for name in "${allowed_env_vars[@]}"; do
 done
 
 if ! docker image inspect "${runtime_image}" >/dev/null 2>&1; then
-    docker buildx build \
-        --build-arg "RUNTIME_HOST_ARCH=${runtime_arch}" \
-        --file "${runtime_dockerfile}" \
-        --load \
-        --platform "linux/${runtime_arch}" \
-        --tag "${runtime_image}" \
-        "${repo_root}"
+    TAG="${runtime_hash}" ARCH="${runtime_arch}" docker buildx bake runtime
 fi
 
 docker_args=(

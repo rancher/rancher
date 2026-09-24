@@ -57,3 +57,29 @@ target "demo" {
   tags = ["${REPO}/rancher:${TAG}-${ARCH}"]
   output = DEST_DIR == "" ? ["type=docker"] : ["type=docker,dest=${DEST_DIR}/rancher-demo-${OS}-${ARCH}.tar"]
 }
+
+target "installer" {
+  inherits = ["docker-metadata-action"]
+  context = "."
+  dockerfile = "./package/Dockerfile.installer"
+  platforms = ["${OS}/${ARCH}"]
+  args = {
+    VERSION = "${TAG}"
+  }
+  tags = ["${REPO}/system-agent-installer-rancher:${TAG}-${ARCH}"]
+  output = DEST_DIR == "" ? ["type=docker"] : ["type=docker,dest=${DEST_DIR}/system-agent-installer-rancher-${OS}-${ARCH}.tar"]
+}
+
+# Non-deliverable
+
+target "runtime" {
+  inherits = ["docker-metadata-action"]
+  context = "."
+  dockerfile = "./Dockerfile.runtime"
+  platforms = ["${OS}/${ARCH}"]
+  args = {
+    RUNTIME_HOST_ARCH = "${ARCH}"
+  }
+  tags = ["rancher-runtime:${TAG}-${ARCH}"]
+  output = ["type=docker"]
+}
