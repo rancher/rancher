@@ -12,11 +12,11 @@ import (
 
 // HasActiveLifecycleHook reports whether obj still carries at least one lifecycle-hook label
 // (phase or step). While such a label is present, the op's owning controller MUST NOT garbage
-// collect the object even after its terminal phase and TTL have expired — the delegate needs a
+// collect the object even after its terminal phase and TTL have expired: the delegate needs a
 // chance to observe the current phase and pop itself from the beacon's delegate chain, and it
 // signals it is done by removing the label.
 //
-// Recognises any label key containing opv1alpha1.LifecycleHookLabelMarker. That catches every phase
+// Recognizes any label key containing opv1alpha1.LifecycleHookLabelMarker. That catches every phase
 // prefix and every step-level prefix declared by an operation controller package, so callers do not
 // have to enumerate them.
 func HasActiveLifecycleHook(obj metav1.Object) bool {
@@ -53,7 +53,7 @@ func LifecycleHookDelegate(obj metav1.Object, prefix string) (string, string) {
 // HasStepHookLabel reports whether obj carries at least one label whose key begins with the given
 // step-hook prefix (e.g. "rotate.step.hook.operation.cattle.io/"). Callers use this to detect
 // that the operation is in the middle of a step-scoped delegation and thus the operation may not
-// currently sit at the top of the beacon's delegate chain — the delegate the step hook pushed is
+// currently sit at the top of the beacon's delegate chain: the delegate the step hook pushed is
 // there instead. An empty prefix returns false (no label match).
 func HasStepHookLabel(obj metav1.Object, stepPrefix string) bool {
 	if obj == nil || stepPrefix == "" {
@@ -76,8 +76,8 @@ func HasStepHookLabel(obj metav1.Object, stepPrefix string) bool {
 // primitives it is built from because hooks are an operations paradigm: pkg/plan knows how to push
 // a delegate onto a chain, and knows nothing about the labels that decide when to.
 //
-// The returned beacon is always usable — the one passed in when nothing changed or the push failed,
-// the updated one otherwise — so a caller can assign it back unconditionally.
+// The returned beacon is always usable, the one passed in when nothing changed or the push failed,
+// the updated one otherwise, so a caller can assign it back unconditionally.
 func DelegateForHook(obj metav1.Object, beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, prefix string) (bool, *planv1alpha1.Beacon, error) {
 	_, delegate := LifecycleHookDelegate(obj, prefix)
 	if delegate == "" {

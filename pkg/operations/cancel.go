@@ -3,7 +3,7 @@ package operations
 import opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 
 // IsCanceled returns true when the operation's Cancel flag is set. Cancellation is requested from
-// outside the operation — by the user, or by another controller that needs the operation to stop —
+// outside the operation by the user, or by another controller that needs the operation to stop,
 // and cannot be unset, so a controller observing it must drive the operation to the Canceled phase
 // and dispatch no further work.
 //

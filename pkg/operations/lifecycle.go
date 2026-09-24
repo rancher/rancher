@@ -12,8 +12,8 @@ import (
 
 // CancelForDeletion marks an operation deleted before its terminal handling completed as Canceled:
 // the work it dispatched is no longer tracked by anything, so it can be reported neither as
-// succeeded nor as failed. The terminal handler for the Canceled phase then runs as usual —
-// honouring any canceled phase hook, releasing the beacon — before the finalizer is dropped.
+// succeeded nor as failed. The terminal handler for the Canceled phase then runs as usual,
+// honoring any canceled phase hook and releasing the beacon, before the finalizer is dropped.
 //
 // An operation which is already terminated keeps the phase it finished in; only the window before
 // that counts as racing the operation, and in that window its beacon is still held, on its own
@@ -37,7 +37,7 @@ func CancelForDeletion(status *opv1alpha1.OperationStatus) (opv1alpha1.Operation
 // from outside, so it can be reported neither as succeeded nor as failed.
 //
 // Cancellation stops work in flight, and an operation which has reached a terminal phase has none
-// left — its outcome is asserted and will not change, so the phase it ended in stands and the
+// left: its outcome is asserted and will not change, so the phase it ended in stands and the
 // request is declined. UpdateStatus reports the declined request on the Canceled condition, so
 // setting the field is never silently ignored. The terminal check covers the already-Canceled case
 // too, Canceled being terminal itself.
@@ -45,8 +45,8 @@ func CancelForDeletion(status *opv1alpha1.OperationStatus) (opv1alpha1.Operation
 // This is deliberately narrower than CancelForDeletion, which acts on a terminal phase whose
 // handling has not completed. The asymmetry is forced: a deleted operation has to release the beacon
 // and retire its finalizer whatever phase it is in, or it would wait on a lifecycle hook that
-// nothing will ever answer and never finish deleting. So the two verbs differ in scope — cancel
-// stops the work, deletion removes the object and accepts what that implies — and deleting the
+// nothing will ever answer and never finish deleting. So the two verbs differ in scope, cancel
+// stops the work, deletion removes the object and accepts what that implies, and deleting the
 // operation is the remedy for a terminal phase hook whose delegate never returns the beacon.
 //
 // Callers reach this only for an operation which is not paused, so a paused operation is not
@@ -81,9 +81,9 @@ func Collectable(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1a
 // phase handler owns. Every operation type reports its progress the same way, so they all share
 // this; what is specific to an operation is the step it is on, and no condition here reports that.
 //
-// Division of labour for the outcome conditions (Succeeded / Failed / Aborted / Canceled): a phase
+// Division of labor for the outcome conditions (Succeeded / Failed / Aborted / Canceled): a phase
 // handler records *why* the operation ended, by setting the reason and message on the condition
-// matching the phase it moves to — the MarkSucceeded, MarkFailed, MarkAborted and MarkCanceled
+// matching the phase it moves to, the MarkSucceeded, MarkFailed, MarkAborted and MarkCanceled
 // methods on OperationStatus do exactly that. This function asserts that outcome and denies the
 // competing three, and owns the Finalized condition outright.
 //
@@ -94,8 +94,8 @@ func Collectable(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1a
 //   - terminal: the work is over and its outcome will not change, so the matching outcome condition
 //     goes True (keeping the reason and message it was given at decision time) and the others go
 //     False. The progress conditions are cleared.
-//   - terminal and terminated: the controller is done with the operation too — the terminal phase
-//     hook was satisfied and the beacon released — so Finalized goes True. Until then it stays
+//   - terminal and terminated: the controller is done with the operation too, the terminal phase
+//     hook was satisfied and the beacon released, so Finalized goes True. Until then, it stays
 //     False with FinalizingReason, which is the only difference between this state and the one
 //     above.
 func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) {
@@ -129,7 +129,7 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 	outcome, summary := opv1alpha1.OutcomeConditionFor(status.Phase)
 
 	// The outcome is asserted as soon as the terminal phase is reached: the work is over and the
-	// result will not change. The reason and message the phase handler recorded are left in place —
+	// result will not change. The reason and message the phase handler recorded are left in place:
 	// they are the record of why the operation ended.
 	outcome.True(status)
 
@@ -148,8 +148,8 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 	}
 
 	// A cancellation requested after the operation reached a terminal phase changes nothing: there
-	// is no work left to call off. Report it on the denied Canceled condition — which is where an
-	// observer looks to find out what became of the request — so that setting spec.Cancel is
+	// is no work left to call off. Report it on the denied Canceled condition which is where an
+	// observer looks to find out what became of the request, so that setting spec.Cancel is
 	// acknowledged rather than silently passed over. See CancelForRequest for why it is declined,
 	// and note that deleting the operation is what does act in this window.
 	if outcome != opv1alpha1.CanceledCondition && IsCanceled(spec) {
@@ -159,7 +159,7 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 
 	// Terminated is the separate question of whether the controller is done with the operation, so
 	// it is the only thing the terminal marker gates. An operation in this window is past being
-	// cancellable, but is still canceled on its way out if it is deleted — see CancelForDeletion.
+	// cancellable, but is still canceled on its way out if it is deleted: see CancelForDeletion.
 	terminated := IsTerminated(status)
 
 	progressReason := opv1alpha1.FinalizingReason

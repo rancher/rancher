@@ -87,7 +87,7 @@ func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 //
 // Bailing out leaves nothing behind. The entry for a cluster only changes through this function and
 // through the LoadOrStore in start, which only fills an empty one, so a record that is no longer
-// the active one was already cancelled by whoever removed it.
+// the active one was already canceled by whoever removed it.
 func (m *Manager) stopRecord(r *record) {
 	if !m.controllers.CompareAndDelete(r.clusterRec.UID, r) {
 		return

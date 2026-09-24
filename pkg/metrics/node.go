@@ -72,7 +72,7 @@ func (m *nodeMetrics) collect(ctx context.Context) {
 		setMetrics(infos)
 	}
 
-	logrus.Debugf("%s context cancelled, exiting", logPrefix)
+	logrus.Debugf("%s context canceled, exiting", logPrefix)
 }
 
 type nodeLabelValues struct {

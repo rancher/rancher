@@ -1694,10 +1694,7 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 	// reconciles see the cleanup already applied and skip it.
 	instructions := []plan.OneTimeInstruction{
 		ops.GenerateIdempotencyCleanupInstruction(provisioningDir, idempotencyKey),
-	}
-
-	instructions = append(instructions,
-		plan.OneTimeInstruction{
+		{
 			Name:    "shutdown",
 			Command: "/bin/sh",
 			Env: []string{
@@ -1710,7 +1707,7 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 					s.adapter.RuntimeCommand()+"-killall.sh"),
 			},
 		},
-	)
+	}
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" {
 		instructions = append(instructions, plan.OneTimeInstruction{
@@ -2034,10 +2031,10 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 	// no authority left to delegate, and pushing a delegate onto a beacon another controller now
 	// holds would be reaching into its operation. Everything after the hook is either a no-op
 	// without a claim (releaseBeacon) or owed regardless of one, so the operation still terminates
-	// — which is what lets it be collected, or lets a deleted one retire its finalizer.
-	honourHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
+	// (which is what lets it be collected, or lets a deleted one retire its finalizer).
+	honorHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
 
-	if honourHook {
+	if honorHook {
 		delegated, err := h.handleHook(s, phase.hook)
 		if err != nil {
 			return status, err
@@ -2078,7 +2075,7 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.ETCDSnapshotRestoreS
 }
 
 // handleCanceled handles the Canceled terminal phase, which is reached when an external controller
-// cancels the operation or it is deleted before its terminal handling completed. The Canceled-phase
+// cancels the operation, or it is deleted before its terminal handling completed. The Canceled-phase
 // hook runs first so delegates can react to the cancellation. Mirrors save's handleCanceled — what
 // separates cancellation from the other outcomes is that it comes from outside the operation, where
 // Failed means the work was attempted and lost and Aborted means the operation called it off.
@@ -2120,7 +2117,7 @@ func (h *handler) handleSucceeded(s *scope, status opv1alpha1.ETCDSnapshotRestor
 
 // updateStatus refreshes ObservedGeneration and every condition that is not the one the current
 // phase handler owns. Every operation type reports its progress identically, so the work itself is
-// shared — see ops.UpdateStatus.
+// shared (see ops.UpdateStatus).
 func updateStatus(op *opv1alpha1.ETCDSnapshotRestore, status opv1alpha1.ETCDSnapshotRestoreStatus) opv1alpha1.ETCDSnapshotRestoreStatus {
 	logrus.Tracef("[etcdsnapshotrestore] %s/%s: updating conditions", op.Namespace, op.Name)
 

@@ -38,6 +38,7 @@ func TestClusterRefKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := ClusterRefKey(tt.ref); got != tt.want {
 				t.Fatalf("ClusterRefKey() = %q, want %q", got, tt.want)
 			}
@@ -77,7 +78,7 @@ func TestOutcomeConditionFor(t *testing.T) {
 			wantSummary: "Operation canceled",
 		},
 		{
-			// Callers check the phase is terminal first; an unrecognised one is treated as a
+			// Callers check the phase is terminal first; an unrecognized one is treated as a
 			// failure, matching how the operation controllers handle it.
 			name:        "non-terminal falls back to failed",
 			phase:       OperationPhaseInProgress,
@@ -88,6 +89,7 @@ func TestOutcomeConditionFor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			cond, summary := OutcomeConditionFor(tt.phase)
 			if cond != tt.wantCond {
 				t.Fatalf("condition = %q, want %q", cond, tt.wantCond)
@@ -147,6 +149,7 @@ func TestMarkOutcome(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			status := &OperationStatus{}
 			tc.mark(status)
 
@@ -177,6 +180,7 @@ func TestMarkOutcome(t *testing.T) {
 // SetPhase keeps LastUpdated pointing at the moment the operation actually moved, which is what the
 // operation controllers depend on to tell a status that has settled from one that is still moving.
 func TestSetPhaseIsIdempotent(t *testing.T) {
+	t.Parallel()
 	status := &OperationStatus{}
 	status.SetPhase(OperationPhaseInProgress)
 
