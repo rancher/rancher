@@ -57,3 +57,19 @@ target "demo" {
   tags = ["${REPO}/rancher:${TAG}-${ARCH}"]
   output = DEST_DIR == "" ? ["type=docker"] : ["type=docker,dest=${DEST_DIR}/rancher-demo-${OS}-${ARCH}.tar"]
 }
+
+# TODO: add new target for installer Dockerfile
+
+# Non-deliverable
+
+target "runtime" {
+  inherits = ["docker-metadata-action"]
+  context = "."
+  dockerfile = "./Dockerfile.runtime"
+  platforms = ["${OS}/${ARCH}"]
+  args = {
+    RUNTIME_HOST_ARCH = "${ARCH}"
+  }
+  tags = ["rancher-runtime:${TAG}-${ARCH}"]
+  output = ["type=docker"]
+}
