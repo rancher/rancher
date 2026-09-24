@@ -1161,7 +1161,7 @@ func TestGetGroupsFromClaimInfo(t *testing.T) {
 			o := &OpenIDCProvider{
 				Name: "oidc",
 			}
-			got := o.getGroupsFromClaimInfo(tt.args.claimInfo)
+			got := o.getGroupsFromClaimInfo(tt.args.claimInfo, "oidc")
 			var gotGroupNames []string
 			for _, principal := range got {
 				parts := strings.Split(principal.Name, "://")
@@ -1204,10 +1204,20 @@ func TestLogout(t *testing.T) {
 
 	for name, tt := range logoutTests {
 		t.Run(name, func(t *testing.T) {
-			testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+			testToken := &apiv3.Token{
+				AuthProvider: tt.config.GetName(),
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "keycloak_user://9253000",
+					},
+					LoginName:     "developer",
+					PrincipalType: "user",
+				},
+			}
+
 			o := OpenIDCProvider{
 				Name:      providerName,
-				GetConfig: func() (*apiv3.OIDCConfig, error) { return tt.config, nil },
+				GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return tt.config, nil },
 			}
 			b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 				FinalRedirectURL: "https://example.com/logged-out",
@@ -1233,10 +1243,18 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 		s.LogoutAllEnabled = false
 	})
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
@@ -1258,10 +1276,19 @@ func TestLogoutAll(t *testing.T) {
 	oidcConfig := newOIDCConfig("8090", func(s *apiv3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
@@ -1291,10 +1318,19 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	)
 
 	oidcConfig := newOIDCConfig("8090")
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
@@ -1316,10 +1352,18 @@ func TestLogoutWithIDToken(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
 
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
@@ -1350,10 +1394,19 @@ func TestLogoutAllNoIDToken(t *testing.T) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
 
-	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
 	o := OpenIDCProvider{
 		Name:      providerName,
-		GetConfig: func() (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
+		GetConfig: func(_ string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 	}
 
 	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
@@ -1743,12 +1796,22 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	provider := &OpenIDCProvider{
-		Name: Name,
+		Name: ProviderName,
 		UserSearcher: common.NewUserSearcher(&fakes.UserListerMock{
 			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
 				return users, nil
 			},
 		}),
+	}
+
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "oidc_user://aba2350c-4f51-4b0f-a807-ac89f1c9b5b2",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
 	}
 
 	tests := []struct {
@@ -1766,14 +1829,14 @@ func TestSearchPrincipals(t *testing.T) {
 					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -1785,14 +1848,14 @@ func TestSearchPrincipals(t *testing.T) {
 					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://sub-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "oidc_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -1806,7 +1869,7 @@ func TestSearchPrincipals(t *testing.T) {
 					DisplayName:   "sub-0001",
 					LoginName:     "sub-0001",
 					PrincipalType: UserType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -1820,7 +1883,7 @@ func TestSearchPrincipals(t *testing.T) {
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: GroupType,
-					Provider:      Name,
+					Provider:      ProviderName,
 				},
 			},
 		},
@@ -1830,7 +1893,7 @@ func TestSearchPrincipals(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := provider.SearchPrincipals(test.searchValue, test.principalType, &apiv3.Token{})
+			result, err := provider.SearchPrincipals(test.searchValue, test.principalType, token)
 			require.NoError(t, err)
 			assert.Equal(t, test.expected, result)
 		})
@@ -1840,9 +1903,18 @@ func TestSearchPrincipals(t *testing.T) {
 func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
 	t.Parallel()
 
-	provider := &OpenIDCProvider{Name: Name}
+	provider := &OpenIDCProvider{Name: ProviderName}
+	token := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "oidc_user://aba2350c-4f51-4b0f-a807-ac89f1c9b5b2",
+			},
+			LoginName:     "developer",
+			PrincipalType: UserType,
+		},
+	}
 
-	result, err := provider.SearchPrincipals("testu", UserType, &apiv3.Token{})
+	result, err := provider.SearchPrincipals("testu", UserType, token)
 	require.NoError(t, err)
 	assert.Equal(t, []apiv3.Principal{
 		{
@@ -1850,7 +1922,7 @@ func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
 			DisplayName:   "testu",
 			LoginName:     "testu",
 			PrincipalType: UserType,
-			Provider:      Name,
+			Provider:      ProviderName,
 		},
 	}, result)
 }

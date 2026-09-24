@@ -288,6 +288,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	logrus.Debugf("auth: Updated lastUsedAt for token %s", token.GetName())
+
 	return authResp, nil
 }
 

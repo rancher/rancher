@@ -185,7 +185,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 				userScope:             tt.fields.userScope,
 				groupScope:            tt.fields.groupScope,
 			}
-			gotStoredLdapConfig, gotCaPool, err := p.getLDAPConfig(m)
+			gotStoredLdapConfig, gotCaPool, err := p.getLDAPConfig(m, tt.fields.providerName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ldapProvider.getLDAPConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -251,4 +251,56 @@ func (m mockGenericClient) Patch(name string, o runtime.Object, patchType types.
 }
 func (m mockGenericClient) ObjectFactory() objectclient.ObjectFactory {
 	panic("unimplemented")
+}
+
+func TestGetDNAndScopeFromPrincipalID(t *testing.T) {
+	p := &ldapProvider{}
+	tests := []struct {
+		name        string
+		principalID string
+		wantDN      string
+		wantScope   string
+		wantErr     bool
+	}{
+		{
+			name:        "valid user principal",
+			principalID: "openldap_user://cn=alice,dc=example,dc=com",
+			wantDN:      "cn=alice,dc=example,dc=com",
+			wantScope:   "openldap_user",
+		},
+		{
+			name:        "valid group principal",
+			principalID: "freeipa_group://cn=admins,cn=groups,dc=example,dc=com",
+			wantDN:      "cn=admins,cn=groups,dc=example,dc=com",
+			wantScope:   "freeipa_group",
+		},
+		{
+			name:        "principal with colons in DN",
+			principalID: "openldap_user://uid=bob:special,dc=example,dc=com",
+			wantDN:      "uid=bob:special,dc=example,dc=com",
+			wantScope:   "openldap_user",
+		},
+		{
+			name:        "missing colon separator",
+			principalID: "openldap_user//cn=alice,dc=example,dc=com",
+			wantErr:     true,
+		},
+		{
+			name:        "empty string",
+			principalID: "",
+			wantErr:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotDN, gotScope, err := p.getDNAndScopeFromPrincipalID(tt.principalID)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantDN, gotDN)
+			assert.Equal(t, tt.wantScope, gotScope)
+		})
+	}
 }

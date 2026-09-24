@@ -3,18 +3,8 @@ package data
 import (
 	"encoding/json"
 
-	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
-	"github.com/rancher/rancher/pkg/auth/providers/cognito"
-	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
-	"github.com/rancher/rancher/pkg/auth/providers/github"
-	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
-	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
-	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
-	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
-	"github.com/rancher/rancher/pkg/auth/providers/oidc"
-	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -25,72 +15,75 @@ import (
 )
 
 func AuthConfigs(management *config.ManagementContext) error {
-	if err := addAuthConfig(github.Name, client.GithubConfigType, false, management); err != nil {
-		return err
-	}
+	// KEVIN: TODO: Remove these.
+	// KEVIN: We need to figure out how to provide a list of possible
+	// AuthConfigs
+	// if err := addAuthConfig(github.ProviderName, client.GithubConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfig(githubapp.Name, client.GithubAppConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfig(githubapp.ProviderName, client.GithubAppConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfig(activedirectory.Name, client.ActiveDirectoryConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfig(activedirectory.ProviderName, client.ActiveDirectoryConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(azure.Name, client.AzureADConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(azure.ProviderName, client.AzureADConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfig(ldap.OpenLdapName, client.OpenLdapConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfig(ldap.OpenLdapName, client.OpenLdapConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfig(ldap.FreeIpaName, client.FreeIpaConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfig(ldap.FreeIpaName, client.FreeIpaConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(saml.PingName, client.PingConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(saml.PingName, client.PingConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(saml.ADFSName, client.ADFSConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(saml.ADFSName, client.ADFSConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(saml.KeyCloakName, client.KeyCloakConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(saml.KeyCloakName, client.KeyCloakConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(saml.OKTAName, client.OKTAConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(saml.OKTAName, client.OKTAConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(saml.ShibbolethName, client.ShibbolethConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(saml.ShibbolethName, client.ShibbolethConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(saml.GenericSAMLName, client.GenericSAMLConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(saml.GenericSAMLName, client.GenericSAMLConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfig(googleoauth.Name, client.GoogleOauthConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfig(googleoauth.ProviderName, client.GoogleOauthConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(oidc.Name, client.OIDCConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(oidc.Name, client.OIDCConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(keycloakoidc.Name, client.KeyCloakOIDCConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(keycloakoidc.ProviderName, client.KeyCloakOIDCConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
-	if err := addAuthConfigWithSLO(genericoidc.Name, client.GenericOIDCConfigType, false, management); err != nil {
-		return err
-	}
-	if err := addAuthConfigWithSLO(cognito.Name, client.CognitoConfigType, false, management); err != nil {
-		return err
-	}
+	// if err := addAuthConfigWithSLO(genericoidc.ProviderName, client.GenericOIDCConfigType, false, management); err != nil {
+	// 	return err
+	// }
+	// if err := addAuthConfigWithSLO(cognito.Name, client.CognitoConfigType, false, management); err != nil {
+	// 	return err
+	// }
 
 	return addAuthConfig(localprovider.Name, client.LocalConfigType, true, management)
 }
@@ -105,7 +98,7 @@ func addAuthConfigWithSLO(name, aType string, enabled bool, management *config.M
 
 func addAuthConfigCore(name, aType string, enabled, sloSupported bool, management *config.ManagementContext) error {
 	annotations := make(map[string]string)
-	if name == azure.Name {
+	if name == azure.ProviderName {
 		annotations[azure.GraphEndpointMigratedAnnotation] = "true"
 	}
 	annotations[auth.CleanupAnnotation] = auth.CleanupRancherLocked

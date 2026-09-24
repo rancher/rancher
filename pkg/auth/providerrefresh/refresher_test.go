@@ -888,7 +888,7 @@ func (p *mockNonTransientProvider) RefetchGroupPrincipals(principalID string, se
 	return nil, &common.NonTransientError{Err: fmt.Errorf("oauth2: invalid_grant: Session not active")}
 }
 
-func (p *mockNonTransientProvider) IsDisabledProvider() (bool, error) {
+func (p *mockNonTransientProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
@@ -900,7 +900,7 @@ type mockLocalProvider struct {
 	disabledErr    error
 }
 
-func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
+func (p *mockLocalProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
@@ -966,7 +966,7 @@ type mockShibbolethProvider struct {
 	enabledErr error
 }
 
-func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
+func (p *mockShibbolethProvider) IsDisabledProvider(string) (bool, error) {
 	return p.enabled, p.enabledErr
 }
 
@@ -1037,7 +1037,7 @@ func (p *mockGitHubAppProvider) RefetchGroupPrincipals(principalID, secret strin
 	return p.groupPrincipals, nil
 }
 
-func (p *mockGitHubAppProvider) IsDisabledProvider() (bool, error) {
+func (p *mockGitHubAppProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
@@ -1139,7 +1139,7 @@ func (p *mockSecretProvider) RefetchGroupPrincipals(principalID, secret string) 
 	return p.refetchGroups, p.refetchErr
 }
 
-func (p *mockSecretProvider) IsDisabledProvider() (bool, error) {
+func (p *mockSecretProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
@@ -1152,7 +1152,7 @@ func (p *mockRefetchErrorProvider) RefetchGroupPrincipals(principalID, secret st
 	return nil, p.refetchErr
 }
 
-func (p *mockRefetchErrorProvider) IsDisabledProvider() (bool, error) {
+func (p *mockRefetchErrorProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 

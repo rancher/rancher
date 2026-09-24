@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -92,6 +93,10 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	}
 
 	oidcConfig = oidcConfigApplyInput.OIDCConfig
+
+	// TODO: KEVIN!!! verify that the front-end varies this.
+	oidcConfig.Name = cmp.Or(oidcConfigApplyInput.ConfigName, o.Name)
+
 	// set a default value for GroupSearchEnabled
 	// in case user input is nil for some reasons.
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {

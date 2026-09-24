@@ -126,20 +126,39 @@ func TestSearchPrincipals(t *testing.T) {
 		},
 	}
 
+	token := &apiv3.Token{
+		AuthProvider: "okta",
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "okta_user://00ux3opnquJigzHYx697",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
+	extToken := &ext.Token{
+		Spec: ext.TokenSpec{
+			UserPrincipal: ext.TokenPrincipal{
+				Name:          "okta_user://00ux3opnquJigzHYx697",
+				LoginName:     "developer",
+				PrincipalType: "user",
+				Provider:      "otka",
+			},
+		},
+	}
+
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			provider := &Provider{
-				name:      providerName,
-				userType:  userType,
-				groupType: groupType,
+				name: providerName,
 				ldapProvider: &mockLdapProvider{
 					providerName:     providerName,
 					isLdapConfigured: tt.isLdapConfigured,
 				},
 			}
 
-			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &apiv3.Token{})
+			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, token)
 			require.NoError(t, err)
 			require.Len(t, results, len(tt.principals))
 			for _, principal := range results {
@@ -150,16 +169,14 @@ func TestSearchPrincipals(t *testing.T) {
 		// same behaviour for ext tokens
 		t.Run(tt.desc+", ext", func(t *testing.T) {
 			provider := &Provider{
-				name:      providerName,
-				userType:  userType,
-				groupType: groupType,
+				name: providerName,
 				ldapProvider: &mockLdapProvider{
 					providerName:     providerName,
 					isLdapConfigured: tt.isLdapConfigured,
 				},
 			}
 
-			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &ext.Token{})
+			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, extToken)
 			require.NoError(t, err)
 			require.Len(t, results, len(tt.principals))
 			for _, principal := range results {
@@ -512,7 +529,7 @@ func (p *mockLdapProvider) GetUserExtraAttributesFromToken(token accessor.TokenA
 	panic("GetUserExtraAttributesFromToken Unimplemented!")
 }
 
-func (p *mockLdapProvider) IsDisabledProvider() (bool, error) {
+func (p *mockLdapProvider) IsDisabledProvider(string) (bool, error) {
 	panic("IsDisabledProvider Unimplemented!")
 }
 
@@ -523,7 +540,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 		{
 			ObjectMeta:   metav1.ObjectMeta{Name: "u-ping1"},
 			DisplayName:  "Test UserOne",
-			PrincipalIDs: []string{"ping_user://uid-0001", "local://u-ping1"},
+			PrincipalIDs: []string{"ping-eu_user://uid-0001", "local://u-ping1"},
 		},
 		{
 			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta1"},
@@ -533,9 +550,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 	}
 
 	provider := &Provider{
-		name:      PingName,
-		userType:  PingName + "_user",
-		groupType: PingName + "_group",
+		name: PingName,
 		userSearcher: common.NewUserSearcher(&fakes.UserListerMock{
 			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
 				return users, nil
@@ -555,17 +570,17 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.UserPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://uid-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: common.UserPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.UserPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 			},
 		},
@@ -574,24 +589,24 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			searchKey: "testu",
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://uid-0001"},
 					DisplayName:   "Test UserOne",
 					PrincipalType: common.UserPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.UserPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_group://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_group://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.GroupPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 			},
 		},
@@ -601,11 +616,11 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.UserPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://UserFromOkta"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://UserFromOkta"},
 					DisplayName:   "UserFromOkta",
 					LoginName:     "UserFromOkta",
 					PrincipalType: common.UserPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 			},
 		},
@@ -615,11 +630,11 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.UserPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://uid-0001"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_user://uid-0001"},
 					DisplayName:   "uid-0001",
 					LoginName:     "uid-0001",
 					PrincipalType: common.UserPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 			},
 		},
@@ -629,13 +644,24 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 			principalType: common.GroupPrincipalType,
 			want: []apiv3.Principal{
 				{
-					ObjectMeta:    metav1.ObjectMeta{Name: "ping_group://testu"},
+					ObjectMeta:    metav1.ObjectMeta{Name: "ping-eu_group://testu"},
 					DisplayName:   "testu",
 					LoginName:     "testu",
 					PrincipalType: common.GroupPrincipalType,
-					Provider:      PingName,
+					Provider:      "ping-eu",
 				},
 			},
+		},
+	}
+
+	token := &apiv3.Token{
+		AuthProvider: "ping-eu",
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ping-eu_user://00ux3opnquJigzHYx697",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
 		},
 	}
 
@@ -643,7 +669,7 @@ func TestSearchPrincipalsResolvesKnownUsers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := provider.SearchPrincipals(test.searchKey, test.principalType, &apiv3.Token{})
+			got, err := provider.SearchPrincipals(test.searchKey, test.principalType, token)
 			require.NoError(t, err)
 			assert.Equal(t, test.want, got)
 		})
@@ -654,20 +680,31 @@ func TestSearchPrincipalsWithoutUserSearcher(t *testing.T) {
 	t.Parallel()
 
 	provider := &Provider{
-		name:      PingName,
-		userType:  PingName + "_user",
-		groupType: PingName + "_group",
+		name: PingName,
 	}
 
-	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
+	token := &apiv3.Token{
+		AuthProvider: "ping-eu",
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ping-eu_user://00ux3opnquJigzHYx697",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
+	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, token)
 	require.NoError(t, err)
 	assert.Equal(t, []apiv3.Principal{
 		{
-			ObjectMeta:    metav1.ObjectMeta{Name: "ping_user://testu"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ping-eu_user://testu",
+			},
 			DisplayName:   "testu",
 			LoginName:     "testu",
 			PrincipalType: common.UserPrincipalType,
-			Provider:      PingName,
+			Provider:      "ping-eu",
 		},
 	}, got)
 }
@@ -676,9 +713,7 @@ func TestSearchPrincipalsUserSearchError(t *testing.T) {
 	t.Parallel()
 
 	provider := &Provider{
-		name:      PingName,
-		userType:  PingName + "_user",
-		groupType: PingName + "_group",
+		name: PingName,
 		userSearcher: common.NewUserSearcher(&fakes.UserListerMock{
 			ListFunc: func(namespace string, selector labels.Selector) ([]*apiv3.User, error) {
 				return nil, errors.New("cache is not synced")
@@ -686,7 +721,18 @@ func TestSearchPrincipalsUserSearchError(t *testing.T) {
 		}),
 	}
 
-	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, &apiv3.Token{})
+	token := &apiv3.Token{
+		AuthProvider: "ping-eu",
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ping-eu_user://00ux3opnquJigzHYx697",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
+	got, err := provider.SearchPrincipals("testu", common.UserPrincipalType, token)
 	require.ErrorContains(t, err, "cache is not synced")
 	assert.Nil(t, got)
 }
@@ -707,4 +753,19 @@ func TestTransformToAuthProviderGenericSAML(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "https://rancher.example.com/v1-saml/genericsaml/login",
 		out[publicclient.GenericSAMLProviderFieldRedirectURL])
+}
+
+func TestTransformToAuthProvider(t *testing.T) {
+	authConfig := map[string]any{
+		client.OKTAConfigFieldRancherAPIHost: "https://rancher.example.com",
+		"metadata": map[string]any{
+			"name": "okta-1",
+		},
+	}
+
+	p := &Provider{name: OKTAName}
+	out, err := p.TransformToAuthProvider(authConfig)
+	require.NoError(t, err)
+	assert.Equal(t, "https://rancher.example.com/v1-saml/okta/okta-1/login",
+		out[publicclient.OKTAProviderFieldRedirectURL])
 }

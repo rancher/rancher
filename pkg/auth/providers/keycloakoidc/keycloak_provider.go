@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	Name      = "keycloakoidc"
-	UserType  = "user"
-	GroupType = "group"
+	ProviderName = "keycloakoidc"
+	UserType     = "user"
+	GroupType    = "group"
 )
 
 type keyCloakOIDCProvider struct {
@@ -38,7 +38,7 @@ type keyCloakOIDCProvider struct {
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	p := &keyCloakOIDCProvider{
 		oidc.OpenIDCProvider{
-			Name:        Name,
+			Name:        ProviderName,
 			Type:        client.KeyCloakOIDCConfigType,
 			CTX:         ctx,
 			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
@@ -53,7 +53,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 }
 
 func (k *keyCloakOIDCProvider) GetName() string {
-	return Name
+	return ProviderName
 }
 
 func (k *keyCloakOIDCProvider) newClient(config *apiv3.OIDCConfig, token accessor.TokenAccessor) (*KeyCloakClient, error) {
@@ -92,27 +92,31 @@ func (k *keyCloakOIDCProvider) newClient(config *apiv3.OIDCConfig, token accesso
 }
 
 func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	var principals []apiv3.Principal
-	var err error
-
-	config, err := k.GetConfig()
+	configName, err := common.ConfigNameFromToken(token)
 	if err != nil {
-		return principals, err
+		return nil, err
+	}
+	config, err := k.GetConfig(configName)
+	if err != nil {
+		return nil, err
 	}
 	keyCloakClient, err := k.newClient(config, token)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc] SearchPrincipals: error creating new http client: %v", err)
-		return principals, err
+		return nil, err
 	}
 	accts, err := keyCloakClient.searchPrincipals(searchValue, principalType, config)
 	if err != nil {
 		logrus.Errorf("[keycloak oidc] SearchPrincipals: problem searching keycloak: %v", err)
-		return principals, err
+		return nil, err
 	}
+
+	var principals []apiv3.Principal
 	for _, acct := range accts {
 		p := k.toPrincipal(acct.Type, acct, token)
 		principals = append(principals, p)
 	}
+
 	return principals, nil
 }
 
@@ -157,21 +161,19 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 }
 
 func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
-	config, err := k.GetOIDCConfig()
+	configName, err := common.ConfigNameFromToken(token)
 	if err != nil {
 		return apiv3.Principal{}, err
 	}
-	var externalID string
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return apiv3.Principal{}, fmt.Errorf("invalid id %v", principalID)
+	config, err := k.GetOIDCConfig(configName)
+	if err != nil {
+		return apiv3.Principal{}, err
 	}
-	externalID = strings.TrimPrefix(parts[1], "//")
-	parts = strings.SplitN(parts[0], "_", 2)
-	if len(parts) != 2 {
-		return apiv3.Principal{}, fmt.Errorf("invalid id %v", principalID)
+	_, principalType, externalID, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return apiv3.Principal{}, err
 	}
-	principalType := parts[1]
+
 	keyCloakClient, err := k.newClient(config, token)
 	if err != nil {
 		logrus.Warnf("[keycloak oidc] GetPrincipal: error creating new http client: %v", err)
@@ -182,6 +184,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.T
 		return apiv3.Principal{}, err
 	}
 	princ := k.toPrincipal(principalType, acct, token)
+
 	return princ, err
 }
 

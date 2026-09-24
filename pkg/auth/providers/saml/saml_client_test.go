@@ -286,12 +286,6 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 			SamlProviders[GenericSAMLName] = &Provider{name: GenericSAMLName}
 			t.Cleanup(func() {
 				delete(SamlProviders, GenericSAMLName)
-				handlerMu.Lock()
-				delete(routeHandlers, "GenericSAMLACS")
-				delete(routeHandlers, "GenericSAMLSLO")
-				delete(routeHandlers, "GenericSAMLSLOGet")
-				delete(routeHandlers, "GenericSAMLMetadata")
-				handlerMu.Unlock()
 			})
 
 			cfg := base()
@@ -313,11 +307,11 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 			assert.Equal(t, tt.wantForce, sp.ForceAuthn)
 
 			handlerMu.RLock()
-			_, acsRegistered := routeHandlers["GenericSAMLACS"]
-			_, metaRegistered := routeHandlers["GenericSAMLMetadata"]
+			_, acsRegistered := routeHandlers["ACS"]
+			_, metaRegistered := routeHandlers["Metadata"]
 			handlerMu.RUnlock()
-			assert.True(t, acsRegistered, "GenericSAMLACS route handler should be registered")
-			assert.True(t, metaRegistered, "GenericSAMLMetadata route handler should be registered")
+			assert.True(t, acsRegistered, "ACS route handler should be registered")
+			assert.True(t, metaRegistered, "Metadata route handler should be registered")
 		})
 	}
 }
