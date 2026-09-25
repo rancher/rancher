@@ -1557,37 +1557,37 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 			},
 		},
-{
-name: "installation with webhook deployment customization",
-setup: func(mocks testMocks) {
-rc := int32(2)
-clusterWithWebhookCustom := &v3.Cluster{
-Status: v3.ClusterStatus{Driver: "k3s"},
-ObjectMeta: metav1.ObjectMeta{
-Name: "local",
-Annotations: map[string]string{
-importedclusterversionmanagement.VersionManagementAnno: "system-default",
-},
-},
-Spec: v3.ClusterSpec{
-ClusterSpecBase: v3.ClusterSpecBase{
-WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{
-ReplicaCount: &rc,
-},
-},
-},
-}
-mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
-mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).Times(2)
-mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-_ = settings.RancherWebhookVersion.Set("2.0.0")
-_ = settings.RancherTurtlesVersion.Set("2.0.0")
-_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
-_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
-features.MCM.Set(true)
-_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
+		{
+			name: "installation with webhook deployment customization",
+			setup: func(mocks testMocks) {
+				rc := int32(2)
+				clusterWithWebhookCustom := &v3.Cluster{
+					Status: v3.ClusterStatus{Driver: "k3s"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "local",
+						Annotations: map[string]string{
+							importedclusterversionmanagement.VersionManagementAnno: "system-default",
+						},
+					},
+					Spec: v3.ClusterSpec{
+						ClusterSpecBase: v3.ClusterSpecBase{
+							WebhookDeploymentCustomization: &v3.WebhookDeploymentCustomization{
+								ReplicaCount: &rc,
+							},
+						},
+					},
+				}
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).Times(2)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherTurtlesVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				features.MCM.Set(true)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
