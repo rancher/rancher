@@ -66,7 +66,7 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.27.1 AS go-builder
+FROM --platform=$BUILDPLATFORM dp.apps.rancher.io/containers/go:1.27.1 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
