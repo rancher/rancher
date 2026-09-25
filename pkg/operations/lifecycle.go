@@ -51,6 +51,11 @@ func CancelForDeletion(status *opv1alpha1.OperationStatus) (opv1alpha1.Operation
 //
 // Callers reach this only for an operation which is not paused, so a paused operation is not
 // canceled until it is resumed.
+//
+// This records the decision; it does not carry it out. Stopping the work already dispatched is
+// CancelDispatchedPlans, which the Canceled phase's terminal handler runs before it releases the
+// beacon — a plan sitting in a machine-plan secret belongs to the agent, and moving the phase alone
+// would leave it running while the next operation acquired the beacon.
 func CancelForRequest(spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) (opv1alpha1.OperationPhase, bool) {
 	previous := status.Phase
 
@@ -64,17 +69,18 @@ func CancelForRequest(spec *opv1alpha1.OperationSpec, status *opv1alpha1.Operati
 }
 
 // Collectable reports whether a settled operation can be garbage collected: it reached a terminal
-// phase, the controller finished handling that phase, its TTL has elapsed, and no lifecycle hook
-// delegate is still expected to look at it.
+// phase, the controller finished handling that phase, and its TTL has elapsed.
 //
-// The last two conditions are what stop an operation waiting on a terminal phase hook from being
-// deleted the moment its TTL passes, which would strand the delegate holding its beacon and bury
-// the phase it actually finished in behind the cancellation that deletion performs.
-func Collectable(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) bool {
+// Termination is the condition that carries the weight. It is recorded only once nothing is owed —
+// the terminal phase hook was satisfied, or there was never anything to hand it, or it was
+// abandoned because no beacon remained to delegate it on — so an operation still waiting on a hook
+// is not collectable, and one whose hook can never be answered does not sit around forever. Testing
+// the hook labels as well would reintroduce exactly that second case: a label nobody is coming back
+// to clear would pin the operation for good.
+func Collectable(spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) bool {
 	return IsTerminal(status.Phase) &&
 		IsTerminated(status) &&
-		IsExpired(spec, status) &&
-		!HasActiveLifecycleHook(op)
+		IsExpired(spec, status)
 }
 
 // UpdateStatus refreshes ObservedGeneration and every condition that is not the one the current
@@ -98,7 +104,8 @@ func Collectable(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1a
 //     True. Until then, it stays False with FinalizingReason, which is the only difference between
 //     this state and the one above. "Done with" means nothing is owed: the terminal phase hook was
 //     satisfied, or there was never anything to hand it, or the operation is being deleted and its
-//     hooks are abandoned with it.
+//     hooks are abandoned with it, or there is no longer a beacon to delegate them on and they were
+//     abandoned for that — which Finalized reports with HookAbandonedReason.
 func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) {
 	status.ObservedGeneration = op.GetGeneration()
 	if spec.Paused {
@@ -192,6 +199,18 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 	}
 
 	opv1alpha1.FinalizedCondition.True(status)
+
+	// A hook label outliving termination is a hook that was abandoned rather than one that was
+	// satisfied: the only way to get here with one still set is for the beacon it would have been
+	// delegated on to have gone away first. Say so, rather than reporting the operation as having
+	// finished cleanly and leaving the label looking like a hook that never fired.
+	if HasActiveLifecycleHook(op) {
+		opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.HookAbandonedReason)
+		opv1alpha1.FinalizedCondition.Message(status, fmt.Sprintf("%s; lifecycle hooks were abandoned, no beacon remained to delegate them on", summary))
+
+		return
+	}
+
 	opv1alpha1.FinalizedCondition.Reason(status, opv1alpha1.FinishedReason)
 	opv1alpha1.FinalizedCondition.Message(status, summary)
 }

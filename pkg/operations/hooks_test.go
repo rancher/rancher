@@ -8,12 +8,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TestHasActiveLifecycleHook is the load-bearing regression test for the operation-controller
-// TTL-delete guard: every controller's OnChange defers garbage collection while this predicate
-// returns true, so a bug here would either leak operations indefinitely (false positive) or
-// delete operations mid-hook and strand the delegate on the beacon (false negative). The
-// controller-side usage is a single boolean `&& !HasActiveLifecycleHook(op)` in the delete
-// condition, so this table-driven test on the predicate is the primary coverage.
+// TestHasActiveLifecycleHook covers the predicate UpdateStatus reports an abandoned hook from: a
+// false negative would let a terminated operation carrying a hook label look like it finished
+// cleanly, hiding from whoever set the label that their delegate never got its turn. Recognizing
+// the label is all it does — what gates garbage collection is termination, which is only recorded
+// once the hook is satisfied or provably unsatisfiable. See Collectable.
 func TestHasActiveLifecycleHook(t *testing.T) {
 	t.Parallel()
 
@@ -177,5 +176,68 @@ func TestHasStepHookLabel(t *testing.T) {
 
 	if HasStepHookLabel(nil, prefix) {
 		t.Fatal("HasStepHookLabel(nil) = true, want false")
+	}
+}
+
+// TestCollectable pins what garbage collection waits for: a terminal phase, the controller being
+// done with the operation, and the TTL. Lifecycle hooks are deliberately not among them — the
+// signature cannot even see them — because the paths that terminate while a hook label is still set
+// are the ones where nothing will ever come back to clear it, so consulting the label would pin the
+// operation for good. TestOnChange_MissingClusterAbandonsOwedHook covers that end to end in each
+// controller.
+func TestCollectable(t *testing.T) {
+	t.Parallel()
+
+	expired := func(phase opv1alpha1.OperationPhase, terminated bool) *opv1alpha1.OperationStatus {
+		status := &opv1alpha1.OperationStatus{Phase: phase}
+		if terminated {
+			status.SetTerminated()
+		}
+		return status
+	}
+
+	tests := []struct {
+		name   string
+		spec   *opv1alpha1.OperationSpec
+		status *opv1alpha1.OperationStatus
+		want   bool
+	}{
+		{
+			name:   "in flight",
+			spec:   &opv1alpha1.OperationSpec{},
+			status: expired(opv1alpha1.OperationPhaseInProgress, false),
+		},
+		{
+			name: "terminal but the controller is not done",
+			spec: &opv1alpha1.OperationSpec{},
+			// The terminal phase hook is still delegated, so the beacon is held on the operation's
+			// behalf and deleting it would strand the delegate.
+			status: expired(opv1alpha1.OperationPhaseSucceeded, false),
+		},
+		{
+			name:   "terminated but not expired",
+			spec:   &opv1alpha1.OperationSpec{TTL: -1},
+			status: expired(opv1alpha1.OperationPhaseSucceeded, true),
+		},
+		{
+			name:   "terminated and expired",
+			spec:   &opv1alpha1.OperationSpec{},
+			status: expired(opv1alpha1.OperationPhaseSucceeded, true),
+			want:   true,
+		},
+		{
+			name:   "canceled, terminated and expired",
+			spec:   &opv1alpha1.OperationSpec{},
+			status: expired(opv1alpha1.OperationPhaseCanceled, true),
+			want:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Collectable(tt.spec, tt.status); got != tt.want {
+				t.Fatalf("Collectable = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
