@@ -808,3 +808,222 @@ func TestImportedAdapterDistro(t *testing.T) {
 		})
 	}
 }
+
+// configMapNotFound is what the downstream client returns before the ConfigMap has been published.
+var configMapNotFound = apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, configMapName)
+
+// newTriggerHandler builds a handler for the CAPI-side triggers, which unlike onChange resolve this
+// controller's own mgmt Cluster from the cache rather than being handed it.
+func newTriggerHandler(t *testing.T, dyn dynamicClient) (*handler, *fake.MockNonNamespacedCacheInterface[*apimgmtv3.Cluster], *fake.MockCacheInterface[*capi.Cluster], *fake.MockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList]) {
+	t.Helper()
+
+	h, _, capiClusters, configMaps := newTestHandler(t, dyn)
+	mgmtClusters := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.Cluster](gomock.NewController(t))
+	h.mgmtClusterCache = mgmtClusters
+
+	return h, mgmtClusters, capiClusters, configMaps
+}
+
+func TestMatchRKE2ControlPlane(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, matchRKE2ControlPlane(controlplanev1beta2.GroupVersion.WithKind(rke2ControlPlaneCP)))
+	// Another kind in the same group, and the right kind in another group, are both somebody else's.
+	assert.False(t, matchRKE2ControlPlane(controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlaneTemplate")))
+	assert.False(t, matchRKE2ControlPlane(capi.GroupVersion.WithKind(rke2ControlPlaneCP)))
+	// Pinned to the version turtlesAdapter fetches, so the trigger and the render read one object.
+	assert.False(t, matchRKE2ControlPlane(schema.GroupVersionKind{
+		Group:   controlplanev1beta2.GroupVersion.Group,
+		Version: "v1beta1",
+		Kind:    rke2ControlPlaneCP,
+	}))
+}
+
+// The CAPI Cluster's controlPlaneRef decides which RKE2ControlPlane the metadata is rendered from,
+// so a change to it has to republish even though the mgmt Cluster shell was never touched.
+func TestOnCAPIClusterChange(t *testing.T) {
+	t.Parallel()
+
+	t.Run("republishes for the CAPI cluster this shell references", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, capiClusters, configMaps := newTriggerHandler(t, &dynamicClientFake{obj: rke2ControlPlaneUnstructured(t)})
+		mgmtClusters.EXPECT().Get(clusterName).Return(turtlesMgmtCluster(), nil)
+		capiClusters.EXPECT().Get(capiClusterNS, capiClusterName).Return(capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP), nil)
+		configMaps.EXPECT().Get(metav1.NamespaceSystem, configMapName, gomock.Any()).Return(nil, configMapNotFound)
+		configMaps.EXPECT().Create(gomock.Any()).Return(nil, nil)
+
+		in := capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP)
+		out, err := h.onCAPIClusterChange("", in)
+		require.NoError(t, err)
+		assert.Same(t, in, out)
+	})
+
+	// Every registration of this controller watches every CAPI Cluster, so one belonging to another
+	// downstream cluster must not make this one republish — let alone read its objects.
+	t.Run("ignores a CAPI cluster this shell does not reference", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, _, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(turtlesMgmtCluster(), nil)
+
+		in := capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP)
+		in.Name = "someone-else"
+
+		out, err := h.onCAPIClusterChange("", in)
+		require.NoError(t, err)
+		assert.Same(t, in, out)
+	})
+
+	// A cluster that is not turtles-imported is not rendered from any CAPI object, so these events
+	// are none of its business.
+	t.Run("ignores every CAPI cluster when this shell is not turtles-imported", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, _, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(mgmtCluster(), nil)
+
+		out, err := h.onCAPIClusterChange("", capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP))
+		require.NoError(t, err)
+		assert.NotNil(t, out)
+	})
+
+	t.Run("ignores a nil cluster", func(t *testing.T) {
+		t.Parallel()
+
+		h, _, _, _ := newTriggerHandler(t, nil)
+
+		out, err := h.onCAPIClusterChange("", nil)
+		require.NoError(t, err)
+		assert.Nil(t, out)
+	})
+
+	// The shell is on its way out; there is nothing left to publish for.
+	t.Run("ignores a missing mgmt cluster", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, _, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(nil, configMapNotFound)
+
+		out, err := h.onCAPIClusterChange("", capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP))
+		require.NoError(t, err)
+		assert.NotNil(t, out)
+	})
+
+	t.Run("propagates a mgmt cluster lookup error", func(t *testing.T) {
+		t.Parallel()
+
+		expectedErr := errors.New("boom")
+
+		h, mgmtClusters, _, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(nil, expectedErr)
+
+		out, err := h.onCAPIClusterChange("", capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP))
+		assert.ErrorIs(t, err, expectedErr)
+		assert.Nil(t, out)
+	})
+}
+
+// The RKE2ControlPlane carries the whole configuration for a turtles-imported cluster, and it
+// changes — a version bump, a server config edit — without the mgmt Cluster shell being touched.
+// Without this trigger the ConfigMap would keep advertising the object from before the change.
+func TestOnControlPlaneChange(t *testing.T) {
+	t.Parallel()
+
+	controlPlane := func(namespace, name string) runtime.Object {
+		obj := rke2ControlPlaneUnstructured(t)
+		obj.SetNamespace(namespace)
+		obj.SetName(name)
+		return obj
+	}
+
+	t.Run("republishes for the control plane this cluster renders from", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, capiClusters, configMaps := newTriggerHandler(t, &dynamicClientFake{obj: rke2ControlPlaneUnstructured(t)})
+		mgmtClusters.EXPECT().Get(clusterName).Return(turtlesMgmtCluster(), nil)
+		// Once to match the event against the controlPlaneRef, once while rendering.
+		capiClusters.EXPECT().Get(capiClusterNS, capiClusterName).Return(capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP), nil).Times(2)
+		configMaps.EXPECT().Get(metav1.NamespaceSystem, configMapName, gomock.Any()).Return(nil, configMapNotFound)
+		configMaps.EXPECT().Create(gomock.Any()).Return(nil, nil)
+
+		in := controlPlane(capiClusterNS, capiClusterName)
+		out, err := h.onControlPlaneChange(in)
+		require.NoError(t, err)
+		assert.Same(t, in, out)
+	})
+
+	// Matched by the controlPlaneRef rather than by name alone, so another cluster's control plane
+	// in the same namespace is left alone.
+	t.Run("ignores a control plane another cluster renders from", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, capiClusters, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(turtlesMgmtCluster(), nil)
+		capiClusters.EXPECT().Get(capiClusterNS, capiClusterName).Return(capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP), nil)
+
+		out, err := h.onControlPlaneChange(controlPlane(capiClusterNS, "someone-else"))
+		require.NoError(t, err)
+		assert.NotNil(t, out)
+	})
+
+	t.Run("ignores a control plane in another namespace", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, capiClusters, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(turtlesMgmtCluster(), nil)
+		capiClusters.EXPECT().Get(capiClusterNS, capiClusterName).Return(capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP), nil)
+
+		out, err := h.onControlPlaneChange(controlPlane("other-ns", capiClusterName))
+		require.NoError(t, err)
+		assert.NotNil(t, out)
+	})
+
+	t.Run("ignores every control plane when this shell is not turtles-imported", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, _, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(mgmtCluster(), nil)
+
+		out, err := h.onControlPlaneChange(controlPlane(capiClusterNS, capiClusterName))
+		require.NoError(t, err)
+		assert.NotNil(t, out)
+	})
+
+	t.Run("ignores a nil object", func(t *testing.T) {
+		t.Parallel()
+
+		h, _, _, _ := newTriggerHandler(t, nil)
+
+		out, err := h.onControlPlaneChange(nil)
+		require.NoError(t, err)
+		assert.Nil(t, out)
+	})
+
+	// The CAPI cluster is gone, so nothing names a control plane to match against.
+	t.Run("ignores a missing CAPI cluster", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, capiClusters, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(turtlesMgmtCluster(), nil)
+		capiClusters.EXPECT().Get(capiClusterNS, capiClusterName).Return(nil, configMapNotFound)
+
+		out, err := h.onControlPlaneChange(controlPlane(capiClusterNS, capiClusterName))
+		require.NoError(t, err)
+		assert.NotNil(t, out)
+	})
+
+	t.Run("propagates a CAPI cluster lookup error", func(t *testing.T) {
+		t.Parallel()
+
+		expectedErr := errors.New("boom")
+
+		h, mgmtClusters, capiClusters, _ := newTriggerHandler(t, nil)
+		mgmtClusters.EXPECT().Get(clusterName).Return(turtlesMgmtCluster(), nil)
+		capiClusters.EXPECT().Get(capiClusterNS, capiClusterName).Return(nil, expectedErr)
+
+		out, err := h.onControlPlaneChange(controlPlane(capiClusterNS, capiClusterName))
+		assert.ErrorIs(t, err, expectedErr)
+		assert.Nil(t, out)
+	})
+}

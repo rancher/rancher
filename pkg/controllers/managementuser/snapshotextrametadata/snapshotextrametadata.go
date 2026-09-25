@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -24,10 +25,12 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
@@ -81,6 +84,7 @@ type handler struct {
 	dynamic          dynamicClient
 	provClusterCache rocontrollers.ClusterCache
 	capiClusterCache capicontrollers.ClusterCache
+	mgmtClusterCache mgmtcontrollers.ClusterCache
 }
 
 func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wrangler.CAPIContext) {
@@ -92,9 +96,26 @@ func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wra
 		dynamic:          userContext.Management.Wrangler.Dynamic,
 		provClusterCache: userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
 		capiClusterCache: capiCtx.CAPI.Cluster().Cache(),
+		mgmtClusterCache: userContext.Management.Wrangler.Mgmt.Cluster().Cache(),
 	}
 
 	userContext.Management.Wrangler.Mgmt.Cluster().OnChange(ctx, "snapshotextrametadata", h.onChange)
+
+	// The mgmt Cluster is only the whole story for an imported cluster. A turtles-imported one is a
+	// shell: its configuration lives on the CAPI Cluster's RKE2ControlPlane, which changes — a
+	// version bump, a server config edit — without the shell being touched at all. Watching only
+	// the shell would leave this ConfigMap advertising an object from before the change, and every
+	// snapshot taken afterwards would carry it, so restore modes would offer stale configuration.
+	//
+	// These triggers republish directly rather than enqueueing the mgmt Cluster: an enqueue would
+	// re-run every mgmt-cluster handler in Rancher for what is this package's concern alone.
+	capiCtx.CAPI.Cluster().OnChange(ctx, "snapshotextrametadata-capi-cluster", h.onCAPIClusterChange)
+
+	// The RKE2ControlPlane goes through the dynamic controller because CAPRKE2's CRDs are only
+	// installed once turtles is enabled, so there is no generated typed controller to watch and the
+	// kind may not be served yet. Lasso starts the watch when the CRD appears.
+	userContext.Management.Wrangler.Dynamic.OnChange(ctx, "snapshotextrametadata-rke2controlplane",
+		matchRKE2ControlPlane, h.onControlPlaneChange)
 }
 
 func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
@@ -104,50 +125,150 @@ func (h *handler) onChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Clu
 		return cluster, nil
 	}
 
-	a, err := h.newAdapter(cluster)
-	if errors.Is(err, errUnsupportedClusterType) {
-		logrus.Debugf("[snapshotextrametadata] cluster %s: %v, not publishing extra metadata", cluster.Name, err)
-		return cluster, nil
+	if err := h.publish(cluster); err != nil {
+		return nil, err
+	}
+
+	return cluster, nil
+}
+
+// onCAPIClusterChange republishes when the CAPI Cluster this cluster's mgmt shell points at changes.
+// Its controlPlaneRef is what decides which RKE2ControlPlane the metadata is rendered from, so a
+// change here can move the metadata to a different object entirely.
+func (h *handler) onCAPIClusterChange(_ string, capiCluster *capi.Cluster) (*capi.Cluster, error) {
+	if capiCluster == nil {
+		return capiCluster, nil
+	}
+
+	cluster, ownerNS, ownerName, err := h.capiOwner()
+	if err != nil {
+		return nil, err
+	}
+	if cluster == nil {
+		return capiCluster, nil
+	}
+
+	if capiCluster.Namespace != ownerNS || capiCluster.Name != ownerName {
+		return capiCluster, nil
+	}
+
+	if err := h.publish(cluster); err != nil {
+		return nil, err
+	}
+
+	return capiCluster, nil
+}
+
+// onControlPlaneChange republishes when the RKE2ControlPlane carrying this cluster's configuration
+// changes. The object is matched by the controlPlaneRef of the CAPI Cluster this cluster's shell
+// references, which is the same path turtlesAdapter renders from, so the trigger and the render
+// cannot disagree about which control plane belongs to this cluster.
+func (h *handler) onControlPlaneChange(obj runtime.Object) (runtime.Object, error) {
+	if obj == nil {
+		return obj, nil
+	}
+
+	controlPlane, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	cluster, ownerNS, ownerName, err := h.capiOwner()
+	if err != nil {
+		return nil, err
+	}
+	if cluster == nil {
+		return obj, nil
+	}
+
+	capiCluster, err := h.capiClusterCache.Get(ownerNS, ownerName)
+	if apierrors.IsNotFound(err) {
+		return obj, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 
+	if controlPlane.GetNamespace() != capiCluster.Namespace ||
+		controlPlane.GetName() != capiCluster.Spec.ControlPlaneRef.Name {
+		return obj, nil
+	}
+
+	if err := h.publish(cluster); err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+// capiOwner returns this controller's mgmt Cluster along with the CAPI Cluster it references, or a
+// nil cluster when there is nothing for the CAPI-side triggers to act on: the shell is gone, or it
+// is not a turtles-imported cluster and so is not rendered from any CAPI object.
+func (h *handler) capiOwner() (*apimgmtv3.Cluster, string, string, error) {
+	cluster, err := h.mgmtClusterCache.Get(h.clusterName)
+	if apierrors.IsNotFound(err) {
+		return nil, "", "", nil
+	}
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	ownerName := cluster.Labels[capr.CAPIClusterOwnerLabel]
+	ownerNS := cluster.Labels[capr.CAPIClusterOwnerNSLabel]
+	if ownerName == "" || ownerNS == "" {
+		return nil, "", "", nil
+	}
+
+	return cluster, ownerNS, ownerName, nil
+}
+
+// matchRKE2ControlPlane matches the kind caprke2Adapter renders from, pinned to the version
+// turtlesAdapter fetches so the trigger and the render read the same object.
+func matchRKE2ControlPlane(gvk schema.GroupVersionKind) bool {
+	return gvk == controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlane")
+}
+
+// publish resolves how this cluster is managed and writes the extra metadata ConfigMap. It is the
+// shared body of every handler in this package: each one establishes that the object it saw belongs
+// to this cluster and then converges here.
+func (h *handler) publish(cluster *apimgmtv3.Cluster) error {
+	a, err := h.newAdapter(cluster)
+	if errors.Is(err, errUnsupportedClusterType) {
+		logrus.Debugf("[snapshotextrametadata] cluster %s: %v, not publishing extra metadata", cluster.Name, err)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
 	data, err := renderData(a)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	cm, err := h.configMap.Get(metav1.NamespaceSystem, a.configMapName(), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = h.configMap.Create(&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: metav1.NamespaceSystem,
-				Name:      a.configMapName(),
-			},
-			Data: data,
+			Namespace: metav1.NamespaceSystem,
+			Name:      a.configMapName(),
+			Data:      data,
 		})
-		if err != nil {
-			return nil, err
-		}
-		return cluster, nil
+		return err
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if maps.Equal(cm.Data, data) {
-		return cluster, nil
+		return nil
 	}
 
 	cm = cm.DeepCopy()
 	cm.Data = data
 
-	if _, err = h.configMap.Update(cm); err != nil {
-		return nil, err
-	}
+	_, err = h.configMap.Update(cm)
 
-	return cluster, nil
+	return err
 }
 
 // resource is a single object published in the resources section, keyed by the resource type restore

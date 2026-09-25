@@ -390,8 +390,8 @@ func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string
 		return "", ""
 	}
 	for k, v := range s.op.Labels {
-		if strings.HasPrefix(k, prefix) {
-			return strings.TrimPrefix(k, prefix), v
+		if after, ok := strings.CutPrefix(k, prefix); ok  {
+			return after, v
 		}
 	}
 	return "", ""
@@ -485,8 +485,8 @@ func nonWindowsSecret(secret *corev1.Secret) bool {
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
 	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
-	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise attempt to acquire;
-	// a nil return means another controller currently owns it and we must keep waiting.
+	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise, attempt to acquire;
+	// a nil return means another controller currently owns it, and we must keep waiting.
 	if !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
 		acquired, err := plan.AcquireBeacon(s.beacon, h.beacons, s.ownerKey)
 		if err != nil {
@@ -544,7 +544,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	stepPrefix := stepHookPrefixFor(s.op.Status.Step)
 
 	// Stage 1 (loose): the op must appear SOMEWHERE in the ownership chain (owner or any
-	// delegate). Being absent entirely means the beacon was reassigned to another controller and
+	// delegate). Being absent entirely means the beacon was reassigned to another controller, and
 	// we can't recover. If a step hook is currently active on the op, treat the absence as a
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
@@ -1624,14 +1624,12 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			{
 				SaveOutput: true,
-				CommonInstruction: plan.CommonInstruction{
 					Name:    preflightInstructionName,
 					Command: "/bin/sh",
 					Args: []string{
 						"-c",
 						fmt.Sprintf(TokenHashCommandFormat, dataDir),
 					},
-				},
 			},
 		},
 	}, nil
@@ -1677,13 +1675,8 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 		ops.GenerateIdempotencyCleanupInstruction(provisioningDir, idempotencyKey),
 	}
 
-	if install, ok := s.adapter.InstallInstruction(secret, dataDir); ok {
-		instructions = append(instructions, install)
-	}
-
 	instructions = append(instructions,
 		plan.OneTimeInstruction{
-			CommonInstruction: plan.CommonInstruction{
 				Name:    "shutdown",
 				Command: "/bin/sh",
 				Env: []string{
@@ -1695,28 +1688,23 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 						s.adapter.RuntimeCommand(),
 						s.adapter.RuntimeCommand()+"-killall.sh"),
 				},
-			},
 		},
 	)
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" {
 		instructions = append(instructions, plan.OneTimeInstruction{
-			CommonInstruction: plan.CommonInstruction{
 				Name:    "create-etcd-tombstone",
 				Command: "touch",
 				Args:    []string{path.Join(dataDir, "server/db/etcd/tombstone")},
-			},
 		})
 	}
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" || secret.Labels[capr.ControlPlaneRoleLabel] == "true" {
 		instructions = append(instructions,
 			plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
 					Name:    "remove-tls-directory",
 					Command: "rm",
 					Args:    []string{"-rf", path.Join(dataDir, "server/tls")},
-				},
 			},
 		)
 	}
@@ -1774,11 +1762,9 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 		})
 	} else if !initialPass {
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
-			CommonInstruction: plan.CommonInstruction{
 				Name:    "remove-server-arg",
 				Command: "rm",
 				Args:    []string{"-rf", serverArgPath},
-			},
 		})
 	}
 
@@ -1833,11 +1819,9 @@ func buildRestorePlan(s *scope, secret *corev1.Secret, snapshot *rkev1.ETCDSnaps
 		Files: files,
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
 					Name:    "remove-etcd-db-dir",
 					Command: "rm",
 					Args:    []string{"-rf", path.Join(dataDir, "server/db/etcd")},
-				},
 			}),
 			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
 		},
