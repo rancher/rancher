@@ -21,6 +21,7 @@ var operationCRDs = []string{
 	"etcdsnapshotsaves.operation.cattle.io",
 	"etcdsnapshotrestores.operation.cattle.io",
 	"encryptionkeyrotations.operation.cattle.io",
+	"certificaterotations.operation.cattle.io",
 }
 
 // TestOperationCRDsAreAcceptable compiles each operation CRD the way the API server does when it is
