@@ -589,9 +589,7 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *h
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 
-	opts := []oauth2.AuthCodeOption{
-		oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")),
-	}
+	var opts []oauth2.AuthCodeOption
 
 	if config.PKCEMethod != "" {
 		pkceVerifier := getPKCEVerifier(req)
