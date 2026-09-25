@@ -188,7 +188,7 @@ func (a *ImportedAdapter) WaitForRestoreTarget() (bool, error) {
 	return true, nil
 }
 
-// InstallInstruction reinstalls the distro at the version the mgmt cluster is configured for.
+// InstallInstruction installs the distro at the version the mgmt cluster is configured for.
 //
 // For an imported cluster a version change would normally be rolled out by the downstream
 // system-upgrade-controller, but that happens long after this operation completes and

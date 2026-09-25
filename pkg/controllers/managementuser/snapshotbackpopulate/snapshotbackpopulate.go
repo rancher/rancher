@@ -375,7 +375,7 @@ func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) st
 
 // restoreModePrecedence is the order restore modes are emitted in. The annotation value has to be
 // stable across reconciles because populateUpstreamSnapshotFromDownstream diffs its own output to
-// decide whether to patch, and the modes come out of a map. Modes this Rancher does not know about
+// decide whether to patch, and the modes come out of a map. Modes that Rancher does not know about
 // are emitted after the known ones, sorted, so a newer downstream payload still produces a stable
 // value.
 var restoreModePrecedence = map[string]int{

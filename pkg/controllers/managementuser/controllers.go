@@ -138,7 +138,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 						// provisioning-cluster-spec key, and this controller replaces Data
 						// wholesale. Until the two writers are reconciled, v2prov keeps using the
 						// legacy payload.
-						snapshotextrametadata.Register(ctx, cluster, capi, clusterRec)
+						snapshotextrametadata.Register(ctx, cluster, capi)
 						found = true
 						break
 					}

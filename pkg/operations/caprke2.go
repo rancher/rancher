@@ -110,7 +110,7 @@ func (a *CAPRKE2Adapter) WaitForRestoreTarget() (bool, error) {
 	return true, nil
 }
 
-// InstallInstruction reinstalls RKE2 at the RKE2ControlPlane's version. The image is Rancher's
+// InstallInstruction installs RKE2 at the RKE2ControlPlane's version. The image is Rancher's
 // system-agent installer, resolved against the global system-default-registry: CAPRKE2 models no
 // per-cluster registry the way an RKEControlPlane's machineGlobalConfig does.
 func (a *CAPRKE2Adapter) InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {

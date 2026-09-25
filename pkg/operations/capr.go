@@ -133,7 +133,7 @@ func renderedForComparison(spec *provv1.ClusterSpec) *provv1.ClusterSpec {
 	return out
 }
 
-// InstallInstruction reinstalls the distro at the RKEControlPlane's Kubernetes version. That version
+// InstallInstruction installs the distro at the RKEControlPlane's Kubernetes version. That version
 // is what the restore-mode step writes when a restore rolls the cluster back, so installing it here
 // is what lets the subsequent --cluster-reset run against the snapshot's version.
 func (a *CAPRAdapter) InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {

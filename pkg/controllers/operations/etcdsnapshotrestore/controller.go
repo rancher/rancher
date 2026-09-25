@@ -857,13 +857,13 @@ func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCD
 		return status, err
 	}
 	if reason != "" {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: %s", s.op.Namespace, s.op.Name, reason)
 
-		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
-		opv1alpha1.CanceledCondition.True(&status)
-		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-		opv1alpha1.CanceledCondition.Message(&status, reason)
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.FailedReason)
+		opv1alpha1.FailedCondition.Message(&status, reason)
 
 		return status, nil
 	}
@@ -875,11 +875,11 @@ func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCD
 	if reason != "" {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
 
-		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
 
-		opv1alpha1.CanceledCondition.True(&status)
-		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
-		opv1alpha1.CanceledCondition.Message(&status, reason)
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.FailedReason)
+		opv1alpha1.FailedCondition.Message(&status, reason)
 
 		return status, nil
 	}

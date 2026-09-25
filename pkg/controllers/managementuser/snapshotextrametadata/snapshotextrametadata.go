@@ -83,7 +83,7 @@ type handler struct {
 	capiClusterCache capicontrollers.ClusterCache
 }
 
-func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wrangler.CAPIContext, cluster *apimgmtv3.Cluster) {
+func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wrangler.CAPIContext) {
 	logrus.Debugf("[snapshotextrametadata] Registering controller for cluster %s", userContext.ClusterName)
 
 	h := &handler{
