@@ -208,6 +208,7 @@ func PlanCRDs() []string {
 
 func OperationCRDs() []string {
 	return []string{
+		"certificaterotations.operation.cattle.io",
 		"encryptionkeyrotations.operation.cattle.io",
 		"etcdsnapshotsaves.operation.cattle.io",
 		"etcdsnapshotrestores.operation.cattle.io",
@@ -239,6 +240,7 @@ var MigratedResources = map[string]bool{
 	"clusters.management.cattle.io":                                   false,
 	"clusters.provisioning.cattle.io":                                 true,
 	"clusteruserattributes.cluster.cattle.io":                         false,
+	"certificaterotations.operation.cattle.io":                        true,
 	"composeconfigs.management.cattle.io":                             false,
 	"custommachines.rke.cattle.io":                                    true,
 	"dockercredentials.project.cattle.io":                             false,
