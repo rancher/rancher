@@ -178,7 +178,7 @@ scopes:
       - '^pkg/controllers/capr/machinedrain/'         # also basic
       - '^pkg/rkecerts/'
       - '^pkg/controllers/operations/'                # also imported
-      - '^pkg/operations/'
+      - '^pkg/operations/'                            # also imported
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     file-paths:
@@ -195,6 +195,7 @@ scopes:
       - '^pkg/controllers/capr/bootstraptoken/'       # also basic
       - '^pkg/controllers/capr/etcdmgmt/'             # also operations
       - '^pkg/controllers/operations/'                # also operations
+      - '^pkg/operations/'                            # also imported
       - '^pkg/capr/configserver/'                     # also basic
       - '^tests/v2prov/tests/imported/'
     file-paths:
