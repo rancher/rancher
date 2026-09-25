@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/data/management/driverdata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -16,23 +17,9 @@ const (
 	cloudCredentialSchemaID  = "cloudCredential"
 )
 
-type CredentialFields map[string]v32.Field
+type CredentialFields = driverdata.CredentialFields
 
-// Credential Fields data for KEv2 Operators which don't have a corresponding node driver.
-var KEv2OperatorsCredentialFields = map[string]CredentialFields{
-	AlibabaOperator: {
-		"accessKeyId": v32.Field{
-			Create: true,
-			Update: true,
-			Type:   "string",
-		},
-		"accessKeySecret": v32.Field{
-			Create: true,
-			Update: true,
-			Type:   "password",
-		},
-	},
-}
+var KEv2OperatorsCredentialFields = driverdata.KEv2OperatorsCredentialFields
 
 type KEv2CredsSchemaHandler struct {
 	schemaLister v3.DynamicSchemaLister
