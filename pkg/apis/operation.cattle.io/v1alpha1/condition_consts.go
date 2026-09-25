@@ -79,7 +79,11 @@ const (
 	// but the runtime secrets-encrypt status has not yet confirmed reencrypt_finished.
 	WaitingForEncryptionKeyRotationReason = "WaitingForEncryptionKeyRotation"
 
+	// PreflightCheckFailedReason surfaces when an operation with a preflight phase encounters an error.
 	PreflightCheckFailedReason = "PreflightCheckFailed"
+
+	// FailedReason surfaces when an operation is failed. It is a generic, non-descript reason.
+	FailedReason = "Failed"
 )
 
 func WaitingForDelegateMessage(beacon *planv1alpha1.Beacon) string {

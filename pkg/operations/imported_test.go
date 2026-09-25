@@ -8,11 +8,13 @@ import (
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1494,4 +1496,122 @@ func TestArgumentsValues(t *testing.T) {
 		"tls-private-key-file=/custom/scheduler.key",
 	}, args.Values("--kube-scheduler-arg"))
 	assert.Nil(t, args.Values("--missing"))
+}
+
+// newPauseAdapter wires an ImportedAdapter over a stub mgmt client holding the given cluster.
+func newPauseAdapter(cluster *mgmtv3.Cluster) (*ImportedAdapter, *stubClusterController) {
+	clusters := &stubClusterController{
+		clusters: map[string]*mgmtv3.Cluster{cluster.Name: cluster},
+	}
+	return &ImportedAdapter{
+		cluster: cluster,
+		clients: &wrangler.CAPIContext{
+			Context: &wrangler.Context{
+				Mgmt: &stubMgmtInterface{clusters: clusters},
+			},
+		},
+	}, clusters
+}
+
+func newPauseCluster(annotations map[string]string) *mgmtv3.Cluster {
+	return &mgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-mine", Annotations: annotations},
+	}
+}
+
+func TestImportedAdapter_PauseCluster(t *testing.T) {
+	t.Parallel()
+
+	const anno = importedclusterversionmanagement.VersionManagementPausedAnno
+
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		pause       bool
+		wantUpdate  bool
+		wantPaused  bool
+	}{
+		{
+			name:       "pausing an unannotated cluster",
+			pause:      true,
+			wantUpdate: true,
+			wantPaused: true,
+		},
+		{
+			name:        "pausing preserves unrelated annotations",
+			annotations: map[string]string{importedclusterversionmanagement.VersionManagementAnno: "true"},
+			pause:       true,
+			wantUpdate:  true,
+			wantPaused:  true,
+		},
+		{
+			name:        "pausing an already paused cluster does not write",
+			annotations: map[string]string{anno: "true"},
+			pause:       true,
+			wantUpdate:  false,
+			wantPaused:  true,
+		},
+		{
+			name:        "unpausing removes the annotation",
+			annotations: map[string]string{anno: "true"},
+			pause:       false,
+			wantUpdate:  true,
+			wantPaused:  false,
+		},
+		{
+			name:        "unpausing an unpaused cluster does not write",
+			annotations: nil,
+			pause:       false,
+			wantUpdate:  false,
+			wantPaused:  false,
+		},
+		{
+			// The annotation is only ever written as "true", but a stray value must still be cleaned
+			// up on unpause rather than left behind for the upgrade handler to interpret.
+			name:        "unpausing removes a non-true value",
+			annotations: map[string]string{anno: "false"},
+			pause:       false,
+			wantUpdate:  true,
+			wantPaused:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			adapter, clusters := newPauseAdapter(newPauseCluster(tt.annotations))
+
+			require.NoError(t, adapter.PauseCluster(tt.pause))
+
+			if tt.wantUpdate {
+				require.Len(t, clusters.updates, 1, "expected exactly one write")
+			} else {
+				assert.Empty(t, clusters.updates, "no-op must not write the cluster")
+			}
+
+			latest, err := clusters.Get("c-mine", metav1.GetOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantPaused, importedclusterversionmanagement.Paused(latest))
+
+			if !tt.wantPaused && tt.wantUpdate {
+				assert.NotContains(t, latest.Annotations, anno, "unpausing must remove the annotation, not blank it")
+			}
+			if tt.annotations[importedclusterversionmanagement.VersionManagementAnno] != "" {
+				assert.Equal(t, "true", latest.Annotations[importedclusterversionmanagement.VersionManagementAnno],
+					"unrelated annotations must survive")
+			}
+		})
+	}
+}
+
+func TestImportedAdapter_PauseCluster_GetError(t *testing.T) {
+	t.Parallel()
+
+	adapter, clusters := newPauseAdapter(newPauseCluster(nil))
+	clusters.getErr = errors.New("apiserver is down")
+
+	// The restore must not proceed believing it paused the cluster.
+	assert.ErrorContains(t, adapter.PauseCluster(true), "apiserver is down")
+	assert.Empty(t, clusters.updates)
 }

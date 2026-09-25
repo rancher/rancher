@@ -6,21 +6,46 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
+	"github.com/rancher/rancher/pkg/restoremode"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+// stubSnapshotClient serves a single ETCDSnapshot to the restore-mode code paths. Only Get is
+// exercised; every other method of the generated client panics so an unexpected call is loud.
+type stubSnapshotClient struct {
+	rkecontrollers.ETCDSnapshotController
+
+	snapshot *rkev1.ETCDSnapshot
+	notFound bool
+}
+
+func (c *stubSnapshotClient) Get(_, name string, _ metav1.GetOptions) (*rkev1.ETCDSnapshot, error) {
+	if c.notFound {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "rke.cattle.io", Resource: "etcdsnapshots"}, name)
+	}
+	return c.snapshot, nil
+}
 
 // stubAdapter is a minimal ops.Adapter implementation for testing plan construction.
 // Methods unrelated to the test return zero values.
@@ -34,6 +59,23 @@ type stubAdapter struct {
 	kubeconfigPath    string
 	serverUnit        string
 	waitForRegisterOK bool
+
+	// restoreTargets are the objects RestoreTarget serves, keyed by resource key. A key that is
+	// absent yields (nil, nil), i.e. this cluster type has no counterpart for it.
+	restoreTargets    map[string]*unstructured.Unstructured
+	restoreTargetErr  error
+	updatedTargets    []*unstructured.Unstructured
+	updateRestoreErr  error
+	restoreTargetKeys []string
+
+	// restoreTargetSettled is what WaitForRestoreTarget reports. The zero value is false so a test
+	// has to opt in to the settled state, mirroring a cluster that has not yet observed a write.
+	restoreTargetSettled bool
+	waitRestoreTargetErr error
+
+	// installVersion, when set, is the Kubernetes version InstallInstruction installs. Empty means
+	// this cluster type does not manage its distro version.
+	installVersion string
 }
 
 func (a *stubAdapter) EtcdSnapshotNamespace() string {
@@ -54,6 +96,54 @@ func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 }
 func (a *stubAdapter) DistroManifestPaths(_ string) ops.ManifestPaths {
 	return ops.ManifestPaths{}
+}
+func (a *stubAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	a.restoreTargetKeys = append(a.restoreTargetKeys, resourceKey)
+	if a.restoreTargetErr != nil {
+		return nil, a.restoreTargetErr
+	}
+	target, ok := a.restoreTargets[resourceKey]
+	if !ok {
+		return nil, nil
+	}
+	return target.DeepCopy(), nil
+}
+
+func (a *stubAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	if a.updateRestoreErr != nil {
+		return a.updateRestoreErr
+	}
+	a.updatedTargets = append(a.updatedTargets, obj)
+	// Reflect the write back so a subsequent RestoreTarget serves it, the way a real cache would
+	// once the update lands. That is what lets a test drive the step to completion.
+	for key, target := range a.restoreTargets {
+		if target.GetKind() == obj.GetKind() && target.GetName() == obj.GetName() {
+			a.restoreTargets[key] = obj
+		}
+	}
+	return nil
+}
+
+func (a *stubAdapter) WaitForRestoreTarget() (bool, error) {
+	return a.restoreTargetSettled, a.waitRestoreTargetErr
+}
+
+func (a *stubAdapter) InstallInstruction(_ *corev1.Secret, dataDir string) (planapi.OneTimeInstruction, bool) {
+	if a.installVersion == "" {
+		return planapi.OneTimeInstruction{}, false
+	}
+	return planapi.OneTimeInstruction{
+		CommonInstruction: planapi.CommonInstruction{
+			Name:    "install",
+			Image:   "rancher/system-agent-installer-rke2:" + strings.ReplaceAll(a.installVersion, "+", "-"),
+			Command: "sh",
+			Args:    []string{"-c", "run.sh"},
+			Env: []string{
+				"INSTALL_RKE2_SKIP_START=true",
+				"RKE2_DATA_DIR=" + dataDir,
+			},
+		},
+	}, true
 }
 func (a *stubAdapter) ProvisioningDataDirectory(_ *corev1.Secret) string { return a.provisioningDir }
 func (a *stubAdapter) ServerUnit() string                                { return a.serverUnit }
@@ -394,8 +484,9 @@ func TestBuildPreflightPlan_DataDirectoryErrorPropagates(t *testing.T) {
 func TestBuildShutdownPlan(t *testing.T) {
 	t.Parallel()
 
-	s := newTestScope(defaultAdapter(), "restore-uid")
 	adapter := defaultAdapter()
+	adapter.installVersion = "v1.33.0+rke2r1"
+	s := newTestScope(adapter, "restore-uid")
 
 	t.Run("etcd and control plane node", func(t *testing.T) {
 		secret := makePlanSecret("init", "node-init", map[string]string{
@@ -412,25 +503,22 @@ func TestBuildShutdownPlan(t *testing.T) {
 		for _, instr := range plan.OneTimeInstructions {
 			names = append(names, instr.Name)
 		}
+		// The install is ordered ahead of the killall, so anything it starts is torn down again.
 		want := []string{"remove idempotency tracking", "shutdown", "create-etcd-tombstone", "remove-tls-directory"}
 		if strings.Join(names, ",") != strings.Join(want, ",") {
 			t.Errorf("instructions = %v, want %v", names, want)
 		}
 
 		// The killall script reads the data directory out of the environment.
+		// The install now sits between the tracking cleanup and the killall, so the shutdown is third.
+		shutdown := plan.OneTimeInstructions[1]
 		dataDir, err := adapter.DistroDataDirectory(secret)
 		if err != nil {
 			t.Fatal(err)
 		}
 		wantEnv := fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(adapter.RuntimeCommand()), dataDir)
-		var found bool
-		for _, e := range plan.OneTimeInstructions[1].Env {
-			if e == wantEnv {
-				found = true
-			}
-		}
-		if !found {
-			t.Errorf("shutdown instruction env = %v, want it to contain %q", plan.OneTimeInstructions[1].Env, wantEnv)
+		if !slices.Contains(shutdown.Env, wantEnv) {
+			t.Errorf("shutdown instruction env = %v, want it to contain %q", shutdown.Env, wantEnv)
 		}
 
 		if len(plan.Files) != 1 || plan.Files[0].Path != ops.IdempotentActionScriptPath(adapter.ProvisioningDataDirectory(secret)) {
@@ -448,7 +536,8 @@ func TestBuildShutdownPlan(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// No etcd data or TLS material to clear on a worker.
+		// No etcd data or TLS material to clear on a worker, but it is still installed and stopped:
+		// it has to come back on the same version as the control plane it rejoins.
 		if len(plan.OneTimeInstructions) != 2 {
 			t.Fatalf("expected 2 instructions, got %d", len(plan.OneTimeInstructions))
 		}
@@ -743,4 +832,962 @@ func TestOnChange_Paused(t *testing.T) {
 	if status.Step != initialStatus.Step {
 		t.Errorf("Step = %q, want %q (unchanged)", status.Step, initialStatus.Step)
 	}
+}
+
+// provClusterTarget returns an unstructured provisioning cluster for the stub adapter to serve as
+// the restore target, holding the pre-restore configuration.
+func provClusterTarget() *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "provisioning.cattle.io/v1",
+		"kind":       "Cluster",
+		"metadata": map[string]any{
+			"name":      "test-cluster",
+			"namespace": "fleet-default",
+		},
+		"spec": map[string]any{
+			"kubernetesVersion": "v1.34.1+rke2r1",
+			"rkeConfig": map[string]any{
+				"additionalManifest": "# current",
+			},
+		},
+	}}
+}
+
+// provClusterWithDrainTimeout renders a v2prov cluster whose control-plane drain timeout is the
+// given value. It goes through ToUnstructured because both sides of a restore do: CAPRAdapter
+// renders the restore target that way, and snapshotextrametadata publishes the captured cluster
+// that way too (see its sanitize). So the captured and live subtrees have the same shape, and the
+// Go types their numbers carry are the only thing that can disagree.
+func provClusterWithDrainTimeout(t *testing.T, timeout int) *unstructured.Unstructured {
+	t.Helper()
+
+	cluster := &provv1.Cluster{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "provisioning.cattle.io/v1", Kind: "Cluster"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "fleet-default"},
+		Spec: provv1.ClusterSpec{
+			KubernetesVersion: "v1.34.1+rke2r1",
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rkev1.ClusterConfiguration{
+					UpgradeStrategy: rkev1.ClusterUpgradeStrategy{
+						ControlPlaneDrainOptions: rkev1.DrainOptions{Enabled: true, Timeout: timeout},
+					},
+				},
+			},
+		},
+	}
+
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		t.Fatalf("rendering the cluster: %v", err)
+	}
+
+	return &unstructured.Unstructured{Object: obj}
+}
+
+// roundTripProvCluster models what happens to a restore target between two reconciles: CAPRAdapter
+// decodes the object it was handed into a provv1.Cluster to update it, and the next RestoreTarget
+// call renders the stored object back with ToUnstructured. That round trip is what settles a field
+// on the type the unstructured convention gives it, so a test asserting convergence has to go
+// through it rather than reusing the in-memory copy the write was built from. It also fails loudly
+// on a value the typed object cannot hold.
+func roundTripProvCluster(t *testing.T, obj *unstructured.Unstructured) *unstructured.Unstructured {
+	t.Helper()
+
+	cluster := &provv1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		t.Fatalf("decoding the updated cluster: %v", err)
+	}
+
+	stored, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		t.Fatalf("rendering the stored cluster: %v", err)
+	}
+
+	return &unstructured.Unstructured{Object: stored}
+}
+
+// snapshotWithModes builds an upstream snapshot carrying an extra-metadata payload: resources plus a
+// restoreModes map, encoded the way snapshotextrametadata and snapshotbackpopulate do.
+func snapshotWithModes(t *testing.T, modes map[string]string, resources map[string]any, availableModes string) *rkev1.ETCDSnapshot {
+	t.Helper()
+
+	metadata := map[string]string{}
+
+	if modes != nil {
+		payload, err := json.Marshal(modes)
+		if err != nil {
+			t.Fatalf("marshalling restoreModes: %v", err)
+		}
+		metadata[rkev1.SnapshotMetadataRestoreModesKey] = string(payload)
+	}
+
+	if resources != nil {
+		payload, err := snapshotutil.CompressInterface(resources)
+		if err != nil {
+			t.Fatalf("compressing resources: %v", err)
+		}
+		metadata[rkev1.SnapshotMetadataResourcesKey] = payload
+	}
+
+	envelope, err := json.Marshal(metadata)
+	if err != nil {
+		t.Fatalf("marshalling metadata: %v", err)
+	}
+
+	snapshot := &rkev1.ETCDSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "snapshot-1",
+			Namespace:   "fleet-default",
+			Annotations: map[string]string{},
+		},
+	}
+	snapshot.SnapshotFile.Metadata = base64.StdEncoding.EncodeToString(envelope)
+	if availableModes != "" {
+		snapshot.Annotations[capr.RestoreModeOptionsAnnotation] = availableModes
+	}
+	return snapshot
+}
+
+// restoredResources is the resources payload for a snapshot taken when the cluster ran an older
+// Kubernetes version and a different additional manifest.
+func restoredResources() map[string]any {
+	return map[string]any{
+		rkev1.SnapshotResourceProvCluster: map[string]any{
+			"metadata": map[string]any{"name": "test-cluster"},
+			"spec": map[string]any{
+				"kubernetesVersion": "v1.33.0+rke2r1",
+				"rkeConfig": map[string]any{
+					"additionalManifest": "# restored",
+				},
+				// Not in restoremode.WritablePaths: a downstream must not be able to rewrite it.
+				"cloudCredentialSecretName": "cattle-global-data:cc-attacker",
+			},
+		},
+	}
+}
+
+func kubernetesVersionSelector() string {
+	return restoremode.Match{
+		ResourceKey: rkev1.SnapshotResourceProvCluster,
+		Path:        []string{"spec", "kubernetesVersion"},
+	}.String()
+}
+
+func TestRestoresClusterConfig(t *testing.T) {
+	for _, mode := range []string{"", rkev1.RestoreRKEConfigNone} {
+		if restoresClusterConfig(mode) {
+			t.Errorf("mode %q should not restore cluster configuration", mode)
+		}
+	}
+	for _, mode := range []string{rkev1.RestoreRKEConfigKubernetesVersion, rkev1.RestoreRKEConfigAll, "customMode"} {
+		if !restoresClusterConfig(mode) {
+			t.Errorf("mode %q should restore cluster configuration", mode)
+		}
+	}
+}
+
+func TestValidateRestoreMode(t *testing.T) {
+	offered := snapshotWithModes(t, nil, nil, "none,kubernetesVersion,all")
+
+	tests := []struct {
+		name     string
+		mode     string
+		snapshot *rkev1.ETCDSnapshot
+		ok       bool
+		contains string
+	}{
+		{name: "empty mode needs no snapshot", mode: "", snapshot: nil, ok: true},
+		{name: "none needs no snapshot", mode: rkev1.RestoreRKEConfigNone, snapshot: nil, ok: true},
+		{
+			name:     "a mode with no snapshot CR is rejected",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			snapshot: nil,
+			contains: "requires an etcdsnapshot.rke.cattle.io resource",
+		},
+		{name: "an offered mode is accepted", mode: rkev1.RestoreRKEConfigAll, snapshot: offered, ok: true},
+		{
+			name:     "a mode the snapshot does not offer is rejected",
+			mode:     "customMode",
+			snapshot: offered,
+			contains: `restore mode "customMode" is not available`,
+		},
+		{
+			name:     "no annotation means no mode is offered",
+			mode:     rkev1.RestoreRKEConfigAll,
+			snapshot: snapshotWithModes(t, nil, nil, ""),
+			contains: "is not available",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reason, ok := validateRestoreMode(tt.mode, "snapshot-1", tt.snapshot)
+			if ok != tt.ok {
+				t.Fatalf("ok = %v, want %v (reason: %s)", ok, tt.ok, reason)
+			}
+			if tt.ok {
+				if reason != "" {
+					t.Errorf("expected no reason, got %q", reason)
+				}
+				return
+			}
+			if !strings.Contains(reason, tt.contains) {
+				t.Errorf("reason %q does not contain %q", reason, tt.contains)
+			}
+		})
+	}
+}
+
+// resolveScope builds a scope whose op requests mode, with adapter serving the given restore
+// targets.
+func resolveScope(mode string, adapter *stubAdapter) *scope {
+	s := newTestScope(adapter, types.UID("uid-1"))
+	s.op.Spec.Args.Name = "snapshot-1"
+	s.op.Spec.Args.RestoreMode = mode
+	return s
+}
+
+func TestResolveRestoreMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		mode     string
+		modes    map[string]string
+		res      map[string]any
+		expected []string
+		contains string
+	}{
+		{
+			name:     "kubernetesVersion resolves to the captured version",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			modes:    map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			res:      restoredResources(),
+			expected: []string{"spec.kubernetesVersion"},
+		},
+		{
+			name:  "all expands to every writable field that was captured",
+			mode:  rkev1.RestoreRKEConfigAll,
+			modes: map[string]string{rkev1.RestoreRKEConfigAll: rkev1.RestoreModeSelectorWildcard},
+			res:   restoredResources(),
+			// cloudCredentialSecretName is captured but not writable, so it is dropped.
+			expected: []string{"spec.kubernetesVersion", "spec.rkeConfig.additionalManifest"},
+		},
+		{
+			name:     "a mode the payload does not declare is rejected",
+			mode:     "customMode",
+			modes:    map[string]string{rkev1.RestoreRKEConfigAll: rkev1.RestoreModeSelectorWildcard},
+			res:      restoredResources(),
+			contains: `does not declare restore mode "customMode"`,
+		},
+		{
+			name:     "a selector naming only non-writable fields is rejected",
+			mode:     "credentials",
+			modes:    map[string]string{"credentials": restoremode.Match{ResourceKey: rkev1.SnapshotResourceProvCluster, Path: []string{"spec", "cloudCredentialSecretName"}}.String()},
+			res:      restoredResources(),
+			contains: "selects no field that Rancher restores",
+		},
+		{
+			name:     "an unparsable selector is rejected",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			modes:    map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: "spec.kubernetesVersion"},
+			res:      restoredResources(),
+			contains: "unusable selector",
+		},
+		{
+			name:     "a selector that resolves to nothing is rejected",
+			mode:     rkev1.RestoreRKEConfigKubernetesVersion,
+			modes:    map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			res:      map[string]any{},
+			contains: "selects no field that Rancher restores",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot := snapshotWithModes(t, tt.modes, tt.res, "none,"+tt.mode)
+			h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+
+			matches, reason, err := h.resolveRestoreMode(resolveScope(tt.mode, defaultAdapter()), tt.mode)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.contains != "" {
+				if !strings.Contains(reason, tt.contains) {
+					t.Fatalf("reason %q does not contain %q", reason, tt.contains)
+				}
+				return
+			}
+			if reason != "" {
+				t.Fatalf("unexpected reason: %s", reason)
+			}
+
+			var got []string
+			for _, m := range matches {
+				got = append(got, strings.Join(m.Path, "."))
+			}
+			assertSameStrings(t, tt.expected, got)
+		})
+	}
+
+	t.Run("a missing snapshot CR is rejected", func(t *testing.T) {
+		h := &handler{etcdsnapshots: &stubSnapshotClient{notFound: true}}
+
+		_, reason, err := h.resolveRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, defaultAdapter()), rkev1.RestoreRKEConfigAll)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(reason, "requires an etcdsnapshot.rke.cattle.io resource") {
+			t.Errorf("unexpected reason: %s", reason)
+		}
+	})
+
+	t.Run("a snapshot with no metadata is rejected", func(t *testing.T) {
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: &rkev1.ETCDSnapshot{
+			ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1", Namespace: "fleet-default"},
+		}}}
+
+		_, reason, err := h.resolveRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, defaultAdapter()), rkev1.RestoreRKEConfigAll)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(reason, "reading metadata") {
+			t.Errorf("unexpected reason: %s", reason)
+		}
+	})
+}
+
+func TestApplyRestoreMode(t *testing.T) {
+	versionMatch := restoremode.Match{
+		ResourceKey: rkev1.SnapshotResourceProvCluster,
+		Path:        []string{"spec", "kubernetesVersion"},
+		Value:       "v1.33.0+rke2r1",
+	}
+
+	t.Run("writes the selected field onto the restore target", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: provClusterTarget(),
+		}
+		h := &handler{}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), []restoremode.Match{versionMatch})
+		if err != nil || reason != "" {
+			t.Fatalf("err = %v, reason = %s", err, reason)
+		}
+		if !applied {
+			t.Fatal("expected the restore to be applied")
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(adapter.updatedTargets))
+		}
+
+		got, found, err := unstructured.NestedString(adapter.updatedTargets[0].Object, "spec", "kubernetesVersion")
+		if err != nil || !found {
+			t.Fatalf("kubernetesVersion not set: found=%v err=%v", found, err)
+		}
+		if got != "v1.33.0+rke2r1" {
+			t.Errorf("kubernetesVersion = %q, want the captured value", got)
+		}
+
+		// Fields the mode did not select are untouched.
+		manifest, _, _ := unstructured.NestedString(adapter.updatedTargets[0].Object, "spec", "rkeConfig", "additionalManifest")
+		if manifest != "# current" {
+			t.Errorf("additionalManifest = %q, want it left alone", manifest)
+		}
+	})
+
+	t.Run("does not write when the field already holds the captured value", func(t *testing.T) {
+		target := provClusterTarget()
+		if err := unstructured.SetNestedField(target.Object, "v1.33.0+rke2r1", "spec", "kubernetesVersion"); err != nil {
+			t.Fatal(err)
+		}
+
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: target,
+		}
+		h := &handler{}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), []restoremode.Match{versionMatch})
+		if err != nil || reason != "" {
+			t.Fatalf("err = %v, reason = %s", err, reason)
+		}
+		if applied {
+			t.Error("expected no update when the value already matches")
+		}
+		if len(adapter.updatedTargets) != 0 {
+			t.Errorf("expected 0 updates, got %d", len(adapter.updatedTargets))
+		}
+	})
+
+	// A writable path is matched whole, so a subtree like upgradeStrategy is restored as one value
+	// and every number inside it takes part in the comparison. Those only converge if the captured
+	// numbers and the live ones agree on their Go type, which is why this case goes through
+	// resolveRestoreMode rather than a hand-built Match: the captured value has to come out of a
+	// real snapshot payload, which is where the type is decided. A payload decoded as float64 still
+	// writes onto the target, so nothing looks wrong until the second pass keeps reporting
+	// "applied" and the restore-mode step never advances.
+	t.Run("a numeric field converges on the pass after it is written", func(t *testing.T) {
+		upgradeStrategyPath := []string{"spec", "rkeConfig", "upgradeStrategy"}
+		timeoutPath := append(append([]string{}, upgradeStrategyPath...), "controlPlaneDrainOptions", "timeout")
+
+		snapshot := snapshotWithModes(t, map[string]string{
+			rkev1.RestoreRKEConfigAll: restoremode.Match{ResourceKey: rkev1.SnapshotResourceProvCluster, Path: upgradeStrategyPath}.String(),
+		}, map[string]any{
+			rkev1.SnapshotResourceProvCluster: provClusterWithDrainTimeout(t, 30).Object,
+		}, "none,"+rkev1.RestoreRKEConfigAll)
+
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		matches, reason, err := h.resolveRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, defaultAdapter()), rkev1.RestoreRKEConfigAll)
+		if err != nil || reason != "" {
+			t.Fatalf("err = %v, reason = %s", err, reason)
+		}
+		if len(matches) != 1 {
+			t.Fatalf("expected 1 match, got %d: %v", len(matches), matches)
+		}
+
+		// The cluster currently drains with a different timeout.
+		target := provClusterWithDrainTimeout(t, 60)
+
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{rkev1.SnapshotResourceProvCluster: target}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, adapter), matches)
+		if err != nil || reason != "" {
+			t.Fatalf("first pass: err = %v, reason = %s", err, reason)
+		}
+		if !applied {
+			t.Fatal("first pass: expected the captured timeout to be applied")
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Fatalf("first pass: expected 1 update, got %d", len(adapter.updatedTargets))
+		}
+
+		// The next reconcile reads the object back after it was persisted, not the in-memory copy
+		// the write was built from.
+		persisted := roundTripProvCluster(t, adapter.updatedTargets[0])
+		got, found, err := unstructured.NestedInt64(persisted.Object, timeoutPath...)
+		if err != nil || !found {
+			t.Fatalf("timeout not persisted as an integer: found=%v err=%v", found, err)
+		}
+		if got != 30 {
+			t.Errorf("timeout = %d, want the captured value", got)
+		}
+
+		next := defaultAdapter()
+		next.restoreTargets = map[string]*unstructured.Unstructured{rkev1.SnapshotResourceProvCluster: persisted}
+
+		applied, reason, err = h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, next), matches)
+		if err != nil || reason != "" {
+			t.Fatalf("second pass: err = %v, reason = %s", err, reason)
+		}
+		if applied {
+			t.Error("second pass: expected the step to converge once the timeout already holds the captured value")
+		}
+		if len(next.updatedTargets) != 0 {
+			t.Errorf("second pass: expected 0 updates, got %d", len(next.updatedTargets))
+		}
+	})
+
+	t.Run("a cluster with no counterpart for the resource key is rejected", func(t *testing.T) {
+		// An imported cluster: ImportedAdapter.RestoreTarget always returns (nil, nil), because
+		// nothing upstream holds a configuration to restore.
+		adapter := defaultAdapter()
+		h := &handler{}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), []restoremode.Match{versionMatch})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if applied {
+			t.Error("expected nothing to be applied")
+		}
+		if !strings.Contains(reason, "which this cluster has no counterpart for") {
+			t.Errorf("unexpected reason: %s", reason)
+		}
+	})
+
+	t.Run("propagates a restore target error", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargetErr = fmt.Errorf("boom")
+		h := &handler{}
+
+		if _, _, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, adapter), []restoremode.Match{versionMatch}); err == nil {
+			t.Error("expected the error to propagate")
+		}
+	})
+
+	t.Run("propagates an update error", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: provClusterTarget(),
+		}
+		adapter.updateRestoreErr = fmt.Errorf("boom")
+		h := &handler{}
+
+		if _, _, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, adapter), []restoremode.Match{versionMatch}); err == nil {
+			t.Error("expected the error to propagate")
+		}
+	})
+}
+
+func TestReconcileRestoreClusterConfig(t *testing.T) {
+	t.Run("a mode restoring nothing advances straight to shutdown", func(t *testing.T) {
+		adapter := defaultAdapter()
+		h := &handler{}
+		s := resolveScope(rkev1.RestoreRKEConfigNone, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
+		}
+		if len(adapter.restoreTargetKeys) != 0 {
+			t.Errorf("expected no restore target lookups, got %v", adapter.restoreTargetKeys)
+		}
+	})
+
+	t.Run("applies the mode then advances on the next reconcile", func(t *testing.T) {
+		adapter := defaultAdapter()
+		adapter.restoreTargetSettled = true
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: provClusterTarget(),
+		}
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		s := resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter)
+
+		// First pass writes and stays in the step, because the caches this reconcile read are now
+		// stale.
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig {
+			t.Errorf("step = %q, want to stay in RestoreClusterConfig", status.Step)
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(adapter.updatedTargets))
+		}
+
+		// Second pass sees the applied value and advances without writing again.
+		status, err = h.reconcileRestoreClusterConfig(s, status)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Errorf("expected no second update, got %d", len(adapter.updatedTargets))
+		}
+	})
+
+	t.Run("holds until the cluster has observed the restored configuration", func(t *testing.T) {
+		// The write has already landed, so there is nothing left to apply — but the objects rendered
+		// off the restore target have not caught up. Advancing here would let the Restore step build
+		// a node plan, and install a Kubernetes version, from the pre-restore configuration.
+		target := provClusterTarget()
+		if err := unstructured.SetNestedField(target.Object, "v1.33.0+rke2r1", "spec", "kubernetesVersion"); err != nil {
+			t.Fatal(err)
+		}
+
+		adapter := defaultAdapter()
+		adapter.restoreTargetSettled = false
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: target,
+		}
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		s := resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig {
+			t.Errorf("step = %q, want to stay in RestoreClusterConfig", status.Step)
+		}
+		if len(adapter.updatedTargets) != 0 {
+			t.Errorf("expected no writes, got %d", len(adapter.updatedTargets))
+		}
+
+		// Once it settles, the same reconcile advances without writing.
+		adapter.restoreTargetSettled = true
+		status, err = h.reconcileRestoreClusterConfig(s, status)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
+		}
+	})
+
+	t.Run("propagates a restore target wait error", func(t *testing.T) {
+		target := provClusterTarget()
+		if err := unstructured.SetNestedField(target.Object, "v1.33.0+rke2r1", "spec", "kubernetesVersion"); err != nil {
+			t.Fatal(err)
+		}
+
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{
+			rkev1.SnapshotResourceProvCluster: target,
+		}
+		adapter.waitRestoreTargetErr = fmt.Errorf("boom")
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+
+		_, err := h.reconcileRestoreClusterConfig(resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter), opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err == nil {
+			t.Error("expected the error to propagate")
+		}
+	})
+
+	t.Run("a mode restoring nothing still does not wait", func(t *testing.T) {
+		// "none" writes nothing, so there is nothing to propagate and no reason to hold.
+		adapter := defaultAdapter()
+		adapter.restoreTargetSettled = false
+		h := &handler{}
+
+		status, err := h.reconcileRestoreClusterConfig(resolveScope("", adapter), opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Step != opv1alpha1.ETCDSnapshotRestoreStepShutdown {
+			t.Errorf("step = %q, want Shutdown", status.Step)
+		}
+	})
+
+	t.Run("fails when the mode cannot be resolved", func(t *testing.T) {
+		adapter := defaultAdapter()
+		h := &handler{etcdsnapshots: &stubSnapshotClient{notFound: true}}
+		s := resolveScope(rkev1.RestoreRKEConfigAll, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Phase != opv1alpha1.OperationPhaseFailed {
+			t.Errorf("phase = %q, want Failed", status.Phase)
+		}
+	})
+
+	t.Run("failed rather than silently restoring nothing", func(t *testing.T) {
+		// The mode resolves, but this cluster type has no object to write it to. Degrading to a
+		// plain etcd restore would give the user something they did not ask for.
+		adapter := defaultAdapter()
+		snapshot := snapshotWithModes(t,
+			map[string]string{rkev1.RestoreRKEConfigKubernetesVersion: kubernetesVersionSelector()},
+			restoredResources(),
+			"none,kubernetesVersion")
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		s := resolveScope(rkev1.RestoreRKEConfigKubernetesVersion, adapter)
+
+		status, err := h.reconcileRestoreClusterConfig(s, opv1alpha1.ETCDSnapshotRestoreStatus{
+			Step: opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if status.Phase != opv1alpha1.OperationPhaseFailed {
+			t.Errorf("phase = %q, want Failed", status.Phase)
+		}
+	})
+
+}
+
+// TestStepHookPrefixForCoversEveryStep guards the wiring a new step needs: a step missing from
+// stepHookPrefixFor silently loses its lifecycle hook, and handleInProgress's beacon-loss handling
+// consults the prefix to tell an intentional delegation from a genuine loss.
+func TestStepHookPrefixForCoversEveryStep(t *testing.T) {
+	t.Parallel()
+
+	steps := []opv1alpha1.ETCDSnapshotRestoreStep{
+		opv1alpha1.ETCDSnapshotRestoreStepPreflight,
+		opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
+		opv1alpha1.ETCDSnapshotRestoreStepShutdown,
+		opv1alpha1.ETCDSnapshotRestoreStepRestore,
+		opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,
+		opv1alpha1.ETCDSnapshotRestoreStepInitialRestartCluster,
+		opv1alpha1.ETCDSnapshotRestoreStepPostRestoreNodeCleanup,
+		opv1alpha1.ETCDSnapshotRestoreStepRestartCluster,
+	}
+
+	seen := map[string]opv1alpha1.ETCDSnapshotRestoreStep{}
+	for _, step := range steps {
+		prefix := stepHookPrefixFor(step)
+		if prefix == "" {
+			t.Errorf("step %q has no hook prefix", step)
+			continue
+		}
+		if other, ok := seen[prefix]; ok {
+			t.Errorf("steps %q and %q share hook prefix %q", step, other, prefix)
+		}
+		seen[prefix] = step
+	}
+}
+
+func assertSameStrings(t *testing.T, want, got []string) {
+	t.Helper()
+
+	if len(want) != len(got) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	remaining := map[string]int{}
+	for _, w := range want {
+		remaining[w]++
+	}
+	for _, g := range got {
+		remaining[g]--
+	}
+	for k, count := range remaining {
+		if count != 0 {
+			t.Fatalf("got %v, want %v (mismatch on %q)", got, want, k)
+		}
+	}
+}
+
+// TestBuildRestorePlanInstallsConfiguredVersion covers the downgrade mechanism: the restore plan has
+// to reinstall the distro at the configured Kubernetes version before --cluster-reset, because a
+// newer server cannot reset onto etcd data written by an older one.
+func TestBuildRestorePlanInstructions(t *testing.T) {
+	t.Parallel()
+
+	secret := makePlanSecret("etcd-0", "node-etcd-0", map[string]string{capr.EtcdRoleLabel: "true"})
+
+	t.Run("the plan wipes etcd and resets, and installs nothing", func(t *testing.T) {
+		t.Parallel()
+
+		// The adapter does offer an install, so this pins that the restore deliberately leaves it to
+		// the Shutdown step rather than merely having nothing to install: by the time the reset runs,
+		// the snapshot's own binary is already on disk.
+		adapter := defaultAdapter()
+		adapter.installVersion = "v1.33.0+rke2r1"
+		s := newTestScope(adapter, types.UID("uid-1"))
+
+		nodePlan, err := buildRestorePlan(s, secret, nil, "snapshot-1")
+		if err != nil {
+			t.Fatalf("buildRestorePlan: %v", err)
+		}
+
+		assertInstructionOrder(t, nodePlan, []string{idempotencyKey + "/clean-etcd-dir", idempotencyKey + "/restore"})
+	})
+
+	t.Run("the instructions are scoped to this operation", func(t *testing.T) {
+		t.Parallel()
+
+		// Every restore instruction runs through the idempotency wrapper keyed on the op's UID, so a
+		// re-reconcile does not reset etcd twice and two operations never share tracking state.
+		adapter := defaultAdapter()
+
+		first, err := buildRestorePlan(newTestScope(adapter, types.UID("uid-1")), secret, nil, "snapshot-1")
+		if err != nil {
+			t.Fatalf("buildRestorePlan: %v", err)
+		}
+		second, err := buildRestorePlan(newTestScope(adapter, types.UID("uid-2")), secret, nil, "snapshot-1")
+		if err != nil {
+			t.Fatalf("buildRestorePlan: %v", err)
+		}
+
+		if fmt.Sprint(first.OneTimeInstructions[0].Args) == fmt.Sprint(second.OneTimeInstructions[0].Args) {
+			t.Error("expected the restore instructions to be scoped to the operation UID")
+		}
+		if !slices.Contains(first.OneTimeInstructions[0].Args, idempotencyKey+"/clean-etcd-dir") {
+			t.Errorf("args = %v, want the clean-etcd-dir idempotency key", first.OneTimeInstructions[0].Args)
+		}
+	})
+}
+
+// assertInstructionOrder checks the plan's one-time instructions carry the given idempotency
+// identifiers in order.
+func assertInstructionOrder(t *testing.T, nodePlan *planapi.Plan, want []string) {
+	t.Helper()
+
+	var got []string
+	for _, inst := range nodePlan.OneTimeInstructions {
+		got = append(got, instructionIdentifier(inst))
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("instructions = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("instruction %d = %q, want %q (full order: %v)", i, got[i], want[i], got)
+		}
+	}
+}
+
+// instructionIdentifier returns the idempotency identifier of a wrapped instruction.
+// ops.IdempotentInstruction rewrites the instruction to run through the idempotency script with the
+// argument list [-x, <script>, <identifier>, <hashedValue>, <hashedCommand>, <command>,
+// <provisioningDir>, <args>...], so the identifier is the third argument.
+func instructionIdentifier(inst planapi.OneTimeInstruction) string {
+	if inst.Command != "/bin/sh" || len(inst.Args) < 3 {
+		return inst.Name
+	}
+	return inst.Args[2]
+}
+
+func TestBuildRestartPlan(t *testing.T) {
+	t.Parallel()
+
+	const (
+		serverURL          = "10.0.0.1"
+		initialValue       = "uid-1/initial"
+		finalValue         = "uid-1/final"
+		restartTestVersion = "v1.33.0+rke2r1"
+	)
+
+	initSecret := makePlanSecret("init", "node-init", map[string]string{
+		capr.EtcdRoleLabel:         "true",
+		capr.ControlPlaneRoleLabel: "true",
+		capr.InitNodeLabel:         "true",
+	})
+	otherEtcd := makePlanSecret("etcd-2", "node-etcd-2", map[string]string{
+		capr.EtcdRoleLabel: "true",
+	})
+	worker := makePlanSecret("worker", "node-worker", map[string]string{
+		capr.WorkerRoleLabel: "true",
+	})
+
+	t.Run("each pass restarts without reinstalling", func(t *testing.T) {
+		t.Parallel()
+
+		// The version was installed during the Shutdown step, on every node at once, so a restart is
+		// all that is left to do. The adapter still offers an install, so this pins that the restart
+		// leaves it alone rather than there being nothing to install.
+		for _, secret := range []*corev1.Secret{initSecret, otherEtcd, worker} {
+			adapter := defaultAdapter()
+			adapter.installVersion = restartTestVersion
+			s := newTestScope(adapter, types.UID("uid-1"))
+
+			initial, err := buildRestartPlan(s, secret, initSecret, serverURL, initialValue, true)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", secret.Name, err)
+			}
+			assertInstructionOrder(t, initial, []string{idempotencyKey + "/restart"})
+
+			final, err := buildRestartPlan(s, secret, initSecret, serverURL, finalValue, false)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", secret.Name, err)
+			}
+			assertInstructionOrder(t, final, []string{idempotencyKey + "/restart", "remove-server-arg"})
+		}
+	})
+
+	t.Run("worker nodes restart the agent unit", func(t *testing.T) {
+		t.Parallel()
+
+		adapter := defaultAdapter()
+		adapter.installVersion = restartTestVersion
+		s := newTestScope(adapter, types.UID("uid-1"))
+
+		for _, tc := range []struct {
+			secret *corev1.Secret
+			want   string
+		}{
+			{secret: initSecret, want: "rke2-server"},
+			{secret: otherEtcd, want: "rke2-server"},
+			{secret: worker, want: "rke2-agent"},
+		} {
+			nodePlan, err := buildRestartPlan(s, tc.secret, initSecret, serverURL, initialValue, true)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", tc.secret.Name, err)
+			}
+			if args := restartInstructionArgs(t, nodePlan); !slices.Contains(args, tc.want) {
+				t.Errorf("node %s: restart args = %v, want the %s unit", tc.secret.Name, args, tc.want)
+			}
+		}
+	})
+
+	t.Run("the server drop-in points the non-leader nodes at the restored node", func(t *testing.T) {
+		t.Parallel()
+
+		adapter := defaultAdapter()
+		adapter.installVersion = restartTestVersion
+		s := newTestScope(adapter, types.UID("uid-1"))
+		dropIn := path.Join(adapter.ConfigDirectory(otherEtcd), "zz_etcd-snapshot-restore.yaml")
+
+		// Initial pass: every node but the leader gets the drop-in, and nothing removes it yet.
+		nodePlan, err := buildRestartPlan(s, otherEtcd, initSecret, serverURL, initialValue, true)
+		if err != nil {
+			t.Fatalf("buildRestartPlan: %v", err)
+		}
+		if len(nodePlan.Files) != 2 {
+			t.Fatalf("files = %d, want the idempotency script plus the drop-in", len(nodePlan.Files))
+		}
+		if nodePlan.Files[1].Path != dropIn {
+			t.Errorf("drop-in path = %q, want %q", nodePlan.Files[1].Path, dropIn)
+		}
+		content, err := base64.StdEncoding.DecodeString(nodePlan.Files[1].Content)
+		if err != nil {
+			t.Fatalf("decoding drop-in: %v", err)
+		}
+		if want := "server: \"https://10.0.0.1:9345\"\n"; string(content) != want {
+			t.Errorf("drop-in = %q, want %q", string(content), want)
+		}
+
+		// The leader is the node being pointed at, so it must not be told to join itself.
+		leaderPlan, err := buildRestartPlan(s, initSecret, initSecret, serverURL, initialValue, true)
+		if err != nil {
+			t.Fatalf("buildRestartPlan: %v", err)
+		}
+		if len(leaderPlan.Files) != 1 {
+			t.Errorf("leader files = %d, want no server drop-in", len(leaderPlan.Files))
+		}
+
+		// Final pass: the drop-in is removed everywhere, the leader included.
+		for _, secret := range []*corev1.Secret{initSecret, otherEtcd, worker} {
+			finalPlan, err := buildRestartPlan(s, secret, initSecret, serverURL, finalValue, false)
+			if err != nil {
+				t.Fatalf("node %s: buildRestartPlan: %v", secret.Name, err)
+			}
+			if len(finalPlan.Files) != 1 {
+				t.Errorf("node %s: files = %d, want the final pass to write no drop-in", secret.Name, len(finalPlan.Files))
+			}
+			last := finalPlan.OneTimeInstructions[len(finalPlan.OneTimeInstructions)-1]
+			if last.Name != "remove-server-arg" {
+				t.Errorf("node %s: last instruction = %q, want remove-server-arg", secret.Name, last.Name)
+			}
+			if !slices.Contains(last.Args, dropIn) {
+				t.Errorf("node %s: remove args = %v, want %q", secret.Name, last.Args, dropIn)
+			}
+		}
+	})
+}
+
+// restartInstructionArgs returns the arguments of the plan's restart instruction. It is wrapped by
+// the idempotency script, so the real command and its arguments sit at the tail of Args.
+func restartInstructionArgs(t *testing.T, nodePlan *planapi.Plan) []string {
+	t.Helper()
+
+	for _, inst := range nodePlan.OneTimeInstructions {
+		if instructionIdentifier(inst) == idempotencyKey+"/restart" {
+			return inst.Args
+		}
+	}
+	t.Fatalf("plan has no restart instruction: %v", nodePlan.OneTimeInstructions)
+	return nil
 }

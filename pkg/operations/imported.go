@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -145,6 +147,79 @@ func (a *ImportedAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 	}
 
 	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+// RestoreTarget returns the mgmt v3 Cluster, which is where an imported cluster's restorable
+// configuration lives. Its spec.rke2Config/spec.k3sConfig kubernetesVersion is the *desired*
+// version — k3sbasedupgrade reads it and drives the downstream system-upgrade-controller plans from
+// it — and the agent-customization fields are applied by Rancher directly.
+func (a *ImportedAdapter) RestoreTarget(resourceKey string) (*unstructured.Unstructured, error) {
+	if resourceKey != rkev1.SnapshotResourceMgmtCluster {
+		return nil, nil
+	}
+
+	cluster, err := a.clients.Mgmt.Cluster().Cache().Get(a.cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	ustr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: ustr}, nil
+}
+
+func (a *ImportedAdapter) UpdateRestoreTarget(obj *unstructured.Unstructured) error {
+	cluster := &mgmtv3.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		return fmt.Errorf("converting mgmt cluster %s from unstructured: %w", obj.GetName(), err)
+	}
+
+	_, err := a.clients.Mgmt.Cluster().Update(cluster)
+	return err
+}
+
+// WaitForRestoreTarget always reports ready. The mgmt v3 Cluster is itself the restore target and
+// nothing upstream is rendered off it — the desired version is consumed downstream by the
+// system-upgrade-controller, well after this operation has finished.
+func (a *ImportedAdapter) WaitForRestoreTarget() (bool, error) {
+	return true, nil
+}
+
+// InstallInstruction installs the distro at the version the mgmt cluster is configured for.
+//
+// For an imported cluster a version change would normally be rolled out by the downstream
+// system-upgrade-controller, but that happens long after this operation completes and
+// `--cluster-reset` has to run against the snapshot's own binary. Installing it here puts the right
+// version in place before the reset, and leaves the upgrade controller with nothing to do because
+// the nodes already match the desired version.
+func (a *ImportedAdapter) InstallInstruction(secret *corev1.Secret, dataDir string) (plan.OneTimeInstruction, bool) {
+	version := a.kubernetesVersion()
+	if version == "" {
+		return plan.OneTimeInstruction{}, false
+	}
+
+	return installInstruction(version, dataDir, nil, a.cluster.Spec.AgentEnvVars, secret), true
+}
+
+// kubernetesVersion returns the version the mgmt cluster is configured for, preferring the distro
+// config Status.Driver selects — the same choice k3sbasedupgrade makes — and falling back to the
+// version the cluster last reported when no desired version has been set.
+func (a *ImportedAdapter) kubernetesVersion() string {
+	if a.cluster.Status.Driver == mgmtv3.ClusterDriverK3s {
+		if a.cluster.Spec.K3sConfig != nil && a.cluster.Spec.K3sConfig.Version != "" {
+			return a.cluster.Spec.K3sConfig.Version
+		}
+	} else if a.cluster.Spec.Rke2Config != nil && a.cluster.Spec.Rke2Config.Version != "" {
+		return a.cluster.Spec.Rke2Config.Version
+	}
+
+	if a.cluster.Status.Version != nil {
+		return a.cluster.Status.Version.GitVersion
+	}
+	return ""
 }
 
 func (a *ImportedAdapter) LoopbackAddress(_ *corev1.Secret) string {
@@ -869,7 +944,48 @@ func (a *ImportedAdapter) clearLeaderAnnotation(secret *corev1.Secret, operation
 	})
 }
 
-// PauseCluster is a no-op for imported clusters since they have no CAPI cluster.
-func (a *ImportedAdapter) PauseCluster(_ bool) error {
-	return nil
+// PauseCluster suspends version management for the imported cluster by toggling
+// importedclusterversionmanagement.VersionManagementPausedAnno on the mgmt v3 Cluster.
+//
+// An imported cluster has no CAPI object to pause, but it does have a controller that reacts to the
+// cluster's desired Kubernetes version: k3sbasedupgrade renders system-upgrade-controller plans from
+// it. A restore rewrites that version and reinstalls the distro on the nodes itself, so without this
+// the upgrade controller would see the rewritten version mid-restore and start draining nodes to roll
+// out plans of its own. See the annotation's own comment for the rest.
+//
+// The annotation is read straight off the object on every reconcile of the upgrade handler, so the
+// pause takes effect as soon as this returns.
+func (a *ImportedAdapter) PauseCluster(pause bool) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Read through the client rather than trusting a.cluster: the operation holds its adapter
+		// across reconciles, and the annotation is the one field two steps of the same operation both
+		// write.
+		cluster, err := a.clients.Mgmt.Cluster().Get(a.cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if pause {
+			if cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] == "true" {
+				return nil
+			}
+			cluster = cluster.DeepCopy()
+			if cluster.Annotations == nil {
+				cluster.Annotations = map[string]string{}
+			}
+			cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno] = "true"
+		} else {
+			if _, ok := cluster.Annotations[importedclusterversionmanagement.VersionManagementPausedAnno]; !ok {
+				return nil
+			}
+			cluster = cluster.DeepCopy()
+			delete(cluster.Annotations, importedclusterversionmanagement.VersionManagementPausedAnno)
+		}
+
+		logrus.Infof("[operations] imported cluster %s: setting %s=%v", cluster.Name,
+			importedclusterversionmanagement.VersionManagementPausedAnno, pause)
+
+		_, err = a.clients.Mgmt.Cluster().Update(cluster)
+		return err
+	})
 }

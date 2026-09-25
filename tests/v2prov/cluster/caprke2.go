@@ -15,9 +15,11 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -27,9 +29,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
@@ -71,12 +79,110 @@ type CAPRKE2Options struct {
 	// WorkerReplicas is the MachineDeployment replica count for agent (worker-only) nodes. When
 	// 0 no MachineDeployment is created and the cluster is control-plane-only. Default: 0.
 	WorkerReplicas int32
+	// S3, when set, configures etcd snapshots to an S3-compatible object store instead of (well,
+	// in addition to) machine-local disk. See CAPRKE2S3.
+	S3 *CAPRKE2S3
 	// UseSnapshotFileName controls which identifier the test's ETCDSnapshotRestore operation
 	// carries in spec.snapshot.name. When true the test passes rkev1.ETCDSnapshot.SnapshotFile.Name
 	// (the raw on-disk file name like `etcd-snapshot-<host>-<unix>`); when false it passes the
 	// upstream ETCDSnapshot CR name (like `<cluster>-<safe-name>`). Single-server CAPRKE2 clusters
 	// need the file-name form; multi-node clusters need the CR-name form. Default: false.
 	UseSnapshotFileName bool
+}
+
+// CAPRKE2S3 points the cluster's etcd snapshots at an S3-compatible object store. It is rendered onto
+// the RKE2ControlPlane as spec.serverConfig.etcd.backupConfig.s3, which CAPRKE2 turns into the
+// etcd-s3* keys of each server's config.yaml (see cluster-api-provider-rke2/pkg/rke2/config.go).
+//
+// S3 is what makes a snapshot survive a control-plane roll, and — more importantly — what makes it
+// survive with its extra metadata intact. RKE2 stamps ETCDSnapshotFile.Spec.Metadata only on the
+// resource belonging to the node that took the snapshot; a node that merely re-discovers a local file
+// registers it bare, because the metadata is not persisted next to the file. For S3 the metadata is
+// uploaded alongside the snapshot (as <folder>/.metadata/<name>) and read back by whichever node
+// lists the bucket, so the restore modes the snapshot captured are still on offer after the machine
+// that took it is gone.
+type CAPRKE2S3 struct {
+	// Endpoint is host:port, reachable from inside the machine containers. objectstore's external
+	// mode returns a suitable one; a ClusterIP will not work, since CAPD machines sit outside the
+	// local cluster's pod network.
+	Endpoint string
+	// EndpointCA is the PEM CA bundle for Endpoint, base64-encoded — i.e. objectstore.Info.Cert
+	// verbatim.
+	EndpointCA string
+	Bucket     string
+	Folder     string
+	AccessKey  string
+	SecretKey  string
+}
+
+// s3SecretNames returns the names of the two Secrets CAPRKE2 reads the S3 configuration from. Keyed
+// off the cluster name so parallel tests in one namespace do not collide.
+func s3SecretNames(clusterName string) (credentials, endpointCA string) {
+	return clusterName + "-s3-credentials", clusterName + "-s3-ca"
+}
+
+// createS3Secrets creates the credential and CA Secrets in the cluster's namespace. The key names are
+// fixed by CAPRKE2: "aws_access_key_id"/"aws_secret_access_key" for credentials and "ca.pem" for the
+// CA, which it writes to /etc/rancher/rke2/etcd-s3-ca.crt on each machine.
+func createS3Secrets(cs *clients.Clients, ns, clusterName string, s3 *CAPRKE2S3) error {
+	credentialsName, endpointCAName := s3SecretNames(clusterName)
+
+	if err := cs.Client.Create(context.TODO(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: credentialsName},
+		Data: map[string][]byte{
+			"aws_access_key_id":     []byte(s3.AccessKey),
+			"aws_secret_access_key": []byte(s3.SecretKey),
+		},
+	}); err != nil {
+		return fmt.Errorf("creating S3 credential Secret %s/%s: %w", ns, credentialsName, err)
+	}
+
+	ca, err := base64.StdEncoding.DecodeString(s3.EndpointCA)
+	if err != nil {
+		return fmt.Errorf("decoding S3 endpoint CA: %w", err)
+	}
+
+	if err := cs.Client.Create(context.TODO(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: endpointCAName},
+		Data:       map[string][]byte{"ca.pem": ca},
+	}); err != nil {
+		return fmt.Errorf("creating S3 endpoint CA Secret %s/%s: %w", ns, endpointCAName, err)
+	}
+
+	return nil
+}
+
+// etcdBackupConfig renders spec.serverConfig.etcd for the given S3 settings, or nil when the cluster
+// keeps snapshots on machine-local disk only.
+//
+// enforceSslVerify is deliberately true: the object store's certificate covers every node IP (see
+// objectstore.GetExternalObjectStore), so there is no reason to weaken this, and CAPRKE2 inverts the
+// field into etcd-s3-skip-ssl-verify.
+func etcdBackupConfig(ns, clusterName string, s3 *CAPRKE2S3) map[string]any {
+	if s3 == nil {
+		return nil
+	}
+
+	credentialsName, endpointCAName := s3SecretNames(clusterName)
+
+	return map[string]any{
+		"backupConfig": map[string]any{
+			"s3": map[string]any{
+				"endpoint":         s3.Endpoint,
+				"bucket":           s3.Bucket,
+				"folder":           s3.Folder,
+				"enforceSslVerify": true,
+				"s3CredentialSecret": map[string]any{
+					"name":      credentialsName,
+					"namespace": ns,
+				},
+				"endpointCAsecret": map[string]any{
+					"name":      endpointCAName,
+					"namespace": ns,
+				},
+			},
+		},
+	}
 }
 
 // defaultRKE2Version is the RKE2 release used when the test does not pin a specific one. Bump
@@ -120,6 +226,26 @@ func (f *CAPRKE2Fixture) CAPIClusterRef() corev1.ObjectReference {
 		Kind:       gvkCluster.Kind,
 		Name:       f.ClusterName,
 		Namespace:  f.Namespace,
+	}
+}
+
+// MgmtClusterRef returns the corev1.ObjectReference for the management.cattle.io v3 Cluster that
+// turtles auto-imported for this CAPI Cluster. Populated by WaitForCAPRKE2Ready; call it after.
+//
+// Prefer this over CAPIClusterRef for any operation that needs the rkev1.ETCDSnapshot resource.
+// Addressing the mgmt Cluster routes adapter construction through pkg/operations/imported.go's
+// factory, which threads the mgmt cluster name into the CAPRKE2 adapter so
+// EtcdSnapshotNamespace() resolves to the mgmt cluster's namespace — where snapshotbackpopulate
+// actually writes the snapshot CRs. Addressing the CAPI Cluster directly leaves that name empty and
+// the adapter falls back to the CAPI namespace, where no snapshot CR exists. It is also the path the
+// Rancher UI uses (see the comment on the factory in pkg/operations/imported.go).
+//
+// mgmt v3 Clusters are cluster-scoped, so the reference carries no namespace.
+func (f *CAPRKE2Fixture) MgmtClusterRef() corev1.ObjectReference {
+	return corev1.ObjectReference{
+		APIVersion: gvkMgmtV3Cluster.GroupVersion().String(),
+		Kind:       gvkMgmtV3Cluster.Kind,
+		Name:       f.MgmtClusterName,
 	}
 }
 
@@ -205,6 +331,12 @@ func NewCAPRKE2Cluster(cs *clients.Clients, opts CAPRKE2Options) (*CAPRKE2Fixtur
 		return nil, fmt.Errorf("creating DockerMachineTemplate %s/%s: %w", ns, name, err)
 	}
 
+	if opts.S3 != nil {
+		if err := createS3Secrets(cs, ns, name, opts.S3); err != nil {
+			return nil, err
+		}
+	}
+
 	// 3) RKE2ControlPlane — pins the RKE2 version, points at the DockerMachineTemplate.
 	//    machineTemplate.spec.infrastructureRef is Required by the v1beta2 CRD; the reference lives
 	//    under `.spec`, NOT directly under machineTemplate. rolloutStrategy is a non-nullable object
@@ -269,6 +401,11 @@ func NewCAPRKE2Cluster(cs *clients.Clients, opts CAPRKE2Options) (*CAPRKE2Fixtur
 			},
 		},
 	})
+	if etcd := etcdBackupConfig(ns, name, opts.S3); etcd != nil {
+		if err := unstructured.SetNestedMap(rke2ControlPlane.Object, etcd, "spec", "serverConfig", "etcd"); err != nil {
+			return nil, fmt.Errorf("setting etcd backup config on RKE2ControlPlane %s/%s: %w", ns, name, err)
+		}
+	}
 	if err := cs.Client.Create(context.TODO(), rke2ControlPlane); err != nil {
 		return nil, fmt.Errorf("creating RKE2ControlPlane %s/%s: %w", ns, name, err)
 	}
@@ -533,6 +670,36 @@ func RunCAPRKE2Kubectl(ctx context.Context, machineName string, args ...string) 
 	return stdout.Bytes(), nil
 }
 
+// DownstreamClient builds a kubernetes.Interface against the CAPRKE2 cluster by reading the
+// admin kubeconfig that the CAPI cluster controller writes to a `<cluster>-kubeconfig` Secret
+// once the control plane is up. The returned client lets tests do downstream CRUD (e.g. read a
+// ConfigMap after a restore) without shelling out to kubectl from the test runner.
+//
+// Prefer RunCAPRKE2Kubectl for anything that only needs to run a command: it executes inside the
+// control-plane container and so does not depend on the test host being able to route to the
+// workload API. This client exists for the restore-mode tests, which read and compare typed objects
+// (snapshot extra metadata, node kubelet versions) where driving kubectl through jsonpath would be
+// materially harder to follow. They are local-dev only, so the host-routing caveat is acceptable
+// there; think twice before reaching for it in a test that has to pass in CI.
+//
+// Errors if the kubeconfig secret is missing or unparseable — call after WaitForCAPRKE2Ready so
+// the secret is guaranteed to be present.
+func (f *CAPRKE2Fixture) DownstreamClient(cs *clients.Clients) (kubernetes.Interface, error) {
+	secret, err := cs.Core.Secret().Get(f.Namespace, fmt.Sprintf("%s-kubeconfig", f.ClusterName), metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("getting %s-kubeconfig: %w", f.ClusterName, err)
+	}
+	data := secret.Data["value"]
+	if len(data) == 0 {
+		return nil, fmt.Errorf("kubeconfig secret %s/%s has no 'value' data key", f.Namespace, secret.Name)
+	}
+	cfg, err := clientcmd.RESTConfigFromKubeConfig(data)
+	if err != nil {
+		return nil, fmt.Errorf("parsing kubeconfig from %s/%s: %w", f.Namespace, secret.Name, err)
+	}
+	return kubernetes.NewForConfig(cfg)
+}
+
 func newUnstructured(gvk schema.GroupVersionKind, namespace, name string, body map[string]any) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(gvk)
@@ -646,3 +813,226 @@ backend rke2-servers
   server {{ $server }} {{ $backend.Address }}:9345 check check-ssl verify none
   {{- end}}
 `
+
+// RKE2ControlPlane returns the cluster's RKE2ControlPlane as an unstructured object. It shares its
+// name and namespace with the CAPI Cluster by construction (see NewCAPRKE2Cluster).
+//
+// The object is returned unstructured on purpose: CAPRKE2's CRDs are only installed when turtles is
+// enabled, so the test suite has no generated typed client for them — the same reason
+// pkg/operations/caprke2.go reaches for the dynamic client.
+func (f *CAPRKE2Fixture) RKE2ControlPlane(cs *clients.Clients) (*unstructured.Unstructured, error) {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(gvkRKE2ControlPlane)
+	if err := cs.Client.Get(cs.Ctx, client.ObjectKey{Namespace: f.Namespace, Name: f.ClusterName}, obj); err != nil {
+		return nil, fmt.Errorf("getting RKE2ControlPlane %s/%s: %w", f.Namespace, f.ClusterName, err)
+	}
+	return obj, nil
+}
+
+// RKE2ControlPlaneVersion returns spec.version, the Kubernetes version the control plane is
+// configured for. This is the field a kubernetesVersion restore rewrites — it is the only entry
+// restoremode.WritablePaths permits for an RKE2ControlPlane.
+func (f *CAPRKE2Fixture) RKE2ControlPlaneVersion(cs *clients.Clients) (string, error) {
+	obj, err := f.RKE2ControlPlane(cs)
+	if err != nil {
+		return "", err
+	}
+	version, _, err := unstructured.NestedString(obj.Object, "spec", "version")
+	return version, err
+}
+
+// SetRKE2ControlPlaneVersion writes spec.version, which is how a CAPRKE2 cluster's Kubernetes
+// version is changed: the CAPRKE2 control-plane controller rolls the control-plane machines to
+// converge on it. Retried on conflict, since the control plane is written by several controllers
+// concurrently.
+func (f *CAPRKE2Fixture) SetRKE2ControlPlaneVersion(cs *clients.Clients, version string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		obj, err := f.RKE2ControlPlane(cs)
+		if err != nil {
+			return err
+		}
+		if err := unstructured.SetNestedField(obj.Object, version, "spec", "version"); err != nil {
+			return err
+		}
+		return cs.Client.Update(cs.Ctx, obj)
+	})
+}
+
+// nonRestorableMarkerLabel is a machine-template label the restore-mode tests use as a control: it
+// is captured in a snapshot (it lives under spec) but is not in restoremode.WritablePaths, so a
+// restore must leave it alone. A machineTemplate metadata label is chosen deliberately — CAPI
+// propagates those in place rather than rolling machines, so setting it does not disturb the
+// cluster.
+const nonRestorableMarkerLabel = "restoremode.test.cattle.io/marker"
+
+// NonRestorableMarker reads the control label set by SetNonRestorableMarker.
+func (f *CAPRKE2Fixture) NonRestorableMarker(cs *clients.Clients) (string, error) {
+	obj, err := f.RKE2ControlPlane(cs)
+	if err != nil {
+		return "", err
+	}
+	labels, _, err := unstructured.NestedStringMap(obj.Object, "spec", "machineTemplate", "metadata", "labels")
+	if err != nil {
+		return "", err
+	}
+	return labels[nonRestorableMarkerLabel], nil
+}
+
+// SetNonRestorableMarker stamps the control label onto the control plane's machine template.
+func (f *CAPRKE2Fixture) SetNonRestorableMarker(cs *clients.Clients, value string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		obj, err := f.RKE2ControlPlane(cs)
+		if err != nil {
+			return err
+		}
+		labels, _, err := unstructured.NestedStringMap(obj.Object, "spec", "machineTemplate", "metadata", "labels")
+		if err != nil {
+			return err
+		}
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labels[nonRestorableMarkerLabel] = value
+		if err := unstructured.SetNestedStringMap(obj.Object, labels, "spec", "machineTemplate", "metadata", "labels"); err != nil {
+			return err
+		}
+		return cs.Client.Update(cs.Ctx, obj)
+	})
+}
+
+// Machines returns every CAPI Machine belonging to the cluster, keyed by name with its UID as the
+// value. The UID is the identity that matters: a rolled machine can in principle reuse a name, and a
+// test asserting "the same machines are still here" means the same objects, not the same names.
+func (f *CAPRKE2Fixture) Machines(cs *clients.Clients) (map[string]types.UID, error) {
+	list, err := cs.CAPI.Machine().List(f.Namespace, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: f.ClusterName}).String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing machines for cluster %s/%s: %w", f.Namespace, f.ClusterName, err)
+	}
+
+	machines := map[string]types.UID{}
+	for _, machine := range list.Items {
+		machines[machine.Name] = machine.UID
+	}
+	return machines, nil
+}
+
+// WaitForMachineReplacement blocks until none of the machines in `previous` are left and the cluster
+// has settled on a new set, which is what a control-plane version change is supposed to cause.
+// Returns the new set.
+func (f *CAPRKE2Fixture) WaitForMachineReplacement(t *testing.T, cs *clients.Clients, previous map[string]types.UID) map[string]types.UID {
+	t.Helper()
+
+	var current map[string]types.UID
+	err := utilwait.PollUntilContextTimeout(cs.Ctx, 15*time.Second, 45*time.Minute, true, func(context.Context) (bool, error) {
+		var err error
+		current, err = f.Machines(cs)
+		if err != nil {
+			return false, nil
+		}
+		if len(current) == 0 {
+			return false, nil
+		}
+		for name, uid := range previous {
+			if current[name] == uid {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for the control plane to replace machines %v (now %v): %v", previous, current, err)
+	}
+
+	t.Logf("control-plane machines replaced: %v -> %v", mapNames(previous), mapNames(current))
+	return current
+}
+
+// healthyCAPIClusterConditions is what "the cluster is completely healthy" means for a CAPI cluster,
+// expressed in the v1beta2 conditions the Cluster carries. Beyond the obvious availability ones it
+// includes the in-flight conditions: RollingOut/ScalingUp/ScalingDown/Remediating must all be False,
+// and ControlPlaneMachinesUpToDate True, or the control plane has decided its machines no longer match
+// its spec and is about to replace them.
+var healthyCAPIClusterConditions = map[string]string{
+	"Available":                    "True",
+	"RemoteConnectionProbe":        "True",
+	"InfrastructureReady":          "True",
+	"ControlPlaneInitialized":      "True",
+	"ControlPlaneAvailable":        "True",
+	"ControlPlaneMachinesReady":    "True",
+	"ControlPlaneMachinesUpToDate": "True",
+	"RollingOut":                   "False",
+	"Remediating":                  "False",
+	"ScalingUp":                    "False",
+	"ScalingDown":                  "False",
+	"Deleting":                     "False",
+	"Paused":                       "False",
+}
+
+// WaitForCAPIClusterHealthy blocks until every condition in healthyCAPIClusterConditions holds, and
+// fails the test with the offending conditions if it does not. Use it after an operation that is
+// expected to leave the cluster intact — it catches both a control plane that never recovered and one
+// that recovered by quietly deciding to roll.
+func (f *CAPRKE2Fixture) WaitForCAPIClusterHealthy(t *testing.T, cs *clients.Clients, timeout time.Duration) {
+	t.Helper()
+
+	t.Logf("waiting for CAPI Cluster %s/%s to be healthy", f.Namespace, f.ClusterName)
+
+	var unmet []string
+	err := utilwait.PollUntilContextTimeout(cs.Ctx, 15*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		capiCluster := &unstructured.Unstructured{}
+		capiCluster.SetGroupVersionKind(gvkCluster)
+		if err := cs.Client.Get(ctx, client.ObjectKey{Namespace: f.Namespace, Name: f.ClusterName}, capiCluster); err != nil {
+			unmet = []string{fmt.Sprintf("get: %v", err)}
+			return false, nil
+		}
+
+		unmet = unmetConditions(capiCluster)
+		return len(unmet) == 0, nil
+	})
+	if err != nil {
+		t.Fatalf("CAPI Cluster %s/%s is not healthy: %s", f.Namespace, f.ClusterName, strings.Join(unmet, "; "))
+	}
+}
+
+// unmetConditions returns a human-readable entry per condition of healthyCAPIClusterConditions that
+// is missing or does not have the wanted status.
+func unmetConditions(capiCluster *unstructured.Unstructured) []string {
+	conds, _, _ := unstructured.NestedSlice(capiCluster.Object, "status", "conditions")
+
+	got := map[string]map[string]any{}
+	for _, c := range conds {
+		cond, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		condType, _ := cond["type"].(string)
+		got[condType] = cond
+	}
+
+	var unmet []string
+	for condType, want := range healthyCAPIClusterConditions {
+		cond, found := got[condType]
+		if !found {
+			unmet = append(unmet, fmt.Sprintf("%s missing", condType))
+			continue
+		}
+		if status, _ := cond["status"].(string); status != want {
+			reason, _ := cond["reason"].(string)
+			message, _ := cond["message"].(string)
+			unmet = append(unmet, fmt.Sprintf("%s=%s (want %s) reason=%s message=%q", condType, status, want, reason, message))
+		}
+	}
+	sort.Strings(unmet)
+	return unmet
+}
+
+func mapNames(m map[string]types.UID) []string {
+	names := make([]string, 0, len(m))
+	for name := range m {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}

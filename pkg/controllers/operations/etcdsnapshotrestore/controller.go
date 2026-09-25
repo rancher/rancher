@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	operationcontrollers "github.com/rancher/rancher/pkg/generated/controllers/operation.cattle.io/v1alpha1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
@@ -18,11 +21,13 @@ import (
 	"github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	"github.com/rancher/rancher/pkg/restoremode"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,6 +46,12 @@ const (
 	// PreflightStepHookLabelPrefix gates the Preflight step, before the controller performs
 	// the necessary preflight checks to determine whether or not the operation can proceed.
 	PreflightStepHookLabelPrefix = "preflight.step.hook.operation.cattle.io/"
+
+	// RestoreClusterConfigStepHookLabelPrefix gates the RestoreClusterConfig step, before the
+	// controller writes the cluster configuration captured in the snapshot back onto the object that
+	// owns the cluster. Gating here lets a delegate inspect or adjust the configuration a restore is
+	// about to apply, while the cluster is still running.
+	RestoreClusterConfigStepHookLabelPrefix = "restore-cluster-config.step.hook.operation.cattle.io/"
 
 	// ShutdownStepHookLabelPrefix gates the Shutdown step, before the controller assigns the
 	// killall + tombstone-touch + tls/cred-directory cleanup plan to every non-Windows secret.
@@ -379,8 +390,8 @@ func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string
 		return "", ""
 	}
 	for k, v := range s.op.Labels {
-		if strings.HasPrefix(k, prefix) {
-			return strings.TrimPrefix(k, prefix), v
+		if after, ok := strings.CutPrefix(k, prefix); ok {
+			return after, v
 		}
 	}
 	return "", ""
@@ -441,6 +452,8 @@ func stepHookPrefixFor(step opv1alpha1.ETCDSnapshotRestoreStep) string {
 	switch step {
 	case opv1alpha1.ETCDSnapshotRestoreStepPreflight:
 		return PreflightStepHookLabelPrefix
+	case opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig:
+		return RestoreClusterConfigStepHookLabelPrefix
 	case opv1alpha1.ETCDSnapshotRestoreStepShutdown:
 		return ShutdownStepHookLabelPrefix
 	case opv1alpha1.ETCDSnapshotRestoreStepRestore:
@@ -472,8 +485,8 @@ func nonWindowsSecret(secret *corev1.Secret) bool {
 func (h *handler) handlePending(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
 	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
-	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise attempt to acquire;
-	// a nil return means another controller currently owns it and we must keep waiting.
+	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise, attempt to acquire;
+	// a nil return means another controller currently owns it, and we must keep waiting.
 	if !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
 		acquired, err := plan.AcquireBeacon(s.beacon, h.beacons, s.ownerKey)
 		if err != nil {
@@ -531,7 +544,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	stepPrefix := stepHookPrefixFor(s.op.Status.Step)
 
 	// Stage 1 (loose): the op must appear SOMEWHERE in the ownership chain (owner or any
-	// delegate). Being absent entirely means the beacon was reassigned to another controller and
+	// delegate). Being absent entirely means the beacon was reassigned to another controller, and
 	// we can't recover. If a step hook is currently active on the op, treat the absence as a
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
@@ -593,6 +606,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 	switch s.op.Status.Step {
 	case opv1alpha1.ETCDSnapshotRestoreStepPreflight:
 		return h.reconcilePreflight(s, status)
+	case opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig:
+		return h.reconcileRestoreClusterConfig(s, status)
 	case opv1alpha1.ETCDSnapshotRestoreStepShutdown:
 		return h.reconcileShutdown(s, status)
 	case opv1alpha1.ETCDSnapshotRestoreStepRestore:
@@ -611,9 +626,10 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 
 	opv1alpha1.FailedCondition.True(&status)
 	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
+	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [\"%s\"] is unknown, expected one of: [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]",
 		status.Step,
 		opv1alpha1.ETCDSnapshotRestoreStepPreflight,
+		opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig,
 		opv1alpha1.ETCDSnapshotRestoreStepShutdown,
 		opv1alpha1.ETCDSnapshotRestoreStepRestore,
 		opv1alpha1.ETCDSnapshotRestoreStepPostRestorePodCleanup,
@@ -755,10 +771,255 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 		return status, nil
 	}
 
-	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to shutdown", s.op.Namespace, s.op.Name)
+	// Validate the requested restore mode while the cluster is still running, so an unavailable mode
+	// cancels the operation before anything is shut down.
+	if reason, ok := validateRestoreMode(s.op.Spec.Args.RestoreMode, snapshotName, snapshot); !ok {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
+
+		status.SetPhase(opv1alpha1.OperationPhaseCanceled)
+
+		opv1alpha1.CanceledCondition.True(&status)
+		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.PreflightCheckFailedReason)
+		opv1alpha1.CanceledCondition.Message(&status, reason)
+
+		return status, nil
+	}
+
+	if err = s.adapter.PauseCluster(true); err != nil {
+		return status, err
+	}
+
+	logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to restore cluster config", s.op.Namespace, s.op.Name)
+
+	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig)
+	return status, nil
+}
+
+// restoresClusterConfig reports whether mode asks for any cluster configuration to be restored. An
+// empty mode and "none" both mean "etcd only".
+func restoresClusterConfig(mode string) bool {
+	return mode != "" && mode != rkev1.RestoreRKEConfigNone
+}
+
+// validateRestoreMode validates a requested restore mode against the modes the snapshot advertises,
+// returning (reason, false) when the mode cannot be honoured. snapshotbackpopulate computes the
+// annotation by resolving each mode's selector against the resources the snapshot captured, so a
+// mode listed there is one this snapshot can actually satisfy.
+func validateRestoreMode(mode, snapshotName string, snapshot *rkev1.ETCDSnapshot) (string, bool) {
+	if !restoresClusterConfig(mode) {
+		return "", true
+	}
+
+	// The caller tolerates a missing snapshot CR by treating Args.Name as a bare file on disk. That
+	// works for restoring etcd, but there is then nothing to read a cluster configuration from.
+	if snapshot == nil {
+		return fmt.Sprintf("restore mode %q requires an etcdsnapshot.rke.cattle.io resource, but none exists for snapshot %q", mode, snapshotName), false
+	}
+
+	available := restoremode.AvailableModes(snapshot.Annotations[capr.RestoreModeOptionsAnnotation])
+	if !slices.Contains(available, mode) {
+		return fmt.Sprintf("restore mode %q is not available for snapshot %s/%s, which offers [%s]",
+			mode, snapshot.Namespace, snapshot.Name, strings.Join(available, ", ")), false
+	}
+
+	return "", true
+}
+
+// reconcileRestoreClusterConfig applies the requested restore mode: it writes the fields the mode
+// selects, as captured in the snapshot's metadata, back onto the object that owns the cluster.
+//
+// This runs before Shutdown, matching the legacy ordering where the cluster spec was updated before
+// the restore began. It is also why the Restore step can install the right Kubernetes version: the
+// configuration is in place, and propagated, before any node plan is built from it.
+func (h *handler) reconcileRestoreClusterConfig(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
+	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling restore cluster config", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, RestoreClusterConfigStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		return status, nil
+	}
+
+	mode := s.op.Spec.Args.RestoreMode
+	if !restoresClusterConfig(mode) {
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: restore mode %q restores no cluster configuration, transitioning to shutdown", s.op.Namespace, s.op.Name, mode)
+
+		status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepShutdown)
+		return status, nil
+	}
+
+	matches, reason, err := h.resolveRestoreMode(s, mode)
+	if err != nil {
+		return status, err
+	}
+	if reason != "" {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: %s", s.op.Namespace, s.op.Name, reason)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.FailedReason)
+		opv1alpha1.FailedCondition.Message(&status, reason)
+
+		return status, nil
+	}
+
+	applied, reason, err := h.applyRestoreMode(s, matches)
+	if err != nil {
+		return status, err
+	}
+	if reason != "" {
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as canceled: %s", s.op.Namespace, s.op.Name, reason)
+
+		status.SetPhase(opv1alpha1.OperationPhaseFailed)
+
+		opv1alpha1.FailedCondition.True(&status)
+		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.FailedReason)
+		opv1alpha1.FailedCondition.Message(&status, reason)
+
+		return status, nil
+	}
+
+	// An update was issued, so the caches this reconcile read are stale. Come back and re-resolve;
+	// once every field already holds its restored value nothing is applied and we advance.
+	if applied {
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: applying restore mode %q", status.Step, mode))
+
+		return status, nil
+	}
+
+	// The restored configuration is on the restore target, but the objects rendered off it may not
+	// have caught up. Later steps build node plans from those — the Restore step installs the
+	// Kubernetes version they carry — so hold here until they are current rather than racing ahead
+	// and restoring with the pre-restore configuration.
+	settled, err := s.adapter.WaitForRestoreTarget()
+	if err != nil {
+		return status, err
+	}
+	if !settled {
+		logrus.Infof("[etcdsnapshotrestore] %s/%s: waiting for the cluster to observe the restored configuration", s.op.Namespace, s.op.Name)
+
+		opv1alpha1.InProgressCondition.True(&status)
+		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
+		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting in step %s: waiting for the cluster to observe the restored configuration", status.Step))
+
+		return status, nil
+	}
+
+	logrus.Infof("[etcdsnapshotrestore] %s/%s: applied restore mode %q, transitioning to shutdown", s.op.Namespace, s.op.Name, mode)
 
 	status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepShutdown)
 	return status, nil
+}
+
+// resolveRestoreMode reads the snapshot's metadata and returns the fields mode selects that Rancher
+// permits restoring. A non-empty reason means the operation cannot proceed.
+func (h *handler) resolveRestoreMode(s *scope, mode string) ([]restoremode.Match, string, error) {
+	snapshot, err := h.etcdsnapshots.Get(s.adapter.EtcdSnapshotNamespace(), s.op.Spec.Args.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, fmt.Sprintf("restore mode %q requires an etcdsnapshot.rke.cattle.io resource, but %s/%s does not exist",
+			mode, s.adapter.EtcdSnapshotNamespace(), s.op.Spec.Args.Name), nil
+	} else if err != nil {
+		return nil, "", err
+	}
+
+	metadata, err := snapshotutil.SnapshotMetadata(snapshot)
+	if err != nil {
+		return nil, fmt.Sprintf("cannot apply restore mode %q: reading metadata of snapshot %s/%s: %v",
+			mode, snapshot.Namespace, snapshot.Name, err), nil
+	}
+
+	modes, err := restoremode.Modes(metadata)
+	if err != nil {
+		return nil, fmt.Sprintf("cannot apply restore mode %q for snapshot %s/%s: %v", mode, snapshot.Namespace, snapshot.Name, err), nil
+	}
+
+	selector, ok := modes[mode]
+	if !ok {
+		return nil, fmt.Sprintf("snapshot %s/%s does not declare restore mode %q", snapshot.Namespace, snapshot.Name, mode), nil
+	}
+
+	resources, err := restoremode.Resources(metadata)
+	if err != nil {
+		return nil, fmt.Sprintf("cannot apply restore mode %q for snapshot %s/%s: %v", mode, snapshot.Namespace, snapshot.Name, err), nil
+	}
+
+	resolved, err := restoremode.Resolve(selector, resources)
+	if err != nil {
+		return nil, fmt.Sprintf("restore mode %q of snapshot %s/%s has an unusable selector %q: %v",
+			mode, snapshot.Namespace, snapshot.Name, selector, err), nil
+	}
+
+	allowed, denied := restoremode.Writable(resolved)
+	for _, d := range denied {
+		logrus.Warnf("[etcdsnapshotrestore] %s/%s: restore mode %q selects %s, which Rancher does not restore; skipping it",
+			s.op.Namespace, s.op.Name, mode, d)
+	}
+
+	if len(allowed) == 0 {
+		return nil, fmt.Sprintf("restore mode %q of snapshot %s/%s selects no field that Rancher restores", mode, snapshot.Namespace, snapshot.Name), nil
+	}
+
+	return allowed, "", nil
+}
+
+// applyRestoreMode writes matches onto the live objects their resource keys address, returning
+// whether anything was updated. A non-empty reason means the operation cannot proceed.
+//
+// Reporting "nothing was updated" is what lets the restore-mode step finish, so the comparisons
+// below have to be able to see a field that already holds its restored value. That relies on both
+// sides using the same Go types for the same JSON: the live object supplies int64 for integral
+// numbers and restoremode.Match carries them the same way, because snapshotutil.DecompressInterface
+// decodes the snapshot payload with the unstructured number convention.
+func (h *handler) applyRestoreMode(s *scope, matches []restoremode.Match) (bool, string, error) {
+	byResource := map[string][]restoremode.Match{}
+	for _, m := range matches {
+		byResource[m.ResourceKey] = append(byResource[m.ResourceKey], m)
+	}
+
+	applied := false
+	for key, resourceMatches := range byResource {
+		target, err := s.adapter.RestoreTarget(key)
+		if err != nil {
+			return false, "", err
+		}
+		if target == nil {
+			return false, fmt.Sprintf("restore mode selects %s, which this cluster has no counterpart for", key), nil
+		}
+
+		updated := target.DeepCopy()
+		for _, m := range resourceMatches {
+			current, found, err := unstructured.NestedFieldNoCopy(updated.Object, m.Path...)
+			if err != nil {
+				return false, fmt.Sprintf("reading %s from %s: %v", m, key, err), nil
+			}
+			if found && equality.Semantic.DeepEqual(current, m.Value) {
+				continue
+			}
+			if err := unstructured.SetNestedField(updated.Object, m.Value, m.Path...); err != nil {
+				return false, fmt.Sprintf("restoring %s onto %s: %v", m, key, err), nil
+			}
+			logrus.Infof("[etcdsnapshotrestore] %s/%s: restoring %s on %s %s/%s",
+				s.op.Namespace, s.op.Name, m, updated.GetKind(), updated.GetNamespace(), updated.GetName())
+		}
+
+		if equality.Semantic.DeepEqual(target.Object, updated.Object) {
+			continue
+		}
+
+		if err := s.adapter.UpdateRestoreTarget(updated); err != nil {
+			return false, "", err
+		}
+		applied = true
+	}
+
+	return applied, "", nil
 }
 
 func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
@@ -932,55 +1193,11 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
-	dataDir, err := s.adapter.DistroDataDirectory(secret)
-	if err != nil {
-		return status, err
-	}
-	value := s.idempotencyValue()
 	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
-	args := []string{
-		"server",
-		"--cluster-reset",
-		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
-		"--etcd-disable-snapshots=false",
-	}
-
-	var env []string
-
-	files := []plan.File{
-		{
-			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
-			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-		},
-		ops.IdempotentScriptFile(provisioningDir),
-	}
-
-	if snapshot == nil {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
-	} else if snapshot.SnapshotFile.S3 == nil {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
-	} else {
-		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
-		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
-		args = append(args, s3Args...)
-		env = append(env, s3Env...)
-		files = append(files, s3Files...)
-	}
-
-	nodePlan := &plan.Plan{
-		Files: files,
-		OneTimeInstructions: []plan.OneTimeInstruction{
-			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    "remove-etcd-db-dir",
-					Command: "rm",
-					Args:    []string{"-rf", path.Join(dataDir, "server/db/etcd")},
-				},
-			}),
-			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
-		},
+	nodePlan, err := buildRestorePlan(s, secret, snapshot, snapshotName)
+	if err != nil {
+		return status, err
 	}
 
 	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
@@ -1297,6 +1514,10 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		value = value + "/final"
 	}
 
+	if err = s.adapter.PauseCluster(false); err != nil {
+		return status, err
+	}
+
 	initSecret, err := s.adapter.FindOrElectLeader(s.ownerKey, ops.IsEtcd)
 	if err != nil {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
@@ -1325,56 +1546,9 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 	results := make([]plan.PlanStatus, 0, concurrency)
 
 	for _, secret := range secrets {
-		provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
-
-		probes, err := s.adapter.RenderProbes(secret, false)
+		nodePlan, err := buildRestartPlan(s, secret, initSecret, serverURL, value, nextStep != "")
 		if err != nil {
 			return status, err
-		}
-
-		unit := s.adapter.ServerUnit()
-		if secret.Labels[capr.EtcdRoleLabel] != "true" && secret.Labels[capr.ControlPlaneRoleLabel] != "true" {
-			unit = s.adapter.RuntimeCommand() + "-agent"
-		}
-
-		nodePlan := &plan.Plan{
-			Files: []plan.File{ops.IdempotentScriptFile(provisioningDir)},
-			OneTimeInstructions: []plan.OneTimeInstruction{
-				ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restart", value, "systemctl",
-					[]string{"restart", unit}, nil),
-			},
-			Probes: probes,
-		}
-
-		if secret.UID != initSecret.UID {
-			if nextStep != "" {
-				nodePlan.Files = append(nodePlan.Files, plan.File{
-					Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret)))),
-					Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-				})
-			} else {
-				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "remove-server-arg",
-						Command: "rm",
-						Args: []string{
-							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-						},
-					},
-				})
-			}
-		} else {
-			if nextStep == "" {
-				nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
-					CommonInstruction: plan.CommonInstruction{
-						Name:    "remove-server-arg",
-						Command: "rm",
-						Args: []string{
-							"-rf", path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
-						},
-					},
-				})
-			}
 		}
 
 		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
@@ -1450,13 +1624,11 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			{
 				SaveOutput: true,
-				CommonInstruction: plan.CommonInstruction{
-					Name:    preflightInstructionName,
-					Command: "/bin/sh",
-					Args: []string{
-						"-c",
-						fmt.Sprintf(TokenHashCommandFormat, dataDir),
-					},
+				Name:       preflightInstructionName,
+				Command:    "/bin/sh",
+				Args: []string{
+					"-c",
+					fmt.Sprintf(TokenHashCommandFormat, dataDir),
 				},
 			},
 		},
@@ -1464,8 +1636,33 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 }
 
 // buildShutdownPlan assembles the plan which stops the distro on a node ahead of the restore: it
-// clears any idempotency tracking left by a previous attempt, runs the distro's killall script, and
-// on etcd and control-plane nodes lays down the etcd tombstone and removes the TLS directory.
+// clears any idempotency tracking left by a previous attempt, installs the distro version the
+// cluster is now configured for, runs the distro's killall script, and on etcd and control-plane
+// nodes lays down the etcd tombstone and removes the TLS directory.
+//
+// # Why the install lives here
+//
+// This is the one place in the operation that runs on every node while nothing is running, so it is
+// the one place a version change can be applied uniformly. A kubernetesVersion or all restore has
+// already rewritten the cluster's version by this point (the RestoreClusterConfig step did it, and
+// waited for it to propagate), and that version is usually older than what the nodes have on disk.
+// Two things depend on getting it onto disk before the cluster comes back:
+//
+//   - the Restore step's `--cluster-reset` runs on one node and must be executed by the snapshot's
+//     own binary, because a newer server cannot reset onto etcd data written by an older one;
+//   - every other node has to rejoin on that same version, or it would come up a minor ahead of the
+//     control plane it is joining.
+//
+// The legacy planner does this in two separate places — an install in the restore plan for the init
+// node (Planner.generateEtcdSnapshotRestorePlan) and another for every node when
+// rkev1.ETCDSnapshotPhaseInitialRestartCluster runs a full reconcile, each desired plan carrying its
+// own install. Doing it once here covers both, and no node installs twice.
+//
+// The installer is invoked with the distro's start suppressed (see installInstruction's
+// INSTALL_<RUNTIME>_SKIP_START), so it lays down binaries and leaves the service alone: the
+// system-agent installer image exits before its `systemctl restart` when that is set. It is also
+// ordered ahead of the killall rather than after it, so that anything the installer did bring up is
+// taken down again by the shutdown that follows.
 func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
 	dataDir, err := s.adapter.DistroDataDirectory(secret)
@@ -1476,41 +1673,38 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 	// reconciles see the cleanup already applied and skip it.
 	instructions := []plan.OneTimeInstruction{
 		ops.GenerateIdempotencyCleanupInstruction(provisioningDir, idempotencyKey),
-		{
-			CommonInstruction: plan.CommonInstruction{
-				Name:    "shutdown",
-				Command: "/bin/sh",
-				Env: []string{
-					fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), dataDir),
-				},
-				Args: []string{
-					"-c",
-					fmt.Sprintf("if [ -z $(command -v %[1]s) ] && [ -z $(command -v %[2]s) ]; then echo %[1]s does not appear to be installed; exit 0; else %[2]s; fi",
-						s.adapter.RuntimeCommand(),
-						s.adapter.RuntimeCommand()+"-killall.sh"),
-				},
+	}
+
+	instructions = append(instructions,
+		plan.OneTimeInstruction{
+			Name:    "shutdown",
+			Command: "/bin/sh",
+			Env: []string{
+				fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), dataDir),
+			},
+			Args: []string{
+				"-c",
+				fmt.Sprintf("if [ -z $(command -v %[1]s) ] && [ -z $(command -v %[2]s) ]; then echo %[1]s does not appear to be installed; exit 0; else %[2]s; fi",
+					s.adapter.RuntimeCommand(),
+					s.adapter.RuntimeCommand()+"-killall.sh"),
 			},
 		},
-	}
+	)
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" {
 		instructions = append(instructions, plan.OneTimeInstruction{
-			CommonInstruction: plan.CommonInstruction{
-				Name:    "create-etcd-tombstone",
-				Command: "touch",
-				Args:    []string{path.Join(dataDir, "server/db/etcd/tombstone")},
-			},
+			Name:    "create-etcd-tombstone",
+			Command: "touch",
+			Args:    []string{path.Join(dataDir, "server/db/etcd/tombstone")},
 		})
 	}
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" || secret.Labels[capr.ControlPlaneRoleLabel] == "true" {
 		instructions = append(instructions,
 			plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    "remove-tls-directory",
-					Command: "rm",
-					Args:    []string{"-rf", path.Join(dataDir, "server/tls")},
-				},
+				Name:    "remove-tls-directory",
+				Command: "rm",
+				Args:    []string{"-rf", path.Join(dataDir, "server/tls")},
 			},
 		)
 	}
@@ -1518,6 +1712,119 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 	return &plan.Plan{
 		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
 		OneTimeInstructions: instructions,
+	}, nil
+}
+
+// buildRestartPlan assembles the plan that brings a node back up after the restore: it restarts the
+// service and manages the temporary `server:` drop-in that points the non-leader nodes at the node
+// etcd was reset on.
+//
+// The node is already carrying the right distro version — the Shutdown step installed it on every
+// node before anything was torn down (see buildShutdownPlan) — so this only has to start what is
+// there. That is also why the restart is a plain `systemctl restart` rather than an install with a
+// restart stamp, the way the legacy planner's full reconcile does it.
+//
+// initialPass distinguishes the two restart passes the operation makes — InitialRestartCluster, which
+// stands the cluster back up around the restored etcd, and the final RestartCluster once the node
+// cleanup has run. The initial pass writes the `server:` drop-in on every node other than the leader,
+// so they rejoin through it rather than through whatever endpoint they were using; the final pass
+// removes it again, on the leader too.
+func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, value string, initialPass bool) (*plan.Plan, error) {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+
+	probes, err := s.adapter.RenderProbes(secret, false)
+	if err != nil {
+		return nil, err
+	}
+
+	unit := s.adapter.ServerUnit()
+	if !ops.IsEtcd(secret) && !ops.IsControlPlane(secret) {
+		unit = s.adapter.RuntimeCommand() + "-agent"
+	}
+
+	instructions := []plan.OneTimeInstruction{
+		ops.IdempotentInstruction(
+			provisioningDir, idempotencyKey+"/restart", value, "systemctl", []string{"restart", unit}, nil),
+	}
+
+	nodePlan := &plan.Plan{
+		Files:               []plan.File{ops.IdempotentScriptFile(provisioningDir)},
+		OneTimeInstructions: instructions,
+		Probes:              probes,
+	}
+
+	serverArgPath := path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml")
+
+	if initialPass && secret.UID != initSecret.UID {
+		nodePlan.Files = append(nodePlan.Files, plan.File{
+			Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("server: \"https://%s:%s\"\n", serverURL, s.adapter.GetSupervisorPort(secret)))),
+			Path:    serverArgPath,
+		})
+	} else if !initialPass {
+		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
+			Name:    "remove-server-arg",
+			Command: "rm",
+			Args:    []string{"-rf", serverArgPath},
+		})
+	}
+
+	return nodePlan, nil
+}
+
+// buildRestorePlan builds the plan that resets etcd from the snapshot on the elected leader:
+// reinstall the configured distro version, wipe the etcd data directory, then `--cluster-reset`
+// onto the snapshot. A nil snapshot means no ETCDSnapshot resource exists and snapshotName names a
+// file already on disk.
+func buildRestorePlan(s *scope, secret *corev1.Secret, snapshot *rkev1.ETCDSnapshot, snapshotName string) (*plan.Plan, error) {
+	provisioningDir := s.adapter.ProvisioningDataDirectory(secret)
+	dataDir, err := s.adapter.DistroDataDirectory(secret)
+	if err != nil {
+		return nil, err
+	}
+	value := s.idempotencyValue()
+
+	args := []string{
+		"server",
+		"--cluster-reset",
+		fmt.Sprintf("--etcd-arg=advertise-client-urls=https://%s:2379", s.adapter.LoopbackAddress(secret)),
+		"--etcd-disable-snapshots=false",
+	}
+
+	var env []string
+
+	files := []plan.File{
+		{
+			Content: base64.StdEncoding.EncodeToString([]byte("server: \"\"\n")),
+			Path:    path.Join(s.adapter.ConfigDirectory(secret), "zz_etcd-snapshot-restore.yaml"),
+		},
+		ops.IdempotentScriptFile(provisioningDir),
+	}
+
+	if snapshot == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshotName), "--etcd-s3=false")
+	} else if snapshot.SnapshotFile.S3 == nil {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=db/snapshots/%s", snapshot.SnapshotFile.Name), "--etcd-s3=false")
+	} else {
+		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
+		s3Args, s3Env, s3Files := s.adapter.ToS3ArgsEnvAndFiles(secret)
+		args = append(args, s3Args...)
+		env = append(env, s3Env...)
+		files = append(files, s3Files...)
+	}
+
+	// Nothing is installed here: the Shutdown step put the version this snapshot needs on every node
+	// while nothing was running (see buildShutdownPlan), so the reset below is already being executed
+	// by the right binary.
+	return &plan.Plan{
+		Files: files,
+		OneTimeInstructions: []plan.OneTimeInstruction{
+			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
+				Name:    "remove-etcd-db-dir",
+				Command: "rm",
+				Args:    []string{"-rf", path.Join(dataDir, "server/db/etcd")},
+			}),
+			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
+		},
 	}, nil
 }
 

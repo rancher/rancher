@@ -85,6 +85,12 @@ const (
 	SnapshotNameAnnotation      = "etcdsnapshot.rke.io/snapshot-name"
 	SnapshotTokenHashAnnotation = "rke.cattle.io/snapshot-token-hash"
 
+	// RestoreModeOptionsAnnotation holds the comma-joined list of restore modes a snapshot can be
+	// restored with. It is written by the snapshotbackpopulate controller, which resolves each mode's
+	// selector against the resources captured in the snapshot's metadata, and read by the
+	// etcdsnapshotrestore operations controller to validate a requested mode.
+	RestoreModeOptionsAnnotation = "etcdsnapshot.rke.io/restore-mode-options"
+
 	JoinServerImplausible = "implausible"
 
 	SecretTypeMachinePlan  = "rke.cattle.io/machine-plan"

@@ -97,3 +97,56 @@ func TestVersionManagementEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestPaused(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster *mgmtv3.Cluster
+		want    bool
+	}{
+		{
+			name:    "nil cluster",
+			cluster: nil,
+			want:    false,
+		},
+		{
+			name:    "no annotations",
+			cluster: &mgmtv3.Cluster{},
+			want:    false,
+		},
+		{
+			name:    "annotation true",
+			cluster: clusterWithAnnotations(map[string]string{VersionManagementPausedAnno: "true"}),
+			want:    true,
+		},
+		{
+			name:    "annotation false",
+			cluster: clusterWithAnnotations(map[string]string{VersionManagementPausedAnno: "false"}),
+			want:    false,
+		},
+		{
+			name:    "unrecognised value",
+			cluster: clusterWithAnnotations(map[string]string{VersionManagementPausedAnno: "system-default"}),
+			want:    false,
+		},
+		{
+			name:    "unrelated annotation",
+			cluster: clusterWithAnnotations(map[string]string{VersionManagementAnno: "true"}),
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Paused(tt.cluster); got != tt.want {
+				t.Errorf("Paused() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func clusterWithAnnotations(annotations map[string]string) *mgmtv3.Cluster {
+	return &mgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+	}
+}
