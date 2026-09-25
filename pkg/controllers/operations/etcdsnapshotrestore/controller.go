@@ -390,7 +390,7 @@ func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string
 		return "", ""
 	}
 	for k, v := range s.op.Labels {
-		if after, ok := strings.CutPrefix(k, prefix); ok  {
+		if after, ok := strings.CutPrefix(k, prefix); ok {
 			return after, v
 		}
 	}
@@ -1624,12 +1624,12 @@ func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			{
 				SaveOutput: true,
-					Name:    preflightInstructionName,
-					Command: "/bin/sh",
-					Args: []string{
-						"-c",
-						fmt.Sprintf(TokenHashCommandFormat, dataDir),
-					},
+				Name:       preflightInstructionName,
+				Command:    "/bin/sh",
+				Args: []string{
+					"-c",
+					fmt.Sprintf(TokenHashCommandFormat, dataDir),
+				},
 			},
 		},
 	}, nil
@@ -1677,34 +1677,34 @@ func buildShutdownPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 
 	instructions = append(instructions,
 		plan.OneTimeInstruction{
-				Name:    "shutdown",
-				Command: "/bin/sh",
-				Env: []string{
-					fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), dataDir),
-				},
-				Args: []string{
-					"-c",
-					fmt.Sprintf("if [ -z $(command -v %[1]s) ] && [ -z $(command -v %[2]s) ]; then echo %[1]s does not appear to be installed; exit 0; else %[2]s; fi",
-						s.adapter.RuntimeCommand(),
-						s.adapter.RuntimeCommand()+"-killall.sh"),
-				},
+			Name:    "shutdown",
+			Command: "/bin/sh",
+			Env: []string{
+				fmt.Sprintf("%s_DATA_DIR=%s", strings.ToUpper(s.adapter.RuntimeCommand()), dataDir),
+			},
+			Args: []string{
+				"-c",
+				fmt.Sprintf("if [ -z $(command -v %[1]s) ] && [ -z $(command -v %[2]s) ]; then echo %[1]s does not appear to be installed; exit 0; else %[2]s; fi",
+					s.adapter.RuntimeCommand(),
+					s.adapter.RuntimeCommand()+"-killall.sh"),
+			},
 		},
 	)
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" {
 		instructions = append(instructions, plan.OneTimeInstruction{
-				Name:    "create-etcd-tombstone",
-				Command: "touch",
-				Args:    []string{path.Join(dataDir, "server/db/etcd/tombstone")},
+			Name:    "create-etcd-tombstone",
+			Command: "touch",
+			Args:    []string{path.Join(dataDir, "server/db/etcd/tombstone")},
 		})
 	}
 
 	if secret.Labels[capr.EtcdRoleLabel] == "true" || secret.Labels[capr.ControlPlaneRoleLabel] == "true" {
 		instructions = append(instructions,
 			plan.OneTimeInstruction{
-					Name:    "remove-tls-directory",
-					Command: "rm",
-					Args:    []string{"-rf", path.Join(dataDir, "server/tls")},
+				Name:    "remove-tls-directory",
+				Command: "rm",
+				Args:    []string{"-rf", path.Join(dataDir, "server/tls")},
 			},
 		)
 	}
@@ -1762,9 +1762,9 @@ func buildRestartPlan(s *scope, secret, initSecret *corev1.Secret, serverURL, va
 		})
 	} else if !initialPass {
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions, plan.OneTimeInstruction{
-				Name:    "remove-server-arg",
-				Command: "rm",
-				Args:    []string{"-rf", serverArgPath},
+			Name:    "remove-server-arg",
+			Command: "rm",
+			Args:    []string{"-rf", serverArgPath},
 		})
 	}
 
@@ -1819,9 +1819,9 @@ func buildRestorePlan(s *scope, secret *corev1.Secret, snapshot *rkev1.ETCDSnaps
 		Files: files,
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			ops.ConvertToIdempotentInstruction(provisioningDir, idempotencyKey+"/clean-etcd-dir", value, plan.OneTimeInstruction{
-					Name:    "remove-etcd-db-dir",
-					Command: "rm",
-					Args:    []string{"-rf", path.Join(dataDir, "server/db/etcd")},
+				Name:    "remove-etcd-db-dir",
+				Command: "rm",
+				Args:    []string{"-rf", path.Join(dataDir, "server/db/etcd")},
 			}),
 			ops.IdempotentInstruction(provisioningDir, idempotencyKey+"/restore", value, s.adapter.RuntimeCommand(), args, env),
 		},

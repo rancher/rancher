@@ -283,7 +283,7 @@ func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string
 	}
 
 	for k, v := range s.op.Labels {
-		if after, ok :=strings.CutPrefix(k, prefix); ok  {
+		if after, ok := strings.CutPrefix(k, prefix); ok {
 			return after, v
 		}
 	}
@@ -564,12 +564,12 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		}
 
 		saveInstruction := plan.OneTimeInstruction{
-				Name:    "snapshot",
-				Command: s.adapter.RuntimeCommand(),
-				Args: []string{
-					"etcd-snapshot",
-					"save",
-				},
+			Name:    "snapshot",
+			Command: s.adapter.RuntimeCommand(),
+			Args: []string{
+				"etcd-snapshot",
+				"save",
+			},
 		}
 
 		if s.op.Spec.Args.Name != "" {
@@ -679,12 +679,12 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		nodePlan := &plan.Plan{
 			OneTimeInstructions: []plan.OneTimeInstruction{
 				{
-						Name:    "restart",
-						Command: "systemctl",
-						Args: []string{
-							"restart",
-							s.adapter.ServerUnit(),
-						},
+					Name:    "restart",
+					Command: "systemctl",
+					Args: []string{
+						"restart",
+						s.adapter.ServerUnit(),
+					},
 				},
 			},
 			Probes: probes,
