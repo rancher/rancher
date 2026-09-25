@@ -225,7 +225,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("operations", "releases", "apps").verbs("get", "list", "watch").
 		addClusterScopedRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addClusterScopedRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("").resources("nodes, persistentvolumes").verbs("get", "list", "watch").
+		addClusterScopedRule().apiGroups("").resources("nodes", "persistentvolumes").verbs("get", "list", "watch").
 		addClusterScopedRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
 		addClusterScopedRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addClusterScopedRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
