@@ -644,7 +644,7 @@ func (s *Store) Create(
 						User:    clusterName,
 					})
 
-					if currentContext == cluster.Name {
+					if currentContext == cluster.Name && kubeconfig.Spec.DefaultContextType != "proxy" {
 						data.CurrentContext = fqdnName
 					}
 
@@ -685,7 +685,9 @@ func (s *Store) Create(
 					})
 
 					if !isCurrentContextSet && currentContext == cluster.Name && v3node.IsMachineReady(node) {
-						data.CurrentContext = nodeName // Set the current context to the first ready control plane node.
+						if kubeconfig.Spec.DefaultContextType != "proxy" {
+							data.CurrentContext = nodeName // Set the current context to the first ready control plane node.
+						}
 						isCurrentContextSet = true
 					}
 				}
