@@ -93,8 +93,8 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
 	env := make([]string, 0, 2)
 	image := p.getInstallerImage(controlPlane)
-	stamp := restartStamp(nodePlan, controlPlane, image)
-	drainHash := drainHash(nodePlan, controlPlane, image)
+	stamp := restartStamp(nodePlan, controlPlane, image, entry)
+	drainHash := drainHash(nodePlan, controlPlane, image, entry)
 	switch entry.Metadata.Labels[capr.CattleOSLabel] {
 	case capr.WindowsMachineOS:
 		env = append(env,
