@@ -150,6 +150,7 @@ type DrainOptions struct {
 	// GracePeriod is the period of time in seconds given to each pod to
 	// terminate gracefully.
 	// If negative, the default value specified in the pod will be used.
+	// +kubebuilder:default=-1
 	// +optional
 	GracePeriod int `json:"gracePeriod"`
 
