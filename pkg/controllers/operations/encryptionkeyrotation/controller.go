@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +33,12 @@ import (
 // ControllerOwnerKey is the shared operation-type key for encryption key rotation coordination.
 // Beacon ownership uses a per-operation key derived from the operation UID.
 const ControllerOwnerKey = "encryption-key-rotation"
-const beaconOwnerRefAnnotation = "rke.cattle.io/operation-owner-ref"
+
+// OperationKind is this operation's kind, as it appears in the beacon claims the controller writes.
+// See ops.BeaconOwnerKey.
+const OperationKind = "EncryptionKeyRotation"
+
+const Finalizer = "encryptionkeyrotation.operation.cattle.io"
 
 // Step hook label prefixes for the encryptionkeyrotation operation. Each prefix gates a single
 // rotation step and follows the shared label semantics documented on planv1alpha1's phase-hook
@@ -98,94 +104,269 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	operationcontrollers.RegisterEncryptionKeyRotationStatusHandler(ctx, clients.Operation.EncryptionKeyRotation(), "", "encryption-key-rotation-handler", h.OnChange)
 }
 
+// OnChange is the status handler entrypoint invoked by the wrangler-registered controller, and the
+// whole of one reconcile. It decides whether the operation should be reconciled at all, and if so
+// hands it to whichever of the two drivers applies:
+//
+//   - paused: nothing is reconciled, in flight or deleting. Only the conditions are refreshed, so
+//     the operation reports that it is paused and otherwise stands still.
+//   - deleting: reconcileDeleting cancels an operation the deletion caught in flight, runs its
+//     terminal handler, and retires the finalizer once that handling is complete.
+//   - otherwise: reconcileActive advances the operation through its phases and, once it stops
+//     moving, either garbage collects it or schedules the next poll.
 func (h *handler) OnChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	status, err := h.onChange(op, status)
-	if err != nil {
-		return status, err
-	}
-	status = updateStatus(op, status)
-
-	// Paused operations resume on a spec change; skip TTL cleanup and polling until then.
-	if ops.IsPaused(&op.Spec.OperationSpec) {
-		return status, nil
-	}
-
-	if equality.Semantic.DeepEqual(op.Status, status) {
-		// handle after normal processing to allow for proper phase-related cleanup (freeing beacon)
-		//
-		// See the equivalent guard in etcdsnapshotsave's OnChange for the rationale: while any
-		// lifecycle-hook label is still on the op, TTL garbage collection must be deferred so the
-		// delegate has a chance to observe the terminal phase and pop itself from the beacon.
-		// EKR is particularly exposed to this without the guard because the operation defaults
-		// to TTL=0 (immediate expiry) in some code paths.
-		if ops.IsTerminal(status.Phase) &&
-			ops.IsExpired(&op.Spec.OperationSpec, &status.OperationStatus) &&
-			!planv1alpha1.HasActiveLifecycleHook(op) {
-			err = h.encryptionkeyrotations.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{})
-			if err != nil {
-				return status, err
-			}
-			return status, generic.ErrSkip
-		}
-		h.encryptionkeyrotations.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
-	}
-	return status, nil
-}
-
-func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	if op == nil {
 		return status, nil
 	}
-	if op.DeletionTimestamp != nil {
-		return status, nil
-	}
+
+	// Pausing an operation stops the controller touching it at all: no plans are dispatched, no
+	// beacon is acquired or released, and no finalizer is taken. That holds for a deleting operation
+	// too — releasing its beacon is reconciliation like any other — so an operation already carrying
+	// the finalizer when it was paused will not finish deleting until it is resumed.
 	if ops.IsPaused(&op.Spec.OperationSpec) {
 		logrus.Debugf("[encryptionkeyrotation] %s/%s: skipping paused operation", op.Namespace, op.Name)
+
+		return updateStatus(op, status), nil
+	}
+
+	if op.DeletionTimestamp != nil {
+		return h.reconcileDeleting(op, status)
+	}
+
+	return h.reconcileActive(op, status)
+}
+
+// reconcileActive drives an operation which is neither paused nor being deleted: it takes the
+// finalizer, advances the operation one step, and then either garbage collects it or arranges to
+// look again.
+func (h *handler) reconcileActive(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	// The finalizer is what guarantees the controller observes the deletion of an operation which is
+	// still in flight, so it can cancel it and release the beacon. A paused operation is turned away
+	// above before reaching this: it has dispatched nothing since it was paused, and taking the
+	// finalizer would only wedge its deletion until it is resumed.
+	if err := h.ensureFinalizer(op); err != nil {
+		return status, err
+	}
+
+	// An operation which has not been reconciled before starts out Pending.
+	if status.Phase == "" {
+		status.SetPhase(opv1alpha1.OperationPhasePending)
+	}
+
+	if previous, canceled := ops.CancelForRequest(&op.Spec.OperationSpec, &status.OperationStatus); canceled {
+		logrus.Infof("[encryptionkeyrotation] %s/%s: marking operation as canceled: cancellation requested in phase [%s] step [%s]", op.Namespace, op.Name, previous, status.Step)
+	}
+
+	status, err := h.advance(op, status)
+	if err != nil {
+		return status, err
+	}
+
+	status = updateStatus(op, status)
+
+	if !equality.Semantic.DeepEqual(op.Status, status) {
+		// State moved this tick. The status handler writes it out, and that update re-enqueues the
+		// operation, so there is nothing to schedule here.
 		return status, nil
 	}
 
-	if status.Phase == "" {
-		status.Phase = opv1alpha1.OperationPhasePending
-		status.LastUpdated = metav1.Now()
+	if ops.Collectable(&op.Spec.OperationSpec, &status.OperationStatus) {
+		if err := h.encryptionkeyrotations.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{}); err != nil {
+			return status, err
+		}
+
+		// The operation is on its way out, so the status computed for it is moot.
+		return status, generic.ErrSkip
 	}
+
+	// Nothing moved, so poll: plan secret state, beacon transitions and the TTL falling due are all
+	// changes this controller will not otherwise be told about.
+	h.encryptionkeyrotations.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
+
+	return status, nil
+}
+
+// reconcileDeleting drives an operation which is being deleted. The deletion is held up by our
+// finalizer until terminal handling has been recorded as complete, which keeps the operation — and
+// with it any beacon delegation made on its behalf — alive while a terminal phase hook delegate
+// finishes its work. The terminal status is also persisted before the finalizer is dropped, so an
+// observer waiting on the final phase gets to see it rather than the object simply vanishing.
+func (h *handler) reconcileDeleting(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	// Teardown is driven off our finalizer. Without it the operation has either already been torn
+	// down or was never ours to begin with, and is on its way out under someone else's control.
+	if !hasFinalizer(op) {
+		return updateStatus(op, status), nil
+	}
+
+	// cancelForDeletion always leaves a phase behind, so unlike reconcileActive there is no unset
+	// phase to default here.
+	if previous, canceled := ops.CancelForDeletion(&status.OperationStatus); canceled {
+		logrus.Infof("[encryptionkeyrotation] %s/%s: marking operation as canceled: deleted in phase [%s] step [%s] before terminal handling completed", op.Namespace, op.Name, previous, status.Step)
+	}
+
+	status, err := h.advance(op, status)
+	if err != nil {
+		return status, err
+	}
+
+	status = updateStatus(op, status)
+
+	if !equality.Semantic.DeepEqual(op.Status, status) {
+		// State moved this tick: let the status handler write it out. The resulting update
+		// re-enqueues the operation, and the next pass retires the finalizer.
+		return status, nil
+	}
+
+	if !ops.IsTerminated(&status.OperationStatus) {
+		// Terminal handling is still in flight — typically a canceled phase hook whose delegate has
+		// yet to hand the beacon back. Keep the finalizer and poll for it to finish.
+		logrus.Debugf("[encryptionkeyrotation] %s/%s: deferring deletion, terminal handling has not completed", op.Namespace, op.Name)
+		h.encryptionkeyrotations.EnqueueAfter(op.Namespace, op.Name, 5*time.Second)
+
+		return status, nil
+	}
+
+	logrus.Infof("[encryptionkeyrotation] %s/%s: terminal handling complete, releasing operation for deletion", op.Namespace, op.Name)
+
+	return status, h.removeFinalizer(op)
+}
+
+// advance resolves everything the phase handlers work from and runs the handler for the operation's
+// current phase.
+//
+// A nil scope from resolveScope means the reconcile has already settled for this tick — the cluster
+// or the beacon is gone, or a deleting operation has nothing left to release — and the status it
+// returned is what should be reported.
+func (h *handler) advance(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	s, status, err := h.resolveScope(op, status)
+	if err != nil || s == nil {
+		return status, err
+	}
+
+	return h.dispatchPhase(s, status)
+}
+
+// hasFinalizer reports whether the operation still carries our finalizer, i.e. whether its teardown
+// is ours to drive.
+func hasFinalizer(op *opv1alpha1.EncryptionKeyRotation) bool {
+	return slices.Contains(op.Finalizers, Finalizer)
+}
+
+// ensureFinalizer adds our finalizer to the operation if it is not already present. The status
+// handler only ever persists status, so the finalizer has to be written with an explicit Update;
+// the updated object is copied back over op so the resource version the status handler goes on to
+// use for its own UpdateStatus is not stale.
+func (h *handler) ensureFinalizer(op *opv1alpha1.EncryptionKeyRotation) error {
+	if hasFinalizer(op) {
+		return nil
+	}
+
+	logrus.Debugf("[encryptionkeyrotation] %s/%s: adding finalizer", op.Namespace, op.Name)
+
+	updated := op.DeepCopy()
+	updated.Finalizers = append(updated.Finalizers, Finalizer)
+
+	updated, err := h.encryptionkeyrotations.Update(updated)
+	if err != nil {
+		return err
+	}
+
+	*op = *updated
+
+	return nil
+}
+
+// removeFinalizer drops our finalizer from the operation, which lets the API server complete the
+// deletion. A NotFound is treated as success: something else (another finalizer holder finishing
+// last, or a previous attempt whose response was lost) already let the object go.
+func (h *handler) removeFinalizer(op *opv1alpha1.EncryptionKeyRotation) error {
+	if !hasFinalizer(op) {
+		return nil
+	}
+
+	updated := op.DeepCopy()
+	updated.Finalizers = slices.DeleteFunc(updated.Finalizers, func(f string) bool {
+		return f == Finalizer
+	})
+
+	updated, err := h.encryptionkeyrotations.Update(updated)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	*op = *updated
+
+	return nil
+}
+
+// resolveScope gathers everything the phase handlers work from: the parent cluster, the Adapter for
+// its kind, and the cluster's beacon.
+//
+// A nil scope returned with a nil error means the reconcile has settled for this tick and the
+// returned status is what should be reported — the cluster is missing, the beacon has not been
+// created yet, or the operation is deleting and has nothing left to release.
+func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) (*scope, opv1alpha1.EncryptionKeyRotationStatus, error) {
+	deleting := op.DeletionTimestamp != nil
 
 	gvk := schema.FromAPIVersionAndKind(op.Spec.ClusterRef.APIVersion, op.Spec.ClusterRef.Kind)
 	ref, err := h.dynamic.Get(gvk, op.Spec.ClusterRef.Namespace, op.Spec.ClusterRef.Name)
 	if apierrors.IsNotFound(err) {
-		key := fmt.Sprintf("apiVersion=%s, kind=%s", op.Spec.ClusterRef.APIVersion, op.Spec.ClusterRef.Kind)
-		if op.Spec.ClusterRef.Namespace != "" {
-			key += fmt.Sprintf(", namespace=%s", op.Spec.ClusterRef.Namespace)
+		key := opv1alpha1.ClusterRefKey(op.Spec.ClusterRef)
+
+		// A missing cluster is only a failure for an operation which still has work to dispatch. One
+		// which is deleting, or which has already concluded, has none: with no cluster there is no
+		// adapter, and so no way to reach a beacon to release. Failing it here would overwrite the
+		// outcome the operation ended with — the phase a cancellation just recorded, or a success
+		// from an earlier reconcile — and, for a cluster deleted mid-operation, wedge the deletion
+		// behind our finalizer.
+		if deleting || ops.IsTerminal(status.Phase) {
+			logrus.Infof("[encryptionkeyrotation] %s/%s: cluster %s is gone, nothing to release", op.Namespace, op.Name, key)
+
+			// Any hook the operation still carries a label for is abandoned rather than waited on.
+			// A hook is delegated by pushing onto the beacon's delegate chain, and the beacon is
+			// reached through the cluster's adapter, so with no cluster there is no chain to push
+			// onto and nothing would ever satisfy it. Waiting would keep the operation out of TTL
+			// collection, or hold its finalizer open, for good. UpdateStatus reports the
+			// abandonment on Finalized for as long as the label is there.
+			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
+
+			return nil, status, nil
 		}
-		key += fmt.Sprintf(", name=%s", op.Spec.ClusterRef.Name)
+
 		logrus.Errorf("[encryptionkeyrotation]: %s/%s failed to find cluster for %s", op.Namespace, op.Name, key)
 
-		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.ClusterNotFoundReason)
-		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("cluster %s not found", key))
+		status.MarkFailed(opv1alpha1.ClusterNotFoundReason, fmt.Sprintf("cluster %s not found", key))
 
-		status.Phase = opv1alpha1.OperationPhaseFailed
-		status.LastUpdated = metav1.Now()
-		return status, nil
+		// This failure is terminated here rather than by handleFailed: the beacon is resolved
+		// through the cluster's adapter, so with no cluster there is no beacon to release and every
+		// subsequent reconcile would return from this branch without ever reaching a terminal
+		// handler — leaving the operation ineligible for TTL garbage collection forever.
+		status.SetTerminated()
+
+		return nil, status, nil
 	}
 	if err != nil {
-		return status, err
+		return nil, status, err
 	}
 
 	ustrMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ref)
 	if err != nil {
-		return status, err
+		return nil, status, err
 	}
 
 	ustr := unstructured.Unstructured{Object: ustrMap}
 
 	adapter, err := ops.NewAdapter(h.clients, &ustr)
 	if err != nil {
-		return status, err
+		return nil, status, err
 	}
 
 	clusterObj, err := adapter.ClusterObject()
 	if err != nil {
-		return status, err
+		return nil, status, err
 	}
 
 	// Resolve the beacon via the adapter, not op.Spec.ClusterRef. See
@@ -193,51 +374,107 @@ func (h *handler) onChange(op *opv1alpha1.EncryptionKeyRotation, status opv1alph
 	namespace, beaconName := adapter.BeaconRef()
 
 	beacon, err := h.beacons.Get(namespace, beaconName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) && status.Phase == opv1alpha1.OperationPhasePending {
-		logrus.Warnf("[encryptionkeyrotation]: %s/%s failed to find beacon %s/%s (clusterRef apiVersion=%s kind=%s name=%s)",
-			op.Namespace, op.Name, namespace, beaconName, ustr.GetAPIVersion(), ustr.GetKind(), ustr.GetName())
+	if apierrors.IsNotFound(err) {
+		switch {
+		// Nothing is owed on the beacon. A deleting operation is discarded along with its hooks;
+		// an Aborted one called its own work off; a Canceled one was called off from outside, often
+		// by whoever wanted the beacon next, so the beacon was never guaranteed to still be this
+		// operation's. None of them are worse off for it being gone.
+		case deleting,
+			status.Phase == opv1alpha1.OperationPhaseAborted,
+			status.Phase == opv1alpha1.OperationPhaseCanceled:
+			logrus.Infof("[encryptionkeyrotation] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
 
-		opv1alpha1.PendingCondition.True(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
-		opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+			// The hook goes the same way as the beacon: with no chain left to delegate it on,
+			// nothing could satisfy it, so it is abandoned rather than waited on.
+			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
-		return status, nil
-	} else if err != nil {
-		return status, err
+			return nil, status, nil
+
+		// Already released whatever it held, so a beacon collected afterwards is no concern of this
+		// operation's. Let the reconcile settle so TTL collection can take it.
+		case ops.IsTerminated(&status.OperationStatus):
+			return nil, status, nil
+
+		// Succeeded and Failed both dispatched work to the cluster under the beacon's authority and
+		// have not yet handed that authority back. A beacon which has gone missing in that window
+		// means the state serializing writes to this cluster was destroyed while an operation still
+		// had a claim on it — so complain, and keep complaining, rather than quietly recording the
+		// operation as wrapped up. It stays stuck until an administrator looks at it; deleting the
+		// operation is the way out, and cancels it on the way.
+		case ops.IsTerminal(status.Phase):
+			return nil, status, fmt.Errorf("beacon %s/%s is gone while %s/%s has yet to release it: %w",
+				namespace, beaconName, op.Namespace, op.Name, err)
+
+		// Pending has not acquired the beacon yet, so its absence is "not created" rather than
+		// "lost": the system-agent controller creates one once the cluster can take operations.
+		case status.Phase == opv1alpha1.OperationPhasePending, status.Phase == "":
+			logrus.Warnf("[encryptionkeyrotation]: %s/%s failed to find beacon %s/%s (clusterRef apiVersion=%s kind=%s name=%s)",
+				op.Namespace, op.Name, namespace, beaconName, ustr.GetAPIVersion(), ustr.GetKind(), ustr.GetName())
+
+			opv1alpha1.PendingCondition.True(&status)
+			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
+			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon creation")
+
+			return nil, status, nil
+
+		// Anything still in flight has had the beacon taken out from under it, which is the fault
+		// handleInProgress reports when it finds the beacon reassigned. There is nothing left to
+		// release, so the failure is terminated here for the same reason the missing-cluster failure
+		// above is: no later reconcile would reach a terminal handler to do it. The Failed-phase
+		// hook is abandoned with it, there being no beacon left to delegate it on.
+		default:
+			logrus.Errorf("[encryptionkeyrotation] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
+
+			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("beacon %s/%s not found", namespace, beaconName))
+			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
+
+			return nil, status, nil
+		}
+	}
+	if err != nil {
+		return nil, status, err
 	}
 
-	s := &scope{
+	return &scope{
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		beacon:     beacon,
 		namespace:  namespace,
 		clusterObj: clusterObj,
 		adapter:    adapter,
-	}
+	}, status, nil
+}
 
+// dispatchPhase routes the operation to the handler for its current phase. An unrecognized phase is
+// itself terminal: the controller cannot know what the operation was doing, so it fails it. This
+// should be prevented by validation, but is handled just in case.
+func (h *handler) dispatchPhase(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	switch status.Phase {
 	case opv1alpha1.OperationPhasePending:
 		return h.handlePending(s, status)
 	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
+	case opv1alpha1.OperationPhaseAborted:
+		return h.handleAborted(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
 		return h.handleCanceled(s, status)
 	case opv1alpha1.OperationPhaseFailed:
 		return h.handleFailed(s, status)
 	case opv1alpha1.OperationPhaseSucceeded:
 		return h.handleSucceeded(s, status)
-	default:
-		// Should be prevented via validation, but just in case
-		status.SetPhase(opv1alpha1.OperationPhaseFailed)
-
-		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownPhaseReason)
-		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("unknown phase [%s]", op.Status.Phase))
 	}
+
+	status.MarkFailed(opv1alpha1.UnknownPhaseReason, fmt.Sprintf("unknown phase [%s]", s.op.Status.Phase))
 
 	return status, nil
 }
 
 type scope struct {
+	// ownerKey is the per-operation beacon owner key, derived from the operation UID. Unlike the
+	// other operation controllers, encryption key rotation never shares one key across operations.
+	ownerKey string
+
 	op        *opv1alpha1.EncryptionKeyRotation
 	namespace string
 
@@ -246,63 +483,32 @@ type scope struct {
 	adapter    ops.Adapter
 }
 
-// lifecycleHookDelegate returns (suffix, delegate) for the first label on the operation whose key
-// starts with prefix. Returns ("", "") when no such label is set.
-func (h *handler) lifecycleHookDelegate(s *scope, prefix string) (string, string) {
-	if s.op.Labels == nil {
-		return "", ""
-	}
-	for k, v := range s.op.Labels {
-		if strings.HasPrefix(k, prefix) {
-			return strings.TrimPrefix(k, prefix), v
-		}
-	}
-	return "", ""
-}
-
-// delegate pushes delegate onto the beacon's delegate chain if it is not already there. Idempotent
-// across the reconciles that may occur while a hook is held.
-func (h *handler) delegate(s *scope, name, delegate string) error {
-	logrus.Tracef("[encryptionkeyrotation] %s/%s: delegating ownership of beacon to %s on behalf of %s", s.op.Namespace, s.op.Name, delegate, name)
-
-	if plan.IsInDelegateChain(s.beacon, delegate) {
-		return nil
-	}
-
-	beacon, err := plan.PushDelegate(s.beacon, delegate, h.beacons)
-	if err != nil {
-		return err
-	}
-	s.beacon = beacon
-	return nil
-}
-
-// handleHook is the per-handler entry point for the lifecycle-hook mechanism. Returns (true, nil)
-// while a label with the given prefix exists on the operation, signalling the caller to short
-// circuit. To advance past the hook the operator must clear the label AND pop the delegate (see
-// AdvancePastEncryptionKeyRotationHook in the test helpers for the rationale on ordering).
+// handleHook pushes the delegate named by the operation's hook label for prefix onto the beacon, and
+// reports whether there was one — in which case the caller stops where it is and waits.
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
 	logrus.Tracef("[encryptionkeyrotation] %s/%s: checking lifecycle hook for prefix %q", s.op.Namespace, s.op.Name, prefix)
 
-	if name, delegate := h.lifecycleHookDelegate(s, prefix); delegate != "" {
-		err := h.delegate(s, name, delegate)
-		return true, err
-	}
-	return false, nil
-}
+	delegated, beacon, err := ops.DelegateForHook(s.op, s.beacon, h.beacons, prefix)
+	s.beacon = beacon
 
+	return delegated, err
+}
 func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	ownerKey := beaconOwnerKey(s.op)
-	if err := h.reclaimStaleBeaconOwnerIfNeeded(s); err != nil {
+	// A beacon still carrying a claim from an earlier incarnation of this operation's name is
+	// reclaimed before anything is attempted: that claim is provably dead, and leaving it would
+	// either block this operation forever or, worse, be mistaken for its own.
+	beacon, err := ops.ReclaimSupersededBeacon(s.beacon, h.beacons, s.ownerKey)
+	if err != nil {
 		return status, err
 	}
+	s.beacon = beacon
 
 	// Pending waits until this op is either the primary owner OR anywhere in the delegate chain.
 	// If we're already in the chain, the primary owner is driving the beacon on our behalf — skip
-	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise attempt to acquire;
-	// a nil return means another controller currently owns it and we must keep waiting.
-	if !plan.IsInDelegateChain(s.beacon, ownerKey) {
-		acquired, err := plan.AcquireBeacon(s.beacon, h.beacons, ownerKey)
+	// AcquireBeacon entirely and continue with hook + WaitForRegister. Otherwise, attempt to acquire;
+	// a nil return means another controller currently owns it, and we must keep waiting.
+	if !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		acquired, err := plan.AcquireBeacon(s.beacon, h.beacons, s.ownerKey)
 		if err != nil {
 			return status, err
 		}
@@ -315,29 +521,13 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		s.beacon = acquired
 	}
 
-	desiredOwnerRef := fmt.Sprintf("%s/%s/%s", s.op.Namespace, s.op.Name, s.op.UID)
-	if s.beacon.Annotations == nil || s.beacon.Annotations[beaconOwnerRefAnnotation] != desiredOwnerRef {
-		beacon := s.beacon.DeepCopy()
-		if beacon.Annotations == nil {
-			beacon.Annotations = map[string]string{}
-		}
-		beacon.Annotations[beaconOwnerRefAnnotation] = desiredOwnerRef
-		updated, err := h.beacons.Update(beacon)
-		if err != nil {
-			return status, err
-		}
-		s.beacon = updated
-	}
-
-	// Pending-phase hook fires after beacon acquisition + owner-ref tagging so a delegate can
-	// inspect the recorded ownership before the controller starts driving the rotation.
-	delegated, err := h.handleHook(s, planv1alpha1.PendingPhaseHookLabelPrefix)
+	// Pending-phase hook fires after beacon acquisition so a delegate can inspect the recorded
+	// ownership before the controller starts driving the rotation.
+	delegated, err := h.handleHook(s, opv1alpha1.PendingPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
-		opv1alpha1.PendingCondition.True(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-		opv1alpha1.PendingCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		ops.SetWaitingForDelegate(opv1alpha1.PendingCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -355,9 +545,8 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 
 	logrus.Infof("[encryptionkeyrotation] %s/%s: transitioning to rotate", s.op.Namespace, s.op.Name)
 
-	status.Phase = opv1alpha1.OperationPhaseInProgress
-	status.LastUpdated = metav1.Now()
-	status.Step = opv1alpha1.EncryptionKeyRotationStepRotate
+	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
+	status.SetStep(opv1alpha1.EncryptionKeyRotationStepRotate)
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
@@ -365,27 +554,19 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 }
 
 func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	ownerKey := beaconOwnerKey(s.op)
 	stepPrefix := stepHookPrefixFor(s.op.Status.Step)
 
 	// Stage 1 (loose): the op must appear SOMEWHERE in the ownership chain (owner or any
-	// delegate). Being absent entirely means the beacon was reassigned to another controller and
+	// delegate). Being absent entirely means the beacon was reassigned to another controller, and
 	// we can't recover. If a step hook is currently active on the op, treat the absence as a
 	// step-scoped delegation and surface WaitingForDelegate instead of failing — the delegate may
 	// have popped us in service of the hook and will restore ownership when the hook clears.
-	if !plan.IsOwningBeaconHolder(s.beacon, ownerKey) && !plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
-			opv1alpha1.InProgressCondition.True(&status)
-			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+	if !plan.IsOwningBeaconHolder(s.beacon, s.ownerKey) && !plan.IsInDelegateChain(s.beacon, s.ownerKey) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
+			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		status.Phase = opv1alpha1.OperationPhaseFailed
-		status.LastUpdated = metav1.Now()
-
-		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
-		opv1alpha1.FailedCondition.Message(&status, "beacon reassigned, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
 
 		return status, nil
 	}
@@ -399,13 +580,11 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	// InProgress-phase hook fires on every InProgress reconcile, ahead of step dispatch — useful
 	// for delegates that need to gate ALL step work uniformly without subscribing to each
 	// individual step prefix.
-	delegated, err := h.handleHook(s, planv1alpha1.InProgressPhaseHookLabelPrefix)
+	delegated, err := h.handleHook(s, opv1alpha1.InProgressPhaseHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -413,19 +592,12 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	// primary owner or the most-recent delegate on the chain to drive step work. If a step hook
 	// is still active on the op, treat the missing-top state as an intentional delegation and
 	// wait; otherwise this is a genuine beacon loss and we fail.
-	if !plan.AuthorizedForBeacon(s.beacon, ownerKey) {
-		if planv1alpha1.HasStepHookLabel(s.op, stepPrefix) {
-			opv1alpha1.InProgressCondition.True(&status)
-			opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-			opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+	if !plan.AuthorizedForBeacon(s.beacon, s.ownerKey) {
+		if ops.HasStepHookLabel(s.op, stepPrefix) {
+			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		status.Phase = opv1alpha1.OperationPhaseFailed
-		status.LastUpdated = metav1.Now()
-
-		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.BeaconLostReason)
-		opv1alpha1.FailedCondition.Message(&status, "beacon acquired by another controller, aborting")
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon acquired by another controller, aborting")
 
 		return status, nil
 	}
@@ -437,12 +609,7 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 		return h.reconcileRestart(s, status)
 	}
 
-	status.Phase = opv1alpha1.OperationPhaseFailed
-	status.LastUpdated = metav1.Now()
-
-	opv1alpha1.FailedCondition.True(&status)
-	opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.UnknownStepReason)
-	opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("current step [%q] is unknown, expected one of: [%q, %q]",
+	status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [%q] is unknown, expected one of: [%q, %q]",
 		status.Step, opv1alpha1.EncryptionKeyRotationStepRotate, opv1alpha1.EncryptionKeyRotationStepRestart))
 
 	return status, nil
@@ -459,9 +626,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	if err != nil {
 		return status, err
 	} else if delegated {
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -496,41 +661,33 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 		OneTimeInstructions: []plan.OneTimeInstruction{
 			// 1. Run rotate-keys via wrapper that always exits 0; captures real exit code in output.
 			{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    rotateKeysInstructionName,
-					Command: "/bin/sh",
-					Args:    []string{"-c", rotateKeysScript(runtime)},
-				},
+				Name:       rotateKeysInstructionName,
+				Command:    "/bin/sh",
+				Args:       []string{"-c", rotateKeysScript(runtime)},
 				SaveOutput: true,
 			},
 			// 2. Poll until secrets-encrypt status responds; gates planStatus.Applied until
 			// the encryption server is reachable after key reload.
 			{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    waitForStatusInstructionName,
-					Command: "/bin/sh",
-					Args:    []string{"-c", waitForStatusScript(runtime)},
-				},
+				Name:    waitForStatusInstructionName,
+				Command: "/bin/sh",
+				Args:    []string{"-c", waitForStatusScript(runtime)},
 			},
 			// 3. One-time status snapshot captured when the plan is applied; provides an
 			// observability anchor and confirms the endpoint is stable.
 			{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
-				},
+				Name:       statusPeriodicName,
+				Command:    runtime,
+				Args:       []string{"secrets-encrypt", "status"},
 				SaveOutput: true,
 			},
 		},
 		PeriodicInstructions: []plan.PeriodicInstruction{
 			// Runs every 5s independently; used for stage/hash convergence checking.
 			{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
-				},
+				Name:          statusPeriodicName,
+				Command:       runtime,
+				Args:          []string{"secrets-encrypt", "status"},
 				PeriodSeconds: 5,
 			},
 		},
@@ -547,16 +704,14 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 
 	if planStatus.Failure() {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: rotate-keys plan failed to execute on leader %s", s.op.Namespace, s.op.Name, leader.Name)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("encryption key rotation plan failed for leader %s/%s", leader.Namespace, leader.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encryption key rotation plan failed for leader %s/%s", leader.Namespace, leader.Name))
 		return status, nil
 	}
 
 	if planStatus.Waiting() {
 		logrus.Debugf("[encryptionkeyrotation] %s/%s: waiting for rotate-keys plan for %s/%s", s.op.Namespace, s.op.Name, leader.Namespace, leader.Name)
 
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
-		opv1alpha1.InProgressCondition.Message(&status, plan.Message([]plan.PlanStatus{*planStatus}))
+		ops.SetWaitingForSinglePlan(&status.OperationStatus, planStatus)
 
 		return status, nil
 	}
@@ -585,7 +740,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	}
 	if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: corrupt rotate-keys output on leader %s: %v", s.op.Namespace, s.op.Name, leader.Name, err)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt rotate-keys output on leader %s", leader.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt rotate-keys output on leader %s", leader.Name))
 		return status, nil
 	}
 
@@ -596,7 +751,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 			logrus.Warnf("[encryptionkeyrotation] %s/%s: rotate-keys CLI timed out on leader %s; continuing to observe periodic status", s.op.Namespace, s.op.Name, leader.Name)
 		} else {
 			logrus.Errorf("[encryptionkeyrotation] %s/%s: rotate-keys failed on leader %s with exit code %d", s.op.Namespace, s.op.Name, leader.Name, result.exitCode)
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("secrets-encrypt rotate-keys failed on leader %s (exit code %d); please perform an etcd restore", leader.Name, result.exitCode))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("secrets-encrypt rotate-keys failed on leader %s (exit code %d); please perform an etcd restore", leader.Name, result.exitCode))
 			return status, nil
 		}
 	}
@@ -605,7 +760,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	waitMsg, err := convergenceWaitMessage(leader, false)
 	if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: convergence check failed on leader %s: %v", s.op.Namespace, s.op.Name, leader.Name, err)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on leader %s; please perform an etcd restore", leader.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on leader %s; please perform an etcd restore", leader.Name))
 		return status, nil
 	}
 	if waitMsg != "" {
@@ -617,7 +772,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	}
 
 	logrus.Infof("[encryptionkeyrotation] %s/%s: rotate-keys reencrypt_finished on leader %s, transitioning to restart", s.op.Namespace, s.op.Name, leader.Name)
-	status.Step = opv1alpha1.EncryptionKeyRotationStepRestart
+	status.SetStep(opv1alpha1.EncryptionKeyRotationStepRestart)
 	return status, nil
 }
 
@@ -630,9 +785,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 	if err != nil {
 		return status, err
 	} else if delegated {
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-		opv1alpha1.InProgressCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 		return status, nil
 	}
 
@@ -654,12 +807,12 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 		return status, err
 	} else if err != nil {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: no control-plane nodes found at restart step", s.op.Namespace, s.op.Name)
-		markFailed(&status, opv1alpha1.UnknownStepReason, "no control-plane nodes found; cannot verify post-restart encryption status")
+		status.MarkFailed(opv1alpha1.UnknownStepReason, "no control-plane nodes found; cannot verify post-restart encryption status")
 		return status, nil
 	}
 	if !ops.IsControlPlane(secrets[len(secrets)-1]) {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: nodes are not correctly ordered at restart step", s.op.Namespace, s.op.Name)
-		markFailed(&status, opv1alpha1.UnknownStepReason, "last control plane node not found; cannot verify hash convergence after restart")
+		status.MarkFailed(opv1alpha1.UnknownStepReason, "last control plane node not found; cannot verify hash convergence after restart")
 		return status, nil
 	}
 
@@ -683,14 +836,28 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 		}
 	}
 
+	return h.finishRotation(s, status)
+}
+
+// finishRotation hands the cluster back to the planner and records the rotation as successful. Both
+// belong to the same moment and are done together so that neither can happen without the other.
+//
+// It is reached only from the end of reconcileRestart, once every server node has restarted and
+// converged, which makes it the one place a rotation unpauses. A rotation which does not get this
+// far has left the cluster mid-rotation, with some nodes on the new key and some on the old, and
+// letting the planner roll nodes in that state would be unsafe — so it stays paused, deliberately,
+// for an administrator to resolve. That is what its failure messages already ask for, and it is why
+// terminal handling does not unpause either.
+func (h *handler) finishRotation(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	// Unpause before asserting the outcome: a rotation reported successful while its cluster is
+	// still paused would look finished and leave the cluster frozen.
+	if err := s.adapter.PauseCluster(false); err != nil {
+		return status, err
+	}
+
 	logrus.Infof("[encryptionkeyrotation] %s/%s: marking as success", s.op.Namespace, s.op.Name)
 
-	status.Phase = opv1alpha1.OperationPhaseSucceeded
-	status.LastUpdated = metav1.Now()
-
-	opv1alpha1.SucceededCondition.True(&status)
-	opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.FinishedReason)
-	opv1alpha1.SucceededCondition.Message(&status, "Operation completed successfully")
+	status.MarkSucceeded()
 
 	return status, nil
 }
@@ -715,18 +882,14 @@ func (h *handler) reconcileRestartNode(
 
 	oneTimeInstructions := []plan.OneTimeInstruction{
 		{
-			CommonInstruction: plan.CommonInstruction{
-				Name:    "restart",
-				Command: "systemctl",
-				Args:    []string{"restart", serverUnit},
-			},
+			Name:    "restart",
+			Command: "systemctl",
+			Args:    []string{"restart", serverUnit},
 		},
 		{
-			CommonInstruction: plan.CommonInstruction{
-				Name:    "wait-for-systemctl-status",
-				Command: "/bin/sh",
-				Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
-			},
+			Name:    "wait-for-systemctl-status",
+			Command: "/bin/sh",
+			Args:    []string{"-c", waitForSystemctlStatusScript(serverUnit)},
 		},
 	}
 
@@ -737,28 +900,22 @@ func (h *handler) reconcileRestartNode(
 	if ops.IsControlPlane(secret) {
 		nodePlan.OneTimeInstructions = append(nodePlan.OneTimeInstructions,
 			plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    waitForStatusInstructionName,
-					Command: "/bin/sh",
-					Args:    []string{"-c", waitForStatusScript(runtime)},
-				},
+				Name:    waitForStatusInstructionName,
+				Command: "/bin/sh",
+				Args:    []string{"-c", waitForStatusScript(runtime)},
 			},
 			plan.OneTimeInstruction{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
-				},
+				Name:       statusPeriodicName,
+				Command:    runtime,
+				Args:       []string{"secrets-encrypt", "status"},
 				SaveOutput: true,
 			},
 		)
 		nodePlan.PeriodicInstructions = []plan.PeriodicInstruction{
 			{
-				CommonInstruction: plan.CommonInstruction{
-					Name:    statusPeriodicName,
-					Command: runtime,
-					Args:    []string{"secrets-encrypt", "status"},
-				},
+				Name:          statusPeriodicName,
+				Command:       runtime,
+				Args:          []string{"secrets-encrypt", "status"},
 				PeriodSeconds: 5,
 			},
 		}
@@ -771,15 +928,13 @@ func (h *handler) reconcileRestartNode(
 
 	if planStatus.Failure() {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: restart plan failed for %s", s.op.Namespace, s.op.Name, secret.Name)
-		markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s; please perform an etcd restore", secret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s; please perform an etcd restore", secret.Name))
 		return status, false, nil
 	}
 
 	if planStatus.Waiting() {
 		logrus.Debugf("[encryptionkeyrotation] %s/%s: waiting for restart for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForPlanAppliedReason)
-		opv1alpha1.InProgressCondition.Message(&status, plan.Message([]plan.PlanStatus{*planStatus}))
+		ops.SetWaitingForSinglePlan(&status.OperationStatus, planStatus)
 		return status, false, nil
 	}
 
@@ -787,7 +942,7 @@ func (h *handler) reconcileRestartNode(
 		waitMsg, err := convergenceWaitMessage(secret, requireHashMatch)
 		if err != nil {
 			logrus.Errorf("[encryptionkeyrotation] %s/%s: convergence check failed on %s: %v", s.op.Namespace, s.op.Name, secret.Name, err)
-			markFailed(&status, opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on %s; please perform an etcd restore", secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("corrupt encryption key rotation state on %s; please perform an etcd restore", secret.Name))
 			return status, false, nil
 		}
 		if waitMsg != "" {
@@ -801,249 +956,172 @@ func (h *handler) reconcileRestartNode(
 	return status, true, nil
 }
 
-// handleCanceled is the terminal handler for the Canceled phase. Like handleFailed/handleSucceeded
-// it runs its phase hook first so a delegate can observe cancellation, then unpauses the cluster
-// and releases the beacon if we still own it. The cancel-vs-fail distinction is that an external
-// party cancels whereas the operation fails itself — neither implies the other.
+// terminalPhase describes what is specific to one terminal phase: the condition it reports through,
+// the lifecycle hook that can defer its completion, and any work to run once the beacon is back.
+type terminalPhase struct {
+	hook string
+
+	// beaconOptional marks a phase an operation can reach without holding the beacon, which is
+	// every outcome but success:
+	//
+	//   - Failed, which handleInProgress reaches precisely because the beacon was lost;
+	//   - Aborted, where the operation called its own work off and may since have been overtaken;
+	//   - Canceled, driven from outside the operation and often by whoever wants the beacon next.
+	//
+	// For those a missing claim is an expected outcome rather than a failure, so the phase's hook
+	// is passed over — without a claim there is no authority to delegate — and the beacon is left
+	// untouched. Succeeded is deliberately not one of them: an operation cannot have finished its
+	// work without holding the beacon throughout, so a missing claim there is an anomaly rather
+	// than a state to paper over.
+	beaconOptional bool
+
+	// beforeRelease, when set, runs after the phase's hook has been satisfied and before the beacon
+	// is released, for work that has to happen while this operation is still the one authorized to
+	// write to the cluster's machine-plan secrets. Returning an error leaves the beacon held and the
+	// operation un-terminated, so the next reconcile tries again.
+	beforeRelease func(s *scope) error
+
+	// onRelease, when set, runs after the beacon has been released. owning reports whether this
+	// operation was the beacon's primary owner rather than a delegate acting on its behalf.
+	onRelease func(s *scope, owning bool)
+}
+
+// handleTerminal is the shared body of every terminal phase handler, and the only place an
+// operation is recorded as terminated.
+//
+// Reaching a terminal phase is not the end of the operation's handling: the phase's lifecycle hook
+// may hand the beacon to a delegate first, and the beacon has to be released afterward so the next
+// operation in line can acquire it. Recording termination in this one place — after the hook is
+// satisfied, after the release succeeded — is what keeps the marker honest, since that marker is
+// what makes the operation eligible for TTL collection and lets a deleted operation finish
+// deleting. A terminal phase handler that returns early therefore cannot forget to withhold it.
+//
+// Unpausing the cluster is deliberately not part of this. Only a rotation which restarted every
+// node has left the cluster in a state fit to hand back to the planner, so reconcileRestart does it
+// and no terminal path undoes it — see there.
+//
+// An operation which no longer holds the beacon has none of that left to do: see
+// beaconOptional. It terminates without the beacon being written to at all, which is what
+// keeps an operation that lost its claim from reaching into whichever one holds it now.
+// beforeRelease still runs for it: what it does is scoped to the plans this operation
+// itself dispatched, so it cannot disturb the operation that holds the beacon now either.
+func (h *handler) handleTerminal(s *scope, status opv1alpha1.EncryptionKeyRotationStatus, phase terminalPhase) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
+
+	// A phase whose beacon claim is optional passes over its hook once that claim is gone: there is
+	// no authority left to delegate, and pushing a delegate onto a beacon another controller now
+	// holds would be reaching into its operation. Everything after the hook is either a no-op
+	// without a claim (releaseBeacon) or owed regardless of one, so the operation still terminates
+	// — which is what lets it be collected, or lets a deleted one retire its finalizer.
+	honorHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
+
+	if honorHook {
+		delegated, err := h.handleHook(s, phase.hook)
+		if err != nil {
+			return status, err
+		} else if delegated {
+			// The delegate drives the beacon on this operation's behalf from here, and the cluster stays
+			// paused for it. Nothing is written to the outcome condition: it already reports the outcome
+			// with the reason the phase handler gave it, and that reason must survive the delegation.
+			// updateStatus reports the delegate on Finalized for as long as the hook label is present,
+			// so the wait resolves on its own once the delegate clears the label rather than being left
+			// behind on a condition.
+			return status, nil
+		}
+	} else {
+		logrus.Debugf("[encryptionkeyrotation] %s/%s: %s with no claim on the beacon, leaving it untouched", s.op.Namespace, s.op.Name, status.Phase)
+	}
+
+	if phase.beforeRelease != nil {
+		if err := phase.beforeRelease(s); err != nil {
+			return status, err
+		}
+	}
+
+	owning, err := plan.ReleaseBeaconIfHeld(s.beacon, h.beacons, s.ownerKey)
+	if err != nil {
+		return status, err
+	}
+
+	if phase.onRelease != nil {
+		phase.onRelease(s, owning)
+	}
+
+	status.SetTerminated()
+
+	return status, nil
+}
+
+// handleAborted handles the Aborted terminal phase, reached when the operation called its own work
+// off rather than attempting it and losing — which is what separates it from Failed. Its phase hook
+// runs first so a delegate can observe why the operation stopped.
+func (h *handler) handleAborted(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	return h.handleTerminal(s, status, terminalPhase{
+		hook:           opv1alpha1.AbortedPhaseHookLabelPrefix,
+		beaconOptional: true,
+	})
+}
+
+// handleCanceled handles the Canceled terminal phase, which is reached when an external controller
+// cancels the operation or it is deleted before its terminal handling completed. Its phase hook
+// runs first so a delegate can observe the cancellation. What separates cancellation from the other
+// outcomes is that it comes from outside the operation, where Failed means the work was attempted
+// and lost and Aborted means the operation called it off itself — none implies another.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation canceled", s.op.Namespace, s.op.Name)
+	return h.handleTerminal(s, status, terminalPhase{
+		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
+		beaconOptional: true,
 
-	delegated, err := h.handleHook(s, planv1alpha1.CanceledPhaseHookLabelPrefix)
-	if err != nil {
-		return status, err
-	} else if delegated {
-		opv1alpha1.CanceledCondition.True(&status)
-		opv1alpha1.CanceledCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-		opv1alpha1.CanceledCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
-		return status, nil
-	}
-
-	if err := s.adapter.PauseCluster(false); err != nil {
-		return status, err
-	}
-
-	// Owner and mid-chain delegates both go through ReleaseBeacon: it clears the beacon fully
-	// for the owner, or removes the delegate slot from the chain otherwise.
-	ownerKey := beaconOwnerKey(s.op)
-	if plan.IsOwningBeaconHolder(s.beacon, ownerKey) || plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
-			return status, err
-		}
-	}
-	return status, nil
+		// Cancellation has to reach the cluster and not just the operation's status: a plan already
+		// handed to an agent is the agent's to run, and the beacon is about to be released to
+		// whichever operation is next in line. Canceling those plans while this operation is still
+		// the authorized writer is what stops the two overlapping.
+		beforeRelease: func(s *scope) error {
+			_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op)
+			return err
+		},
+	})
 }
 
-// handleFailed releases the beacon and unpauses cluster activity after the
-// operation has already been marked terminal.
+// handleFailed handles the Failed terminal phase. Its hook fires before cleanup so a delegate can
+// inspect failure state (status conditions, plan-secret applied output, residual rotate-keys
+// process) before the cluster is unpaused and the beacon released.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation failed", s.op.Namespace, s.op.Name)
-
-	// Failed-phase hook fires before cleanup so a delegate can inspect failure state (status
-	// conditions, plan-secret applied output, residual rotate-keys process) before the cluster is
-	// unpaused and the beacon released.
-	delegated, err := h.handleHook(s, planv1alpha1.FailedPhaseHookLabelPrefix)
-	if err != nil {
-		return status, err
-	} else if delegated {
-		opv1alpha1.FailedCondition.True(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-		opv1alpha1.FailedCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
-		return status, nil
-	}
-
-	if err := s.adapter.PauseCluster(false); err != nil {
-		return status, err
-	}
-
-	// Owner performs full teardown via ReleaseBeacon; a mid-chain delegate is removed from the
-	// chain by the same call. Non-participants are no-op.
-	ownerKey := beaconOwnerKey(s.op)
-	if plan.IsOwningBeaconHolder(s.beacon, ownerKey) || plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
-			return status, err
-		}
-	}
-	return status, nil
+	return h.handleTerminal(s, status, terminalPhase{
+		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
+		beaconOptional: true,
+	})
 }
 
-// handleSucceeded clears the active beacon state, releases ownership, unpauses
-// cluster activity, and re-enqueues the backing cluster so downstream
-// controllers observe the final beacon transition.
+// handleSucceeded handles the Succeeded terminal phase. Its hook fires before unpausing and
+// releasing — delegates use this to chain follow-up work (e.g. a verifier that re-runs
+// `secrets-encrypt status` from outside the operation) before the cluster goes back to accepting
+// new operations. On the owner path it then re-enqueues the backing cluster so downstream
+// controllers observe the final beacon transition; only the owner does so, since only the owner
+// terminating implies downstream work.
 func (h *handler) handleSucceeded(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
-	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation succeeded", s.op.Namespace, s.op.Name)
-
-	// Succeeded-phase hook fires before unpausing + releasing — delegates use this to chain
-	// follow-up work (e.g. a verifier that re-runs `secrets-encrypt status` from outside the
-	// operation) before the cluster goes back to accepting new operations.
-	delegated, err := h.handleHook(s, planv1alpha1.SucceededPhaseHookLabelPrefix)
-	if err != nil {
-		return status, err
-	} else if delegated {
-		opv1alpha1.SucceededCondition.True(&status)
-		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.WaitingForDelegateReason)
-		opv1alpha1.SucceededCondition.Message(&status, fmt.Sprintf("Waiting for delegates to finish: %v", opv1alpha1.WaitingForDelegateMessage(s.beacon)))
-		return status, nil
-	}
-
-	if err := s.adapter.PauseCluster(false); err != nil {
-		return status, err
-	}
-
-	// Owner does the full teardown + enqueues the cluster; a mid-chain delegate just removes
-	// itself. Only owner cleanup implies downstream reconciliation, so only owner enqueues.
-	// ReleaseBeacon handles Active=false + Owner="" + Delegates=nil in a single UpdateStatus for
-	// the owner path — no separate ToggleBeacon call is needed.
-	ownerKey := beaconOwnerKey(s.op)
-	owning := plan.IsOwningBeaconHolder(s.beacon, ownerKey)
-	if owning || plan.IsInDelegateChain(s.beacon, ownerKey) {
-		if err := plan.ReleaseBeacon(s.beacon, h.beacons, ownerKey); err != nil {
-			return status, err
-		}
-	}
-	if owning {
-		// enqueue original object to ensure it is processed by requisite controllers
-		gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
-		_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
-	}
-	return status, nil
+	return h.handleTerminal(s, status, terminalPhase{
+		hook: opv1alpha1.SucceededPhaseHookLabelPrefix,
+		onRelease: func(s *scope, owning bool) {
+			if !owning {
+				return
+			}
+			// enqueue original object to ensure it is processed by requisite controllers
+			gvk := schema.FromAPIVersionAndKind(s.clusterObj.GetAPIVersion(), s.clusterObj.GetKind())
+			_ = h.dynamic.Enqueue(gvk, s.clusterObj.GetNamespace(), s.clusterObj.GetName())
+		},
+	})
 }
 
-// updateStatus updates the conditions of the operation based on the current status.
-// This function also updates the ObservedGeneration.
-// The handler is responsible for updating the condition relevant to the current phase, but this function updates the
-// remaining conditions.
+// updateStatus refreshes ObservedGeneration and every condition that is not the one the current
+// phase handler owns. Every operation type reports its progress identically, so the work itself is
+// shared — see ops.UpdateStatus.
 func updateStatus(op *opv1alpha1.EncryptionKeyRotation, status opv1alpha1.EncryptionKeyRotationStatus) opv1alpha1.EncryptionKeyRotationStatus {
 	logrus.Tracef("[encryptionkeyrotation] %s/%s: updating conditions", op.Namespace, op.Name)
 
-	status.ObservedGeneration = op.Generation
-	if op.Spec.Paused {
-		opv1alpha1.PausedCondition.True(&status)
-		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.PausedReason)
-		opv1alpha1.PausedCondition.Message(&status, "Operation is paused")
-	} else {
-		opv1alpha1.PausedCondition.False(&status)
-		opv1alpha1.PausedCondition.Reason(&status, opv1alpha1.NotPausedReason)
-		opv1alpha1.PausedCondition.Message(&status, "")
-	}
-
-	if status.Phase == opv1alpha1.OperationPhasePending {
-		opv1alpha1.PendingCondition.True(&status)
-	} else if status.Phase == opv1alpha1.OperationPhaseInProgress {
-		opv1alpha1.PendingCondition.False(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.InProgressReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation now in progress")
-	} else if status.Phase == opv1alpha1.OperationPhaseSucceeded {
-		opv1alpha1.PendingCondition.False(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation completed successfully")
-		opv1alpha1.InProgressCondition.False(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.InProgressCondition.Message(&status, "Operation completed successfully")
-		opv1alpha1.FailedCondition.False(&status)
-		opv1alpha1.FailedCondition.Reason(&status, opv1alpha1.NotFailedReason)
-		opv1alpha1.FailedCondition.Message(&status, "Operation completed successfully")
-	} else if status.Phase == opv1alpha1.OperationPhaseFailed {
-		opv1alpha1.PendingCondition.False(&status)
-		opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.PendingCondition.Message(&status, "Operation failed")
-		opv1alpha1.InProgressCondition.False(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.FinishedReason)
-		opv1alpha1.InProgressCondition.Message(&status, "Operation failed")
-		opv1alpha1.SucceededCondition.False(&status)
-		opv1alpha1.SucceededCondition.Reason(&status, opv1alpha1.NotSuccessfulReason)
-		opv1alpha1.SucceededCondition.Message(&status, "Operation failed")
-	}
+	ops.UpdateStatus(op, &op.Spec.OperationSpec, &status.OperationStatus)
 
 	return status
-}
-
-// markFailed transitions status to the Failed phase with the given reason and condition message.
-// Callers are responsible for logging before calling.
-func markFailed(status *opv1alpha1.EncryptionKeyRotationStatus, reason, condMsg string) {
-	status.Phase = opv1alpha1.OperationPhaseFailed
-	status.LastUpdated = metav1.Now()
-	opv1alpha1.FailedCondition.True(status)
-	opv1alpha1.FailedCondition.Reason(status, reason)
-	opv1alpha1.FailedCondition.Message(status, condMsg)
-}
-
-// beaconOwnerKey returns the per-operation beacon owner key used for
-// beacon ownership checks and lifecycle cleanup.
-func beaconOwnerKey(op *opv1alpha1.EncryptionKeyRotation) string {
-	if op == nil {
-		return ControllerOwnerKey
-	}
-	if op.UID != "" {
-		return fmt.Sprintf("%s-%s", ControllerOwnerKey, op.UID)
-	}
-	return fmt.Sprintf("%s-%s-%s", ControllerOwnerKey, op.Namespace, op.Name)
-}
-
-// reclaimStaleBeaconOwnerIfNeeded clears stale beacon ownership when the
-// recorded owner reference is invalid, missing, deleted, or terminal.
-// Non-matching owners are left untouched so this controller only reclaims its own
-// operation type.
-func (h *handler) reclaimStaleBeaconOwnerIfNeeded(s *scope) error {
-	if s.beacon == nil {
-		return nil
-	}
-
-	currentOwnerKey := s.beacon.Status.Owner
-	newOwnerKey := beaconOwnerKey(s.op)
-	// No owner, or we already own it
-	if currentOwnerKey == "" || currentOwnerKey == newOwnerKey {
-		return nil
-	}
-	// Another controller type owns it
-	if currentOwnerKey != ControllerOwnerKey && !strings.HasPrefix(currentOwnerKey, ControllerOwnerKey+"-") {
-		return nil
-	}
-
-	reclaim := false
-
-	ownerRef := ""
-	if s.beacon.Annotations != nil {
-		ownerRef = s.beacon.Annotations[beaconOwnerRefAnnotation]
-	}
-	parts := strings.SplitN(ownerRef, "/", 3)
-	// Missing or broken owner ref means we cannot trust this owner
-	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		reclaim = true
-	} else {
-		currentOp, err := h.encryptionkeyrotations.Get(parts[0], parts[1], metav1.GetOptions{})
-		// Owner object is gone
-		if apierrors.IsNotFound(err) {
-			reclaim = true
-		} else if err != nil {
-			return err
-			// UID changed or owner finished
-		} else if string(currentOp.UID) != parts[2] || ops.IsTerminal(currentOp.Status.Phase) {
-			reclaim = true
-		}
-	}
-	if !reclaim {
-		return nil
-	}
-
-	beacon := s.beacon.DeepCopy()
-	beacon.Status.Owner = ""
-	updated, err := h.beacons.Update(beacon)
-	if err != nil {
-		return err
-	}
-	s.beacon = updated
-
-	beacon = s.beacon.DeepCopy()
-	if beacon.Annotations != nil {
-		delete(beacon.Annotations, beaconOwnerRefAnnotation)
-	}
-	updated, err = h.beacons.Update(beacon)
-	if err != nil {
-		return err
-	}
-	s.beacon = updated
-
-	return nil
 }
 
 // errRotateKeysOutputNotYet is returned by readRotateKeysResult when the rotate-keys output
@@ -1132,7 +1210,7 @@ func readRotateKeysResult(appliedOutput map[string][]byte) (commandResult, error
 		return commandResult{}, errRotateKeysOutputNotYet
 	}
 	message := string(raw)
-	for _, line := range strings.Split(message, "\n") {
+	for line := range strings.SplitSeq(message, "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, exitCodePrefix) {
 			continue
@@ -1261,7 +1339,7 @@ func statusFromOutput(output string) (runtimeStatus, error) {
 	}
 
 	var result runtimeStatus
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		key, value, ok := strings.Cut(line, ":")
 		if !ok {
 			continue

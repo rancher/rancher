@@ -115,7 +115,7 @@ func (d *Daemon) Schedule(exp string) error {
 			case <-d.done:
 				return
 			case <-d.ctx.Done():
-				logrus.Info(d.withPrefix("context cancelled, stopping daemon"))
+				logrus.Info(d.withPrefix("context canceled, stopping daemon"))
 
 				d.mu.Lock()
 				defer d.mu.Unlock()

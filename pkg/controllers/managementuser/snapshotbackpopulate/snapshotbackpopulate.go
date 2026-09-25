@@ -463,7 +463,7 @@ func restoreModesFromMetadata(metadata map[string]string, logPrefix string) ([]s
 	return available, nil
 }
 
-// restoreModesFromClusterSpec is the pre-extra-metadata behaviour: derive the available modes from
+// restoreModesFromClusterSpec is the pre-extra-metadata behavior: derive the available modes from
 // the presence of the fields each one restores in the provisioning-cluster-spec payload.
 func restoreModesFromClusterSpec(downstream *k3s.ETCDSnapshotFile, logPrefix string) []string {
 	availableModes := []string{rkev1.RestoreRKEConfigNone}
@@ -636,7 +636,7 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 //     Node whose LabelNodeName matches nodeName. Additionally, ClusterLifecycle labels (from the
 //     CAPI Cluster) and MachineLifecycle labels (from the CAPI Machine whose NodeRef matches
 //     nodeName) are stamped so reconcileRestore can correlate against machine-plan secrets — plan
-//     secrets on CAPRKE2 clusters are labelled with the CAPI Machine's identity, not the v3 Node's.
+//     secrets on CAPRKE2 clusters are labeled with the CAPI Machine's identity, not the v3 Node's.
 //
 //   - Otherwise (v2prov / imported RKE2/K3s): read the downstream Node's MachineLifecycle labels
 //     and dereference to whatever machine object they name (CAPI Machine for v2prov, mgmt v3 Node

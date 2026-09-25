@@ -73,6 +73,17 @@ spec:
                 description: |-
                   Cancel requests the operation to stop permanently. Unlike Paused, it is terminal and cannot be unset.
                   Recover by deleting and recreating the operation.
+                  Paused takes precedence: a paused operation halts reconciliation entirely, so the cancellation
+                  is only observed once the pause is lifted.
+                  Canceling an operation which has already reached a terminal phase does nothing: there is no
+                  work left to call off, so the phase it ended in stands and the Canceled condition reports that
+                  the request was declined. Deleting such an operation does still stop it, which is the remedy
+                  for one whose terminal phase hook is never answered.
+                  Setting it on an operation already in a terminal phase is rejected outright, by a validation
+                  rule which has to live on each operation type rather than here: a rule on this field only sees
+                  the field, and deciding whether a cancellation can still take effect needs status.phase. The
+                  rule cannot close the race where an operation reaches a terminal phase between the request
+                  being admitted and the controller acting on it, which is why the controller declines it too.
                 type: boolean
                 x-kubernetes-validations:
                 - message: cancel cannot be unset once true
@@ -144,7 +155,14 @@ spec:
               conditions:
                 description: |-
                   Conditions represent the latest available observations of an operation's current state.
-                  Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, and Paused .
+                  Known condition types are Pending, InProgress, Succeeded, Failed, Aborted, Canceled,
+                  Finalized, and Paused.
+                  Succeeded, Failed, Aborted and Canceled report how the operation ended, and the one matching the
+                  terminal phase goes True as soon as that phase is reached. Finalized reports the separate
+                  question of whether the controller has finished with the operation (terminal phase hook
+                  satisfied, beacon released (see TerminatedAt)) and is True whenever any outcome condition is
+                  and that work is done, so an observer that only needs to know the operation is over can wait
+                  on it alone.
                   Operations may have additional conditions of their own.
                   Operations may also provide additional information in the form of messages.
                 items:
@@ -197,12 +215,14 @@ spec:
                   An InProgress operation is one that is currently executing.
                   A Succeeded operation is one that completed successfully.
                   A Failed operation is one that failed to complete successfully.
-                  A Canceled operation is one that was canceled by the user or system.
+                  An Aborted operation is one that called its own work off, having found it cannot proceed.
+                  A Canceled operation is one that was called off from outside, by the user or the system.
                 enum:
                 - Pending
                 - InProgress
                 - Succeeded
                 - Failed
+                - Aborted
                 - Canceled
                 type: string
               step:
@@ -214,10 +234,28 @@ spec:
                 - Save
                 - Restart
                 type: string
+              terminatedAt:
+                description: |-
+                  TerminatedAt identifies when the controller finished handling the terminal phase of the
+                  Operation, meaning nothing is owed on it any more. Ordinarily the terminal-phase lifecycle
+                  hook (if any) ran to completion and the beacon was released; it also covers an Operation with
+                  no beacon left to release, and one being deleted, whose hooks are abandoned along with it.
+                  It is set once and never cleared, and is only ever set on an Operation which has reached a
+                  terminal phase.
+                  An Operation which reached a terminal phase is not necessarily terminated: terminal handling
+                  may still be delegated to another controller. An Operation deleted before it is terminated is
+                  canceled, as the work it dispatched is no longer tracked by anything.
+                format: date-time
+                type: string
             type: object
         required:
         - spec
         type: object
+        x-kubernetes-validations:
+        - message: cancel cannot be set once the operation has reached a terminal
+            phase; delete the operation instead
+          rule: '!self.spec.cancel || oldSelf.spec.cancel || !has(self.status) ||
+            !has(self.status.phase) || !(self.status.phase in [''Succeeded'',''Failed'',''Aborted'',''Canceled''])'
     served: true
     storage: true
     subresources:

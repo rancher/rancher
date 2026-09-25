@@ -44,15 +44,6 @@ type CertificateRotationStatus struct {
 	Step CertificateRotationStep `json:"step,omitempty"`
 }
 
-// SetPhase sets the status phase, updating LastUpdated only when the value changes.
-func (s *CertificateRotationStatus) SetPhase(phase OperationPhase) {
-	if s.Phase == phase {
-		return
-	}
-	s.Phase = phase
-	s.LastUpdated = metav1.Now()
-}
-
 // SetStep sets the status step, updating LastUpdated only when the value changes.
 func (s *CertificateRotationStatus) SetStep(step CertificateRotationStep) {
 	if s.Step == step {
@@ -68,6 +59,7 @@ func (s *CertificateRotationStatus) SetStep(step CertificateRotationStep) {
 // +kubebuilder:resource:path=certificaterotations,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:validation:XValidation:rule="!self.spec.cancel || oldSelf.spec.cancel || !has(self.status) || !has(self.status.phase) || !(self.status.phase in ['Succeeded','Failed','Aborted','Canceled'])",message="cancel cannot be set once the operation has reached a terminal phase; delete the operation instead"
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
 // +kubebuilder:printcolumn:name="Services",type=string,JSONPath=".spec.args.services"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"

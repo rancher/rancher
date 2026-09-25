@@ -78,14 +78,6 @@ type ETCDSnapshotRestoreStatus struct {
 	Step ETCDSnapshotRestoreStep `json:"step,omitempty"`
 }
 
-func (s *ETCDSnapshotRestoreStatus) SetPhase(phase OperationPhase) {
-	if s.Phase == phase {
-		return
-	}
-	s.Phase = phase
-	s.LastUpdated = metav1.Now()
-}
-
 func (s *ETCDSnapshotRestoreStatus) SetStep(step ETCDSnapshotRestoreStep) {
 	if s.Step == step {
 		return
@@ -100,6 +92,7 @@ func (s *ETCDSnapshotRestoreStatus) SetStep(step ETCDSnapshotRestoreStep) {
 // +kubebuilder:resource:path=etcdsnapshotrestores,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:validation:XValidation:rule="!self.spec.cancel || oldSelf.spec.cancel || !has(self.status) || !has(self.status.phase) || !(self.status.phase in ['Succeeded','Failed','Aborted','Canceled'])",message="cancel cannot be set once the operation has reached a terminal phase; delete the operation instead"
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
 // +kubebuilder:printcolumn:name="Snapshot",type=string,JSONPath=".spec.args.name"
 // +kubebuilder:printcolumn:name="Mode",type=string,JSONPath=".spec.args.restoreMode"

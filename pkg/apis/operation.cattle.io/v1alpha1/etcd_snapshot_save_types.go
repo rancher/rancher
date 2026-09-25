@@ -4,7 +4,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-
 // ETCDSnapshotSaveArgs contains parameters for saving an ETCD snapshot.
 // Name specifies the name of the snapshot file.
 type ETCDSnapshotSaveArgs struct {
@@ -51,14 +50,6 @@ type ETCDSnapshotSaveStatus struct {
 	Step ETCDSnapshotSaveStep `json:"step,omitempty"`
 }
 
-func (s *ETCDSnapshotSaveStatus) SetPhase(phase OperationPhase) {
-	if s.Phase == phase {
-		return
-	}
-	s.Phase = phase
-	s.LastUpdated = metav1.Now()
-}
-
 func (s *ETCDSnapshotSaveStatus) SetStep(step ETCDSnapshotSaveStep) {
 	if s.Step == step {
 		return
@@ -73,6 +64,7 @@ func (s *ETCDSnapshotSaveStatus) SetStep(step ETCDSnapshotSaveStep) {
 // +kubebuilder:resource:path=etcdsnapshotsaves,scope=Namespaced,categories=operations
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:validation:XValidation:rule="!self.spec.cancel || oldSelf.spec.cancel || !has(self.status) || !has(self.status.phase) || !(self.status.phase in ['Succeeded','Failed','Aborted','Canceled'])",message="cancel cannot be set once the operation has reached a terminal phase; delete the operation instead"
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.Name"
 // +kubebuilder:printcolumn:name="Paused",type=string,JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
