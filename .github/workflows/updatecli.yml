@@ -18,7 +18,6 @@ on:
         options:
           - 'all'
           - 'k3s'
-          - 'k8s'
           - 'harvester-docker-machine'
           - 'machine'
           - 'wins-system-agent'
