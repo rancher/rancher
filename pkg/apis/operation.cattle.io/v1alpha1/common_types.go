@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +37,16 @@ type OperationSpec struct {
 	TTL int64 `json:"ttl,omitempty"`
 }
 
+// ClusterRefKey renders a cluster reference for logs and status messages, omitting the namespace
+// for cluster-scoped references.
+func ClusterRefKey(ref *corev1.ObjectReference) string {
+	key := fmt.Sprintf("apiVersion=%s, kind=%s", ref.APIVersion, ref.Kind)
+	if ref.Namespace != "" {
+		key += fmt.Sprintf(", namespace=%s", ref.Namespace)
+	}
+	return key + fmt.Sprintf(", name=%s", ref.Name)
+}
+
 // OperationPhase represents the current phase of the operation.
 type OperationPhase string
 
@@ -58,7 +70,14 @@ const (
 // OperationStatus defines the observed state of an operation.
 type OperationStatus struct {
 	// Conditions represent the latest available observations of an operation's current state.
-	// Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, and Paused .
+	// Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, Finalized, and
+	// Paused.
+	// Succeeded, Failed and Canceled report how the operation ended, and the one matching the
+	// terminal phase goes True as soon as that phase is reached. Finalized reports the separate
+	// question of whether the controller has finished with the operation — terminal phase hook
+	// satisfied, beacon released (see TerminatedAt) — and is True whenever any outcome condition is
+	// and that work is done, so an observer that only needs to know the operation is over can wait
+	// on it alone.
 	// Operations may have additional conditions of their own.
 	// Operations may also provide additional information in the form of messages.
 	// +optional
@@ -71,6 +90,16 @@ type OperationStatus struct {
 	// LastUpdated will also be updated during step transitions, if applicable.
 	// +optional
 	LastUpdated metav1.Time `json:"lastUpdated,omitempty,omitzero"`
+
+	// TerminatedAt identifies when the controller finished handling the terminal phase of the
+	// Operation: the terminal-phase lifecycle hook (if any) ran to completion and the beacon was
+	// released. It is set once and never cleared, and is only ever set on an Operation which has
+	// reached a terminal phase.
+	// An Operation which reached a terminal phase is not necessarily terminated: terminal handling
+	// may still be delegated to another controller. An Operation deleted before it is terminated is
+	// canceled, as the work it dispatched is no longer tracked by anything.
+	// +optional
+	TerminatedAt metav1.Time `json:"terminatedAt,omitempty,omitzero"`
 
 	// Phase represents the current phase of the Operation.
 	// A Pending operation is one that is currently waiting to acquire the beacon, active it, and begin execution.
@@ -86,4 +115,19 @@ type OperationStatus struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+// SetTerminated records that terminal handling for the operation has completed. Operation
+// controllers must only call this once the terminal phase is fully handled — i.e. the terminal
+// phase hook has been satisfied and the beacon has been released — as it is what makes the
+// operation eligible for TTL garbage collection and what distinguishes a deletion that races
+// terminal handling (canceled) from one that follows it (left as-is).
+//
+// The timestamp is only written on the first call so it keeps pointing at the moment terminal
+// handling actually completed, no matter how many times the operation is reconciled afterwards.
+func (s *OperationStatus) SetTerminated() {
+	if !s.TerminatedAt.IsZero() {
+		return
+	}
+	s.TerminatedAt = metav1.Now()
 }

@@ -144,7 +144,14 @@ spec:
               conditions:
                 description: |-
                   Conditions represent the latest available observations of an operation's current state.
-                  Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, and Paused .
+                  Known condition types are Pending, InProgress, Succeeded, Failed, Canceled, Finalized, and
+                  Paused.
+                  Succeeded, Failed and Canceled report how the operation ended, and the one matching the
+                  terminal phase goes True as soon as that phase is reached. Finalized reports the separate
+                  question of whether the controller has finished with the operation — terminal phase hook
+                  satisfied, beacon released (see TerminatedAt) — and is True whenever any outcome condition is
+                  and that work is done, so an observer that only needs to know the operation is over can wait
+                  on it alone.
                   Operations may have additional conditions of their own.
                   Operations may also provide additional information in the form of messages.
                 items:
@@ -213,6 +220,17 @@ spec:
                 - Preflight
                 - Save
                 - Restart
+                type: string
+              terminatedAt:
+                description: |-
+                  TerminatedAt identifies when the controller finished handling the terminal phase of the
+                  Operation: the terminal-phase lifecycle hook (if any) ran to completion and the beacon was
+                  released. It is set once and never cleared, and is only ever set on an Operation which has
+                  reached a terminal phase.
+                  An Operation which reached a terminal phase is not necessarily terminated: terminal handling
+                  may still be delegated to another controller. An Operation deleted before it is terminated is
+                  canceled, as the work it dispatched is no longer tracked by anything.
+                format: date-time
                 type: string
             type: object
         required:
