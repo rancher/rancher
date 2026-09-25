@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/data/management"
@@ -17,7 +19,239 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
+
+func TestClusterObjectNameAuthorized(t *testing.T) {
+	const annotation = "rke.cattle.io/object-authorized-for-clusters"
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		clusterName string
+		want        bool
+	}{
+		{"listed cluster", map[string]string{annotation: "alpha,beta"}, "beta", true},
+		{"whitespace around names", map[string]string{annotation: "alpha, beta "}, "beta", true},
+		{"unlisted cluster", map[string]string{annotation: "alpha,beta"}, "gamma", false},
+		{"exact name only", map[string]string{annotation: "alpha,beta"}, "bet", false},
+		{"missing annotation", nil, "alpha", false},
+		{"empty cluster name", map[string]string{annotation: "alpha"}, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: tt.annotations}}
+			assert.Equal(t, tt.want, clusterObjectNameAuthorized(secret, annotation, tt.clusterName))
+		})
+	}
+	t.Run("nil object", func(t *testing.T) {
+		var secret *corev1.Secret
+		assert.False(t, clusterObjectNameAuthorized(secret, annotation, "beta"))
+	})
+}
+
+func TestClusterObjectLabelSelectorAuthorized(t *testing.T) {
+	const annotation = capr.AuthorizedObjectSelectorAnnotation
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		labels      map[string]string
+		want        bool
+	}{
+		{"missing annotation", nil, map[string]string{"env": "dev"}, false},
+		{"empty selector matches all", map[string]string{annotation: ""}, nil, true},
+		{"matching label", map[string]string{annotation: "env=dev"}, map[string]string{"env": "dev"}, true},
+		{"different label", map[string]string{annotation: "env=dev"}, map[string]string{"env": "prod"}, false},
+		{"set selector matches", map[string]string{annotation: "env in (dev,prod)"}, map[string]string{"env": "dev"}, true},
+		{"negative selector matches", map[string]string{annotation: "!restricted"}, nil, true},
+		{"invalid selector rejected", map[string]string{annotation: "env in ("}, map[string]string{"env": "dev"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: tt.annotations}}
+			assert.Equal(t, tt.want, clusterObjectLabelSelectorAuthorized(secret, tt.labels))
+		})
+	}
+}
+
+func TestRenderFilesAuthorization(t *testing.T) {
+	for _, kind := range []struct {
+		name         string
+		fileSource   rkev1.ProvisioningFileSource
+		expectObject func(*mockPlanner, map[string]string)
+		file         plan.File
+	}{
+		{
+			name: "secret",
+			fileSource: rkev1.ProvisioningFileSource{Secret: rkev1.K8sObjectFileSource{
+				Name: "shared-secret", Items: []rkev1.KeyToPath{{Key: "file", Path: "/etc/secret"}},
+			}},
+			expectObject: func(mp *mockPlanner, annotations map[string]string) {
+				mp.secretCache.EXPECT().Get("fleet-default", "shared-secret").Return(&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+					Data:       map[string][]byte{"file": []byte("secret data")},
+				}, nil).Times(1)
+			},
+			file: plan.File{Path: "/etc/secret", Content: base64.StdEncoding.EncodeToString([]byte("secret data"))},
+		},
+		{
+			name: "configmap",
+			fileSource: rkev1.ProvisioningFileSource{ConfigMap: rkev1.K8sObjectFileSource{
+				Name: "shared-configmap", Items: []rkev1.KeyToPath{{Key: "file", Path: "/etc/configmap"}},
+			}},
+			expectObject: func(mp *mockPlanner, annotations map[string]string) {
+				mp.configMapCache.EXPECT().Get("fleet-default", "shared-configmap").Return(&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+					Data:       map[string]string{"file": "config data"},
+				}, nil).Times(1)
+			},
+			file: plan.File{Path: "/etc/configmap", Content: base64.StdEncoding.EncodeToString([]byte("config data"))},
+		},
+	} {
+		t.Run(kind.name, func(t *testing.T) {
+			tests := []struct {
+				name          string
+				annotations   map[string]string
+				clusterLabels map[string]string
+				clusterErr    error
+				clusterCalls  int
+				wantFiles     []plan.File
+				wantError     string
+			}{
+				{
+					name:        "name authorized",
+					annotations: map[string]string{capr.AuthorizedObjectAnnotation: "example"},
+					wantFiles:   []plan.File{kind.file},
+				},
+				{
+					name:          "selector authorized",
+					annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+					clusterLabels: map[string]string{"env": "dev"},
+					clusterCalls:  1,
+					wantFiles:     []plan.File{kind.file},
+				},
+				{
+					name:      "missing annotations deny access",
+					wantError: fmt.Sprintf("error rendering files: cluster fleet-default/example was not authorized to access %s fleet-default/shared-%s", kind.name, kind.name),
+				},
+				{
+					name:          "selector denies access",
+					annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+					clusterLabels: map[string]string{"env": "prod"},
+					clusterCalls:  1,
+					wantError:     fmt.Sprintf("error rendering files: cluster fleet-default/example was not authorized to access %s fleet-default/shared-%s", kind.name, kind.name),
+				},
+				{
+					name:         "cluster lookup fails",
+					annotations:  map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+					clusterErr:   fmt.Errorf("cache unavailable"),
+					clusterCalls: 1,
+					wantError:    fmt.Sprintf("error checking authorization for %s fleet-default/shared-%s: error retrieving cluster fleet-default/example while rendering files: cache unavailable", kind.name, kind.name),
+				},
+			}
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					mp := newMockPlanner(t, InfoFunctions{})
+					kind.expectObject(mp, tt.annotations)
+					mp.rancherClusterCache.EXPECT().Get("fleet-default", "example").Return(&provisioningv1.Cluster{
+						ObjectMeta: metav1.ObjectMeta{Labels: tt.clusterLabels},
+					}, tt.clusterErr).Times(tt.clusterCalls)
+					controlPlane := &rkev1.RKEControlPlane{
+						ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
+						Spec: rkev1.RKEControlPlaneSpec{ClusterConfiguration: rkev1.ClusterConfiguration{
+							MachineSelectorFiles: []rkev1.RKEProvisioningFiles{{FileSources: []rkev1.ProvisioningFileSource{kind.fileSource}}},
+						}},
+					}
+					files, err := mp.planner.renderFiles(controlPlane, &planEntry{Machine: &capi.Machine{}})
+					if tt.wantError != "" {
+						assert.EqualError(t, err, tt.wantError)
+					} else {
+						assert.NoError(t, err)
+					}
+					assert.Equal(t, tt.wantFiles, files)
+				})
+			}
+		})
+	}
+}
+
+func TestMachineSelectorFileAuthorized(t *testing.T) {
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
+	}
+
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		clusterLabels map[string]string
+		clusterErr    error
+		clusterCalls  int
+		want          bool
+		wantError     string
+	}{
+		{
+			name: "name match skips cluster lookup",
+			annotations: map[string]string{
+				capr.AuthorizedObjectAnnotation:         "example",
+				capr.AuthorizedObjectSelectorAnnotation: "env=dev",
+			},
+			want: true,
+		},
+		{name: "missing annotations skip cluster lookup"},
+		{
+			name:          "selector matches",
+			annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+			clusterLabels: map[string]string{"env": "dev"},
+			clusterCalls:  1,
+			want:          true,
+		},
+		{
+			name:          "selector does not match",
+			annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+			clusterLabels: map[string]string{"env": "prod"},
+			clusterCalls:  1,
+		},
+		{
+			name:         "cluster lookup error fails closed",
+			annotations:  map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
+			clusterErr:   fmt.Errorf("cache unavailable"),
+			clusterCalls: 1,
+			wantError:    "error retrieving cluster fleet-default/example while rendering files: cache unavailable",
+		},
+	}
+
+	for _, kind := range []struct {
+		name   string
+		object func(map[string]string) runtime.Object
+	}{
+		{"secret", func(annotations map[string]string) runtime.Object {
+			return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Annotations: annotations}}
+		}},
+		{"configmap", func(annotations map[string]string) runtime.Object {
+			return &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Annotations: annotations}}
+		}},
+	} {
+		t.Run(kind.name, func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					mp := newMockPlanner(t, InfoFunctions{})
+					mp.rancherClusterCache.EXPECT().Get("fleet-default", "example").Return(&provisioningv1.Cluster{
+						ObjectMeta: metav1.ObjectMeta{Labels: tt.clusterLabels},
+					}, tt.clusterErr).Times(tt.clusterCalls)
+					authorized, err := mp.planner.machineSelectorFileAuthorized(kind.object(tt.annotations), controlPlane)
+					if tt.wantError != "" {
+						assert.EqualError(t, err, tt.wantError)
+					} else {
+						assert.NoError(t, err)
+					}
+					assert.Equal(t, tt.want, authorized)
+				})
+			}
+		})
+	}
+}
 
 func TestPrimaryAddressFamily(t *testing.T) {
 	tests := []struct {
@@ -63,62 +297,6 @@ func TestPrimaryAddressFamily(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, primaryAddressFamily(tt.config))
-		})
-	}
-}
-
-func TestClusterObjectAuthorized(t *testing.T) {
-	tests := []struct {
-		name           string
-		obj            *corev1.Secret
-		annotation     string
-		clusterName    string
-		wantAuthorized bool
-		wantFound      bool
-	}{
-		{
-			name: "authorized cluster",
-			obj: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						capr.AuthorizedObjectAnnotation: "cluster-a,cluster-b",
-					},
-				},
-			},
-			annotation:     capr.AuthorizedObjectAnnotation,
-			clusterName:    "cluster-b",
-			wantAuthorized: true,
-			wantFound:      true,
-		},
-		{
-			name: "unauthorized cluster",
-			obj: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						capr.AuthorizedObjectAnnotation: "cluster-a",
-					},
-				},
-			},
-			annotation:     capr.AuthorizedObjectAnnotation,
-			clusterName:    "cluster-b",
-			wantAuthorized: false,
-			wantFound:      true,
-		},
-		{
-			name:           "nil object",
-			obj:            nil,
-			annotation:     capr.AuthorizedObjectAnnotation,
-			clusterName:    "cluster-b",
-			wantAuthorized: false,
-			wantFound:      false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			authorized, found := clusterObjectAuthorized(tt.obj, tt.annotation, tt.clusterName)
-			assert.Equal(t, tt.wantAuthorized, authorized)
-			assert.Equal(t, tt.wantFound, found)
 		})
 	}
 }
