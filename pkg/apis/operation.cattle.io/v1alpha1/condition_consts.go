@@ -106,6 +106,13 @@ const (
 	// be held.
 	FinalizingReason = "Finalizing"
 
+	// HookAbandonedReason surfaces when an operation finished with a lifecycle hook label still on
+	// it, because there was never going to be a beacon to hand that hook's delegate: the cluster or
+	// the beacon went away first. The hook is not waited on, since nothing would ever satisfy it,
+	// and the label is reported here instead so the abandonment is visible rather than looking like
+	// a hook that simply never fired.
+	HookAbandonedReason = "HookAbandoned"
+
 	// NotFailedReason surfaces when an operation has not failed.
 	NotFailedReason = "NotFailed"
 

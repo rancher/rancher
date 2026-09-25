@@ -278,6 +278,37 @@ func PlanHash(plan []byte) string {
 	return hex.EncodeToString(result[:])
 }
 
+// CancelPlan asks the agent to abort the plan currently assigned to secret, by setting
+// PlanCanceledAnnotation. It reports whether the annotation had to be written, and returns the
+// secret to go on using — the updated one when it wrote, the one passed in otherwise — so a caller
+// can assign it back unconditionally.
+//
+// Cancellation is terminal for the plan: clearing the annotation does not resume it, and the agent
+// will not act again until new plan content is assigned. It is also idempotent here, so a caller
+// which cannot tell whether a previous attempt landed can simply call it again.
+func (s *Store) CancelPlan(secret *corev1.Secret) (bool, *corev1.Secret, error) {
+	if secret == nil {
+		return false, nil, nil
+	}
+
+	if secret.Annotations[PlanCanceledAnnotation] == "true" {
+		return false, secret, nil
+	}
+
+	updated := secret.DeepCopy()
+	if updated.Annotations == nil {
+		updated.Annotations = map[string]string{}
+	}
+	updated.Annotations[PlanCanceledAnnotation] = "true"
+
+	updated, err := s.secrets.Update(updated)
+	if err != nil {
+		return false, secret, err
+	}
+
+	return true, updated, nil
+}
+
 // AssignPlan assigns the plan to the secret.
 // Returns a PlanStatus indicating the current state of the plan.
 // This function is based off the CAPR assignAndCheckPlan function and will supersede it in the future once its CAPI dependency is unraveled.
@@ -299,13 +330,14 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 		Secret: secret,
 	}
 
-	if !bytes.Equal(secret.Data["plan"], data) {
+	if !bytes.Equal(secret.Data[PlanDataKey], data) {
 		result.Pending = true
 		delete(secret.Data, "probe-statuses")
 		secret.Annotations[PlanLastUpdatedAnnotation] = time.Now().UTC().Format(time.RFC3339)
 		secret.Annotations[PlanProbesPassedAnnotation] = ""
+		delete(secret.Annotations, PlanCanceledAnnotation)
 
-		secret.Data["plan"] = data
+		secret.Data[PlanDataKey] = data
 		if maxFailures > 0 || maxFailures == -1 {
 			secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))
 		} else {
@@ -339,7 +371,7 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 		}
 	}
 
-	planData := secret.Data["plan"]
+	planData := secret.Data[PlanDataKey]
 	failedChecksum := string(secret.Data["failed-checksum"])
 	failureCount := secret.Data["failure-count"]
 
