@@ -180,6 +180,44 @@ func TestSyncHarvesterToken(t *testing.T) {
 			},
 		},
 		{
+			name: "success with nil secret annotations",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "cattle-global-data",
+					Name:      "test",
+				},
+				Data: map[string][]byte{
+					"harvestercredentialConfig-kubeconfigContent": []byte("users:\n- user:\n    token: kubeconfig-u-test:abcdef"),
+				},
+			},
+			expected: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "cattle-global-data",
+					Name:      "test",
+					Annotations: map[string]string{
+						"management.cattle.io/harvester-token-checksum": "380a5176e6ba7262e104bfbcf4b2617b4125d0eedfa2df8d5c16f54ffbc46dd6",
+					},
+					Finalizers: []string{"management.cattle.io/harvester-token-cleanup"},
+				},
+				Data: map[string][]byte{
+					"harvestercredentialConfig-kubeconfigContent": []byte("users:\n- user:\n    token: kubeconfig-u-test:abcdef"),
+				},
+			},
+			token: &v3.Token{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "kubeconfig-u-test",
+				},
+				Token:     "test-token",
+				TTLMillis: 1000,
+			},
+			before: func(tt *test) {
+				tt._tokens.EXPECT().Get("kubeconfig-u-test", metav1.GetOptions{}).Return(tt.token, nil).Times(1)
+				tt._secrets.EXPECT().Update(gomock.AssignableToTypeOf(&corev1.Secret{})).DoAndReturn(func(obj *corev1.Secret) (*corev1.Secret, error) {
+					return obj, nil
+				}).Times(2)
+			},
+		},
+		{
 			name: "success",
 			secret: &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
