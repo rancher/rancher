@@ -29,7 +29,7 @@ updatecli/
 ├── README.md
 ├── scripts                                # For auxiliary scripts if needed
 ├── updatecli.d                            # For the update related workflows
-│   ├── update-k3s                          # Each workflow should have its own subdirectory
+│   ├── update-machine                      # Each workflow should have its own subdirectory
 │   └── update-versions-config-yaml        # Another workflow in its own directory
 └── values.d                               # For variable related configuration files
     ├── values.yaml                        # Configuration values
