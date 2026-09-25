@@ -25,13 +25,13 @@ replace (
 	k8s.io/component-base => k8s.io/component-base v0.36.4
 	k8s.io/component-helpers => k8s.io/component-helpers v0.36.4
 	k8s.io/controller-manager => k8s.io/controller-manager v0.36.4
-	k8s.io/cri-api => k8s.io/cri-api v0.36.4
+	k8s.io/cri-api => k8s.io/cri-api v0.36.5
 	k8s.io/cri-client => k8s.io/cri-client v0.36.4
 	k8s.io/cri-streaming => k8s.io/cri-streaming v0.36.4
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.36.4
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.36.4
 	k8s.io/endpointslice => k8s.io/endpointslice v0.36.4
-	k8s.io/externaljwt => k8s.io/externaljwt v0.36.4
+	k8s.io/externaljwt => k8s.io/externaljwt v0.36.5
 	k8s.io/kms => k8s.io/kms v0.36.4
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.36.4
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.36.4
@@ -42,7 +42,7 @@ replace (
 	k8s.io/kubernetes => k8s.io/kubernetes v1.36.4
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.36.1
 	k8s.io/metrics => k8s.io/metrics v0.36.4
-	k8s.io/mount-utils => k8s.io/mount-utils v0.36.4
+	k8s.io/mount-utils => k8s.io/mount-utils v0.36.5
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.36.4
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.36.4
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
@@ -293,7 +293,7 @@ require (
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/kms v0.36.4 // indirect
-	k8s.io/streaming v0.36.4 // indirect
+	k8s.io/streaming v0.36.5 // indirect
 	modernc.org/libc v1.72.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
