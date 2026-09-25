@@ -179,7 +179,8 @@ scopes:
       - '^pkg/controllers/capr/etcdmgmt/'             # also imported
       - '^pkg/controllers/capr/machinedrain/'         # also basic
       - '^pkg/rkecerts/'
-      - '^pkg/operations/'
+      - '^pkg/controllers/operations/'                # also imported
+      - '^pkg/operations/'                            # also imported
       - '^tests/v2prov/tests/custom/'                 # also basic
       - '^tests/v2prov/tests/machineprovisioning/'    # also basic
     file-paths:
@@ -195,6 +196,8 @@ scopes:
       - '^pkg/controllers/capr/unmanaged/'
       - '^pkg/controllers/capr/bootstraptoken/'       # also basic
       - '^pkg/controllers/capr/etcdmgmt/'             # also operations
+      - '^pkg/controllers/operations/'                # also operations
+      - '^pkg/operations/'                            # also imported
       - '^pkg/capr/configserver/'                     # also basic
       - '^tests/v2prov/tests/imported/'
     file-paths:
@@ -229,6 +232,7 @@ full:
       - 'sigs.k8s.io/'
   - '^pkg/controllers/capr/controllers.go'
   - '^pkg/controllers/provisioningv2/controllers.go'
+  - '^pkg/capr/common.go'
   - '^pkg/capr/planner/'
   - '^pkg/plan/'
   - '^pkg/controllers/capr/planner/'
