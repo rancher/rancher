@@ -9,8 +9,8 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/tests/v2/integration/defaults"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/deployments"
+	"github.com/rancher/rancher/tests/v2/integration/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/clients/rancher/catalog"
 	stevev1 "github.com/rancher/shepherd/clients/rancher/v1"
