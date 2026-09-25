@@ -227,7 +227,8 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_UpdateExistingHelmOp()
 
 func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 	cluster := s.createTestCluster("test-cluster", "default")
-	repository := s.h.getChartRepository(cluster)
+	repository, err := s.h.getChartRepository(cluster)
+	s.Require().NoError(err)
 
 	existingHelmOp := &fleet.HelmOp{
 		ObjectMeta: metav1.ObjectMeta{
@@ -283,7 +284,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", existingHelmOp, nil)
 	s.helmOp.EXPECT().Update(gomock.Any()).Times(0)
 
-	err := s.h.ensureFleetHelmOp(cluster, "v1", 3)
+	err = s.h.ensureFleetHelmOp(cluster, "v1", 3)
 	s.NoError(err)
 }
 
@@ -844,8 +845,10 @@ func (s *autoscalerSuite) TestGetChartRepository_ExplicitSettingIsPreserved() {
 	s.withSettings(map[settings.Setting]string{
 		settings.ClusterAutoscalerChartRepository: "oci://registry.rancher.io/rancher/cluster-autoscaler",
 	})
-	s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", s.h.getChartRepository(cluster))
-	s.Empty(getChartName(s.h.getChartRepository(cluster)))
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("oci://registry.rancher.io/rancher/cluster-autoscaler", repository)
+	s.Empty(getChartName(repository))
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_ExplicitHTTPSSettingIsPreserved() {
@@ -853,8 +856,10 @@ func (s *autoscalerSuite) TestGetChartRepository_ExplicitHTTPSSettingIsPreserved
 	s.withSettings(map[settings.Setting]string{
 		settings.ClusterAutoscalerChartRepository: "https://charts.example.com",
 	})
-	s.Equal("https://charts.example.com", s.h.getChartRepository(cluster))
-	s.Equal("cluster-autoscaler", getChartName(s.h.getChartRepository(cluster)))
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("https://charts.example.com", repository)
+	s.Equal("cluster-autoscaler", getChartName(repository))
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_ReturnsEmptyWithoutPrivateRegistry() {
@@ -864,9 +869,9 @@ func (s *autoscalerSuite) TestGetChartRepository_ReturnsEmptyWithoutPrivateRegis
 		settings.SystemDefaultRegistry:            "",
 	})
 
-	repository := s.h.getChartRepository(cluster)
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
 	s.Empty(repository)
-	s.Equal("cluster-autoscaler", getChartName(repository))
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_ClusterRegistryTakesPrecedence() {
@@ -902,7 +907,9 @@ func (s *autoscalerSuite) TestGetChartRepository_ClusterRegistryTakesPrecedence(
 		settings.ClusterAutoscalerChartRepository: "",
 		settings.SystemDefaultRegistry:            "global-registry.local",
 	})
-	s.Equal("oci://cluster-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", s.h.getChartRepository(cluster))
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("oci://cluster-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", repository)
 }
 
 func (s *autoscalerSuite) TestGetChartRepository_FallsBackToGlobalRegistry() {
@@ -932,5 +939,7 @@ func (s *autoscalerSuite) TestGetChartRepository_FallsBackToGlobalRegistry() {
 		settings.ClusterAutoscalerChartRepository: "",
 		settings.SystemDefaultRegistry:            "fallback-registry.local",
 	})
-	s.Equal("oci://fallback-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", s.h.getChartRepository(cluster))
+	repository, err := s.h.getChartRepository(cluster)
+	s.NoError(err)
+	s.Equal("oci://fallback-registry.local/rancher/charts/appco-kubernetes-cluster-autoscaler", repository)
 }

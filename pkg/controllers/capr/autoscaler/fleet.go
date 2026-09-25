@@ -58,7 +58,10 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 	if err != nil {
 		return err
 	}
-	repository := h.getChartRepository(cluster)
+	repository, err := h.getChartRepository(cluster)
+	if err != nil {
+		return err
+	}
 
 	bundle := fleet.HelmOpSpec{
 		BundleSpec: fleet.BundleSpec{
@@ -176,6 +179,7 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster, pullSec
 
 	var autoscalerImage string
 
+	// this is an override - if the setting is set we're going to use that image for _all_ autoscaler instances.
 	autoscalerOverrideImage := settings.ClusterAutoscalerImage.Get()
 	// if the setting _isn't_ set, we resolve the image based on the provisioning cluster's registry configuration
 	if autoscalerOverrideImage == "" {
@@ -237,10 +241,11 @@ func getChartName(repository string) string {
 // getChartRepository returns the chart repository URL to use for the Fleet HelmOp.
 // An explicit chart repository setting is preserved. Otherwise the default autoscaler
 // image is resolved against the cluster registry and represented as an OCI URL.
-func (h *autoscalerHandler) getChartRepository(cluster *capi.Cluster) string {
+func (h *autoscalerHandler) getChartRepository(cluster *capi.Cluster) (string, error) {
+	// this is effectively an override, if the setting is set we'll use that autoscaler chart for _all_ of the managed autoscalers.
 	repo := settings.ClusterAutoscalerChartRepository.Get()
 	if repo != "" {
-		return repo
+		return repo, nil
 	}
 
 	var provCluster *provv1.Cluster
@@ -249,7 +254,7 @@ func (h *autoscalerHandler) getChartRepository(cluster *capi.Cluster) string {
 		provCluster, err = capr.GetProvisioningClusterFromCAPICluster(cluster, h.clusterCache)
 		if err != nil {
 			logrus.Debugf("[autoscaler] failed to find provisioning cluster for autoscaler repository: %v", err)
-			return ""
+			return "", err
 		}
 	}
 
@@ -257,10 +262,10 @@ func (h *autoscalerHandler) getChartRepository(cluster *capi.Cluster) string {
 	registry, _ := provimage.GetPrivateRepoURLFromCluster(provCluster)
 	if registry == "" {
 		logrus.Warnf("[autoscaler] no available private registry found for cluster %s/%s - unable to resolve chart repository for cluster-autoscaler", cluster.Namespace, cluster.Name)
-		return ""
+		return "", nil
 	}
 
-	return "oci://" + provimage.ResolveWithCluster("rancher/charts/appco-kubernetes-cluster-autoscaler", provCluster)
+	return "oci://" + provimage.ResolveWithCluster("rancher/charts/appco-kubernetes-cluster-autoscaler", provCluster), nil
 }
 
 // getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object

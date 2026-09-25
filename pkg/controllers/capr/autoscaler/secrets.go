@@ -26,7 +26,11 @@ func (h *autoscalerHandler) manageHelmOpSecrets(capiCluster *capi.Cluster) (helm
 	// (TLS, mirrors), but does not cover the registry used for the autoscaler chart/image.
 	// In this case, the global credentials should be used. When the cluster _does_ have valid
 	// credentials for the chart host, the cluster-scoped secrets are used.
-	chartHost := chartRepositoryHost(h.getChartRepository(capiCluster))
+	repository, err := h.getChartRepository(capiCluster)
+	if err != nil {
+		return "", "", err
+	}
+	chartHost := chartRepositoryHost(repository)
 	if image.GetRegistryAuthSecretForHostname(provCluster, chartHost) != "" {
 		username, password, err := h.findClusterLevelAutoScalerHostnameCreds(provCluster, chartHost)
 		if err != nil && !errors.Is(err, cluster.ErrRegistryHostnameNotFound) {
