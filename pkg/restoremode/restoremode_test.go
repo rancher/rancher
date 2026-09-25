@@ -339,6 +339,49 @@ func TestResources(t *testing.T) {
 		assert.Empty(t, resources)
 	})
 
+	// Numeric fields are the reason this assertion exists rather than a plain value comparison: an
+	// integral number arriving as a float64 still writes onto the restore target, so the only
+	// visible symptom is that the field never compares equal to the int64 the live object holds,
+	// applyRestoreMode reports "applied" forever and the restore-mode step never converges.
+	t.Run("integral numbers decode as int64 and fractional ones as float64", func(t *testing.T) {
+		t.Parallel()
+
+		resources, err := Resources(map[string]string{
+			rkev1.SnapshotMetadataResourcesKey: compress(t, map[string]any{
+				rkev1.SnapshotResourceProvCluster: map[string]any{
+					"spec": map[string]any{
+						"rkeConfig": map[string]any{
+							"upgradeStrategy": map[string]any{
+								"controlPlaneDrainOptions": map[string]any{
+									"timeout":     30,
+									"gracePeriod": -1,
+								},
+							},
+						},
+						"clusterAgentDeploymentCustomization": map[string]any{
+							"appendTolerations": []any{
+								map[string]any{"key": "node-role", "tolerationSeconds": 300},
+							},
+						},
+						"fraction": 1.5,
+					},
+				},
+			}),
+		})
+		require.NoError(t, err)
+
+		spec := resources[rkev1.SnapshotResourceProvCluster].(map[string]any)["spec"].(map[string]any)
+		drain := spec["rkeConfig"].(map[string]any)["upgradeStrategy"].(map[string]any)["controlPlaneDrainOptions"].(map[string]any)
+		assert.Equal(t, int64(30), drain["timeout"])
+		assert.Equal(t, int64(-1), drain["gracePeriod"])
+
+		// Slice elements go through a separate conversion path than map values do.
+		toleration := spec["clusterAgentDeploymentCustomization"].(map[string]any)["appendTolerations"].([]any)[0].(map[string]any)
+		assert.Equal(t, int64(300), toleration["tolerationSeconds"])
+
+		assert.Equal(t, 1.5, spec["fraction"])
+	})
+
 	t.Run("errors on a corrupt payload", func(t *testing.T) {
 		t.Parallel()
 

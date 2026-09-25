@@ -971,6 +971,12 @@ func (h *handler) resolveRestoreMode(s *scope, mode string) ([]restoremode.Match
 
 // applyRestoreMode writes matches onto the live objects their resource keys address, returning
 // whether anything was updated. A non-empty reason means the operation cannot proceed.
+//
+// Reporting "nothing was updated" is what lets the restore-mode step finish, so the comparisons
+// below have to be able to see a field that already holds its restored value. That relies on both
+// sides using the same Go types for the same JSON: the live object supplies int64 for integral
+// numbers and restoremode.Match carries them the same way, because snapshotutil.DecompressInterface
+// decodes the snapshot payload with the unstructured number convention.
 func (h *handler) applyRestoreMode(s *scope, matches []restoremode.Match) (bool, string, error) {
 	byResource := map[string][]restoremode.Match{}
 	for _, m := range matches {

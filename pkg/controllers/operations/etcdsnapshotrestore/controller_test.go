@@ -12,6 +12,7 @@ import (
 	"time"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	rkeplan "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -25,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -892,6 +894,59 @@ func provClusterTarget() *unstructured.Unstructured {
 	}}
 }
 
+// provClusterWithDrainTimeout renders a v2prov cluster whose control-plane drain timeout is the
+// given value. It goes through ToUnstructured because both sides of a restore do: CAPRAdapter
+// renders the restore target that way, and snapshotextrametadata publishes the captured cluster
+// that way too (see its sanitize). So the captured and live subtrees have the same shape, and the
+// Go types their numbers carry are the only thing that can disagree.
+func provClusterWithDrainTimeout(t *testing.T, timeout int) *unstructured.Unstructured {
+	t.Helper()
+
+	cluster := &provv1.Cluster{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "provisioning.cattle.io/v1", Kind: "Cluster"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "fleet-default"},
+		Spec: provv1.ClusterSpec{
+			KubernetesVersion: "v1.34.1+rke2r1",
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rkev1.ClusterConfiguration{
+					UpgradeStrategy: rkev1.ClusterUpgradeStrategy{
+						ControlPlaneDrainOptions: rkev1.DrainOptions{Enabled: true, Timeout: timeout},
+					},
+				},
+			},
+		},
+	}
+
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		t.Fatalf("rendering the cluster: %v", err)
+	}
+
+	return &unstructured.Unstructured{Object: obj}
+}
+
+// roundTripProvCluster models what happens to a restore target between two reconciles: CAPRAdapter
+// decodes the object it was handed into a provv1.Cluster to update it, and the next RestoreTarget
+// call renders the stored object back with ToUnstructured. That round trip is what settles a field
+// on the type the unstructured convention gives it, so a test asserting convergence has to go
+// through it rather than reusing the in-memory copy the write was built from. It also fails loudly
+// on a value the typed object cannot hold.
+func roundTripProvCluster(t *testing.T, obj *unstructured.Unstructured) *unstructured.Unstructured {
+	t.Helper()
+
+	cluster := &provv1.Cluster{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+		t.Fatalf("decoding the updated cluster: %v", err)
+	}
+
+	stored, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		t.Fatalf("rendering the stored cluster: %v", err)
+	}
+
+	return &unstructured.Unstructured{Object: stored}
+}
+
 // snapshotWithModes builds an upstream snapshot carrying an extra-metadata payload: resources plus a
 // restoreModes map, encoded the way snapshotextrametadata and snapshotbackpopulate do.
 func snapshotWithModes(t *testing.T, modes map[string]string, resources map[string]any, availableModes string) *rkev1.ETCDSnapshot {
@@ -1206,6 +1261,75 @@ func TestApplyRestoreMode(t *testing.T) {
 		}
 	})
 
+	// A writable path is matched whole, so a subtree like upgradeStrategy is restored as one value
+	// and every number inside it takes part in the comparison. Those only converge if the captured
+	// numbers and the live ones agree on their Go type, which is why this case goes through
+	// resolveRestoreMode rather than a hand-built Match: the captured value has to come out of a
+	// real snapshot payload, which is where the type is decided. A payload decoded as float64 still
+	// writes onto the target, so nothing looks wrong until the second pass keeps reporting
+	// "applied" and the restore-mode step never advances.
+	t.Run("a numeric field converges on the pass after it is written", func(t *testing.T) {
+		upgradeStrategyPath := []string{"spec", "rkeConfig", "upgradeStrategy"}
+		timeoutPath := append(append([]string{}, upgradeStrategyPath...), "controlPlaneDrainOptions", "timeout")
+
+		snapshot := snapshotWithModes(t, map[string]string{
+			rkev1.RestoreRKEConfigAll: restoremode.Match{ResourceKey: rkev1.SnapshotResourceProvCluster, Path: upgradeStrategyPath}.String(),
+		}, map[string]any{
+			rkev1.SnapshotResourceProvCluster: provClusterWithDrainTimeout(t, 30).Object,
+		}, "none,"+rkev1.RestoreRKEConfigAll)
+
+		h := &handler{etcdsnapshots: &stubSnapshotClient{snapshot: snapshot}}
+		matches, reason, err := h.resolveRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, defaultAdapter()), rkev1.RestoreRKEConfigAll)
+		if err != nil || reason != "" {
+			t.Fatalf("err = %v, reason = %s", err, reason)
+		}
+		if len(matches) != 1 {
+			t.Fatalf("expected 1 match, got %d: %v", len(matches), matches)
+		}
+
+		// The cluster currently drains with a different timeout.
+		target := provClusterWithDrainTimeout(t, 60)
+
+		adapter := defaultAdapter()
+		adapter.restoreTargets = map[string]*unstructured.Unstructured{rkev1.SnapshotResourceProvCluster: target}
+
+		applied, reason, err := h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, adapter), matches)
+		if err != nil || reason != "" {
+			t.Fatalf("first pass: err = %v, reason = %s", err, reason)
+		}
+		if !applied {
+			t.Fatal("first pass: expected the captured timeout to be applied")
+		}
+		if len(adapter.updatedTargets) != 1 {
+			t.Fatalf("first pass: expected 1 update, got %d", len(adapter.updatedTargets))
+		}
+
+		// The next reconcile reads the object back after it was persisted, not the in-memory copy
+		// the write was built from.
+		persisted := roundTripProvCluster(t, adapter.updatedTargets[0])
+		got, found, err := unstructured.NestedInt64(persisted.Object, timeoutPath...)
+		if err != nil || !found {
+			t.Fatalf("timeout not persisted as an integer: found=%v err=%v", found, err)
+		}
+		if got != 30 {
+			t.Errorf("timeout = %d, want the captured value", got)
+		}
+
+		next := defaultAdapter()
+		next.restoreTargets = map[string]*unstructured.Unstructured{rkev1.SnapshotResourceProvCluster: persisted}
+
+		applied, reason, err = h.applyRestoreMode(resolveScope(rkev1.RestoreRKEConfigAll, next), matches)
+		if err != nil || reason != "" {
+			t.Fatalf("second pass: err = %v, reason = %s", err, reason)
+		}
+		if applied {
+			t.Error("second pass: expected the step to converge once the timeout already holds the captured value")
+		}
+		if len(next.updatedTargets) != 0 {
+			t.Errorf("second pass: expected 0 updates, got %d", len(next.updatedTargets))
+		}
+	})
+
 	t.Run("a cluster with no counterpart for the resource key is rejected", func(t *testing.T) {
 		// An imported cluster: ImportedAdapter.RestoreTarget always returns (nil, nil), because
 		// nothing upstream holds a configuration to restore.
@@ -1394,7 +1518,7 @@ func TestReconcileRestoreClusterConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("cancels when the mode cannot be resolved", func(t *testing.T) {
+	t.Run("fails when the mode cannot be resolved", func(t *testing.T) {
 		adapter := defaultAdapter()
 		h := &handler{etcdsnapshots: &stubSnapshotClient{notFound: true}}
 		s := resolveScope(rkev1.RestoreRKEConfigAll, adapter)
@@ -1405,12 +1529,12 @@ func TestReconcileRestoreClusterConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if status.Phase != opv1alpha1.OperationPhaseCanceled {
-			t.Errorf("phase = %q, want Canceled", status.Phase)
+		if status.Phase != opv1alpha1.OperationPhaseFailed {
+			t.Errorf("phase = %q, want Failed", status.Phase)
 		}
 	})
 
-	t.Run("cancels rather than silently restoring nothing", func(t *testing.T) {
+	t.Run("failed rather than silently restoring nothing", func(t *testing.T) {
 		// The mode resolves, but this cluster type has no object to write it to. Degrading to a
 		// plain etcd restore would give the user something they did not ask for.
 		adapter := defaultAdapter()
@@ -1427,8 +1551,8 @@ func TestReconcileRestoreClusterConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if status.Phase != opv1alpha1.OperationPhaseCanceled {
-			t.Errorf("phase = %q, want Canceled", status.Phase)
+		if status.Phase != opv1alpha1.OperationPhaseFailed {
+			t.Errorf("phase = %q, want Failed", status.Phase)
 		}
 	})
 

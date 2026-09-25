@@ -87,6 +87,10 @@ var WritablePaths = map[string][][]string{
 
 // Resources decompresses the resources payload out of a snapshot's metadata. A snapshot with no
 // resources key yields an empty map rather than an error: it predates the extra metadata ConfigMap.
+//
+// Numbers in the returned tree follow the Kubernetes unstructured convention — int64 when integral,
+// float64 otherwise — so the values Matches carry can be compared against, and written into, an
+// unstructured object without a type mismatch.
 func Resources(metadata map[string]string) (map[string]any, error) {
 	resources := map[string]any{}
 

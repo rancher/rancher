@@ -11,6 +11,7 @@ import (
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 const (
@@ -39,6 +40,14 @@ func CompressInterface(v interface{}) (string, error) {
 }
 
 // DecompressInterface is a function that will base64 decode, ungzip, and unmarshal a string into the provided interface.
+//
+// Decoding follows the Kubernetes unstructured convention rather than encoding/json's: a JSON
+// number landing in an interface{} becomes an int64 when it is integral and a float64 otherwise,
+// matching what runtime.DefaultUnstructuredConverter.ToUnstructured produces. Callers that decode
+// into a map[string]any and then compare against — or write into — an unstructured object depend on
+// this; with encoding/json every number would arrive as a float64 and never compare equal to the
+// int64 on the unstructured side. Object keys are matched case-sensitively as a consequence, which
+// is safe for payloads CompressInterface produced from the same Go types.
 func DecompressInterface(inputb64 string, v any) error {
 	if inputb64 == "" {
 		return fmt.Errorf("base64 input is empty")
@@ -60,7 +69,7 @@ func DecompressInterface(inputb64 string, v any) error {
 		return fmt.Errorf("gzip read failed: %w", err)
 	}
 
-	if err := json.Unmarshal(csBytes, v); err != nil {
+	if err := kjson.Unmarshal(csBytes, v); err != nil {
 		return fmt.Errorf("JSON unmarshal failed: %w", err)
 	}
 	return nil
