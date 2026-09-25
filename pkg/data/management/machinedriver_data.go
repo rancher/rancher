@@ -9,6 +9,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	"github.com/rancher/rancher/pkg/data/management/driverdata"
 	"github.com/rancher/rancher/pkg/features"
 	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -18,123 +19,30 @@ import (
 )
 
 const (
-	AlibabaDriver      = "aliyunecs"
-	Amazonec2driver    = "amazonec2"
-	Azuredriver        = "azure"
-	DigitalOceandriver = "digitalocean"
-	ExoscaleDriver     = "exoscale"
-	HarvesterDriver    = "harvester"
-	Linodedriver       = "linode"
-	NutanixDriver      = "nutanix"
-	OCIDriver          = "oci"
-	OTCDriver          = "otc"
-	OpenstackDriver    = "openstack"
-	PacketDriver       = "packet"
-	PhoenixNAPDriver   = "pnap"
-	PodDriver          = "pod"
-	RackspaceDriver    = "rackspace"
-	SoftLayerDriver    = "softlayer"
-	Vmwaredriver       = "vmwarevsphere"
-	GoogleDriver       = "google"
-	OutscaleDriver     = "outscale"
+	AlibabaDriver      = driverdata.AlibabaDriver
+	Amazonec2driver    = driverdata.Amazonec2driver
+	Azuredriver        = driverdata.Azuredriver
+	DigitalOceandriver = driverdata.DigitalOceandriver
+	ExoscaleDriver     = driverdata.ExoscaleDriver
+	HarvesterDriver    = driverdata.HarvesterDriver
+	Linodedriver       = driverdata.Linodedriver
+	NutanixDriver      = driverdata.NutanixDriver
+	OCIDriver          = driverdata.OCIDriver
+	OTCDriver          = driverdata.OTCDriver
+	OpenstackDriver    = driverdata.OpenstackDriver
+	PacketDriver       = driverdata.PacketDriver
+	PhoenixNAPDriver   = driverdata.PhoenixNAPDriver
+	PodDriver          = driverdata.PodDriver
+	RackspaceDriver    = driverdata.RackspaceDriver
+	SoftLayerDriver    = driverdata.SoftLayerDriver
+	Vmwaredriver       = driverdata.Vmwaredriver
+	GoogleDriver       = driverdata.GoogleDriver
+	OutscaleDriver     = driverdata.OutscaleDriver
 )
 
-// DriverDataConfig contains driver‑specific metadata that is parsed as
-// annotations on the corresponding NodeDriver object.
-// FileToFieldAliases field maps `Schema field => driver field`
-type DriverDataConfig struct {
-	FileToFieldAliases       map[string]string
-	PublicCredentialFields   []string
-	PrivateCredentialFields  []string
-	PasswordFields           []string
-	OptionalCredentialFields []string
-	Defaults                 map[string]string
-}
+type DriverDataConfig = driverdata.DriverDataConfig
 
-var DriverData = map[string]DriverDataConfig{
-	AlibabaDriver: {
-		FileToFieldAliases: map[string]string{"sshKeyContents": "sshKeypath"},
-	},
-	Amazonec2driver: {
-		FileToFieldAliases:      map[string]string{"sshKeyContents": "sshKeypath", "userdata": "userdata"},
-		PublicCredentialFields:  []string{"accessKey"},
-		PrivateCredentialFields: []string{"secretKey"},
-	},
-	Azuredriver: {
-		FileToFieldAliases:       map[string]string{"customData": "customData"},
-		PublicCredentialFields:   []string{"clientId", "subscriptionId", "tenantId", "environment"},
-		PrivateCredentialFields:  []string{"clientSecret"},
-		OptionalCredentialFields: []string{"tenantId"},
-	},
-	DigitalOceandriver: {
-		FileToFieldAliases:      map[string]string{"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
-		PrivateCredentialFields: []string{"accessToken"},
-	},
-	ExoscaleDriver: {
-		FileToFieldAliases:      map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-		PublicCredentialFields:  []string{"apiKey"},
-		PrivateCredentialFields: []string{"apiSecretKey"},
-	},
-	HarvesterDriver: {
-		PublicCredentialFields:   []string{"clusterType", "clusterId"},
-		PrivateCredentialFields:  []string{"kubeconfigContent"},
-		OptionalCredentialFields: []string{"clusterId"},
-		Defaults:                 map[string]string{"clusterType": "imported"},
-	},
-	Linodedriver: {
-		PrivateCredentialFields: []string{"token"},
-		PasswordFields:          []string{"rootPass"},
-	},
-	NutanixDriver: {
-		PublicCredentialFields:  []string{"endpoint", "username", "port"},
-		PrivateCredentialFields: []string{"password"},
-	},
-	OCIDriver: {
-		PublicCredentialFields:  []string{"tenancyId", "userId", "fingerprint"},
-		PrivateCredentialFields: []string{"privateKeyContents"},
-		PasswordFields:          []string{"privateKeyPassphrase"},
-	},
-	OTCDriver: {
-		FileToFieldAliases:      map[string]string{"privateKeyFile": "privateKeyFile"},
-		PublicCredentialFields:  []string{"accessKey", "username"},
-		PrivateCredentialFields: []string{"secretKey", "password", "token"},
-	},
-	OpenstackDriver: {
-		FileToFieldAliases:      map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-		PrivateCredentialFields: []string{"password"},
-	},
-	PacketDriver: {
-		FileToFieldAliases:      map[string]string{"userdata": "userdata"},
-		PrivateCredentialFields: []string{"apiKey"},
-	},
-	PhoenixNAPDriver: {
-		PublicCredentialFields:  []string{"clientIdentifier"},
-		PrivateCredentialFields: []string{"clientSecret"},
-	},
-	PodDriver: {
-		FileToFieldAliases: map[string]string{"userdata": "userdata"},
-	},
-	RackspaceDriver: {
-		PrivateCredentialFields: []string{"apiKey"},
-	},
-	SoftLayerDriver: {
-		PrivateCredentialFields: []string{"apiKey"},
-	},
-	Vmwaredriver: {
-		FileToFieldAliases:      map[string]string{"cloudConfig": "cloud-config"},
-		PublicCredentialFields:  []string{"username", "vcenter", "vcenterPort"},
-		PrivateCredentialFields: []string{"password"},
-		Defaults:                map[string]string{"vcenterPort": "443"},
-	},
-	GoogleDriver: {
-		FileToFieldAliases:      map[string]string{"authEncodedJson": "authEncodedJson", "userdata": "userdata"},
-		PrivateCredentialFields: []string{"authEncodedJson"},
-	},
-	OutscaleDriver: {
-		PublicCredentialFields:  []string{"accessKey", "region"},
-		PrivateCredentialFields: []string{"secretKey"},
-	},
-}
+var DriverData = driverdata.DriverData
 
 func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(Amazonec2driver, "local://", "", "",

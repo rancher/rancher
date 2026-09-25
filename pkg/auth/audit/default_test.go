@@ -8,25 +8,25 @@ import (
 	"testing"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/data/management"
+	"github.com/rancher/rancher/pkg/data/management/driverdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultPolicies(t *testing.T) {
 	machineDataInput, machineDataWant := make(map[string]interface{}), make(map[string]interface{})
-	for driverName, fields := range management.DriverData {
+	for driverName, fields := range driverdata.DriverData {
 		inputFields := make(map[string]string)
 		wantFields := make(map[string]string)
 
 		for _, item := range fields.PublicCredentialFields {
 			inputFields[item] = "fake_" + item
 
-			// This exception is needed because the management.ExoscaleDriver config has the 'apiKey' set to Public, contrary to the other drivers that set it to Private.
+			// This exception is needed because the driverdata.ExoscaleDriver config has the 'apiKey' set to Public, contrary to the other drivers that set it to Private.
 			// With the way the auditLog currently works, it will simply redact *all apiKeys* if at least one of them is set to private.
 			// A more granular policy will be implemented in the future to better handle this scenario and have the AuditLog *not* redact the apiKey for the
 			// Exoscale driver. For now, however, the if condition will guarantee the tests can handle this edge case without failing.
-			if driverName == management.ExoscaleDriver {
+			if driverName == driverdata.ExoscaleDriver {
 				wantFields[item] = redacted
 			} else {
 				wantFields[item] = "fake_" + item
@@ -515,6 +515,14 @@ func TestDefaultPolicies(t *testing.T) {
 			ExpectedHeaders: http.Header{"Content-Type": {contentTypeJSON}, "Referrer": {"/v3/import/redactMe.yaml"}},
 			Body:            []byte(`{"normalField": "some data", "manifestUrl": "https://localhost:8443/v3/import/abcd.yaml", "insecureWindowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "command": "curl https://localhost:8443/v3/import/abcd.yaml", "windowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml"}`),
 			ExpectedBody:    []byte(fmt.Sprintf(`{"normalField": "some data", "manifestUrl": "%s", "insecureWindowsNodeCommand": "%[1]s", "insecureNodeCommand": "%[1]s", "insecureCommand": "%[1]s", "command": "%[1]s", "windowsNodeCommand": "%[1]s"}`, redacted)),
+		},
+		{
+			// The generated driver cases read the same data as the redaction code,
+			// so they can't catch a field dropped from it. These names are fixed.
+			Name:         "With node driver and KEv2 operator credential fields",
+			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
+			Body:         []byte(`{"normalField": "some data", "secretKey": "fake", "clientSecret": "fake", "apiSecretKey": "fake", "privateKeyContents": "fake", "privateKeyPassphrase": "fake", "rootPass": "fake", "apiKey": "fake", "authEncodedJson": "fake", "accessKeySecret": "fake"}`),
+			ExpectedBody: []byte(fmt.Sprintf(`{"normalField": "some data", "secretKey": "%s", "clientSecret": "%[1]s", "apiSecretKey": "%[1]s", "privateKeyContents": "%[1]s", "privateKeyPassphrase": "%[1]s", "rootPass": "%[1]s", "apiKey": "%[1]s", "authEncodedJson": "%[1]s", "accessKeySecret": "%[1]s"}`, redacted)),
 		},
 	}
 

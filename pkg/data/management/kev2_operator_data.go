@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/rancher/rancher/pkg/data/management/driverdata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -13,10 +14,10 @@ import (
 )
 
 const (
-	EKSOperator     = "eks"
-	GKEOperator     = "gke"
-	AKSOperator     = "aks"
-	AlibabaOperator = "alibaba"
+	EKSOperator     = driverdata.EKSOperator
+	GKEOperator     = driverdata.GKEOperator
+	AKSOperator     = driverdata.AKSOperator
+	AlibabaOperator = driverdata.AlibabaOperator
 )
 
 var Kev2ToKontainerDriver = map[string]string{

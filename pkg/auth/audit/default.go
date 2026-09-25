@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/data/management"
+	"github.com/rancher/rancher/pkg/data/management/driverdata"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,12 +33,12 @@ var (
 )
 
 func init() {
-	for _, fields := range management.DriverData {
+	for _, fields := range driverdata.DriverData {
 		sensitiveBodyFields = append(sensitiveBodyFields, fields.PrivateCredentialFields...)
 		sensitiveBodyFields = append(sensitiveBodyFields, fields.PasswordFields...)
 	}
 
-	for _, fields := range management.KEv2OperatorsCredentialFields {
+	for _, fields := range driverdata.KEv2OperatorsCredentialFields {
 		for fieldName, field := range fields {
 			if field.Type == "password" {
 				sensitiveBodyFields = append(sensitiveBodyFields, fieldName)
