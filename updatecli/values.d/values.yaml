@@ -22,12 +22,6 @@ repos:
   machine:
     owner: 'rancher'
     repo: 'machine'
-  k3s:
-    owner: 'k3s-io'
-    repo: 'k3s'
-  k8s:
-    owner: 'kubernetes'
-    repo: 'kubernetes'
   system_agent:
     owner: 'rancher'
     repo: 'system-agent'
@@ -48,20 +42,6 @@ machine:
   commitmessage:
     type: 'deps'
     scope: 'machine'
-
-k8s:
-  manifest: 'Update K8s patch versions'
-  pipelineid: 'update-k8s-versions'
-  commitmessage:
-    type: 'deps'
-    scope: 'k8s'
-
-k3s:
-  manifest: 'Update K3s patch versions'
-  pipelineid: 'update-k3s-versions'
-  commitmessage:
-    type: 'deps'
-    scope: 'k3s'
 
 wins_system_agent:
   manifest: 'Update wins and system-agent patch versions'
