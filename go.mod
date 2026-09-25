@@ -172,7 +172,7 @@ require (
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/aws-iam-authenticator v0.7.20
-	sigs.k8s.io/cluster-api v1.13.5
+	sigs.k8s.io/cluster-api v1.14.2
 	sigs.k8s.io/controller-runtime v0.25.0
 	sigs.k8s.io/structured-merge-diff/v7 v7.0.0
 	sigs.k8s.io/yaml v1.6.0
