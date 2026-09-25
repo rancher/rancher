@@ -302,7 +302,7 @@ func (h *handler) reconcileActive(op *opv1alpha1.ETCDSnapshotRestore, status opv
 		return status, nil
 	}
 
-	if ops.Collectable(op, &op.Spec.OperationSpec, &status.OperationStatus) {
+	if ops.Collectable(&op.Spec.OperationSpec, &status.OperationStatus) {
 		if err := h.etcdsnapshotrestores.Delete(op.Namespace, op.Name, &metav1.DeleteOptions{}); err != nil {
 			return status, err
 		}
@@ -457,11 +457,13 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 		if deleting || ops.IsTerminal(status.Phase) {
 			logrus.Infof("[etcdsnapshotrestore] %s/%s: cluster %s is gone, nothing to release", op.Namespace, op.Name, key)
 
-			// A terminal phase hook may still be owed, in which case the operation is left
-			// un-terminated: its delegate has not had its turn, and recording termination would
-			// claim that it had. UpdateStatus reports that wait, and deleting the operation is the
-			// remedy if the delegate never clears its label.
-			ops.TerminateUnlessHookOwed(op, &status.OperationStatus)
+			// Any hook the operation still carries a label for is abandoned rather than waited on.
+			// A hook is delegated by pushing onto the beacon's delegate chain, and the beacon is
+			// reached through the cluster's adapter, so with no cluster there is no chain to push
+			// onto and nothing would ever satisfy it. Waiting would keep the operation out of TTL
+			// collection, or hold its finalizer open, for good. UpdateStatus reports the
+			// abandonment on Finalized for as long as the label is there.
+			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
 			return nil, status, nil
 		}
@@ -518,7 +520,9 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 			status.Phase == opv1alpha1.OperationPhaseCanceled:
 			logrus.Infof("[etcdsnapshotrestore] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
 
-			ops.TerminateUnlessHookOwed(op, &status.OperationStatus)
+			// The hook goes the same way as the beacon: with no chain left to delegate it on,
+			// nothing could satisfy it, so it is abandoned rather than waited on.
+			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
 			return nil, status, nil
 
@@ -552,12 +556,13 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 		// Anything still in flight has had the beacon taken out from under it, which is the fault
 		// handleInProgress reports when it finds the beacon reassigned. There is nothing left to
 		// release, so the failure is terminated here for the same reason the missing-cluster failure
-		// above is: no later reconcile would reach a terminal handler to do it.
+		// above is: no later reconcile would reach a terminal handler to do it. The Failed-phase
+		// hook is abandoned with it, there being no beacon left to delegate it on.
 		default:
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
 
 			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("beacon %s/%s not found", namespace, beaconName))
-			ops.TerminateUnlessHookOwed(op, &status.OperationStatus)
+			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
 			return nil, status, nil
 		}
@@ -2054,6 +2059,12 @@ type terminalPhase struct {
 	// than a state to paper over.
 	beaconOptional bool
 
+	// beforeRelease, when set, runs after the phase's hook has been satisfied and before the beacon
+	// is released, for work that has to happen while this operation is still the one authorized to
+	// write to the cluster's machine-plan secrets. Returning an error leaves the beacon held and the
+	// operation un-terminated, so the next reconcile tries again.
+	beforeRelease func(s *scope) error
+
 	// onRelease, when set, runs after the beacon has been released. owning reports whether this
 	// operation was the beacon's primary owner rather than a delegate acting on its behalf.
 	onRelease func(s *scope, owning bool)
@@ -2072,6 +2083,8 @@ type terminalPhase struct {
 // An operation which no longer holds the beacon has none of that left to do: see
 // beaconOptional. It terminates without the beacon being written to at all, which is what
 // keeps an operation that lost its claim from reaching into whichever one holds it now.
+// beforeRelease still runs for it: what it does is scoped to the plans this operation
+// itself dispatched, so it cannot disturb the operation that holds the beacon now either.
 func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus, phase terminalPhase) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
 
@@ -2096,6 +2109,12 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 		}
 	} else {
 		logrus.Debugf("[etcdsnapshotrestore] %s/%s: %s with no claim on the beacon, leaving it untouched", s.op.Namespace, s.op.Name, status.Phase)
+	}
+
+	if phase.beforeRelease != nil {
+		if err := phase.beforeRelease(s); err != nil {
+			return status, err
+		}
 	}
 
 	owning, err := plan.ReleaseBeaconIfHeld(s.beacon, h.beacons, s.ownerKey)
@@ -2131,6 +2150,15 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
+
+		// Cancellation has to reach the cluster and not just the operation's status: a plan already
+		// handed to an agent is the agent's to run, and the beacon is about to be released to
+		// whichever operation is next in line. Canceling those plans while this operation is still
+		// the authorized writer is what stops the two overlapping.
+		beforeRelease: func(s *scope) error {
+			_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op)
+			return err
+		},
 	})
 }
 

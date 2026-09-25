@@ -15,8 +15,9 @@ import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
-	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
+	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // stubAdapter is a minimal ops.Adapter implementation for testing component
@@ -127,6 +129,10 @@ type fakeBeaconClient struct {
 
 	statusUpdates []*planv1alpha1.Beacon
 	updates       []*planv1alpha1.Beacon
+
+	// events, when set, records beacon writes into a log shared with other fakes, so a test can
+	// assert the order work happened in rather than just that it happened.
+	events *[]string
 }
 
 func (f *fakeBeaconClient) Get(namespace, name string, _ metav1.GetOptions) (*planv1alpha1.Beacon, error) {
@@ -149,6 +155,9 @@ func (f *fakeBeaconClient) Update(beacon *planv1alpha1.Beacon) (*planv1alpha1.Be
 }
 
 func (f *fakeBeaconClient) UpdateStatus(beacon *planv1alpha1.Beacon) (*planv1alpha1.Beacon, error) {
+	if f.events != nil {
+		*f.events = append(*f.events, "beacon-write")
+	}
 	f.statusUpdates = append(f.statusUpdates, beacon.DeepCopy())
 	f.beacon = beacon.DeepCopy()
 	return beacon, nil
@@ -1068,24 +1077,39 @@ func TestOnChange_MissingClusterKeepsConcludedOutcome(t *testing.T) {
 
 // The other half of that rule: a terminal phase hook which is still owed keeps the operation from
 // recording termination, because its delegate has not had its turn.
-func TestOnChange_MissingClusterWithOwedHookDefersTermination(t *testing.T) {
+// TestOnChange_MissingClusterAbandonsOwedHook covers the operation whose cluster is deleted while a
+// terminal phase hook is still owed a delegate. The hook cannot be honored — delegation is a push
+// onto the beacon's delegate chain and the beacon is reached through the cluster's adapter — so it
+// is abandoned rather than waited on, and the second pass proves the operation is collected instead
+// of being pinned by a label nobody is coming back to clear.
+func TestOnChange_MissingClusterAbandonsOwedHook(t *testing.T) {
 	t.Parallel()
 
 	op := missingClusterOp(newOp())
-	op.Spec.TTL = -1
+	op.Spec.TTL = 0
 	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "verify": "delegate-a"}
 
 	initial := opv1alpha1.CertificateRotationStatus{Step: opv1alpha1.CertificateRotationStepRotate}
 	initial.MarkSucceeded()
 	op.Status = initial
 
-	h, _, _ := newOnChangeHandler(newBeacon("", false))
+	h, controller, _ := newOnChangeHandler(newBeacon("", false))
 
 	status, err := h.OnChange(op, op.Status)
 	require.NoError(t, err)
-	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase)
-	assert.True(t, status.TerminatedAt.IsZero(), "the delegate has not had its turn, so nothing may be recorded")
-	assert.Equal(t, opv1alpha1.WaitingForDelegateReason, opv1alpha1.FinalizedCondition.GetReason(&status))
+	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase, "the outcome it reached still stands")
+	assert.False(t, status.TerminatedAt.IsZero(), "nothing can ever satisfy the hook, so the controller is done")
+	assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&status))
+	assert.Equal(t, opv1alpha1.HookAbandonedReason, opv1alpha1.FinalizedCondition.GetReason(&status),
+		"the abandoned hook must be reported rather than looking like a clean finish")
+	assert.True(t, ops.Collectable(&op.Spec.OperationSpec, &status.OperationStatus),
+		"an expired operation nothing is owed on must be collectable")
+
+	// The label is still on the operation, which is what used to pin it here for good.
+	op.Status = status
+	_, err = h.OnChange(op, op.Status)
+	assert.ErrorIs(t, err, generic.ErrSkip)
+	assert.Equal(t, 1, controller.deleteCalls, "the operation must be collected, not leaked")
 }
 
 // TestOnChange_MissingClusterStillFailsRunningOperation guards that rule from over-reaching.
@@ -1129,11 +1153,13 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 		name       string
 		phase      opv1alpha1.OperationPhase
 		terminated bool
+		labels     map[string]string
 
-		wantErr        bool
-		wantPhase      opv1alpha1.OperationPhase
-		wantReason     string
-		wantTerminated bool
+		wantErr             bool
+		wantPhase           opv1alpha1.OperationPhase
+		wantReason          string
+		wantTerminated      bool
+		wantFinalizedReason string
 	}{
 		{
 			name:           "aborted finishes",
@@ -1173,6 +1199,27 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantReason:     opv1alpha1.BeaconLostReason,
 			wantTerminated: true,
 		},
+		{
+			// The beacon this hook would have been delegated on is gone, so nothing can ever
+			// satisfy it: waiting on the label would leave the operation un-terminated for good,
+			// and out of reach of TTL collection with it.
+			name:                "canceled with an owed hook abandons it",
+			phase:               opv1alpha1.OperationPhaseCanceled,
+			labels:              map[string]string{opv1alpha1.CanceledPhaseHookLabelPrefix + "verify": "delegate-a"},
+			wantPhase:           opv1alpha1.OperationPhaseCanceled,
+			wantTerminated:      true,
+			wantFinalizedReason: opv1alpha1.HookAbandonedReason,
+		},
+		{
+			// Same for the Failed-phase hook of an operation the missing beacon has just failed.
+			name:                "in progress with an owed failed hook abandons it",
+			phase:               opv1alpha1.OperationPhaseInProgress,
+			labels:              map[string]string{opv1alpha1.FailedPhaseHookLabelPrefix + "verify": "delegate-a"},
+			wantPhase:           opv1alpha1.OperationPhaseFailed,
+			wantReason:          opv1alpha1.BeaconLostReason,
+			wantTerminated:      true,
+			wantFinalizedReason: opv1alpha1.HookAbandonedReason,
+		},
 	}
 
 	for _, tc := range cases {
@@ -1180,7 +1227,8 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			t.Parallel()
 
 			op := newOp()
-			op.Spec.TTL = -1
+			op.Spec.TTL = 0
+			op.Labels = tc.labels
 
 			initial := opv1alpha1.CertificateRotationStatus{Step: opv1alpha1.CertificateRotationStepRotate}
 			initial.SetPhase(tc.phase)
@@ -1204,7 +1252,13 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 				assert.Equal(t, tc.wantReason, outcome.GetReason(&status))
 			}
 			assert.Equal(t, tc.wantTerminated, !status.TerminatedAt.IsZero(),
-				"termination is recorded only when nothing is owed")
+				"termination is recorded only when nothing can still be owed")
+			if tc.wantFinalizedReason != "" {
+				assert.Equal(t, tc.wantFinalizedReason, opv1alpha1.FinalizedCondition.GetReason(&status),
+					"an abandoned hook must be reported rather than left looking like a clean finish")
+				assert.True(t, ops.Collectable(&op.Spec.OperationSpec, &status.OperationStatus),
+					"a label nobody is coming back to clear must not pin the operation")
+			}
 		})
 	}
 }
@@ -1294,4 +1348,82 @@ func TestFinishRotation(t *testing.T) {
 	assert.Equal(t, []bool{false}, adapter.pauseCalls, "exactly one unpause")
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase)
 	assert.Equal(t, "True", opv1alpha1.SucceededCondition.GetStatus(&status))
+}
+
+// fakePlanSecrets serves machine-plan secrets to the collector and records the plans canceled
+// through it, into a log it can share with fakeBeaconClient so their relative order is observable.
+type fakePlanSecrets struct {
+	corecontrollers.SecretClient
+
+	items   []corev1.Secret
+	events  *[]string
+	updates []*corev1.Secret
+}
+
+func (f *fakePlanSecrets) List(_ string, _ metav1.ListOptions) (*corev1.SecretList, error) {
+	return &corev1.SecretList{Items: f.items}, nil
+}
+
+func (f *fakePlanSecrets) Update(secret *corev1.Secret) (*corev1.Secret, error) {
+	if f.events != nil {
+		*f.events = append(*f.events, "cancel-plan/"+secret.Name)
+	}
+	f.updates = append(f.updates, secret.DeepCopy())
+	return secret, nil
+}
+
+// dispatchedPlanSecret builds a machine-plan secret holding a plan this operation dispatched, i.e.
+// one stamped with the operation environment the way reconcileRotate assigns it.
+func dispatchedPlanSecret(t *testing.T, name string, op *opv1alpha1.CertificateRotation) corev1.Secret {
+	t.Helper()
+
+	nodePlan := &plan.Plan{OneTimeInstructions: []plan.OneTimeInstruction{{Name: "rotate", Command: "rke2"}}}
+	data, err := json.Marshal(ops.WithOperationEnv(nodePlan, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.CertificateRotationStepRotate)))
+	require.NoError(t, err)
+
+	return corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "fleet-default", UID: types.UID(name)},
+		Data:       map[string][]byte{plan.PlanDataKey: data},
+	}
+}
+
+// A canceled operation has to stop the work it already handed to the agents, not just record that
+// it was called off: a plan sitting in a machine-plan secret is the agent's to run, and releasing
+// the beacon lets the next operation start. So the plans are canceled first, and this asserts that
+// order rather than just the two writes.
+func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T) {
+	t.Parallel()
+
+	s := terminalScope(&stubAdapter{})
+
+	var events []string
+	secrets := &fakePlanSecrets{
+		events: &events,
+		items: []corev1.Secret{
+			dispatchedPlanSecret(t, "node-a", s.op),
+			// Dispatched by some other operation, so not this one's to cancel.
+			func() corev1.Secret {
+				other := newOp()
+				other.UID = "someone-else"
+				return dispatchedPlanSecret(t, "node-b", other)
+			}(),
+		},
+	}
+	beacons := &fakeBeaconClient{beacon: s.beacon, events: &events}
+
+	h := &handler{beacons: beacons, secrets: secrets, store: plan.NewStore(secrets)}
+
+	status := opv1alpha1.CertificateRotationStatus{}
+	status.MarkCanceled(opv1alpha1.CancelRequestedReason, "cancellation requested")
+
+	out, err := h.handleCanceled(s, status)
+	require.NoError(t, err)
+	assert.False(t, out.TerminatedAt.IsZero(), "the terminal handling completed")
+
+	assert.Equal(t, []string{"cancel-plan/node-a", "beacon-write"}, events,
+		"the plans this operation dispatched must be canceled while it is still the authorized writer")
+
+	require.Len(t, secrets.updates, 1)
+	assert.Equal(t, "true", secrets.updates[0].Annotations[plan.PlanCanceledAnnotation])
+	assert.Empty(t, beacons.beacon.Status.Owner, "the beacon is handed back afterwards")
 }

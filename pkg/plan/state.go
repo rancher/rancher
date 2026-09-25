@@ -47,6 +47,10 @@ const (
 )
 
 const (
+	// PlanDataKey is the Secret data key holding the plan the agent is to run, as assigned by
+	// Store.AssignPlan.
+	PlanDataKey = "plan"
+
 	// PlanCheckpointKey is the Secret data key holding the resume checkpoint.
 	PlanCheckpointKey = "plan-checkpoint"
 

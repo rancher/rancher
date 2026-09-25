@@ -1,8 +1,12 @@
 package plan
 
 import (
+	"errors"
 	"testing"
 
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -99,4 +103,80 @@ func TestMessage(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fakeSecretUpdater records the secrets written through Update. Every other method of the generated
+// client panics, so an unexpected call is loud rather than silently returning a zero value.
+type fakeSecretUpdater struct {
+	corecontrollers.SecretClient
+
+	updates []*corev1.Secret
+	err     error
+}
+
+func (f *fakeSecretUpdater) Update(secret *corev1.Secret) (*corev1.Secret, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	f.updates = append(f.updates, secret.DeepCopy())
+	return secret, nil
+}
+
+func TestStoreCancelPlan(t *testing.T) {
+	annotated := func(value string) *corev1.Secret {
+		s := mockSecret("node-alpha")
+		s.Annotations = map[string]string{PlanCanceledAnnotation: value}
+		return s
+	}
+
+	t.Run("annotates a plan that is not already canceled", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		written, updated, err := NewStore(client).CancelPlan(mockSecret("node-alpha"))
+		require.NoError(t, err)
+		assert.True(t, written)
+		assert.Equal(t, "true", updated.Annotations[PlanCanceledAnnotation])
+		require.Len(t, client.updates, 1)
+		assert.Equal(t, "true", client.updates[0].Annotations[PlanCanceledAnnotation])
+	})
+
+	// A caller which cannot tell whether an earlier attempt landed calls this again, so a second
+	// call must not issue a pointless write.
+	t.Run("is idempotent", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		written, updated, err := NewStore(client).CancelPlan(annotated("true"))
+		require.NoError(t, err)
+		assert.False(t, written)
+		assert.Empty(t, client.updates)
+		assert.Equal(t, "true", updated.Annotations[PlanCanceledAnnotation])
+	})
+
+	// "false" is the annotation's other valid value and means the plan is not canceled, so it is
+	// overwritten rather than read as "already handled".
+	t.Run("overwrites an explicit false", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		written, _, err := NewStore(client).CancelPlan(annotated("false"))
+		require.NoError(t, err)
+		assert.True(t, written)
+		require.Len(t, client.updates, 1)
+	})
+
+	t.Run("returns the secret it was given when the write fails", func(t *testing.T) {
+		client := &fakeSecretUpdater{err: errors.New("boom")}
+		secret := mockSecret("node-alpha")
+
+		written, returned, err := NewStore(client).CancelPlan(secret)
+		require.Error(t, err)
+		assert.False(t, written)
+		assert.Same(t, secret, returned, "the caller must be left with a usable secret")
+		assert.Empty(t, secret.Annotations, "the secret it was given must not be mutated")
+	})
+
+	t.Run("a nil secret is a no-op", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		written, returned, err := NewStore(client).CancelPlan(nil)
+		require.NoError(t, err)
+		assert.False(t, written)
+		assert.Nil(t, returned)
+		assert.Empty(t, client.updates)
+	})
 }

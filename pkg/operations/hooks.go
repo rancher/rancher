@@ -7,14 +7,17 @@ import (
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HasActiveLifecycleHook reports whether obj still carries at least one lifecycle-hook label
-// (phase or step). While such a label is present, the op's owning controller MUST NOT garbage
-// collect the object even after its terminal phase and TTL have expired: the delegate needs a
-// chance to observe the current phase and pop itself from the beacon's delegate chain, and it
-// signals it is done by removing the label.
+// (phase or step), which is how a delegate says it has not finished: it signals completion by
+// removing the label.
+//
+// A terminated operation carrying one is an operation whose hook was abandoned — it was never going
+// to be handed the beacon, so the controller stopped waiting on it — and UpdateStatus reports that
+// on Finalized. Termination itself is what gates garbage collection, not this: see Collectable.
 //
 // Recognizes any label key containing opv1alpha1.LifecycleHookLabelMarker. That catches every phase
 // prefix and every step-level prefix declared by an operation controller package, so callers do not
@@ -62,17 +65,29 @@ func TerminalHookDelegate(op metav1.Object, phase opv1alpha1.OperationPhase) str
 	return delegate
 }
 
-// TerminateUnlessHookOwed records terminal handling as complete unless the operation's terminal
-// phase hook is still owed a turn. Callers use it where there is nothing left to hand a delegate —
-// no cluster, or no beacon — so the operation would otherwise be recorded as wrapped up while its
-// delegate had never been given the beacon it was promised.
+// TerminateAbandoningHooks records terminal handling as complete, abandoning any lifecycle hook the
+// operation still carries a label for.
 //
-// A deleting operation is the exception: it is discarded along with its hooks, so it terminates at
-// once rather than holding its finalizer open for a delegate that will never be handed anything.
-func TerminateUnlessHookOwed(op metav1.Object, status *opv1alpha1.OperationStatus) {
-	if op.GetDeletionTimestamp() != nil || TerminalHookDelegate(op, status.Phase) == "" {
-		status.SetTerminated()
+// Callers use it where there is no beacon left to hand a delegate — the cluster is gone, or the
+// beacon itself is — which is precisely where a hook cannot be satisfied: delegation is a push onto
+// the beacon's delegate chain, and there is no chain. Waiting for the label to clear would wait
+// forever, and because nothing is terminated in the meantime the operation would also never become
+// eligible for TTL collection or be able to retire its finalizer. So the hook is given up on rather
+// than waited on.
+//
+// The label is deliberately left in place: it belongs to whoever set it, it is how they find out
+// their hook was reached, and UpdateStatus reports the abandonment on Finalized for as long as it is
+// there. See HookAbandonedReason.
+func TerminateAbandoningHooks(op metav1.Object, status *opv1alpha1.OperationStatus) {
+	// Only the pass that gives up on the hook says so. SetTerminated is idempotent and these paths
+	// are reached on every reconcile until the operation is collected, so logging unconditionally
+	// would repeat the same line for the whole of the operation's TTL.
+	if delegate := TerminalHookDelegate(op, status.Phase); delegate != "" && !IsTerminated(status) {
+		logrus.Infof("[operations] %s/%s: abandoning the %s phase hook owed to %q: no beacon remains to delegate it on",
+			op.GetNamespace(), op.GetName(), status.Phase, delegate)
 	}
+
+	status.SetTerminated()
 }
 
 // HasStepHookLabel reports whether obj carries at least one label whose key begins with the given
