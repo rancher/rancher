@@ -3,7 +3,6 @@ package planner
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"math"
@@ -813,30 +812,19 @@ func PruneEmpty(config map[string]interface{}) {
 
 // getTaints returns a slice of taints for the machine in question
 func getTaints(entry *planEntry, cp *rkev1.RKEControlPlane) (result []corev1.Taint, _ error) {
-	data := entry.Metadata.Annotations[capr.TaintsAnnotation]
-	if data != "" {
-		if err := json.Unmarshal([]byte(data), &result); err != nil {
-			return result, err
-		}
+	// Get user-defined taints from annotation
+	userTaints, err := capr.ParseTaintsAnnotation(entry.Metadata.Annotations)
+	if err != nil {
+		return result, err
 	}
+	result = append(result, userTaints...)
 
-	if !isWorker(entry) {
-		// k3s charts do not have correct tolerations when the master node is both controlplane and etcd
-		if isEtcd(entry) && (capr.GetRuntime(cp.Spec.KubernetesVersion) != capr.RuntimeK3S || !isControlPlane(entry)) {
-			result = append(result, corev1.Taint{
-				Key:    "node-role.kubernetes.io/etcd",
-				Effect: corev1.TaintEffectNoExecute,
-			})
-		}
-		if isControlPlane(entry) {
-			result = append(result, corev1.Taint{
-				Key:    "node-role.kubernetes.io/control-plane",
-				Effect: corev1.TaintEffectNoSchedule,
-			})
-		}
-	}
+	// Add default taints based on roles using shared logic
+	runtime := capr.GetRuntime(cp.Spec.KubernetesVersion)
+	defaultTaints := capr.GetExpectedDefaultTaints(entry.Machine, runtime)
+	result = append(result, defaultTaints...)
 
-	return
+	return result, nil
 }
 
 type reconcilable struct {
