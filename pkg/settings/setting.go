@@ -281,11 +281,11 @@ var (
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
 	RancherTurtlesVersion = NewSetting("rancher-turtles-version", buildconfig.TurtlesVersion)
 
-	// ClusterAutoscalerChartRepository represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
+	// ClusterAutoscalerChartRepository optionally overrides the chart repository for the cluster autoscaler. It
 	// can be an OCI image path or a regular helm repo.
 	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_CHART_REPOSITORY")
 
-	// ClusterAutoscalerImage represents the default image repository for the cluster autoscaler
+	// ClusterAutoscalerImage optionally overrides the image repository for the cluster autoscaler.
 	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", "").WithEnvDefault("CATTLE_BASE_CLUSTER_AUTOSCALER_IMAGE")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
