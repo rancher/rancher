@@ -168,3 +168,37 @@ func TestHasKey(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePathsInvalid(t *testing.T) {
+	cases := []struct {
+		Name string
+		Path string
+	}{
+		{
+			Name: "Unterminated Slice Subscript",
+			Path: "$['testing'][5:",
+		},
+		{
+			Name: "Unterminated Bracket",
+			Path: "$[",
+		},
+		{
+			Name: "Unterminated Quoted Key",
+			Path: "$['a",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			compiled, err := parsePaths([]string{tc.Path})
+			assert.Error(t, err)
+			assert.Nil(t, compiled)
+		})
+	}
+}
+
+func TestParsePathsValid(t *testing.T) {
+	compiled, err := parsePaths([]string{"$.foo.bar", "$['baz']"})
+	assert.NoError(t, err)
+	assert.Len(t, compiled, 2)
+}
