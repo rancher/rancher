@@ -17,7 +17,7 @@ env:
   HEAD_TAG: "head"
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
-  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE: ${{ github.repository_owner }}/rancher-server
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
@@ -37,7 +37,7 @@ jobs:
         uses: $/.github/actions/rancher-chart/build
   # Tests only consume the linux/amd64 images, so the amd64 builds gate tests
   # while the arm64 builds run as separate, non-gating jobs below.
-  build-server-amd64:
+  build-images-amd64:
     # On the critical path with a CPU-bound Go compile, so use 8cpu to shorten
     # the build head; arm64 is off the critical path and stays on 4cpu.
     runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
@@ -52,25 +52,10 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: $/.github/actions/build-images/server
-  build-agent-amd64:
-    # 8cpu for the same reason as build-server-amd64.
-    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    env:
-      ARCH: x64
-      OS: linux
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: setup and build
-        uses: $/.github/actions/build-images/agent
+        uses: $/.github/actions/build-images
   # arm64 builds validate that the images compile for arm64. Nothing downstream
   # depends on them, so they run in parallel, off the critical path.
-  build-server-arm64:
+  build-images-arm64:
     runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
     env:
       ARCH: arm64
@@ -83,21 +68,7 @@ jobs:
         with:
           persist-credentials: false
       - name: setup and build
-        uses: $/.github/actions/build-images/server
-  build-agent-arm64:
-    runs-on: runs-on,runner=4cpu-linux-arm64,image=ubuntu22-full-arm64,run-id=${{ github.run_id }}
-    env:
-      ARCH: arm64
-      OS: linux
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: setup and build
-        uses: $/.github/actions/build-images/agent
+        uses: $/.github/actions/build-images
   build-installer:
     runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
@@ -107,28 +78,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Verify installer Dockerfile build
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: ./package/Dockerfile.installer
-          build-args: |
-            BUILDARCH=amd64
-            VERSION=0.0.0
-          platforms: linux/amd64
-          load: false
-          push: false
-          cache-from: type=gha,scope=pr-build-installer
-          cache-to: type=gha,mode=min,scope=pr-build-installer
+      - name: setup and build
+        uses: $/.github/actions/build-installer-image
   integration-tests:
     permissions:
       contents: read
-    needs: [build-chart, build-server-amd64, build-agent-amd64]
+    needs: [build-chart, build-images-amd64]
     uses: $/.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
       contents: read
-    needs: [build-server-amd64, build-agent-amd64]
+    needs: [build-images-amd64]
     uses: $/.github/workflows/provisioning-tests.yml

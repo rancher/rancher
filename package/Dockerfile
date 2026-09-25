@@ -33,17 +33,15 @@ FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
 FROM --platform=$BUILDPLATFORM ${GODEP_WRANGLER} AS godep-wrangler
 
 FROM registry.suse.com/bci/bci-micro:16.0 AS final
-RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
+FROM registry.suse.com/bci/bci-base:16.0 AS base-builder
 
-# Temporary build stage image
-FROM registry.suse.com/bci/bci-base:16.0 AS chroot-builder
+# Extend bci-nano base image by creating a chroot
+FROM base-builder AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
+RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ] # Assert that builder matches the target OS version
 
-# Assert that builder matches the target OS version
-RUN [ "$(grep '^VERSION=' /etc/os-release)" = "$(grep '^VERSION=' /chroot/etc/os-release)" ]
-
-# Install some packages with zypper in the chroot of the final micro image
+# Packages used in both images
 RUN zypper refresh && \
     zypper --installroot /chroot -n in --no-recommends \
       catatonit curl util-linux ca-certificates ca-certificates-mozilla findutils xz gzip tar gawk vim-small openssh-clients openssl patterns-base-fips
@@ -63,25 +61,102 @@ RUN zypper --installroot /chroot -n in --no-recommends \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
 
-FROM final AS builder
-COPY --from=chroot-builder-server /chroot/ /
-
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.27.1 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
 ENV GOCACHE=/root/.cache/go/cache
 
-FROM builder AS kdm
+FROM base-builder AS downloads
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
     curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > /var/lib/rancher-data/driver-metadata/data.json
 
+ARG ARCH
+ENV KUBECTL_VERSION=v1.36.0
+ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
+ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
 
-# Main stage using bci-micro as the base image
-FROM final AS base
-# Copy binaries and configuration files from builder to micro
+RUN case "${ARCH}" in \
+        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
+        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
+        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
+    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
+    sha256sum -c kubectl.sha256 && \
+    rm kubectl.sha256 && \
+    chmod +x /usr/bin/kubectl
+
+# Enable exporting of the k3s images as part of the build process.
+FROM --platform=$BUILDPLATFORM go-builder AS images
+WORKDIR /src
+ENV CGO_ENABLED=1
+ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
+RUN zypper -n install libbtrfs-devel libgpgme-devel
+COPY hack/airgap/go.mod hack/airgap/go.sum /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
+COPY hack/airgap/ /src/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
+RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
+
+# Output just k3s images
+FROM scratch AS k3s-images
+COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
+
+# rancher-go-builder is an intermediate target to build Rancher's go binaries.
+# go mod dependencies are early loaded, to optimize caching
+FROM --platform=$BUILDPLATFORM go-builder AS rancher-build
+ARG BUILD_WORKDIR
+WORKDIR ${BUILD_WORKDIR}
+ARG GODEP_APISERVER_PATH
+COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
+ARG GODEP_REMOTEDIALER_PATH
+COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
+ARG GODEP_SHEPHERD_PATH
+COPY --from=godep-shepherd / ${GODEP_SHEPHERD_PATH}
+ARG GODEP_STEVE_PATH
+COPY --from=godep-steve / ${GODEP_STEVE_PATH}
+ARG GODEP_WRANGLER_PATH
+COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
+# Only invalidate cache if go.mod/go.sum changes.
+COPY go.mod go.sum ./
+COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
+COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
+RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
+RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
+
+ARG VERSION
+ARG COMMIT
+ARG TAGS="k8s"
+ARG LINKFLAGS="-extldflags -static -s"
+ARG GCFLAGS
+ARG TARGETOS
+ARG TARGETARCH
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY main.go ./
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "-X main.VERSION=${VERSION} ${LINKFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
+
+# Output just the server binary
+FROM scratch AS server-binary
+COPY --from=rancher-build /app/rancher /bin/rancher
+
+
+# Extract server chroot
+FROM scratch AS server
 COPY --from=chroot-builder-server /chroot/ /
+
+# TODO: remove `kubectl` usage from Go code
+COPY --from=downloads /usr/bin/kubectl /usr/bin/
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
@@ -100,18 +175,13 @@ RUN useradd rancher && \
     chgrp jail-accessors /var/lib/rancher /var/lib/cattle /usr/local/bin && \
     chmod 750            /var/lib/rancher /var/lib/cattle /usr/local/bin && \
     chmod g+s            /var/lib/rancher /var/lib/cattle /usr/local/bin
-
-RUN mkdir /root/.kube && \
-    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
-    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config && \
-    ln -s /usr/bin/rancher /usr/bin/reset-password && \
+RUN ln -s /usr/bin/rancher /usr/bin/reset-password && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
 
 ARG ARCH
-ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
-ARG IMAGE_NAME=rancher
+ARG IMAGE_NAME=rancher-server
 ARG CHART_DEFAULT_BRANCH
 ARG PARTNER_CHART_DEFAULT_BRANCH
 ARG RKE2_CHART_DEFAULT_BRANCH
@@ -125,9 +195,6 @@ ENV CATTLE_MACHINE_CHECKSUM_amd64=1d961c67b3dfe0d7d7bdcae1256b96277f5948cf48e68a
 ENV CATTLE_MACHINE_CHECKSUM_arm64=8e85bf417ace7a43b0f8b04ceb10065c8d92ddcd295ea9707018956b0202b2c5
 ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION=v3.6.12
-ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
-ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v4.2.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
@@ -196,82 +263,6 @@ RUN case "${ARCH}" in \
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui-dashboard/assets/ && \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 
-
-# Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.36.4-k3s1 \
-    /bin/blkid \
-    /bin/bandwidth \
-    /bin/cni \
-    /bin/conntrack \
-    /bin/containerd \
-    /bin/containerd-shim-runc-v2 \
-    /bin/ethtool \
-    /bin/firewall \
-    /bin/ip \
-    /bin/ipset \
-    /bin/k3s \
-    /bin/losetup \
-    /bin/pigz \
-    /bin/runc \
-    /bin/which \
-    /bin/aux/iptables-apply \
-    /bin/aux/iptables-detect.sh \
-    /bin/aux/nft \
-    /bin/aux/xtables-set-mode.sh \
-    /bin/aux/xtables-legacy-multi \
-    /bin/aux/xtables-nft-multi \
-    /usr/bin/
-
-RUN ln -s /usr/bin/cni /usr/bin/bridge && \
-    ln -s /usr/bin/cni /usr/bin/flannel && \
-    ln -s /usr/bin/cni /usr/bin/host-local && \
-    ln -s /usr/bin/cni /usr/bin/loopback && \
-    ln -s /usr/bin/cni /usr/bin/portmap && \
-    ln -s /usr/bin/k3s /usr/bin/crictl && \
-    ln -s /usr/bin/k3s /usr/bin/ctr && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
-    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-    ln -s /usr/bin/k3s /usr/bin/kubectl && \
-    ln -s /usr/bin/pigz /usr/bin/unpigz && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
-    ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-save && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-restore-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-save && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-restore && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-restore-translate && \
-    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
-    ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
-
-RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
-    case "${ARCH}" in \
-        amd64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_amd64}" ;; \
-        arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
-    printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
-    sha256sum -c etcd.sha256 && \
-    rm etcd.sha256 && \
-    tar xvzf /tmp/etcd.tar.gz --strip-components=1 --no-same-owner -C /usr/bin/ "etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl" && \
-    mkdir -p /var/lib/rancher-data/driver-metadata && \
-    rm /tmp/etcd.tar.gz
 
 ENV CATTLE_DASHBOARD_UI_VERSION=master
 
@@ -345,94 +336,10 @@ ENV CATTLE_CLI_URL_DARWIN=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION
 ENV CATTLE_CLI_URL_LINUX=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_WINDOWS=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
-COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
-
-ENV ETCDCTL_API=3
+COPY --from=downloads /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
 
 ENV SSL_CERT_DIR=/etc/rancher/ssl
-ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 
-
-# Enable exporting of the k3s images as part of the build process.
-FROM --platform=$BUILDPLATFORM go-builder AS images
-WORKDIR /src
-ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.36.3+k3s1
-RUN zypper -n install libbtrfs-devel libgpgme-devel
-COPY hack/airgap/go.mod hack/airgap/go.sum /src/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
-COPY hack/airgap/ /src/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
-RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
-
-# Output just k3s images
-FROM scratch AS k3s-images
-COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
-
-# rancher-go-builder is an intermediate stage with go mod ready and Rancher
-# dependencies downloaded. Can be used to build both the Rancher server and agent
-# binaries.
-FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder
-ARG BUILD_WORKDIR
-WORKDIR ${BUILD_WORKDIR}
-ARG GODEP_APISERVER_PATH
-COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
-ARG GODEP_LASSO_PATH
-COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
-ARG GODEP_NORMAN_PATH
-COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
-ARG GODEP_REMOTEDIALER_PATH
-COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
-ARG GODEP_SHEPHERD_PATH
-COPY --from=godep-shepherd / ${GODEP_SHEPHERD_PATH}
-ARG GODEP_STEVE_PATH
-COPY --from=godep-steve / ${GODEP_STEVE_PATH}
-ARG GODEP_WRANGLER_PATH
-COPY --from=godep-wrangler / ${GODEP_WRANGLER_PATH}
-# Only invalidate cache if go.mod/go.sum changes.
-COPY go.mod go.sum ./
-COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
-COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
-COPY pkg/plan/go.mod pkg/plan/go.sum pkg/plan/
-RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
-RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download
-
-
-FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
-ARG VERSION
-ARG COMMIT
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
-ARG GCFLAGS
-ARG TARGETOS
-ARG TARGETARCH
-COPY internal/ internal/
-COPY pkg/ pkg/
-COPY main.go ./
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
-
-# Output just the server binary
-FROM scratch AS server-binary
-COPY --from=server-build /app/rancher /bin/rancher
-
-
-FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
-ARG VERSION
-ARG TAGS="k8s"
-ARG LINKFLAGS="-extldflags -static -s"
-ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
-ARG GCFLAGS
-ARG TARGETOS
-ARG TARGETARCH
-COPY cmd/ cmd/
-COPY internal/ internal/
-COPY pkg/ pkg/
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
-
-
-FROM base AS server
 ARG VERSION
 ARG BASE_REGISTRY
 ARG BASE_UI_BRAND
@@ -455,9 +362,7 @@ ENV CATTLE_BASE_RKE2_PROVISIONING_PRIME_DEFAULT=$CATTLE_BASE_RKE2_PROVISIONING_P
 RUN mkdir -p /var/lib/rancher-data/local-catalogs
 
 COPY --chown=root:root --chmod=0755 \
-    --from=server-build /app/rancher /usr/bin/
-COPY --chown=root:root --chmod=0755 \
-    --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+    --from=rancher-build /app/rancher /usr/bin/
 COPY --chown=root:root --chmod=0755 \
     package/loglevel \
     package/entrypoint.sh \
@@ -465,8 +370,6 @@ COPY --chown=root:root --chmod=0755 \
 
 VOLUME /var/lib/rancher-data/local-catalogs
 VOLUME /var/lib/rancher
-VOLUME /var/lib/kubelet
-VOLUME /var/lib/cni
 VOLUME /var/log
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/dashboard/master/shell/static/welcome-cow.svg" \
@@ -475,15 +378,15 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opencontainers.image.title"="Rancher Manager: complete container management platform." \
     "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
     "org.opencontainers.image.version"=${VERSION} \
-    "org.opensuse.reference"=rancher/rancher:${VERSION}
+    "org.opensuse.reference"=${IMAGE_REPO}/${IMAGE_NAME}:${VERSION}
 ENTRYPOINT ["entrypoint.sh"]
 
 
-# Main stage using bci-micro as the base image.
-FROM final AS agent
-
-# Copy binaries and configuration files from zypper to micro.
+# Extract agent chroot
+FROM scratch AS agent
 COPY --from=chroot-builder-agent /chroot/ /
+
+COPY --from=downloads /usr/bin/kubectl /usr/bin/
 
 # Test that some of the dependency binaries were copied
 # and are working on the target image.
@@ -492,22 +395,6 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
 
-ARG ARCH
-ENV KUBECTL_VERSION=v1.36.0
-ENV KUBECTL_CHECKSUM_amd64=123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
-ENV KUBECTL_CHECKSUM_arm64=9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
-
-RUN case "${ARCH}" in \
-        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
-        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
-    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
-    sha256sum -c kubectl.sha256 && \
-    rm kubectl.sha256 && \
-    chmod +x /usr/bin/kubectl
-
 LABEL io.cattle.agent=true
 
 ARG RANCHER_REPO=rancher
@@ -515,8 +402,8 @@ ARG VERSION
 ENV AGENT_IMAGE=${RANCHER_REPO}/rancher-agent:${VERSION}
 
 ENV SSL_CERT_DIR=/etc/kubernetes/ssl/certs
-COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
-COPY --from=agent-build /app/agent /usr/bin/
+COPY --from=downloads /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
+COPY --from=rancher-build /app/agent /usr/bin/
 COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
@@ -534,3 +421,106 @@ LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/ranch
     "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
 
 ENTRYPOINT ["run.sh"]
+
+
+FROM server AS demo
+ARG ETCD_UNSUPPORTED_ARCH
+
+ENV CATTLE_SERVER_IMAGE=${IMAGE_REPO}/rancher
+ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
+ENV ETCDCTL_API=3
+
+LABEL "org.opensuse.reference"=rancher/rancher:${VERSION}
+
+# Replace entrypoint
+COPY --chown=root:root --chmod=0755 \
+    package/entrypoint-demo.sh /usr/bin/entrypoint-demo.sh
+
+COPY --chown=root:root --chmod=0755 \
+    --from=images /src/k3s-airgap-images.tar /var/lib/rancher/k3s/agent/images/
+#
+# Set up K3s: copy the necessary binaries from the K3s image.
+COPY --from=rancher/k3s:v1.36.4-k3s1 \
+    /bin/blkid \
+    /bin/bandwidth \
+    /bin/cni \
+    /bin/conntrack \
+    /bin/containerd \
+    /bin/containerd-shim-runc-v2 \
+    /bin/ethtool \
+    /bin/firewall \
+    /bin/ip \
+    /bin/ipset \
+    /bin/k3s \
+    /bin/losetup \
+    /bin/pigz \
+    /bin/runc \
+    /bin/which \
+    /bin/aux/iptables-apply \
+    /bin/aux/iptables-detect.sh \
+    /bin/aux/nft \
+    /bin/aux/xtables-set-mode.sh \
+    /bin/aux/xtables-legacy-multi \
+    /bin/aux/xtables-nft-multi \
+    /usr/bin/
+
+RUN ln -s /usr/bin/cni /usr/bin/bridge && \
+    ln -s /usr/bin/cni /usr/bin/flannel && \
+    ln -s /usr/bin/cni /usr/bin/host-local && \
+    ln -s /usr/bin/cni /usr/bin/loopback && \
+    ln -s /usr/bin/cni /usr/bin/portmap && \
+    ln -s /usr/bin/k3s /usr/bin/crictl && \
+    ln -s /usr/bin/k3s /usr/bin/ctr && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+    ln -s /usr/bin/pigz /usr/bin/unpigz && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables && \
+    ln -s /usr/bin/iptables-apply /usr/bin/ip6tables-apply && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-legacy-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-nft-save && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-restore-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/ip6tables-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/ip6tables-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-legacy-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-nft-save && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-restore && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-restore-translate && \
+    ln -s /usr/bin/iptables-detect.sh /usr/bin/iptables-save && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/iptables-translate && \
+    ln -s /usr/bin/xtables-nft-multi /usr/bin/xtables-monitor
+
+RUN mkdir /root/.kube && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config
+
+ENV CATTLE_ETCD_VERSION=v3.6.12
+ENV CATTLE_ETCD_CHECKSUM_amd64=d2564bb50b58e52fbaf3bde4a9561a1d04e20cdc761f795580e4d615d5d41355
+ENV CATTLE_ETCD_CHECKSUM_arm64=147afc710e164fa342ad8561bcca8903f3913bd9fb9ae0c83c857b1d868189cc
+RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
+    case "${ARCH}" in \
+        amd64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_amd64}" ;; \
+        arm64) CATTLE_ETCD_CHECKSUM="${CATTLE_ETCD_CHECKSUM_arm64}" ;; \
+        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
+    esac && \
+    # Rancher's SSL_CERT_DIR interfers with curl
+    SSL_CERT_DIR= curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz" > /tmp/etcd.tar.gz && \
+    printf "%s  %s\n" "${CATTLE_ETCD_CHECKSUM}" "/tmp/etcd.tar.gz" > etcd.sha256 && \
+    sha256sum -c etcd.sha256 && \
+    rm etcd.sha256 && \
+    tar xvzf /tmp/etcd.tar.gz --strip-components=1 --no-same-owner -C /usr/bin/ "etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl" && \
+    mkdir -p /var/lib/rancher-data/driver-metadata && \
+    rm /tmp/etcd.tar.gz
+
+VOLUME /var/lib/kubelet
+VOLUME /var/lib/cni

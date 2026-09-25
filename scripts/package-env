@@ -9,7 +9,7 @@ build_file="$(git rev-parse --show-toplevel)/build.yaml"
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-$(grep -m1 'chartDefaultBranch' "$build_file" | cut -d ' ' -f2)}
 
 REGISTRY=${REGISTRY/:-""}
-IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
+IMAGE=${REGISTRY}${REPO}/rancher-server:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
 SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" "${SCRIPT_DIR}/../package/Dockerfile" | awk -F'=' '{ print $NF }')-suc
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
