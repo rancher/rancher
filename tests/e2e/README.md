@@ -175,6 +175,9 @@ All supported fields:
 Tests that only use the `local` cluster do **not** require a downstream cluster and can be run with just a basic
 `config.yaml`. Tests marked "downstream required" need an imported cluster referenced by `rancher.clusterName`.
 
+Every test file has a companion `*_test_summary.md` describing what it covers. They're aggregated into
+[`test-summary.md`](./test-summary.md) — regenerate it with `go generate ./tests/e2e` after adding or editing a summary.
+
 | Directory | Test Function | What It Tests | Downstream Required? |
 |---|---|---|---|
 | `catalogv2/` | `TestChartsTestSuite` | Chart installation, tolerations, pull-through | Yes |
