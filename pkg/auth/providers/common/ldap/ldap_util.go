@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,8 @@ type ConfigAttributes struct {
 	UserLoginAttribute          string
 	UserNameAttribute           string
 	UserObjectClass             string
+	UserIDAttribute             string
+	GroupIDAttribute            string
 }
 
 func Connect(config *v3.LdapConfig, caPool *x509.CertPool) (*ldapv3.Conn, error) {
@@ -154,10 +157,18 @@ func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccoun
 	return nil
 }
 
-func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute string) (*v3.Principal, error) {
+func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute, identifierAttribute string) (*v3.Principal, error) {
 	var externalIDType, accountName, externalID, login, kind string
 	externalID = dnStr
 	externalIDType = scope
+
+	if identifierAttribute != "" {
+		values := GetAttributeValuesByName(attribs, identifierAttribute)
+		if len(values) == 0 || values[0] == "" {
+			return nil, fmt.Errorf("ldap: configured identifier attribute %q not found on entry %s", identifierAttribute, dnStr)
+		}
+		externalID = values[0]
+	}
 
 	if IsType(attribs, userObjectClass) {
 		for _, attr := range attribs {
@@ -214,14 +225,27 @@ func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, provi
 
 func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *ConfigAttributes, lConn ldapv3.Client,
 	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
-	groupMap[groupPrincipal.ObjectMeta.Name] = true
-	principals := []v3.Principal{}
-
 	parts := strings.SplitN(groupPrincipal.ObjectMeta.Name, ":", 2)
 	if len(parts) != 2 {
 		return errors.Errorf("invalid id %v", groupPrincipal.ObjectMeta.Name)
 	}
 	groupDN := strings.TrimPrefix(parts[1], "//")
+
+	if config.GroupIDAttribute != "" {
+		dn, err := ResolveIdentifierToDN(searchDomain, config.GroupObjectClass, config.GroupIDAttribute, groupDN, lConn)
+		if err != nil {
+			return fmt.Errorf("ldap: failed to resolve group identifier %q to DN: %w", groupDN, err)
+		}
+		groupDN = dn
+		searchAttributes = append(slices.Clone(searchAttributes), config.GroupIDAttribute)
+	}
+
+	return gatherParentGroupsByDN(groupPrincipal.ObjectMeta.Name, groupDN, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
+}
+
+func gatherParentGroupsByDN(groupName, groupDN, searchDomain, groupScope string, config *ConfigAttributes, lConn ldapv3.Client,
+	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
+	groupMap[groupName] = true
 
 	filter := fmt.Sprintf(
 		"(&(%s=%s)(%s=%s))",
@@ -242,29 +266,64 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 		return err
 	}
 
-	for i := 0; i < len(resultGroups.Entries); i++ {
-		entry := resultGroups.Entries[i]
-		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	type parentGroup struct {
+		principal v3.Principal
+		dn        string
+	}
+	var parents []parentGroup
+	for _, entry := range resultGroups.Entries {
+		principal, err := AttributesToPrincipal(entry.Attributes, entry.DN, groupScope, config.ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute, config.GroupIDAttribute)
 		if err != nil {
 			logrus.Errorf("Error translating group result: %v", err)
 			continue
 		}
-		principals = append(principals, *principal)
+		parents = append(parents, parentGroup{principal: *principal, dn: entry.DN})
 	}
 
-	for _, gp := range principals {
-		if _, ok := groupMap[gp.ObjectMeta.Name]; ok {
+	for _, parent := range parents {
+		if _, ok := groupMap[parent.principal.ObjectMeta.Name]; ok {
 			continue
 		}
 
-		*nestedGroupPrincipals = append(*nestedGroupPrincipals, gp)
-		err = GatherParentGroups(gp, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
+		*nestedGroupPrincipals = append(*nestedGroupPrincipals, parent.principal)
+		err = gatherParentGroupsByDN(parent.principal.ObjectMeta.Name, parent.dn, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// NewIdentifierSearchRequest builds a whole-subtree search for the single entry of the given
+// object class whose identifier attribute equals identifierValue.
+func NewIdentifierSearchRequest(searchBase, objectClass, identifierAttribute, identifierValue string, attributes []string) *ldapv3.SearchRequest {
+	filter := fmt.Sprintf(
+		"(&(%s=%s)(%s=%s))",
+		"objectClass",
+		SanitizeAttr(objectClass),
+		SanitizeAttr(identifierAttribute),
+		ldapv3.EscapeFilter(identifierValue),
+	)
+	return NewWholeSubtreeSearchRequest(searchBase, filter, attributes)
+}
+
+// ResolveIdentifierToDN returns the DN of the single entry whose identifier attribute equals identifierValue.
+func ResolveIdentifierToDN(searchBase, objectClass, identifierAttribute, identifierValue string, lConn ldapv3.Client) (string, error) {
+	search := NewIdentifierSearchRequest(searchBase, objectClass, identifierAttribute, identifierValue, []string{"dn"})
+	result, err := lConn.Search(search)
+	if err != nil {
+		return "", fmt.Errorf("ldap: error resolving identifier %s=%s: %w", identifierAttribute, identifierValue, err)
+	}
+
+	if len(result.Entries) == 0 {
+		return "", fmt.Errorf("ldap: no entry found for %s=%s", identifierAttribute, identifierValue)
+	}
+	if len(result.Entries) > 1 {
+		return "", fmt.Errorf("ldap: multiple entries found for %s=%s, expected unique identifier", identifierAttribute, identifierValue)
+	}
+
+	return result.Entries[0].DN, nil
 }
 
 func FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, groupPrincipals []v3.Principal, nonDupGroupPrincipals []v3.Principal) []v3.Principal {
