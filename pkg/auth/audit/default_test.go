@@ -50,6 +50,7 @@ func TestDefaultPolicies(t *testing.T) {
 	type testCase struct {
 		Name            string
 		Uri             string
+		SCIM            bool
 		Headers         http.Header
 		ExpectedHeaders http.Header
 		Body            []byte
@@ -517,6 +518,33 @@ func TestDefaultPolicies(t *testing.T) {
 			ExpectedBody:    []byte(fmt.Sprintf(`{"normalField": "some data", "manifestUrl": "%s", "insecureWindowsNodeCommand": "%[1]s", "insecureNodeCommand": "%[1]s", "insecureCommand": "%[1]s", "command": "%[1]s", "windowsNodeCommand": "%[1]s"}`, redacted)),
 		},
 		{
+			Name:         "With SCIM PATCH operations on sensitive paths",
+			SCIM:         true,
+			Headers:      http.Header{"Content-Type": {contentTypeSCIMJSON}},
+			Body:         []byte(`{"Operations": [{"op": "replace", "path": "password", "value": "fake"}, {"op": "add", "path": "userPassword", "value": "fake"}, {"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:password", "value": "fake"}, {"op": "replace", "path": "password", "value": {"nested": "fake"}}]}`),
+			ExpectedBody: []byte(fmt.Sprintf(`{"Operations": [{"op": "replace", "path": "password", "value": "%s"}, {"op": "add", "path": "userPassword", "value": "%[1]s"}, {"op": "replace", "path": "urn:ietf:params:scim:schemas:core:2.0:User:password", "value": "%[1]s"}, {"op": "replace", "path": "password", "value": "%[1]s"}]}`, redacted)),
+		},
+		{
+			Name:         "With SCIM PATCH operations on other paths",
+			SCIM:         true,
+			Headers:      http.Header{"Content-Type": {contentTypeSCIMJSON}},
+			Body:         []byte(`{"Operations": [{"op": "replace", "path": "displayName", "value": "Jane"}, {"op": "remove", "path": "password"}]}`),
+			ExpectedBody: []byte(`{"Operations": [{"op": "replace", "path": "displayName", "value": "Jane"}, {"op": "remove", "path": "password"}]}`),
+		},
+		{
+			Name:         "With SCIM PATCH operation without path",
+			SCIM:         true,
+			Headers:      http.Header{"Content-Type": {contentTypeSCIMJSON}},
+			Body:         []byte(`{"Operations": [{"op": "replace", "value": {"password": "fake", "displayName": "Jane"}}]}`),
+			ExpectedBody: []byte(fmt.Sprintf(`{"Operations": [{"op": "replace", "value": {"password": "%s", "displayName": "Jane"}}]}`, redacted)),
+		},
+		{
+			Name:         "With PATCH operations not marked as SCIM",
+			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
+			Body:         []byte(`{"Operations": [{"op": "replace", "path": "password", "value": "fake"}]}`),
+			ExpectedBody: []byte(`{"Operations": [{"op": "replace", "path": "password", "value": "fake"}]}`),
+		},
+		{
 			// The generated driver cases read the same data as the redaction code,
 			// so they can't catch a field dropped from it. These names are fixed.
 			Name:         "With node driver and KEv2 operator credential fields",
@@ -557,6 +585,7 @@ func TestDefaultPolicies(t *testing.T) {
 				AuditID:       "0123456789",
 				RequestURI:    c.Uri,
 				RequestHeader: c.Headers,
+				scim:          c.SCIM,
 			}
 
 			// In production, request bodies are prepared by newLog(); tests that

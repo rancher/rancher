@@ -51,12 +51,18 @@ func init() {
 		panic(fmt.Sprintf("failed to create regex redactor: %v", err))
 	}
 
+	scimPatchOps, err := scimPatchOpRedactor([]string{defaultRegex})
+	if err != nil {
+		panic(fmt.Sprintf("failed to create SCIM PATCH operation redactor: %v", err))
+	}
+
 	defaultMu.Lock()
 	defaultRedactors = []Redactor{
 		RedactFunc(redactSecret),
 		RedactFunc(redactConfigMap),
 		RedactFunc(redactImportUrl),
 		r,
+		scimPatchOps,
 	}
 	defaultMu.Unlock()
 }

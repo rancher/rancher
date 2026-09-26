@@ -18,9 +18,11 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			reqTimestamp := time.Now().Format(time.RFC3339)
 			user := getUserInfo(req)
-			context := context.WithValue(req.Context(), userKeyValue, user)
-			req = req.WithContext(context)
 			keepReqBody := auditLog.level >= auditlogv1.LevelRequest
+			scim := &scimRecord{keepBody: keepReqBody}
+			ctx := context.WithValue(req.Context(), userKeyValue, user)
+			ctx = context.WithValue(ctx, scimRecordKey{}, scim)
+			req = req.WithContext(ctx)
 			rawReqBody, userName := copyReqBody(req, keepReqBody)
 
 			// keepResBody determines whether to buffer response bodies for audit logging.
@@ -48,7 +50,7 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 			if auditLog.writer.ExcludeGroups {
 				auditUser.Group = nil
 			}
-			auditLogEntry := newLog(verbosityLevel, auditUser, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName)
+			auditLogEntry := newLog(verbosityLevel, auditUser, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName, scim)
 			auditLog.Write(auditLogEntry)
 		})
 	}

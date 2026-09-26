@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -87,7 +88,10 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 
 		ttl := a.expireTokensAfter()
 
-		var authenticated bool
+		var (
+			authenticated bool
+			tokenID       string
+		)
 		for _, secret := range list {
 			if ttl > 0 && secret.CreationTimestamp.Add(ttl).Before(time.Now()) {
 				// Clean up expired tokens, but don't block authentication if deletion fails for some reason
@@ -97,8 +101,9 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 				continue
 			}
 
-			if !authenticated {
-				authenticated = subtle.ConstantTimeCompare([]byte(token), secret.Data["token"]) == 1
+			if !authenticated && subtle.ConstantTimeCompare([]byte(token), secret.Data["token"]) == 1 {
+				authenticated = true
+				tokenID = secret.Name
 			}
 		}
 
@@ -106,6 +111,9 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 			writeError(w, NewError(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized)))
 			return
 		}
+
+		setAuditUser(r, provider, tokenID)
+		audit.CaptureSCIMRequest(r)
 
 		next.ServeHTTP(w, r)
 	})
@@ -120,5 +128,22 @@ func NewTokenAuthenticator(wContext *wrangler.Context) *tokenAuthenticator {
 		isDisabledProvider: providers.IsDisabledProvider,
 		expireTokensAfter:  func() time.Duration { return settings.ExpireSCIMTokensAfter.GetDuration() },
 		getConfig:          func(provider string) providerConfig { return getProviderConfig(cmCache, provider) },
+	}
+}
+
+// setAuditUser records the SCIM caller in the request's audit log entry, if audit logging is enabled.
+// tokenID identifies the token that authenticated the request, never its value.
+// Group and Extra are replaced, not modified in place, because they share memory with the user info in the request context.
+func setAuditUser(r *http.Request, provider, tokenID string) {
+	auditUser, ok := audit.FromContext(r.Context())
+	if !ok {
+		return
+	}
+
+	auditUser.Name = "system:scim:" + provider
+	auditUser.Group = []string{"system:scim"}
+	auditUser.Extra = map[string][]string{
+		"scim.cattle.io/provider": {provider},
+		"scim.cattle.io/token-id": {tokenID},
 	}
 }

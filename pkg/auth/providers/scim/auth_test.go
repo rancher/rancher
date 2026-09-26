@@ -1,12 +1,18 @@
 package scim
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -15,6 +21,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func enabledProvider(string) providerConfig { return providerConfig{Enabled: true} }
@@ -434,5 +442,142 @@ func TestTokenAuthenticator(t *testing.T) {
 		auth.Authenticate(next).ServeHTTP(w, r)
 
 		require.Equal(t, http.StatusServiceUnavailable, w.Result().StatusCode)
+	})
+}
+
+func TestTokenAuthenticatorAuditUser(t *testing.T) {
+	t.Parallel()
+
+	const (
+		provider   = "okta"
+		validToken = "ebbebf0873ed0935e0e0e506fc5065dc391450d14cdddd7de4f677868a88c486"
+		otherToken = "f3104cc584da56ef4a1bd0e019845f4423c0d853a2d5329abfea34977cb8cfed"
+		patchBody  = `{"Operations":[{"op":"replace","path":"active","value":false}]}`
+	)
+
+	secrets := []*v1.Secret{
+		{ObjectMeta: metav1.ObjectMeta{Name: "scim-okta-new"}, Data: map[string][]byte{"token": []byte(validToken)}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "scim-okta-old"}, Data: map[string][]byte{"token": []byte(otherToken)}},
+	}
+
+	// serve runs a request through the audit log middleware and the authenticator,
+	// as in production, and returns the written audit log entry.
+	serve := func(t *testing.T, secrets []*v1.Secret, token string, opts audit.WriterOptions, userInfo *user.DefaultInfo) map[string]any {
+		ctrl := gomock.NewController(t)
+		secretCache := fake.NewMockCacheInterface[*v1.Secret](ctrl)
+		secretCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(secrets, nil).AnyTimes()
+
+		auth := &tokenAuthenticator{
+			secretCache:        secretCache,
+			isDisabledProvider: func(string) (bool, error) { return false, nil },
+			expireTokensAfter:  func() time.Duration { return 0 },
+			getConfig:          enabledProvider,
+		}
+
+		out := &bytes.Buffer{}
+		writer, err := audit.NewWriter(out, opts)
+		require.NoError(t, err)
+
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+		})
+		handler := audit.NewAuditLogMiddleware(writer)(auth.Authenticate(next))
+
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/u-abc", strings.NewReader(patchBody))
+		r.Header.Set("Content-Type", "application/scim+json")
+		r.SetPathValue("provider", provider)
+		r.Header.Set("Authorization", "Bearer "+token)
+		r = r.WithContext(request.WithUser(r.Context(), userInfo))
+
+		handler.ServeHTTP(httptest.NewRecorder(), r)
+
+		var entry map[string]any
+		require.NoError(t, json.Unmarshal(out.Bytes(), &entry))
+		return entry
+	}
+
+	// newErrorUser returns the user Rancher's authenticator sets for a SCIM token it doesn't recognize.
+	// Groups has spare capacity so an append would write into it.
+	newErrorUser := func() *user.DefaultInfo {
+		groups := make([]string, 2, 4)
+		copy(groups, []string{"system:unauthenticated", "system:cattle:error"})
+		return &user.DefaultInfo{
+			Name:   "system:cattle:error",
+			Groups: groups,
+			Extra:  map[string][]string{"foo": {"bar"}},
+		}
+	}
+
+	t.Run("valid token", func(t *testing.T) {
+		t.Parallel()
+
+		userInfo := newErrorUser()
+
+		got := serve(t, secrets, validToken, audit.WriterOptions{}, userInfo)["user"]
+
+		assert.Equal(t, map[string]any{
+			"name":  "system:scim:okta",
+			"group": []any{"system:scim"},
+			"extra": map[string]any{
+				"scim.cattle.io/provider": []any{"okta"},
+				"scim.cattle.io/token-id": []any{"scim-okta-new"},
+			},
+		}, got)
+
+		// The user info in the request context is unchanged.
+		assert.Equal(t, newErrorUser(), userInfo)
+		assert.Equal(t, []string{"system:unauthenticated", "system:cattle:error", "", ""}, userInfo.Groups[:4])
+	})
+
+	t.Run("invalid token", func(t *testing.T) {
+		t.Parallel()
+
+		got := serve(t, secrets, "invalid", audit.WriterOptions{}, newErrorUser())["user"].(map[string]any)
+
+		assert.Equal(t, "system:cattle:error", got["name"])
+		assert.Equal(t, []any{"system:unauthenticated", "system:cattle:error"}, got["group"])
+		assert.Equal(t, map[string]any{"foo": []any{"bar"}}, got["extra"])
+	})
+
+	t.Run("exclude groups", func(t *testing.T) {
+		t.Parallel()
+
+		got := serve(t, secrets, validToken, audit.WriterOptions{ExcludeGroups: true}, newErrorUser())["user"].(map[string]any)
+
+		assert.Equal(t, "system:scim:okta", got["name"])
+		assert.NotContains(t, got, "group")
+	})
+
+	t.Run("valid token captures the request body", func(t *testing.T) {
+		t.Parallel()
+
+		got := serve(t, secrets, validToken, audit.WriterOptions{DefaultPolicyLevel: auditlogv1.LevelRequest}, newErrorUser())
+
+		var want map[string]any
+		require.NoError(t, json.Unmarshal([]byte(patchBody), &want))
+		assert.Equal(t, want, got["requestBody"])
+	})
+
+	t.Run("invalid token does not mark the request", func(t *testing.T) {
+		t.Parallel()
+
+		got := serve(t, secrets, "invalid", audit.WriterOptions{DefaultPolicyLevel: auditlogv1.LevelRequestResponse}, newErrorUser())
+
+		assert.Nil(t, got["requestBody"])
+		// The 401 response is application/scim+json, which is logged only for marked requests.
+		assert.Nil(t, got["responseBody"])
+	})
+
+	t.Run("matching secret listed second", func(t *testing.T) {
+		t.Parallel()
+
+		reversed := []*v1.Secret{secrets[1], secrets[0]}
+		got := serve(t, reversed, validToken, audit.WriterOptions{}, newErrorUser())["user"].(map[string]any)
+
+		assert.Equal(t, map[string]any{
+			"scim.cattle.io/provider": []any{"okta"},
+			"scim.cattle.io/token-id": []any{"scim-okta-new"},
+		}, got["extra"])
 	})
 }
