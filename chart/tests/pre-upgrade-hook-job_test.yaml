@@ -1,0 +1,28 @@
+suite: Test Pre-Upgrade Job
+templates:
+- pre-upgrade-hook-job.yaml
+tests:
+- it: sets default linux node toleration
+  asserts:
+    - contains:
+        path: spec.template.spec.tolerations
+        content:
+          key: "cattle.io/os"
+          value: "linux"
+          effect: "NoSchedule"
+          operator: "Equal"
+- it: sets extraTolerations so the hook job can run on tainted nodes
+  set:
+    extraTolerations:
+      - key: "hardware"
+        operator: "Equal"
+        value: "gpu"
+        effect: "NoSchedule"
+  asserts:
+    - contains:
+        path: spec.template.spec.tolerations
+        content:
+          key: "hardware"
+          operator: "Equal"
+          value: "gpu"
+          effect: "NoSchedule"
