@@ -166,7 +166,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 		mutator.Annotations[namespace.AnnotationManagedNamespace] = namespace.AnnotationManagedNamespaceTrue
 
-		namespace.SetMutator(mutator)
+		if err := namespace.SetMutator(mutator); err != nil {
+			return nil, err
+		}
 	}
 
 	wranglerContext, err := wrangler.NewPrimaryContext(ctx, clientConfg, restConfig)
