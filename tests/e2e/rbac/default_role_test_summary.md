@@ -20,7 +20,7 @@ Sets 3 RoleTemplates as project-creator defaults, then creates a project.
 - Checks each PRTB is bound to a real user whose principal matches.
 
 ## `TestProjectCreateRoleLocked`
-Sets 3 project-creator defaults, locks one of them, then creates a project.
+Sets 3 project-creator defaults, locks one of them, waits for the lock to take effect, then creates a project.
 - Checks the project reaches `InitialRolesPopulated`.
 - Checks only the 2 unlocked roles produce PRTBs (locked role is skipped, others still bound).
 
