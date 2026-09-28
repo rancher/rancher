@@ -294,14 +294,10 @@ func (t *TelemetryGatherer) visitWithInitInfo(info initcond.InitInfo) {
 	t.gitHash = info.GitHash
 }
 
-func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, error) {
-	cls, err := t.clusterCache.List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-
+func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 	isNVIDIAPresent := false
-	for _, cl := range cls {
+
+	for _, cl := range clusters {
 		fmt.Println("========================================")
 		fmt.Println("Secrets ManagedClusters")
 		fmt.Println("----------------------------------------")
@@ -331,12 +327,21 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 					fmt.Println("secret.Name", v.Name)
 					if v.Name == "nvidia-registry" {
 						isNVIDIAPresent = true
+						// TODO: break loop
 					}
 				}
 			}
 		}
 	}
 
+	return isNVIDIAPresent
+}
+
+func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, error) {
+	cls, err := t.clusterCache.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
 	nodeMap := map[ClusterID][]*v3.Node{}
 	var localCluster *v3.Cluster
 	var localNodes []*v3.Node
@@ -374,7 +379,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 		localNodes,
 		managedCls,
 		nodeMap,
-		isNVIDIAPresent,
+		t.isNVIDIAPresent(cls),
 	), nil
 }
 
