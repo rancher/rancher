@@ -1,22 +1,28 @@
 package telemetry
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"iter"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
 	v3ctrl "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-type ClusterID string
-type NodeID string
-type NodeRole string
+type (
+	ClusterID string
+	NodeID    string
+	NodeRole  string
+)
 
 const (
 	NodeRoleEtcd    NodeRole = "etcd"
@@ -58,6 +64,8 @@ type RancherManagerTelemetry interface {
 
 	// RancherVersionTelemetry exposes versioning related metadata
 	RancherVersionTelemetry
+
+	IsNVIDIAPresent() bool
 }
 
 type ClusterTelemetry interface {
@@ -140,11 +148,12 @@ func (n *nodeTelemetryImpl) KernelVersion() string {
 }
 
 type rancherTelemetryImpl struct {
-	rancherVersion string
-	gitHash        string
-	installUUID    string
-	clusterUUID    string
-	serverURL      string
+	rancherVersion  string
+	gitHash         string
+	installUUID     string
+	clusterUUID     string
+	serverURL       string
+	isNVIDIAPresent bool
 
 	localCluster *v3.Cluster
 	localNodes   []*v3.Node
@@ -154,6 +163,10 @@ type rancherTelemetryImpl struct {
 }
 
 var _ RancherManagerTelemetry = (*rancherTelemetryImpl)(nil)
+
+func (r *rancherTelemetryImpl) IsNVIDIAPresent() bool {
+	return r.isNVIDIAPresent
+}
 
 func (r *rancherTelemetryImpl) ManagedClusterCount() int {
 	return 1 + len(r.managedClusters)
@@ -256,17 +269,20 @@ type TelemetryGatherer struct {
 	clusterUUID    string
 	serverURL      string
 
-	nodeCache    v3ctrl.NodeCache
-	clusterCache v3ctrl.ClusterCache
+	nodeCache           v3ctrl.NodeCache
+	clusterCache        v3ctrl.ClusterCache
+	multiClusterManager wrangler.MultiClusterManager
 }
 
 func NewTelemetryGatherer(
 	clusterCache v3ctrl.ClusterCache,
 	nodeCache v3ctrl.NodeCache,
+	multiClusterManager wrangler.MultiClusterManager,
 ) TelemetryGatherer {
 	return TelemetryGatherer{
-		clusterCache: clusterCache,
-		nodeCache:    nodeCache,
+		clusterCache:        clusterCache,
+		nodeCache:           nodeCache,
+		multiClusterManager: multiClusterManager,
 	}
 }
 
@@ -282,6 +298,43 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 	cls, err := t.clusterCache.List(labels.Everything())
 	if err != nil {
 		return nil, err
+	}
+
+	isNVIDIAPresent := false
+	for _, cl := range cls {
+		fmt.Println("========================================")
+		fmt.Println("Secrets ManagedClusters")
+		fmt.Println("----------------------------------------")
+		fmt.Printf("searching secrets in cluster %s\n", cl.Name)
+		fmt.Println("========================================")
+		k8s, err := t.multiClusterManager.K8sClient(cl.Name)
+		if err != nil {
+			fmt.Printf("error creating K8sClient for cluster %s\n", cl.Name)
+			fmt.Println(err.Error())
+		}
+
+		if k8s != nil {
+			list, err := k8s.
+				CoreV1().
+				Secrets("aif-operator").
+				List(
+					context.Background(),
+					metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=aif-operator"},
+				)
+			if err != nil {
+				fmt.Printf("error listing secrets for cluster %s\n", cl.Name)
+				fmt.Println(err.Error())
+			}
+			if list != nil {
+				fmt.Println("Secrets Count", len(list.Items))
+				for _, v := range list.Items {
+					fmt.Println("secret.Name", v.Name)
+					if v.Name == "nvidia-registry" {
+						isNVIDIAPresent = true
+					}
+				}
+			}
+		}
 	}
 
 	nodeMap := map[ClusterID][]*v3.Node{}
@@ -321,6 +374,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 		localNodes,
 		managedCls,
 		nodeMap,
+		isNVIDIAPresent,
 	), nil
 }
 
@@ -334,6 +388,7 @@ func newTelemetryImpl(
 	localNodes []*v3.Node,
 	clList []*v3.Cluster,
 	nodeMap map[ClusterID][]*v3.Node,
+	isNVIDIAPresent bool,
 ) *rancherTelemetryImpl {
 	return &rancherTelemetryImpl{
 		rancherVersion:  version,
@@ -345,6 +400,7 @@ func newTelemetryImpl(
 		localNodes:      localNodes,
 		managedClusters: clList,
 		managedNodes:    nodeMap,
+		isNVIDIAPresent: isNVIDIAPresent,
 	}
 }
 

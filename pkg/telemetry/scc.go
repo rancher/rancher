@@ -84,7 +84,7 @@ func bytesToMiBRounded(bytes int) int {
 
 type nodeCount int
 
-func GenerateSCCPayload(telG RancherManagerTelemetry, isNVIDIARegistryPresent bool) (*SccPayload, error) {
+func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	now := time.Now()
 	systemsMap := map[sccSystemKey]int{}
 	clustersMap := map[nodeCount]int{}
@@ -171,7 +171,7 @@ func GenerateSCCPayload(telG RancherManagerTelemetry, isNVIDIARegistryPresent bo
 		FeatureFlags:                telG.FeatureFlags(),
 		ManagedSystems:              systems,
 		ManagedClusters:             clusters,
-		NVIDIARegistrySecretPresent: isNVIDIARegistryPresent,
+		NVIDIARegistrySecretPresent: telG.IsNVIDIAPresent(),
 		Subscription: SccSubscription{
 			InstallUUID: telG.InstallUUID(),
 			ClusterUUID: telG.ClusterUUID(),

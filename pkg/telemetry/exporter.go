@@ -223,29 +223,11 @@ func (s *secretTelemetryExporter) Register(telG TelemetryGatherer) {
 }
 
 func (s *secretTelemetryExporter) CollectAndExport() error {
-	isNVIDIARegistryPresent := false
-	list, err := s.ctrl.List("aif-operator", metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=aif-operator"})
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("========================================")
-	fmt.Println("Printing CollectAndExport() Secrets")
-	fmt.Println("========================================")
-	fmt.Println("Secrets Count", len(list.Items))
-	for _, v := range list.Items {
-		fmt.Println("secret.Name", v.Name, isNVIDIARegistryPresent)
-		if v.Name == "nvidia-registry" {
-			isNVIDIARegistryPresent = true
-		}
-	}
-
 	telG, err := s.telG.GetClusterTelemetry()
 	if err != nil {
 		return err
 	}
-	// [1]
-	payload, err := GenerateSCCPayload(telG, isNVIDIARegistryPresent)
+	payload, err := GenerateSCCPayload(telG)
 	if err != nil {
 		return err
 	}
@@ -253,6 +235,9 @@ func (s *secretTelemetryExporter) CollectAndExport() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("----------------------------------------")
+	fmt.Println("SCCPayload")
+	fmt.Println("----------------------------------------")
 	fmt.Println(string(data))
 	fmt.Println("----------------------------------------")
 
