@@ -48,6 +48,15 @@ spec:
                   allowlist. These are expected to be domain names, and not URL paths.
                 items:
                   properties:
+                    caBundle:
+                      description: |-
+                        CABundle is a PEM-encoded bundle of CA certificates to trust when verifying the TLS
+                        certificate of the endpoint. This is useful for self-signed certificates or certificates
+                        from non-public Certificate Authorities.
+                        When specified, only these CA certificates (plus the system's root CAs) will be trusted
+                        for verifying the endpoint's certificate. Do not use this with InsecureSkipTLSVerify.
+                      maxLength: 100000
+                      type: string
                     credentialInjection:
                       description: |-
                         e.g.: credID=cattle-global-data/my-cred headers=X-Token=token;X-User=user
@@ -155,9 +164,21 @@ spec:
                         InsecureSkipTLSVerify disables TLS certificate verification when proxying to this domain.
                         Use this only for development or when the endpoint uses a self-signed certificate.
                       type: boolean
+                    serverName:
+                      description: |-
+                        ServerName is the SNI (Server Name Indication) hostname to use during the TLS handshake.
+                        If not specified, the domain hostname is used. This is useful when the endpoint domain
+                        does not match the certificate's CN or SAN fields.
+                      maxLength: 253
+                      type: string
                   required:
                   - domain
                   type: object
+                  x-kubernetes-validations:
+                  - message: caBundle cannot be set when insecureSkipTLSVerify is
+                      true
+                    rule: '!(has(self.caBundle) && size(self.caBundle) > 0 && has(self.insecureSkipTLSVerify)
+                      && self.insecureSkipTLSVerify)'
                 type: array
             required:
             - routes

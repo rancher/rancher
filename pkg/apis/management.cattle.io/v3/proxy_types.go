@@ -27,6 +27,7 @@ type ProxyEndpointSpec struct {
 	Routes []ProxyEndpointRoute `json:"routes,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!(has(self.caBundle) && size(self.caBundle) > 0 && has(self.insecureSkipTLSVerify) && self.insecureSkipTLSVerify)",message="caBundle cannot be set when insecureSkipTLSVerify is true"
 type ProxyEndpointRoute struct {
 	// Domain is the domain to be added to the proxy allowlist.
 	// Absolute domain names (e.g., example.com) and wildcard patterns are supported.
@@ -64,6 +65,22 @@ type ProxyEndpointRoute struct {
 	// Use this only for development or when the endpoint uses a self-signed certificate.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// CABundle is a PEM-encoded bundle of CA certificates to trust when verifying the TLS
+	// certificate of the endpoint. This is useful for self-signed certificates or certificates
+	// from non-public Certificate Authorities.
+	// When specified, only these CA certificates (plus the system's root CAs) will be trusted
+	// for verifying the endpoint's certificate. Do not use this with InsecureSkipTLSVerify.
+	// +optional
+	// +kubebuilder:validation:MaxLength=100000
+	CABundle string `json:"caBundle,omitempty"`
+
+	// ServerName is the SNI (Server Name Indication) hostname to use during the TLS handshake.
+	// If not specified, the domain hostname is used. This is useful when the endpoint domain
+	// does not match the certificate's CN or SAN fields.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	ServerName string `json:"serverName,omitempty"`
 
 	// CredentialInjection defines how credentials are applied to proxied requests for this domain.
 	// When set, clients need to supply a credential ID and values for the secret fields via X-API-CattleAuth-Header;
@@ -122,6 +139,14 @@ type InjectionFieldMapping struct {
 	// config-type prefix (e.g. for "genericConfig-apiKey" the SecretField is "apiKey").
 	// +required
 	SecretField string `json:"secretField"`
+}
+
+type SecretReference struct {
+	//TODO: Delete this struct
+}
+
+type TLSVerificationSpec struct {
+	//TODO: Delete this struct
 }
 
 type ProxyEndpointStatus struct{}

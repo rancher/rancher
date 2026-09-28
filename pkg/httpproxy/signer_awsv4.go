@@ -14,6 +14,7 @@ import (
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
+	// "github.com/sirupsen/logrus"
 )
 
 const (
@@ -43,7 +44,7 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 	if req.Body != nil {
 		body, err = io.ReadAll(req.Body)
 		if err != nil {
-			return fmt.Errorf("error reading request body %v", err)
+			return fmt.Errorf("awsv4.sign: awsv4.sign: error reading request body %v", err)
 		}
 	}
 
