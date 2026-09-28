@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/impersonation"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -251,7 +252,8 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 	}
 	clusterRole = clusterRole.DeepCopy()
 	clusterRole.Rules = rt.Rules
-	logrus.Infof("Updating clusterRole %v because of rules difference with roleTemplate %v (%v).", clusterRole.Name, rt.DisplayName, rt.Name)
+	logrus.Infof("installUUID=%s cluster=%s: Updating clusterRole %v because of rules difference with roleTemplate %v (%v).",
+		settings.InstallUUID.Get(), m.clusterName, clusterRole.Name, rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Update(clusterRole)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't update clusterRole %v", rt.Name)
@@ -260,7 +262,8 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 }
 
 func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
-	logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, rt.Name)
+	logrus.Infof("installUUID=%s cluster=%s: Creating clusterRole for roleTemplate %v (%v).",
+		settings.InstallUUID.Get(), m.clusterName, rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        rt.Name,
@@ -363,7 +366,7 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 	}
 
 	deleteFunc := func(name string) error {
-		logrus.Infof("Deleting clusterRoleBinding %v", name)
+		logrus.Infof("installUUID=%s cluster=%s: Deleting clusterRoleBinding %v", settings.InstallUUID.Get(), m.clusterName, name)
 		err := m.workload.RBACw.ClusterRoleBinding().Delete(name, &metav1.DeleteOptions{})
 		return client.IgnoreNotFound(err)
 	}
@@ -400,7 +403,7 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 	}
 
 	deleteFunc := func(name string) error {
-		logrus.Infof("Deleting roleBinding %v", name)
+		logrus.Infof("installUUID=%s cluster=%s: Deleting roleBinding %v", settings.InstallUUID.Get(), m.clusterName, name)
 		err := m.workload.RBACw.RoleBinding().Delete(ns, name, &metav1.DeleteOptions{})
 		return client.IgnoreNotFound(err)
 	}
@@ -461,7 +464,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		case *rbacv1.RoleBinding:
 			_, err := m.rbLister.Get(ns, roleBinding.Name)
 			if apierrors.IsNotFound(err) {
-				logrus.Infof("Creating roleBinding %v in %s", key, ns)
+				logrus.Infof("installUUID=%s cluster=%s: Creating roleBinding %v in %s", settings.InstallUUID.Get(), m.clusterName, key, ns)
 				_, err := m.roleBindings.Create(roleBinding)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
@@ -470,7 +473,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
-			logrus.Infof("Creating clusterRoleBinding %v", key)
+			logrus.Infof("installUUID=%s cluster=%s: Creating clusterRoleBinding %v", settings.InstallUUID.Get(), m.clusterName, key)
 			_, err := m.workload.RBACw.ClusterRoleBinding().Create(roleBinding)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
