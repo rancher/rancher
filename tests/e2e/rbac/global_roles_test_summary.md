@@ -3,7 +3,8 @@
 Verifies access control on global roles, global role bindings, and the visibility differences between the "user" and "user-base" global roles.
 
 ## `TestUserVsUserBaseGlobalRoleVisibility`
-Creates two users—one with the "user" role and one with "user-base"—and compares their visibility of users and role templates.
+Creates two users—one with the "user" role and one with "user-base"—plus two extra users to pad the count, and compares their visibility of users and role templates.
+- Checks the admin sees at least 5 users.
 - Checks the "user" role user sees only themselves.
 - Checks the "user" role user can list all role templates once RBAC propagates.
 - Checks the "user-base" role user sees only themselves.
@@ -28,6 +29,7 @@ Creates a non-builtin global role and attempts CRUD operations as both admin and
 ## `TestAdminCannotDeleteBuiltinGlobalRole`
 Attempts to delete a builtin global role and update the role itself.
 - Checks builtin role has no remove link.
+- Checks a newly created global role ignores builtin=true (the created role is not builtin).
 - Checks admin can update the builtin role.
 - Checks admin receives 403 Forbidden when attempting to delete the builtin role.
 - Checks the error message contains "cannot delete builtin global roles".
