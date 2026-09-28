@@ -395,6 +395,7 @@ func machineDeployments(cluster *provv1.Cluster, capiCluster *capi.Cluster, dyna
 		}
 
 		machineDeploymentLabels[capr.CattleOSLabel] = machineOS
+		machineDeploymentLabels[capr.ClusterNameLabel] = cluster.Name
 
 		machineSpecAnnotations := map[string]string{}
 		// Ignore drain if DrainBeforeDelete is unset
