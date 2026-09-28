@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetworkspace"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/harvestercleanup"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/machineconfigcleanup"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/machinetemplatecleanup"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/managedchart"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/provisioningcluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/provisioninglog"
@@ -34,6 +35,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 	provisioningcluster.Register(ctx, clients)
 	provisioninglog.Register(ctx, clients)
 	machineconfigcleanup.Register(ctx, clients)
+	machinetemplatecleanup.Register(ctx, clients)
 
 	if features.Harvester.Enabled() {
 		harvestercleanup.Register(ctx, clients)
