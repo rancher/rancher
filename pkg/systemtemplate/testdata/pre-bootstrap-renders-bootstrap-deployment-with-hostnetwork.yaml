@@ -162,8 +162,7 @@ spec:
       - effect: NoExecute
         key: "node-role.kubernetes.io/etcd"
         operator: "Exists"
-      - effect: NoSchedule
-        key: node.cloudprovider.kubernetes.io/uninitialized
+      - key: node.cloudprovider.kubernetes.io/uninitialized
         operator: "Exists"
       initContainers:
       - name: rancher-charts-copy
