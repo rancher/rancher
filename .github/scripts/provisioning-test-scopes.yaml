@@ -56,7 +56,7 @@ explicit:
     meta:
       branches:
         - main
-        # - release/v2.15 uncomment once the nightly workflow has been backported
+        - release/v2.15
     tests:
       - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
       - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
