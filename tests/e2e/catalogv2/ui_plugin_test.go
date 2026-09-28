@@ -383,7 +383,7 @@ func (w *UIPluginTest) TestUnreachableCompressedEndpoint() {
 
 func StartUIPluginTgzServer() (*httptest.Server, error) {
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "../../../testdata/uiext/0.4.1.tgz")
+		http.ServeFile(w, r, "../../testdata/uiext/0.4.1.tgz")
 	})
 
 	ts := httptest.NewUnstartedServer(customHandler)
@@ -401,7 +401,7 @@ func StartUIPluginTgzServer() (*httptest.Server, error) {
 
 func StartUIPluginServer() (*httptest.Server, error) {
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
+		http.FileServer(http.Dir("../../testdata/uiext")).ServeHTTP(w, r)
 	})
 
 	ts := httptest.NewUnstartedServer(customHandler)
@@ -425,7 +425,7 @@ func StartUIPluginServerWithBackoff() (*httptest.Server, error) {
 			reqCount++
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		} else {
-			http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
+			http.FileServer(http.Dir("../../testdata/uiext")).ServeHTTP(w, r)
 		}
 	})
 
