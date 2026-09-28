@@ -646,8 +646,8 @@ github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1 h1:rtjAwj6YNSo6570OHDQIRoj78KN
 github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1/go.mod h1:aXKyYDfC0a6pmsgwt3Lqd2F+wMYZNpewhyo/RgE3I+0=
 github.com/rancher/fleet/pkg/helmvalues v0.16.1 h1:KiIO9FnOQEvmLFuqhKraaZuENoDMZwKL/Fbs6C/uDvU=
 github.com/rancher/fleet/pkg/helmvalues v0.16.1/go.mod h1:gEATz57BmnWeX8LP2WjaHjs9Q+ObU7k0xkOdLZk92fg=
-github.com/rancher/gke-operator v1.15.2 h1:Y05xmvLpcqU5m1ySEtrnkmrryITWo1SZG+ljCPNtxBg=
-github.com/rancher/gke-operator v1.15.2/go.mod h1:DzNiLN8zed0GZbLUThYeNOoCmO2+dpPloPN8O38VJJ0=
+github.com/rancher/gke-operator v1.15.3 h1:Ag61jhP4rRwQFuD0pq2EsUk0i5UXQYGG0q0gX10Q/48=
+github.com/rancher/gke-operator v1.15.3/go.mod h1:fXkjQpeG9jpr71IjlsSNLpW5yvweoZ5cUfsVsMUABc0=
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1 h1:vRtxuvIF0UarXIAwGYNwSFoRYJadVnOrD8kx2qrZyN8=
 github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1/go.mod h1:xavYr3cNyyAeA72nMVB60+q/EJ8Anu+loQWFJyXOeP8=
 github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379 h1:/DKzOm5Du2jPLE5rXPGhsb0XeT68kWEIRi6jnzMeyGk=
@@ -668,8 +668,8 @@ github.com/rancher/remotedialer-proxy v0.9.0-rc.2 h1:xM+ko4RaqtjfGFS8l7n2hn4XFQy
 github.com/rancher/remotedialer-proxy v0.9.0-rc.2/go.mod h1:tUvcbs5xQgIGVUWSWpdTp9kubmOIKCA+D3DTYaPv8fM=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20260921153737-8e09fea6aaaf h1:gjjue7EfiYivzzSMOVvr2jPIQHCtdJzuMhP7BIzlGsE=
-github.com/rancher/shepherd v0.0.0-20260921153737-8e09fea6aaaf/go.mod h1:OxexRIlEGlPaWS9YeFVfYD5ANH/8Yqb+hMyPuUiCp2o=
+github.com/rancher/shepherd v0.0.0-20260928043301-df07a4727889 h1:qkImUpdFTA0i5AEsMWLP5lptPQSiBY53zvhtGsnSoWI=
+github.com/rancher/shepherd v0.0.0-20260928043301-df07a4727889/go.mod h1:fKpwRL07dBLvMIzWAsB+2CPYmlPEs+7Ua23r5sXTq1M=
 github.com/rancher/steve v0.10.4 h1:OC8Hs+l5O1QEQGu67N24TeIfs3wOXgpzEvRFM5FpiMc=
 github.com/rancher/steve v0.10.4/go.mod h1:OQnZKKRb1hdljpxSUgVPmNLzxUwCUaRU1P4lkRDPpCs=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822 h1:PS5UzNmlTMeBhm0Df48pHjiy5MWkHzqHDr4On7kYpDc=
