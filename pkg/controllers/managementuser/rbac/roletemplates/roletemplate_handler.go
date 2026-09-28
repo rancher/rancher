@@ -19,11 +19,13 @@ const (
 func newRoleTemplateHandler(uc *config.UserContext) *roleTemplateHandler {
 	return &roleTemplateHandler{
 		crController: uc.RBACw.ClusterRole(),
+		clusterName:  uc.ClusterName,
 	}
 }
 
 type roleTemplateHandler struct {
 	crController crbacv1.ClusterRoleController
+	clusterName  string
 }
 
 // OnChange ensures that the following Cluster Roles exist:
