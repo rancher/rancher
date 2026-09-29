@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"errors"
-	"fmt"
 	"iter"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -18,11 +17,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-type (
-	ClusterID string
-	NodeID    string
-	NodeRole  string
-)
+type ClusterID string
+type NodeID string
+type NodeRole string
 
 const (
 	NodeRoleEtcd    NodeRole = "etcd"
@@ -298,12 +295,7 @@ func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 	isNVIDIAPresent := false
 
 	for _, cl := range clusters {
-		k8s, err := t.multiClusterManager.K8sClient(cl.Name)
-		if err != nil {
-			fmt.Printf("error creating K8sClient for cluster %s\n", cl.Name)
-			fmt.Println(err.Error())
-		}
-
+		k8s, _ := t.multiClusterManager.K8sClient(cl.Name)
 		if k8s != nil {
 			_, err := k8s.
 				CoreV1().
@@ -316,6 +308,7 @@ func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 
 			if err == nil {
 				isNVIDIAPresent = true
+				break
 			}
 		}
 	}
@@ -328,6 +321,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 	if err != nil {
 		return nil, err
 	}
+
 	nodeMap := map[ClusterID][]*v3.Node{}
 	var localCluster *v3.Cluster
 	var localNodes []*v3.Node

@@ -71,7 +71,7 @@ func TestSccPayload(t *testing.T) {
 					},
 				},
 				managedNodes: map[ClusterID][]*v3.Node{
-					ClusterID("c-pkjsf"): {
+					ClusterID("c-pkjsf"): []*v3.Node{
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-klawl",
@@ -107,7 +107,7 @@ func TestSccPayload(t *testing.T) {
 							},
 						},
 					},
-					ClusterID("c-kwerk"): {
+					ClusterID("c-kwerk"): []*v3.Node{
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-sadfk",
@@ -160,7 +160,7 @@ func TestSccPayload(t *testing.T) {
 							},
 						},
 					},
-					ClusterID("c-kwpow"): {
+					ClusterID("c-kwpow"): []*v3.Node{
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-sadfk",
@@ -213,7 +213,7 @@ func TestSccPayload(t *testing.T) {
 							},
 						},
 					},
-					ClusterID("c-weoriyu"): {
+					ClusterID("c-weoriyu"): []*v3.Node{
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "machine-sadfk",

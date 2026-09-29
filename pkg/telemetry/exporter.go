@@ -235,11 +235,6 @@ func (s *secretTelemetryExporter) CollectAndExport() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("----------------------------------------")
-	fmt.Println("SCCPayload")
-	fmt.Println("----------------------------------------")
-	fmt.Println(string(data))
-	fmt.Println("----------------------------------------")
 
 	if err := s.createOrUpdate(data); err != nil {
 		return err
