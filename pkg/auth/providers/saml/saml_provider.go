@@ -341,7 +341,12 @@ func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 
 	config.SpKey = spKey
 
-	if s.hasLdapGroupSearch() {
+	// We manage the config for all providers which have the data embedded
+	// into them. Even if the provider has the use of that data disabled.
+	// Example: ADFS LDAP search is gated on a prime feature. We will manage
+	// the ADFS data here if present, however the users will not if not on a
+	// prime install.
+	if s.hasLdapConfig() {
 		combinedConfig, err := s.combineSamlAndLdapConfig(config)
 		if err != nil {
 			return err
@@ -589,11 +594,22 @@ func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.O
 	return fullConfig, nil
 }
 
+// hasLdapGroupSearch reports if the provider uses embedded LDAP configuration
+// data. For ADFS this is gated on a prime feature. The others are unconditional.
 func (s *Provider) hasLdapGroupSearch() bool {
 	// see also ldap_provider.go -- samlSearchProvider()
 	return ShibbolethName == s.name ||
 		OKTAName == s.name ||
 		(ADFSName == s.name && features.ADFSLDAPSearch.Enabled())
+}
+
+// hasLdapConfig reports if the provider has LDAP configuration data embedded
+// into their structure. This tells nothing about actual use of that data.
+func (s *Provider) hasLdapConfig() bool {
+	// see also ldap_provider.go -- samlSearchProvider()
+	return ShibbolethName == s.name ||
+		OKTAName == s.name ||
+		ADFSName == s.name
 }
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
