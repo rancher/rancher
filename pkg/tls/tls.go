@@ -528,6 +528,10 @@ func ensureInternalCertSANs(secrets corev1controllers.SecretController, clusterI
 	}
 
 	// If the clusterIP is already recorded in the SAN annotations, nothing to do.
+	// NeedsUpdate became a *TLS method with the dynamiclistener bump. The
+	// zero-value receiver is safe here because maxSANs is 0 and the only
+	// receiver-dependent logic is wildcard coverage, which is not relevant to a
+	// valid literal ClusterIP.
 	if !(&factory.TLS{}).NeedsUpdate(0, secret, clusterIP) {
 		return nil
 	}
