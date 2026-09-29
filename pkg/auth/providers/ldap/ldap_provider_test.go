@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
@@ -196,6 +197,48 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			if !reflect.DeepEqual(gotCaPool, tt.wantCaPool) {
 				t.Errorf("ldapProvider.getLDAPConfig() got caPool = %v, want %v", gotCaPool, tt.wantCaPool)
 			}
+		})
+	}
+}
+
+func TestSamlSearchProvider(t *testing.T) {
+	// Test in prime environment
+	features.ADFSLDAPSearch.Set(true)
+	t.Cleanup(features.ADFSLDAPSearch.Unset)
+	t.Setenv("RANCHER_VERSION_TYPE", "prime")
+
+	for _, tt := range []struct {
+		name    string
+		hasLDAP bool
+	}{
+		{name: "adfs", hasLDAP: true},
+		{name: "okta", hasLDAP: true},
+		{name: "other", hasLDAP: false},
+		{name: "shibboleth", hasLDAP: true},
+	} {
+		t.Run(""+tt.name, func(t *testing.T) {
+			p := ldapProvider{providerName: tt.name}
+			assert.Equal(t, tt.hasLDAP, p.samlSearchProvider())
+		})
+	}
+}
+
+func TestSamlSearchProviderNonPrime(t *testing.T) {
+	// Test in non-prime environment
+	t.Setenv("RANCHER_VERSION_TYPE", "")
+
+	for _, tt := range []struct {
+		name    string
+		hasLDAP bool
+	}{
+		{name: "adfs", hasLDAP: false},
+		{name: "okta", hasLDAP: true},
+		{name: "other", hasLDAP: false},
+		{name: "shibboleth", hasLDAP: true},
+	} {
+		t.Run(""+tt.name, func(t *testing.T) {
+			p := ldapProvider{providerName: tt.name}
+			assert.Equal(t, tt.hasLDAP, p.samlSearchProvider())
 		})
 	}
 }
