@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	v3ctrl "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -263,6 +264,7 @@ type TelemetryGatherer struct {
 func NewTelemetryGatherer(
 	clusterCache v3ctrl.ClusterCache,
 	nodeCache v3ctrl.NodeCache,
+	_ ...wrangler.MultiClusterManager,
 ) TelemetryGatherer {
 	return TelemetryGatherer{
 		clusterCache: clusterCache,
