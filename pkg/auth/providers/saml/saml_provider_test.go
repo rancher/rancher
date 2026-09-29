@@ -97,6 +97,29 @@ func TestConfiguredGenericSAMLProviderHasNoLdap(t *testing.T) {
 	assert.Nil(t, provider.ldapProvider, "Generic SAML provider must not receive a child LDAP provider")
 }
 
+func TestNonPrimeADFSProviderHasNoLdap(t *testing.T) {
+	// ADFS / LDAP is prime gated. Here we verify that LDAP is not present for a non-prime setup
+	//
+	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
+	// just enough scaffolding to run the Configure function.
+	ctx := t.Context()
+	mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
+	require.NoError(t, err, "Failed to create NewScaledContext")
+
+	// Create the dummy wrangler context
+	wranglerContext, err := wrangler.NewContext(ctx, nil, &rest.Config{})
+	require.NoError(t, err, "Failed to create wranglerContext")
+	mgmtCtx.Wrangler = wranglerContext
+
+	tokenMGR := tokens.NewManager(wranglerContext)
+
+	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR, ADFSName).(*Provider)
+	require.True(t, ok, "Failed to Configure a valid Provider")
+
+	assert.False(t, provider.hasLdapGroupSearch(), "AFDS provider must not have LDAP group search for non-prime")
+	assert.Nil(t, provider.ldapProvider, "ADFS SAML provider must not receive a child LDAP provider for non-prime")
+}
+
 func TestCombineSamlAndLdapConfigStoresLDAPPasswordInSecret(t *testing.T) {
 	originalGetLDAPConfig := getLDAPConfig
 	t.Cleanup(func() {
@@ -280,6 +303,76 @@ func TestSearchPrincipals(t *testing.T) {
 						userType + "://dev",
 						groupType + "://dev",
 					},
+				},
+			}
+
+			for _, tt := range tests {
+				tt := tt
+				t.Run(tt.desc, func(t *testing.T) {
+					provider := &Provider{
+						name:      providerName,
+						userType:  userType,
+						groupType: groupType,
+						ldapProvider: &mockLdapProvider{
+							providerName:     providerName,
+							isLdapConfigured: tt.isLdapConfigured,
+						},
+					}
+
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &apiv3.Token{})
+					require.NoError(t, err)
+					require.Len(t, results, len(tt.principals))
+					for _, principal := range results {
+						assert.Contains(t, tt.principals, principal.Name)
+					}
+				})
+
+				// same behaviour for ext tokens
+				t.Run(tt.desc+", ext", func(t *testing.T) {
+					provider := &Provider{
+						name:      providerName,
+						userType:  userType,
+						groupType: groupType,
+						ldapProvider: &mockLdapProvider{
+							providerName:     providerName,
+							isLdapConfigured: tt.isLdapConfigured,
+						},
+					}
+
+					results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &ext.Token{})
+					require.NoError(t, err)
+					require.Len(t, results, len(tt.principals))
+					for _, principal := range results {
+						assert.Contains(t, tt.principals, principal.Name)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestSearchPrincipalsNonPrime(t *testing.T) {
+	// ADFS / LDAP search is prime gated. Here we verify the non-prime behaviour
+	for _, providerName := range []string{
+		"adfs",
+	} {
+		t.Run(providerName, func(t *testing.T) {
+			userType := providerName + "_user"
+			groupType := providerName + "_group"
+
+			tests := []struct {
+				desc             string
+				searchKey        string
+				principalType    string
+				isLdapConfigured bool
+				principals       []string
+			}{
+				{
+					desc:             "search for user with ldap is not",
+					isLdapConfigured: true,
+					searchKey:        "al",
+					principalType:    common.UserPrincipalType,
+					principals: []string{userType+"://al"},
 				},
 			}
 
