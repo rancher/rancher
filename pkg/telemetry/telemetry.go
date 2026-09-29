@@ -298,11 +298,6 @@ func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 	isNVIDIAPresent := false
 
 	for _, cl := range clusters {
-		fmt.Println("========================================")
-		fmt.Println("Secrets ManagedClusters")
-		fmt.Println("----------------------------------------")
-		fmt.Printf("searching secrets in cluster %s\n", cl.Name)
-		fmt.Println("========================================")
 		k8s, err := t.multiClusterManager.K8sClient(cl.Name)
 		if err != nil {
 			fmt.Printf("error creating K8sClient for cluster %s\n", cl.Name)
@@ -310,26 +305,17 @@ func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 		}
 
 		if k8s != nil {
-			list, err := k8s.
+			_, err := k8s.
 				CoreV1().
 				Secrets("aif-operator").
-				List(
-					context.Background(),
-					metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=aif-operator"},
+				Get(
+					context.TODO(),
+					"nvidia-registry",
+					metav1.GetOptions{},
 				)
-			if err != nil {
-				fmt.Printf("error listing secrets for cluster %s\n", cl.Name)
-				fmt.Println(err.Error())
-			}
-			if list != nil {
-				fmt.Println("Secrets Count", len(list.Items))
-				for _, v := range list.Items {
-					fmt.Println("secret.Name", v.Name)
-					if v.Name == "nvidia-registry" {
-						isNVIDIAPresent = true
-						// TODO: break loop
-					}
-				}
+
+			if err == nil {
+				isNVIDIAPresent = true
 			}
 		}
 	}
