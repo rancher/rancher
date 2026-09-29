@@ -99,7 +99,8 @@ func TestConfiguredGenericSAMLProviderHasNoLdap(t *testing.T) {
 
 func TestNonPrimeADFSProviderHasNoLdap(t *testing.T) {
 	// ADFS / LDAP is prime gated. Here we verify that LDAP is not present for a non-prime setup
-	//
+	t.Setenv("RANCHER_VERSION_TYPE", "")
+
 	// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
 	// just enough scaffolding to run the Configure function.
 	ctx := t.Context()
@@ -360,6 +361,8 @@ func TestSearchPrincipalsNonPrime(t *testing.T) {
 			userType := providerName + "_user"
 			groupType := providerName + "_group"
 
+			t.Setenv("RANCHER_VERSION_TYPE", "")
+
 			tests := []struct {
 				desc             string
 				searchKey        string
@@ -372,7 +375,7 @@ func TestSearchPrincipalsNonPrime(t *testing.T) {
 					isLdapConfigured: true,
 					searchKey:        "al",
 					principalType:    common.UserPrincipalType,
-					principals: []string{userType+"://al"},
+					principals:       []string{userType + "://al"},
 				},
 			}
 
