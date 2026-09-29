@@ -88,20 +88,23 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
+			// deliberately out of order: the rendered tolerations must come out
+			// sorted, otherwise the pod template changes on every reconcile and
+			// the agent is rolled out endlessly
 			taints: []corev1.Taint{
+				{
+					Key:    "key2",
+					Effect: corev1.TaintEffectPreferNoSchedule,
+				},
 				{
 					Key:       "key1",
 					Value:     "value1",
 					Effect:    corev1.TaintEffectNoSchedule,
 					TimeAdded: &metav1.Time{}, // this should be stripped from tolerations
 				},
-				{
-					Key:    "key2",
-					Effect: corev1.TaintEffectPreferNoSchedule,
-				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "026d73c819a0667fbbd50ca10a4f4215624f5c3d448a1324b24c5f9f8ae99cb3",
+				"cattle-cluster-agent": "a8cad65483a9ae357a36417acb9a969270f68875ab3704d1e9d693af2af62dfc",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -155,7 +158,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "0ced645edfc4a11bdbf1731fc97ea76c69d5da0f691a395293df4cc6b6ce9e8c",
+				"cattle-cluster-agent": "f5e7e941331d777988575dbdd5904bcea83731374740a8ec3e6de512b94b7529",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -212,7 +215,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "04e8f9817b3d89a8b7302329bc4447fa70eb43d19051f4bc068bd47e26fa4e61",
+				"cattle-cluster-agent": "89f73d219493bde631de6a9d30784e1aee6f201743f78bf8e0972df2ab3b979a",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -260,7 +263,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "b4ffce8a1fc601ce95f599332de597de478a2244fc6bac3b7dc6204416dfb550",
+				"cattle-cluster-agent": "5273154c350d729e9fb76594a0b2dd1e0e2b42d71c61ed2c38e0219816ff5b07",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -309,7 +312,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "5bbbf41e0dcb41ed586e26899d0de6eb474c7d6c309cfac9355a3ee4651b6b3d",
+				"cattle-cluster-agent": "288adcdb7cdd4befbb4b3552a2bc5eb760c6d2da6e63546f98e930178abb9b6b",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -356,7 +359,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				Labels: map[string]string{},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "c7193972923103ae418b609b0fae682322ea9b3b59b00e9a526561d388b2c500",
+				"cattle-cluster-agent": "6bf32144d0b4cd43c6f6b0dcd390282327922d1d7d91bee2a488ca3e0f7d0a82",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -402,7 +405,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "098ff7fd84702264e219dd843e1e39a73b09535beb08f13c5922e285e5b189cf",
+				"cattle-cluster-agent": "5f206bad8db8cdedf30037ebcbf118b422513ad627038cc002fa606f886e5fd3",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
