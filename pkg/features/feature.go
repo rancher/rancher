@@ -235,6 +235,13 @@ var (
 		false,
 		true,
 	)
+	UIImprovedTables = newFeature(
+		"ui-improved-tables",
+		"Use new and improved UI tables",
+		true,
+		true,
+		true,
+	)
 )
 
 func ListEnabled() []string {
