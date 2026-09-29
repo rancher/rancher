@@ -17,6 +17,18 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
+  build-chart:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: ghcr.io/rancher/ci-image/go1.26@sha256:34d6500cf7fda045e047ac054f42fa65a2c0c291658ddc021c61d2179def46a5 # go1.26
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: setup and build
+        uses: $/.github/actions/rancher-chart/build
   build-server:
     strategy:
       matrix:
@@ -80,7 +92,7 @@ jobs:
   integration-tests:
     permissions:
       contents: read
-    needs: [build-server, build-agent]
+    needs: [build-server, build-chart, build-agent]
     uses: $/.github/workflows/integration-tests.yml
   provisioning-tests:
     permissions:
