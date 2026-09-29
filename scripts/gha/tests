@@ -63,16 +63,17 @@ echo Starting rancher server for test
 
 export KUBECONFIG=$(pwd)/build/testdata/k3s.yaml
 
-LOGS_DIR=$PWD/build/logs
-mkdir -p "$LOGS_DIR"
-
 dump_rancher_logs()
 {
-  echo "Dumping Rancher + K3s container logs to rancher.log and k3s.log"
-  # Best-effort: this runs under `set -e`, so don't let a missing container/log
-  # abort the caller or leave the workflow's artifact upload step empty-handed.
-  kubectl --kubeconfig "$KUBECONFIG" logs -n cattle-system -l app=rancher --tail=-1 &> "${LOGS_DIR}/rancher.log" || echo "failed to fetch rancher logs" >> "${LOGS_DIR}/rancher.log"
-  docker logs k3d-rancher-server-server-0 &> "${LOGS_DIR}/k3s.log" || echo "failed to fetch k3s.log" > "${LOGS_DIR}/k3s.log"
+  echo "::notice title=Rancher Logs::Captured Rancher service output below."
+  echo "::group::Rancher Logs"
+  kubectl logs -n cattle-system -l app=rancher --tail=-1 || echo "failed to fetch rancher logs"
+  echo "::endgroup::"
+
+  echo "::notice title=Rancher Logs::Captured Rancher service output below."
+  echo "::group::K3s Logs"
+  docker logs k3d-rancher-server-server-0 || echo "failed to fetch k3s logs"
+  echo "::endgroup::"
 }
 
 export -f dump_rancher_logs
@@ -90,6 +91,7 @@ trap cleanup exit
 # `go test -c` compiles each package's test binary (including its _test.go files)
 # without running anything, so nothing reaches Rancher during the wait.
 echo "Building integrationsetup + pre-compiling integration test binaries in the background"
+PRECOMPILE_LOG=$(mktemp)
 (
   set -e
   mkdir -p tests/v2/integration/bin
@@ -98,7 +100,7 @@ echo "Building integrationsetup + pre-compiling integration test binaries in the
   for pkg in $(go list $INTEGRATION_TEST_PACKAGES); do
     go test -c -o /dev/null "$pkg"
   done
-) > "${LOGS_DIR}/precompile.log" 2>&1 &
+) > "$PRECOMPILE_LOG" 2>&1 &
 PRECOMPILE_PID=$!
 
 echo "Waiting for K3s kubeconfig to be generated"
@@ -137,7 +139,7 @@ export CATTLE_TEST_CONFIG=$(pwd)/tests/v2/integration/config.yaml # used by inte
 # real error.
 if [ -n "${PRECOMPILE_PID:-}" ]; then
   echo "Waiting for background integrationsetup build + test compilation to finish"
-  wait "$PRECOMPILE_PID" || { echo "background build/compilation reported an error:"; cat "${LOGS_DIR}/precompile.log" || true; }
+  wait "$PRECOMPILE_PID" || { echo "background build/compilation reported an error:"; cat "${PRECOMPILE_LOG}" || true; }
 fi
 ./tests/v2/integration/bin/integrationsetup || {
   dump_rancher_logs
