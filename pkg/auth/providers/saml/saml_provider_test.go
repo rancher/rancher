@@ -117,7 +117,7 @@ func TestNonPrimeADFSProviderHasNoLdap(t *testing.T) {
 	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR, ADFSName).(*Provider)
 	require.True(t, ok, "Failed to Configure a valid Provider")
 
-	assert.False(t, provider.hasLdapGroupSearch(), "AFDS provider must not have LDAP group search for non-prime")
+	assert.False(t, provider.hasLdapGroupSearch(), "ADFS provider must not have LDAP group search for non-prime")
 	assert.Nil(t, provider.ldapProvider, "ADFS SAML provider must not receive a child LDAP provider for non-prime")
 }
 
