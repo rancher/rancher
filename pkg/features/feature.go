@@ -231,7 +231,7 @@ var (
 	ADFSLDAPSearch = newPrimeFeature(
 		"adfs-ldap-search",
 		"Enable LDAP search for ADFS/SAML",
-		IsPrime(),
+		true,
 		false,
 		true,
 	)
