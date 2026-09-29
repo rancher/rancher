@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -576,7 +577,9 @@ func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.O
 
 func (s *Provider) hasLdapGroupSearch() bool {
 	// see also ldap_provider.go -- samlSearchProvider()
-	return ShibbolethName == s.name || OKTAName == s.name || ADFSName == s.name
+	return ShibbolethName == s.name ||
+		OKTAName == s.name ||
+		(ADFSName == s.name && features.ADFSLDAPSearch.Enabled())
 }
 
 func (s *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {

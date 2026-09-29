@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -40,6 +41,13 @@ func TestConfiguredProviderContainsLdapProvider(t *testing.T) {
 		"adfs",
 	} {
 		t.Run(providerName+" has ldap configuration", func(t *testing.T) {
+			// Attention: ADFS/LDAP search is a prime feature
+			if providerName == "adfs" {
+				features.ADFSLDAPSearch.Set(true)
+				t.Cleanup(features.ADFSLDAPSearch.Unset)
+				t.Setenv("RANCHER_VERSION_TYPE", "prime")
+			}
+
 			// saml.Configure runs some ldap specific logic based on the saml provider name, so we provide
 			// just enough scaffolding to run the Configure function.
 			ctx := t.Context()
@@ -88,6 +96,13 @@ func TestSearchPrincipals(t *testing.T) {
 		"adfs",
 	} {
 		t.Run(providerName, func(t *testing.T) {
+			// Attention: ADFS/LDAP search is a prime feature
+			if providerName == "adfs" {
+				features.ADFSLDAPSearch.Set(true)
+				t.Cleanup(features.ADFSLDAPSearch.Unset)
+				t.Setenv("RANCHER_VERSION_TYPE", "prime")
+			}
+
 			userType := providerName + "_user"
 			groupType := providerName + "_group"
 

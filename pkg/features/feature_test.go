@@ -490,3 +490,16 @@ func TestRequireRestartsNonPrimeBuild(t *testing.T) {
 	// because the feature is unconditionally disabled.
 	assert.False(t, RequireRestarts(feat, featureObj))
 }
+
+func TestADFSLDAPSearchIsPrimeFeature(t *testing.T) {
+	assert.True(t, ADFSLDAPSearch.Prime())
+
+	ADFSLDAPSearch.Set(true)
+	t.Cleanup(ADFSLDAPSearch.Unset)
+
+	t.Setenv(primeEnv, "")
+	assert.False(t, ADFSLDAPSearch.Enabled())
+
+	t.Setenv(primeEnv, "prime")
+	assert.True(t, ADFSLDAPSearch.Enabled())
+}
