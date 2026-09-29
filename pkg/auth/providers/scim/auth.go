@@ -22,7 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var tokenSecretNamespace = namespace.GlobalNamespace
+// tokenSecretNamespace is the namespace for SCIM token secrets.
+var tokenSecretNamespace = namespace.System
 
 // tokenAuthenticator authenticates requests to SCIM endpoints using Bearer tokens
 // stored as secrets in [tokenSecretNamespace].
@@ -35,8 +36,8 @@ var tokenSecretNamespace = namespace.GlobalNamespace
 //
 // Here is an example of how to create a secret with a token for the "okta" provider:
 //
-// kubectl create secret generic scim-okta -n cattle-global-data --from-literal="token=$(sha256 -s $(uuidgen))"
-// kubectl label secret -n cattle-global-data scim-okta 'cattle.io/kind=scim-auth-token' 'authn.management.cattle.io/provider=okta'
+// kubectl create secret generic scim-okta -n cattle-system --from-literal="token=$(sha256 -s $(uuidgen))"
+// kubectl label secret -n cattle-system scim-okta 'cattle.io/kind=scim-auth-token' 'authn.management.cattle.io/provider=okta'
 type tokenAuthenticator struct {
 	secretCache        wcorev1.SecretCache
 	secrets            wcorev1.SecretClient
