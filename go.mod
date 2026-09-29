@@ -120,7 +120,7 @@ require (
 	github.com/rancher/eks-operator v1.15.1
 	github.com/rancher/fleet/pkg/apis v0.17.0-alpha.1
 	github.com/rancher/fleet/pkg/helmvalues v0.16.1
-	github.com/rancher/gke-operator v1.15.2
+	github.com/rancher/gke-operator v1.15.3
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.9
@@ -132,7 +132,7 @@ require (
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
 	github.com/rancher/remotedialer v0.6.1
 	github.com/rancher/remotedialer-proxy v0.9.0-rc.2
-	github.com/rancher/shepherd v0.0.0-20260921153737-8e09fea6aaaf
+	github.com/rancher/shepherd v0.0.0-20260929081636-5298a4c7decf
 	github.com/rancher/steve v0.10.4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260803054930-c6c76ca75822
 	github.com/rancher/wrangler/v3 v3.7.1
