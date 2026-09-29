@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/data"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/kv"
 	"github.com/sirupsen/logrus"
@@ -193,6 +194,17 @@ func (h handler) ensureChart(toInstallCrdChart, toInstallChart *chart.Definition
 		}
 	} else {
 		chartValues[priorityClassKey] = priorityClassName
+	}
+
+	// merge custom values set in the rancher-config ConfigMap; these take highest
+	// precedence, letting an admin override values the operator chart does not
+	// otherwise expose through Rancher, such as eks-operator's useDualStackEndpoint.
+	if configMapValues, err := h.chartsConfig.GetChartValues(toInstallChart.ChartName); err != nil {
+		if !chart.IsNotFoundError(err) {
+			logrus.Warnf("Failed to get custom chart values for '%q': %v", toInstallChart.ChartName, err)
+		}
+	} else {
+		chartValues = data.MergeMaps(chartValues, configMapValues)
 	}
 
 	if err := h.manager.Ensure(

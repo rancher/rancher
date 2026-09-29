@@ -391,6 +391,64 @@ func Test_handler_onClusterChange(t *testing.T) {
 	}
 }
 
+func Test_handler_ensureChart_customValuesFromConfigMap(t *testing.T) {
+	initialConfigMapName := settings.ConfigMapName.Get()
+	initialEksOperatorVersion := settings.EksOperatorVersion.Get()
+	t.Cleanup(func() {
+		settings.ConfigMapName.Set(initialConfigMapName)
+		settings.EksOperatorVersion.Set(initialEksOperatorVersion)
+	})
+	settings.ConfigMapName.Set("priority-class-config")
+	settings.EksOperatorVersion.Set("")
+
+	ctrl := gomock.NewController(t)
+
+	secretsCache := fake.NewMockCacheInterface[*v1.Secret](ctrl)
+	secretsCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	configCache := fake.NewMockCacheInterface[*v1.ConfigMap](ctrl)
+	configCache.EXPECT().Get(gomock.Any(), "priority-class-config").
+		Return(&v1.ConfigMap{Data: map[string]string{"priorityClassName": priorityClassName}}, nil).AnyTimes()
+	configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).
+		Return(&v1.ConfigMap{Data: map[string]string{
+			EksChart.ChartName: "useDualStackEndpoint: \"false\"",
+		}}, nil).AnyTimes()
+
+	manager := chartsfake.NewMockManager(ctrl)
+	expectedValues := map[string]interface{}{
+		"global": map[string]interface{}{
+			"cattle": map[string]interface{}{
+				"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+				"imagePullSecrets":      ([]string)(nil),
+			},
+		},
+		"httpProxy":            os.Getenv("HTTP_PROXY"),
+		"httpsProxy":           os.Getenv("HTTPS_PROXY"),
+		"noProxy":              os.Getenv("NO_PROXY"),
+		"additionalTrustedCAs": false,
+		"priorityClassName":    priorityClassName,
+		"useDualStackEndpoint": "false",
+	}
+	var b bool
+	manager.EXPECT().Ensure(
+		EksCrdChart.ReleaseNamespace, EksCrdChart.ReleaseName, EksCrdChart.ChartName,
+		gomock.Any(), "", nil, gomock.AssignableToTypeOf(b), "",
+	).Return(nil)
+	manager.EXPECT().Ensure(
+		EksChart.ReleaseNamespace, EksChart.ReleaseName, EksChart.ChartName,
+		gomock.Any(), "", expectedValues, gomock.AssignableToTypeOf(b), "",
+	).Return(nil)
+
+	h := handler{
+		manager:      manager,
+		secretsCache: secretsCache,
+		chartsConfig: chart.RancherConfigGetter{ConfigCache: configCache},
+	}
+
+	err := h.ensureChart(&EksCrdChart, &EksChart, settings.EksOperatorVersion.Get())
+	assert.NoError(t, err)
+}
+
 func Test_handler_onSettingsChange(t *testing.T) {
 	installedApp := &catalogv1.App{ObjectMeta: metav1.ObjectMeta{Name: "operator", Namespace: "cattle-system"}}
 
