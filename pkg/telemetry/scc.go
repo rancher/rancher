@@ -25,7 +25,7 @@ type SccPayload struct {
 	FeatureFlags                []string        `json:"feature_flags,omitempty" jsonschema:"description=Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags"`
 	ManagedSystems              []SccSystem     `json:"managedSystems" jsonschema:"description=Active systems under management and their details; to be expanded"`
 	ManagedClusters             []SccCluster    `json:"managedClusters"`
-	NVIDIARegistrySecretPresent bool            `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=FIXME,default=false"`
+	NVIDIARegistrySecretPresent bool            `json:"nvidia_registry_secret_present,omitempty" jsonschema:"description=Check if any NVIDIA registration key is being used by SUSE AI Factory,default=false"`
 	Timestamp                   time.Time       `json:"timestamp"`
 }
 
