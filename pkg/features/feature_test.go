@@ -480,3 +480,16 @@ func TestRequireRestartsNonPrimeBuild(t *testing.T) {
 	// because the feature is unconditionally disabled.
 	assert.False(t, RequireRestarts(feat, featureObj))
 }
+
+func TestSCIMIsPrimeFeature(t *testing.T) {
+	assert.True(t, SCIM.Prime())
+
+	SCIM.Set(true)
+	t.Cleanup(SCIM.Unset)
+
+	t.Setenv(primeEnv, "")
+	assert.False(t, SCIM.Enabled())
+
+	t.Setenv(primeEnv, "prime")
+	assert.True(t, SCIM.Enabled())
+}
