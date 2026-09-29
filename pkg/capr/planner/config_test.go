@@ -203,6 +203,16 @@ func TestMachineSelectorFileAuthorized(t *testing.T) {
 			want:          true,
 		},
 		{
+			name: "selector matches after name list misses",
+			annotations: map[string]string{
+				capr.AuthorizedObjectAnnotation:         "other-cluster",
+				capr.AuthorizedObjectSelectorAnnotation: "env=dev",
+			},
+			clusterLabels: map[string]string{"env": "dev"},
+			clusterCalls:  1,
+			want:          true,
+		},
+		{
 			name:          "selector does not match",
 			annotations:   map[string]string{capr.AuthorizedObjectSelectorAnnotation: "env=dev"},
 			clusterLabels: map[string]string{"env": "prod"},

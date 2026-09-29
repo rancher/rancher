@@ -25,7 +25,10 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-const PlannerOwnerKey = "planner"
+const (
+	PlannerOwnerKey             = "planner"
+	byMachineSelectorFileSource = "rke.cattle.io/by-machine-selector-file-source"
+)
 
 var (
 	capiScalingUpCondition   = condition.Cond("ScalingUp")
@@ -34,68 +37,94 @@ var (
 )
 
 type handler struct {
-	planner       *caprplanner.Planner
-	controlPlanes rkecontrollers.RKEControlPlaneController
-	beacons       plancontrollers.BeaconClient
+	planner           *caprplanner.Planner
+	controlPlanes     rkecontrollers.RKEControlPlaneController
+	controlPlaneCache rkecontrollers.RKEControlPlaneCache
+	beacons           plancontrollers.BeaconClient
 
 	etcdsnapshotsaves operationcontrollers.ETCDSnapshotSaveClient
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprplanner.Planner) {
+	clients.RKE.RKEControlPlane().Cache().AddIndexer(byMachineSelectorFileSource, machineSelectorFileSourceIndexer)
 	h := handler{
 		planner:           planner,
 		controlPlanes:     clients.RKE.RKEControlPlane(),
+		controlPlaneCache: clients.RKE.RKEControlPlane().Cache(),
 		beacons:           clients.Plan.Beacon(),
 		etcdsnapshotsaves: clients.Operation.ETCDSnapshotSave(),
 	}
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)
-	relatedresource.Watch(ctx, "planner", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if secret, ok := obj.(*corev1.Secret); ok {
-			var relatedResources []relatedresource.Key
-			clusterName := secret.Labels[capr.ClusterNameLabel]
-			if clusterName != "" {
-				logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by secret %s/%s", secret.Namespace, clusterName, secret.Namespace, secret.Name)
-				relatedResources = append(relatedResources, relatedresource.Key{
-					Namespace: secret.Namespace,
-					Name:      clusterName,
-				})
+	relatedresource.Watch(ctx, "planner", h.resolvePlannerKeys, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine(), clients.Core.ConfigMap())
+}
+
+func fileSourceIndexKey(kind, namespace, name string) string {
+	return kind + "/" + namespace + "/" + name
+}
+
+func machineSelectorFileSourceIndexer(cp *rkev1.RKEControlPlane) ([]string, error) {
+	var keys []string
+	for _, msf := range cp.Spec.MachineSelectorFiles {
+		for _, source := range msf.FileSources {
+			if source.Secret.Name != "" {
+				keys = append(keys, fileSourceIndexKey("secret", cp.Namespace, source.Secret.Name))
 			}
-			authorizedObjects := secret.Annotations[capr.AuthorizedObjectAnnotation]
-			if authorizedObjects != "" {
-				for _, clusterName = range strings.Split(authorizedObjects, ",") {
-					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized secret %s/%s", secret.Namespace, clusterName, secret.Namespace, secret.Name)
-					relatedResources = append(relatedResources, relatedresource.Key{
-						Namespace: secret.Namespace,
-						Name:      clusterName,
-					})
-				}
+			if source.ConfigMap.Name != "" {
+				keys = append(keys, fileSourceIndexKey("configmap", cp.Namespace, source.ConfigMap.Name))
 			}
-			return relatedResources, nil
-		} else if machine, ok := obj.(*capi.Machine); ok {
-			clusterName := machine.Labels[capi.ClusterNameLabel]
-			if clusterName != "" {
-				logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by machine %s/%s", machine.Namespace, clusterName, machine.Namespace, machine.Name)
-				return []relatedresource.Key{{
-					Namespace: machine.Namespace,
-					Name:      clusterName,
-				}}, nil
-			}
-		} else if configmap, ok := obj.(*corev1.ConfigMap); ok {
-			var relatedResources []relatedresource.Key
-			authorizedObjects := configmap.Annotations[capr.AuthorizedObjectAnnotation]
-			if authorizedObjects != "" {
-				for _, clusterName := range strings.Split(authorizedObjects, ",") {
-					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized configmap %s/%s", configmap.Namespace, clusterName, configmap.Namespace, configmap.Name)
-					relatedResources = append(relatedResources, relatedresource.Key{
-						Namespace: configmap.Namespace,
-						Name:      clusterName,
-					})
-				}
-			}
-			return relatedResources, nil
 		}
-		return nil, nil
-	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine(), clients.Core.ConfigMap())
+	}
+	// Referencing the same Secret or ConfigMap in multiple entries produces repeated keys.
+	// No need to dedupe, the cache index still returns each control plane only once for a given source.
+	return keys, nil
+}
+
+func authorizedClusterNameKeys(obj metav1.Object) []relatedresource.Key {
+	authorizedObjects := obj.GetAnnotations()[capr.AuthorizedObjectAnnotation]
+	if authorizedObjects == "" {
+		return nil
+	}
+	var keys []relatedresource.Key
+	for _, clusterName := range strings.Split(authorizedObjects, ",") {
+		keys = append(keys, relatedresource.Key{Namespace: obj.GetNamespace(), Name: clusterName})
+	}
+	return keys
+}
+
+func (h *handler) referencingControlPlaneKeys(kind, namespace, name string) ([]relatedresource.Key, error) {
+	controlPlanes, err := h.controlPlaneCache.GetByIndex(byMachineSelectorFileSource, fileSourceIndexKey(kind, namespace, name))
+	if err != nil {
+		return nil, err
+	}
+	var keys []relatedresource.Key
+	for _, cp := range controlPlanes {
+		keys = append(keys, relatedresource.Key{Namespace: cp.Namespace, Name: cp.Name})
+	}
+	return keys, nil
+}
+
+func (h *handler) resolvePlannerKeys(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	switch resource := obj.(type) {
+	case *corev1.Secret:
+		var keys []relatedresource.Key
+		if clusterName := resource.Labels[capr.ClusterNameLabel]; clusterName != "" {
+			logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by secret %s/%s", resource.Namespace, clusterName, resource.Namespace, resource.Name)
+			keys = append(keys, relatedresource.Key{Namespace: resource.Namespace, Name: clusterName})
+		}
+		keys = append(keys, authorizedClusterNameKeys(resource)...)
+		referencingKeys, err := h.referencingControlPlaneKeys("secret", resource.Namespace, resource.Name)
+		return append(keys, referencingKeys...), err
+	case *corev1.ConfigMap:
+		keys := authorizedClusterNameKeys(resource)
+		referencingKeys, err := h.referencingControlPlaneKeys("configmap", resource.Namespace, resource.Name)
+		return append(keys, referencingKeys...), err
+	case *capi.Machine:
+		if clusterName := resource.Labels[capi.ClusterNameLabel]; clusterName != "" {
+			logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by machine %s/%s", resource.Namespace, clusterName, resource.Namespace, resource.Name)
+			return []relatedresource.Key{{Namespace: resource.Namespace, Name: clusterName}}, nil
+		}
+	}
+	return nil, nil
 }
 
 func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
