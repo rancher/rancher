@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,7 +117,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			gid := cfg.groupID(group.DisplayName, group.ExternalID)
+			gid := cfg.GroupID(group.DisplayName, group.ExternalID)
 			if gid == "" {
 				continue
 			}
@@ -188,7 +189,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := s.getConfig(provider)
-	gid := cfg.groupID(payload.DisplayName, payload.ExternalID)
+	gid := cfg.GroupID(payload.DisplayName, payload.ExternalID)
 	if gid == "" {
 		writeError(w, NewError(http.StatusBadRequest,
 			fmt.Sprintf("%s is required when configured as groupIdAttribute", cfg.GroupIDAttribute)))
@@ -274,7 +275,7 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := s.getConfig(provider)
-	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	gid := cfg.GroupID(group.DisplayName, group.ExternalID)
 	if gid == "" {
 		logrus.Errorf("scim::GetGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
 		writeError(w, NewInternalError())
@@ -355,11 +356,11 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if group.ExternalID != payload.ExternalID && cfg.GroupIDAttribute == GroupIDExternalID {
+	if group.ExternalID != payload.ExternalID && cfg.GroupIDAttribute == scimconfig.GroupIDExternalID {
 		writeError(w, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the group principal identifier", "mutability"))
 		return
 	}
-	if group.DisplayName != payload.DisplayName && cfg.GroupIDAttribute != GroupIDExternalID {
+	if group.DisplayName != payload.DisplayName && cfg.GroupIDAttribute != scimconfig.GroupIDExternalID {
 		writeError(w, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier", "mutability"))
 		return
 	}
@@ -376,7 +377,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	gid := cfg.GroupID(group.DisplayName, group.ExternalID)
 	if gid == "" {
 		logrus.Errorf("scim::UpdateGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
 		writeError(w, NewInternalError())
@@ -557,7 +558,7 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	gid := cfg.GroupID(group.DisplayName, group.ExternalID)
 	if gid == "" {
 		logrus.Errorf("scim::PatchGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
 		writeError(w, NewInternalError())
@@ -647,7 +648,7 @@ func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := s.getConfig(provider)
-	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	gid := cfg.GroupID(group.DisplayName, group.ExternalID)
 	if gid == "" {
 		logrus.Errorf("scim::DeleteGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
 		writeError(w, NewInternalError())
@@ -993,7 +994,7 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Gro
 
 // applyPatchGroup applies a SCIM PATCH add/replace operation to a group.
 // For single-valued attributes, add and replace have identical semantics (RFC 7644 §3.5.2).
-func applyPatchGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, error) {
+func applyPatchGroup(group *v3.Group, op patchOp, cfg scimconfig.Config) (bool, error) {
 	if op.Path == "" {
 		// Bulk update - apply multiple attributes at once.
 		fields, ok := op.Value.(map[string]any)
@@ -1034,7 +1035,7 @@ func applyPatchGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, err
 			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for displayName: %v", op.Value))
 		}
 		if group.DisplayName != displayName {
-			if cfg.GroupIDAttribute != GroupIDExternalID {
+			if cfg.GroupIDAttribute != scimconfig.GroupIDExternalID {
 				return false, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier", "mutability")
 			}
 			group.DisplayName = displayName
@@ -1046,7 +1047,7 @@ func applyPatchGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, err
 			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for externalId: %v", op.Value))
 		}
 		if group.ExternalID != externalID {
-			if cfg.GroupIDAttribute == GroupIDExternalID {
+			if cfg.GroupIDAttribute == scimconfig.GroupIDExternalID {
 				return false, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the group principal identifier", "mutability")
 			}
 			group.ExternalID = externalID

@@ -1,13 +1,20 @@
-package scim
+// Package scimconfig reads the per-provider SCIM configuration. It imports no
+// auth code, so the SCIM handlers, the user manager and the provider refresher
+// can all use it.
+package scimconfig
 
 import (
-	"fmt"
 	"strconv"
 
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/namespace"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
+
+// Namespace is the namespace of the SCIM configuration ConfigMaps.
+const Namespace = namespace.GlobalNamespace
 
 const (
 	configMapNamePrefix = "scim-config-"
@@ -23,7 +30,7 @@ const (
 	GroupIDExternalID = "externalId"
 )
 
-// providerConfig holds SCIM provisioning settings for a single auth provider.
+// Config holds SCIM provisioning settings for a single auth provider.
 // Stored as a ConfigMap in cattle-global-data with name "scim-config-{provider}".
 //
 // Each field maps directly to a key in ConfigMap.Data:
@@ -34,7 +41,7 @@ const (
 //	groupIdAttribute:           "displayName" | "externalId"    (default: "displayName")
 //	rateLimitRequestsPerSecond: integer                         (default: 0 = disabled)
 //	rateLimitBurst:             integer                         (default: 10)
-type providerConfig struct {
+type Config struct {
 	// Enabled controls whether SCIM provisioning is active for this provider.
 	// The SCIM feature flag must also be enabled; this flag alone is not sufficient.
 	Enabled bool
@@ -67,16 +74,18 @@ type providerConfig struct {
 	RateLimitBurst int
 }
 
-func (c *providerConfig) userID(user scimUser) string {
+// UserID returns the SCIM user attribute the user principal ID is built from.
+func (c Config) UserID(userName, externalID string) string {
 	switch c.UserIDAttribute {
 	case UserIDExternalID:
-		return user.ExternalID
+		return externalID
 	default:
-		return user.UserName
+		return userName
 	}
 }
 
-func (c *providerConfig) groupID(displayName, externalID string) string {
+// GroupID returns the SCIM group attribute the group principal ID is built from.
+func (c Config) GroupID(displayName, externalID string) string {
 	switch c.GroupIDAttribute {
 	case GroupIDExternalID:
 		return externalID
@@ -87,8 +96,9 @@ func (c *providerConfig) groupID(displayName, externalID string) string {
 
 const defaultRateLimitBurst = 10
 
-func defaultProviderConfig() providerConfig {
-	return providerConfig{
+// Default returns the configuration used when a provider has no ConfigMap.
+func Default() Config {
+	return Config{
 		UserIDAttribute:  UserIDUserName,
 		GroupIDAttribute: GroupIDDisplayName,
 		RateLimitBurst:   defaultRateLimitBurst,
@@ -105,16 +115,16 @@ var validGroupIDAttributes = map[string]bool{
 	GroupIDExternalID:  true,
 }
 
-// getProviderConfig loads the SCIM configuration for a provider from the ConfigMap.
-// Returns default config if no ConfigMap exists.
-func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) providerConfig {
-	cfg := defaultProviderConfig()
+// Get loads the SCIM configuration for a provider from its ConfigMap.
+// Returns Default() if no ConfigMap exists.
+func Get(configMapCache wcorev1.ConfigMapCache, provider string) Config {
+	cfg := Default()
 
 	name := configMapNamePrefix + provider
-	cm, err := configMapCache.Get(tokenSecretNamespace, name)
+	cm, err := configMapCache.Get(Namespace, name)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			logrus.Errorf("scim::getProviderConfig: failed to get configmap %s: %s", name, err)
+			logrus.Errorf("scimconfig::Get: failed to get configmap %s: %s", name, err)
 		}
 		return cfg
 	}
@@ -122,7 +132,7 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 	if v, ok := cm.Data["enabled"]; ok {
 		enabled, err := strconv.ParseBool(v)
 		if err != nil {
-			logrus.Errorf("scim::getProviderConfig: invalid enabled value %q in configmap %s, using default", v, name)
+			logrus.Errorf("scimconfig::Get: invalid enabled value %q in configmap %s, using default", v, name)
 		} else {
 			cfg.Enabled = enabled
 		}
@@ -131,7 +141,7 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 	if v, ok := cm.Data["paused"]; ok {
 		paused, err := strconv.ParseBool(v)
 		if err != nil {
-			logrus.Errorf("scim::getProviderConfig: invalid paused value %q in configmap %s, using default", v, name)
+			logrus.Errorf("scimconfig::Get: invalid paused value %q in configmap %s, using default", v, name)
 		} else {
 			cfg.Paused = paused
 		}
@@ -141,7 +151,7 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 		if validUserIDAttributes[v] {
 			cfg.UserIDAttribute = v
 		} else {
-			logrus.Errorf("scim::getProviderConfig: invalid userIdAttribute %q in configmap %s, using default", v, name)
+			logrus.Errorf("scimconfig::Get: invalid userIdAttribute %q in configmap %s, using default", v, name)
 		}
 	}
 
@@ -149,14 +159,14 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 		if validGroupIDAttributes[v] {
 			cfg.GroupIDAttribute = v
 		} else {
-			logrus.Errorf("scim::getProviderConfig: invalid groupIdAttribute %q in configmap %s, using default", v, name)
+			logrus.Errorf("scimconfig::Get: invalid groupIdAttribute %q in configmap %s, using default", v, name)
 		}
 	}
 
 	if v, ok := cm.Data["rateLimitRequestsPerSecond"]; ok {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			logrus.Errorf("scim::getProviderConfig: invalid rateLimitRequestsPerSecond value %q in configmap %s, using default", v, name)
+			logrus.Errorf("scimconfig::Get: invalid rateLimitRequestsPerSecond value %q in configmap %s, using default", v, name)
 		} else {
 			cfg.RateLimitRequestsPerSecond = n
 		}
@@ -165,7 +175,7 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 	if v, ok := cm.Data["rateLimitBurst"]; ok {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			logrus.Errorf("scim::getProviderConfig: invalid rateLimitBurst value %q in configmap %s, using default", v, name)
+			logrus.Errorf("scimconfig::Get: invalid rateLimitBurst value %q in configmap %s, using default", v, name)
 		} else {
 			cfg.RateLimitBurst = n
 		}
@@ -174,10 +184,9 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 	return cfg
 }
 
-func userPrincipalName(provider, id string) string {
-	return fmt.Sprintf("%s_user://%s", provider, id)
-}
-
-func groupPrincipalName(provider, id string) string {
-	return fmt.Sprintf("%s_group://%s", provider, id)
+// Enabled reports whether SCIM is enabled for provider: the scim feature flag
+// is on and the provider's ConfigMap has enabled set to true. A paused
+// provider counts as enabled.
+func Enabled(configMapCache wcorev1.ConfigMapCache, provider string) bool {
+	return features.SCIM.Enabled() && Get(configMapCache, provider).Enabled
 }

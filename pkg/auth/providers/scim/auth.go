@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -37,7 +38,7 @@ type tokenAuthenticator struct {
 	secrets            wcorev1.SecretClient
 	isDisabledProvider func(provider string) (bool, error)
 	expireTokensAfter  func() time.Duration
-	getConfig          func(provider string) providerConfig
+	getConfig          func(provider string) scimconfig.Config
 }
 
 // Authenticate implements the http middleware for tokenAuthenticator.
@@ -127,7 +128,7 @@ func NewTokenAuthenticator(wContext *wrangler.Context) *tokenAuthenticator {
 		secrets:            wContext.Core.Secret(),
 		isDisabledProvider: providers.IsDisabledProvider,
 		expireTokensAfter:  func() time.Duration { return settings.ExpireSCIMTokensAfter.GetDuration() },
-		getConfig:          func(provider string) providerConfig { return getProviderConfig(cmCache, provider) },
+		getConfig:          func(provider string) scimconfig.Config { return scimconfig.Get(cmCache, provider) },
 	}
 }
 
