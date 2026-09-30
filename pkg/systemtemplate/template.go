@@ -187,6 +187,7 @@ spec:
       {{- if .EnablePriorityClass }}
       priorityClassName: cattle-cluster-agent-priority-class
       {{- end }}
+      {{- if not .IsPreBootstrap }}
       initContainers:
       - name: rancher-charts-copy
         image: {{.AssetsImage}}
@@ -194,6 +195,7 @@ spec:
         volumeMounts:
         - name: rancher-charts
           mountPath: /charts
+      {{- end }}
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent

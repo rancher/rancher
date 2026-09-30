@@ -165,13 +165,6 @@ spec:
       - effect: NoSchedule
         key: node.cloudprovider.kubernetes.io/uninitialized
         operator: "Exists"
-      initContainers:
-      - name: rancher-charts-copy
-        image: rancher/assets:charts
-        imagePullPolicy: IfNotPresent
-        volumeMounts:
-        - name: rancher-charts
-          mountPath: /charts
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
