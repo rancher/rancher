@@ -1,5 +1,5 @@
-Steve API Integration Tests
-===========================
+Steve API E2E Tests
+====================
 
 This test suite tests the steve resource listing API using secrets as the main
 test resource, since they are quick to create. The suite uses three user

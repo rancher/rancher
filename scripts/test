@@ -175,13 +175,13 @@ echo Running build-integration-setup
 ./tests/e2e/scripts/build-integration-setup
 
 echo Running integrationsetup
-export CATTLE_TEST_CONFIG=$(pwd)/tests/e2e/config.yaml # used by integration tests and test setup
+export CATTLE_TEST_CONFIG=$(pwd)/tests/e2e/config.yaml # used by e2e tests and test setup
 ./tests/e2e/bin/integrationsetup || {
   dump_rancher_logs
   exit 1
 }
 
-echo Running go integration tests
+echo Running go e2e tests
 CGO_ENABLED=0 go test -v -failfast -timeout 30m -p 1 ./tests/e2e/... || {
   dump_rancher_logs
   exit 1

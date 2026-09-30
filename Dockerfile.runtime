@@ -17,11 +17,11 @@
 # Key contents:
 #   - Go toolchain (from registry.suse.com/bci/golang)
 #   - Docker CLI + buildx (for building container images inside the container)
-#   - K3s binaries (for integration tests that spin up a local cluster)
+#   - K3s binaries (for e2e tests that spin up a local cluster)
 #   - k3d (for provisioning tests)
 #   - golangci-lint (amd64 only)
 #   - rancher-machine
-#   - Python 3.11 + tox (for validation/integration test suites)
+#   - Python 3.11 + tox (for validation/e2e test suites)
 
 FROM registry.suse.com/bci/golang:1.27.1
 

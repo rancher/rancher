@@ -1,10 +1,10 @@
-# Integration Tests
+# E2E Tests
 
 ## Running Tests
 
 ### Method 1: Full CI Run (Recommended for Validation)
 
-To run the integration tests in `tests/e2e`, use
+To run the e2e tests in `tests/e2e`, use
 
 ```shell
 make ci
@@ -14,7 +14,7 @@ This will run `scripts/test` inside the Rancher runtime container built from `Do
 will set up and run Rancher. Upon startup, Rancher will create a local cluster using k3s and deploy CRDs to it. Once
 the Rancher and the local cluster are ready, the tests will be run.
 
-This _should_ work on Mac and Linux systems out of the box, at least in theory. The whole integration test process does
+This _should_ work on Mac and Linux systems out of the box, at least in theory. The whole e2e test process does
 consume a fair bit of CPU and memory. If you experience unexpected timeouts, you may not have enough compute power. If
 you encounter OOM issues that affect scheduling of containers, you may not have enough memory.
 
@@ -105,7 +105,7 @@ file directly. See [Configuration Reference](#configuration-reference) below for
 ```bash
 export CATTLE_TEST_CONFIG=$(pwd)/tests/e2e/config.yaml
 
-# Run all integration tests
+# Run all e2e tests
 go test -v -timeout 30m -failfast -p 1 ./tests/e2e/...
 
 # Run a specific test suite
@@ -124,10 +124,10 @@ go test -v -count=1 -run TestSteveLocal ./tests/e2e/steveapi/
 |---|---|---|
 | `-timeout` | `-timeout 30m` | Hard deadline for the entire test binary. The default is **10 minutes**, which is too short for catalog tests that pull external repositories. Use `30m` for full suite runs. |
 | `-run` | `-run TestChartsTestSuite` | Run only tests/suites matching the regex. Supports `/` to select a sub-test: `-run Suite/TestName`. |
-| `-count` | `-count=1` | Disable test result caching. Always use `-count=1` when running integration tests to ensure a fresh run. |
+| `-count` | `-count=1` | Disable test result caching. Always use `-count=1` when running e2e tests to ensure a fresh run. |
 | `-v` | `-v` | Verbose output — prints each test name and PASS/FAIL as it runs. Useful for spotting which test hangs. |
 | `-failfast` | `-failfast` | Stop the run after the first test failure. Used in CI to avoid wasting time once something breaks. |
-| `-p` | `-p 1` | Number of test packages to build and run in parallel. Must be `1` for integration tests to avoid resource conflicts. |
+| `-p` | `-p 1` | Number of test packages to build and run in parallel. Must be `1` for e2e tests to avoid resource conflicts. |
 
 ---
 
@@ -199,9 +199,9 @@ Every test file has a companion `*_test_summary.md` describing what it covers. T
 
 ## Test Setup Details
 
-Setup for the integration tests can be found in `scripts/test` and `tests/e2e/setup/main.go`. The latter is
+Setup for the e2e tests can be found in `scripts/test` and `tests/e2e/setup/main.go`. The latter is
 responsible primarily for
-1. Generating and saving a test config file that will be used by the integration tests.
+1. Generating and saving a test config file that will be used by the e2e tests.
 2. Creating a user and corresponding token with which to access Rancher from tests.
 3. Creating a new test namespace in the local cluster to which credentials for Docker container registries will be 
 deployed in the form of secrets.
@@ -214,12 +214,12 @@ images pulled by downstream clusters when they create containers in order to spe
 creating these registries will also result in secrets being deployed to the aforementioned test namespace. The cattle
 cluster agent image built locally (by `scripts/ci`) is then pushed to the first registry, so it can be pulled by 
 downstream clusters. Configuration for these two registries is merged together and used to create a test cluster that
-is used in integration tests. The merged registry config is what allows the downstream cluster to access the registries
+is used in e2e tests. The merged registry config is what allows the downstream cluster to access the registries
 inside the local cluster.
 
 ### Downstream Cluster Provisioning
 
-The downstream cluster is created the same way in the integration test setup as it would be in v2 provisioning tests.
+The downstream cluster is created the same way in the e2e test setup as it would be in v2 provisioning tests.
 We create the downstream cluster using the provided `cluster.New()` function in 
 `github.com/rancher/rancher/tests/v2prov/cluster`. This, in turn, uses Rancher's v2 provisioning functionality to create
 a container in the test namespace that runs a machine provisioner. This machine provisioner will create a
@@ -227,7 +227,7 @@ a container in the test namespace that runs a machine provisioner. This machine 
 Kubernetes cluster. In other words, the end result is
 - A Docker container running the Rancher runtime environment
   - `scripts/test` running
-    - Integration tests
+    - E2E tests
     - Rancher
     - Rancher's "local" cluster: a k3s cluster running
       - A number of containers (for stuff like networking, but Rancher-specific things like the rancher-webhook)
