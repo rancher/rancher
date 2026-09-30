@@ -2,6 +2,8 @@ package v3
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUserIsSystem(t *testing.T) {
@@ -66,4 +68,48 @@ func TestUserIsAdmin(t *testing.T) {
 			t.Errorf("Expected %t got %t", want, got)
 		}
 	}
+}
+
+func TestActiveDirectoryConfigSearchAttributes(t *testing.T) {
+	config := ActiveDirectoryConfig{
+		UserObjectClass:      "person",
+		UserLoginAttribute:   "sAMAccountName",
+		UserNameAttribute:    "name",
+		UserEnabledAttribute: "userAccountControl",
+		GroupObjectClass:     "group",
+		GroupNameAttribute:   "name",
+		GroupSearchAttribute: "sAMAccountName",
+	}
+
+	assert.Equal(t, []string{"person", "sAMAccountName", "name", "userAccountControl", "memberOf"}, config.GetUserSearchAttributes("memberOf"))
+	assert.Equal(t, []string{"group", "sAMAccountName", "name", "sAMAccountName", "objectClass"}, config.GetGroupSearchAttributes("objectClass"))
+
+	config.UserIDAttribute = "objectGUID"
+	config.GroupIDAttribute = "objectSid"
+
+	assert.Equal(t, []string{"person", "sAMAccountName", "name", "userAccountControl", "objectGUID", "memberOf"}, config.GetUserSearchAttributes("memberOf"))
+	assert.Equal(t, []string{"group", "sAMAccountName", "name", "sAMAccountName", "objectSid", "objectClass"}, config.GetGroupSearchAttributes("objectClass"))
+}
+
+func TestLdapConfigSearchAttributes(t *testing.T) {
+	config := LdapConfig{LdapFields: LdapFields{
+		UserMemberAttribute:      "memberOf",
+		GroupMemberUserAttribute: "entryDN",
+		UserObjectClass:          "inetOrgPerson",
+		UserLoginAttribute:       "uid",
+		UserNameAttribute:        "cn",
+		UserEnabledAttribute:     "nsAccountLock",
+		GroupObjectClass:         "groupOfNames",
+		GroupNameAttribute:       "cn",
+		GroupSearchAttribute:     "cn",
+	}}
+
+	assert.Equal(t, []string{"dn", "memberOf", "inetOrgPerson", "uid", "cn", "nsAccountLock", "objectClass"}, config.GetUserSearchAttributes("objectClass"))
+	assert.Equal(t, []string{"entryDN", "groupOfNames", "uid", "cn", "cn", "objectClass"}, config.GetGroupSearchAttributes("objectClass"))
+
+	config.UserIDAttribute = "entryUUID"
+	config.GroupIDAttribute = "gidNumber"
+
+	assert.Equal(t, []string{"dn", "memberOf", "inetOrgPerson", "uid", "cn", "nsAccountLock", "entryUUID", "objectClass"}, config.GetUserSearchAttributes("objectClass"))
+	assert.Equal(t, []string{"entryDN", "groupOfNames", "uid", "cn", "cn", "gidNumber", "objectClass"}, config.GetGroupSearchAttributes("objectClass"))
 }
