@@ -389,6 +389,42 @@ func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageUsesClusterRegis
 	}, result)
 }
 
+func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageUsesClusterRegistryWithPath() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "provisioning.cattle.io/v1",
+					Kind:       "Cluster",
+					Name:       "test-cluster",
+				},
+			},
+		},
+	}
+	provCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				ClusterConfiguration: rke.ClusterConfiguration{
+					MachineGlobalConfig: rke.GenericMap{
+						Data: map[string]interface{}{"system-default-registry": "cluster-registry.local/subpath"},
+					},
+				},
+			},
+		},
+	}
+	s.clusterCache.EXPECT().Get("default", "test-cluster").Return(provCluster, nil)
+
+	result := s.h.getChartImageSettings(cluster, "")
+	s.Equal(map[string]any{
+		"repository": "subpath/rancher/appco-kubernetes-cluster-autoscaler",
+		"registry":   "cluster-registry.local",
+		"tag":        defaultChartVersionConfigs.imageTag,
+	}, result)
+}
+
 func (s *autoscalerSuite) TestGetChartImageSettings_DefaultImageFallsBackToGlobalRegistry() {
 	cluster := &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
