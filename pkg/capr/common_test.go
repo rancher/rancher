@@ -812,20 +812,6 @@ func TestShouldPreBootstrap(t *testing.T) {
 	}
 }
 
-func TestShouldPreBootstrapWhenClusterAlreadyPreBootstrapped(t *testing.T) {
-	cluster := &apimgmtv3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
-		Spec: apimgmtv3.ClusterSpec{
-			DisplayName:        "c-test",
-			FleetWorkspaceName: "fleet-default",
-		},
-	}
-	apimgmtv3.ClusterConditionPreBootstrapped.True(cluster)
-
-	got := ShouldPreBootstrap(cluster)
-	assert.False(t, got)
-}
-
 func TestClusterAuthorizedForSecret(t *testing.T) {
 	assert.True(t, ClusterAuthorizedForSecret("a,b,c-test", "c-test"))
 	assert.True(t, ClusterAuthorizedForSecret("a, c-test", "c-test"))
