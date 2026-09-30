@@ -184,9 +184,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		}, nil
 	}
 
-	if os := machine.GetLabels()[capr.CattleOSLabel]; os == capr.WindowsMachineOS {
-		return nil, fmt.Errorf("windows is not currently supported with external capi infrastructure providers")
-	}
+	isWindows := machine.GetLabels()[capr.CattleOSLabel] == capr.WindowsMachineOS
 
 	// For external capi infrastructure providers, we merge the user-provided
 	// userdata here.
@@ -213,18 +211,27 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 
 	content := base64.StdEncoding.EncodeToString(output.Bytes())
 
-	command := "sh"
+	// cloudbase-init (the Windows equivalent of cloud-init) accept the same cloud-config
+	// write_files and runcmd directives, but the install script needs to be run via powershell.exe
+	// and written to a Windows path rather than a linux path.
 	path := "/usr/local/custom_script/install.sh"
+	var runCommand []any
+	if isWindows {
+		path = `C:\usr\local\bin\install.ps1`
+		runCommand = []any{"powershell.exe", "-File", path}
+	} else {
+		runCommand = []any{"sh", path}
+	}
+
+	writeFile := map[string]string{
+		"content":     content,
+		"encoding":    "gzip+b64",
+		"path":        path,
+		"permissions": "0600",
+	}
 
 	// Copy system agent install script
-	writeFiles := []any{
-		map[string]string{
-			"content":     content,
-			"encoding":    "gzip+b64",
-			"path":        path,
-			"permissions": "0600",
-		},
-	}
+	writeFiles := []any{writeFile}
 
 	if userWriteFiles, ok := userdata["write_files"]; ok {
 		userWriteFiles, ok := userWriteFiles.([]any)
@@ -237,7 +244,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	userdata["write_files"] = writeFiles
 
 	// Call system agent install script
-	runcmd := []any{fmt.Sprintf("%s %s", command, path)}
+	runcmd := []any{runCommand}
 
 	if userRunCmd, ok := userdata["runcmd"]; ok {
 		userRunCmd, ok := userRunCmd.([]any)
