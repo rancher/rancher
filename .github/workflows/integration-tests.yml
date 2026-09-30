@@ -7,7 +7,7 @@ env:
   HOST_ARCH: amd64
   ARCH: amd64
   GOLANG_VERSION: '1.27'
-  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE: ${{ github.repository_owner }}/rancher-server
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}
 permissions: {}
@@ -87,7 +87,7 @@ jobs:
             exit 1
           fi
 
-          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
+          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-server:.*amd64.*$" | head -n 1)
           echo "the image created is $AMD_IMAGE"
           docker tag "$image_server_id" "${IMAGE}:${TAG}"
           docker image ls

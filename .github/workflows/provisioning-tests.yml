@@ -92,7 +92,7 @@ jobs:
       CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
       TAG: ${{ github.sha }}-head
       COMMIT: ${{ github.sha }}
-      IMAGE: ${{ github.repository_owner }}/rancher
+      IMAGE: ${{ github.repository_owner }}/rancher-server
       IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
     permissions:
       contents: read
@@ -113,7 +113,7 @@ jobs:
         with:
           path: "/tmp"
           merge-multiple: true
-      - name: Load rancher/rancher image
+      - name: Load rancher/rancher-server image
         run: |
           image_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_id" ]; then
@@ -121,7 +121,7 @@ jobs:
             exit 1
           fi
 
-          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
+          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-server:.*amd64.*$" | head -n 1)
           docker tag "$image_id" "${IMAGE}:${TAG}"
           echo "the image created is ${IMAGE}:${TAG}"
       - name: Load rancher/rancher-agent image
