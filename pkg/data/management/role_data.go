@@ -247,7 +247,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("security.istio.io").resources("requestauthentications").verbs(crudVerbs...).
 		addRule().apiGroups("telemetry.istio.io").resources("telemetries").verbs(crudVerbs...).
 		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs(crudVerbs...).
-		addRule().apiGroups("catalog.cattle.io").resources("operations", "release", "apps").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("operations", "releases", "apps").verbs("get", "list", "watch").
 		addRule().apiGroups("traefik.io").resources("ingressroutes", "ingressroutetcps", "ingressrouteudps", "middlewares", "middlewaretcps", "tlsoptions", "tlsstores", "serverstransports", "serverstransporttcps").verbs(crudVerbs...).
 		// Promoted Rules
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
