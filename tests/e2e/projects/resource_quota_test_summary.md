@@ -3,20 +3,44 @@
 Verifies that resource quotas are correctly created, overridden, and propagated when projects and namespaces are created or updated.
 
 ## `TestCreateNamespaceWithQuotaInProject`
-Creates a project with resource quota limit of 500m CPU and namespace default of 200m CPU, then creates a namespace in that project.
-- Checks exactly 1 resource quota is created in the namespace.
-- Checks the quota contains the namespace default limit of 200m CPU.
+**Arrange:**
+- Creates a project with a resource quota limit of 500m CPU and a namespace-default resource quota limit of 200m CPU.
+
+**Act:** Creates a namespace in that project.
+
+**Assert:**
+- Checks exactly 1 resource quota exists in the namespace.
+- Checks the quota's CPU limit matches the namespace default (200m).
 
 ## `TestCreateNamespaceWithOverriddenQuotaInProject`
-Creates a project with resource quota 500m CPU and namespace default 200m CPU, then creates two namespaces with overridden quotas (190m CPU and 400m CPU + 50 ConfigMaps via annotations).
-- Checks the first namespace has 190m CPU quota (lower than default).
-- Checks the second namespace has 0 CPU quota (400m exceeds project limit, so CPU is removed).
+**Arrange:**
+- Creates a project with a resource quota limit of 500m CPU and a namespace-default limit of 200m CPU.
+
+**Act:** Creates two namespaces in the project — one annotated to override its quota to 190m CPU, the other annotated to override to 400m CPU plus 50 ConfigMaps.
+
+**Assert:**
+- Checks the first namespace's quota is 190m CPU (an override below the default is honored).
+- Checks the second namespace's quota has CPU reset to 0 (the 400m override exceeds the project limit, so CPU is dropped instead of applied).
 
 ## `TestRemoveQuotaFromProjectWithNamespacePropagation`
-Creates a project and namespace with CPU 500m project limit, 200m namespace default, and ConfigMaps 10 project, 5 namespace; then removes CPU limits from both project and namespace defaults; then removes ConfigMaps limits.
-- Checks after removing CPU limits, the namespace quota retains only ConfigMaps limit of 5.
-- Checks after removing ConfigMaps limits, the namespace has no resource quotas (deletion detected via watch).
+**Arrange:**
+- Creates a project with resource quota limits of 500m CPU and 10 ConfigMaps, and namespace-default limits of 200m CPU and 5 ConfigMaps.
+- Creates a namespace in that project.
+
+**Act 1:** Removes the CPU limit from the project and its namespace default.
+**Assert 1:**
+- Checks the namespace's resource quota retains just the ConfigMaps limit (5).
+
+**Act 2:** Removes the ConfigMaps limit as well.
+**Assert 2:**
+- Checks the namespace's resource quota object is deleted entirely (detected via watch).
 
 ## `TestAddQuotaFromProjectWithNamespacePropagation`
-Creates a project and namespace with CPU 500m project limit and 200m namespace default, then adds Secrets limit 20 to project and 10 to namespace default.
-- Checks the namespace quota is updated to include both CPU 200m and Secrets 10.
+**Arrange:**
+- Creates a project with a resource quota limit of 500m CPU and a namespace-default limit of 200m CPU.
+- Creates a namespace in that project.
+
+**Act:** Adds a Secrets limit to the project (20) and its namespace default (10), then updates the project.
+
+**Assert:**
+- Checks the namespace's resource quota updates to include both the existing CPU limit (200m) and the new Secrets limit (10).

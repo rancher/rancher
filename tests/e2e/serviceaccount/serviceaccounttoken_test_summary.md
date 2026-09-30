@@ -3,5 +3,12 @@
 Verifies that concurrent requests to ensure a service account secret do not create duplicate secrets.
 
 ## `TestSingleSecretForServiceAccount`
-Creates a namespace and service account, then calls the EnsureSecretForServiceAccount function 10 times concurrently from goroutines, and verifies exactly one secret is created.
-- Checks only 1 secret is created in the namespace despite 10 concurrent calls.
+**Arrange:**
+- Gets a Kubernetes clientset for the local cluster.
+- Creates a namespace.
+- Creates a service account in that namespace.
+
+**Act:** Calls `EnsureSecretForServiceAccount` 10 times concurrently for the same service account.
+
+**Assert:**
+- Checks only 1 secret is created in the namespace despite the 10 concurrent calls.
