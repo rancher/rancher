@@ -1,7 +1,9 @@
 # `cluster_defaults_test.go` Summary
 
-Verifies that newly created import clusters have the correct initial state with respect to conditions and defaults.
+Verifies that a newly created import cluster has no conditions set immediately after creation.
 
 ## `TestImportInitialConditions`
-Creates a new import cluster and verifies its initial state immediately after creation.
-- Checks that the cluster has no conditions set when first created.
+**Act:** Creates a new import cluster.
+
+**Assert:**
+- Checks the cluster has no conditions set immediately after creation.
