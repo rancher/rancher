@@ -1,18 +1,24 @@
 # `node_test.go` Summary
 
-Verifies that the Norman schema for node types and node driver configurations expose the correct CRUD operations, field permissions, and do not leak sensitive filesystem paths.
+Verifies that the Norman schemas for the node type and node driver configurations expose the correct CRUD operations and field permissions, and do not leak sensitive filesystem paths.
 
 ## `TestNodeFields`
-Fetches the node schema and verifies that CRUD methods are available and field-level create/update permissions match expectations.
-- Checks the node schema supports GET and POST collection methods.
-- Checks the node schema supports GET, PUT, and DELETE resource methods.
-- Checks 30+ explicit fields have the correct create/update permissions (e.g., allocatable is read-only, labels are create-update, clusterId is create-only).
-- Checks all fields ending in "Config" are create-only, except customConfig which is create-update.
+**Act:** Fetches the Norman schema for the node type.
+
+**Assert:**
+- Checks the schema's collection methods include GET and POST.
+- Checks the schema's resource methods include GET, PUT, and DELETE.
+- Checks 30+ explicit fields have the correct create/update permissions (e.g. `allocatable` is read-only, `labels` is create-update, `clusterId` is create-only).
+- Checks all fields ending in "Config" are create-only, except `customConfig` which is create-update.
 
 ## `TestNodeDriverSchema`
-Fetches the amazonec2config, digitaloceanconfig, and azureconfig schemas and verifies they do not expose sensitive filesystem path fields.
-- Checks that sshKeypath, sshKeyPath, and existingKeyPath fields are not present in driver schemas.
+**Act:** Fetches the `amazonec2config`, `digitaloceanconfig`, and `azureconfig` schemas.
+
+**Assert:**
+- Checks none of the schemas expose the `sshKeypath`, `sshKeyPath`, or `existingKeyPath` fields.
 
 ## `TestAmazonNodeDriverSchema`
-Fetches the amazonec2config schema and verifies it includes fields required for EBS integration.
-- Checks the amazonec2config schema contains the encryptEbsVolume field.
+**Act:** Fetches the `amazonec2config` schema.
+
+**Assert:**
+- Checks the schema contains the `encryptEbsVolume` field.

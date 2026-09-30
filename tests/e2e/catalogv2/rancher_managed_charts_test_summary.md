@@ -1,39 +1,70 @@
 # `rancher_managed_charts_test.go` Summary
 
-Verifies that Rancher-managed system charts are installed, upgraded, and downgraded correctly based on latest available versions, configuration map modifications, and system cluster updates.
+Verifies that Rancher's system-managed `rancher-aks-operator` chart tracks the latest available version from the `rancher-charts` repo, and correctly handles upgrades, degraded/working-version transitions, and icon serving for bundled catalogs.
 
 ## `TestInstallChartLatestVersion`
-Updates the rancher-charts ClusterRepo to point to charts-small-fork on the aks-integration-test-working-charts branch, triggers cluster update, and verifies rancher-aks-operator deploys at the latest version.
-- Checks the ClusterRepo is updated and resources are downloaded.
-- Checks the rancher-aks-operator app reaches StatusDeployed.
-- Checks the installed chart version is 104.0.2+up1.9.0.
-- Checks the version matches the latest available from the catalog.
-- Checks no values are set on the app.
+**Arrange:**
+- Points the `rancher-charts` ClusterRepo at `charts-small-fork`'s `aks-integration-test-working-charts` branch (a controlled chart source with known versions) and waits for it to download.
+
+**Act:** Enables AKS on the management cluster (sets `AKSConfig`).
+
+**Assert:**
+- Checks the `rancher-aks-operator` app reaches `StatusDeployed`.
+- Checks the deployed chart version is `104.0.2+up1.9.0`.
+- Checks this version matches the latest version available from the catalog.
+- Checks no explicit Helm values are set on the app or chart.
 
 ## `TestUpgradeChartToLatestVersion`
-Updates rancher-charts ClusterRepo, downgrades the latest version in the ConfigMap index, triggers cluster update, and verifies the system deploys the downgraded (older) version.
-- Checks the ClusterRepo is updated and resources are downloaded.
-- Checks the original latest version is extracted from the ConfigMap.
-- Checks after downgrading the index, the app reaches StatusDeployed with the lower version.
-- Checks the deployed version is less than the original latest.
-- Checks the ConfigMap is reverted and ForceUpdate is triggered to recover the original index.
-- Checks after recovery, the app reaches StatusDeployed with the original latest version.
+**Arrange:**
+- Points the `rancher-charts` ClusterRepo at `charts-small-fork`'s `aks-integration-test-working-charts` branch and waits for it to download.
+
+**Act 1:** Removes the top (truly-latest) `rancher-aks-operator` entry from the downloaded index ConfigMap, then enables AKS on the management cluster.
+**Assert 1:**
+- Checks `rancher-aks-operator` deploys at the now-highest remaining version (`104.0.1+up1.9.0`), which is lower than the actual latest version recorded before the edit.
+- Checks no explicit Helm values are set.
+
+**Act 2:** Reverts the index ConfigMap to its original content and forces the ClusterRepo to refresh.
+**Assert 2:**
+- Checks `rancher-aks-operator` is automatically upgraded to the restored (true) latest version.
+- Checks no explicit Helm values are set.
 
 ## `TestUpgradeToWorkingVersion`
-Sets the rancher-charts branch to aks-integration-test-1, removes the latest version from the ConfigMap index, triggers cluster update, and verifies degraded version is deployed, then reverts.
-- Checks the ClusterRepo initially has no rancher-aks-charts app.
-- Checks after modifying the ConfigMap and updating the cluster, the rancher-aks-operator app reaches StatusFailed.
-- Checks the operation count for rancher-aks-operator is tracked before and after.
-- Checks no more than 2 additional operations are created after the failed deployment.
-- Checks after reverting the ConfigMap and forcing refresh, the app reaches StatusDeployed.
+**Arrange:**
+- Confirms the cluster has no `AKSConfig` and no `rancher-aks-charts` app yet.
+- Points the `rancher-charts` ClusterRepo at `charts-small-fork`'s `aks-integration-test-1` branch (whose second-highest `rancher-aks-operator` version is deliberately broken) and waits for it to download.
+- Records the current operation count for `rancher-aks-operator`.
+
+**Act 1:** Removes the newest index entry (promoting the broken version to "latest"), then enables AKS on the management cluster.
+**Assert 1:**
+- Checks `rancher-aks-operator` reaches `StatusFailed`.
+- Checks no explicit Helm values are set.
+- Checks no more than 2 additional operations were created beyond the pre-recorded count (Rancher doesn't retry runaway on repeated failures).
+
+**Act 2:** Reverts the index ConfigMap to its original content and forces the ClusterRepo to refresh.
+**Assert 2:**
+- Checks `rancher-aks-operator` eventually reaches `StatusDeployed` at the restored (true) latest version.
 
 ## `TestUpgradeToBrokenVersion`
-Sets the rancher-charts branch to aks-integration-test-2, removes the latest version from the ConfigMap, triggers cluster update to deploy a broken version, then reverts.
-- Checks after modifying the ConfigMap, the rancher-aks-operator app reaches StatusDeployed with version 102.0.0+up1.1.0.
-- Checks the operation count is tracked before revert.
-- Checks after reverting the ConfigMap and triggering ForceUpdate, the app reaches StatusFailed.
-- Checks no more than 2 additional operations are created between successful and failed states.
+**Arrange:**
+- Points the `rancher-charts` ClusterRepo at `charts-small-fork`'s `aks-integration-test-2` branch and waits for it to download.
+
+**Act 1:** Removes the newest index entry (forcing fallback to a lower, working version), then enables AKS on the management cluster.
+**Assert 1:**
+- Checks `rancher-aks-operator` deploys successfully at the resulting version (`102.0.0+up1.1.0`).
+- Checks no explicit Helm values are set.
+
+**Act 2:** Reverts the index ConfigMap to restore the true (broken) latest version entry and forces the ClusterRepo to refresh.
+**Assert 2:**
+- Checks `rancher-aks-operator` transitions to `StatusFailed` at the restored version.
+- Checks no more than 2 additional operations were created between the successful and failed states (bounded retries).
 
 ## `TestServeIcons`
-Clones the rancher/charts-small-fork repository to a specific build directory to test that Rancher serves chart icons from the prebuild helm repository location.
-- Checks the clone directory is created.
+**Arrange:**
+- Clones the `charts-small-fork` repo locally into the directory Rancher expects for a prebuilt/bundled catalog.
+- Creates a ClusterRepo pointing at the same fork (`main` branch) and waits for it to download; confirms more than 1 chart is discoverable and that the `system-catalog` setting starts as `external`.
+
+**Act:** Updates the `system-catalog` setting to `bundled`.
+
+**Assert:**
+- Checks the setting updates to `bundled`.
+- Checks fetching the `rancher-compliance` chart icon (served via the `file://`-backed bundled catalog) succeeds and returns non-empty image data.

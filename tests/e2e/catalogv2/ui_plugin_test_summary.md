@@ -1,43 +1,88 @@
 # `ui_plugin_test.go` Summary
 
-Verifies UI plugin installation, authentication requirements, content-type headers, plugin fetching, and endpoint reliability with compressed archives and exponential backoff retry logic.
+Verifies that the `/v1/uiplugins` index and per-plugin file endpoints respect authentication requirements and content types, and that UIPlugin resources correctly fetch, cache, and retry compressed/uncompressed plugin archives from remote endpoints.
 
 ## `TestGetIndexAuthenticated`
-Fetches the UI plugin index with an authenticated session using admin token.
-- Checks the index returns 4 installed plugins (uk-locale, clock, top-level-product, homepage).
+**Arrange:**
+- None (relies on the suite's 4 pre-installed plugins: `uk-locale`, `clock`, `top-level-product`, `homepage`).
+
+**Act:** Requests `/v1/uiplugins` with an authenticated session (valid `R_SESS` cookie).
+
+**Assert:**
+- Checks the returned index contains exactly 4 entries.
 
 ## `TestGetIndexUnauthenticated`
-Fetches the UI plugin index without authentication.
-- Checks the index returns only 1 plugin (uk-locale), which is unauthenticated.
+**Arrange:**
+- None.
+
+**Act:** Requests `/v1/uiplugins` without authentication.
+
+**Assert:**
+- Checks the returned index contains exactly 1 entry.
+- Checks that entry is `uk-locale` (the only plugin that doesn't require authentication).
 
 ## `TestCorrectContentType`
-Requests a plugin file (top-level-product-0.1.0.umd.min.1.js) with authenticated session and verifies the response headers.
+**Arrange:**
+- None.
+
+**Act:** Requests a specific plugin file (`/v1/uiplugins/top-level-product/0.1.0/plugin/top-level-product-0.1.0.umd.min.1.js`) with an authenticated session.
+
+**Assert:**
 - Checks the response status is 200 OK.
-- Checks the Content-Type header matches the MIME type for .js files.
+- Checks the `Content-Type` header matches the MIME type inferred from the file's `.js` extension.
 
 ## `TestGetSingleExtensionAuthenticated`
-Requests the clock plugin file (clock-0.2.0.umd.min.js) with an authenticated session.
+**Arrange:**
+- None.
+
+**Act:** Requests the `clock` plugin's JS file with an authenticated session.
+
+**Assert:**
 - Checks the response status is 200 OK.
 
 ## `TestGetSingleExtensionUnauthenticated`
-Requests the uk-locale plugin file without authentication (uk-locale does not require auth).
-- Checks the response status is 200 OK.
+**Arrange:**
+- None.
+
+**Act:** Requests the `uk-locale` plugin's JS file without authentication.
+
+**Assert:**
+- Checks the response status is 200 OK (`uk-locale` doesn't require authentication).
 
 ## `TestGetSingleUnauthorizedExtension`
-Requests the clock plugin file without authentication (clock requires auth).
-- Checks the response returns 404 Not Found.
+**Arrange:**
+- None.
+
+**Act:** Requests the `clock` plugin's JS file without authentication.
+
+**Assert:**
+- Checks the response status is 404 Not Found (`clock` requires authentication).
 
 ## `TestCompressedEndpoint`
-Starts a test server serving a compressed plugin archive, updates the homepage plugin to use the CompressedEndpoint, fetches a file from the compressed archive, and verifies the plugin reaches ready status.
-- Checks the compressed endpoint HTTP response is 200 OK or 425 Too Early.
-- Checks the plugin eventually reaches ready status with the CompressedEndpoint configured.
+**Arrange:**
+- Starts a test server serving a compressed (`.tgz`) plugin archive.
+
+**Act:** Updates the `homepage` UIPlugin to clear `Endpoint` and set `CompressedEndpoint` to the test server's URL.
+
+**Assert:**
+- Checks a request for a file served from the compressed archive returns 200 OK or 425 Too Early.
+- Checks the plugin eventually reaches `Ready` status with the `CompressedEndpoint` configured.
 
 ## `TestExponentialBackoff`
-Starts a test server that fails on the first 2 requests then succeeds, updates the homepage plugin endpoint, and verifies exponential backoff retry logic.
-- Checks the plugin initially has RetryNumber 1 and is not ready.
-- Checks the plugin then has RetryNumber 2 and is not ready.
-- Checks after backoff succeeds, the plugin has RetryNumber 0 and reaches ready status.
+**Arrange:**
+- Starts a test server that returns a server error on the first 2 requests, then serves the plugin successfully.
+
+**Act:** Updates the `homepage` UIPlugin's `Endpoint` to the test server's URL (clearing `CompressedEndpoint`).
+
+**Assert:**
+- Checks the plugin's `RetryNumber` progresses to 1, then to 2, remaining not-`Ready` at each step.
+- Checks that once the server starts succeeding, `RetryNumber` resets to 0 and the plugin becomes `Ready`.
 
 ## `TestUnreachableCompressedEndpoint`
-Sets both an unreachable CompressedEndpoint and a working Endpoint on the homepage plugin.
-- Checks the plugin reaches ready status by falling back to the working Endpoint.
+**Arrange:**
+- Starts a working test server for the plugin's uncompressed endpoint.
+
+**Act:** Sets the `homepage` UIPlugin's `CompressedEndpoint` to an unreachable URL while also setting a working `Endpoint`.
+
+**Assert:**
+- Checks the plugin still reaches `Ready` status, falling back to the working `Endpoint` despite the broken `CompressedEndpoint`.

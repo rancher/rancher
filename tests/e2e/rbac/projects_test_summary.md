@@ -3,83 +3,180 @@
 Verifies role-based access control on projects, resource quotas, namespace lifecycle, and the system project.
 
 ## `TestProjectCreatorGetsOwnerBindings`
-User with cluster-member role creates a project and namespace, then verifies they have owner access via project-owner bindings.
-- Checks user can create a project with cluster-member role.
-- Checks user can list pods, create deployments, and list metrics in their project namespace.
-- Checks user has a project-owner role binding in the namespace.
+**Arrange:**
+- Creates a user.
+- Grants the user "cluster-member" on the local cluster via CRTB.
+
+**Act:** The user creates a project (retrying until RBAC permits it) and a namespace within it.
+
+**Assert:**
+- Checks the user can eventually create the namespace once RBAC propagates, and the project becomes active.
+- Checks the user can list pods in the namespace.
+- Checks the user has a `project-owner` (or `project-owner-aggregator`) RoleBinding in the namespace.
+- Checks the user can create deployments (extensions group) in the namespace.
+- Checks the user can list `pods.metrics.k8s.io` in the namespace.
 
 ## `TestReadOnlyCannotEditSecret`
-Binds a user to "read-only" role on a project and attempts secret operations.
-- Checks read-only user cannot create a secret.
-- Checks read-only user cannot update an admin-created secret (forbidden).
+**Arrange:**
+- Creates a user and binds them to "read-only" on the suite's shared project (local cluster) via PRTB.
+- Creates a namespace in the project.
+- Admin creates a secret in the namespace (for the update check).
+
+**Act:** The read-only user attempts to create a new secret in the namespace and attempts to update the admin-created secret.
+
+**Assert:**
+- Checks creating the secret is forbidden.
+- Checks updating the existing secret is forbidden.
 
 ## `TestReadOnlyCannotMoveNamespace`
-Creates two projects, binds a user to "read-only" on both, then attempts to move a namespace between them.
-- Checks read-only user can see both project namespaces.
-- Checks read-only user cannot update the projectId annotation to move a namespace (forbidden).
+**Arrange:**
+- Creates a user.
+- Creates two projects (p1, p2) on the local cluster, waiting for their project namespaces to exist.
+- Binds the user to "read-only" on both projects via PRTBs.
+- Creates a namespace in project 1, and waits for the user to be able to see it.
+
+**Act:** The read-only user attempts to move the namespace to project 2 by patching its `field.cattle.io/projectId` annotation.
+
+**Assert:**
+- Checks the patch attempt is forbidden.
 
 ## `TestSystemProjectCreated`
-Lists all projects in the cluster and checks for System and Default projects.
-- Checks System project exists with label "authz.management.cattle.io/system-project"="true".
-- Checks Default project exists with label "authz.management.cattle.io/default-project"="true".
+**Act:** Lists all projects in the local cluster.
+
+**Assert:**
+- Checks the Default project exists with label `authz.management.cattle.io/default-project`="true".
+- Checks the System project exists with label `authz.management.cattle.io/system-project`="true".
 
 ## `TestSystemProjectCannotBeDeleted`
-Retrieves the System project and attempts to delete it.
-- Checks deletion returns 405 Method Not Allowed.
-- Checks error message contains "System Project cannot be deleted".
+**Arrange:**
+- Retrieves the System project from the local cluster's project list.
+
+**Act:** Attempts to delete the System project.
+
+**Assert:**
+- Checks deletion fails with 405 Method Not Allowed.
+- Checks the error message contains "System Project cannot be deleted".
 
 ## `TestSystemNamespacesDefaultServiceAccount`
-Reads the system-namespaces setting and checks the default ServiceAccount in each system namespace.
-- Checks each default service account in system namespaces (except kube-system) has automountServiceAccountToken=false.
+**Arrange:**
+- Reads the "system-namespaces" setting to get the list of system namespace names.
+
+**Act:** Lists the default ServiceAccount object across namespaces.
+
+**Assert:**
+- Checks every default ServiceAccount in a system namespace (excluding kube-system) has `automountServiceAccountToken=false`.
 
 ## `TestProjectResourceQuotaFields`
-Creates a project with resource quota and namespace default resource quota, then retrieves it.
-- Checks project.resourceQuota.limit.pods="100".
-- Checks project.namespaceDefaultResourceQuota.limit.pods="100".
+**Act:** Creates a project on the local cluster with a ResourceQuota (pods=100) and a NamespaceDefaultResourceQuota (pods=100).
+
+**Assert:**
+- Checks `project.resourceQuota.limit.pods` is "100".
+- Checks `project.namespaceDefaultResourceQuota.limit.pods` is "100".
 
 ## `TestProjectQuotaAPIValidation`
-Tests various invalid quota configurations: resourceQuota without namespaceDefaultResourceQuota, vice versa, exceeding limits, and missing fields.
-- Checks resourceQuota without namespaceDefaultResourceQuota fails with 422.
-- Checks namespaceDefaultResourceQuota without resourceQuota fails with 422.
-- Checks namespace quota exceeding project quota fails with 422.
-- Checks namespace quota missing fields defined on project quota fails with 422.
+**Act:** Attempts several invalid project quota configurations: a `resourceQuota` without a `namespaceDefaultResourceQuota`, a `namespaceDefaultResourceQuota` without a `resourceQuota`, a namespace default quota (pods=200) exceeding the project quota (pods=100), and — via update on a freshly created project — a namespace default quota missing the "services" field defined on the project quota (pods=100, services=100).
+
+**Assert:**
+- Checks `resourceQuota` without `namespaceDefaultResourceQuota` fails with 422.
+- Checks `namespaceDefaultResourceQuota` without `resourceQuota` fails with 422.
+- Checks the namespace default quota exceeding the project quota fails with 422.
+- Checks the namespace default quota missing a field defined on the project quota fails with 422.
 
 ## `TestProjectContainerDefaultResourceLimit`
-Creates a project with containerDefaultResourceLimit (CPU/memory requests and limits), then clears it.
-- Checks project stores the limits correctly.
-- Checks updating with null clears the limit.
+**Arrange:**
+- None beyond suite defaults.
+
+**Act 1:** Creates a project on the local cluster with a ResourceQuota (pods=100), a NamespaceDefaultResourceQuota (pods=100), and a ContainerDefaultResourceLimit (requests 1 CPU / 1Gi memory, limits 2 CPU / 2Gi memory).
+**Assert 1:**
+- Checks the project stores the ResourceQuota.
+- Checks the project stores the ContainerDefaultResourceLimit.
+
+**Act 2:** Updates the project, setting `containerDefaultResourceLimit` to nil.
+**Assert 2:**
+- Checks the project's `containerDefaultResourceLimit` becomes nil.
 
 ## `TestNamespaceResourceQuotaCreated`
-Creates a project with quota and namespace with explicit quota annotation requesting 4 pods.
-- Checks a k8s ResourceQuota is created with pods limit=4.
+**Arrange:**
+- Creates a project on the local cluster with a ResourceQuota (pods=100) and a NamespaceDefaultResourceQuota (pods=100).
+
+**Act:** Creates a namespace in the project with an explicit quota annotation requesting 4 pods.
+
+**Assert:**
+- Checks a k8s ResourceQuota object is created in the namespace with a pods limit of 4.
 
 ## `TestNamespaceDefaultQuotaApplied`
-Creates a project with namespace default quota of 4 pods and a namespace without explicit quota.
-- Checks the k8s ResourceQuota is created with the project's default limit of 4 pods.
+**Arrange:**
+- Creates a project on the local cluster with a ResourceQuota (pods=100) and a NamespaceDefaultResourceQuota (pods=4).
+
+**Act:** Creates a namespace in the project without an explicit quota annotation.
+
+**Assert:**
+- Checks the k8s ResourceQuota created in the namespace uses the project's default limit of 4 pods.
 
 ## `TestProjectUsedQuotaUpdated`
-Creates a project with quota and a namespace with default quota.
-- Checks the project's usedLimit.pods is updated to 4 (the namespace quota).
+**Arrange:**
+- Creates a project on the local cluster with a ResourceQuota (pods=100) and a NamespaceDefaultResourceQuota (pods=4).
+
+**Act:** Creates a namespace in the project without an explicit quota, so the project's default applies.
+
+**Assert:**
+- Checks the project's `usedLimit.pods` updates to 4.
 
 ## `TestProjectQuotaUpdateAppliedToNamespace`
-Creates a project without quota, adds a namespace, then updates the project to add quota.
-- Checks the controller applies the default quota to the existing namespace.
+**Arrange:**
+- Creates a project on the local cluster without a quota.
+- Creates a namespace in the project (no quota exists yet).
+
+**Act:** Updates the project to add a ResourceQuota (pods=100) and a NamespaceDefaultResourceQuota (pods=4).
+
+**Assert:**
+- Checks the controller creates a k8s ResourceQuota in the existing namespace using the new default of 4 pods.
 
 ## `TestProjectUsedQuotaExactMatch`
-Creates a project with 10 pod limit, then creates two namespaces using 2 and 8 pods respectively (totaling 10).
-- Checks the project's usedLimit is 10.
-- Checks reducing the project quota below 10 fails with 422.
+**Arrange:**
+- Creates a project on the local cluster with a ResourceQuota (pods=10) and a NamespaceDefaultResourceQuota (pods=2).
+- Creates two namespaces with explicit quotas of 2 and 8 pods respectively (totaling 10, matching the full project limit).
+- Confirms the project's `usedLimit.pods` reaches 10.
+
+**Act:** Attempts to reduce the project's quota to pods=8 (with a namespace default of pods=1).
+
+**Assert:**
+- Checks the update fails with 422 Unprocessable Entity.
 
 ## `TestProjectQuotaAddRemoveFields`
-Creates a project with pod quota, adds two namespaces, then adds/removes a services field.
-- Checks adding services with invalid default fails with 422.
-- Checks adding services with valid default succeeds and controller propagates to existing namespaces.
-- Checks removing the services field succeeds.
+**Arrange:**
+- Creates a project on the local cluster with a ResourceQuota (pods=10) and a NamespaceDefaultResourceQuota (pods=2).
+- Creates two namespaces using the default quota (2 pods each); confirms the project's `usedLimit.pods` reaches 4.
+
+**Act 1:** Attempts to add a "services" field to the project quota (services=10) and namespace default (services=7) — a default that, multiplied across the 2 existing namespaces, would exceed the project limit.
+**Assert 1:**
+- Checks the update fails with 422 Unprocessable Entity.
+
+**Act 2:** Updates the project with a valid "services" default (project services=10, namespace default services=2).
+**Assert 2:**
+- Checks the update succeeds.
+- Checks the controller propagates the new default to the existing namespaces, bringing the project's `usedLimit.services` to 4.
+
+**Act 3:** Removes the "services" field from both the project quota and the namespace default.
+**Assert 3:**
+- Checks the update succeeds.
 
 ## `TestProjectQuotaCannotExceedWithExistingNamespaces`
-Creates a project with 4 namespaces, then attempts to set quota where default × namespace count exceeds limit.
-- Checks setting quota where 2 pods default × 4 namespaces = 8 > 5 limit fails with 422.
+**Arrange:**
+- Creates a project on the local cluster without a quota.
+- Creates 4 namespaces in the project (no quotas).
+
+**Act:** Attempts to set the project quota to pods=5 with a namespace default of pods=2 (2 × 4 = 8 > 5).
+
+**Assert:**
+- Checks the update fails with 422 Unprocessable Entity.
 
 ## `TestNamespaceQuotaExceedsProjectLimit`
-Creates namespace requesting more pods (200) than the project allows (100).
-- Checks a k8s ResourceQuota is created but with zeroed overused resources.
+**Arrange:**
+- Creates a project on the local cluster with a ResourceQuota (pods=100) and a NamespaceDefaultResourceQuota (pods=100).
+
+**Act:** Creates a namespace in the project requesting an explicit quota of 200 pods, exceeding the project's limit.
+
+**Assert:**
+- Checks a k8s ResourceQuota is still created in the namespace.
+- Checks the pods value is not set to the requested 200 (overused resources are zeroed rather than granted).

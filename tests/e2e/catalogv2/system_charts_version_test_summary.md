@@ -1,13 +1,23 @@
 # `system_charts_version_test.go` Summary
 
-Verifies that system charts (rancher-webhook and fleet) can be installed at specific versions and that the system deploys the latest available version when appropriate.
+Verifies that Rancher-managed system charts (rancher-webhook and fleet) deploy at the version dictated by their version settings, deploying the latest available version when the configured constraint allows it.
 
 ## `TestInstallWebhook`
-Uninstalls rancher-webhook, sets the webhook version setting to 2.0.3+up0.3.3, watches for the App to be created, and verifies the installed release matches the specified version.
-- Checks the app reaches StatusDeployed.
-- Checks the installed Helm release version is 2.0.3+up0.3.3.
+**Arrange:**
+- Uninstalls the existing `rancher-webhook` release.
+
+**Act:** Sets the `rancher-webhook-version` setting to an exact version (`2.0.3+up0.3.3`).
+
+**Assert:**
+- Checks the `rancher-webhook` App is (re)created.
+- Checks the installed Helm release version matches the exact configured version.
 
 ## `TestInstallFleet`
-Uninstalls the fleet chart from cattle-fleet-system namespace, sets the fleet-min-version setting to 102.0.0+up0.6.0, watches for the App to be created, and verifies the deployed version matches the latest available.
-- Checks the app reaches StatusDeployed.
-- Checks the installed Helm release version equals the latest available version from the catalog.
+**Arrange:**
+- Uninstalls the existing `fleet` release from the `cattle-fleet-system` namespace.
+
+**Act:** Sets the `fleet-min-version` setting to a version below the latest available (`102.0.0+up0.6.0`).
+
+**Assert:**
+- Checks the `fleet` App is (re)created.
+- Checks the deployed Helm release version equals the latest version available from the catalog (Rancher deploys latest when the configured minimum is below it, not the minimum itself).

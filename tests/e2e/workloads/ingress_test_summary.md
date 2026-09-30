@@ -1,20 +1,35 @@
 # `ingress_test.go` Summary
 
-Verifies the Norman API for ingress resources, testing that the ingress schema exposes correct field permissions for ingress, ingressBackend, ingressRule, and httpIngressPath types, and that ingress rules can be created, merged based on host/path matching, and properly stored.
+Verifies the Norman API for ingress resources, covering the exposed schemas' field permissions and that ingress rules can be created and are merged when they share the same host and path.
 
 ## `TestIngressFields`
-Retrieves schemas for ingress, ingressBackend, ingressRule, and httpIngressPath types from the Norman API and verifies each type exposes the expected fields with correct create/update permissions.
-- Checks ingress schema supports CRUD, with fields `namespaceId` and `projectId` as create-only, fields `rules`, `tls`, `ingressClassName`, `backend`, `defaultBackend` as create+update, and `publicEndpoints` and `status` as read-only.
-- Checks ingressBackend, ingressRule, and httpIngressPath expose all expected fields as create+update.
+**Arrange:**
+- Creates a project.
+
+**Act:** Retrieves the Norman schemas for the ingress, ingressBackend, ingressRule, and httpIngressPath types.
+
+**Assert:**
+- Checks the ingress schema supports full CRUD, with `namespaceId`/`projectId` create-only, `rules`/`tls`/`ingressClassName`/`backend`/`defaultBackend` create+update, and `publicEndpoints`/`status` read-only.
+- Checks ingressBackend, ingressRule, and httpIngressPath each expose their fields as create+update.
 
 ## `TestIngress`
-Creates a workload, then creates an ingress with a single rule targeting that workload with host "foo.com" and path "/" on targetPort 80.
-- Checks ingress is created with one rule containing the host "foo.com".
-- Checks the rule's path entry has path "/", targetPort 80, and the correct workloadIds reference.
-- Checks serviceId is nil for the workload-based rule.
+**Arrange:**
+- Creates a workload.
+
+**Act:** Creates an ingress with a single rule (host "foo.com", path "/", targetPort 80) referencing the workload.
+
+**Assert:**
+- Checks the ingress is created with one rule for host "foo.com".
+- Checks the rule's path entry has path "/", targetPort 80, and the workload's ID in `workloadIds`.
+- Checks `serviceId` is nil.
 
 ## `TestIngressRulesSameHostPortPath`
-Creates two workloads, then creates an ingress with two rules sharing the same host ("foo.com"), path ("/"), and targetPort (80) but referencing different workloads.
+**Arrange:**
+- Creates two workloads.
+
+**Act:** Creates an ingress with two rules that share the same host ("foo.com"), path ("/"), and targetPort (80) but reference different workloads.
+
+**Assert:**
 - Checks the two rules are merged into a single rule with one path entry.
-- Checks the merged path entry contains workloadIds for both workloads.
-- Checks serviceId remains nil.
+- Checks the merged path entry's `workloadIds` contains both workloads' IDs.
+- Checks `serviceId` remains nil.

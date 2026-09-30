@@ -2,57 +2,101 @@
 
 Verifies that the Steve API (Rancher's REST API wrapper) provides access to extension API servers with proper authentication and authorization, and that listing, filtering, sorting, and CRUD operations on secrets respect user permissions across projects and namespaces.
 
+This file uses a shared-base-struct embedding pattern: the unexported `steveAPITestSuite` holds common test methods (`TestList`, `TestLinks`, `TestCRUD`), while `LocalSteveAPITestSuite` and `DownstreamSteveAPITestSuite` each embed it with their own `SetupSuite` (one against the local cluster, one against a real downstream cluster). A test method defined on the shared base runs once per concrete suite.
+
 ## `TestExtensionAPIServer` (LocalSteveAPITestSuite)
-Creates a discovery client against the extension API server and verifies server groups, OpenAPI v2 and v3 schemas are available with admin token, then verifies all endpoints return forbidden errors when accessed without authentication.
-- Checks the discovery client retrieves server groups.
-- Checks OpenAPI v2 schema is available and non-nil.
-- Checks OpenAPI v3 paths are available.
-- Checks unauthenticated requests to all endpoints return forbidden errors.
+**Arrange:**
+- Builds a discovery client against the extension API server using the admin token.
+- Builds a second discovery client against the same server with no auth token.
+
+**Act:** Queries server groups, the OpenAPI v2 schema, and the OpenAPI v3 paths with both the authenticated and unauthenticated clients.
+
+**Assert:**
+- Checks the authenticated client retrieves server groups, a non-nil OpenAPI v2 schema, and OpenAPI v3 paths.
+- Checks the unauthenticated client's requests to all three endpoints return forbidden errors.
 
 ## `TestExtensionAPIServerAuthorization`
-Makes HTTP requests to various OpenAPI and metrics/health endpoints with an authenticated client and verifies expected status codes for each.
+**Arrange:**
+- Builds an authenticated HTTP client against the extension API server.
+
+**Act:** Sends GET requests to each of 8 endpoints (`/openapi/v2`, `/openapi/v3`, `/openapi/v3/version`, `/metrics`, `/healthz`, `/readyz`, `/livez`, `/version`).
+
+**Assert:**
 - Checks `/openapi/v2`, `/openapi/v3`, and `/openapi/v3/version` return 200 OK.
 - Checks `/metrics`, `/healthz`, `/readyz`, `/livez`, and `/version` return 403 Forbidden.
 
 ## `TestExtensionAPIServerCreateRequests`
-Posts JSON payloads to create a kubeconfig and a selfuser resource via the extension API and verifies both return 201 Created.
-- Checks creating a kubeconfig with name, clusters, and TTL returns 201 Created.
-- Checks creating a selfuser resource returns 201 Created.
+**Arrange:**
+- Builds an authenticated HTTP client against the extension API server.
+
+**Act:** Posts a JSON payload to create a kubeconfig (name, clusters, description, TTL) and a JSON payload to create a selfuser resource.
+
+**Assert:**
+- Checks creating the kubeconfig returns 201 Created.
+- Checks creating the selfuser resource returns 201 Created.
 
 ## `TestExtensionAPIServerUpdateRequests`
-Retrieves a test kubeconfig, then updates it via PUT with modified description and verifies 200 OK, and attempts to update a non-existent kubeconfig and verifies 404 Not Found.
-- Checks updating an existing kubeconfig with modified description returns 200 OK.
+**Arrange:**
+- Creates a test kubeconfig via the extension API.
+
+**Act:** Sends PUT requests updating the existing kubeconfig's description and updating a non-existent kubeconfig.
+
+**Assert:**
+- Checks updating the existing kubeconfig with a modified description returns 200 OK.
 - Checks updating a non-existent kubeconfig returns 404 Not Found.
 
 ## `TestExtensionAPIServerDeleteRequests`
-Retrieves a test kubeconfig, then deletes it via DELETE and verifies 204 No Content, and attempts to delete a non-existent kubeconfig and verifies 404 Not Found.
-- Checks deleting an existing kubeconfig returns 204 No Content.
+**Arrange:**
+- Creates a test kubeconfig via the extension API.
+
+**Act:** Sends DELETE requests for the existing kubeconfig and for a non-existent kubeconfig.
+
+**Assert:**
+- Checks deleting the existing kubeconfig returns 204 No Content.
 - Checks deleting a non-existent kubeconfig returns 404 Not Found.
 
 ## `TestExtensionAPIServer` (DownstreamSteveAPITestSuite)
-Attempts to access extension API server endpoints on a downstream cluster and verifies all requests return 404 Not Found because the extension API is not served on downstream clusters.
-- Checks ServerGroups request returns 404 Not Found.
-- Checks OpenAPI v2 schema request returns 404 Not Found.
-- Checks OpenAPI v3 paths request returns 404 Not Found.
+**Arrange:**
+- Builds a discovery client against the extension API server on the downstream cluster using the admin token.
+
+**Act:** Queries server groups, the OpenAPI v2 schema, and the OpenAPI v3 paths.
+
+**Assert:**
+- Checks all three requests return 404 Not Found, since the extension API is not served on downstream clusters.
 
 ## `TestList`
-Sets up 5 test secrets per namespace (9 namespaces total), 2 projects with namespace assignments, 5 test users with varying project-level and namespace-level RBAC bindings, then executes 100+ table-driven test cases that verify listing, filtering, sorting, and pagination behavior for each user across different access scopes.
+**Arrange:**
+- Creates 2 projects and 9 namespaces (7 assigned across the 2 projects, 2 unassigned), each seeded with up to 5 test secrets carrying shared and per-secret labels (used for filter/selector tests).
+- Creates 5 test users with varying access scopes: `user-a` (project-owner on 1 project), `user-b` (namespace-scoped role binding granting get/list on secrets in 1 namespace), `user-c` (namespace-scoped role binding with a resource-name restriction across 3 namespaces), `user-d` (project-owner on 2 projects plus namespace-scoped bindings in 2 more namespaces), and `user-e` (cluster-owner).
+
+**Act:** Runs 139 table-driven subtests, each issuing a Steve API list request for secrets as a given user, optionally scoped to a namespace, with a given query string.
+
+**Assert:**
 - Checks each user sees only secrets in namespaces they have access to via project membership or role bindings.
 - Checks label and field selectors correctly filter results across multiple namespaces or within a single namespace.
-- Checks filter queries with AND, OR, and NOT operators work correctly.
-- Checks sort by metadata.name and metadata.namespace in ascending and descending order.
-- Checks pagination with pagesize parameter returns correct first page and subsequent pages using continue tokens and revision numbers.
-- Checks `projectsornamespaces` parameter restricts results to specific projects or namespaces, and `projectsornamespaces!=` excludes them.
-- Checks summary queries return aggregated counts per property value (name, namespace, state) on the current page.
+- Checks filter queries combining AND (multiple `filter` params), OR (comma-separated values), and NOT (`!=`) operators return the correct set of secrets.
+- Checks sorting by `metadata.name` and `metadata.namespace`, ascending and descending, returns results in the expected order.
+- Checks pagination with `pagesize` returns the correct first page, and subsequent pages fetched with `page` plus a `continue`/`revision` token return the correct remaining results.
+- Checks `projectsornamespaces` restricts results to the named projects or namespaces, and `projectsornamespaces!=` excludes them.
+- Checks `summary` queries return aggregated counts per property value (e.g. `metadata.name`, `metadata.namespace`, `metadata.state.name`) reflecting only the current page.
 
 ## `TestLinks`
-Creates a secret resource via the Steve API and reads it back, then verifies that the returned object has correct self, view, update, patch, and remove links pointing to valid API endpoints.
-- Checks the secret ID is formatted as `namespace/name`.
-- Checks links reference the correct API endpoints: `/v1/secrets/{namespace}/{name}` for Steve API operations and `/api/v1/namespaces/{namespace}/secrets/{name}` for the Kubernetes view link.
+**Arrange:**
+- Creates a secret via the Steve API, then reads it back by ID.
+
+**Act:** Deletes the secret.
+
+**Assert:**
+- Checks the secret's `id` field is formatted as `namespace/name`.
+- Checks the returned `links` map's `self`, `view`, `update`, `patch`, and `remove` entries point to the correct endpoints: `/v1/secrets/{namespace}/{name}` for Steve API operations, and `/api/v1/namespaces/{namespace}/secrets/{name}` for the Kubernetes view link.
 
 ## `TestCRUD`
-Tests both global (`/v1/secrets`) and namespaced (`/v1/secrets/{namespace}`) endpoints for secret CRUD operations, with each variant creating, reading, updating, and deleting a secret.
-- Checks creating a secret returns a valid resource object.
-- Checks reading a secret by ID retrieves the same object.
-- Checks updating a secret's data field persists the change.
-- Checks deleting a secret removes it and subsequent reads return an error.
+**Arrange:**
+- None beyond obtaining a Steve client for the cluster.
+
+**Act:** For both the global (`/v1/secrets`) and namespaced (`/v1/secrets/{namespace}`) endpoints, creates a secret, reads it, updates its data field, deletes it, then reads it again.
+
+**Assert:**
+- Checks the created secret can be read back with its original data.
+- Checks the updated secret's data reflects the new value on re-read.
+- Checks the secret is gone and reading it after deletion returns an error, for both the global and namespaced endpoint variants.

@@ -1,11 +1,20 @@
 # `cluster_node_count_test.go` Summary
 
-Verifies that cluster node count is accurately maintained as management nodes are created and deleted.
+Verifies that a cluster's node count accurately reflects management nodes as they are created and deleted.
 
 ## `TestClusterNodeCount`
-Creates an import cluster, waits for its management namespace to be created on the local cluster, then adds and removes nodes via the management API while verifying the node count updates correctly.
-- Checks the cluster node count starts at 0.
-- Checks that the cluster's management namespace is created in the local cluster.
-- Checks the node count increments to 1 after creating the first node.
-- Checks the node count increments to 2 after creating a second node.
-- Checks the node count decrements back to 1 after deleting a node.
+**Arrange:**
+- Creates a cluster, whose node count starts at 0.
+- Waits for the cluster's management namespace to be created on the local cluster.
+
+**Act 1:** Creates a node in the cluster's namespace via the management API.
+**Assert 1:**
+- Checks the node count increments to 1.
+
+**Act 2:** Creates a second node in the cluster's namespace.
+**Assert 2:**
+- Checks the node count increments to 2.
+
+**Act 3:** Deletes the second node.
+**Assert 3:**
+- Checks the node count drops back to 1.

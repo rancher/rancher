@@ -1,21 +1,36 @@
 # `dns_test.go` Summary
 
-Verifies the dnsRecord Norman API, testing that the schema exposes full CRUD access with correct field permissions, and that dnsRecords can be created with hostnames or IP addresses, updated, retrieved, and deleted.
+Verifies the dnsRecord Norman API, covering the exposed schema's CRUD permissions and the full create/update/list/delete lifecycle for dnsRecords created with a hostname or with IP addresses.
 
 ## `TestDNSFields`
-Retrieves the dnsRecord schema from the Norman API and verifies that it exposes full CRUD operations and expected resource fields with correct create/update permissions.
-- Checks collection supports GET and POST, resource supports GET, PUT, and DELETE.
-- Checks 16 specific fields including `allocateLoadBalancerNodePorts`, `clusterIPs`, `hostname`, `ipAddresses`, `ipFamilies`, `namespaceId`, `projectId`, `selector`, `targetDnsRecordIds`, `targetWorkloadIds`, and `trafficDistribution` are present with correct create/update permissions.
+**Arrange:**
+- Creates a project.
+
+**Act:** Retrieves the dnsRecord schema from the Norman API.
+
+**Assert:**
+- Checks the collection supports GET and POST, and the resource supports GET, PUT, and DELETE.
+- Checks 16 fields (including `allocateLoadBalancerNodePorts`, `clusterIPs`, `hostname`, `ipAddresses`, `ipFamilies`, `namespaceId`, `projectId`, `selector`, `targetDnsRecordIds`, `targetWorkloadIds`, `trafficDistribution`) are present with the expected create/update permissions.
 
 ## `TestDNSHostname`
-Creates a project and namespace, then creates a dnsRecord with a hostname field via the Norman API, updates the hostname, and verifies CRUD operations through retrieval by ID and listing.
-- Checks dnsRecord is created with `baseType` "dnsRecord" and the provided hostname "target".
-- Checks the hostname field can be updated to "target2" and persists through GET and LIST operations.
-- Checks the record appears in the list and can be fetched by ID and deleted successfully.
+**Arrange:**
+- Creates a project and a namespace.
+
+**Act:** Creates a dnsRecord with hostname "target" in the namespace.
+
+**Assert:**
+- Checks the record is created with `baseType`/`type` "dnsRecord" and hostname "target".
+- Checks the hostname can be updated to "target2" and the change persists through GET and reload.
+- Checks the record appears in the list, can be fetched by ID, and can be deleted.
 
 ## `TestDNSIPs`
-Creates a dnsRecord with two IP addresses (1.1.1.1 and 2.2.2.2) via the Norman API, updates the IPs, and verifies that creating a dnsRecord with a loopback IP (127.0.0.2) in the default namespace is rejected with status 422.
-- Checks dnsRecord is created with `ipAddresses` containing both provided IPs.
-- Checks IP addresses can be updated to different values and persist through reload.
-- Checks that loopback IP in default namespace is rejected with HTTP 422 (UnprocessableEntity).
-- Checks the original record remains queryable in list after the failed loopback attempt.
+**Arrange:**
+- Creates a project and a namespace.
+
+**Act:** Creates a dnsRecord with IP addresses 1.1.1.1 and 2.2.2.2 in the namespace.
+
+**Assert:**
+- Checks the record is created with `ipAddresses` containing both IPs.
+- Checks the IPs can be updated to different values and the change persists through reload.
+- Checks creating a dnsRecord with a loopback IP (127.0.0.2) in the default namespace is rejected with HTTP 422.
+- Checks the original record still appears in the list after the rejected attempt.

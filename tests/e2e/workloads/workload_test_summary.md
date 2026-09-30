@@ -1,58 +1,121 @@
 # `workload_test.go` Summary
 
-Verifies the Norman API for workloads (Deployments, StatefulSets) and related resources, testing workload creation via Norman and Kubernetes APIs, port mapping, private registry image pulling, port type changes with service cluster IP updates, probe persistence, scheduler field updates, volume mount subPath validation, redeploy action, read-only access permissions, and HorizontalPodAutoscaler creation.
+Verifies the Norman API for workloads and related resources, covering workload creation via Kubernetes and Norman APIs, port-kind handling, private-registry image-pull selection, probe/scheduler persistence, subPath validation, the redeploy and rollback actions, and HorizontalPodAutoscaler creation.
 
 ## `TestDeploymentCreationKubectl`
-Creates a Deployment directly via the Kubernetes API with a container port mapped to hostPort 8099, then polls the Norman workload API until the deployment appears with the correct port mapping translated to sourcePort + kind=HostPort.
+**Arrange:**
+- Creates a project and a namespace.
+
+**Act:** Creates a Deployment directly via the Kubernetes API with a container port mapped to hostPort 8099.
+
+**Assert:**
 - Checks the deployment appears in the Norman workload list for the project.
-- Checks the port kind is "HostPort" with sourcePort 8099 and containerPort 80.
+- Checks the port is translated to kind "HostPort" with sourcePort 8099 and containerPort 80.
 
 ## `TestWorkloadPortKinds`
-Creates 4 separate workloads via the Norman API, each with a container port using a different kind (HostPort 776, NodePort 777, LoadBalancer 778, ClusterIP 779) all on containerPort 80.
-- Checks each workload is created successfully with the specified port kind.
-- Checks the port kind and sourcePort are correctly stored and returned for HostPort, NodePort, LoadBalancer, and ClusterIP kinds.
-- Checks containerPort is consistently 80 across all port types.
+**Arrange:**
+- Creates a project.
+
+**Act:** Creates 4 workloads via the Norman API, each in its own namespace, with a container port of a different kind (HostPort 776, NodePort 777, LoadBalancer 778, ClusterIP 779), all on containerPort 80.
+
+**Assert:**
+- Checks each workload is created successfully.
+- Checks the port kind and sourcePort are correctly stored and returned for each of the 4 kinds, with containerPort consistently 80.
 
 ## `TestWorkloadImageChangePrivateRegistry`
-Creates 2 docker credentials (for index.docker.io and quay.io), then creates a workload with a docker.io image, verifies registry1 is auto-selected as imagePullSecret, updates the workload image to quay.io, and verifies registry2 is now auto-selected.
-- Checks workload is created with imagePullSecrets containing registry1 name for docker.io image.
-- Checks updating the image to quay.io causes imagePullSecrets to be updated to registry2 name.
+**Arrange:**
+- Creates a project and a namespace.
+- Creates two docker credentials: one for index.docker.io, one for quay.io.
+
+**Act 1:** Creates a workload using a docker.io image.
+**Assert 1:**
+- Checks `imagePullSecrets` contains the index.docker.io credential.
+
+**Act 2:** Updates the workload's image to a quay.io image.
+**Assert 2:**
+- Checks the container's image is updated to the quay.io image.
+- Checks `imagePullSecrets` is now updated to the quay.io credential.
 
 ## `TestWorkloadPortsChange`
-Creates a workload with no ports (expecting headless service with no cluster IP), updates it to add a ClusterIP port (expecting cluster IP to be assigned), then removes the port (expecting cluster IP to be cleared).
-- Checks headless workload service has no cluster IP or empty cluster IP.
-- Checks adding a ClusterIP port on containerPort 80 results in a non-empty cluster IP being assigned.
-- Checks removing the port resets cluster IP to empty or null.
+**Arrange:**
+- Creates a project and a namespace.
+
+**Act 1:** Creates a workload with no container ports.
+**Assert 1:**
+- Checks the backing ClusterIP service is headless (no cluster IP).
+
+**Act 2:** Updates the workload to add a ClusterIP port on containerPort 80.
+**Assert 2:**
+- Checks the service is assigned a non-empty cluster IP.
+
+**Act 3:** Updates the workload again to remove the port.
+**Assert 3:**
+- Checks the service's cluster IP is cleared back to empty/nil.
 
 ## `TestWorkloadProbes`
-Creates a workload with a container that has both liveness and readiness probes configured with specific settings (failureThreshold 3, initialDelaySeconds 10, periodSeconds 2, etc.), updates the probe host fields to "updatedhost", and verifies persistence.
-- Checks the workload is created with liveness and readiness probes configured with the specified values.
-- Checks probe host fields can be updated and persist through reload.
+**Arrange:**
+- Creates a project and a namespace.
+
+**Act:** Creates a workload with a container that has liveness and readiness probes configured (failureThreshold 3, initialDelaySeconds 10, periodSeconds 2, successThreshold 1, timeoutSeconds 2, host "localhost", port 80, among other settings).
+
+**Assert:**
+- Checks both probes are created with host "localhost".
+- Checks updating both probes' host to "updatedhost" persists through reload.
 
 ## `TestWorkloadScheduling`
-Creates a workload with a scheduler field set to "some-scheduler", updates it to "test-scheduler", and verifies the scheduler field persists.
-- Checks the workload is created with the specified scheduler value.
-- Checks the scheduler value can be updated and persists through reload.
+**Arrange:**
+- Creates a project and a namespace.
+
+**Act:** Creates a workload with `scheduling.scheduler` set to "some-scheduler".
+
+**Assert:**
+- Checks the workload is created with scheduler "some-scheduler".
+- Checks updating the scheduler to "test-scheduler" persists through reload.
 
 ## `TestStatefulSetWorkloadVolumeMountSubpath`
-Creates a StatefulSet via the Norman API with a volumeMount, testing that subPath validation rejects absolute paths and paths containing "..".
-- Checks workload creation with absolute subPath "/mysql" is rejected with HTTP 422.
-- Checks workload creation with subPath containing ".." is rejected with HTTP 422.
-- Checks workload creation with valid relative subPath "mysql" succeeds.
-- Checks workload updates with invalid subPaths are also rejected with HTTP 422.
+**Arrange:**
+- Creates a project.
+- Defines a shared StatefulSet config and persistentVolumeClaim volume used for every create/update attempt.
+
+**Act:** Creates and updates a StatefulSet workload using a volumeMount subPath.
+
+**Assert:**
+- Checks creation with an absolute subPath ("/mysql") is rejected with HTTP 422.
+- Checks creation with a subPath containing ".." ("../mysql") is rejected with HTTP 422.
+- Checks creation with a valid relative subPath ("mysql") succeeds.
+- Checks updating the created workload with either invalid subPath is also rejected with HTTP 422.
 
 ## `TestWorkloadRedeploy`
-Creates a workload, triggers the redeploy action, and polls until the cattle.io/timestamp annotation appears on the workload.
-- Checks the redeploy action succeeds (2xx status).
-- Checks the workload gains a cattle.io/timestamp annotation after redeploy is triggered.
+**Arrange:**
+- Creates a project and a namespace.
+- Creates a workload.
+
+**Act:** Triggers the redeploy action on the workload.
+
+**Assert:**
+- Checks the redeploy action returns a 2xx status.
+- Checks the workload gains a `cattle.io/timestamp` annotation after redeploy.
 
 ## `TestWorkloadActionReadOnly`
-Creates a workload, then creates read-only and project-member users with respective role bindings, and tests that read-only user receives 404 on rollback action while project-member succeeds.
-- Checks workload is created by admin.
-- Checks read-only user attempting rollback receives HTTP 404.
-- Checks project-member user attempting rollback succeeds with 2xx status.
+**Arrange:**
+- Creates a project and a namespace.
+- Creates a workload as admin and updates it once to produce a second revision.
+- Creates a read-only user and a project-member user, each bound to the project with their respective role.
+- Looks up the workload's replicaSet ID from its revisions.
+
+**Act:** A read-only user and a project-member user each attempt the rollback action on the workload.
+
+**Assert:**
+- Checks the read-only user receives HTTP 404.
+- Checks the project-member user succeeds with a 2xx status.
 
 ## `TestHPA`
-Creates a workload with CPU resource requests, then creates a HorizontalPodAutoscaler referencing the workload with 4 metric types (Resource-cpu at 50% utilization, Pods-test at average 50, External at value 50, Object-test at value 50) and maxReplicas 10.
-- Checks HPA is created successfully with all 4 metric types configured.
-- Checks HPA appears in the list with state "initializing".
+**Arrange:**
+- Creates a project and a namespace.
+- Creates a workload with a CPU resource request.
+
+**Act:** Creates a HorizontalPodAutoscaler referencing the workload with maxReplicas 10 and 4 metric types (Resource-cpu at 50% utilization, Pods averageValue 50, External value 50, Object value 50).
+
+**Assert:**
+- Checks the HPA is created successfully with all 4 metrics.
+- Checks exactly one HPA appears in the list, with state "initializing".

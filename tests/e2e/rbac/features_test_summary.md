@@ -3,10 +3,21 @@
 Verifies that only admins can mutate Feature resources and that standard users can list them once RBAC propagates.
 
 ## `TestCannotCreateFeature`
-Creates a standard user and attempts to create a Feature resource as both admin and the standard user.
-- Checks that both the admin and standard user receive a 405 Method Not Allowed response.
+**Arrange:**
+- Creates a standard user with the "user" global role.
+
+**Act:** Attempts to create a Feature resource as both the admin and the standard user.
+
+**Assert:**
+- Checks the admin's attempt fails with 405 Method Not Allowed.
+- Checks the standard user's attempt also fails with 405 Method Not Allowed.
 
 ## `TestCanListFeatures`
-Creates a standard user and waits for the "user" role's RBAC permissions to propagate.
-- Checks that the standard user can list features once RBAC propagates.
-- Checks that the admin can list features.
+**Arrange:**
+- Creates a standard user with the "user" global role.
+
+**Act:** Lists Features as both the standard user (waiting for RBAC propagation) and the admin.
+
+**Assert:**
+- Checks the standard user can eventually list features once RBAC propagates, and the list is non-empty.
+- Checks the admin can list a non-empty set of features.

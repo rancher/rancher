@@ -5,22 +5,31 @@ description: Turn a plain-English description of test steps into a new Go end-to
 
 # Write End-to-End Test
 
-Add **one new test** to an existing suite under `tests/e2e`, from a plain-English description of
-what it should do. This skill adds a single test method to the best-fitting existing suite — it
-does not restructure suites, split files, or fix existing tests. If the input seems to call for
-more than one new test, or for changes to existing tests, stop and ask before doing either.
+Add **one new test** to an existing suite under `tests/e2e` — or, when the input describes a
+multi-stage progression that turns out to split cleanly (see Step 2), one test per stage — from a
+plain-English description of what it should do. This skill adds test methods to the best-fitting
+existing suite — it does not restructure suites, split existing files, or fix existing tests. If
+the input describes genuinely unrelated behaviors bundled together (not a splittable progression),
+stop and ask before generating anything.
 
 Ambiguity is resolved by **asking**, never by assuming — this applies throughout, but especially
-to cluster targeting (see Step 2 below), since guessing wrong there produces a test that silently
+to cluster targeting (see Step 3 below), since guessing wrong there produces a test that silently
 checks the wrong thing.
 
 ## Input format
 
-The input looks exactly like a summary entry, given directly in the prompt rather than read from a
-file — a one-sentence flow plus a list of checks:
+The input looks exactly like a summary entry produced by the `summarize-e2e-test` skill, given
+directly in the prompt rather than read from a file — **Arrange** bullets, a single **Act**
+sentence, and **Assert** bullets:
 
 ```
-<one-sentence flow: setup + primary action, present tense>
+**Arrange:**
+- <setup/precondition step>
+- <setup/precondition step>
+
+**Act:** <the single action that triggers the behavior under test, present tense>
+
+**Assert:**
 - <check 1>
 - <check 2>
 ```
@@ -28,14 +37,43 @@ file — a one-sentence flow plus a list of checks:
 Example:
 
 ```
-Bind a restricted user (global role "user-base") to the "backups-manage" ClusterRoleTemplate
-on the local cluster.
+**Arrange:**
+- Create a restricted user with global role "user-base".
+
+**Act:** Bind the user to the "backups-manage" ClusterRoleTemplate on the local cluster.
+
+**Assert:**
 - Checks the user can list etcdbackups in the local cluster's namespace once RBAC propagates.
 ```
 
-There is no required schema beyond this — no labeled "Test name:"/"Cluster:"/"Suite:" fields. The
-workflow below extracts the test name, cluster targeting, and suite placement from the prose, and
-asks whenever any of those aren't unambiguous.
+There is no required schema beyond these labels — no separate "Test name:"/"Cluster:"/"Suite:"
+fields. The workflow below extracts the test name, cluster targeting, and suite placement from the
+Arrange/Act text, and asks whenever any of those aren't unambiguous.
+
+Each Arrange bullet maps to one setup step in the generated test body; Act maps to the single call
+being tested; each Assert bullet maps to one inline assertion following it. **Arrange** may be
+absent entirely — that means the input describes a test with no precondition beyond the Act itself
+(e.g. calling `Create` directly with inline field values meant to trigger a validation error).
+Don't invent a setup step to fill it in.
+
+The input may instead use numbered `Act 1`/`Assert 1`, `Act 2`/`Assert 2`, ... pairs under one
+shared Arrange, matching `summarize-e2e-test`'s multi-stage format for a genuine progression:
+
+```
+**Arrange:**
+- <setup/precondition step>
+
+**Act 1:** <first action, present tense>
+**Assert 1:**
+- <check 1>
+
+**Act 2:** <second action, present tense, building on the state left by Assert 1>
+**Assert 2:**
+- <check 2>
+```
+
+Multi-stage input does **not** automatically become one multi-stage test method — see Step 2,
+which checks whether it should instead become several independent single-stage tests.
 
 ## Conventions
 
@@ -113,7 +151,7 @@ a real downstream cluster), with no duplicated code. This is a structural fact a
 behavioral one, so a plain-English description of "what the test does" will never mention it — if a
 new test's behavior isn't inherently local-only or downstream-only, and it's going into an area that
 already has this local/downstream split, ask explicitly whether it should run once or against both
-contexts (see Step 2), rather than assuming "one cluster" just because the input only describes one
+contexts (see Step 3), rather than assuming "one cluster" just because the input only describes one
 run of it.
 
 When a test does need to target "a" downstream cluster and the input doesn't name one, prefer
@@ -223,7 +261,7 @@ func (p *RTBTestSuite) setClusterCreatorDefaults(client *rancher.Client, roleIDs
 This is a cleanup category distinct from deleting a created object: **restoring mutated state on
 objects the test didn't create.** It applies to any global/shared toggle, not just these three
 fields. If the input just says "exactly N" without saying whether other defaults need clearing,
-that's not resolvable from the text alone — ask (see Step 2 of the Workflow).
+that's not resolvable from the text alone — ask (see Step 3 of the Workflow).
 
 ### Assertions always live in the test body
 
@@ -274,10 +312,31 @@ test does not require or invite fixing either — leave them as-is.
 
 ### Step 1 — Parse the input
 
-Read the lead sentence and bullet checks. Identify the setup/actions, the checks, and anything
-already stated about cluster targeting.
+Read the Arrange bullets, the Act sentence, and the Assert bullets. Identify the setup/actions, the
+checks, and anything already stated about cluster targeting.
 
-### Step 2 — Resolve ambiguity (always ask, never assume)
+### Step 2 — Multi-stage input: decide whether to split
+
+Skip this step entirely for single-Act input. If the input has numbered `Act N`/`Assert N` pairs,
+decide whether to generate several independent single-stage tests or one multi-stage test method:
+
+- Check whether each stage could stand alone: if stage N's Arrange would just be the shared Arrange
+  plus stage N-1's Act — with no dependency on stage N-1's *assertion* itself beyond the state it
+  left behind — it can be split into its own test.
+- **Default to splitting** into N separate single-stage tests, each with its own Arrange (the
+  shared bullets plus whichever earlier Acts are needed to reach that stage's starting state), one
+  Act, one Assert. Simple, single-stage tests are the goal going forward — multi-stage should be
+  the exception, not the default output shape.
+- Only generate a single multi-stage test method when splitting would genuinely lose coverage —
+  e.g. the thing being tested is the *transition itself* (that a controller correctly reacts to a
+  second change on top of a first, in the same run), not just two facts that happen to be checked
+  in sequence.
+- State which you're doing and why, and confirm before proceeding — even when confident. If it's
+  genuinely unclear which applies, ask rather than defaulting silently.
+- This decision determines how many test methods Step 6 generates, and feeds into Step 4's
+  suite-fit check (a split test's fixture needs may differ per stage).
+
+### Step 3 — Resolve ambiguity (always ask, never assume)
 
 For every resource creation, mutation, or check in the input:
 
@@ -298,11 +357,12 @@ For every resource creation, mutation, or check in the input:
   once against a single cluster, or against both contexts like its neighbors, rather than assuming
   "one cluster" just because the input only describes one run of it.
 
-Also confirm the proposed Go test function name (inferred from the lead sentence, `TestXxx`
-PascalCase), and flag anything else vague enough that two engineers would reasonably write
-different code from it (e.g. the input says "should fail" but not which status code or error text).
+Also confirm the proposed Go test function name(s) (inferred from the Act sentence — one name per
+generated test if Step 2 split the input, `TestXxx` PascalCase), and flag anything else vague
+enough that two engineers would reasonably write different code from it (e.g. the input says
+"should fail" but not which status code or error text).
 
-### Step 3 — Find the best-fit home
+### Step 4 — Find the best-fit home
 
 - Match against existing suites by fixture overlap: does a suite's `SetupSuite` already build what
   this test needs (same client scope, same shared project/cluster fixture, same resource types
@@ -314,7 +374,7 @@ different code from it (e.g. the input says "should fail" but not which status c
 - If no existing suite fits at all: ask whether to create a new suite (new file, possibly new
   directory). Never do this silently.
 
-### Step 4 — Identify reusable code
+### Step 5 — Identify reusable code
 
 - Read the target suite's setup file for what already exists (the sub-session helper, shared
   fixtures, suite-level helpers like `createUser`) and reuse it.
@@ -324,25 +384,27 @@ different code from it (e.g. the input says "should fail" but not which status c
   repeated setup need — call this out explicitly, since it's the one case where adding "one test"
   still touches the shared setup file.
 
-### Step 5 — Generate
+### Step 6 — Generate
 
-- Write exactly one new test method on the target suite type, in the target file.
-- First line: obtain a client via the suite's sub-session helper.
+- Write one new test method per Step 2's decision: exactly one if the input was single-Act (or a
+  multi-stage input kept as one test), or one per stage if Step 2 chose to split — all on the target
+  suite type, in the target file.
+- Each generated method's first line: obtain a client via the suite's sub-session helper.
 - Every behavioral assertion inline, per the Conventions section — never factored into a shared
   helper.
-- Cluster targeting exactly as resolved in Step 2 for each resource/check.
+- Cluster targeting exactly as resolved in Step 3 for each resource/check.
 - If the input describes an action that causes a resource to be created indirectly (a controller
   reacting to something the test did, not the test's own `.Create()` call), add an explicit
   `T().Cleanup` for it — see "Indirectly-created resources need explicit cleanup" in Conventions.
   Don't rely on the sub-session to catch it.
 
-### Step 6 — Validate
+### Step 7 — Validate
 
 - Run `go build` and `go vet` on the affected package.
 - Surface any compile failure rather than silently reworking it — report it and either fix the
   specific issue or hand it back with the error.
 
-### Step 7 — Hand back
+### Step 8 — Hand back
 
-- Present the generated method (and any new helper from Step 4) for review before considering the
-  task done.
+- Present the generated method(s) (and any new helper from Step 5) for review before considering
+  the task done.
