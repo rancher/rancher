@@ -223,12 +223,13 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("own").
 		addRule().apiGroups("catalog.cattle.io").resources("operations", "releases", "apps").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("").resources("nodes", "persistentvolumes").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
+		// Promoted Rules
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
+		addRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("nodes", "persistentvolumes").verbs("get", "list", "watch").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", false, false, false).
@@ -248,12 +249,13 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("gateway.networking.k8s.io").resources("httproutes", "grpcroutes", "tcproutes", "tlsroutes", "udproutes").verbs(crudVerbs...).
 		addRule().apiGroups("catalog.cattle.io").resources("operations", "release", "apps").verbs("get", "list", "watch").
 		addRule().apiGroups("traefik.io").resources("ingressroutes", "ingressroutetcps", "ingressrouteudps", "middlewares", "middlewaretcps", "tlsoptions", "tlsstores", "serverstransports", "serverstransporttcps").verbs(crudVerbs...).
-		addClusterScopedRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
-		addClusterScopedRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		// Promoted Rules
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
+		addRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", false, false, false).
@@ -268,12 +270,13 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("get", "list", "watch").
 		addRule().apiGroups("security.istio.io").resources("authorizationpolicies").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("operations", "releases", "apps").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
-		addClusterScopedRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		// Promoted Rules
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
+		addRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", false, false, false).
@@ -330,13 +333,15 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	rb.addRoleTemplate("Manage Volumes", "persistentvolumeclaims-manage", "project", false, false, false).
 		addRule().apiGroups("").resources("persistentvolumeclaims").verbs("*").
-		addClusterScopedRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch")
+		// Promoted Rules
+		addRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("View Volumes", "persistentvolumeclaims-view", "project", false, false, false).
 		addRule().apiGroups("").resources("persistentvolumeclaims").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
-		addClusterScopedRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch")
+		// Promoted Rules
+		addRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Service Accounts", "serviceaccounts-manage", "project", false, false, false).
 		addRule().apiGroups("").resources("serviceaccounts").verbs("*")
@@ -373,7 +378,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addExternalRule().apiGroups("").resources("endpoints").verbs("list").resourceNames(endpointNames...)
 
 	rb.addRoleTemplate("View Navlinks", "navlinks-view", "project", false, false, false).
-		addClusterScopedRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch")
+		// Promoted Rules
+		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch")
 
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in
