@@ -71,6 +71,13 @@ const (
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
 	ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
 	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
+	// ClusterConditionAgentUninstallScheduled is set during cluster removal once the job that uninstalls
+	// the Rancher agent from the downstream cluster has been created, or was not needed. It is False if
+	// the job could not be created.
+	ClusterConditionAgentUninstallScheduled condition.Cond = "AgentUninstallScheduled"
+	// ClusterConditionUserControllersStopped is set during cluster removal by the Rancher replica that
+	// owns the cluster, once it no longer runs the cluster's user controllers.
+	ClusterConditionUserControllersStopped condition.Cond = "UserControllersStopped"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"

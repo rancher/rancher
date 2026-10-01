@@ -3,23 +3,32 @@ package usercontrollers
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 )
 
-// currentClusterControllersVersion is the version of the controllers that are run in the local cluster for a particular downstream cluster.
-const currentClusterControllersVersion = "management.cattle.io/current-cluster-controllers-version"
+const (
+	// currentClusterControllersVersion is the version of the controllers that are run in the local cluster for a particular downstream cluster.
+	currentClusterControllersVersion = "management.cattle.io/current-cluster-controllers-version"
+
+	// reasonStopped is the reason for the UserControllersStopped condition.
+	reasonStopped = "Stopped"
+)
 
 // Register adds the user-controllers-controller handler and starts the peer manager.
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) {
@@ -47,9 +56,29 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 		clusterLister: scaledContext.Wrangler.Mgmt.Cluster().Cache(),
 		clusters:      scaledContext.Wrangler.Mgmt.Cluster(),
 		ownerStrategy: getOwnerStrategy(ctx, scaledContext.PeerManager, initialValue),
+		identity:      replicaIdentity(),
 	}
 
 	scaledContext.Wrangler.Mgmt.Cluster().OnChange(ctx, "user-controllers-controller", u.sync)
+
+	// OnChange is called with the cluster's name only once it's gone, and a cluster recreated under the
+	// same name looks like an update of the old one, so neither tells which cluster went away. The
+	// informer's events carry the old object.
+	informer := scaledContext.Wrangler.Mgmt.Cluster().Informer()
+	registration, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: u.onClusterUpdate,
+		DeleteFunc: u.onClusterDelete,
+	})
+	if err != nil {
+		logrus.Errorf("Failed to watch for removed clusters, their user controllers are only stopped when they are deleted: %v", err)
+	} else {
+		go func() {
+			<-ctx.Done()
+			if err := informer.RemoveEventHandler(registration); err != nil {
+				logrus.Debugf("Failed to stop watching for removed clusters: %v", err)
+			}
+		}()
+	}
 
 	go func() {
 		// temporary measure to recover user controllers not able to successfully start
@@ -99,11 +128,24 @@ type userControllersController struct {
 	starter       controllerStarter
 	clusterLister controllers.ClusterCache
 	clusters      controllers.ClusterClient
+	// identity names this replica when it reports a cluster's user controllers stopped.
+	identity string
+}
+
+// replicaIdentity returns the name of this Rancher replica, which is the pod name when running in a pod.
+func replicaIdentity() string {
+	if name, err := os.Hostname(); err == nil && name != "" {
+		return name
+	}
+	return "unknown"
 }
 
 func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil || cluster.DeletionTimestamp != nil {
+	if cluster == nil {
 		return nil, nil
+	}
+	if cluster.DeletionTimestamp != nil {
+		return nil, u.syncRemoving(cluster)
 	}
 
 	// Check if the cluster has been upgraded to a major or minor version and restart the controllers.
@@ -136,6 +178,52 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 	}
 
 	return cluster, nil
+}
+
+// syncRemoving stops the user controllers of a cluster being removed, once the agent uninstall has been
+// recorded: until then they keep running. Every replica stops its own controllers for the cluster; the
+// replica that owns the cluster then reports them stopped, which is what the removal waits for. The
+// owner reports this even if it had no controllers running, so the removal isn't left waiting when no
+// replica runs them.
+func (u *userControllersController) syncRemoving(cluster *v3.Cluster) error {
+	if !util.ConditionConcluded(cluster, v3.ClusterConditionAgentUninstallScheduled) {
+		return nil
+	}
+
+	u.starter.Stop(cluster)
+
+	if !u.isOwner(cluster) || v3.ClusterConditionUserControllersStopped.IsTrue(cluster) {
+		return nil
+	}
+	message := fmt.Sprintf("user controllers stopped by %s", u.identity)
+	if err := util.SetCondition(u.clusters, cluster, v3.ClusterConditionUserControllersStopped, corev1.ConditionTrue, reasonStopped, message); err != nil {
+		return fmt.Errorf("userControllersController: failed to report user controllers stopped for cluster %s: %w", cluster.Name, err)
+	}
+	return nil
+}
+
+// onClusterUpdate stops the user controllers of a cluster that was replaced by a new one with the same
+// name. A replica that was disconnected while that happened sees it as an update, not a deletion.
+func (u *userControllersController) onClusterUpdate(oldObj, newObj any) {
+	oldCluster, ok := oldObj.(*v3.Cluster)
+	if !ok {
+		return
+	}
+	newCluster, ok := newObj.(*v3.Cluster)
+	if !ok || oldCluster.UID == newCluster.UID {
+		return
+	}
+	u.starter.Stop(oldCluster)
+}
+
+// onClusterDelete stops the user controllers of a cluster that is gone.
+func (u *userControllersController) onClusterDelete(obj any) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	if cluster, ok := obj.(*v3.Cluster); ok {
+		u.starter.Stop(cluster)
+	}
 }
 
 func (u *userControllersController) checkClusterControllerVersion(cluster *v3.Cluster) (newVersion string, needsRestart bool, err error) {

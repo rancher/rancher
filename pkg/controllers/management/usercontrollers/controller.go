@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -17,6 +18,7 @@ import (
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	batchV1 "k8s.io/api/batch/v1"
@@ -32,6 +34,16 @@ import (
 const (
 	WebhookClusterRoleBindingName = "rancher-webhook"
 	WebhookConfigurationName      = "rancher.cattle.io"
+
+	// Reasons for the AgentUninstallScheduled condition.
+	reasonJobCreated       = "JobCreated"
+	reasonCompleted        = "Completed"
+	reasonNotRequired      = "NotRequired"
+	reasonSchedulingFailed = "SchedulingFailed"
+
+	// userControllersStoppedRequeue is how often a cluster being removed is checked again while it waits
+	// for its user controllers to be reported stopped.
+	userControllersStoppedRequeue = 10 * time.Second
 )
 
 var (
@@ -58,19 +70,21 @@ RegisterEarly registers ClusterLifecycleCleanup controller which is responsible 
 and de-registering k8s controllers, on cluster.remove
 */
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
+	clusterClient := management.Management.Clusters("")
 	lifecycle := &ClusterLifecycleCleanup{
 		Manager:  manager,
 		mgmtCore: management.Core,
+		clusters: clusterClient,
 		ctx:      ctx,
 	}
 
-	clusterClient := management.Management.Clusters("")
 	clusterClient.AddLifecycle(ctx, "cluster-agent-controller-cleanup", lifecycle)
 }
 
 type ClusterLifecycleCleanup struct {
 	Manager  *clustermanager.Manager
 	mgmtCore corev1.Interface
+	clusters v3.ClusterInterface
 	ctx      context.Context
 }
 
@@ -78,58 +92,99 @@ func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error
 	return nil, nil
 }
 
+// Remove uninstalls the Rancher agent from the downstream cluster where that is needed, then holds the
+// cluster until the replica that owns it reports its user controllers stopped. Every replica stops its
+// own controllers for the cluster once the agent uninstall has been recorded, see the
+// user-controllers-controller.
 func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
-	// Try to clean up an imported cluster 3 times, then move on.
+	if !util.ConditionConcluded(obj, v32.ClusterConditionAgentUninstallScheduled) {
+		status, reason, message := c.scheduleAgentUninstall(obj)
+		if err := util.SetCondition(c.clusters, obj, v32.ClusterConditionAgentUninstallScheduled, status, reason, message); err != nil {
+			return obj, fmt.Errorf("[cluster-cleanup] recording agent uninstall for cluster [%s]: %w", obj.Name, err)
+		}
+	}
+
+	// The user-controllers-controller does this on every replica, this one included, once the uninstall
+	// is recorded. Stopping here as well keeps this replica from waiting on its own informer.
+	c.Manager.Stop(obj)
+
+	if !v32.ClusterConditionUserControllersStopped.IsTrue(obj) {
+		// Reporting the controllers stopped updates the cluster, which brings it back here. The requeue
+		// only covers that update being missed.
+		c.clusters.Controller().EnqueueAfter("", obj.Name, userControllersStoppedRequeue)
+		return obj, generic.ErrSkip
+	}
+	return nil, nil
+}
+
+// scheduleAgentUninstall uninstalls the Rancher agent from the downstream cluster if it needs it, trying
+// 3 times before giving up, and returns how to record the outcome on AgentUninstallScheduled.
+func (c *ClusterLifecycleCleanup) scheduleAgentUninstall(obj *v3.Cluster) (coreV1.ConditionStatus, string, string) {
+	var uninstall func(*v3.Cluster) (string, error)
+	switch {
+	case obj.Name == "local" && obj.Spec.Internal:
+		uninstall = c.cleanupLocalCluster
+	case obj.Status.Driver == v32.ClusterDriverK3s ||
+		obj.Status.Driver == v32.ClusterDriverK3os ||
+		obj.Status.Driver == v32.ClusterDriverRke2 ||
+		obj.Status.Driver == v32.ClusterDriverRancherD ||
+		(obj.Status.Driver == v32.ClusterDriverImported && !imported.IsAdministratedByProvisioningCluster(obj)) ||
+		(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
+		(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
+		(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) ||
+		(obj.Status.AliStatus.UpstreamSpec != nil && obj.Status.AliStatus.UpstreamSpec.Imported):
+		uninstall = c.cleanupImportedCluster
+	default:
+		return coreV1.ConditionTrue, reasonNotRequired, "the agent is not uninstalled from this type of cluster"
+	}
+
 	backoff := wait.Backoff{
 		Duration: 3 * time.Second,
 		Factor:   1,
 		Steps:    3,
 	}
 
+	var reason, message string
+	var lastErr error
 	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		var err error
-		if obj.Name == "local" && obj.Spec.Internal {
-			err = c.cleanupLocalCluster(obj)
-		} else if obj.Status.Driver == v32.ClusterDriverK3s ||
-			obj.Status.Driver == v32.ClusterDriverK3os ||
-			obj.Status.Driver == v32.ClusterDriverRke2 ||
-			obj.Status.Driver == v32.ClusterDriverRancherD ||
-			(obj.Status.Driver == v32.ClusterDriverImported && !imported.IsAdministratedByProvisioningCluster(obj)) ||
-			(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
-			(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
-			(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) ||
-			(obj.Status.AliStatus.UpstreamSpec != nil && obj.Status.AliStatus.UpstreamSpec.Imported) {
-			err = c.cleanupImportedCluster(obj)
+		reason, lastErr = uninstall(obj)
+		if lastErr != nil {
+			logrus.Infof("[cluster-cleanup] error cleaning up cluster [%s]: %v", obj.Name, lastErr)
 		}
-		if err != nil {
-			logrus.Infof("[cluster-cleanup] error cleaning up cluster [%s]: %v", obj.Name, err)
-		}
-		return err == nil, nil
+		return lastErr == nil, nil
 	}); err != nil {
-		logrus.Warnf("[cluster-cleanup] could not clean imported cluster [%s], moving on with removing cluster: %v", obj.Name, err)
+		logrus.Warnf("[cluster-cleanup] could not clean imported cluster [%s], moving on with removing cluster: %v", obj.Name, lastErr)
+		return coreV1.ConditionFalse, reasonSchedulingFailed, lastErr.Error()
 	}
 
-	c.Manager.Stop(obj)
-	return nil, nil
+	switch reason {
+	case reasonNotRequired:
+		message = "the cluster has no connection details, so no agent was deployed to it"
+	case reasonJobCreated:
+		message = "created the job that uninstalls the agent in namespace default"
+	case reasonCompleted:
+		message = "removed the agent and Rancher's namespace metadata from the local cluster"
+	}
+	return coreV1.ConditionTrue, reason, message
 }
 
-func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
+func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) (string, error) {
 	userContext, err := c.Manager.UserContextFromCluster(obj)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if userContext == nil {
 		logrus.Debugf("could not get context for local cluster, skipping cleanup")
-		return nil
+		return reasonNotRequired, nil
 	}
 
 	err = cleanupNamespaces(userContext.K8sClient)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	propagationBackground := metav1.DeletePropagationBackground
@@ -139,54 +194,54 @@ func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
 
 	err = userContext.Apps.Deployments("cattle-system").Delete("cattle-cluster-agent", deleteOptions)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return err
+		return "", err
 	}
 
-	return nil
+	return reasonCompleted, nil
 }
 
 func (c *ClusterLifecycleCleanup) Updated(obj *v3.Cluster) (runtime.Object, error) {
 	return nil, nil
 }
 
-func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) error {
+func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) (string, error) {
 	userContext, err := c.Manager.UserContextFromCluster(cluster)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if userContext == nil {
 		logrus.Debugf("could not get context for imported cluster, skipping cleanup")
-		return nil
+		return reasonNotRequired, nil
 	}
 
 	role, err := c.createCleanupClusterRole(userContext)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	sa, err := c.createCleanupServiceAccount(userContext)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	crb, err := c.createCleanupClusterRoleBinding(userContext, role.Name, sa.Name)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// create cleanup image pull secret
 	secrets, err := c.createCleanupImagePullSecrets(userContext, cluster)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	job, err := c.createCleanupJob(userContext, cluster, sa.Name, secrets)
 	if err != nil {
 		cleanupErr := c.cleanupImagePullSecrets(userContext, secrets)
 		if cleanupErr != nil {
-			return errors.Join(err, cleanupErr)
+			return "", errors.Join(err, cleanupErr)
 		}
-		return err
+		return "", err
 	}
 
 	or := []metav1.OwnerReference{
@@ -203,25 +258,25 @@ func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) er
 
 	err = c.updateClusterImagePullSecretsOwner(userContext, secrets, or)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = c.updateClusterRoleOwner(userContext, role, or)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = c.updateServiceAccountOwner(userContext, sa, or)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = c.updateClusterRoleBindingOwner(userContext, crb, or)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return reasonJobCreated, nil
 }
 
 func (c *ClusterLifecycleCleanup) createCleanupClusterRole(userContext *config.UserContext) (*rbacV1.ClusterRole, error) {
