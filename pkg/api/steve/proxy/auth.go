@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -18,13 +19,15 @@ const (
 )
 
 type clusterProxyAuthorizer struct {
-	secretCache corecontrollers.SecretCache
+	secretCache    corecontrollers.SecretCache
+	namespaceCache corecontrollers.NamespaceCache
 }
 
 func NewAuthorizer(wrangler *wrangler.Context) remotedialer.Authorizer {
 	secretCache := wrangler.Core.Secret().Cache()
 	a := &clusterProxyAuthorizer{
-		secretCache: secretCache,
+		secretCache:    secretCache,
+		namespaceCache: wrangler.Core.Namespace().Cache(),
 	}
 	secretCache.AddIndexer(tokenIndex, func(obj *corev1.Secret) ([]string, error) {
 		return crt.SecretTokenIndexValues(obj), nil
@@ -45,5 +48,15 @@ func (a *clusterProxyAuthorizer) Authorize(req *http.Request) (string, bool, err
 		return "", false, err
 	}
 
-	return Prefix + secrets[0].Namespace, true, nil
+	for _, secret := range secrets {
+		usable, err := crt.TokenSecretUsable(secret, a.namespaceCache.Get)
+		if err != nil {
+			return "", false, err
+		}
+		if usable {
+			return Prefix + secret.Namespace, true, nil
+		}
+		logrus.Debugf("[steve-proxy] rejecting registration token that belongs to a previous cluster named %s", secret.Namespace)
+	}
+	return "", false, nil
 }

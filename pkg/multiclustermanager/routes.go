@@ -51,7 +51,8 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 			Clusters:     scaledContext.Management.Clusters(""),
 			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),
 			// Reuses the SecretTokenIndex indexer registered by mcmauthorizer.NewAuthorizer.
-			SecretIndexer: scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
+			SecretIndexer:   scaledContext.Core.Secrets("").Controller().Informer().GetIndexer(),
+			NamespaceLister: scaledContext.Core.Namespaces("").Controller().Lister(),
 		}
 	)
 

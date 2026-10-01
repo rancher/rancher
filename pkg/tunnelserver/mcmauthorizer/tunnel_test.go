@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -49,6 +50,16 @@ func TestGetClusterByToken(t *testing.T) {
 			return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
 		},
 	}
+	// c-old is the namespace of a cluster that was deleted; its tokens are still being torn down.
+	namespaceLister := &corefakes.NamespaceListerMock{
+		GetFunc: func(_, name string) (*corev1.Namespace, error) {
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+			if name == "c-old" {
+				ns.Status.Phase = corev1.NamespaceTerminating
+			}
+			return ns, nil
+		},
+	}
 
 	tests := []struct {
 		name       string
@@ -56,6 +67,7 @@ func TestGetClusterByToken(t *testing.T) {
 		token      string
 		wantResult *apimgmtv3.Cluster
 		wantErr    error
+		wantErrMsg string
 	}{
 		{
 			name: "current token matches",
@@ -97,16 +109,42 @@ func TestGetClusterByToken(t *testing.T) {
 			token:   "tok",
 			wantErr: ErrClusterNotFound,
 		},
+		{
+			name: "token from a previous cluster with the same name",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-old", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+			},
+			token:      "tok",
+			wantErr:    ErrClusterNotFound,
+			wantErrMsg: "registration token belongs to a previous cluster named c-old",
+		},
+		{
+			name: "a stale match does not hide a usable one",
+			secrets: []*corev1.Secret{
+				tokenSecret("c-old", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+				tokenSecret("c-abc", "crt-token-system", map[string][]byte{"token": []byte("tok")}),
+			},
+			token:      "tok",
+			wantResult: cluster,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			auth := &Authorizer{
-				secretIndexer: newTestSecretIndexer(t, tt.secrets...),
-				clusterLister: clusterLister,
+				secretIndexer:   newTestSecretIndexer(t, tt.secrets...),
+				clusterLister:   clusterLister,
+				namespaceLister: namespaceLister,
 			}
 			got, err := auth.getClusterByToken(tt.token)
-			assert.Equal(t, tt.wantErr, err)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				if tt.wantErrMsg != "" {
+					assert.ErrorContains(t, err, tt.wantErrMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.wantResult, got)
 		})
 	}

@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -49,6 +50,27 @@ func SecretTokenIndexValues(secret *corev1.Secret) []string {
 		values = append(values, string(prev))
 	}
 	return values
+}
+
+// TokenSecretUsable reports whether the token stored in secret can still be used to register with the
+// cluster named by its namespace. A cluster's token secrets live in a namespace named after the cluster,
+// and that namespace is deleted with the cluster, but not waited for: a new cluster can be created under
+// the same name while the old namespace, and the old cluster's tokens in it, are still being torn down.
+// Nothing new can be created in a terminating namespace, so any token found in one belongs to a cluster
+// that is gone.
+//
+// A namespace that can't be found is not treated as stale: a namespace is only removed once everything
+// in it is, so the secret can't outlive it, and not finding it only means the namespace cache is behind
+// the secret cache. Rejecting then would turn a lagging cache into failed registrations.
+func TokenSecretUsable(secret *corev1.Secret, getNamespace func(name string) (*corev1.Namespace, error)) (bool, error) {
+	ns, err := getNamespace(secret.Namespace)
+	if apierrors.IsNotFound(err) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to get namespace %s of token secret %s: %w", secret.Namespace, secret.Name, err)
+	}
+	return ns.DeletionTimestamp == nil && ns.Status.Phase != corev1.NamespaceTerminating, nil
 }
 
 func GetTokenFromSecret(secrets SecretGetter, crt *v3.ClusterRegistrationToken) (string, error) {

@@ -9,12 +9,47 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
+
+// newTestNamespaceLister returns a namespace lister whose namespaces are all active, or all terminating.
+func newTestNamespaceLister(terminating bool) *corefakes.NamespaceListerMock {
+	return &corefakes.NamespaceListerMock{
+		GetFunc: func(_, name string) (*corev1.Namespace, error) {
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+			if terminating {
+				now := metav1.Now()
+				ns.DeletionTimestamp = &now
+				ns.Status.Phase = corev1.NamespaceTerminating
+			}
+			return ns, nil
+		},
+	}
+}
+
+func TestIsValidTokenRejectsATokenFromAPreviousCluster(t *testing.T) {
+	ch := &ClusterImport{
+		SecretIndexer:   newTestSecretIndexer("cluster", "token"),
+		NamespaceLister: newTestNamespaceLister(true),
+	}
+
+	assert.False(t, ch.isValidToken("cluster", "token"))
+}
+
+func TestIsValidTokenAcceptsATokenOfTheCurrentCluster(t *testing.T) {
+	ch := &ClusterImport{
+		SecretIndexer:   newTestSecretIndexer("cluster", "token"),
+		NamespaceLister: newTestNamespaceLister(false),
+	}
+
+	assert.True(t, ch.isValidToken("cluster", "token"))
+	assert.False(t, ch.isValidToken("other-cluster", "token"), "a token only belongs to the cluster named by its namespace")
+}
 
 func newTestSecretIndexer(clusterID, token string) cache.Indexer {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
@@ -35,7 +70,8 @@ func TestClusterImportHandler_ValidateAuthImage(t *testing.T) {
 				return &apimgmtv3.Cluster{}, nil
 			},
 		},
-		SecretIndexer: newTestSecretIndexer("cluster", "token"),
+		SecretIndexer:   newTestSecretIndexer("cluster", "token"),
+		NamespaceLister: newTestNamespaceLister(false),
 	}
 
 	tests := []struct {

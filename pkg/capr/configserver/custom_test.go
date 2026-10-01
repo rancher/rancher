@@ -46,7 +46,22 @@ func newTestConfigServer(t *testing.T, tokenSecret *corev1.Secret, readySecret *
 		secretsCache:     secretsCache,
 		secrets:          secrets,
 		mgmtClusterCache: mgmtClusterCache,
+		namespaceCache:   newTestNamespaceCache(ctrl),
 	}
+}
+
+// newTestNamespaceCache returns a namespace cache in which c-old is the namespace of a deleted cluster,
+// still being torn down, and every other namespace is active.
+func newTestNamespaceCache(ctrl *gomock.Controller) *fake.MockNonNamespacedCacheInterface[*corev1.Namespace] {
+	namespaceCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+	namespaceCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*corev1.Namespace, error) {
+		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+		if name == "c-old" {
+			ns.Status.Phase = corev1.NamespaceTerminating
+		}
+		return ns, nil
+	}).AnyTimes()
+	return namespaceCache
 }
 
 func readyMachineSecret(namespace, name string) *corev1.Secret {
@@ -119,4 +134,35 @@ func TestFindMachineByClusterToken(t *testing.T) {
 			assert.Equal(t, "machine-1", ref.Name)
 		})
 	}
+}
+
+func TestFindMachineByClusterTokenRejectsATokenFromAPreviousCluster(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	secretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secretsCache.EXPECT().GetByIndex(crtTokenIndex, "tok").Return([]*corev1.Secret{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-old", Name: "crt-token-default-token"}},
+	}, nil)
+	// No other mock expectations: a rejected token must not create a machine request or resolve a cluster.
+	r := &RKE2ConfigServer{secretsCache: secretsCache, namespaceCache: newTestNamespaceCache(ctrl)}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer tok")
+	req.Header.Set(machineIDHeader, "machine-1")
+
+	ref, err := r.findMachineByClusterToken(req)
+	require.NoError(t, err)
+	assert.Nil(t, ref, "a stale token is treated like an unknown one")
+}
+
+func TestTokenNamespacePrefersAUsableToken(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	r := &RKE2ConfigServer{namespaceCache: newTestNamespaceCache(ctrl)}
+
+	namespace, err := r.tokenNamespace([]*corev1.Secret{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-old", Name: "crt-token-default-token"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "c-abcde", Name: "crt-token-default-token"}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "c-abcde", namespace)
 }

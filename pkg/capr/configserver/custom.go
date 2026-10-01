@@ -10,6 +10,8 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
+	crt "github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,13 +40,12 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1
 		return nil, err
 	}
 
-	if len(secrets) == 0 {
-		return nil, nil
+	namespace, err := r.tokenNamespace(secrets)
+	if err != nil || namespace == "" {
+		return nil, err
 	}
 
 	data := dataFromHeaders(req)
-
-	namespace := secrets[0].Namespace
 
 	lc, err := ResolveMgmtTokenCaller(r.mgmtClusterCache, r.capiClusterCache, namespace)
 	if err != nil {
@@ -86,6 +87,23 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1
 	}
 
 	return nil, fmt.Errorf("unknown caller kind %v", lc.Kind)
+}
+
+// tokenNamespace returns the namespace of the first token secret in secrets that can still be used to
+// register with its cluster, or "" if there is none. A token left behind by a previous cluster with the
+// same name is treated like an unknown token.
+func (r *RKE2ConfigServer) tokenNamespace(secrets []*corev1.Secret) (string, error) {
+	for _, secret := range secrets {
+		usable, err := crt.TokenSecretUsable(secret, r.namespaceCache.Get)
+		if err != nil {
+			return "", err
+		}
+		if usable {
+			return secret.Namespace, nil
+		}
+		logrus.Infof("[rke2configserver] rejecting registration token that belongs to a previous cluster named %s", secret.Namespace)
+	}
+	return "", nil
 }
 
 func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*capi.Machine, error) {

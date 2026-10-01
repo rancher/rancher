@@ -74,6 +74,7 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 		KontainerDriverLister: context.Management.KontainerDrivers("").Controller().Lister(),
 		Secrets:               context.Core.Secrets(""),
 		SecretLister:          context.Core.Secrets("").Controller().Lister(),
+		namespaceLister:       context.Core.Namespaces("").Controller().Lister(),
 	}
 	// Registered through wrangler's Cache().AddIndexer (panics via
 	// utilruntime.Must on failure) instead of the raw informer's
@@ -98,6 +99,7 @@ type Authorizer struct {
 	KontainerDriverLister v3.KontainerDriverLister
 	Secrets               corev1.SecretInterface
 	SecretLister          corev1.SecretLister
+	namespaceLister       corev1.NamespaceLister
 }
 
 type Client struct {
@@ -395,9 +397,18 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 		return nil, err
 	}
 
+	stale := ""
 	for _, obj := range secrets {
 		secret, ok := obj.(*k8scorev1.Secret)
 		if !ok {
+			continue
+		}
+		usable, err := clusterregistrationtoken.TokenSecretUsable(secret, t.getNamespace)
+		if err != nil {
+			return nil, err
+		}
+		if !usable {
+			stale = secret.Namespace
 			continue
 		}
 		cluster, err := t.clusterLister.Get("", secret.Namespace)
@@ -410,7 +421,14 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 		return cluster, nil
 	}
 
+	if stale != "" {
+		return nil, fmt.Errorf("%w: registration token belongs to a previous cluster named %s", ErrClusterNotFound, stale)
+	}
 	return nil, ErrClusterNotFound
+}
+
+func (t *Authorizer) getNamespace(name string) (*k8scorev1.Namespace, error) {
+	return t.namespaceLister.Get("", name)
 }
 
 func (t *Authorizer) secretTokenIndex(secret *k8scorev1.Secret) ([]string, error) {

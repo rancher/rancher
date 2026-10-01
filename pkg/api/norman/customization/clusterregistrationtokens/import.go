@@ -7,6 +7,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -22,9 +23,10 @@ import (
 )
 
 type ClusterImport struct {
-	Clusters      v3.ClusterInterface
-	SecretLister  v1.SecretLister
-	SecretIndexer k8scache.Indexer
+	Clusters        v3.ClusterInterface
+	SecretLister    v1.SecretLister
+	SecretIndexer   k8scache.Indexer
+	NamespaceLister v1.NamespaceLister
 }
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
@@ -119,9 +121,22 @@ func (ch *ClusterImport) isValidToken(clusterID, token string) bool {
 	}
 	for _, obj := range objs {
 		secret, ok := obj.(*corev1.Secret)
-		if ok && secret.Namespace == clusterID {
+		if !ok || secret.Namespace != clusterID {
+			continue
+		}
+		usable, err := clusterregistrationtoken.TokenSecretUsable(secret, ch.getNamespace)
+		if err != nil {
+			logrus.Errorf("[cluster-registration-tokens] %v", err)
+			return false
+		}
+		if usable {
 			return true
 		}
+		logrus.Infof("[cluster-registration-tokens] rejecting registration token that belongs to a previous cluster named %s", clusterID)
 	}
 	return false
+}
+
+func (ch *ClusterImport) getNamespace(name string) (*corev1.Namespace, error) {
+	return ch.NamespaceLister.Get("", name)
 }

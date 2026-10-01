@@ -52,6 +52,24 @@ func TestClusterProxyAuthorizer_Authorize(t *testing.T) {
 			wantOK:     false,
 		},
 		{
+			name:       "token from a previous cluster with the same name is unauthorized",
+			authHeader: "Bearer " + Prefix + "tok",
+			getByIndex: []*corev1.Secret{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "c-old", Name: "crt-token-system"}},
+			},
+			wantOK: false,
+		},
+		{
+			name:       "a stale match does not hide a usable one",
+			authHeader: "Bearer " + Prefix + "tok",
+			getByIndex: []*corev1.Secret{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "c-old", Name: "crt-token-system"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "c-abc", Name: "crt-token-system"}},
+			},
+			wantID: Prefix + "c-abc",
+			wantOK: true,
+		},
+		{
 			name:       "unexpected error with results is propagated",
 			authHeader: "Bearer " + Prefix + "tok",
 			getByIndex: []*corev1.Secret{
@@ -69,7 +87,17 @@ func TestClusterProxyAuthorizer_Authorize(t *testing.T) {
 			mockCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			mockCache.EXPECT().GetByIndex(tokenIndex, gomock.Any()).Return(tt.getByIndex, tt.getByIndexErr).AnyTimes()
 
-			a := &clusterProxyAuthorizer{secretCache: mockCache}
+			// c-old is the namespace of a cluster that was deleted; its tokens are still being torn down.
+			namespaceCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			namespaceCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*corev1.Namespace, error) {
+				ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+				if name == "c-old" {
+					ns.Status.Phase = corev1.NamespaceTerminating
+				}
+				return ns, nil
+			}).AnyTimes()
+
+			a := &clusterProxyAuthorizer{secretCache: mockCache, namespaceCache: namespaceCache}
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set("Authorization", tt.authHeader)
