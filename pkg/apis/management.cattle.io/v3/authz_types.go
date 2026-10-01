@@ -321,7 +321,7 @@ type RoleTemplate struct {
 	// +optional
 	Rules []rbacv1.PolicyRule `json:"rules,omitempty"`
 
-	// ClusterScopedRules hold all the PolicyRules that are scoped to the cluster for this RoleTemplate.
+	// ClusterScopedRules holds all the PolicyRules that are scoped to the cluster for this RoleTemplate.
 	// Unlike Rules, which are confined to the project's namespaces, these rules are granted cluster-wide.
 	// Only applies to RoleTemplates with a context set to "project".
 	// +optional

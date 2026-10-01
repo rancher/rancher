@@ -32,7 +32,6 @@ type roleBuilder struct {
 	roleTemplateNames                  []string
 	rules                              []*ruleBuilder
 	namespacedRules                    []*namespacedRuleBuilder
-	clusterScopedRules                 []*ruleBuilder
 	externalRules                      []*ruleBuilder
 	inheritedClusterRoles              []string
 	inheritedFleetWorkspacePermissions *v3.FleetWorkspacePermission
@@ -101,14 +100,6 @@ func (rb *roleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilde
 	return n
 }
 
-func (rb *roleBuilder) addClusterScopedRule() *ruleBuilder {
-	r := &ruleBuilder{
-		rb: rb,
-	}
-	rb.clusterScopedRules = append(rb.clusterScopedRules, r)
-	return r
-}
-
 func (rb *roleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	rb.roleTemplateNames = names
 	return rb
@@ -163,14 +154,6 @@ func (rb *roleBuilder) namespacedPolicyRules() map[string][]rbacv1.PolicyRule {
 	return nsRules
 }
 
-func (rb *roleBuilder) clusterScopedPolicyRules() []rbacv1.PolicyRule {
-	var prs []rbacv1.PolicyRule
-	for _, r := range rb.clusterScopedRules {
-		prs = append(prs, r.toPolicyRule())
-	}
-	return prs
-}
-
 type ruleBuilder struct {
 	rb             *roleBuilder
 	_verbs         []string
@@ -215,10 +198,6 @@ func (r *ruleBuilder) addRule() *ruleBuilder {
 
 func (r *ruleBuilder) addExternalRule() *ruleBuilder {
 	return r.rb.addExternalRule()
-}
-
-func (r *ruleBuilder) addClusterScopedRule() *ruleBuilder {
-	return r.rb.addClusterScopedRule()
 }
 
 func (r *ruleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
@@ -391,16 +370,15 @@ func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateCl
 				Name:   current.name,
 				Labels: defaultRTLabel,
 			},
-			DisplayName:        current.displayName,
-			Builtin:            current.builtin,
-			External:           current.external,
-			ExternalRules:      current.policyExternalRules(),
-			Hidden:             current.hidden,
-			Context:            current.context,
-			Rules:              current.policyRules(),
-			RoleTemplateNames:  current.roleTemplateNames,
-			Administrative:     current.administrative,
-			ClusterScopedRules: current.clusterScopedPolicyRules(),
+			DisplayName:       current.displayName,
+			Builtin:           current.builtin,
+			External:          current.external,
+			ExternalRules:     current.policyExternalRules(),
+			Hidden:            current.hidden,
+			Context:           current.context,
+			Rules:             current.policyRules(),
+			RoleTemplateNames: current.roleTemplateNames,
+			Administrative:    current.administrative,
 		}
 		return role.Name, role, nil
 	}
@@ -424,7 +402,7 @@ func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateCl
 		equal := haveRT.DisplayName == wantRT.DisplayName && reflect.DeepEqual(haveRT.Rules, wantRT.Rules) && reflect.DeepEqual(haveRT.ExternalRules, wantRT.ExternalRules) &&
 			reflect.DeepEqual(haveRT.RoleTemplateNames, wantRT.RoleTemplateNames) && haveRT.Builtin == wantRT.Builtin &&
 			haveRT.External == wantRT.External && haveRT.Hidden == wantRT.Hidden && haveRT.Context == wantRT.Context &&
-			haveRT.Administrative == wantRT.Administrative && reflect.DeepEqual(haveRT.ClusterScopedRules, wantRT.ClusterScopedRules)
+			haveRT.Administrative == wantRT.Administrative
 
 		haveRT.DisplayName = wantRT.DisplayName
 		haveRT.Rules = wantRT.Rules
@@ -435,7 +413,6 @@ func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateCl
 		haveRT.Hidden = wantRT.Hidden
 		haveRT.Context = wantRT.Context
 		haveRT.Administrative = wantRT.Administrative
-		haveRT.ClusterScopedRules = wantRT.ClusterScopedRules
 
 		return equal, haveRT, nil
 	}
