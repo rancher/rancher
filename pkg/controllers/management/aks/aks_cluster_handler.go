@@ -258,15 +258,15 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 			}
 		}
 
-		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-
 		if cluster.Spec.AKSConfig.Imported {
 			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, statusMessage)
 			if err != nil {
 				return cluster, err
 			}
-			logrus.Infof("%s", statusMessage)
 		}
+
+		logrus.Infof("%s", statusMessage)
+		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 
 		if failureMessage == "" {
 			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, statusMessage)
