@@ -242,6 +242,13 @@ var (
 		true,
 		true,
 	)
+	UIConfigurableDashboards = newFeature(
+		"ui-configurable-dashboards",
+		"[Experimental] Allow users to customise specific UI pages",
+		false,
+		true,
+		true,
+	)
 )
 
 func ListEnabled() []string {
