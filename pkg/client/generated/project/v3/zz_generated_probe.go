@@ -15,6 +15,7 @@ const (
 	ProbeFieldPath                          = "path"
 	ProbeFieldPeriodSeconds                 = "periodSeconds"
 	ProbeFieldPort                          = "port"
+	ProbeFieldProtocol                      = "protocol"
 	ProbeFieldScheme                        = "scheme"
 	ProbeFieldSuccessThreshold              = "successThreshold"
 	ProbeFieldTCP                           = "tcp"
@@ -32,6 +33,7 @@ type Probe struct {
 	Path                          string             `json:"path,omitempty" yaml:"path,omitempty"`
 	PeriodSeconds                 int64              `json:"periodSeconds,omitempty" yaml:"periodSeconds,omitempty"`
 	Port                          intstr.IntOrString `json:"port,omitempty" yaml:"port,omitempty"`
+	Protocol                      string             `json:"protocol,omitempty" yaml:"protocol,omitempty"`
 	Scheme                        string             `json:"scheme,omitempty" yaml:"scheme,omitempty"`
 	SuccessThreshold              int64              `json:"successThreshold,omitempty" yaml:"successThreshold,omitempty"`
 	TCP                           bool               `json:"tcp,omitempty" yaml:"tcp,omitempty"`
