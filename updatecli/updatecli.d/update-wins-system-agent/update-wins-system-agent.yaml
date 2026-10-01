@@ -75,22 +75,27 @@ sources:
       - find: 'v\d+\.\d+\.\d+\S*'
 
   wins-release:
-    name: 'Get latest upstream wins version'
-    kind: githubrelease
+    name: 'Get requested or latest upstream wins version'
+    kind: shell
     dependson:
       - 'wins-current-base-version'
     spec:
-      owner: '{{ .repos.wins.owner }}'
-      repository: '{{ .repos.wins.repo }}'
-      key: tagname
-      typefilter:
-        release: true
-        prerelease: true
-      username: '{{ .scm.username }}'
-      token: '{{ requiredEnv .scm.token }}'
-      versionfilter:
-        kind: semver
-        pattern: '~{{ source "wins-current-base-version" }}-0'
+      environments:
+        - name: 'WINS_RELEASE_TAG'
+      command: |
+        if [ -n "${WINS_RELEASE_TAG}" ]; then
+          if ! git check-ref-format --allow-onelevel "refs/tags/${WINS_RELEASE_TAG}"; then
+            echo "Invalid Wins tag: ${WINS_RELEASE_TAG}" >&2
+            exit 1
+          fi
+          git ls-remote --exit-code --tags https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}.git "refs/tags/${WINS_RELEASE_TAG}" > /dev/null ||
+            { echo "Wins tag does not exist: ${WINS_RELEASE_TAG}" >&2; exit 1; }
+          printf '%s\n' "${WINS_RELEASE_TAG}"
+        else
+          git ls-remote --tags https://github.com/{{ .repos.wins.owner }}/{{ .repos.wins.repo }}.git |
+            cut -f2 | sed -E 's#refs/tags/##; s/\^\{\}$//' |
+            sort -u | grep -E '^{{ source "wins-current-base-version" }}(-.*)?$' | sort -V | tail -1
+        fi
 
   system-agent-release:
     name: 'Get latest upstream system-agent version'
