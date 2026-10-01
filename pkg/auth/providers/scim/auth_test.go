@@ -14,6 +14,7 @@ import (
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-func enabledProvider(string) providerConfig { return providerConfig{Enabled: true} }
+func enabledProvider(string) scimconfig.Config { return scimconfig.Config{Enabled: true} }
 
 func TestTokenAuthenticator(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -412,7 +413,7 @@ func TestTokenAuthenticator(t *testing.T) {
 	t.Run("scim not enabled", func(t *testing.T) {
 		auth := &tokenAuthenticator{
 			isDisabledProvider: isDisabledProvider,
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: false} },
+			getConfig:          func(string) scimconfig.Config { return scimconfig.Config{Enabled: false} },
 		}
 
 		w := httptest.NewRecorder()
@@ -431,7 +432,7 @@ func TestTokenAuthenticator(t *testing.T) {
 		auth := &tokenAuthenticator{
 			secretCache:        secretCache,
 			isDisabledProvider: isDisabledProvider,
-			getConfig:          func(string) providerConfig { return providerConfig{Enabled: true, Paused: true} },
+			getConfig:          func(string) scimconfig.Config { return scimconfig.Config{Enabled: true, Paused: true} },
 		}
 
 		w := httptest.NewRecorder()

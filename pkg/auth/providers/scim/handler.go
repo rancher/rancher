@@ -3,6 +3,7 @@ package scim
 import (
 	"net/http"
 
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -17,7 +18,7 @@ type SCIMServer struct {
 	userAttributeCache v3.UserAttributeCache
 	userAttributes     v3.UserAttributeClient
 	userMGR            user.Manager
-	getConfig          func(provider string) providerConfig
+	getConfig          func(provider string) scimconfig.Config
 }
 
 // NewHandler instantiates [SCIMServer] and returns an [http.Handler] that serves SCIM API endpoints.
@@ -31,8 +32,8 @@ func NewHandler(scaledContext *config.ScaledContext) http.Handler {
 		userAttributeCache: scaledContext.Wrangler.Mgmt.UserAttribute().Cache(),
 		userAttributes:     scaledContext.Wrangler.Mgmt.UserAttribute(),
 		userMGR:            scaledContext.UserManager,
-		getConfig: func(provider string) providerConfig {
-			return getProviderConfig(configMapCache, provider)
+		getConfig: func(provider string) scimconfig.Config {
+			return scimconfig.Get(configMapCache, provider)
 		},
 	}
 
