@@ -374,15 +374,15 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 		}
 
-		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-
 		if cluster.Spec.EKSConfig.Imported {
 			cluster, err = e.SetUnknown(cluster, apimgmtv3.ClusterConditionPending, statusMessage)
 			if err != nil {
 				return cluster, err
 			}
-			logrus.Infof("%s", statusMessage)
 		}
+
+		logrus.Info(statusMessage)
+		e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
 
 		if failureMessage == "" {
 			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionProvisioned, statusMessage)
