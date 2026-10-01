@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-var testDefaultGetConfig = func(string) providerConfig { return defaultProviderConfig() }
+var testDefaultGetConfig = func(string) scimconfig.Config { return scimconfig.Default() }
 
 func TestGetRancherGroupMembers(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -539,8 +540,8 @@ func TestSyncGroupMembersUpdatesStaleDisplayName(t *testing.T) {
 }
 
 func TestApplyPatchGroup(t *testing.T) {
-	cfg := defaultProviderConfig()
-	externalIDCfg := providerConfig{GroupIDAttribute: GroupIDExternalID}
+	cfg := scimconfig.Default()
+	externalIDCfg := scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 
 	t.Run("replaces externalId", func(t *testing.T) {
 		group := &v3.Group{ExternalID: "old-id"}
@@ -1268,8 +1269,8 @@ func TestPatchGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 
@@ -1320,8 +1321,8 @@ func TestPatchGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupCache,
 			userCache:   userCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 
@@ -2783,8 +2784,8 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 
@@ -2836,8 +2837,8 @@ func TestUpdateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{GroupIDAttribute: scimconfig.GroupIDExternalID}
 			},
 		}
 

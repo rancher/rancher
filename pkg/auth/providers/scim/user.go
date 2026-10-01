@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -237,7 +238,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := s.getConfig(provider)
-	uid := cfg.userID(payload)
+	uid := cfg.UserID(payload.UserName, payload.ExternalID)
 	if uid == "" {
 		writeError(w, NewError(http.StatusBadRequest,
 			fmt.Sprintf("%s is required when configured as userIdAttribute", cfg.UserIDAttribute)))
@@ -293,7 +294,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if reprovisionCandidate != nil && cfg.UserIDAttribute == UserIDExternalID {
+	if reprovisionCandidate != nil && cfg.UserIDAttribute == scimconfig.UserIDExternalID {
 		s.reprovisionUser(w, r, provider, payload, reprovisionCandidate.user, reprovisionCandidate.attr)
 		return
 	}
@@ -585,7 +586,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var changedUserName, changedExternalID string
 
 	if userName := first(attr.ExtraByProvider[provider]["username"]); userName != payload.UserName {
-		if cfg.UserIDAttribute != UserIDExternalID {
+		if cfg.UserIDAttribute != scimconfig.UserIDExternalID {
 			writeError(w, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier", "mutability"))
 			return
 		}
@@ -594,7 +595,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		shouldUpdateAttr = true
 	}
 	if externalID := first(attr.ExtraByProvider[provider]["externalid"]); externalID != payload.ExternalID {
-		if cfg.UserIDAttribute == UserIDExternalID {
+		if cfg.UserIDAttribute == scimconfig.UserIDExternalID {
 			writeError(w, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the principal identifier", "mutability"))
 			return
 		}
@@ -854,7 +855,7 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 
 // applyPatchUser applies a SCIM PATCH add/replace operation to a user.
 // For single-valued attributes, add and replace have identical semantics (RFC 7644 §3.5.2).
-func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op patchOp, cfg providerConfig) (bool, bool, error) {
+func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op patchOp, cfg scimconfig.Config) (bool, bool, error) {
 	if op.Path == "" {
 		fields, ok := op.Value.(map[string]any)
 		if !ok {
@@ -922,7 +923,7 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 		}
 
 		if first(attr.ExtraByProvider[provider]["username"]) != username {
-			if cfg.UserIDAttribute != UserIDExternalID {
+			if cfg.UserIDAttribute != scimconfig.UserIDExternalID {
 				return false, false, NewError(http.StatusBadRequest, "userName cannot be changed when it is used as the principal identifier", "mutability")
 			}
 			attr.ExtraByProvider[provider]["username"] = []string{username}
@@ -935,7 +936,7 @@ func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op p
 		}
 
 		if first(attr.ExtraByProvider[provider]["externalid"]) != externalID {
-			if cfg.UserIDAttribute == UserIDExternalID {
+			if cfg.UserIDAttribute == scimconfig.UserIDExternalID {
 				return false, false, NewError(http.StatusBadRequest, "externalId cannot be changed when it is used as the principal identifier", "mutability")
 			}
 			attr.ExtraByProvider[provider]["externalid"] = []string{externalID}

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -1229,8 +1230,8 @@ func TestCreateUser(t *testing.T) {
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1312,8 +1313,8 @@ func TestCreateUser(t *testing.T) {
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1424,8 +1425,8 @@ func TestCreateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1481,8 +1482,8 @@ func TestCreateUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userMGR:            userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1590,8 +1591,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:      userCache,
 			userMGR:        userMGR,
 			userAttributes: userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1665,8 +1666,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:      userCache,
 			userAttributes: userAttrClient,
 			userMGR:        userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -1768,8 +1769,8 @@ func TestUpdateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache: userCache,
 			userMGR:   userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -2154,8 +2155,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:      userCache,
 			userMGR:        userMGR,
 			userAttributes: userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -2331,8 +2332,8 @@ func TestUpdateUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userMGR:            userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3000,8 +3001,8 @@ func TestPatchUser(t *testing.T) {
 			userCache:      userCache,
 			userMGR:        userMGR,
 			userAttributes: userAttrClient,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3139,8 +3140,8 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache: userCache,
 			userMGR:   userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3190,8 +3191,8 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache: userCache,
 			userMGR:   userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
@@ -3923,8 +3924,8 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userMGR:            userMGR,
-			getConfig: func(string) providerConfig {
-				return providerConfig{UserIDAttribute: UserIDExternalID}
+			getConfig: func(string) scimconfig.Config {
+				return scimconfig.Config{UserIDAttribute: scimconfig.UserIDExternalID}
 			},
 		}
 
