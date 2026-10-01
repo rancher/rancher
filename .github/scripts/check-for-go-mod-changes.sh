@@ -3,7 +3,15 @@ set -ue
 
 for DIRECTORY in . ./pkg/apis ./pkg/client; do
     cd "$DIRECTORY"
-    go mod tidy
+    for attempt in 1 2 3; do
+        if go mod tidy; then
+            break
+        fi
+        if [ "$attempt" -eq 3 ]; then
+            exit 1
+        fi
+        sleep 5
+    done
     go mod verify
     cd "$OLDPWD"
 done
