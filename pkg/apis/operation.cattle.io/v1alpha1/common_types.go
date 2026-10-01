@@ -74,11 +74,11 @@ const (
 	// OperationPhaseFailed indicates the operation was unsuccessful.
 	OperationPhaseFailed OperationPhase = "Failed"
 
-	// OperationPhaseAborted indicates the operation called its own work off, having found a
+	// OperationPhaseRejected indicates the operation called its own work off, having found a
 	// condition it cannot proceed past (e.g. a failed preflight check). Nothing outside
 	// the operation asked it to stop, and nothing it was asked to do was attempted and lost, which
-	// is what separates Aborted from Canceled and Failed respectively.
-	OperationPhaseAborted OperationPhase = "Aborted"
+	// is what separates Rejected from Canceled and Failed respectively.
+	OperationPhaseRejected OperationPhase = "Rejected"
 
 	// OperationPhaseCanceled indicates the operation was called off from outside: the user set
 	// Cancel, another controller needed it to stop, or it was deleted before its terminal handling
@@ -90,9 +90,9 @@ const (
 // OperationStatus defines the observed state of an operation.
 type OperationStatus struct {
 	// Conditions represent the latest available observations of an operation's current state.
-	// Known condition types are Pending, InProgress, Succeeded, Failed, Aborted, Canceled,
+	// Known condition types are Pending, InProgress, Succeeded, Failed, Rejected, Canceled,
 	// Finalized, and Paused.
-	// Succeeded, Failed, Aborted and Canceled report how the operation ended, and the one matching the
+	// Succeeded, Failed, Rejected and Canceled report how the operation ended, and the one matching the
 	// terminal phase goes True as soon as that phase is reached. Finalized reports the separate
 	// question of whether the controller has finished with the operation (terminal phase hook
 	// satisfied, beacon released (see TerminatedAt)) and is True whenever any outcome condition is
@@ -128,9 +128,9 @@ type OperationStatus struct {
 	// An InProgress operation is one that is currently executing.
 	// A Succeeded operation is one that completed successfully.
 	// A Failed operation is one that failed to complete successfully.
-	// An Aborted operation is one that called its own work off, having found it cannot proceed.
+	// A Rejected operation is one that called its own work off, having found it cannot proceed.
 	// A Canceled operation is one that was called off from outside, by the user or the system.
-	// +kubebuilder:validation:Enum=Pending;InProgress;Succeeded;Failed;Aborted;Canceled
+	// +kubebuilder:validation:Enum=Pending;InProgress;Succeeded;Failed;Rejected;Canceled
 	// +optional
 	Phase OperationPhase `json:"phase,omitempty"`
 
@@ -168,12 +168,12 @@ func (s *OperationStatus) MarkFailed(reason, message string) {
 	s.markOutcome(OperationPhaseFailed, reason, message)
 }
 
-// MarkAborted moves the operation to the Aborted terminal phase, for work the operation called off
+// MarkRejected moves the operation to the Rejected terminal phase, for work the operation called off
 // itself after finding a condition it cannot proceed past (e.g. a failed preflight check).
 // The corresponding downstream cluster must be in a healthy state, either equal or comparable to
 // the state pre-operation.
-func (s *OperationStatus) MarkAborted(reason, message string) {
-	s.markOutcome(OperationPhaseAborted, reason, message)
+func (s *OperationStatus) MarkRejected(reason, message string) {
+	s.markOutcome(OperationPhaseRejected, reason, message)
 }
 
 // MarkCanceled moves the operation to the Canceled terminal phase, for work that was called off

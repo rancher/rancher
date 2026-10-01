@@ -57,7 +57,7 @@ func TestHasActiveLifecycleHook(t *testing.T) {
 		},
 		{
 			name:   "aborted phase hook",
-			labels: map[string]string{opv1alpha1.AbortedPhaseHookLabelPrefix + "test": "delegate-a"},
+			labels: map[string]string{opv1alpha1.RejectedPhaseHookLabelPrefix + "test": "delegate-a"},
 			want:   true,
 		},
 		{

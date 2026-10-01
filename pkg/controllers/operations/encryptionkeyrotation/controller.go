@@ -377,11 +377,11 @@ func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1
 	if apierrors.IsNotFound(err) {
 		switch {
 		// Nothing is owed on the beacon. A deleting operation is discarded along with its hooks;
-		// an Aborted one called its own work off; a Canceled one was called off from outside, often
+		// a Rejected one called its own work off; a Canceled one was called off from outside, often
 		// by whoever wanted the beacon next, so the beacon was never guaranteed to still be this
 		// operation's. None of them are worse off for it being gone.
 		case deleting,
-			status.Phase == opv1alpha1.OperationPhaseAborted,
+			status.Phase == opv1alpha1.OperationPhaseRejected,
 			status.Phase == opv1alpha1.OperationPhaseCanceled:
 			logrus.Infof("[encryptionkeyrotation] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
 
@@ -455,8 +455,8 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		return h.handlePending(s, status)
 	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
-	case opv1alpha1.OperationPhaseAborted:
-		return h.handleAborted(s, status)
+	case opv1alpha1.OperationPhaseRejected:
+		return h.handleRejected(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
 		return h.handleCanceled(s, status)
 	case opv1alpha1.OperationPhaseFailed:
@@ -965,7 +965,7 @@ type terminalPhase struct {
 	// every outcome but success:
 	//
 	//   - Failed, which handleInProgress reaches precisely because the beacon was lost;
-	//   - Aborted, where the operation called its own work off and may since have been overtaken;
+	//   - Rejected, where the operation called its own work off and may since have been overtaken;
 	//   - Canceled, driven from outside the operation and often by whoever wants the beacon next.
 	//
 	// For those a missing claim is an expected outcome rather than a failure, so the phase's hook
@@ -1052,12 +1052,12 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.EncryptionKeyRotati
 	return status, nil
 }
 
-// handleAborted handles the Aborted terminal phase, reached when the operation called its own work
+// handleRejected handles the Rejected terminal phase, reached when the operation called its own work
 // off rather than attempting it and losing — which is what separates it from Failed. Its phase hook
 // runs first so a delegate can observe why the operation stopped.
-func (h *handler) handleAborted(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+func (h *handler) handleRejected(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           opv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.RejectedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -1066,7 +1066,7 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.EncryptionKeyRotatio
 // cancels the operation or it is deleted before its terminal handling completed. Its phase hook
 // runs first so a delegate can observe the cancellation. What separates cancellation from the other
 // outcomes is that it comes from outside the operation, where Failed means the work was attempted
-// and lost and Aborted means the operation called it off itself — none implies another.
+// and lost and Rejected means the operation called it off itself — none implies another.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
