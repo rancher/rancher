@@ -44,9 +44,6 @@ var (
 	// the common production steady state.
 	lastKnownEnabled atomic.Value // stores string
 
-	// userExtraAttributesMap defines which token ExtraInfo keys are propagated to UserAttributes.
-	userExtraAttributesMap = map[string]bool{common.UserAttributePrincipalID: true, common.UserAttributeUserName: true}
-
 	// samlProviders lists all SAML provider names. Used to look up the provider based on the type.
 	samlProviders = map[string]bool{
 		saml.PingName:       true,
@@ -142,15 +139,6 @@ func ProviderLogout(w http.ResponseWriter, r *http.Request, token accessor.Token
 	}
 
 	return ap.Logout(w, r, token)
-}
-
-// IsValidUserExtraAttribute reports whether key is a recognized extra attribute for user propagation.
-func IsValidUserExtraAttribute(key string) bool {
-	if _, ok := userExtraAttributesMap[strings.ToLower(key)]; ok {
-		return true
-	}
-
-	return false
 }
 
 // AuthenticateUser delegates authentication to the named provider and returns the resulting principals.
