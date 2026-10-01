@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -57,6 +58,7 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 		clusters:      scaledContext.Wrangler.Mgmt.Cluster(),
 		ownerStrategy: getOwnerStrategy(ctx, scaledContext.PeerManager, initialValue),
 		identity:      replicaIdentity(),
+		sessions:      scaledContext.Wrangler.TunnelSessions,
 	}
 
 	scaledContext.Wrangler.Mgmt.Cluster().OnChange(ctx, "user-controllers-controller", u.sync)
@@ -130,6 +132,12 @@ type userControllersController struct {
 	clusters      controllers.ClusterClient
 	// identity names this replica when it reports a cluster's user controllers stopped.
 	identity string
+	sessions sessionCloser
+}
+
+// sessionCloser ends the tunnel sessions this replica serves for a cluster.
+type sessionCloser interface {
+	CloseCluster(uid k8stypes.UID) int
 }
 
 // replicaIdentity returns the name of this Rancher replica, which is the pod name when running in a pod.
@@ -202,8 +210,8 @@ func (u *userControllersController) syncRemoving(cluster *v3.Cluster) error {
 	return nil
 }
 
-// onClusterUpdate stops the user controllers of a cluster that was replaced by a new one with the same
-// name. A replica that was disconnected while that happened sees it as an update, not a deletion.
+// onClusterUpdate releases a cluster that was replaced by a new one with the same name. A replica that
+// was disconnected while that happened sees it as an update, not a deletion.
 func (u *userControllersController) onClusterUpdate(oldObj, newObj any) {
 	oldCluster, ok := oldObj.(*v3.Cluster)
 	if !ok {
@@ -213,16 +221,26 @@ func (u *userControllersController) onClusterUpdate(oldObj, newObj any) {
 	if !ok || oldCluster.UID == newCluster.UID {
 		return
 	}
-	u.starter.Stop(oldCluster)
+	u.release(oldCluster)
 }
 
-// onClusterDelete stops the user controllers of a cluster that is gone.
+// onClusterDelete releases a cluster that is gone.
 func (u *userControllersController) onClusterDelete(obj any) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
 	if cluster, ok := obj.(*v3.Cluster); ok {
-		u.starter.Stop(cluster)
+		u.release(cluster)
+	}
+}
+
+// release stops the user controllers of a cluster that no longer exists, and ends the tunnel sessions
+// this replica serves for it. Both are tied to the cluster's UID, so a new cluster with the same name is
+// left alone.
+func (u *userControllersController) release(cluster *v3.Cluster) {
+	u.starter.Stop(cluster)
+	if u.sessions != nil {
+		u.sessions.CloseCluster(cluster.UID)
 	}
 }
 

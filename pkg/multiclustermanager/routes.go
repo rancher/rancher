@@ -46,7 +46,7 @@ import (
 func router(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
 		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
-		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
+		connectHandler = scaledContext.Wrangler.TunnelSessions.Handler(scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer)
 		clusterImport  = clusterregistrationtokens.ClusterImport{
 			Clusters:     scaledContext.Management.Clusters(""),
 			SecretLister: scaledContext.Core.Secrets("").Controller().Lister(),

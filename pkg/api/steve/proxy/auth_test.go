@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -12,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestClusterProxyAuthorizer_Authorize(t *testing.T) {
@@ -24,6 +27,8 @@ func TestClusterProxyAuthorizer_Authorize(t *testing.T) {
 		wantID        string
 		wantOK        bool
 		wantErr       bool
+		// wantTracked is the UID of the cluster the session should be tracked for, if any.
+		wantTracked types.UID
 	}{
 		{
 			name:       "no prefix",
@@ -36,7 +41,17 @@ func TestClusterProxyAuthorizer_Authorize(t *testing.T) {
 			getByIndex: []*corev1.Secret{
 				{ObjectMeta: metav1.ObjectMeta{Namespace: "c-abc", Name: "crt-token-system"}},
 			},
-			wantID: Prefix + "c-abc",
+			wantID:      Prefix + "c-abc",
+			wantOK:      true,
+			wantTracked: "uid-abc",
+		},
+		{
+			name:       "a session for a cluster that can't be found is not tracked",
+			authHeader: "Bearer " + Prefix + "tok",
+			getByIndex: []*corev1.Secret{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "c-missing", Name: "crt-token-system"}},
+			},
+			wantID: Prefix + "c-missing",
 			wantOK: true,
 		},
 		{
@@ -66,8 +81,9 @@ func TestClusterProxyAuthorizer_Authorize(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Namespace: "c-old", Name: "crt-token-system"}},
 				{ObjectMeta: metav1.ObjectMeta{Namespace: "c-abc", Name: "crt-token-system"}},
 			},
-			wantID: Prefix + "c-abc",
-			wantOK: true,
+			wantID:      Prefix + "c-abc",
+			wantOK:      true,
+			wantTracked: "uid-abc",
 		},
 		{
 			name:       "unexpected error with results is propagated",
@@ -97,12 +113,30 @@ func TestClusterProxyAuthorizer_Authorize(t *testing.T) {
 				return ns, nil
 			}).AnyTimes()
 
-			a := &clusterProxyAuthorizer{secretCache: mockCache, namespaceCache: namespaceCache}
+			clusterCache := fake.NewMockNonNamespacedCacheInterface[*apimgmtv3.Cluster](ctrl)
+			clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*apimgmtv3.Cluster, error) {
+				if name == "c-abc" {
+					return &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: name, UID: "uid-abc"}}, nil
+				}
+				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
+			}).AnyTimes()
+
+			a := &clusterProxyAuthorizer{secretCache: mockCache, namespaceCache: namespaceCache, clusterCache: clusterCache}
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set("Authorization", tt.authHeader)
 
-			id, ok, err := a.Authorize(req)
+			var (
+				id         string
+				ok         bool
+				err        error
+				trackedUID types.UID
+			)
+			tunnelserver.NewSessionTracker().Handler(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				id, ok, err = a.Authorize(r)
+				_, trackedUID = tunnelserver.SessionCluster(r)
+			})).ServeHTTP(httptest.NewRecorder(), req)
+			assert.Equal(t, tt.wantTracked, trackedUID)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

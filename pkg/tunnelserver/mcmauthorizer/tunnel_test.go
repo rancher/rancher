@@ -1,16 +1,21 @@
 package mcmauthorizer
 
 import (
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -204,6 +209,64 @@ func TestFormatAddress(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("formatAddress(%q) = %q, want %q", tt.address, result, tt.expected)
 			}
+		})
+	}
+}
+
+func TestAuthorizeTunnelTracksTheSessionsCluster(t *testing.T) {
+	cluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-abc", UID: "uid-abc"},
+		// A driver that doesn't take its connection details from the agent, so authorizing doesn't
+		// update the cluster.
+		Status: apimgmtv3.ClusterStatus{Driver: apimgmtv3.ClusterDriverAKS},
+	}
+	auth := &Authorizer{
+		secretIndexer: newTestSecretIndexer(t, tokenSecret("c-abc", "crt-token-system", map[string][]byte{"token": []byte("tok")})),
+		clusterLister: &fakes.ClusterListerMock{
+			GetFunc: func(_, name string) (*apimgmtv3.Cluster, error) {
+				if name == "c-abc" {
+					return cluster, nil
+				}
+				return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "clusters"}, name)
+			},
+		},
+		namespaceLister: &corefakes.NamespaceListerMock{
+			GetFunc: func(_, name string) (*corev1.Namespace, error) {
+				return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}, nil
+			},
+		},
+	}
+	params := base64.StdEncoding.EncodeToString([]byte(`{"cluster":{"address":"10.0.0.1:6443","token":"sa-token","caCert":"ca"}}`))
+
+	tests := []struct {
+		name        string
+		token       string
+		wantKey     string
+		wantOK      bool
+		wantTracked types.UID
+	}{
+		{name: "authorized", token: "tok", wantKey: "c-abc", wantOK: true, wantTracked: "uid-abc"},
+		{name: "rejected", token: "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/v3/connect/register", nil)
+			req.Header.Set(Token, tt.token)
+			req.Header.Set(Params, params)
+
+			var (
+				key        string
+				ok         bool
+				trackedUID types.UID
+			)
+			tunnelserver.NewSessionTracker().Handler(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				key, ok, _ = auth.AuthorizeTunnel(r)
+				_, trackedUID = tunnelserver.SessionCluster(r)
+			})).ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.Equal(t, tt.wantKey, key)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantTracked, trackedUID)
 		})
 	}
 }

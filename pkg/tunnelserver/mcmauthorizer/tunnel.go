@@ -22,6 +22,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	k8scorev1 "k8s.io/api/core/v1"
@@ -112,6 +113,9 @@ type Client struct {
 
 func (t *Authorizer) AuthorizeTunnel(req *http.Request) (string, bool, error) {
 	client, ok, err := t.Authorize(req)
+	if ok && err == nil && client != nil && client.Cluster != nil {
+		tunnelserver.SetSessionCluster(req, client.Cluster.Name, client.Cluster.UID)
+	}
 	if client != nil && client.Node != nil {
 		return client.Cluster.Name + ":" + client.Node.Name, ok, err
 	} else if client != nil && client.Cluster != nil {

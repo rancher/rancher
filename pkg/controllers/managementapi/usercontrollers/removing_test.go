@@ -21,6 +21,16 @@ type fixedOwnerStrategy struct {
 func (s fixedOwnerStrategy) isOwner(*v3.Cluster) bool      { return s.owner }
 func (s fixedOwnerStrategy) forcedResync() <-chan struct{} { return nil }
 
+// fakeSessions records the clusters whose tunnel sessions were closed.
+type fakeSessions struct {
+	closed []types.UID
+}
+
+func (f *fakeSessions) CloseCluster(uid types.UID) int {
+	f.closed = append(f.closed, uid)
+	return 1
+}
+
 func newRemovingCluster(uid types.UID) *v3.Cluster {
 	now := metav1.NewTime(time.Now())
 	return &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: uid, DeletionTimestamp: &now}}
@@ -113,6 +123,8 @@ func TestSyncIgnoresAClusterThatIsGone(t *testing.T) {
 func TestOnClusterDeleteStopsTheDeletedCluster(t *testing.T) {
 	starter := simpleControllerStarter{}
 	controller, _ := newMockUserControllersController(t, &starter)
+	sessions := &fakeSessions{}
+	controller.sessions = sessions
 	deleted := newRemovingCluster("uid-1")
 
 	controller.onClusterDelete(deleted)
@@ -122,11 +134,14 @@ func TestOnClusterDeleteStopsTheDeletedCluster(t *testing.T) {
 	require.Len(t, starter.stopped, 2, "the object and the tombstone should both stop the cluster")
 	assert.Same(t, deleted, starter.stopped[0])
 	assert.Same(t, deleted, starter.stopped[1])
+	assert.Equal(t, []types.UID{"uid-1", "uid-1"}, sessions.closed, "the deleted cluster's tunnel sessions should be closed")
 }
 
 func TestOnClusterUpdateStopsAClusterReplacedUnderTheSameName(t *testing.T) {
 	starter := simpleControllerStarter{}
 	controller, _ := newMockUserControllersController(t, &starter)
+	sessions := &fakeSessions{}
+	controller.sessions = sessions
 	old := newRemovingCluster("uid-1")
 	replacement := &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-2"}}
 
@@ -134,15 +149,19 @@ func TestOnClusterUpdateStopsAClusterReplacedUnderTheSameName(t *testing.T) {
 
 	require.Len(t, starter.stopped, 1)
 	assert.Same(t, old, starter.stopped[0], "the replaced cluster should be stopped, not the new one")
+	assert.Equal(t, []types.UID{"uid-1"}, sessions.closed, "only the replaced cluster's tunnel sessions should be closed")
 }
 
 func TestOnClusterUpdateIgnoresOrdinaryUpdates(t *testing.T) {
 	starter := simpleControllerStarter{}
 	controller, _ := newMockUserControllersController(t, &starter)
+	sessions := &fakeSessions{}
+	controller.sessions = sessions
 	before := &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-1", ResourceVersion: "1"}}
 	after := &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-1", ResourceVersion: "2"}}
 
 	controller.onClusterUpdate(before, after)
 
 	assert.False(t, starter.stopCalled)
+	assert.Empty(t, sessions.closed)
 }
