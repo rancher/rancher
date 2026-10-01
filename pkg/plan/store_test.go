@@ -1,8 +1,10 @@
 package plan
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
@@ -179,4 +181,206 @@ func TestStoreCancelPlan(t *testing.T) {
 		assert.Nil(t, returned)
 		assert.Empty(t, client.updates)
 	})
+}
+
+func TestStoreAssignPlan(t *testing.T) {
+	fixed := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	now = func() time.Time { return fixed }
+	t.Cleanup(func() { now = time.Now })
+
+	assigned := &Plan{OneTimeInstructions: []OneTimeInstruction{{CommonInstruction: CommonInstruction{Name: "one", Command: "true"}}}}
+	raw, err := json.Marshal(assigned)
+	require.NoError(t, err)
+	checksum := PlanHash(raw)
+
+	healthyProbes := []byte(`{"probe":{"healthy":true}}`)
+
+	// withPlan returns a secret already carrying the assigned plan, with data merged in.
+	withPlan := func(data map[string]string, annotations map[string]string) *corev1.Secret {
+		s := mockSecret("node-alpha")
+		s.Data = map[string][]byte{PlanDataKey: raw}
+		for k, v := range data {
+			s.Data[k] = []byte(v)
+		}
+		s.Annotations = annotations
+		return s
+	}
+
+	t.Run("new content is written as pending", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		secret := mockSecret("node-alpha")
+		secret.Data = map[string][]byte{
+			PlanStateKey:     []byte(PlanStateSucceeded),
+			probeStatusesKey: healthyProbes,
+		}
+		secret.Annotations = map[string]string{PlanCanceledAnnotation: "true"}
+
+		status, err := NewStore(client).AssignPlan(secret, assigned, 1, 1)
+		require.NoError(t, err)
+		assert.Equal(t, &PlanStatus{Secret: status.Secret, Pending: true}, status)
+		require.Len(t, client.updates, 1)
+		written := client.updates[0]
+		assert.Equal(t, string(PlanStatePending), string(written.Data[PlanStateKey]))
+		assert.Equal(t, raw, written.Data[PlanDataKey])
+		assert.Equal(t, "1", string(written.Data[maxFailuresKey]))
+		assert.Equal(t, "1", string(written.Data[failureThresholdKey]))
+		assert.NotContains(t, written.Data, probeStatusesKey)
+		assert.NotContains(t, written.Annotations, PlanCanceledAnnotation)
+		assert.Equal(t, "", written.Annotations[PlanProbesPassedAnnotation])
+	})
+
+	tests := []struct {
+		name        string
+		data        map[string]string
+		annotations map[string]string
+		expected    PlanStatus
+		// retried is whether plan-state is expected to have been reset to pending.
+		retried bool
+	}{
+		{
+			name:     "pending and not yet picked up",
+			data:     map[string]string{PlanStateKey: string(PlanStatePending)},
+			expected: PlanStatus{Pending: true},
+		},
+		{
+			name:     "in progress",
+			data:     map[string]string{PlanStateKey: string(PlanStateInProgress)},
+			expected: PlanStatus{InProgress: true},
+		},
+		{
+			name: "in progress retrying an earlier failure",
+			data: map[string]string{
+				PlanStateKey: string(PlanStateInProgress), failedChecksumKey: checksum, failureCountKey: "1", failureThresholdKey: "3",
+			},
+			expected: PlanStatus{InProgress: true, Failing: true},
+		},
+		{
+			name:     "succeeded, waiting for probes",
+			data:     map[string]string{PlanStateKey: string(PlanStateSucceeded)},
+			expected: PlanStatus{Applied: true},
+		},
+		{
+			name:        "succeeded and probes passed",
+			data:        map[string]string{PlanStateKey: string(PlanStateSucceeded), probeStatusesKey: string(healthyProbes)},
+			annotations: map[string]string{PlanProbesPassedAnnotation: "yes"},
+			expected:    PlanStatus{Applied: true, ProbesPassed: true},
+		},
+		{
+			name: "failed at the threshold",
+			data: map[string]string{
+				PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1",
+				maxFailuresKey: "1", failureThresholdKey: "1",
+			},
+			expected: PlanStatus{Failed: true},
+		},
+		{
+			name:     "failed without a threshold set",
+			data:     map[string]string{PlanStateKey: string(PlanStateFailed)},
+			expected: PlanStatus{Failed: true},
+		},
+		{
+			name: "failed below the threshold is retried",
+			data: map[string]string{
+				PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "2",
+				maxFailuresKey: "5", failureThresholdKey: "5",
+			},
+			expected: PlanStatus{Pending: true, Failing: true},
+			retried:  true,
+		},
+		{
+			name: "failed below the threshold waits out the cooldown",
+			data: map[string]string{
+				PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "2",
+				maxFailuresKey: "5", failureThresholdKey: "5", lastApplyTimeKey: fixed.Add(-10 * time.Second).Format(time.UnixDate),
+			},
+			expected: PlanStatus{Failing: true},
+		},
+		{
+			name: "failed below the threshold is retried once the cooldown passes",
+			data: map[string]string{
+				PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "2",
+				maxFailuresKey: "5", failureThresholdKey: "5", lastApplyTimeKey: fixed.Add(-time.Minute).Format(time.UnixDate),
+			},
+			expected: PlanStatus{Pending: true, Failing: true},
+			retried:  true,
+		},
+		{
+			name: "failed out of attempts with an unlimited threshold is not retried",
+			data: map[string]string{
+				PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "3",
+				maxFailuresKey: "3", failureThresholdKey: "-1",
+			},
+			expected: PlanStatus{Failing: true},
+		},
+		{
+			name: "failed and canceled is not retried",
+			data: map[string]string{
+				PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1",
+				maxFailuresKey: "5", failureThresholdKey: "5",
+			},
+			annotations: map[string]string{PlanCanceledAnnotation: "true"},
+			expected:    PlanStatus{Canceled: true},
+		},
+		{
+			name:     "canceled",
+			data:     map[string]string{PlanStateKey: string(PlanStateCanceled)},
+			expected: PlanStatus{Canceled: true},
+		},
+		{
+			name:     "paused",
+			data:     map[string]string{PlanStateKey: string(PlanStatePaused)},
+			expected: PlanStatus{Paused: true},
+		},
+		// Agents which predate plan-state leave it as pending, or absent for a plan assigned before it existed.
+		{
+			name:     "checksum flow applied",
+			data:     map[string]string{PlanStateKey: string(PlanStatePending), appliedPlanKey: string(raw)},
+			expected: PlanStatus{Applied: true},
+		},
+		{
+			name:     "checksum flow without plan-state in progress",
+			data:     map[string]string{},
+			expected: PlanStatus{InProgress: true},
+		},
+		{
+			name: "checksum flow failing",
+			data: map[string]string{
+				PlanStateKey: string(PlanStatePending), failedChecksumKey: checksum, failureCountKey: "1", failureThresholdKey: "3",
+			},
+			expected: PlanStatus{InProgress: true, Failing: true},
+		},
+		{
+			name: "checksum flow failed",
+			data: map[string]string{
+				PlanStateKey: string(PlanStatePending), failedChecksumKey: checksum, failureCountKey: "3", failureThresholdKey: "3",
+			},
+			expected: PlanStatus{Failed: true},
+		},
+		{
+			name: "checksum flow ignores failures of another plan",
+			data: map[string]string{
+				PlanStateKey: string(PlanStatePending), failedChecksumKey: "other", failureCountKey: "3", failureThresholdKey: "3",
+			},
+			expected: PlanStatus{Pending: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeSecretUpdater{}
+			status, err := NewStore(client).AssignPlan(withPlan(tt.data, tt.annotations), assigned, 5, 5)
+			require.NoError(t, err)
+
+			tt.expected.Secret = status.Secret
+			assert.Equal(t, &tt.expected, status)
+
+			if !tt.retried {
+				assert.Empty(t, client.updates)
+				return
+			}
+			require.Len(t, client.updates, 1)
+			assert.Equal(t, string(PlanStatePending), string(client.updates[0].Data[PlanStateKey]))
+			assert.Equal(t, raw, client.updates[0].Data[PlanDataKey], "a retry must not change the plan")
+		})
+	}
 }
