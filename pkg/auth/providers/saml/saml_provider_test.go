@@ -546,6 +546,10 @@ func (m *fakeUserManager) UserAttributeCreateOrUpdate(userID, provider string, g
 	return nil
 }
 
+func (m *fakeUserManager) UserAttributeCreateOrUpdateNoGroups(userID, provider string, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	return nil
+}
+
 var _ accessor.TokenAccessor = (*fakeToken)(nil)
 
 type fakeToken struct {

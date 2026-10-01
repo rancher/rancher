@@ -371,6 +371,18 @@ func (m *userManager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribut
 }
 
 func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	return m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, false, userExtraInfo, loginTime...)
+}
+
+// UserAttributeCreateOrUpdateNoGroups creates or updates the user's
+// attributes for a write that carries no group memberships. With SCIM enabled
+// for the provider, the stored groups are kept. Otherwise they are replaced
+// with an empty list.
+func (m *userManager) UserAttributeCreateOrUpdateNoGroups(userID, provider string, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	return m.userAttributeCreateOrUpdate(userID, provider, nil, true, userExtraInfo, loginTime...)
+}
+
+func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, noGroups bool, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
@@ -386,10 +398,12 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 	if userExtraInfo == nil {
 		userExtraInfo = make(map[string][]string)
 	}
-	if scimconfig.Enabled(m.configMapCache, provider) {
+	scimEnabled := scimconfig.Enabled(m.configMapCache, provider)
+	if scimEnabled {
 		// Keep the stored keys this write doesn't set, such as SCIM's externalid and email.
 		userExtraInfo = MergeUserExtraAttributes(attribs.ExtraByProvider[provider], userExtraInfo)
 	}
+	keepGroups := noGroups && scimEnabled
 
 	var shouldUpdate bool
 
@@ -398,7 +412,7 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 		shouldUpdate = true
 	}
 
-	if m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
+	if m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals, keepGroups) {
 		shouldUpdate = true
 	}
 	if len(loginTime) > 0 && !loginTime[0].IsZero() {
@@ -408,7 +422,12 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 		shouldUpdate = true
 	}
 
-	attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+	if !keepGroups {
+		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+	} else if _, ok := attribs.GroupPrincipals[provider]; !ok {
+		// Readers fall back to the token's groups when the entry is missing.
+		attribs.GroupPrincipals[provider] = v3.Principals{}
+	}
 	attribs.ExtraByProvider[provider] = userExtraInfo
 
 	if needCreate {
@@ -430,13 +449,30 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 	return nil
 }
 
-func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal) bool {
-	if len(attribs.GroupPrincipals[provider].Items) != len(groupPrincipals) {
+func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal, keepGroups bool) bool {
+	if keepGroups {
+		// A missing entry is written as an empty one.
+		if _, ok := attribs.GroupPrincipals[provider]; !ok {
+			return true
+		}
+	} else if groupPrincipalsChanged(attribs.GroupPrincipals[provider].Items, groupPrincipals) {
+		return true
+	}
+
+	if attribs.ExtraByProvider == nil && extraInfo != nil {
+		return true
+	}
+
+	return !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo)
+}
+
+func groupPrincipalsChanged(stored, groupPrincipals []v3.Principal) bool {
+	if len(stored) != len(groupPrincipals) {
 		return true
 	}
 
 	var oldSet, newSet []string
-	for _, principal := range attribs.GroupPrincipals[provider].Items {
+	for _, principal := range stored {
 		oldSet = append(oldSet, principal.ObjectMeta.Name)
 	}
 	for _, principal := range groupPrincipals {
@@ -446,15 +482,7 @@ func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider s
 	slices.Sort(oldSet)
 	slices.Sort(newSet)
 
-	if !slices.Equal(oldSet, newSet) {
-		return true
-	}
-
-	if attribs.ExtraByProvider == nil && extraInfo != nil {
-		return true
-	}
-
-	return !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo)
+	return !slices.Equal(oldSet, newSet)
 }
 
 func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {

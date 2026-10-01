@@ -831,10 +831,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			[]v3.Principal{},
 			map[string][]string{
 				"username":    {"john.doe"},
 				"externalid":  {"ext-12345"},
@@ -904,10 +903,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-def456"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-def456",
 			provider,
-			[]v3.Principal{},
 			map[string][]string{
 				"username":    {"jane.doe"},
 				"externalid":  {"ext-67890"},
@@ -1113,10 +1111,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			gomock.Any(),
 			gomock.Any(),
 		).Return(fmt.Errorf("failed to create attributes"))
 
@@ -1158,10 +1155,9 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(
 			"u-abc123",
 			provider,
-			gomock.Any(),
 			gomock.Any(),
 		).Return(nil)
 
@@ -1376,7 +1372,7 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1479,7 +1475,7 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1531,7 +1527,7 @@ func TestCreateUser(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-newuser"},
 			Enabled:    &enabled,
 		}, nil)
-		userMGR.EXPECT().UserAttributeCreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		srv := &SCIMServer{
 			userCache:          userCache,
@@ -1720,7 +1716,7 @@ func TestCreateUserMatchingExternalID(t *testing.T) {
 			userMGR := mocks.NewMockManager(ctrl)
 			if tt.wantEnsure != "" {
 				userMGR.EXPECT().EnsureUser(tt.wantEnsure, tt.payloadUserName).Return(existingUser, nil)
-				userMGR.EXPECT().UserAttributeCreateOrUpdate(userID, provider, gomock.Any(), gomock.Any()).Return(nil)
+				userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(userID, provider, gomock.Any()).Return(nil)
 			}
 
 			userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)

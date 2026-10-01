@@ -319,7 +319,6 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groupPrincipals := []v3.Principal{}
 	extras := map[string][]string{
 		"username":    {payload.UserName},
 		"externalid":  {payload.ExternalID},
@@ -338,7 +337,9 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = s.userMGR.UserAttributeCreateOrUpdate(user.Name, provider, groupPrincipals, extras)
+	// SCIM writes groups only through the group endpoints, so the groups login
+	// stored are kept.
+	err = s.userMGR.UserAttributeCreateOrUpdateNoGroups(user.Name, provider, extras)
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to ensure user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
