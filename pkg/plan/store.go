@@ -58,6 +58,15 @@ type PlanStatus struct {
 
 	// Failed is true if the plan has failed to be applied.
 	Failed bool
+
+	// Paused is true if the agent is holding the plan because of PlanPausedAnnotation. Only reported by
+	// agents which support plan-state.
+	Paused bool
+
+	// Canceled is true if the agent has recorded the plan as canceled because of PlanCanceledAnnotation.
+	// Cancellation is terminal: the agent will not act again until new plan content is assigned. Only
+	// reported by agents which support plan-state.
+	Canceled bool
 }
 
 // Success returns true if the plan has been successfully applied and all probes have passed.
@@ -65,17 +74,22 @@ func (p *PlanStatus) Success() bool {
 	return p.Applied && p.ProbesPassed
 }
 
-// Failure returns true if the plan has failed to be applied.
+// Failure returns true if the plan has failed to be applied, or was canceled before it could be.
+// Either way, the plan will never complete without new content being assigned.
 func (p *PlanStatus) Failure() bool {
-	return p.Failed
+	return p.Failed || p.Canceled
 }
 
 // Waiting returns true if the plan is in a transient state.
 func (p *PlanStatus) Waiting() bool {
 	switch {
+	case p.Canceled:
+		return false
 	case p.Pending:
 		return true
 	case p.InProgress:
+		return true
+	case p.Paused:
 		return true
 	case p.Applied && !p.ProbesPassed:
 		return true
@@ -91,10 +105,14 @@ func (p *PlanStatus) Waiting() bool {
 
 func (p *PlanStatus) String() string {
 	switch {
+	case p.Canceled:
+		return "plan canceled"
 	case p.Pending:
 		return "waiting for plan to be picked up"
 	case p.InProgress:
 		return "waiting for plan to be applied"
+	case p.Paused:
+		return "plan paused"
 	case p.Applied && !p.ProbesPassed:
 		return "waiting for probes"
 	case p.Applied && p.ProbesPassed:
@@ -113,9 +131,10 @@ func (p *PlanStatus) String() string {
 //  1. failing plan (Failing == true, Failed == false)
 //  2. waiting for plan to be picked up (Pending == true)
 //  3. waiting for plan applied (InProgress == true)
-//  4. waiting for probes (Applied == true, ProbesPassed == false)
+//  4. plan paused (Paused == true)
+//  5. waiting for probes (Applied == true, ProbesPassed == false)
 //
-// Nodes that do not fit into these buckets (e.g., fully successfully applied or strictly failed) are ignored.
+// Nodes that do not fit into these buckets (e.g., fully successfully applied, strictly failed or canceled) are ignored.
 // Within each bucket, node names are sorted lexicographically to guarantee deterministic outputs.
 //
 // Output string patterns adapt dynamically based on the node count per bucket:
@@ -156,12 +175,16 @@ func Message(results []PlanStatus) string {
 		}
 
 		// Order of evaluation sets the bucket for each node
-		if res.Failing && !res.Failed {
+		if res.Canceled {
+			continue
+		} else if res.Failing && !res.Failed {
 			buckets["failing plan"] = append(buckets["failing plan"], name)
 		} else if res.Pending {
 			buckets["waiting for plan to be picked up"] = append(buckets["waiting for plan to be picked up"], name)
 		} else if res.InProgress {
 			buckets["waiting for plan applied"] = append(buckets["waiting for plan applied"], name)
+		} else if res.Paused {
+			buckets["plan paused"] = append(buckets["plan paused"], name)
 		} else if res.Applied && !res.ProbesPassed {
 			buckets["waiting for probes"] = append(buckets["waiting for probes"], name)
 		}
@@ -180,10 +203,12 @@ func Message(results []PlanStatus) string {
 			return 2
 		case "waiting for plan applied":
 			return 3
-		case "waiting for probes":
+		case "plan paused":
 			return 4
-		default:
+		case "waiting for probes":
 			return 5
+		default:
+			return 6
 		}
 	}
 
@@ -312,6 +337,17 @@ func (s *Store) CancelPlan(secret *corev1.Secret) (bool, *corev1.Secret, error) 
 // AssignPlan assigns the plan to the secret.
 // Returns a PlanStatus indicating the current state of the plan.
 // This function is based off the CAPR assignAndCheckPlan function and will supersede it in the future once its CAPI dependency is unraveled.
+//
+// New plan content is written with plan-state set to pending, after which an agent which supports
+// plan-state drives the state itself, and that state is what the returned PlanStatus is built from.
+// An agent which predates plan-state never moves it off pending, so for pending (or a secret
+// assigned before plan-state existed) the status falls back to comparing the applied plan and the
+// failed checksum, as it always has.
+//
+// maxFailures is the number of attempts to make at the plan, and failureThreshold the number of
+// failures after which it is reported as Failed; -1 means unlimited for either. In the plan-state
+// flow the agent stops at the first failure and leaves the retry to the orchestrator, so the retries
+// are made here: see retryFailedPlan.
 func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failureThreshold int) (*PlanStatus, error) {
 	data, err := json.Marshal(&plan)
 	if err != nil {
@@ -326,88 +362,244 @@ func (s *Store) AssignPlan(secret *corev1.Secret, plan *Plan, maxFailures, failu
 		secret.Annotations = map[string]string{}
 	}
 
-	result := &PlanStatus{
-		Secret: secret,
-	}
-
 	if !bytes.Equal(secret.Data[PlanDataKey], data) {
-		result.Pending = true
-		delete(secret.Data, "probe-statuses")
-		secret.Annotations[PlanLastUpdatedAnnotation] = time.Now().UTC().Format(time.RFC3339)
-		secret.Annotations[PlanProbesPassedAnnotation] = ""
+		markPending(secret)
 		delete(secret.Annotations, PlanCanceledAnnotation)
 
 		secret.Data[PlanDataKey] = data
 		if maxFailures > 0 || maxFailures == -1 {
-			secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))
+			secret.Data[maxFailuresKey] = []byte(strconv.Itoa(maxFailures))
 		} else {
-			delete(secret.Data, "max-failures")
+			delete(secret.Data, maxFailuresKey)
 		}
 
 		if failureThreshold > 0 || failureThreshold == -1 {
-			secret.Data["failure-threshold"] = []byte(strconv.Itoa(failureThreshold))
+			secret.Data[failureThresholdKey] = []byte(strconv.Itoa(failureThreshold))
 		} else {
-			delete(secret.Data, "failure-threshold")
+			delete(secret.Data, failureThresholdKey)
 		}
 
 		secret, err = s.secrets.Update(secret)
 		if err != nil {
 			return nil, err
 		}
-		result.Secret = secret
-	} else {
-		result.Pending = false
-		result.InProgress = true
+
+		// Nothing the secret holds about earlier plans says anything about this one yet.
+		return &PlanStatus{Secret: secret, Pending: true}, nil
 	}
 
-	probes := secret.Data["probe-statuses"]
-	if probesPassed, ok := secret.Annotations[PlanProbesPassedAnnotation]; ok && probesPassed != "" {
-		if len(probes) > 0 {
-			_, healthy, err := ParseProbeStatuses(probes)
-			if err != nil {
-				return nil, err
-			}
-			result.ProbesPassed = healthy
-		}
-	}
-
-	planData := secret.Data[PlanDataKey]
-	failedChecksum := string(secret.Data["failed-checksum"])
-	failureCount := secret.Data["failure-count"]
-
-	if len(failureCount) > 0 && PlanHash(planData) == failedChecksum {
-		failureCount, err := strconv.Atoi(string(failureCount))
+	switch PlanState(secret.Data[PlanStateKey]) {
+	case PlanStateInProgress:
+		failing, _, err := failureStatus(secret)
 		if err != nil {
 			return nil, err
 		}
-		if failureCount > 0 {
-			result.Failed = true
-			// The failure-threshold is set by Rancher when the plan is updated. If it is not set, then it essentially
-			// defaults to 1, and any failure causes the plan to be marked as failed
-			rawFailureThreshold := secret.Data["failure-threshold"]
-			if len(rawFailureThreshold) > 0 {
-				failureThreshold, err := strconv.Atoi(string(rawFailureThreshold))
-				if err != nil {
-					return nil, err
-				}
-				if failureCount < failureThreshold || failureThreshold == -1 {
-					// the plan hasn't actually failed to be applied because we haven't passed the failure threshold or failure threshold is set to -1.
-					result.Failed = false
-					result.Failing = true
-				}
-			}
+		// A retry of an earlier failed attempt is still reported as failing, so the plan's message
+		// shows that it has failed before rather than reading as a first attempt.
+		return &PlanStatus{Secret: secret, InProgress: true, Failing: failing}, nil
+	case PlanStateSucceeded:
+		probesPassed, err := probesPassed(secret)
+		if err != nil {
+			return nil, err
+		}
+		return &PlanStatus{Secret: secret, Applied: true, ProbesPassed: probesPassed}, nil
+	case PlanStateFailed:
+		return s.retryFailedPlan(secret)
+	case PlanStateCanceled:
+		return &PlanStatus{Secret: secret, Canceled: true}, nil
+	case PlanStatePaused:
+		return &PlanStatus{Secret: secret, Paused: true}, nil
+	default:
+		return checksumPlanStatus(secret)
+	}
+}
+
+const (
+	// maxFailuresKey and failureThresholdKey are the secret data keys AssignPlan writes the plan's
+	// failure limits to.
+	maxFailuresKey      = "max-failures"
+	failureThresholdKey = "failure-threshold"
+
+	// The secret data keys the agent records the plan's outcome under.
+	probeStatusesKey  = "probe-statuses"
+	failedChecksumKey = "failed-checksum"
+	failureCountKey   = "failure-count"
+	lastApplyTimeKey  = "last-apply-time"
+	appliedPlanKey    = "appliedPlan"
+
+	// failedPlanRetryCooldown is how long a failed plan is left before it is retried. It matches the
+	// cooldown agents which predate plan-state apply between their own retries, so a plan which fails
+	// immediately does not burn through its attempts in the time it takes to reconcile a few times.
+	failedPlanRetryCooldown = 30 * time.Second
+)
+
+// now is replaced in tests.
+var now = time.Now
+
+// markPending resets secret for the agent to run its plan from the start, discarding everything
+// recorded about the previous run's probes so that this run is judged on its own.
+func markPending(secret *corev1.Secret) {
+	delete(secret.Data, probeStatusesKey)
+	secret.Annotations[PlanLastUpdatedAnnotation] = now().UTC().Format(time.RFC3339)
+	secret.Annotations[PlanProbesPassedAnnotation] = ""
+	secret.Data[PlanStateKey] = []byte(PlanStatePending)
+}
+
+// retryFailedPlan handles a plan the agent has recorded as failed. The agent never retries a plan
+// itself in the plan-state flow, so while the plan has attempts left this sets plan-state back to
+// pending for the agent to run it again, once failedPlanRetryCooldown has passed since the last
+// attempt.
+//
+// Note that the agent starts a pending plan at attempt 1, so CATTLE_AGENT_ATTEMPT_NUMBER does not
+// advance across these retries. A plan built from IdempotentActionScript instructions should be
+// assigned with a single attempt, as a retry would find the instruction already recorded as run.
+func (s *Store) retryFailedPlan(secret *corev1.Secret) (*PlanStatus, error) {
+	result := &PlanStatus{Secret: secret}
+
+	failing, failed, err := failureStatus(secret)
+	if err != nil {
+		return nil, err
+	}
+	if !failing && !failed {
+		// plan-state is authoritative about the plan having failed, even if the failure count does
+		// not show it. Count it as the one failure it must have been.
+		failed, err = failureThresholdReached(secret, 1)
+		if err != nil {
+			return nil, err
+		}
+		failing = !failed
+	}
+	if failed {
+		result.Failed = true
+		return result, nil
+	}
+	result.Failing = true
+
+	if secret.Annotations[PlanCanceledAnnotation] == "true" {
+		// The plan was asked to stop. Retrying it would only have the agent record the cancellation.
+		return &PlanStatus{Secret: secret, Canceled: true}, nil
+	}
+
+	attempts, err := failureCount(secret)
+	if err != nil {
+		return nil, err
+	}
+	maxFailures := -1
+	if raw := secret.Data[maxFailuresKey]; len(raw) > 0 {
+		maxFailures, err = strconv.Atoi(string(raw))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if maxFailures != -1 && attempts >= maxFailures {
+		// Out of attempts but short of the failure threshold, which the threshold being unlimited
+		// allows. Agents which predate plan-state stop retrying here too, and keep reporting the plan
+		// as failing.
+		return result, nil
+	}
+
+	if lastApply, err := time.Parse(time.UnixDate, string(secret.Data[lastApplyTimeKey])); err == nil && now().Before(lastApply.Add(failedPlanRetryCooldown)) {
+		return result, nil
+	}
+
+	secret = secret.DeepCopy()
+	markPending(secret)
+	secret, err = s.secrets.Update(secret)
+	if err != nil {
+		return nil, err
+	}
+	result.Secret = secret
+	result.Pending = true
+
+	return result, nil
+}
+
+// checksumPlanStatus builds the status of a plan from the applied plan and the failed checksum.
+// This is how the status of plans run by agents which predate plan-state is told, and of plans
+// which are still pending, which agents that support plan-state have yet to pick up.
+func checksumPlanStatus(secret *corev1.Secret) (*PlanStatus, error) {
+	result := &PlanStatus{Secret: secret}
+
+	var err error
+	result.ProbesPassed, err = probesPassed(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Failing, result.Failed, err = failureStatus(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Applied = bytes.Equal(secret.Data[PlanDataKey], secret.Data[appliedPlanKey])
+
+	if !result.Applied && !result.Failed {
+		if PlanState(secret.Data[PlanStateKey]) == PlanStatePending && !result.Failing {
+			// Nothing has been recorded against the plan yet, so as far as can be told the agent has
+			// not picked it up.
+			result.Pending = true
+		} else {
+			result.InProgress = true
 		}
 	}
 
-	appliedPlanData := secret.Data["appliedPlan"]
-
-	if bytes.Equal(planData, appliedPlanData) {
-		result.Applied = true
-	}
-
-	if result.Applied || result.Failed {
-		result.InProgress = false
-	}
-
 	return result, nil
+}
+
+// probesPassed reports whether the probes have passed for the plan currently assigned to secret.
+func probesPassed(secret *corev1.Secret) (bool, error) {
+	if secret.Annotations[PlanProbesPassedAnnotation] == "" {
+		return false, nil
+	}
+	probes := secret.Data[probeStatusesKey]
+	if len(probes) == 0 {
+		return false, nil
+	}
+	_, healthy, err := ParseProbeStatuses(probes)
+	if err != nil {
+		return false, err
+	}
+	return healthy, nil
+}
+
+// failureCount returns the number of times the plan currently assigned to secret has failed. The
+// failure count carries over from earlier plans, so it is only taken to describe this one when the
+// failed checksum is this plan's.
+func failureCount(secret *corev1.Secret) (int, error) {
+	rawFailureCount := secret.Data[failureCountKey]
+	if len(rawFailureCount) == 0 || PlanHash(secret.Data[PlanDataKey]) != string(secret.Data[failedChecksumKey]) {
+		return 0, nil
+	}
+	return strconv.Atoi(string(rawFailureCount))
+}
+
+// failureStatus reports whether the plan currently assigned to secret has failed but not yet reached
+// its failure threshold (failing), or has reached it (failed).
+func failureStatus(secret *corev1.Secret) (failing, failed bool, err error) {
+	count, err := failureCount(secret)
+	if err != nil || count <= 0 {
+		return false, false, err
+	}
+	failed, err = failureThresholdReached(secret, count)
+	if err != nil {
+		return false, false, err
+	}
+	return !failed, failed, nil
+}
+
+// failureThresholdReached reports whether count failures reach the failure threshold of the plan
+// currently assigned to secret. The threshold is set by AssignPlan; if it is not set, then it
+// essentially defaults to 1, and any failure causes the plan to be marked as failed.
+func failureThresholdReached(secret *corev1.Secret, count int) (bool, error) {
+	rawFailureThreshold := secret.Data[failureThresholdKey]
+	if len(rawFailureThreshold) == 0 {
+		return true, nil
+	}
+	failureThreshold, err := strconv.Atoi(string(rawFailureThreshold))
+	if err != nil {
+		return false, err
+	}
+	// The plan hasn't actually failed to be applied if we haven't passed the failure threshold or
+	// failure threshold is set to -1.
+	return failureThreshold != -1 && count >= failureThreshold, nil
 }
