@@ -4,8 +4,9 @@ import (
 	"reflect"
 	"sort"
 
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	authcommon "github.com/rancher/rancher/pkg/auth/providers/common"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
-	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -24,7 +25,7 @@ type userAttributeHandler struct {
 	clusterUserAttributeLister clusterv3.ClusterUserAttributeLister
 }
 
-func (h *userAttributeHandler) Sync(key string, userAttribute *managementv3.UserAttribute) (runtime.Object, error) {
+func (h *userAttributeHandler) Sync(key string, userAttribute *apisv3.UserAttribute) (runtime.Object, error) {
 	if userAttribute == nil || userAttribute.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -43,7 +44,7 @@ func (h *userAttributeHandler) Sync(key string, userAttribute *managementv3.User
 	}
 	clusterUserAttribute = clusterUserAttribute.DeepCopy()
 	clusterUserAttribute.Groups = groups
-	clusterUserAttribute.ExtraByProvider = userAttribute.ExtraByProvider
+	clusterUserAttribute.ExtraByProvider = userExtraByProvider(userAttribute.ExtraByProvider)
 	clusterUserAttribute.LastRefresh = userAttribute.LastRefresh
 	clusterUserAttribute.NeedsRefresh = userAttribute.NeedsRefresh
 
@@ -51,7 +52,7 @@ func (h *userAttributeHandler) Sync(key string, userAttribute *managementv3.User
 	return nil, err
 }
 
-func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAttribute, clusterUserAttribute clusterv3.ClusterUserAttribute) ([]string, bool) {
+func compareUserAttributeClusterUserAttribute(userAttribute apisv3.UserAttribute, clusterUserAttribute clusterv3.ClusterUserAttribute) ([]string, bool) {
 	var groups []string
 	for _, gp := range userAttribute.GroupPrincipals {
 		for i := range gp.Items {
@@ -64,7 +65,7 @@ func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAtt
 		groups:       groups,
 		lastRefresh:  userAttribute.LastRefresh,
 		needsRefresh: userAttribute.NeedsRefresh,
-		extra:        userAttribute.ExtraByProvider,
+		extra:        userExtraByProvider(userAttribute.ExtraByProvider),
 	}
 	old := userAttributeCompare{
 		groups:       clusterUserAttribute.Groups,
@@ -73,4 +74,27 @@ func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAtt
 		extra:        clusterUserAttribute.ExtraByProvider,
 	}
 	return groups, reflect.DeepEqual(current, old)
+}
+
+// userExtraByProvider keeps only the keys Rancher sends as user extras,
+// principalid and username (see authcommon.IsValidUserExtraAttribute).
+// Nothing downstream reads the other stored attributes, such as the email
+// and externalid SCIM stores, so they aren't copied to downstream clusters.
+func userExtraByProvider(extraByProvider map[string]map[string][]string) map[string]map[string][]string {
+	var filtered map[string]map[string][]string
+	for provider, extra := range extraByProvider {
+		for key, value := range extra {
+			if !authcommon.IsValidUserExtraAttribute(key) {
+				continue
+			}
+			if filtered == nil {
+				filtered = map[string]map[string][]string{}
+			}
+			if filtered[provider] == nil {
+				filtered[provider] = map[string][]string{}
+			}
+			filtered[provider][key] = value
+		}
+	}
+	return filtered
 }
