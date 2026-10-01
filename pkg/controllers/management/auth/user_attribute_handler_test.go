@@ -300,6 +300,9 @@ func TestSyncProviderRefreshErrorAfterHandlingConflict(t *testing.T) {
 
 	_, err := controller.sync("", attribs)
 	require.Error(t, err)
+	// The original error from the first update is returned.
+	assert.True(t, apierrors.IsConflict(err))
+	assert.ErrorContains(t, err, "error updating user attribute "+userID+" after provider refresh")
 
 	assert.Equal(t, 1, providerRefreshCalledTimes)
 	assert.Equal(t, 2, userAttributesGetCalledTimes)
@@ -554,4 +557,264 @@ func TestSyncSkipsAnnotatedUserAttribute(t *testing.T) {
 	assert.False(t, synced.NeedsRefresh)
 	// Annotation is preserved (only cleared on login).
 	assert.Contains(t, synced.Annotations, common.ProviderRefreshErrorAnnotation)
+}
+
+func TestSyncProviderRefreshConflictKeepsConcurrentChanges(t *testing.T) {
+	t.Parallel()
+
+	userID := "u-abcdef"
+	stored := &v3.UserAttribute{
+		ObjectMeta:   metav1.ObjectMeta{Name: userID},
+		NeedsRefresh: true,
+		GroupPrincipals: map[string]v3.Principals{
+			"okta":  {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "okta_group://g1"}}, {ObjectMeta: metav1.ObjectMeta{Name: "okta_group://g2"}}}},
+			"azure": {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "azuread_group://a1"}}}},
+		},
+		ExtraByProvider: map[string]map[string][]string{
+			"okta": {
+				"principalid": {"okta_user://alice"},
+				"externalid":  {"00u123"},
+				"email":       {"old@example.com"},
+			},
+			"azure": {
+				"principalid": {"azuread_user://alice"},
+				"stale":       {"value"},
+			},
+		},
+	}
+
+	groupResource := schema.GroupResource{
+		Group:    management.GroupName,
+		Resource: v3.UserAttributeResourceName,
+	}
+	now := time.Now().Truncate(time.Second)
+
+	var getCalls, updateCalls, refreshCalls int
+	var updated *v3.UserAttribute
+
+	ctrl := gomock.NewController(t)
+	userAttributeClient := fake.NewMockNonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttributeClient.EXPECT().Get(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(name string, opts metav1.GetOptions) (*v3.UserAttribute, error) {
+		getCalls++
+		a := stored.DeepCopy()
+		if getCalls > 1 {
+			// Changes SCIM made while the refresh was running.
+			a.GroupPrincipals["okta"] = v3.Principals{Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "okta_group://g1"}}}}
+			a.ExtraByProvider["okta"]["email"] = []string{"new@example.com"}
+		}
+		return a, nil
+	})
+	userAttributeClient.EXPECT().Update(gomock.Any()).AnyTimes().DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		updateCalls++
+		if updateCalls == 1 {
+			return nil, apierrors.NewConflict(groupResource, userAttribute.Name, fmt.Errorf("some error"))
+		}
+		updated = userAttribute.DeepCopy()
+		return updated, nil
+	})
+
+	controller := UserAttributeController{
+		userAttributes:            userAttributeClient,
+		ensureUserRetentionLabels: func(attribs *v3.UserAttribute) error { return nil },
+		providerRefresh: func(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
+			refreshCalls++
+			a := attribs.DeepCopy()
+			a.NeedsRefresh = false
+			a.LastRefresh = now.Format(time.RFC3339)
+			a.GroupPrincipals["azure"] = v3.Principals{Items: []v3.Principal{
+				{ObjectMeta: metav1.ObjectMeta{Name: "azuread_group://a1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "azuread_group://a2"}},
+			}}
+			a.GroupPrincipals["github"] = v3.Principals{}
+			a.ExtraByProvider["azure"]["username"] = []string{"alice@example.com"}
+			delete(a.ExtraByProvider["azure"], "stale")
+			a.ExtraByProvider["github"] = map[string][]string{}
+			return a, nil
+		},
+	}
+
+	_, err := controller.sync("", stored)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, refreshCalls)
+	assert.Equal(t, 2, updateCalls)
+	require.NotNil(t, updated)
+
+	assert.False(t, updated.NeedsRefresh)
+	assert.Equal(t, now.Format(time.RFC3339), updated.LastRefresh)
+
+	// SCIM's changes made during the refresh are kept.
+	assert.Equal(t, []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: "okta_group://g1"}}}, updated.GroupPrincipals["okta"].Items)
+	assert.Equal(t, map[string][]string{
+		"principalid": {"okta_user://alice"},
+		"externalid":  {"00u123"},
+		"email":       {"new@example.com"},
+	}, updated.ExtraByProvider["okta"])
+
+	// The refresh's own changes are applied.
+	assert.Len(t, updated.GroupPrincipals["azure"].Items, 2)
+	assert.Equal(t, map[string][]string{
+		"principalid": {"azuread_user://alice"},
+		"username":    {"alice@example.com"},
+	}, updated.ExtraByProvider["azure"])
+	assert.Contains(t, updated.GroupPrincipals, "github")
+	assert.Contains(t, updated.ExtraByProvider, "github")
+}
+
+func TestApplyRefreshChanges(t *testing.T) {
+	t.Parallel()
+
+	principal := func(name string) v3.Principal {
+		return v3.Principal{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+
+	tests := []struct {
+		name      string
+		before    *v3.UserAttribute
+		refreshed *v3.UserAttribute
+		current   *v3.UserAttribute
+		want      *v3.UserAttribute
+	}{
+		{
+			name: "provider removed by the refresh",
+			before: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1")}}},
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+			refreshed: &v3.UserAttribute{},
+			current: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1")}}},
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+			want: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{},
+				ExtraByProvider: map[string]map[string][]string{},
+			},
+		},
+		{
+			name: "reordered groups are unchanged",
+			before: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1"), principal("g2")}}},
+			},
+			refreshed: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g2"), principal("g1")}}},
+			},
+			current: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1")}}},
+			},
+			want: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1")}}},
+			},
+		},
+		{
+			name: "extras merge key by key within one provider",
+			before: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"old"}, "email": {"e1"}}},
+			},
+			refreshed: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"new"}, "email": {"e1"}}},
+			},
+			current: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"old"}, "email": {"e2"}}},
+			},
+			want: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"new"}, "email": {"e2"}}},
+			},
+		},
+		{
+			name: "refresh list wins when both change one provider's groups",
+			before: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1"), principal("g2")}}},
+			},
+			refreshed: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1"), principal("g2"), principal("g3")}}},
+			},
+			current: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1")}}},
+			},
+			want: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1"), principal("g2"), principal("g3")}}},
+			},
+		},
+		{
+			name: "current without the provider's extras takes the refreshed entry",
+			before: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"old"}}},
+			},
+			refreshed: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"new"}}},
+			},
+			current: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{},
+			},
+			want: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"new"}}},
+			},
+		},
+		{
+			name: "entry the refresh left alone stays removed",
+			before: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+			refreshed: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+			current: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{},
+			},
+			want: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{},
+			},
+		},
+		{
+			name: "current entry is null",
+			before: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+			refreshed: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"u"}}},
+			},
+			current: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": nil},
+			},
+			want: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"username": {"u"}}},
+			},
+		},
+		{
+			name:   "entry added by another writer during the refresh",
+			before: &v3.UserAttribute{},
+			refreshed: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+			current: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"email": {"e"}}},
+			},
+			want: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "email": {"e"}}},
+			},
+		},
+		{
+			name:   "current without maps",
+			before: &v3.UserAttribute{},
+			refreshed: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1")}}},
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+			current: &v3.UserAttribute{},
+			want: &v3.UserAttribute{
+				GroupPrincipals: map[string]v3.Principals{"okta": {Items: []v3.Principal{principal("g1")}}},
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			applyRefreshChanges(tt.before, tt.refreshed, tt.current)
+
+			assert.Equal(t, tt.want, tt.current)
+		})
+	}
 }
