@@ -78,8 +78,8 @@ func SamePrincipal(me, other v3.Principal) bool {
 
 }
 
-// MergeUserExtraAttributes returns a copy of stored with each key in update
-// set to the update's value. Keys update doesn't have keep their stored value.
+// MergeUserExtraAttributes returns a copy of stored with each key in update set to the update's value.
+// Keys update doesn't have keep their stored value.
 func MergeUserExtraAttributes(stored, update map[string][]string) map[string][]string {
 	merged := maps.Clone(stored)
 	if merged == nil {

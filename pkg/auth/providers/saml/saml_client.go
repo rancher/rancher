@@ -355,8 +355,8 @@ func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[stri
 	return userPrincipal, groupPrincipals, nil
 }
 
-// updateUserAttribute stores the login's extra attributes and groups. With an
-// empty groupsField the IdP sends no groups, so the write carries none.
+// updateUserAttribute stores the login's extra attributes and groups.
+// With an empty groupsField the IdP sends no groups, so the write carries none.
 func (s *Provider) updateUserAttribute(config *apiv3.SamlConfig, userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime time.Time) error {
 	if config.GroupsField == "" {
 		return s.userMGR.UserAttributeCreateOrUpdateNoGroups(userID, provider, userExtraInfo, loginTime)

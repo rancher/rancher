@@ -289,9 +289,8 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 			eid := first(attr.ExtraByProvider[provider]["externalid"])
 			if strings.EqualFold(eid, payload.ExternalID) {
 				if user.GetEnabled() {
-					// A user who logged in keeps externalid. When that user
-					// holds the payload's principal, EnsureUser below returns
-					// them, so this isn't a conflict.
+					// A user who logged in keeps externalid.
+					// When that user holds the payload's principal, EnsureUser below returns them, so this isn't a conflict.
 					if attr.LastLogin != nil && slices.Contains(user.PrincipalIDs, principalName) {
 						continue
 					}
@@ -323,8 +322,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		"username":    {payload.UserName},
 		"externalid":  {payload.ExternalID},
 		"principalid": {principalName},
-		// email is always written, so the merge with the stored keys
-		// doesn't keep an email the payload no longer has.
+		// email is always written, so the merge with the stored keys doesn't keep an email the payload no longer has.
 		"email": {""},
 	}
 
@@ -337,8 +335,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// SCIM writes groups only through the group endpoints, so the groups login
-	// stored are kept.
+	// SCIM writes groups only through the group endpoints, so the groups login stored are kept.
 	err = s.userMGR.UserAttributeCreateOrUpdateNoGroups(user.Name, provider, extras)
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to ensure user attributes for %s: %s", user.Name, err)

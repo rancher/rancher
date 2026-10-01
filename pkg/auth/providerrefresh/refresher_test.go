@@ -2028,8 +2028,7 @@ func TestRefreshAttributesWithSCIM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Not parallel: the feature flag, the environment and the
-			// providers are global.
+			// Not parallel: the feature flag, the environment and the providers are global.
 			t.Setenv("RANCHER_VERSION_TYPE", "prime")
 			features.SCIM.Set(true)
 			t.Cleanup(features.SCIM.Unset)

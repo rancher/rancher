@@ -374,10 +374,8 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 	return m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, false, userExtraInfo, loginTime...)
 }
 
-// UserAttributeCreateOrUpdateNoGroups creates or updates the user's
-// attributes for a write that carries no group memberships. With SCIM enabled
-// for the provider, the stored groups are kept. Otherwise they are replaced
-// with an empty list.
+// UserAttributeCreateOrUpdateNoGroups creates or updates the user's attributes for a write that carries no group memberships.
+// With SCIM enabled for the provider, the stored groups are kept. Otherwise they are replaced with an empty list.
 func (m *userManager) UserAttributeCreateOrUpdateNoGroups(userID, provider string, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	return m.userAttributeCreateOrUpdate(userID, provider, nil, true, userExtraInfo, loginTime...)
 }
