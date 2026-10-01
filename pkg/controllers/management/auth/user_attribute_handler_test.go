@@ -807,6 +807,24 @@ func TestApplyRefreshChanges(t *testing.T) {
 				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}}},
 			},
 		},
+		{
+			name: "extras merged by a refresh with SCIM enabled keep a SCIM change made during the refresh",
+			before: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"old"}, "externalid": {"x"}, "email": {"e1"}}},
+			},
+			refreshed: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": common.MergeUserExtraAttributes(
+					map[string][]string{"principalid": {"p"}, "username": {"old"}, "externalid": {"x"}, "email": {"e1"}},
+					map[string][]string{"principalid": {"p"}, "username": {"new"}},
+				)},
+			},
+			current: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"old"}, "externalid": {"x"}, "email": {"e2"}}},
+			},
+			want: &v3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{"okta": {"principalid": {"p"}, "username": {"new"}, "externalid": {"x"}, "email": {"e2"}}},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -41,6 +41,7 @@ func StartRefreshDaemon(scaledContext *config.ScaledContext, mgmtContext *config
 			userAttributeLister:       mgmtContext.Management.UserAttributes("").Controller().Lister(),
 			extTokenStore:             extTokenStore,
 			ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
+			configMapCache:            scaledContext.Wrangler.Core.ConfigMap().Cache(),
 		}
 
 		UpdateRefreshMaxAge(maxAge)

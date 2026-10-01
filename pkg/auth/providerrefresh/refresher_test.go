@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/rancher/norman/types"
@@ -15,11 +16,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1949,4 +1953,162 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 		assert.Nil(t, got)
 		assert.ErrorContains(t, err, "error disabling token")
 	})
+}
+
+func TestRefreshAttributesWithSCIM(t *testing.T) {
+	const providerName = "okta"
+
+	group := func(name string) apiv3.Principal {
+		return apiv3.Principal{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+	scimExtras := map[string][]string{
+		common.UserAttributePrincipalID: {providerName + "_user://alice"},
+		common.UserAttributeUserName:    {"alice"},
+		"externalid":                    {"00u123"},
+		"email":                         {"alice@example.com"},
+	}
+	refreshExtras := map[string][]string{
+		common.UserAttributePrincipalID: {providerName + "_user://alice"},
+		common.UserAttributeUserName:    {"alice.login"},
+	}
+
+	tests := []struct {
+		name        string
+		scimEnabled bool
+		provider    common.AuthProvider
+		wantExtras  map[string][]string
+		wantGroups  []apiv3.Principal
+	}{
+		{
+			name:        "SCIM enabled keeps keys the refresh doesn't set and, when the provider can't refresh groups, the stored groups",
+			scimEnabled: true,
+			provider:    &mockShibbolethProvider{},
+			wantExtras: map[string][]string{
+				common.UserAttributePrincipalID: {providerName + "_user://alice"},
+				common.UserAttributeUserName:    {"alice.login"},
+				"externalid":                    {"00u123"},
+				"email":                         {"alice@example.com"},
+			},
+			wantGroups: []apiv3.Principal{group("okta_group://g1")},
+		},
+		{
+			name:       "SCIM not enabled replaces the extras",
+			provider:   &mockShibbolethProvider{},
+			wantExtras: refreshExtras,
+			wantGroups: []apiv3.Principal{group("okta_group://g1")},
+		},
+		{
+			name:        "SCIM enabled, refetch with no groups replaces them with an empty list",
+			scimEnabled: true,
+			provider:    &mockGitHubAppProvider{mockLocalProvider: mockLocalProvider{canAccess: true}},
+			wantExtras: map[string][]string{
+				common.UserAttributePrincipalID: {providerName + "_user://alice"},
+				common.UserAttributeUserName:    {"alice.login"},
+				"externalid":                    {"00u123"},
+				"email":                         {"alice@example.com"},
+			},
+			wantGroups: nil,
+		},
+		{
+			name:        "SCIM enabled, refetch with groups replaces them",
+			scimEnabled: true,
+			provider: &mockGitHubAppProvider{
+				mockLocalProvider: mockLocalProvider{canAccess: true},
+				groupPrincipals:   []apiv3.Principal{group("okta_group://g2")},
+			},
+			wantExtras: map[string][]string{
+				common.UserAttributePrincipalID: {providerName + "_user://alice"},
+				common.UserAttributeUserName:    {"alice.login"},
+				"externalid":                    {"00u123"},
+				"email":                         {"alice@example.com"},
+			},
+			wantGroups: []apiv3.Principal{group("okta_group://g2")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Not parallel: the feature flag, the environment and the
+			// providers are global.
+			t.Setenv("RANCHER_VERSION_TYPE", "prime")
+			features.SCIM.Set(true)
+			t.Cleanup(features.SCIM.Unset)
+
+			providers.SetProviders(map[string]common.AuthProvider{
+				providerName: tt.provider,
+			})
+
+			user := &apiv3.User{
+				ObjectMeta:   metav1.ObjectMeta{Name: "user-alice"},
+				PrincipalIDs: []string{providerName + "_user://alice"},
+			}
+			attribs := &apiv3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: "user-alice"},
+				GroupPrincipals: map[string]apiv3.Principals{
+					providerName: {Items: []apiv3.Principal{group("okta_group://g1")}},
+				},
+				ExtraByProvider: map[string]map[string][]string{
+					providerName: scimExtras,
+				},
+			}
+			attribsBefore := attribs.DeepCopy()
+			loginToken := &apiv3.Token{
+				UserID:       "user-alice",
+				AuthProvider: providerName,
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{Name: providerName + "_user://alice"},
+					Provider:   providerName,
+					LoginName:  "alice.login",
+					ExtraInfo: map[string]string{
+						common.UserAttributePrincipalID: providerName + "_user://alice",
+						common.UserAttributeUserName:    "alice.login",
+					},
+				},
+			}
+
+			ctrl := gomock.NewController(t)
+			configMapCache := fake.NewMockCacheInterface[*corev1.ConfigMap](ctrl)
+			configMapCache.EXPECT().Get(scimconfig.Namespace, "scim-config-"+providerName).Return(&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "scim-config-" + providerName},
+				Data:       map[string]string{"enabled": strconv.FormatBool(tt.scimEnabled)},
+			}, nil).AnyTimes()
+
+			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(scache)
+			scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil).AnyTimes()
+
+			tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+
+			r := &refresher{
+				tokenLister: &fakes.TokenListerMock{
+					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+						return []*apiv3.Token{loginToken}, nil
+					},
+				},
+				userLister: &fakes.UserListerMock{
+					GetFunc: func(_, _ string) (*apiv3.User, error) {
+						return user, nil
+					},
+				},
+				tokens:   &fakes.TokenInterfaceMock{},
+				tokenMGR: tokens.NewMockedManager(tokenClient, nil),
+				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+					exttokens.NewTimeHandler(),
+					exttokens.NewHashHandler(),
+					exttokens.NewAuthHandler()),
+				configMapCache: configMapCache,
+			}
+
+			got, err := r.refreshAttributes(attribs)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantExtras, got.ExtraByProvider[providerName])
+			assert.Equal(t, tt.wantGroups, got.GroupPrincipals[providerName].Items)
+			// The refresh works on a copy.
+			assert.Equal(t, attribsBefore, attribs)
+		})
+	}
 }

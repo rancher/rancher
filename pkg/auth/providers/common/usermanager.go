@@ -15,10 +15,12 @@ import (
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/controllers"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrangrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
@@ -60,6 +62,7 @@ func NewUserManagerNoBindings(wranglerContext *wrangler.Context) (user.Manager, 
 		userAttributeCache: wranglerContext.Mgmt.UserAttribute().Cache(),
 		userIndexer:        userInformer.GetIndexer(),
 		rbacClient:         wranglerContext.RBAC,
+		configMapCache:     wranglerContext.Core.ConfigMap().Cache(),
 	}, nil
 }
 
@@ -116,6 +119,7 @@ func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
 		clusterRoleLister:        wranglerContext.RBAC.ClusterRole().Cache(),
 		clusterRoleBindingLister: wranglerContext.RBAC.ClusterRoleBinding().Cache(),
 		rbacClient:               wranglerContext.RBAC,
+		configMapCache:           wranglerContext.Core.ConfigMap().Cache(),
 	}, nil
 }
 
@@ -135,6 +139,7 @@ type userManager struct {
 	clusterRoleLister        wrangrbacv1.ClusterRoleCache
 	clusterRoleBindingLister wrangrbacv1.ClusterRoleBindingCache
 	rbacClient               wrangrbacv1.Interface
+	configMapCache           wcorev1.ConfigMapCache
 }
 
 func (m *userManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error) {
@@ -380,6 +385,10 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 	}
 	if userExtraInfo == nil {
 		userExtraInfo = make(map[string][]string)
+	}
+	if scimconfig.Enabled(m.configMapCache, provider) {
+		// Keep the stored keys this write doesn't set, such as SCIM's externalid and email.
+		userExtraInfo = MergeUserExtraAttributes(attribs.ExtraByProvider[provider], userExtraInfo)
 	}
 
 	var shouldUpdate bool

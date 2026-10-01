@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -75,4 +76,16 @@ func SamePrincipal(me, other v3.Principal) bool {
 		me.LoginName == other.LoginName &&
 		me.PrincipalType == other.PrincipalType
 
+}
+
+// MergeUserExtraAttributes returns a copy of stored with each key in update
+// set to the update's value. Keys update doesn't have keep their stored value.
+func MergeUserExtraAttributes(stored, update map[string][]string) map[string][]string {
+	merged := maps.Clone(stored)
+	if merged == nil {
+		merged = make(map[string][]string, len(update))
+	}
+	maps.Copy(merged, update)
+
+	return merged
 }

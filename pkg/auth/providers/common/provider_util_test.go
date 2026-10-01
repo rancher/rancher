@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"maps"
 	"testing"
 	"time"
 
@@ -97,6 +98,66 @@ func TestIsValidUserExtraAttribute(t *testing.T) {
 			t.Parallel()
 
 			assert.Equal(t, tt.want, common.IsValidUserExtraAttribute(tt.key))
+		})
+	}
+}
+
+func TestMergeUserExtraAttributes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		stored map[string][]string
+		update map[string][]string
+		want   map[string][]string
+	}{
+		{
+			name: "keeps stored keys the update doesn't set",
+			stored: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice"},
+				common.UserAttributeUserName:    {"alice"},
+				"externalid":                    {"00u123"},
+				"email":                         {"alice@example.com"},
+			},
+			update: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice"},
+				common.UserAttributeUserName:    {"alice.login"},
+			},
+			want: map[string][]string{
+				common.UserAttributePrincipalID: {"okta_user://alice"},
+				common.UserAttributeUserName:    {"alice.login"},
+				"externalid":                    {"00u123"},
+				"email":                         {"alice@example.com"},
+			},
+		},
+		{
+			name:   "nothing stored",
+			update: map[string][]string{common.UserAttributeUserName: {"alice"}},
+			want:   map[string][]string{common.UserAttributeUserName: {"alice"}},
+		},
+		{
+			name:   "empty update",
+			stored: map[string][]string{"email": {"alice@example.com"}},
+			want:   map[string][]string{"email": {"alice@example.com"}},
+		},
+		{
+			name: "nothing stored and empty update",
+			want: map[string][]string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var storedBefore map[string][]string
+			if tt.stored != nil {
+				storedBefore = maps.Clone(tt.stored)
+			}
+
+			got := common.MergeUserExtraAttributes(tt.stored, tt.update)
+			assert.Equal(t, tt.want, got)
+			// The stored map isn't changed in place.
+			assert.Equal(t, storedBefore, tt.stored)
 		})
 	}
 }
