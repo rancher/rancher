@@ -75,7 +75,7 @@ type Config struct {
 }
 
 // UserID returns the SCIM user attribute the user principal ID is built from.
-func (c Config) UserID(userName, externalID string) string {
+func (c *Config) UserID(userName, externalID string) string {
 	switch c.UserIDAttribute {
 	case UserIDExternalID:
 		return externalID
@@ -85,7 +85,7 @@ func (c Config) UserID(userName, externalID string) string {
 }
 
 // GroupID returns the SCIM group attribute the group principal ID is built from.
-func (c Config) GroupID(displayName, externalID string) string {
+func (c *Config) GroupID(displayName, externalID string) string {
 	switch c.GroupIDAttribute {
 	case GroupIDExternalID:
 		return externalID
