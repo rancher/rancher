@@ -776,9 +776,9 @@ func TestReconcileRotate_UnsupportedServiceFailsBeforePlanAssignment(t *testing.
 	require.NoError(t, err)
 	// The operation called its own work off before dispatching any, which is Aborted rather than
 	// Failed: nothing was attempted and lost.
-	assert.Equal(t, opv1alpha1.OperationPhaseAborted, got.Phase)
-	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.AbortedCondition.GetReason(&got))
-	assert.Contains(t, opv1alpha1.AbortedCondition.GetMessage(&got), "rke2-server")
+	assert.Equal(t, opv1alpha1.OperationPhaseRejected, got.Phase)
+	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.RejectedCondition.GetReason(&got))
+	assert.Contains(t, opv1alpha1.RejectedCondition.GetMessage(&got), "rke2-server")
 	assert.Empty(t, adapter.pauseCalls, "a request rejected before any plan is assigned must not pause the cluster")
 }
 
@@ -1052,7 +1052,7 @@ func TestOnChange_MissingClusterKeepsConcludedOutcome(t *testing.T) {
 	for _, phase := range []opv1alpha1.OperationPhase{
 		opv1alpha1.OperationPhaseSucceeded,
 		opv1alpha1.OperationPhaseFailed,
-		opv1alpha1.OperationPhaseAborted,
+		opv1alpha1.OperationPhaseRejected,
 		opv1alpha1.OperationPhaseCanceled,
 	} {
 		t.Run(string(phase), func(t *testing.T) {
@@ -1163,8 +1163,8 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 	}{
 		{
 			name:           "aborted finishes",
-			phase:          opv1alpha1.OperationPhaseAborted,
-			wantPhase:      opv1alpha1.OperationPhaseAborted,
+			phase:          opv1alpha1.OperationPhaseRejected,
+			wantPhase:      opv1alpha1.OperationPhaseRejected,
 			wantTerminated: true,
 		},
 		{

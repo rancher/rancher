@@ -3,7 +3,7 @@ package v1alpha1
 // Phase hook label prefixes are the shared "<phase>.phase.hook.operation.cattle.io/" namespace used
 // to gate operation progression at phase boundaries. They are common to every operation type
 // (ETCDSnapshotSave, ETCDSnapshotRestore, EncryptionKeyRotation, …) because every operation goes
-// through the same phase state machine (Pending → InProgress → Succeeded | Failed | Aborted, with
+// through the same phase state machine (Pending → InProgress → Succeeded | Failed | Rejected, with
 // Canceled reachable from any phase the controller has not finished handling yet).
 // Step-level hooks are operation-specific and live alongside their controller.
 //
@@ -44,11 +44,11 @@ const (
 	// step prefix individually.
 	InProgressPhaseHookLabelPrefix = "in-progress.phase.hook.operation.cattle.io/"
 
-	// AbortedPhaseHookLabelPrefix gates the Aborted phase, before the controller releases the
+	// RejectedPhaseHookLabelPrefix gates the Rejected phase, before the controller releases the
 	// beacon and runs any operation-type-specific cleanup (e.g. unpausing the CAPI cluster on
 	// encryption-key-rotation). Lets a delegate inspect / react to the reason the operation called
 	// its own work off.
-	AbortedPhaseHookLabelPrefix = "aborted.phase.hook.operation.cattle.io/"
+	RejectedPhaseHookLabelPrefix = "rejected.phase.hook.operation.cattle.io/"
 
 	// CanceledPhaseHookLabelPrefix gates the Canceled phase, before the controller releases the
 	// beacon and runs any operation-type-specific cleanup (e.g. unpausing the CAPI cluster on

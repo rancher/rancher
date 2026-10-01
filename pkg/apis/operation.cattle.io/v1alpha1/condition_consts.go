@@ -8,7 +8,7 @@ import (
 )
 
 // The conditions below split into three kinds: progress conditions (Pending, InProgress, Paused)
-// report what an operation is doing right now; outcome conditions (Succeeded, Failed, Aborted,
+// report what an operation is doing right now; outcome conditions (Succeeded, Failed, Rejected,
 // Canceled) report how the work ended; and Finalized reports whether the controller is done with
 // the operation altogether.
 //
@@ -44,11 +44,11 @@ var (
 	// controller has finished with it.
 	FailedCondition = condition.Cond("Failed")
 
-	// AbortedCondition represents the condition state for a task or process that called its own
+	// RejectedCondition represents the condition state for a task or process that called its own
 	// work off, having found a condition it cannot proceed past.
-	// True once the operation reaches the Aborted phase; see FinalizedCondition for whether the
+	// True once the operation reaches the Rejected phase; see FinalizedCondition for whether the
 	// controller has finished with it.
-	AbortedCondition = condition.Cond("Aborted")
+	RejectedCondition = condition.Cond("Rejected")
 
 	// CanceledCondition represents the condition state for a task or process that has been canceled
 	// from outside: by the user, by another controller, or by being deleted mid-flight.
@@ -119,8 +119,8 @@ const (
 	// NotSuccessfulReason surfaces when an operation has not completed successfully.
 	NotSuccessfulReason = "NotSuccessful"
 
-	// NotAbortedReason surfaces when an operation did not abort itself.
-	NotAbortedReason = "NotAborted"
+	// AcceptedReason surfaces when an operation did not reject itself.
+	AcceptedReason = "Accepted"
 
 	// NotCanceledReason surfaces when an operation was not canceled.
 	NotCanceledReason = "NotCanceled"
@@ -175,8 +175,8 @@ func OutcomeConditionFor(phase OperationPhase) (condition.Cond, string) {
 	switch phase {
 	case OperationPhaseSucceeded:
 		return SucceededCondition, "Operation completed successfully"
-	case OperationPhaseAborted:
-		return AbortedCondition, "Operation aborted"
+	case OperationPhaseRejected:
+		return RejectedCondition, "Operation rejected"
 	case OperationPhaseCanceled:
 		return CanceledCondition, "Operation canceled"
 	default:

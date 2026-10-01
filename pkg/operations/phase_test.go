@@ -59,7 +59,7 @@ func TestTerminalPhaseHookPrefix(t *testing.T) {
 	cases := map[opv1alpha1.OperationPhase]string{
 		opv1alpha1.OperationPhaseSucceeded:  opv1alpha1.SucceededPhaseHookLabelPrefix,
 		opv1alpha1.OperationPhaseFailed:     opv1alpha1.FailedPhaseHookLabelPrefix,
-		opv1alpha1.OperationPhaseAborted:    opv1alpha1.AbortedPhaseHookLabelPrefix,
+		opv1alpha1.OperationPhaseRejected:   opv1alpha1.RejectedPhaseHookLabelPrefix,
 		opv1alpha1.OperationPhaseCanceled:   opv1alpha1.CanceledPhaseHookLabelPrefix,
 		opv1alpha1.OperationPhasePending:    "",
 		opv1alpha1.OperationPhaseInProgress: "",

@@ -7,13 +7,13 @@ import (
 )
 
 // IsTerminal returns true when the operation has reached a terminal phase: Succeeded, Failed,
-// Aborted, or Canceled. Terminal operations no longer dispatch plans or modify cluster state. The
+// Rejected, or Canceled. Terminal operations no longer dispatch plans or modify cluster state. The
 // etcdsnapshotsave/etcdsnapshotrestore controllers use this to decide when to release the beacon
 // and when to respect the TTL for automatic deletion.
 func IsTerminal(phase opv1alpha1.OperationPhase) bool {
 	return phase == opv1alpha1.OperationPhaseSucceeded ||
 		phase == opv1alpha1.OperationPhaseFailed ||
-		phase == opv1alpha1.OperationPhaseAborted ||
+		phase == opv1alpha1.OperationPhaseRejected ||
 		phase == opv1alpha1.OperationPhaseCanceled
 }
 
@@ -40,8 +40,8 @@ func TerminalPhaseHookPrefix(phase opv1alpha1.OperationPhase) string {
 		return opv1alpha1.SucceededPhaseHookLabelPrefix
 	case opv1alpha1.OperationPhaseFailed:
 		return opv1alpha1.FailedPhaseHookLabelPrefix
-	case opv1alpha1.OperationPhaseAborted:
-		return opv1alpha1.AbortedPhaseHookLabelPrefix
+	case opv1alpha1.OperationPhaseRejected:
+		return opv1alpha1.RejectedPhaseHookLabelPrefix
 	case opv1alpha1.OperationPhaseCanceled:
 		return opv1alpha1.CanceledPhaseHookLabelPrefix
 	}

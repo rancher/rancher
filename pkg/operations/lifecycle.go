@@ -87,9 +87,9 @@ func Collectable(spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationSta
 // phase handler owns. Every operation type reports its progress the same way, so they all share
 // this; what is specific to an operation is the step it is on, and no condition here reports that.
 //
-// Division of labor for the outcome conditions (Succeeded / Failed / Aborted / Canceled): a phase
+// Division of labor for the outcome conditions (Succeeded / Failed / Rejected / Canceled): a phase
 // handler records *why* the operation ended, by setting the reason and message on the condition
-// matching the phase it moves to, the MarkSucceeded, MarkFailed, MarkAborted and MarkCanceled
+// matching the phase it moves to, the MarkSucceeded, MarkFailed, MarkRejected and MarkCanceled
 // methods on OperationStatus do exactly that. This function asserts that outcome and denies the
 // competing three, and owns the Finalized condition outright.
 //
@@ -144,7 +144,7 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 	for cond, reason := range map[condition.Cond]string{
 		opv1alpha1.SucceededCondition: opv1alpha1.NotSuccessfulReason,
 		opv1alpha1.FailedCondition:    opv1alpha1.NotFailedReason,
-		opv1alpha1.AbortedCondition:   opv1alpha1.NotAbortedReason,
+		opv1alpha1.RejectedCondition:  opv1alpha1.AcceptedReason,
 		opv1alpha1.CanceledCondition:  opv1alpha1.NotCanceledReason,
 	} {
 		if cond == outcome {

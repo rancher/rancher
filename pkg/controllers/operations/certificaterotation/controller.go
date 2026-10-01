@@ -373,11 +373,11 @@ func (h *handler) resolveScope(op *opv1alpha1.CertificateRotation, status opv1al
 	if apierrors.IsNotFound(err) {
 		switch {
 		// Nothing is owed on the beacon. A deleting operation is discarded along with its hooks;
-		// an Aborted one called its own work off; a Canceled one was called off from outside, often
+		// a Rejected one called its own work off; a Canceled one was called off from outside, often
 		// by whoever wanted the beacon next, so the beacon was never guaranteed to still be this
 		// operation's. None of them are worse off for it being gone.
 		case deleting,
-			status.Phase == opv1alpha1.OperationPhaseAborted,
+			status.Phase == opv1alpha1.OperationPhaseRejected,
 			status.Phase == opv1alpha1.OperationPhaseCanceled:
 			logrus.Infof("[certificaterotation] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
 
@@ -451,8 +451,8 @@ func (h *handler) dispatchPhase(s *scope, status opv1alpha1.CertificateRotationS
 		return h.handlePending(s, status)
 	case opv1alpha1.OperationPhaseInProgress:
 		return h.handleInProgress(s, status)
-	case opv1alpha1.OperationPhaseAborted:
-		return h.handleAborted(s, status)
+	case opv1alpha1.OperationPhaseRejected:
+		return h.handleRejected(s, status)
 	case opv1alpha1.OperationPhaseCanceled:
 		return h.handleCanceled(s, status)
 	case opv1alpha1.OperationPhaseFailed:
@@ -624,13 +624,13 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		return status, err
 	} else if err != nil {
 		logrus.Errorf("[certificaterotation] %s/%s: aborting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
-		status.MarkAborted(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
+		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
 	if len(candidates) == 0 {
 		logrus.Errorf("[certificaterotation] %s/%s: aborting operation: no eligible machine-plan secrets found", s.op.Namespace, s.op.Name)
-		status.MarkAborted(opv1alpha1.PreflightCheckFailedReason, "no eligible machine-plan secrets found")
+		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, "no eligible machine-plan secrets found")
 		return status, nil
 	}
 
@@ -640,7 +640,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 	if unsupported := unsupportedServices(s.adapter, requested, candidates); len(unsupported) > 0 {
 		logrus.Errorf("[certificaterotation] %s/%s: requested services are not available on this %s cluster: %s",
 			s.op.Namespace, s.op.Name, s.adapter.RuntimeCommand(), strings.Join(unsupported, ", "))
-		status.MarkAborted(opv1alpha1.PreflightCheckFailedReason,
+		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason,
 			fmt.Sprintf("requested services are not available on this %s cluster: %s", s.adapter.RuntimeCommand(), strings.Join(unsupported, ", ")))
 		return status, nil
 	}
@@ -816,7 +816,7 @@ type terminalPhase struct {
 	// every outcome but success:
 	//
 	//   - Failed, which handleInProgress reaches precisely because the beacon was lost;
-	//   - Aborted, where the operation called its own work off and may since have been overtaken;
+	//   - Rejected, where the operation called its own work off and may since have been overtaken;
 	//   - Canceled, driven from outside the operation and often by whoever wants the beacon next.
 	//
 	// For those a missing claim is an expected outcome rather than a failure, so the phase's hook
@@ -903,12 +903,12 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.CertificateRotation
 	return status, nil
 }
 
-// handleAborted handles the Aborted terminal phase, reached when the operation called its own work
+// handleRejected handles the Rejected terminal phase, reached when the operation called its own work
 // off rather than attempting it and losing — which is what separates it from Failed. Its phase hook
 // runs first so a delegate can observe why the operation stopped.
-func (h *handler) handleAborted(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
+func (h *handler) handleRejected(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           opv1alpha1.AbortedPhaseHookLabelPrefix,
+		hook:           opv1alpha1.RejectedPhaseHookLabelPrefix,
 		beaconOptional: true,
 	})
 }
@@ -916,7 +916,7 @@ func (h *handler) handleAborted(s *scope, status opv1alpha1.CertificateRotationS
 // handleCanceled handles the Canceled terminal phase, which is reached when spec.Cancel is set, when
 // another controller cancels the operation, or when it is deleted before its terminal handling
 // completed. What separates cancellation from the other outcomes is that it comes from outside the
-// operation, where Failed means the work was attempted and lost and Aborted means the operation
+// operation, where Failed means the work was attempted and lost and Rejected means the operation
 // called it off itself — none implies another.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
