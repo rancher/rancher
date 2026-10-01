@@ -235,9 +235,9 @@ var (
 		false,
 		true,
 	)
-	UIImprovedTables = newFeature(
-		"ui-improved-tables",
-		"Use new and improved UI tables",
+	UIConfigurableTables = newFeature(
+		"ui-configurable-tables",
+		"Enable configurable UI tables",
 		true,
 		true,
 		true,
