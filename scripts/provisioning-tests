@@ -354,6 +354,15 @@ if [ -z "${V2PROV_TEST_PARALLELISM}" ]; then
   V2PROV_TEST_PARALLELISM=1
 fi
 
+if [ -z "${V2PROV_PACKAGE_PARALLELISM}" ]; then
+  # The value 3 was chosen based off of the
+  # GHA Runner configuration and test suite of rancher/rancher,
+  # and offers a balance between stability and runtime. Repos
+  # which import these tests should re-evaluate this value
+  # based on their testing needs and runner configurations.
+  V2PROV_PACKAGE_PARALLELISM=3
+fi
+
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # `go test -v` buffers each package's output and only releases it once that
@@ -373,7 +382,7 @@ render_test_json() {
     '. as $line | try ($line | fromjson | select(.Action == "output" or .Action == "build-output") | .Output) catch ($line + "\n")'
 }
 
-go test -run "${V2PROV_TEST_RUN_REGEX}" -json -v -failfast -timeout 60m -p 3 -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... \
+go test -run "${V2PROV_TEST_RUN_REGEX}" -json -v -failfast -timeout 60m -p "${V2PROV_PACKAGE_PARALLELISM}" -parallel "${V2PROV_TEST_PARALLELISM}" ./tests/v2prov/tests/... \
   2> >(tee -a /tmp/out.txt >&2) \
   | tee /tmp/out.json \
   | render_test_json \
