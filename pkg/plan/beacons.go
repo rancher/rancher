@@ -1,10 +1,35 @@
 package plan
 
 import (
+	"slices"
+
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 )
+
+// BeaconRefForSecret returns the namespace and name of the beacon governing writes to the plan on a
+// machine-plan secret, and false if the secret does not name the cluster it belongs to.
+//
+// A cluster's beacon lives in the same namespace as its machine-plan secrets and carries the
+// cluster's name, which every machine-plan secret records under rke.cattle.io/cluster-name. That
+// holds for each kind of cluster operations run against: an imported cluster's beacon and secrets
+// are in the namespace named after the management cluster, and a CAPR or CAPRKE2 cluster's are in
+// the namespace of its control plane, which shares the cluster's name. It is also the label
+// NewCollector selects a cluster's secrets by, so it is present on every secret a plan is assigned to.
+//
+// Resolving the beacon from the secret alone is what lets the machine-plan webhook check the writer
+// of a plan (see PlanWriterAnnotation) without any lookup beyond the beacon itself.
+func BeaconRefForSecret(secret *corev1.Secret) (namespace, name string, ok bool) {
+	if secret == nil {
+		return "", "", false
+	}
+	name = secret.Labels[labelClusterName]
+	if name == "" {
+		return "", "", false
+	}
+	return secret.Namespace, name, true
+}
 
 // AcquireBeacon acquires a beacon if it is not already owned by the desired owner.
 // If the beacon is already owned by the desired owner, it is returned.
@@ -36,7 +61,7 @@ func AcquireBeacon(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconCl
 //     Delegates=nil).
 //   - Otherwise, if `expected` appears anywhere in the delegate chain, it is removed from the
 //     chain. This is broader than PopDelegate (which only pops the top) because a terminating
-//     operation may hold a mid-chain slot — its dependent delegates should already have popped
+//     operation may hold a mid-chain slot: its dependent delegates should already have popped
 //     themselves off by the time we run cleanup, but if they haven't we still need to prevent
 //     leaking our own reference.
 //   - If `expected` is neither the owner nor in the chain, no action is taken.
@@ -101,30 +126,32 @@ func AuthorizedForBeacon(beacon *planv1alpha1.Beacon, desired string) bool {
 	return IsOwningBeaconHolder(beacon, desired)
 }
 
+// HoldsBeacon reports whether desired has a claim on the beacon, either as its primary owner or
+// from anywhere in the delegate chain. It is the question "may I still act on this beacon", which
+// is broader than AuthorizedForBeacon: a holder part-way down the chain has handed authority to a
+// delegate but has not given the beacon up, and still has its own slot to release.
+func HoldsBeacon(beacon *planv1alpha1.Beacon, desired string) bool {
+	return IsOwningBeaconHolder(beacon, desired) || IsInDelegateChain(beacon, desired)
+}
+
+// ReleaseBeaconIfHeld hands the beacon back when expected still holds it, and reports whether it was
+// the primary owner rather than a delegate acting on its behalf which is what callers use to
+// decide whether their own termination implies downstream work. Releasing a beacon held by anybody
+// else is a no-op, so the guard also spares the caller an update it does not need.
+func ReleaseBeaconIfHeld(beacon *planv1alpha1.Beacon, beacons plancontrollers.BeaconClient, expected string) (bool, error) {
+	if !HoldsBeacon(beacon, expected) {
+		return false, nil
+	}
+
+	return IsOwningBeaconHolder(beacon, expected), ReleaseBeacon(beacon, beacons, expected)
+}
+
 func IsOwningBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
 	if beacon == nil {
 		return desired == ""
 	}
 
 	return beacon.Status.Owner == desired
-}
-
-func IsActiveBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
-	if beacon == nil {
-		return false
-	}
-
-	if beacon.Status.Owner == desired {
-		return true
-	}
-
-	if len(beacon.Status.Delegates) > 0 {
-		if beacon.Status.Delegates[len(beacon.Status.Delegates)-1] == desired {
-			return true
-		}
-	}
-
-	return false
 }
 
 func IsDelegateBeaconHolder(beacon *planv1alpha1.Beacon, desired string) bool {
@@ -148,13 +175,7 @@ func IsInDelegateChain(beacon *planv1alpha1.Beacon, desired string) bool {
 		return false
 	}
 
-	for _, delegate := range beacon.Status.Delegates {
-		if delegate == desired {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(beacon.Status.Delegates, desired)
 }
 
 func PushDelegate(beacon *planv1alpha1.Beacon, delegate string, beacons plancontrollers.BeaconClient) (*planv1alpha1.Beacon, error) {
@@ -199,17 +220,4 @@ func PopDelegate(beacon *planv1alpha1.Beacon, delegate string, beacons plancontr
 	beacon.Status.Delegates = beacon.Status.Delegates[:len(beacon.Status.Delegates)-1]
 	beacon, err := beacons.UpdateStatus(beacon)
 	return beacon, err
-}
-
-func ControllerOwnerKey(obj metav1.Object, prefix string) string {
-	if obj == nil {
-		return ""
-	}
-
-	key := obj.GetName()
-	if namespace := obj.GetNamespace(); namespace != "" {
-		key = namespace + "/" + key
-	}
-
-	return prefix + "/" + key
 }

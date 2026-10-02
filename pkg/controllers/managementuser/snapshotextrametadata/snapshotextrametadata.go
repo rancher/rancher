@@ -105,7 +105,7 @@ func Register(ctx context.Context, userContext *config.UserContext, capiCtx *wra
 	// shell: its configuration lives on the CAPI Cluster's RKE2ControlPlane, which changes — a
 	// version bump, a server config edit — without the shell being touched at all. Watching only
 	// the shell would leave this ConfigMap advertising an object from before the change, and every
-	// snapshot taken afterwards would carry it, so restore modes would offer stale configuration.
+	// snapshot taken afterward would carry it, so restore modes would offer stale configuration.
 	//
 	// These triggers republish directly rather than enqueueing the mgmt Cluster: an enqueue would
 	// re-run every mgmt-cluster handler in Rancher for what is this package's concern alone.

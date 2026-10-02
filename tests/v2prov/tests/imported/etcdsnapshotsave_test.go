@@ -5,7 +5,6 @@ import (
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/controllers/operations/etcdsnapshotsave"
-	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/stretchr/testify/assert"
@@ -70,7 +69,7 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveLifecycleHook(t *testi
 	preflightHookKey := etcdsnapshotsave.PreflightStepHookLabelPrefix + hookName
 	saveHookKey := etcdsnapshotsave.SaveStepHookLabelPrefix + hookName
 	restartHookKey := etcdsnapshotsave.RestartStepHookLabelPrefix + hookName
-	succeededHookKey := planv1alpha1.SucceededPhaseHookLabelPrefix + hookName
+	succeededHookKey := opv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
 	// Attach all three hook labels up front. Each prefix is scoped to a specific
 	// phase/step handler, so the controller only checks the relevant key when it enters that
