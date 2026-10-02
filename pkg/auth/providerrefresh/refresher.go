@@ -12,11 +12,13 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +44,7 @@ func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher
 		userAttributeLister:       scaledContext.Management.UserAttributes("").Controller().Lister(),
 		extTokenStore:             extTokenStore,
 		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
+		configMapCache:            scaledContext.Wrangler.Core.ConfigMap().Cache(),
 	}
 }
 
@@ -57,6 +60,7 @@ type refresher struct {
 	maxAge                    time.Duration
 	extTokenStore             *exttokenstore.SystemStore
 	ensureAndGetUserAttribute func(userID string) (*apiv3.UserAttribute, bool, error)
+	configMapCache            wcorev1.ConfigMapCache
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
@@ -360,6 +364,10 @@ func (r *refresher) refreshProvider(
 		if userExtraInfo != nil {
 			if attribs.ExtraByProvider == nil {
 				attribs.ExtraByProvider = make(map[string]map[string][]string)
+			}
+			if scimconfig.Enabled(r.configMapCache, providerName) {
+				// Keep the stored keys the refresh doesn't set, such as SCIM's externalid and email.
+				userExtraInfo = common.MergeUserExtraAttributes(attribs.ExtraByProvider[providerName], userExtraInfo)
 			}
 			attribs.ExtraByProvider[providerName] = userExtraInfo
 		}
