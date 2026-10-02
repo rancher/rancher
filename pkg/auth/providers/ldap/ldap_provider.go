@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -333,7 +334,9 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 // if provider only enabled for search by a SAML provider
 func (p *ldapProvider) samlSearchProvider() bool {
 	// see also saml_provider.go -- hasLdapGroupSearch()
-	return ShibbolethName == p.providerName || OKTAName == p.providerName || ADFSName == p.providerName
+	return ShibbolethName == p.providerName ||
+		OKTAName == p.providerName ||
+		(ADFSName == p.providerName && features.ADFSLDAPSearch.Enabled())
 }
 
 func (p *ldapProvider) samlSearchGetPrincipal(

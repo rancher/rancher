@@ -228,6 +228,13 @@ var (
 		true,
 		true,
 	)
+	ADFSLDAPSearch = newPrimeFeature(
+		"adfs-ldap-search",
+		"Enable LDAP search for ADFS/SAML",
+		true,
+		false,
+		true,
+	)
 )
 
 func ListEnabled() []string {
