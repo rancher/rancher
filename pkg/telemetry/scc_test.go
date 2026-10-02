@@ -27,7 +27,7 @@ func TestSccPayloadVersion(t *testing.T) {
 		{"not-a-version", "not-a-version"},
 	}
 	for _, tc := range cases {
-		rancherT := newTelemetryImpl(tc.input, "", "", "", "", &v3.Cluster{}, nil, nil, nil)
+		rancherT := newTelemetryImpl(tc.input, "", "", "", "", &v3.Cluster{}, nil, nil, nil, true)
 		payload, err := GenerateSCCPayload(rancherT)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.expected, payload.Version, "input: %s", tc.input)
@@ -344,6 +344,7 @@ func TestSccPayload(t *testing.T) {
 			tc.input.localNodes,
 			tc.input.managedClusters,
 			tc.input.managedNodes,
+			true,
 		)
 		payload, err := GenerateSCCPayload(rancherT)
 		assert.Equal(err, tc.err)
