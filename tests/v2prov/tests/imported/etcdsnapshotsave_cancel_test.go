@@ -22,18 +22,24 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-// These tests depend on a system-agent which supports plan-state (and with it, plan cancellation).
-// They are not part of any CI scope.
+// These tests depend on a system-agent which supports plan-state (and with it, plan pause and
+// cancellation). They are not part of any CI scope.
 
-// Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveCancel cancels an ETCDSnapshotSave and
-// asserts that the cancellation reaches the machine-plan secret rather than stopping at the
-// operation's status: the plan the operation dispatched is annotated as canceled, and the agent
-// records plan-state canceled for it.
+const (
+	cancelHookName     = "v2prov-e2e-cancel"
+	cancelDelegateName = "v2prov-e2e-cancel-delegate"
+)
+
+// Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveCancel cancels an ETCDSnapshotSave with its
+// save plan still unfinished, and asserts that the cancellation reaches the machine-plan secret rather
+// than stopping at the operation's status: the plan the operation dispatched is annotated as
+// canceled, and the agent records plan-state canceled for it.
 //
-// The operation is held on a Restart step hook so the cancellation lands at a deterministic point:
-// the save plan has been applied, and the restart plan has not yet been dispatched. The agent records
-// a cancellation against a succeeded plan as well as an in-flight one, since a succeeded plan still
-// runs periodic instructions, so this does not have to race the snapshot itself.
+// An etcd snapshot is too quick to cancel reliably while it runs, so the test holds the plan instead:
+// while the operation waits on its Save step hook, it pauses the node's machine-plan, so the agent
+// holds the save plan the operation then assigns rather than running it. A paused plan is still
+// unfinished, which is what the operation cancels on its way out; a plan that already succeeded
+// would be left alone.
 func Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveCancel(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
@@ -45,13 +51,13 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveCancel(t *testing.T) {
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
-	cancelSnapshotSaveAtRestart(t, cs, fx)
+	cancelSnapshotSaveWhilePaused(t, cs, fx)
 }
 
 // Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveFollowUp runs saves of the same shape one
-// after another, each of which computes the same plan apart from the operation it is scoped to. Each
-// one must be run by the agent on its own account rather than inheriting the outcome of the plan left
-// on the machine-plan secret by the one before it:
+// after another. Each computes exactly the plans the one before it did, and each must still be run
+// by the agent on its own account rather than inheriting the outcome of the plan the one before it
+// left on the machine-plan secret:
 //
 //   - after a canceled save, the follow-up must not be reported as canceled (or failed) on the
 //     strength of the previous plan's plan-state, and must clear the cancellation from the secret;
@@ -72,55 +78,98 @@ func Test_Imported_Operation_SetD_ImportedETCDSnapshotSaveFollowUp(t *testing.T)
 		{ControlPlane: true, ETCD: true, Worker: true, Quantity: 1},
 	})
 
-	canceled := cancelSnapshotSaveAtRestart(t, cs, fx)
+	canceled := cancelSnapshotSaveWhilePaused(t, cs, fx)
+	canceledPlan := canceled.Data[planapi.PlanDataKey]
 	revision := planRevision(t, canceled)
 
-	for _, leg := range []string{"after a canceled save", "after a succeeded save"} {
-		op := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	// After the canceled save. Its machine-plan is still paused, so the follow-up lifts the pause
+	// while it holds the beacon at its Save step hook, before it assigns its own save plan.
+	restartHookKey := etcdsnapshotsave.RestartStepHookLabelPrefix + cancelHookName
+	saveHookKey := etcdsnapshotsave.SaveStepHookLabelPrefix + cancelHookName
+	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 
-		secret := etcdPlanSecret(t, cs, fx)
-		assert.True(t, ops.PlanDispatchedBy(secret, op), "%s: the plan on the secret should be the follow-up's own", leg)
-		assert.Equal(t, string(planapi.PlanStateSucceeded), string(secret.Data[planapi.PlanStateKey]), leg)
-		assert.NotEqual(t, "true", secret.Annotations[planapi.PlanCanceledAnnotation],
-			"%s: assigning new plan content must clear the previous plan's cancellation", leg)
+	followUp := CreateETCDSnapshotSaveOp(t, cs, fx.ns.Name, fx.clusterRef, WithSaveLabels(map[string]string{
+		saveHookKey:    cancelDelegateName,
+		restartHookKey: cancelDelegateName,
+	}))
+	followUpKey := ops.BeaconOwnerKey(etcdsnapshotsave.OperationKind, followUp)
 
-		next := planRevision(t, secret)
-		assert.GreaterOrEqual(t, next, revision+2,
-			"%s: the agent should have picked up both the save and the restart plan of the follow-up", leg)
-		revision = next
-	}
+	WaitForSnapshotSaveHookPause(t, cs, followUp, beaconNS, beaconName, saveHookKey, cancelDelegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepSave)
+	setPlanPaused(t, cs, fx, false)
+	AdvancePastSnapshotSaveHook(t, cs, followUp, beaconNS, beaconName, saveHookKey, cancelDelegateName)
+
+	// At the Restart step hook the follow-up's save plan has run: the very plan the canceled save
+	// left on the secret, now assigned by the follow-up and run to completion.
+	WaitForSnapshotSaveHookPause(t, cs, followUp, beaconNS, beaconName, restartHookKey, cancelDelegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepRestart)
+	secret := etcdPlanSecret(t, cs, fx)
+	assert.Equal(t, string(canceledPlan), string(secret.Data[planapi.PlanDataKey]), "the follow-up's save plan is identical to the canceled one's")
+	assert.True(t, ops.PlanDispatchedBy(secret, followUpKey), "the plan on the secret should be the follow-up's own")
+	assert.Equal(t, string(planapi.PlanStateSucceeded), string(secret.Data[planapi.PlanStateKey]))
+	assert.NotEqual(t, "true", secret.Annotations[planapi.PlanCanceledAnnotation],
+		"assigning the plan afresh must clear the previous plan's cancellation")
+	assert.Greater(t, planRevision(t, secret), revision, "the agent should have picked up the follow-up's save plan")
+	AdvancePastSnapshotSaveHook(t, cs, followUp, beaconNS, beaconName, restartHookKey, cancelDelegateName)
+
+	WaitForSnapshotSaveSucceeded(t, cs, followUp, beaconNS, beaconName)
+	revision = assertFollowUpRan(t, cs, fx, followUpKey, revision, "after a canceled save")
+
+	// After a succeeded save.
+	op := RunETCDSnapshotSaveOperationTest(t, cs, fx.ns.Name, fx.clusterRef)
+	assertFollowUpRan(t, cs, fx, ops.BeaconOwnerKey(etcdsnapshotsave.OperationKind, op), revision, "after a succeeded save")
 }
 
-// cancelSnapshotSaveAtRestart runs an ETCDSnapshotSave up to its Restart step hook, cancels it there,
-// and waits for both the operation and the plan it dispatched to report the cancellation. Returns the
-// machine-plan secret as it stands once the agent has recorded the plan as canceled.
-func cancelSnapshotSaveAtRestart(t *testing.T, cs *clients.Clients, fx *importedClusterFixture) *corev1.Secret {
+// assertFollowUpRan asserts that the save whose beacon key is writer ran both of its steps on the
+// node, starting from the given plan-revision, and returns the revision it left.
+func assertFollowUpRan(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, writer string, revision int, leg string) int {
 	t.Helper()
 
-	const (
-		hookName     = "v2prov-e2e-cancel"
-		delegateName = "v2prov-e2e-cancel-delegate"
-	)
-	restartHookKey := etcdsnapshotsave.RestartStepHookLabelPrefix + hookName
+	secret := etcdPlanSecret(t, cs, fx)
+	assert.True(t, ops.PlanDispatchedBy(secret, writer), "%s: the plan on the secret should be the follow-up's own", leg)
+	assert.Equal(t, "restart", firstInstructionName(t, secret), "%s: the follow-up's restart plan should be the last it assigned", leg)
+	assert.Equal(t, string(planapi.PlanStateSucceeded), string(secret.Data[planapi.PlanStateKey]), leg)
+	assert.NotEqual(t, "true", secret.Annotations[planapi.PlanCanceledAnnotation], leg)
+
+	next := planRevision(t, secret)
+	assert.GreaterOrEqual(t, next, revision+2,
+		"%s: the agent should have picked up both the save and the restart plan of the follow-up", leg)
+	return next
+}
+
+// cancelSnapshotSaveWhilePaused runs an ETCDSnapshotSave whose save plan the agent holds paused,
+// cancels it, and waits for both the operation and the plan it dispatched to report the
+// cancellation. Returns the machine-plan secret as it stands once the agent has recorded the plan as
+// canceled; the secret is left paused.
+func cancelSnapshotSaveWhilePaused(t *testing.T, cs *clients.Clients, fx *importedClusterFixture) *corev1.Secret {
+	t.Helper()
+
+	saveHookKey := etcdsnapshotsave.SaveStepHookLabelPrefix + cancelHookName
 	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 
 	op := CreateETCDSnapshotSaveOp(t, cs, fx.ns.Name, fx.clusterRef, WithSaveLabels(map[string]string{
-		restartHookKey: delegateName,
+		saveHookKey: cancelDelegateName,
 	}))
+	ownerKey := ops.BeaconOwnerKey(etcdsnapshotsave.OperationKind, op)
 
-	WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, restartHookKey, delegateName,
-		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepRestart)
+	// Pause the node's machine-plan while the operation waits on its Save step hook, before it has
+	// assigned anything, so the agent holds the save plan instead of running it.
+	WaitForSnapshotSaveHookPause(t, cs, op, beaconNS, beaconName, saveHookKey, cancelDelegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.ETCDSnapshotSaveStepSave)
+	setPlanPaused(t, cs, fx, true)
+	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, saveHookKey, cancelDelegateName)
 
-	// The save step completed, so the plan on the secret is this operation's save plan, run to
-	// completion, and the restart plan has not been dispatched.
-	secret := etcdPlanSecret(t, cs, fx)
-	require.True(t, ops.PlanDispatchedBy(secret, op), "the save plan should be on the secret while the operation waits on its restart hook")
-	assert.Equal(t, "snapshot", firstInstructionName(t, secret), "the restart plan must not have been dispatched yet")
-	assert.Equal(t, string(planapi.PlanStateSucceeded), string(secret.Data[planapi.PlanStateKey]))
+	secret := waitForPlanSecret(t, cs, fx, "the agent to hold the save plan paused", func(secret *corev1.Secret) bool {
+		return ops.PlanDispatchedBy(secret, ownerKey) && planapi.PlanState(secret.Data[planapi.PlanStateKey]) == planapi.PlanStatePaused
+	})
+	assert.Equal(t, "snapshot", firstInstructionName(t, secret))
 
-	// Cancel before releasing the hook: every reconcile from here on sees the cancellation before it
-	// would advance the operation, so the restart plan is never dispatched.
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	latest, err := cs.Operation.ETCDSnapshotSave().Get(op.Namespace, op.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, opv1alpha1.OperationPhaseInProgress, latest.Status.Phase, "the operation should be waiting on its paused plan")
+	require.Equal(t, opv1alpha1.ETCDSnapshotSaveStepSave, latest.Status.Step)
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest, err := cs.Operation.ETCDSnapshotSave().Get(op.Namespace, op.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -132,9 +181,6 @@ func cancelSnapshotSaveAtRestart(t *testing.T, cs *clients.Clients, fx *imported
 	})
 	require.NoError(t, err, "cancel op %s/%s", op.Namespace, op.Name)
 
-	AdvancePastSnapshotSaveHook(t, cs, op, beaconNS, beaconName, restartHookKey, delegateName)
-
-	var latest *opv1alpha1.ETCDSnapshotSave
 	err = utilwait.PollUntilContextTimeout(cs.Ctx, 2*time.Second, 5*time.Minute, true, func(_ context.Context) (bool, error) {
 		got, err := cs.Operation.ETCDSnapshotSave().Get(op.Namespace, op.Name, metav1.GetOptions{})
 		if err != nil {
@@ -153,19 +199,51 @@ func cancelSnapshotSaveAtRestart(t *testing.T, cs *clients.Clients, fx *imported
 	}
 	assert.Equal(t, opv1alpha1.CancelRequestedReason, opv1alpha1.CanceledCondition.GetReason(latest))
 
-	err = utilwait.PollUntilContextTimeout(cs.Ctx, 2*time.Second, 5*time.Minute, true, func(_ context.Context) (bool, error) {
-		secret = etcdPlanSecret(t, cs, fx)
-		return planapi.PlanState(secret.Data[planapi.PlanStateKey]) == planapi.PlanStateCanceled, nil
+	secret = waitForPlanSecret(t, cs, fx, "the agent to record the plan as canceled", func(secret *corev1.Secret) bool {
+		return planapi.PlanState(secret.Data[planapi.PlanStateKey]) == planapi.PlanStateCanceled
 	})
-	if err != nil {
-		handleError(t, cs, fx.mgmtCluster.Name, fmt.Errorf("waiting for the agent to record plan-state %s (have %q): %w",
-			planapi.PlanStateCanceled, secret.Data[planapi.PlanStateKey], err))
-	}
-
 	assert.Equal(t, "true", secret.Annotations[planapi.PlanCanceledAnnotation])
-	assert.True(t, ops.PlanDispatchedBy(secret, op), "the canceled plan should still be the one the operation dispatched")
+	assert.True(t, ops.PlanDispatchedBy(secret, ownerKey), "the canceled plan should still be the one the operation dispatched")
 	assert.Equal(t, "snapshot", firstInstructionName(t, secret), "the restart plan must never have been dispatched")
 
+	return secret
+}
+
+// setPlanPaused sets or lifts the pause on the fixture's etcd machine-plan, on behalf of the
+// lifecycle hook delegate holding the cluster's beacon: the writer the machine-plan webhook checks
+// such a write against.
+func setPlanPaused(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, paused bool) {
+	t.Helper()
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		secret := etcdPlanSecret(t, cs, fx).DeepCopy()
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		if paused {
+			secret.Annotations[planapi.PlanPausedAnnotation] = "true"
+		} else {
+			delete(secret.Annotations, planapi.PlanPausedAnnotation)
+		}
+		secret.Annotations[planapi.PlanWriterAnnotation] = cancelDelegateName
+		_, err := cs.Core.Secret().Update(secret)
+		return err
+	})
+	require.NoError(t, err, "set %s=%t", planapi.PlanPausedAnnotation, paused)
+}
+
+// waitForPlanSecret polls the fixture's etcd machine-plan secret until done reports true for it.
+func waitForPlanSecret(t *testing.T, cs *clients.Clients, fx *importedClusterFixture, what string, done func(*corev1.Secret) bool) *corev1.Secret {
+	t.Helper()
+
+	var secret *corev1.Secret
+	err := utilwait.PollUntilContextTimeout(cs.Ctx, 2*time.Second, 5*time.Minute, true, func(_ context.Context) (bool, error) {
+		secret = etcdPlanSecret(t, cs, fx)
+		return done(secret), nil
+	})
+	if err != nil {
+		handleError(t, cs, fx.mgmtCluster.Name, fmt.Errorf("waiting for %s (plan-state %q): %w", what, secret.Data[planapi.PlanStateKey], err))
+	}
 	return secret
 }
 

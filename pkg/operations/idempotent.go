@@ -13,10 +13,12 @@ import (
 // will be attempted until it is successfully run once, and then prevent it from being
 // run again - effectively making arbitrary commands idempotent. This prevents
 // potential re-execution of commands which must only be run once (etcd operations, etc.)
-// but are not idempotent by default. The command will be reattempted until either it is
-// successful, or the max-failures limit set for the plan is reached. The definition of
-// $CATTLE_AGENT_ATTEMPT_NUMBER can be found in the system-agent repository, but it is effectively
-// just the plans failure-count + 1.
+// but are not idempotent by default. The command is run again only when
+// $CATTLE_AGENT_ATTEMPT_NUMBER differs from the attempt it last ran at. The system-agent defines it:
+// in the plan-state flow it is 1 whenever the agent picks up a pending plan, including each retry
+// planapi.Store makes of a failed plan, and failure-count + 1 only when the agent resumes a plan it
+// was running when it restarted. So a failed command is not re-run by those retries; plans built from
+// these instructions should be assigned with a single attempt.
 const IdempotentActionScript = `
 #!/bin/sh
 

@@ -7,6 +7,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
+	planapi "github.com/rancher/rancher/pkg/plan"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/stretchr/testify/assert"
@@ -1052,5 +1053,53 @@ func TestSetMachineJoinURL(t *testing.T) {
 				assert.Equal(t, generic.ErrSkip, err)
 			}
 		})
+	}
+}
+
+// UpdatePlan records the planner as the writer of the plans it assigns, which is what the
+// machine-plan webhook checks against the beacon, and drops a cancellation left by an operation
+// canceled with its plan in flight, which would otherwise stop the planner's plan as soon as the
+// agent picked it up.
+func TestUpdatePlanWritesAsThePlanner(t *testing.T) {
+	const rkeBootstrapName = "bogus-rkebootstrap"
+
+	mp := newMockPlanner(t, InfoFunctions{})
+	secret := &corev1.Secret{
+		Type: capr.SecretTypeMachinePlan,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      capr.PlanSecretFromBootstrapName(rkeBootstrapName),
+			Namespace: "test",
+			Annotations: map[string]string{
+				planapi.PlanWriterAnnotation:   "operation.cattle.io/ETCDSnapshotSave/test/save-1/uid-1",
+				planapi.PlanCanceledAnnotation: "true",
+			},
+		},
+		Data: map[string][]byte{"plan": []byte(`{"previous":true}`)},
+	}
+	entry := &planEntry{
+		Machine: &capi.Machine{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+			Spec: capi.MachineSpec{
+				Bootstrap: capi.Bootstrap{
+					ConfigRef: capi.ContractVersionedObjectReference{Kind: capr.RKEBootstrapKind, Name: rkeBootstrapName, APIGroup: "rke.cattle.io"},
+				},
+			},
+		},
+		Metadata: &plan.Metadata{Labels: map[string]string{}, Annotations: map[string]string{}},
+	}
+
+	var written *corev1.Secret
+	mp.secretClient.EXPECT().Get("test", secret.Name, metav1.GetOptions{}).Return(secret, nil)
+	mp.secretClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+		written = s.DeepCopy()
+		return s, nil
+	})
+
+	err := mp.planner.store.UpdatePlan(entry, plan.NodePlan{}, "", 1, 1)
+	assert.NoError(t, err)
+	if assert.NotNil(t, written) {
+		assert.Equal(t, BeaconOwnerKey, written.Annotations[planapi.PlanWriterAnnotation])
+		assert.NotContains(t, written.Annotations, planapi.PlanCanceledAnnotation)
+		assert.Equal(t, string(planapi.PlanStatePending), string(written.Data[planapi.PlanStateKey]))
 	}
 }

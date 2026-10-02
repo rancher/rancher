@@ -30,6 +30,10 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
+// BeaconOwnerKey is the key the planner holds a cluster's beacon under while it plans the cluster,
+// and records as the writer of the plans it assigns (see planapi.PlanWriterAnnotation).
+const BeaconOwnerKey = "planner"
+
 const (
 	NoAgentPlanStatusMessage = "waiting for agent to check in and apply initial plan"
 	WaitingPlanStatusMessage = "waiting for plan to be applied"
@@ -406,6 +410,16 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, join
 
 	// Set plan-state to pending so the agent knows new plan content has been written.
 	secret.Data[planapi.PlanStateKey] = []byte(planapi.PlanStatePending)
+	if secret.Annotations == nil {
+		secret.Annotations = map[string]string{}
+	}
+	// The planner writes plans while holding the cluster's beacon, and records that it did, as every
+	// writer of a plan does: the machine-plan webhook checks the writer against the beacon, and the
+	// key left by whichever operation wrote last would not match.
+	secret.Annotations[planapi.PlanWriterAnnotation] = BeaconOwnerKey
+	// A cancellation is of the plan it was requested for. One left behind by an operation canceled with
+	// its plan in flight must not stop this one the moment the agent picks it up.
+	delete(secret.Annotations, planapi.PlanCanceledAnnotation)
 	secret.Data["plan"] = data
 	if maxFailures > 0 || maxFailures == -1 {
 		secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))

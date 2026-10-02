@@ -56,7 +56,10 @@ type connectionInfo struct {
 }
 
 type machinePlanFeedbackState struct {
-	AppliedPlanHash  string
+	AppliedPlanHash string
+	// PlanRevision is the agent's count of the plans it has picked up for execution. Unlike the
+	// applied plan's hash it advances for every plan run, including one identical to the last.
+	PlanRevision     string
 	ProbeStatusesLen int
 	PlanLastUpdated  string
 	ProbesPassed     string
@@ -694,6 +697,7 @@ func getMachinePlanFeedbackState(t *testing.T, clients *clients.Clients, cluster
 
 	return machinePlanFeedbackState{
 		AppliedPlanHash:  hashBytes(secret.Data["appliedPlan"]),
+		PlanRevision:     string(secret.Data[plan.PlanRevisionKey]),
 		ProbeStatusesLen: len(secret.Data["probe-statuses"]),
 		PlanLastUpdated:  strings.TrimSpace(secret.Annotations[plan.PlanLastUpdatedAnnotation]),
 		ProbesPassed:     strings.TrimSpace(secret.Annotations[plan.PlanProbesPassedAnnotation]),
@@ -713,8 +717,9 @@ func summarizeImportedPlanIdentity(identity importedPlanIdentity) string {
 
 func formatMachinePlanFeedbackState(state machinePlanFeedbackState) string {
 	return fmt.Sprintf(
-		"appliedPlanHash=%q probeStatusesLen=%d planLastUpdated=%q probesPassed=%q",
+		"appliedPlanHash=%q planRevision=%q probeStatusesLen=%d planLastUpdated=%q probesPassed=%q",
 		state.AppliedPlanHash,
+		state.PlanRevision,
 		state.ProbeStatusesLen,
 		state.PlanLastUpdated,
 		state.ProbesPassed,
@@ -799,7 +804,10 @@ func waitForMachinePlanFeedbackAfterOperation(
 		if probesPassedTime.Before(operationCreatedAt) {
 			return false, nil
 		}
-		return hashBytes(secret.Data["appliedPlan"]) != baseline.AppliedPlanHash, nil
+		// The plans an operation assigns can be identical to ones the secret held before, so it is the
+		// agent having picked a plan up since the baseline that says the feedback is fresh, not the
+		// plan having changed.
+		return string(secret.Data[plan.PlanRevisionKey]) != baseline.PlanRevision, nil
 	})
 	if err != nil {
 		appliedPlanLen := 0
@@ -807,7 +815,9 @@ func waitForMachinePlanFeedbackAfterOperation(
 		planLastUpdated := ""
 		probesPassed := ""
 		appliedPlanHash := ""
+		planRevision := ""
 		if secret != nil {
+			planRevision = string(secret.Data[plan.PlanRevisionKey])
 			appliedPlanLen = len(secret.Data["appliedPlan"])
 			probeStatusesLen = len(secret.Data["probe-statuses"])
 			planLastUpdated = secret.Annotations[plan.PlanLastUpdatedAnnotation]
@@ -815,12 +825,14 @@ func waitForMachinePlanFeedbackAfterOperation(
 			appliedPlanHash = hashBytes(secret.Data["appliedPlan"])
 		}
 		t.Fatalf(
-			"timed out waiting for fresh machine-plan feedback on %s/%s after snapshot op: %v (baselinePlanHash=%q currentPlanHash=%q appliedPlan=%d probe-statuses=%d plan-last-updated=%q probes-passed=%q)",
+			"timed out waiting for fresh machine-plan feedback on %s/%s after snapshot op: %v (baselinePlanHash=%q currentPlanHash=%q baselinePlanRevision=%q currentPlanRevision=%q appliedPlan=%d probe-statuses=%d plan-last-updated=%q probes-passed=%q)",
 			clusterName,
 			secretName,
 			err,
 			baseline.AppliedPlanHash,
 			appliedPlanHash,
+			baseline.PlanRevision,
+			planRevision,
 			appliedPlanLen,
 			probeStatusesLen,
 			planLastUpdated,

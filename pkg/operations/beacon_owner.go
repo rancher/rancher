@@ -37,9 +37,10 @@ type BeaconOwner struct {
 // next operation created with the same name, inheriting whatever the dead one left on the beacon;
 // with it, that claim cannot be mistaken for the new operation's own (see SupersedesBeaconOwner).
 //
-// It is also the identity the operation's plans already carry, since OperationEnv stamps the same
-// UID into every plan it assigns: so a claim on the beacon and the plan content written under it
-// name the same object.
+// It is also the identity the operation's plans carry, since every plan it assigns records the same
+// key as its writer (planapi.PlanWriterAnnotation): so a claim on the beacon and the plans written
+// under it name the same object, which is what lets the machine-plan webhook check one against the
+// other.
 func BeaconOwnerKey(kind string, op metav1.Object) string {
 	if op == nil {
 		return ""

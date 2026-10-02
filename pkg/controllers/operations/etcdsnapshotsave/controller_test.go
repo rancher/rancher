@@ -220,36 +220,37 @@ func newPlanSecret(name string) *corev1.Secret {
 	}
 }
 
-// withAppliedPlan returns a copy of the secret pre-populated to look like the system-agent has
-// already applied the given plan with healthy probes — used to fast-forward reconcile tests
+// withAppliedPlan returns a copy of the secret pre-populated to look like op assigned the given plan
+// and the system-agent has applied it with healthy probes — used to fast-forward reconcile tests
 // through the "wait for plan" branch.
-func withAppliedPlan(secret *corev1.Secret, expectedPlan *planapi.Plan) *corev1.Secret {
-	out := secret.DeepCopy()
-	data, _ := json.Marshal(expectedPlan)
-	if out.Data == nil {
-		out.Data = map[string][]byte{}
-	}
-	out.Data["plan"] = data
-	out.Data["appliedPlan"] = data
+func withAppliedPlan(secret *corev1.Secret, op *opv1alpha1.ETCDSnapshotSave, expectedPlan *planapi.Plan) *corev1.Secret {
+	out := withAssignedPlan(secret, op, expectedPlan, planapi.PlanStateSucceeded)
 	out.Data["probe-statuses"] = []byte(`{"x":{"healthy":true}}`)
-	if out.Annotations == nil {
-		out.Annotations = map[string]string{}
-	}
 	out.Annotations[planapi.PlanProbesPassedAnnotation] = "applied"
 	return out
 }
 
-// withFailedPlan marks the secret as having failed its plan past the failure threshold so the
-// store reports Failure() == true.
-func withFailedPlan(secret *corev1.Secret, expectedPlan *planapi.Plan) *corev1.Secret {
+// withAssignedPlan returns a copy of the secret holding the given plan as op assigned it, in the
+// given plan-state.
+func withAssignedPlan(secret *corev1.Secret, op *opv1alpha1.ETCDSnapshotSave, expectedPlan *planapi.Plan, state planapi.PlanState) *corev1.Secret {
 	out := secret.DeepCopy()
 	data, _ := json.Marshal(expectedPlan)
 	if out.Data == nil {
 		out.Data = map[string][]byte{}
 	}
-	out.Data["plan"] = data
-	out.Data["failed-checksum"] = []byte(planapi.PlanHash(data))
-	out.Data["failure-count"] = []byte("5")
+	if out.Annotations == nil {
+		out.Annotations = map[string]string{}
+	}
+	out.Data[planapi.PlanDataKey] = data
+	out.Data[planapi.PlanStateKey] = []byte(state)
+	out.Annotations[planapi.PlanWriterAnnotation] = ops.BeaconOwnerKey(OperationKind, op)
+	return out
+}
+
+// withFailedPlan marks the secret as having failed the plan op assigned past the failure threshold
+// so the store reports Failure() == true.
+func withFailedPlan(secret *corev1.Secret, op *opv1alpha1.ETCDSnapshotSave, expectedPlan *planapi.Plan) *corev1.Secret {
+	out := withAssignedPlan(secret, op, expectedPlan, planapi.PlanStateFailed)
 	out.Data["max-failures"] = []byte("1")
 	out.Data["failure-threshold"] = []byte("1")
 	return out
@@ -834,18 +835,17 @@ func expectedSaveInstruction(op *opv1alpha1.ETCDSnapshotSave, runtime string) pl
 	}
 }
 
-// Both plans are scoped to the operation and step they belong to, exactly as the controller assigns
-// them: without that the plan bytes of two operations would be identical, and the second would be
-// reported as already applied instead of being executed.
+// expectedSavePlan and expectedRestartPlan are the plans the controller assigns in each step, so tests
+// can predict the exact plan bytes the agent will see.
 func expectedSavePlan(op *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) *planapi.Plan {
-	return ops.WithOperationEnv(&planapi.Plan{
+	return &planapi.Plan{
 		OneTimeInstructions: []planapi.OneTimeInstruction{expectedSaveInstruction(op, adapter.runtimeCommand)},
 		Probes:              adapter.probes,
-	}, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.ETCDSnapshotSaveStepSave))
+	}
 }
 
-func expectedRestartPlan(op *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) *planapi.Plan {
-	return ops.WithOperationEnv(&planapi.Plan{
+func expectedRestartPlan(_ *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) *planapi.Plan {
+	return &planapi.Plan{
 		OneTimeInstructions: []planapi.OneTimeInstruction{
 			{CommonInstruction: planapi.CommonInstruction{
 				Name:    "restart",
@@ -854,7 +854,7 @@ func expectedRestartPlan(op *opv1alpha1.ETCDSnapshotSave, adapter *stubAdapter) 
 			}},
 		},
 		Probes: adapter.probes,
-	}, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.ETCDSnapshotSaveStepRestart))
+	}
 }
 
 func TestReconcileSave_NoSecrets(t *testing.T) {
@@ -901,7 +901,7 @@ func TestReconcileSave_TransitionsToRestartWhenApplied(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedSavePlan(op, adapter))
+	secret := withAppliedPlan(newPlanSecret("etcd-1"), op, expectedSavePlan(op, adapter))
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
@@ -920,7 +920,7 @@ func TestReconcileSave_PlanFailureMarksFailed(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	secret := withFailedPlan(newPlanSecret("etcd-1"), expectedSavePlan(op, adapter))
+	secret := withFailedPlan(newPlanSecret("etcd-1"), op, expectedSavePlan(op, adapter))
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
@@ -943,7 +943,7 @@ func TestReconcileSave_AppliesSnapshotArgs(t *testing.T) {
 	// Pre-populate so the test traverses the "applied" branch without needing additional poll
 	// cycles — we're asserting on the *plan content* not the wait behavior here.
 	expectedPlan := expectedSavePlan(op, adapter)
-	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedPlan)
+	secret := withAppliedPlan(newPlanSecret("etcd-1"), op, expectedPlan)
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
@@ -965,7 +965,7 @@ func TestReconcileRestart_MarksSucceededWhenApplied(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	secret := withAppliedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(op, adapter))
+	secret := withAppliedPlan(newPlanSecret("etcd-1"), op, expectedRestartPlan(op, adapter))
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
@@ -1003,7 +1003,7 @@ func TestReconcileRestart_PlanFailureMarksFailed(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	secret := withFailedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(op, adapter))
+	secret := withFailedPlan(newPlanSecret("etcd-1"), op, expectedRestartPlan(op, adapter))
 	h := &handler{
 		secrets: newSecretClient(t, ctrl, secret),
 	}
@@ -1022,7 +1022,7 @@ func TestReconcileRestart_FiltersToEtcdSecrets(t *testing.T) {
 	op := newOp()
 	adapter := defaultAdapter()
 
-	etcd := withAppliedPlan(newPlanSecret("etcd-1"), expectedRestartPlan(op, adapter))
+	etcd := withAppliedPlan(newPlanSecret("etcd-1"), op, expectedRestartPlan(op, adapter))
 	worker := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "worker-1",
@@ -1046,43 +1046,6 @@ func TestReconcileRestart_FiltersToEtcdSecrets(t *testing.T) {
 	// Worker secret must be ignored — only etcd nodes receive the restart plan; success would
 	// not be reached if the worker were included (its plan is not in "applied" state).
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, got.Phase, "non-etcd secrets must not be in the iteration")
-}
-
-// TestAssignedPlansAreOperationScoped covers the property the assigned plans depend on: AssignPlan
-// only writes a plan whose bytes differ from the one already on the secret, and the system-agent only
-// re-runs a plan whose content changed. Two saves of the same shape must therefore serialize
-// differently, otherwise a save retried after a failed one would be reported as already applied and
-// succeed without ever taking a snapshot.
-func TestAssignedPlansAreOperationScoped(t *testing.T) {
-	t.Parallel()
-
-	adapter := defaultAdapter()
-
-	opWithUID := func(uid types.UID) *opv1alpha1.ETCDSnapshotSave {
-		op := newOp()
-		op.UID = uid
-		return op
-	}
-
-	for name, build := range map[string]func(*opv1alpha1.ETCDSnapshotSave) *planapi.Plan{
-		"save":    func(op *opv1alpha1.ETCDSnapshotSave) *planapi.Plan { return expectedSavePlan(op, adapter) },
-		"restart": func(op *opv1alpha1.ETCDSnapshotSave) *planapi.Plan { return expectedRestartPlan(op, adapter) },
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			marshal := func(uid types.UID) string {
-				data, err := json.Marshal(build(opWithUID(uid)))
-				assert.NoError(t, err)
-				return string(data)
-			}
-
-			assert.NotEqual(t, marshal("save-uid-1"), marshal("save-uid-2"),
-				"plans for two operations must not serialize identically, or the second is reported as already applied")
-			assert.Equal(t, marshal("save-uid-1"), marshal("save-uid-1"),
-				"plans for one operation must serialize identically across reconciles")
-		})
-	}
 }
 
 func TestOnChange_StablePausedOperation(t *testing.T) {
@@ -2309,7 +2272,7 @@ func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T
 
 	var events []string
 	secrets := &fakePlanSecrets{events: &events, items: []*corev1.Secret{
-		withDispatchedPlan(t, newPlanSecret("node-a"), op),
+		withDispatchedPlan(newPlanSecret("node-a"), op),
 	}}
 	beacons := &fakeBeaconClient{beacon: s.beacon, events: &events}
 
@@ -2327,19 +2290,9 @@ func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T
 	assert.Equal(t, "true", secrets.updates[0].Annotations[planapi.PlanCanceledAnnotation])
 }
 
-// withDispatchedPlan returns a copy of secret holding a plan this operation dispatched, i.e. one
-// stamped with the operation environment the way the step reconcilers assign it.
-func withDispatchedPlan(t *testing.T, secret *corev1.Secret, op *opv1alpha1.ETCDSnapshotSave) *corev1.Secret {
-	t.Helper()
-
+// withDispatchedPlan returns a copy of secret holding a plan this operation dispatched and the agent
+// is still running.
+func withDispatchedPlan(secret *corev1.Secret, op *opv1alpha1.ETCDSnapshotSave) *corev1.Secret {
 	nodePlan := &planapi.Plan{OneTimeInstructions: []planapi.OneTimeInstruction{{Name: "work", Command: "rke2"}}}
-	data, err := json.Marshal(ops.WithOperationEnv(nodePlan, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.ETCDSnapshotSaveStepRestart)))
-	require.NoError(t, err)
-
-	out := secret.DeepCopy()
-	if out.Data == nil {
-		out.Data = map[string][]byte{}
-	}
-	out.Data[planapi.PlanDataKey] = data
-	return out
+	return withAssignedPlan(secret, op, nodePlan, planapi.PlanStateInProgress)
 }

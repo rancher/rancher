@@ -713,8 +713,6 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 	concurrency := len(secrets)
 	results := make([]plan.PlanStatus, 0, concurrency)
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
@@ -741,7 +739,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, s.ownerKey, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -813,8 +811,6 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 	concurrency := 1
 	results := make([]plan.PlanStatus, 0, concurrency)
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-
 	for _, secret := range secrets {
 		probes, err := s.adapter.RenderProbes(secret, true)
 		if err != nil {
@@ -835,7 +831,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 			Probes: probes,
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, s.ownerKey, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -916,8 +912,8 @@ type terminalPhase struct {
 // An operation which no longer holds the beacon has none of that left to do: see
 // beaconOptional. It terminates without the beacon being written to at all, which is what
 // keeps an operation that lost its claim from reaching into whichever one holds it now.
-// beforeRelease still runs for it: what it does is scoped to the plans this operation
-// itself dispatched, so it cannot disturb the operation that holds the beacon now either.
+// beforeRelease still runs for it, so anything it does that writes to the cluster has to check
+// the claim itself, as cancelDispatchedPlans does.
 func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotSaveStatus, phase terminalPhase) (opv1alpha1.ETCDSnapshotSaveStatus, error) {
 	logrus.Tracef("[etcdsnapshotsave] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
 
@@ -980,15 +976,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotSaveSta
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
-
-		// Cancellation has to reach the cluster and not just the operation's status: a plan already
-		// handed to an agent is the agent's to run, and the beacon is about to be released to
-		// whichever operation is next in line. Canceling those plans while this operation is still
-		// the authorized writer is what stops the two overlapping.
-		beforeRelease: func(s *scope) error {
-			_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op)
-			return err
-		},
+		beforeRelease:  h.cancelDispatchedPlans,
 	})
 }
 
@@ -999,7 +987,25 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotSaveStatu
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
 		beaconOptional: true,
+
+		// A failed operation stops what it started too: a plan it dispatched may still be running when
+		// the failure is decided, such as on the other nodes of a step that failed on one of them.
+		beforeRelease: h.cancelDispatchedPlans,
 	})
+}
+
+// cancelDispatchedPlans asks the agents to stop the plans this operation dispatched which are still
+// running, before the beacon is released to whichever operation is next in line.
+//
+// An operation's terminal outcome has to reach the cluster and not just its status: a plan already
+// handed to an agent is the agent's to run, so releasing the beacon on the strength of the status
+// alone would let the next operation start while this one's instructions were still executing.
+// Canceling those plans while this operation is still the authorized writer is what stops the two
+// overlapping. An operation that no longer holds the beacon writes nothing; see
+// ops.CancelDispatchedPlans.
+func (h *handler) cancelDispatchedPlans(s *scope) error {
+	_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op, s.ownerKey, s.beacon)
+	return err
 }
 
 // handleSucceeded handles the Succeeded terminal phase. On the owner path it also nudges the parent

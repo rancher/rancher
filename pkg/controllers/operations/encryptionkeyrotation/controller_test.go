@@ -38,6 +38,9 @@ type stubAdapter struct {
 	waitForRegisterErr error
 	pauseCalls         []bool
 	pauseErr           error
+
+	// leader is the secret FindOrElectLeader serves.
+	leader *corev1.Secret
 }
 
 func (a *stubAdapter) BeaconRef() (string, string) { return "test-namespace", "test-cluster" }
@@ -100,7 +103,7 @@ func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string {
 }
 
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
-	return nil, nil
+	return a.leader, nil
 }
 
 func (a *stubAdapter) PauseCluster(paused bool) error {
@@ -2444,13 +2447,13 @@ func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T
 	}
 }
 
-// withDispatchedPlan returns a copy of secret holding a plan this operation dispatched, i.e. one
-// stamped with the operation environment the way the step reconcilers assign it.
+// withDispatchedPlan returns a copy of secret holding a plan this operation dispatched and the agent
+// is still running.
 func withDispatchedPlan(t *testing.T, secret *corev1.Secret, op *opv1alpha1.EncryptionKeyRotation) *corev1.Secret {
 	t.Helper()
 
 	nodePlan := &plan.Plan{OneTimeInstructions: []plan.OneTimeInstruction{{Name: "work", Command: "rke2"}}}
-	data, err := json.Marshal(ops.WithOperationEnv(nodePlan, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.EncryptionKeyRotationStepRestart)))
+	data, err := json.Marshal(nodePlan)
 	if err != nil {
 		t.Fatalf("marshalling the dispatched plan: %v", err)
 	}
@@ -2459,7 +2462,12 @@ func withDispatchedPlan(t *testing.T, secret *corev1.Secret, op *opv1alpha1.Encr
 	if out.Data == nil {
 		out.Data = map[string][]byte{}
 	}
+	if out.Annotations == nil {
+		out.Annotations = map[string]string{}
+	}
 	out.Data[plan.PlanDataKey] = data
+	out.Data[plan.PlanStateKey] = []byte(plan.PlanStateInProgress)
+	out.Annotations[plan.PlanWriterAnnotation] = ops.BeaconOwnerKey(OperationKind, op)
 	return out
 }
 

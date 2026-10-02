@@ -3,7 +3,6 @@ package certificaterotation
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -822,7 +821,10 @@ func TestReconcileRotate_DataDirectoryErrorReturnsBeforePlanAssignment(t *testin
 	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, got.Phase)
 }
 
-func TestReconcileRotate_AssignedPlanCarriesOperationEnvOnce(t *testing.T) {
+// The plan is assigned as the operation, which is what the machine-plan webhook checks against the
+// beacon and what tells this rotation's plan from the next one's; nothing about the operation is
+// put into the plan the agent runs.
+func TestReconcileRotate_AssignsPlanAsTheOperation(t *testing.T) {
 	t.Parallel()
 
 	secret := &corev1.Secret{
@@ -862,6 +864,7 @@ func TestReconcileRotate_AssignedPlanCarriesOperationEnvOnce(t *testing.T) {
 	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
 
 	s := &scope{
+		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
 		op:         op,
 		namespace:  "fleet-default",
 		clusterObj: cluster,
@@ -879,20 +882,42 @@ func TestReconcileRotate_AssignedPlanCarriesOperationEnvOnce(t *testing.T) {
 	if !assert.NotNil(t, assigned, "AssignPlan must have been called") {
 		return
 	}
+	assert.Equal(t, s.ownerKey, assigned.Annotations[plan.PlanWriterAnnotation])
+	assert.Equal(t, string(plan.PlanStatePending), string(assigned.Data[plan.PlanStateKey]))
 
 	var assignedPlan plan.Plan
 	require.NoError(t, json.Unmarshal(assigned.Data["plan"], &assignedPlan))
 	require.NotEmpty(t, assignedPlan.OneTimeInstructions)
-
-	wantEnv := fmt.Sprintf("CERTIFICATE_ROTATION_OPERATION_UID=%s", op.UID)
 	for _, instr := range assignedPlan.OneTimeInstructions {
-		count := 0
 		for _, e := range instr.Env {
-			if e == wantEnv {
-				count++
-			}
+			assert.NotContains(t, e, string(op.UID), "instruction %q must not carry the operation", instr.Name)
 		}
-		assert.Equal(t, 1, count, "instruction %q must carry the operation env exactly once", instr.Name)
+	}
+
+	// Once this rotation's plan has succeeded, the next rotation must have its own run rather than be
+	// reported on this one's outcome.
+	succeeded := assigned.DeepCopy()
+	succeeded.Data[plan.PlanStateKey] = []byte(plan.PlanStateSucceeded)
+	succeeded.Data["probe-statuses"] = []byte(`{"x":{"healthy":true}}`)
+	succeeded.Annotations[plan.PlanProbesPassedAnnotation] = "applied"
+
+	next := &opv1alpha1.CertificateRotation{ObjectMeta: metav1.ObjectMeta{UID: "next-operation-uid"}}
+	nextSecrets := ctrlfake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	nextSecrets.EXPECT().List(gomock.Any(), gomock.Any()).Return(&corev1.SecretList{Items: []corev1.Secret{*succeeded}}, nil)
+	var reassigned *corev1.Secret
+	nextSecrets.EXPECT().Update(gomock.Any()).DoAndReturn(func(s *corev1.Secret) (*corev1.Secret, error) {
+		reassigned = s
+		return s, nil
+	})
+	h = &handler{secrets: nextSecrets, store: plan.NewStore(nextSecrets)}
+	s.op, s.ownerKey = next, ops.BeaconOwnerKey(OperationKind, next)
+
+	got, err = h.reconcileRotate(s, status)
+	require.NoError(t, err)
+	assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, got.Step, "the next rotation waits on its own plan")
+	if assert.NotNil(t, reassigned, "the next rotation must assign its own plan") {
+		assert.Equal(t, s.ownerKey, reassigned.Annotations[plan.PlanWriterAnnotation])
+		assert.Equal(t, string(plan.PlanStatePending), string(reassigned.Data[plan.PlanStateKey]))
 	}
 }
 
@@ -1372,18 +1397,21 @@ func (f *fakePlanSecrets) Update(secret *corev1.Secret) (*corev1.Secret, error) 
 	return secret, nil
 }
 
-// dispatchedPlanSecret builds a machine-plan secret holding a plan this operation dispatched, i.e.
-// one stamped with the operation environment the way reconcileRotate assigns it.
+// dispatchedPlanSecret builds a machine-plan secret holding a plan this operation dispatched and the
+// agent is still running.
 func dispatchedPlanSecret(t *testing.T, name string, op *opv1alpha1.CertificateRotation) corev1.Secret {
 	t.Helper()
 
 	nodePlan := &plan.Plan{OneTimeInstructions: []plan.OneTimeInstruction{{Name: "rotate", Command: "rke2"}}}
-	data, err := json.Marshal(ops.WithOperationEnv(nodePlan, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.CertificateRotationStepRotate)))
+	data, err := json.Marshal(nodePlan)
 	require.NoError(t, err)
 
 	return corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "fleet-default", UID: types.UID(name)},
-		Data:       map[string][]byte{plan.PlanDataKey: data},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name, Namespace: "fleet-default", UID: types.UID(name),
+			Annotations: map[string]string{plan.PlanWriterAnnotation: ops.BeaconOwnerKey(OperationKind, op)},
+		},
+		Data: map[string][]byte{plan.PlanDataKey: data, plan.PlanStateKey: []byte(plan.PlanStateInProgress)},
 	}
 }
 

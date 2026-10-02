@@ -5,7 +5,31 @@ import (
 
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
+
+// BeaconRefForSecret returns the namespace and name of the beacon governing writes to the plan on a
+// machine-plan secret, and false if the secret does not name the cluster it belongs to.
+//
+// A cluster's beacon lives in the same namespace as its machine-plan secrets and carries the
+// cluster's name, which every machine-plan secret records under rke.cattle.io/cluster-name. That
+// holds for each kind of cluster operations run against: an imported cluster's beacon and secrets
+// are in the namespace named after the management cluster, and a CAPR or CAPRKE2 cluster's are in
+// the namespace of its control plane, which shares the cluster's name. It is also the label
+// NewCollector selects a cluster's secrets by, so it is present on every secret a plan is assigned to.
+//
+// Resolving the beacon from the secret alone is what lets the machine-plan webhook check the writer
+// of a plan (see PlanWriterAnnotation) without any lookup beyond the beacon itself.
+func BeaconRefForSecret(secret *corev1.Secret) (namespace, name string, ok bool) {
+	if secret == nil {
+		return "", "", false
+	}
+	name = secret.Labels[labelClusterName]
+	if name == "" {
+		return "", "", false
+	}
+	return secret.Namespace, name, true
+}
 
 // AcquireBeacon acquires a beacon if it is not already owned by the desired owner.
 // If the beacon is already owned by the desired owner, it is returned.
