@@ -927,7 +927,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: could not read preflight check output for %s/%s",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-				status.MarkFailed(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("could not read preflight check output for %s/%s", secret.Namespace, secret.Name))
+				status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("could not read preflight check output for %s/%s", secret.Namespace, secret.Name))
 
 				return status, nil
 			}
@@ -938,7 +938,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: preflight check output for %s/%s does not match snapshot token hash",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-				status.MarkFailed(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
+				status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("preflight check output for %s/%s does not match snapshot token hash", secret.Namespace, secret.Name))
 
 				return status, nil
 			}
