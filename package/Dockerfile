@@ -61,7 +61,7 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
       sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat openssl
-RUN RUN zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+RUN zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
     rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
     zypper --installroot /chroot -n in -r pkgs kubectl-1.37
 RUN zypper --installroot /chroot clean -a && \
