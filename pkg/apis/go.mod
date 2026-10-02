@@ -43,7 +43,7 @@ require (
 	github.com/rancher/gke-operator v1.16.0-rc.1
 	github.com/rancher/norman v0.10.1
 	github.com/rancher/rancher/pkg/plan v0.0.0-20260428222332-2696373f4152
-	github.com/rancher/wrangler/v3 v3.8.0-rc.1
+	github.com/rancher/wrangler/v3 v3.8.0-rc.2
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
 	k8s.io/api v0.37.1
