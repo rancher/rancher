@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	applyconfigurationrkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type RKEClusterInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*rkecattleiov1.RKEClusterList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKECluster, err error)
+	Apply(ctx context.Context, rKECluster *applyconfigurationrkecattleiov1.RKEClusterApplyConfiguration, opts metav1.ApplyOptions) (result *rkecattleiov1.RKECluster, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, rKECluster *applyconfigurationrkecattleiov1.RKEClusterApplyConfiguration, opts metav1.ApplyOptions) (result *rkecattleiov1.RKECluster, err error)
 	RKEClusterExpansion
 }
 
 // rKEClusters implements RKEClusterInterface
 type rKEClusters struct {
-	*gentype.ClientWithList[*rkecattleiov1.RKECluster, *rkecattleiov1.RKEClusterList]
+	*gentype.ClientWithListAndApply[*rkecattleiov1.RKECluster, *rkecattleiov1.RKEClusterList, *applyconfigurationrkecattleiov1.RKEClusterApplyConfiguration]
 }
 
 // newRKEClusters returns a RKEClusters
 func newRKEClusters(c *RkeV1Client, namespace string) *rKEClusters {
 	return &rKEClusters{
-		gentype.NewClientWithList[*rkecattleiov1.RKECluster, *rkecattleiov1.RKEClusterList](
+		gentype.NewClientWithListAndApply[*rkecattleiov1.RKECluster, *rkecattleiov1.RKEClusterList, *applyconfigurationrkecattleiov1.RKEClusterApplyConfiguration](
 			"rkeclusters",
 			c.RESTClient(),
 			scheme.ParameterCodec,

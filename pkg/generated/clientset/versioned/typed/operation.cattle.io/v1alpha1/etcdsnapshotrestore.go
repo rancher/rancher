@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	operationcattleiov1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	applyconfigurationoperationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/operation.cattle.io/v1alpha1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type ETCDSnapshotRestoreInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*operationcattleiov1alpha1.ETCDSnapshotRestoreList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *operationcattleiov1alpha1.ETCDSnapshotRestore, err error)
+	Apply(ctx context.Context, eTCDSnapshotRestore *applyconfigurationoperationcattleiov1alpha1.ETCDSnapshotRestoreApplyConfiguration, opts v1.ApplyOptions) (result *operationcattleiov1alpha1.ETCDSnapshotRestore, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, eTCDSnapshotRestore *applyconfigurationoperationcattleiov1alpha1.ETCDSnapshotRestoreApplyConfiguration, opts v1.ApplyOptions) (result *operationcattleiov1alpha1.ETCDSnapshotRestore, err error)
 	ETCDSnapshotRestoreExpansion
 }
 
 // eTCDSnapshotRestores implements ETCDSnapshotRestoreInterface
 type eTCDSnapshotRestores struct {
-	*gentype.ClientWithList[*operationcattleiov1alpha1.ETCDSnapshotRestore, *operationcattleiov1alpha1.ETCDSnapshotRestoreList]
+	*gentype.ClientWithListAndApply[*operationcattleiov1alpha1.ETCDSnapshotRestore, *operationcattleiov1alpha1.ETCDSnapshotRestoreList, *applyconfigurationoperationcattleiov1alpha1.ETCDSnapshotRestoreApplyConfiguration]
 }
 
 // newETCDSnapshotRestores returns a ETCDSnapshotRestores
 func newETCDSnapshotRestores(c *OperationV1alpha1Client, namespace string) *eTCDSnapshotRestores {
 	return &eTCDSnapshotRestores{
-		gentype.NewClientWithList[*operationcattleiov1alpha1.ETCDSnapshotRestore, *operationcattleiov1alpha1.ETCDSnapshotRestoreList](
+		gentype.NewClientWithListAndApply[*operationcattleiov1alpha1.ETCDSnapshotRestore, *operationcattleiov1alpha1.ETCDSnapshotRestoreList, *applyconfigurationoperationcattleiov1alpha1.ETCDSnapshotRestoreApplyConfiguration](
 			"etcdsnapshotrestores",
 			c.RESTClient(),
 			scheme.ParameterCodec,

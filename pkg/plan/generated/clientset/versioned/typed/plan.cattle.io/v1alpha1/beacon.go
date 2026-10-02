@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	plancattleiov1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
+	applyconfigurationplancattleiov1alpha1 "github.com/rancher/rancher/pkg/plan/generated/applyconfiguration/plan.cattle.io/v1alpha1"
 	scheme "github.com/rancher/rancher/pkg/plan/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type BeaconInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*plancattleiov1alpha1.BeaconList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *plancattleiov1alpha1.Beacon, err error)
+	Apply(ctx context.Context, beacon *applyconfigurationplancattleiov1alpha1.BeaconApplyConfiguration, opts v1.ApplyOptions) (result *plancattleiov1alpha1.Beacon, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, beacon *applyconfigurationplancattleiov1alpha1.BeaconApplyConfiguration, opts v1.ApplyOptions) (result *plancattleiov1alpha1.Beacon, err error)
 	BeaconExpansion
 }
 
 // beacons implements BeaconInterface
 type beacons struct {
-	*gentype.ClientWithList[*plancattleiov1alpha1.Beacon, *plancattleiov1alpha1.BeaconList]
+	*gentype.ClientWithListAndApply[*plancattleiov1alpha1.Beacon, *plancattleiov1alpha1.BeaconList, *applyconfigurationplancattleiov1alpha1.BeaconApplyConfiguration]
 }
 
 // newBeacons returns a Beacons
 func newBeacons(c *PlanV1alpha1Client, namespace string) *beacons {
 	return &beacons{
-		gentype.NewClientWithList[*plancattleiov1alpha1.Beacon, *plancattleiov1alpha1.BeaconList](
+		gentype.NewClientWithListAndApply[*plancattleiov1alpha1.Beacon, *plancattleiov1alpha1.BeaconList, *applyconfigurationplancattleiov1alpha1.BeaconApplyConfiguration](
 			"beacons",
 			c.RESTClient(),
 			scheme.ParameterCodec,

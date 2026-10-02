@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	catalogcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
+	catalogcattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/catalog.cattle.io/v1"
+	typedcatalogcattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeClusterRepos implements ClusterRepoInterface
 type fakeClusterRepos struct {
-	*gentype.FakeClientWithList[*v1.ClusterRepo, *v1.ClusterRepoList]
+	*gentype.FakeClientWithListAndApply[*v1.ClusterRepo, *v1.ClusterRepoList, *catalogcattleiov1.ClusterRepoApplyConfiguration]
 	Fake *FakeCatalogV1
 }
 
-func newFakeClusterRepos(fake *FakeCatalogV1) catalogcattleiov1.ClusterRepoInterface {
+func newFakeClusterRepos(fake *FakeCatalogV1) typedcatalogcattleiov1.ClusterRepoInterface {
 	return &fakeClusterRepos{
-		gentype.NewFakeClientWithList[*v1.ClusterRepo, *v1.ClusterRepoList](
+		gentype.NewFakeClientWithListAndApply[*v1.ClusterRepo, *v1.ClusterRepoList, *catalogcattleiov1.ClusterRepoApplyConfiguration](
 			fake.Fake,
 			"",
 			v1.SchemeGroupVersion.WithResource("clusterrepos"),

@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	catalogcattleiov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	applyconfigurationcatalogcattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/catalog.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type AppInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*catalogcattleiov1.AppList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *catalogcattleiov1.App, err error)
+	Apply(ctx context.Context, app *applyconfigurationcatalogcattleiov1.AppApplyConfiguration, opts metav1.ApplyOptions) (result *catalogcattleiov1.App, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, app *applyconfigurationcatalogcattleiov1.AppApplyConfiguration, opts metav1.ApplyOptions) (result *catalogcattleiov1.App, err error)
 	AppExpansion
 }
 
 // apps implements AppInterface
 type apps struct {
-	*gentype.ClientWithList[*catalogcattleiov1.App, *catalogcattleiov1.AppList]
+	*gentype.ClientWithListAndApply[*catalogcattleiov1.App, *catalogcattleiov1.AppList, *applyconfigurationcatalogcattleiov1.AppApplyConfiguration]
 }
 
 // newApps returns a Apps
 func newApps(c *CatalogV1Client, namespace string) *apps {
 	return &apps{
-		gentype.NewClientWithList[*catalogcattleiov1.App, *catalogcattleiov1.AppList](
+		gentype.NewClientWithListAndApply[*catalogcattleiov1.App, *catalogcattleiov1.AppList, *applyconfigurationcatalogcattleiov1.AppApplyConfiguration](
 			"apps",
 			c.RESTClient(),
 			scheme.ParameterCodec,
