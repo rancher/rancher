@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -57,17 +58,28 @@ func newCRTBHandler(uc *config.UserContext) (*crtbHandler, error) {
 
 // OnChange ensures that the correct ClusterRoleBinding exists for the ClusterRoleTemplateBinding
 func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+
+	logrus.Debugf("ZZZZZZ rbac/rt/CRTB onchange %q", key)
+
 	if crtb == nil || crtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
+		logrus.Debugf("ZZZZZZ rbac/rt/CRTB onchange %q, skip (missing || in deletion || no aggregation", key)
 		return nil, nil
 	}
 
 	// Only run this controller if the CRTB is for this cluster
 	if crtb.ClusterName != c.clusterName {
+		logrus.Debugf("ZZZZZZ rbac/rt/CRTB onchange %q, skip, cluster mismatch (have %q need %q)",
+			key, crtb.ClusterName, c.clusterName)
 		return nil, nil
 	}
 
+	defer func() {
+		logrus.Debugf("ZZZZZZ rbac/rt/CRTB updated %q - reconcile done", key)
+	}()
+
 	remoteConditions := []metav1.Condition{}
 	if err := c.reconcileBindings(crtb, &remoteConditions); err != nil {
+		logrus.Debugf("ZZZZZZ rbac/rt/CRTB onchange %q, FAIL reconcile bindings: %v, save", key, err)
 		return nil, errors.Join(err, c.updateStatus(crtb, remoteConditions))
 	}
 
@@ -75,9 +87,10 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 	var err error
 	if crtb.UserName != "" {
 		err = c.impersonationHandler.ensureServiceAccountImpersonator(crtb.UserName)
+		logrus.Debugf("ZZZZZZ rbac/rt/CRTB onchange %q, impersonate: %v", key, err)
 		c.s.AddCondition(&remoteConditions, metav1.Condition{Type: ensureServiceAccountImpersonator}, serviceAccountImpersonatorExists, err)
 	}
-
+	logrus.Debugf("ZZZZZZ rbac/rt/CRTB onchange %q - save", key)
 	return crtb, errors.Join(err, c.updateStatus(crtb, remoteConditions))
 }
 
@@ -156,21 +169,27 @@ var timeNow = func() time.Time {
 }
 
 func (c *crtbHandler) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remoteConditions []metav1.Condition) error {
+	logrus.Debugf("ZZZZZZ rbac/rt/CRTB update status %q, cond=((%v))", crtb.Name, remoteConditions)
+
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		crtbFromCluster, err := c.crtbCache.Get(crtb.Namespace, crtb.Name)
 		if err != nil {
+			logrus.Debugf("ZZZZZZ rbac/rt/CRTB update status %q, get FAIL: %v", crtb.Name, err)
 			return err
 		}
 		if status.CompareConditions(crtbFromCluster.Status.RemoteConditions, remoteConditions) {
+			logrus.Debugf("ZZZZZZ rbac/rt/CRTB update status %q, skip, conditions unchanged", crtb.Name)
 			return nil
 		}
 
 		crtbFromCluster.Status.SummaryRemote = status.SummaryCompleted
 		if crtbFromCluster.Status.SummaryLocal == status.SummaryCompleted {
+			logrus.Debugf("ZZZZZZ rbac/rt/CRTB update status %q, summary complete (remote & local complete)", crtb.Name)
 			crtbFromCluster.Status.Summary = status.SummaryCompleted
 		}
 		for _, c := range remoteConditions {
 			if c.Status != metav1.ConditionTrue {
+				logrus.Debugf("ZZZZZZ rbac/rt/CRTB update status %q, summary error, remote error", crtb.Name)
 				crtbFromCluster.Status.Summary = status.SummaryError
 				crtbFromCluster.Status.SummaryRemote = status.SummaryError
 				break
@@ -181,9 +200,8 @@ func (c *crtbHandler) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remoteCo
 		crtbFromCluster.Status.ObservedGenerationRemote = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.RemoteConditions = remoteConditions
 		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
-		if err != nil {
-			return err
-		}
-		return nil
+
+		logrus.Debugf("ZZZZZZ rbac/rt/CRTB update status %q, result: %v", crtb.Name, err)
+		return err
 	})
 }
