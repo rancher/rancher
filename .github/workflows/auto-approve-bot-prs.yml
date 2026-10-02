@@ -44,11 +44,13 @@ jobs:
           fi
 
           today=$(date -u +%F)
+          renovate_bot_login="${RENOVATE_BOT_USERNAME#app/}"
+          [[ "$renovate_bot_login" == *"[bot]" ]] || renovate_bot_login+="[bot]"
           eligible_prs=()
           if ! pr_list_json=$(gh pr list --repo "$REPO" --state open \
             --author "$RENOVATE_BOT_USERNAME" \
             --limit 100 \
-            --json number,state,body,autoMergeRequest,headRepository,headRefName,author,createdAt \
+            --json number,state,autoMergeRequest,headRepository,headRefName,author,createdAt \
             --jq 'sort_by(.createdAt)[] | @json'); then
             echo "Failed to get open Renovate PRs from $REPO."
             exit 1
@@ -63,7 +65,6 @@ jobs:
           while IFS= read -r pr_json; do
             pr_number=$(jq -r '.number' <<<"$pr_json")
             head_ref=$(jq -r '.headRefName' <<<"$pr_json")
-            pr_body=$(jq -r '.body // ""' <<<"$pr_json")
 
             if [[ $(jq -r '.state' <<<"$pr_json") != "OPEN" ||
                   $(jq -r '.autoMergeRequest' <<<"$pr_json") == "null" ||
@@ -72,7 +73,13 @@ jobs:
                   "$head_ref" != renovate/* ]]; then
               continue
             fi
-            if ! [[ "$pr_body" =~ \*\*[[:space:]]*Automerge[[:space:]]*\*\*[[:space:]]*:[[:space:]]*Enabled[[:space:]]*\.? ]]; then
+
+            if ! auto_merge_actor=$(gh api "repos/$REPO/pulls/$pr_number" \
+              --jq '.auto_merge.enabled_by.login // ""'); then
+              echo "Could not read auto-merge enabler for PR #$pr_number."
+              continue
+            fi
+            if [[ "$auto_merge_actor" != "$renovate_bot_login" ]]; then
               continue
             fi
 
