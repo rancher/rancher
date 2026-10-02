@@ -1217,7 +1217,9 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 
 		return status.DownloadTime != prevDownloadTime, nil
 	})
-
+	if err != nil {
+		logrus.Errorf("Error while downloading ClusterRepo %s from catalog: %v. \n CR: \n %v", ClusterRepoName, err, clusterRepo)
+	}
 	return clusterRepo, err
 }
 
