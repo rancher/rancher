@@ -42,8 +42,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
-	"github.com/rancher/rancher/pkg/user"
-	"github.com/rancher/rancher/pkg/wrangler"
+	usertypes "github.com/rancher/rancher/pkg/user/types"
 	steve "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac"
@@ -75,7 +74,7 @@ type ScaledContext struct {
 	AccessControl     types.AccessControl
 	Dialer            dialer.Factory
 	SystemTokens      systemtokens.Interface
-	UserManager       user.Manager
+	UserManager       usertypes.Manager
 	PeerManager       peermanager.PeerManager
 
 	Management managementv3.Interface
@@ -84,7 +83,7 @@ type ScaledContext struct {
 	Core       corev1.Interface
 	Storage    storagev1.Interface
 
-	Wrangler          *wrangler.Context
+	Wrangler          *Context
 	RunContext        context.Context
 	managementContext *ManagementContext
 }
@@ -129,7 +128,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 
 	if opts.ControllerFactory == nil {
 		controllerFactoryOpts := controllers.GetOptsFromEnv(controllers.Scaled)
-		controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&context.RESTConfig), wrangler.Scheme, controllerFactoryOpts)
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&context.RESTConfig), Scheme, controllerFactoryOpts)
 		if err != nil {
 			return nil, err
 		}
@@ -188,7 +187,7 @@ type ManagementContext struct {
 	Schemas           *types.Schemas
 	Scheme            *runtime.Scheme
 	Dialer            dialer.Factory
-	UserManager       user.Manager
+	UserManager       usertypes.Manager
 	SystemTokens      systemtokens.Interface
 
 	Management managementv3.Interface
@@ -196,7 +195,7 @@ type ManagementContext struct {
 	RBAC       rbacv1.Interface
 	Core       corev1.Interface
 	Apps       appsv1.Interface
-	Wrangler   *wrangler.Context
+	Wrangler   *Context
 }
 
 // Impersonator allows managing user impersonation for a given cluster
@@ -422,7 +421,7 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 		AddSchemas(clusterSchema.Schemas).
 		AddSchemas(projectSchema.Schemas)
 
-	context.Scheme = wrangler.Scheme
+	context.Scheme = Scheme
 
 	return context, err
 }
@@ -443,7 +442,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	}
 
 	clientFactory, err := client.NewSharedClientFactory(enableProtobuf(&context.RESTConfig), &client.SharedClientFactoryOptions{
-		Scheme: wrangler.Scheme,
+		Scheme: Scheme,
 	})
 	if err != nil {
 		return nil, err
@@ -563,7 +562,7 @@ func (w *UserContext) RegisterExtraControllerFactory(name string, factory contro
 	return nil
 }
 
-func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
+func NewUserOnlyContext(config *Context) (*UserOnlyContext, error) {
 	var err error
 	context := &UserOnlyContext{
 		RESTConfig:        *config.RESTConfig,
