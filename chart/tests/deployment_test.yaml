@@ -769,7 +769,7 @@ tests:
           - name: IMPERATIVE_API_APP_SELECTOR
             value: RELEASE-NAME-rancher
           - name: RANCHER_NAMESPACES_OPTIONS
-            value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"}}"
+            value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"},\"strict\":false}"
           - name: CATTLE_CHARTS_IMAGE
             value: rancher/rancher-assets:stable-tag
 - it: should not add CATTLE_BASE_REGISTRY_PULL_SECRETS to env when imagePullSecrets is empty
