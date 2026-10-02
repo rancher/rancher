@@ -187,3 +187,12 @@ func TestCancelDispatchedPlans(t *testing.T) {
 		assert.Empty(t, secrets.updates)
 	})
 }
+
+func TestPlanFailureMessage(t *testing.T) {
+	const message = "restart failed for ns/node"
+
+	assert.Equal(t, message, PlanFailureMessage(nil, message))
+	assert.Equal(t, message, PlanFailureMessage(&planapi.PlanStatus{Failed: true}, message))
+	assert.Equal(t, message+": the in-progress plan was canceled externally",
+		PlanFailureMessage(&planapi.PlanStatus{Canceled: true}, message))
+}

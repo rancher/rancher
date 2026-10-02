@@ -751,7 +751,7 @@ func (h *handler) reconcileSave(s *scope, status opv1alpha1.ETCDSnapshotSaveStat
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("etcd snapshot save failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("etcd snapshot save failed for %s/%s", secret.Namespace, secret.Name)))
 
 			return status, nil
 		}
@@ -845,7 +845,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.ETCDSnapshotSaveS
 		if planStatus.Failure() {
 			logrus.Errorf("[etcdsnapshotsave] %s/%s: marking operation as failed: failed to apply plan for %s/%s", s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name)))
 
 			return status, nil
 		}

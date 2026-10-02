@@ -120,3 +120,17 @@ func CancelDispatchedPlans(store *planapi.Store, secrets planapi.SecretClient, c
 
 	return canceled, nil
 }
+
+// PlanFailureMessage returns message, the message an operation is failed with because of
+// planStatus, noting when the plan did not fail but was canceled externally while in progress.
+//
+// planapi.PlanStatus.Failure reports both, since neither plan will ever complete, but they call for
+// different follow-up: a failed plan points at the node, while a canceled one points at whoever
+// canceled it. That is never the operation itself, which only cancels its plans once it has been
+// canceled, and by then it is no longer waiting on any of them.
+func PlanFailureMessage(planStatus *planapi.PlanStatus, message string) string {
+	if planStatus == nil || !planStatus.Canceled {
+		return message
+	}
+	return message + ": the in-progress plan was canceled externally"
+}

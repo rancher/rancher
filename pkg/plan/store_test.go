@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -383,4 +384,433 @@ func TestStoreAssignPlan(t *testing.T) {
 			assert.Equal(t, raw, client.updates[0].Data[PlanDataKey], "a retry must not change the plan")
 		})
 	}
+}
+
+// testPlan returns a plan to assign along with its serialized form, which is what AssignPlan compares
+// against the plan already on the secret.
+func testPlan(t *testing.T, command string) (*Plan, []byte) {
+	t.Helper()
+
+	p := &Plan{OneTimeInstructions: []OneTimeInstruction{{CommonInstruction: CommonInstruction{Name: "one", Command: command}}}}
+	raw, err := json.Marshal(p)
+	require.NoError(t, err)
+	return p, raw
+}
+
+// secretWithData returns a secret carrying the given data, already holding raw as its plan.
+func secretWithData(raw []byte, data map[string]string) *corev1.Secret {
+	s := mockSecret("node-alpha")
+	s.Data = map[string][]byte{PlanDataKey: raw}
+	for k, v := range data {
+		s.Data[k] = []byte(v)
+	}
+	s.Annotations = map[string]string{}
+	return s
+}
+
+func TestPlanStatusMethods(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  PlanStatus
+		success bool
+		failure bool
+		waiting bool
+		message string
+	}{
+		{name: "pending", status: PlanStatus{Pending: true}, waiting: true, message: "waiting for plan to be picked up"},
+		{name: "in progress", status: PlanStatus{InProgress: true}, waiting: true, message: "waiting for plan to be applied"},
+		{name: "paused", status: PlanStatus{Paused: true}, waiting: true, message: "plan paused"},
+		{name: "applied awaiting probes", status: PlanStatus{Applied: true}, waiting: true, message: "waiting for probes"},
+		{name: "applied and probes passed", status: PlanStatus{Applied: true, ProbesPassed: true}, success: true, message: "plan successfully applied"},
+		{name: "failing", status: PlanStatus{Failing: true}, waiting: true, message: "waiting for plan to succeed or reach failure limit"},
+		{name: "failing while retry is pending", status: PlanStatus{Failing: true, Pending: true}, waiting: true, message: "waiting for plan to be picked up"},
+		{name: "failed", status: PlanStatus{Failed: true}, failure: true, message: "plan failed to be applied"},
+		{name: "canceled", status: PlanStatus{Canceled: true}, failure: true, message: "plan canceled"},
+		{name: "zero value", status: PlanStatus{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.success, tt.status.Success(), "Success")
+			assert.Equal(t, tt.failure, tt.status.Failure(), "Failure")
+			assert.Equal(t, tt.waiting, tt.status.Waiting(), "Waiting")
+			assert.Equal(t, tt.message, tt.status.String(), "String")
+			// A plan is never both done and still to be waited on, so a caller checking Failure and
+			// then Waiting can never wait on a plan that will not move again.
+			assert.False(t, tt.status.Waiting() && (tt.status.Success() || tt.status.Failure()), "terminal and waiting at once")
+		})
+	}
+}
+
+func TestMessagePausedAndCanceled(t *testing.T) {
+	assert.Equal(t, "waiting for plan applied for node-a, plan paused for node-b & 1 other node, waiting for probes for node-d",
+		Message([]PlanStatus{
+			{Secret: mockSecret("node-d"), Applied: true},
+			{Secret: mockSecret("node-c"), Paused: true},
+			{Secret: mockSecret("node-b"), Paused: true},
+			{Secret: mockSecret("node-a"), InProgress: true},
+			{Secret: mockSecret("node-e"), Canceled: true},
+		}))
+	assert.Equal(t, "", Message([]PlanStatus{{Secret: mockSecret("node-a"), Canceled: true}}), "a canceled plan has nothing left to wait on")
+}
+
+func TestMessageUsesMachineName(t *testing.T) {
+	s := mockSecret("secret-name")
+	s.Labels = map[string]string{planv1alpha1.MachineLifecycleNameLabel: "machine-name"}
+	assert.Equal(t, "waiting for plan applied for machine-name", Message([]PlanStatus{{Secret: s, InProgress: true}}))
+}
+
+func TestStoreAssignPlanNewContent(t *testing.T) {
+	assigned, raw := testPlan(t, "true")
+
+	t.Run("initializes a secret with no data or annotations", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		status, err := NewStore(client).AssignPlan(mockSecret("node-alpha"), assigned, 0, 0)
+		require.NoError(t, err)
+		assert.True(t, status.Pending)
+		require.Len(t, client.updates, 1)
+		written := client.updates[0]
+		assert.Equal(t, raw, written.Data[PlanDataKey])
+		assert.Equal(t, string(PlanStatePending), string(written.Data[PlanStateKey]))
+		assert.NotEmpty(t, written.Annotations[PlanLastUpdatedAnnotation])
+	})
+
+	t.Run("unset failure limits remove the previous plan's", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		secret := secretWithData([]byte("previous"), map[string]string{maxFailuresKey: "5", failureThresholdKey: "5"})
+		_, err := NewStore(client).AssignPlan(secret, assigned, 0, 0)
+		require.NoError(t, err)
+		require.Len(t, client.updates, 1)
+		assert.NotContains(t, client.updates[0].Data, maxFailuresKey)
+		assert.NotContains(t, client.updates[0].Data, failureThresholdKey)
+	})
+
+	t.Run("unlimited failure limits are written", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		_, err := NewStore(client).AssignPlan(mockSecret("node-alpha"), assigned, -1, -1)
+		require.NoError(t, err)
+		require.Len(t, client.updates, 1)
+		assert.Equal(t, "-1", string(client.updates[0].Data[maxFailuresKey]))
+		assert.Equal(t, "-1", string(client.updates[0].Data[failureThresholdKey]))
+	})
+
+	// Stale failure records of an earlier plan with the same hash must not fail a fresh assignment
+	// before the agent has had the chance to run it.
+	t.Run("reports pending regardless of what earlier plans recorded", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		secret := secretWithData([]byte("previous"), map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: PlanHash(raw), failureCountKey: "9",
+		})
+		status, err := NewStore(client).AssignPlan(secret, assigned, 1, 1)
+		require.NoError(t, err)
+		assert.Equal(t, &PlanStatus{Secret: status.Secret, Pending: true}, status)
+	})
+
+	t.Run("does not mutate the secret it was given", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		secret := secretWithData([]byte("previous"), map[string]string{PlanStateKey: string(PlanStateSucceeded)})
+		secret.Annotations[PlanCanceledAnnotation] = "true"
+		_, err := NewStore(client).AssignPlan(secret, assigned, 1, 1)
+		require.NoError(t, err)
+		assert.Equal(t, "previous", string(secret.Data[PlanDataKey]))
+		assert.Equal(t, string(PlanStateSucceeded), string(secret.Data[PlanStateKey]))
+		assert.Equal(t, "true", secret.Annotations[PlanCanceledAnnotation])
+	})
+
+	t.Run("returns the update error", func(t *testing.T) {
+		client := &fakeSecretUpdater{err: errors.New("boom")}
+		status, err := NewStore(client).AssignPlan(mockSecret("node-alpha"), assigned, 1, 1)
+		assert.Error(t, err)
+		assert.Nil(t, status)
+	})
+}
+
+// A follow-up which assigns content byte-identical to the plan already on the secret is not a new
+// plan: it is reported on the strength of whatever the previous assignment left behind, and nothing
+// is written. This is why every operation scopes its plans with ops.WithOperationEnv — and why a
+// follow-up whose plan differs in any way is run afresh.
+func TestStoreAssignPlanFollowUp(t *testing.T) {
+	assigned, raw := testPlan(t, "true")
+	followUp, followUpRaw := testPlan(t, "false")
+
+	for _, previous := range []PlanState{PlanStateSucceeded, PlanStateFailed, PlanStateCanceled, PlanStateInProgress, PlanStatePaused} {
+		t.Run("identical content after "+string(previous)+" is not reassigned", func(t *testing.T) {
+			client := &fakeSecretUpdater{}
+			secret := secretWithData(raw, map[string]string{PlanStateKey: string(previous), failureThresholdKey: "1"})
+			secret.Annotations[PlanCanceledAnnotation] = "true"
+
+			status, err := NewStore(client).AssignPlan(secret, assigned, 1, 1)
+			require.NoError(t, err)
+			assert.Empty(t, client.updates)
+			assert.False(t, status.Pending, "an identical plan is never handed to the agent again")
+		})
+
+		t.Run("distinct content after "+string(previous)+" is reassigned", func(t *testing.T) {
+			client := &fakeSecretUpdater{}
+			secret := secretWithData(raw, map[string]string{
+				PlanStateKey: string(previous), appliedPlanKey: string(raw), probeStatusesKey: `{"p":{"healthy":true}}`,
+				failedChecksumKey: PlanHash(raw), failureCountKey: "1",
+			})
+			secret.Annotations[PlanCanceledAnnotation] = "true"
+			secret.Annotations[PlanProbesPassedAnnotation] = "yes"
+
+			status, err := NewStore(client).AssignPlan(secret, followUp, 1, 1)
+			require.NoError(t, err)
+			assert.Equal(t, &PlanStatus{Secret: status.Secret, Pending: true}, status)
+			require.Len(t, client.updates, 1)
+			written := client.updates[0]
+			assert.Equal(t, followUpRaw, written.Data[PlanDataKey])
+			assert.Equal(t, string(PlanStatePending), string(written.Data[PlanStateKey]))
+			assert.NotContains(t, written.Annotations, PlanCanceledAnnotation, "the follow-up must not inherit the cancellation")
+			assert.Equal(t, "", written.Annotations[PlanProbesPassedAnnotation])
+			assert.NotContains(t, written.Data, probeStatusesKey)
+
+			// Once the agent picks it up, the follow-up is judged on its own outcome: the previous
+			// plan's applied plan and failure records do not describe it.
+			written.Data[PlanStateKey] = []byte(PlanStateInProgress)
+			status, err = NewStore(&fakeSecretUpdater{}).AssignPlan(written, followUp, 1, 1)
+			require.NoError(t, err)
+			assert.Equal(t, &PlanStatus{Secret: status.Secret, InProgress: true}, status)
+		})
+	}
+
+	// Spelled out, as these are the two outcomes a follow-up would be wrongly handed.
+	t.Run("identical content after a cancellation reports canceled", func(t *testing.T) {
+		status, err := NewStore(&fakeSecretUpdater{}).AssignPlan(
+			secretWithData(raw, map[string]string{PlanStateKey: string(PlanStateCanceled)}), assigned, 1, 1)
+		require.NoError(t, err)
+		assert.True(t, status.Canceled)
+		assert.True(t, status.Failure())
+	})
+	t.Run("identical content after a success reports applied", func(t *testing.T) {
+		status, err := NewStore(&fakeSecretUpdater{}).AssignPlan(
+			secretWithData(raw, map[string]string{PlanStateKey: string(PlanStateSucceeded)}), assigned, 1, 1)
+		require.NoError(t, err)
+		assert.True(t, status.Applied)
+	})
+}
+
+func TestStoreAssignPlanRetry(t *testing.T) {
+	fixed := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	now = func() time.Time { return fixed }
+	t.Cleanup(func() { now = time.Now })
+
+	assigned, raw := testPlan(t, "true")
+	checksum := PlanHash(raw)
+
+	t.Run("resets the previous attempt's probes", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		secret := secretWithData(raw, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1",
+			maxFailuresKey: "3", failureThresholdKey: "3", probeStatusesKey: `{"p":{"healthy":true}}`,
+		})
+		secret.Annotations[PlanProbesPassedAnnotation] = "yes"
+
+		status, err := NewStore(client).AssignPlan(secret, assigned, 3, 3)
+		require.NoError(t, err)
+		assert.True(t, status.Pending)
+		assert.True(t, status.Failing)
+		require.Len(t, client.updates, 1)
+		written := client.updates[0]
+		assert.NotContains(t, written.Data, probeStatusesKey)
+		assert.Equal(t, "", written.Annotations[PlanProbesPassedAnnotation])
+		assert.Equal(t, fixed.Format(time.RFC3339), written.Annotations[PlanLastUpdatedAnnotation])
+		assert.Equal(t, "1", string(written.Data[failureCountKey]), "the failure count is the agent's to keep")
+		assert.Equal(t, written, status.Secret, "the status must carry the secret as written")
+	})
+
+	retried := func(t *testing.T, data map[string]string) bool {
+		t.Helper()
+		client := &fakeSecretUpdater{}
+		status, err := NewStore(client).AssignPlan(secretWithData(raw, data), assigned, 3, 3)
+		require.NoError(t, err)
+		assert.True(t, status.Failing, "a plan with attempts left is failing, not failed")
+		assert.False(t, status.Failed)
+		return len(client.updates) == 1 && status.Pending
+	}
+
+	t.Run("retries with unlimited attempts", func(t *testing.T) {
+		assert.True(t, retried(t, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "40",
+			maxFailuresKey: "-1", failureThresholdKey: "-1",
+		}))
+	})
+	t.Run("retries when max-failures is unset", func(t *testing.T) {
+		assert.True(t, retried(t, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "2", failureThresholdKey: "3",
+		}))
+	})
+	t.Run("retries when last-apply-time is unparsable", func(t *testing.T) {
+		assert.True(t, retried(t, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1",
+			maxFailuresKey: "3", failureThresholdKey: "3", lastApplyTimeKey: "yesterday",
+		}))
+	})
+	t.Run("retries exactly once the cooldown has passed", func(t *testing.T) {
+		assert.True(t, retried(t, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1",
+			maxFailuresKey: "3", failureThresholdKey: "3", lastApplyTimeKey: fixed.Add(-failedPlanRetryCooldown).Format(time.UnixDate),
+		}))
+	})
+	// plan-state failed is authoritative even if the failure records belong to another plan.
+	t.Run("counts a failure recorded against another plan as one", func(t *testing.T) {
+		assert.True(t, retried(t, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: "other", failureCountKey: "9",
+			maxFailuresKey: "3", failureThresholdKey: "3",
+		}))
+	})
+
+	t.Run("does not retry a failure recorded against another plan with a threshold of one", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		status, err := NewStore(client).AssignPlan(secretWithData(raw, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: "other", failureCountKey: "9", failureThresholdKey: "1",
+		}), assigned, 1, 1)
+		require.NoError(t, err)
+		assert.True(t, status.Failed)
+		assert.Empty(t, client.updates)
+	})
+
+	t.Run("does not retry a plan that reached its threshold", func(t *testing.T) {
+		client := &fakeSecretUpdater{}
+		status, err := NewStore(client).AssignPlan(secretWithData(raw, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "3",
+			maxFailuresKey: "5", failureThresholdKey: "3",
+		}), assigned, 5, 3)
+		require.NoError(t, err)
+		assert.Equal(t, &PlanStatus{Secret: status.Secret, Failed: true}, status)
+		assert.Empty(t, client.updates)
+	})
+
+	t.Run("returns the update error", func(t *testing.T) {
+		client := &fakeSecretUpdater{err: errors.New("boom")}
+		status, err := NewStore(client).AssignPlan(secretWithData(raw, map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1",
+			maxFailuresKey: "3", failureThresholdKey: "3",
+		}), assigned, 3, 3)
+		assert.Error(t, err)
+		assert.Nil(t, status)
+	})
+
+	// The agent records a retry it has picked up as in-progress; the retry is then reported as both,
+	// and once it succeeds the plan's earlier failures no longer matter.
+	t.Run("a retry runs to success", func(t *testing.T) {
+		secret := secretWithData(raw, map[string]string{
+			PlanStateKey: string(PlanStateInProgress), failedChecksumKey: checksum, failureCountKey: "1",
+			maxFailuresKey: "3", failureThresholdKey: "3",
+		})
+		status, err := NewStore(&fakeSecretUpdater{}).AssignPlan(secret, assigned, 3, 3)
+		require.NoError(t, err)
+		assert.Equal(t, &PlanStatus{Secret: status.Secret, InProgress: true, Failing: true}, status)
+
+		secret.Data[PlanStateKey] = []byte(PlanStateSucceeded)
+		secret.Data[failureCountKey] = []byte("0")
+		secret.Data[failedChecksumKey] = []byte{}
+		secret.Data[probeStatusesKey] = []byte(`{"p":{"healthy":true}}`)
+		secret.Annotations[PlanProbesPassedAnnotation] = "yes"
+		status, err = NewStore(&fakeSecretUpdater{}).AssignPlan(secret, assigned, 3, 3)
+		require.NoError(t, err)
+		assert.True(t, status.Success())
+	})
+}
+
+func TestStoreAssignPlanProbes(t *testing.T) {
+	assigned, raw := testPlan(t, "true")
+
+	tests := []struct {
+		name         string
+		probes       string
+		probesPassed string
+		expected     bool
+	}{
+		{name: "healthy probes that have passed", probes: `{"a":{"healthy":true},"b":{"healthy":true}}`, probesPassed: "yes", expected: true},
+		{name: "one unhealthy probe", probes: `{"a":{"healthy":true},"b":{}}`, probesPassed: "yes"},
+		{name: "healthy probes not yet recorded as passed", probes: `{"a":{"healthy":true}}`},
+		{name: "passed but no probe statuses", probesPassed: "yes"},
+	}
+
+	for _, tt := range tests {
+		for _, state := range []PlanState{PlanStateSucceeded, ""} {
+			t.Run(tt.name+" with plan-state "+string(state), func(t *testing.T) {
+				data := map[string]string{appliedPlanKey: string(raw)}
+				if state != "" {
+					data[PlanStateKey] = string(state)
+				}
+				if tt.probes != "" {
+					data[probeStatusesKey] = tt.probes
+				}
+				secret := secretWithData(raw, data)
+				if tt.probesPassed != "" {
+					secret.Annotations[PlanProbesPassedAnnotation] = tt.probesPassed
+				}
+
+				status, err := NewStore(&fakeSecretUpdater{}).AssignPlan(secret, assigned, 1, 1)
+				require.NoError(t, err)
+				assert.True(t, status.Applied)
+				assert.Equal(t, tt.expected, status.ProbesPassed)
+			})
+		}
+	}
+}
+
+func TestStoreAssignPlanMalformedData(t *testing.T) {
+	assigned, raw := testPlan(t, "true")
+	checksum := PlanHash(raw)
+
+	tests := []struct {
+		name string
+		data map[string]string
+	}{
+		{name: "probe statuses", data: map[string]string{PlanStateKey: string(PlanStateSucceeded), probeStatusesKey: "{"}},
+		{name: "probe statuses in the checksum flow", data: map[string]string{probeStatusesKey: "{"}},
+		{name: "failure count while in progress", data: map[string]string{
+			PlanStateKey: string(PlanStateInProgress), failedChecksumKey: checksum, failureCountKey: "x",
+		}},
+		{name: "failure count of a failed plan", data: map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "x",
+		}},
+		{name: "failure threshold", data: map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1", failureThresholdKey: "x",
+		}},
+		{name: "max failures", data: map[string]string{
+			PlanStateKey: string(PlanStateFailed), failedChecksumKey: checksum, failureCountKey: "1", failureThresholdKey: "3", maxFailuresKey: "x",
+		}},
+		{name: "failure count in the checksum flow", data: map[string]string{failedChecksumKey: checksum, failureCountKey: "x"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := secretWithData(raw, tt.data)
+			secret.Annotations[PlanProbesPassedAnnotation] = "yes"
+			client := &fakeSecretUpdater{}
+			status, err := NewStore(client).AssignPlan(secret, assigned, 3, 3)
+			assert.Error(t, err)
+			assert.Nil(t, status)
+			assert.Empty(t, client.updates)
+		})
+	}
+
+	// Malformed failure records of another plan are never read.
+	t.Run("failure count of another plan", func(t *testing.T) {
+		status, err := NewStore(&fakeSecretUpdater{}).AssignPlan(secretWithData(raw, map[string]string{
+			PlanStateKey: string(PlanStateInProgress), failedChecksumKey: "other", failureCountKey: "x",
+		}), assigned, 3, 3)
+		require.NoError(t, err)
+		assert.True(t, status.InProgress)
+	})
+}
+
+// An agent may write a state this build does not know about yet. It is treated like a secret
+// without plan-state rather than trusted to mean anything in particular.
+func TestStoreAssignPlanUnknownState(t *testing.T) {
+	assigned, raw := testPlan(t, "true")
+
+	status, err := NewStore(&fakeSecretUpdater{}).AssignPlan(
+		secretWithData(raw, map[string]string{PlanStateKey: "from-the-future"}), assigned, 1, 1)
+	require.NoError(t, err)
+	assert.Equal(t, &PlanStatus{Secret: status.Secret, InProgress: true}, status)
+
+	status, err = NewStore(&fakeSecretUpdater{}).AssignPlan(
+		secretWithData(raw, map[string]string{PlanStateKey: "from-the-future", appliedPlanKey: string(raw)}), assigned, 1, 1)
+	require.NoError(t, err)
+	assert.True(t, status.Applied)
 }

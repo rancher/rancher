@@ -760,10 +760,13 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		}
 
 		if planStatus.Failure() {
-			message := fmt.Sprintf(
-				"certificate rotation plan failed for %s/%s; verify the runtime service is healthy before starting another disruptive operation: %s",
-				secret.Namespace, secret.Name, plan.Message([]plan.PlanStatus{*planStatus}),
-			)
+			message := ops.PlanFailureMessage(planStatus, fmt.Sprintf(
+				"certificate rotation plan failed for %s/%s; verify the runtime service is healthy before starting another disruptive operation",
+				secret.Namespace, secret.Name,
+			))
+			if detail := plan.Message([]plan.PlanStatus{*planStatus}); detail != "" {
+				message += ": " + detail
+			}
 
 			logrus.Errorf("[certificaterotation] %s/%s: %s", s.op.Namespace, s.op.Name, message)
 			status.MarkFailed(opv1alpha1.PlanFailedReason, message)
