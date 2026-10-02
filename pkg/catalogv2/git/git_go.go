@@ -582,7 +582,7 @@ func (g *gitGo) remoteSHAChanged(branch, sha string) (bool, error) {
 		logrus.Warnf("Problem creating http client to check git remote sha of repo [%v]: %v", g.URL, err)
 		return true, nil
 	}
-	
+
 	client.Timeout = time.Second * 30
 	defer client.CloseIdleConnections()
 
