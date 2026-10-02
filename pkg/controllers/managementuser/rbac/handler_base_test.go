@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -315,4 +316,33 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestCreateClusterRole(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	assert.NoError(t, settings.InstallUUID.Set("test-install-uuid"))
+
+	rt := &v3.RoleTemplate{
+		ObjectMeta: metav1.ObjectMeta{Name: "rt-test"},
+		Rules: []v1.PolicyRule{
+			{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+		},
+	}
+
+	mock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+	mock.EXPECT().Create(&v1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "rt-test",
+			Annotations: map[string]string{
+				clusterRoleOwner:            "rt-test",
+				clusterRoleOwnerInstallUUID: "test-install-uuid",
+			},
+		},
+		Rules: rt.Rules,
+	})
+
+	m := manager{clusterRoles: mock}
+	err := m.createClusterRole(rt)
+	assert.NoError(t, err)
 }
