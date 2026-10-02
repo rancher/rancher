@@ -9,12 +9,14 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -283,19 +285,16 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset engine state for isolation.
 			appliedVersion = ""
-			SamlProviders[GenericSAMLName] = &Provider{name: GenericSAMLName}
+			providerName := strings.TrimSuffix(client.GenericSAMLConfigType, "Config")
+
+			SamlProviders[providerName] = &Provider{name: providerName}
 			t.Cleanup(func() {
 				delete(SamlProviders, GenericSAMLName)
-				handlerMu.Lock()
-				delete(routeHandlers, "GenericSAMLACS")
-				delete(routeHandlers, "GenericSAMLSLO")
-				delete(routeHandlers, "GenericSAMLSLOGet")
-				delete(routeHandlers, "GenericSAMLMetadata")
-				handlerMu.Unlock()
 			})
 
 			cfg := base()
 			cfg.ResourceVersion = "test-" + string(rune('a'+i))
+			cfg.Type = client.GenericSAMLConfigType
 			tt.mutate(cfg)
 
 			err := InitializeSamlServiceProvider(cfg, GenericSAMLName)
@@ -313,11 +312,11 @@ func TestInitializeSamlServiceProviderGenericSAML(t *testing.T) {
 			assert.Equal(t, tt.wantForce, sp.ForceAuthn)
 
 			handlerMu.RLock()
-			_, acsRegistered := routeHandlers["GenericSAMLACS"]
-			_, metaRegistered := routeHandlers["GenericSAMLMetadata"]
+			_, acsRegistered := routeHandlers["ACS"]
+			_, metaRegistered := routeHandlers["Metadata"]
 			handlerMu.RUnlock()
-			assert.True(t, acsRegistered, "GenericSAMLACS route handler should be registered")
-			assert.True(t, metaRegistered, "GenericSAMLMetadata route handler should be registered")
+			assert.True(t, acsRegistered, "ACS route handler should be registered")
+			assert.True(t, metaRegistered, "Metadata route handler should be registered")
 		})
 	}
 }

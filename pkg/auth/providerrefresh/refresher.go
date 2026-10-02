@@ -21,6 +21,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 )
@@ -33,7 +34,7 @@ type UserAuthRefresher interface {
 func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher {
 	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
 
-	return &refresher{
+	r := &refresher{
 		tokenLister:               scaledContext.Management.Tokens("").Controller().Lister(),
 		tokens:                    scaledContext.Management.Tokens(""),
 		tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
@@ -41,8 +42,12 @@ func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher
 		userAttributes:            scaledContext.Management.UserAttributes(""),
 		userAttributeLister:       scaledContext.Management.UserAttributes("").Controller().Lister(),
 		extTokenStore:             extTokenStore,
+		authConfigs:               scaledContext.Management.AuthConfigs(""),
 		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
 	}
+	r.isDisabledProvider = r.isDisabledProviderFromResource
+
+	return r
 }
 
 type refresher struct {
@@ -57,6 +62,8 @@ type refresher struct {
 	maxAge                    time.Duration
 	extTokenStore             *exttokenstore.SystemStore
 	ensureAndGetUserAttribute func(userID string) (*apiv3.UserAttribute, bool, error)
+	authConfigs               v3.AuthConfigInterface
+	isDisabledProvider        func(string) (bool, error)
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
@@ -270,7 +277,11 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 		assign(&token)
 	}
 
-	for _, providerName := range providers.ProviderNames() {
+	providerNames, err := r.configuredProviderNames()
+	if err != nil {
+		return nil, err
+	}
+	for _, providerName := range providerNames {
 		canAccess, errConfirming, err := r.refreshProvider(attribs, providerName, user, loginTokens, derivedTokens, errorConfirmingLogins)
 		if err != nil {
 			return nil, err
@@ -308,11 +319,12 @@ func (r *refresher) refreshProvider(
 ) (canAccess bool, errConfirming bool, err error) {
 	principalID := GetPrincipalIDForProvider(providerName, user)
 
-	providerDisabled, err := providers.IsDisabledProvider(providerName)
+	providerDisabled, err := r.isDisabledProvider(providerName)
 	if err != nil {
 		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
 		providerDisabled = false
 	}
+
 	if providerDisabled {
 		principalID = ""
 	}
@@ -435,6 +447,19 @@ func (r *refresher) refreshGroupPrincipals(
 	return nil, canRefresh, errConfirming, updatedPrincipalID, nil
 }
 
+func (r *refresher) configuredProviderNames() ([]string, error) {
+	authConfigs, err := r.authConfigs.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing auth configs: %w", err)
+	}
+
+	providerNames := make([]string, 0, len(authConfigs.Items))
+	for _, authConfig := range authConfigs.Items {
+		providerNames = append(providerNames, authConfig.Name)
+	}
+	return providerNames, nil
+}
+
 func GetPrincipalIDForProvider(providerName string, user *apiv3.User) string {
 	prefix := providerName + "_user://"
 	if providerName == "local" {
@@ -450,4 +475,27 @@ func GetPrincipalIDForProvider(providerName string, user *apiv3.User) string {
 	}
 
 	return principalID
+}
+
+func (r *refresher) isDisabledProviderFromResource(provider string) (bool, error) {
+	authConfigObj, err := r.authConfigs.ObjectClient().UnstructuredClient().Get(provider, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve AuthConfig %s: %w", provider, err)
+	}
+	u, ok := authConfigObj.(runtime.Unstructured)
+	if !ok {
+		return false, fmt.Errorf("failed to parse AuthConfig %s: %w", provider, err)
+	}
+
+	// We could use .enabled from the unstructured content but instead this
+	// converts the type to a name to delegate the IsDisabledProvider check to
+	// the actual provider.
+	rawType, ok := u.UnstructuredContent()["type"].(string)
+	if !ok {
+		return false, fmt.Errorf("invalid AuthConfig %s missing type", provider)
+	}
+
+	providerName := providers.NameFromType(rawType)
+
+	return providers.IsDisabledProvider(providerName, provider)
 }

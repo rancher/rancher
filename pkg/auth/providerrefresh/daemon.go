@@ -40,8 +40,10 @@ func StartRefreshDaemon(scaledContext *config.ScaledContext, mgmtContext *config
 			userAttributes:            mgmtContext.Management.UserAttributes(""),
 			userAttributeLister:       mgmtContext.Management.UserAttributes("").Controller().Lister(),
 			extTokenStore:             extTokenStore,
+			authConfigs:               scaledContext.Management.AuthConfigs(""),
 			ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
 		}
+		ref.isDisabledProvider = ref.isDisabledProviderFromResource
 
 		UpdateRefreshMaxAge(maxAge)
 		UpdateRefreshCronTime(refreshCronTime)

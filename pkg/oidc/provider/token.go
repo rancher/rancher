@@ -17,6 +17,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -194,6 +195,7 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 		}
 		return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError, "failed to get Rancher token: %v", err)
 	}
+
 	resp, oidcErr := h.createTokenResponse(rancherToken, oidcClient, session.Nonce, session.Scope)
 
 	return resp, oidcErr
@@ -319,9 +321,15 @@ func (h *tokenHandler) createTokenResponse(rancherToken accessor.TokenAccessor, 
 	if !rancherToken.GetIsEnabled() {
 		return TokenResponse{}, oidcerror.New(oidcerror.AccessDenied, "Rancher token is disabled")
 	}
+
 	authProvider := rancherToken.GetAuthProvider()
 	if authProvider != "" {
-		disabled, err := providers.IsDisabledProvider(authProvider)
+		configName, err := common.ConfigNameFromToken(rancherToken)
+		if err != nil {
+			return TokenResponse{}, oidcerror.Newf(oidcerror.AccessDenied, "parsing auth provider: %v", err)
+		}
+
+		disabled, err := providers.IsDisabledProvider(authProvider, configName)
 		if err != nil {
 			return TokenResponse{}, oidcerror.Newf(oidcerror.ServerError,
 				"can't check if auth provider is disabled: %v", err)
