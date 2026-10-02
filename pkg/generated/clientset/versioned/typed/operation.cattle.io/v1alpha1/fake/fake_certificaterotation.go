@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
-	operationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/operation.cattle.io/v1alpha1"
+	operationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/operation.cattle.io/v1alpha1"
+	typedoperationcattleiov1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/operation.cattle.io/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeCertificateRotations implements CertificateRotationInterface
 type fakeCertificateRotations struct {
-	*gentype.FakeClientWithList[*v1alpha1.CertificateRotation, *v1alpha1.CertificateRotationList]
+	*gentype.FakeClientWithListAndApply[*v1alpha1.CertificateRotation, *v1alpha1.CertificateRotationList, *operationcattleiov1alpha1.CertificateRotationApplyConfiguration]
 	Fake *FakeOperationV1alpha1
 }
 
-func newFakeCertificateRotations(fake *FakeOperationV1alpha1, namespace string) operationcattleiov1alpha1.CertificateRotationInterface {
+func newFakeCertificateRotations(fake *FakeOperationV1alpha1, namespace string) typedoperationcattleiov1alpha1.CertificateRotationInterface {
 	return &fakeCertificateRotations{
-		gentype.NewFakeClientWithList[*v1alpha1.CertificateRotation, *v1alpha1.CertificateRotationList](
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.CertificateRotation, *v1alpha1.CertificateRotationList, *operationcattleiov1alpha1.CertificateRotationApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1alpha1.SchemeGroupVersion.WithResource("certificaterotations"),

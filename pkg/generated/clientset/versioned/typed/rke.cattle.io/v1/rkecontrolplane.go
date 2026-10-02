@@ -22,6 +22,7 @@ import (
 	context "context"
 
 	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	applyconfigurationrkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,18 +48,21 @@ type RKEControlPlaneInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*rkecattleiov1.RKEControlPlaneList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rkecattleiov1.RKEControlPlane, err error)
+	Apply(ctx context.Context, rKEControlPlane *applyconfigurationrkecattleiov1.RKEControlPlaneApplyConfiguration, opts metav1.ApplyOptions) (result *rkecattleiov1.RKEControlPlane, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, rKEControlPlane *applyconfigurationrkecattleiov1.RKEControlPlaneApplyConfiguration, opts metav1.ApplyOptions) (result *rkecattleiov1.RKEControlPlane, err error)
 	RKEControlPlaneExpansion
 }
 
 // rKEControlPlanes implements RKEControlPlaneInterface
 type rKEControlPlanes struct {
-	*gentype.ClientWithList[*rkecattleiov1.RKEControlPlane, *rkecattleiov1.RKEControlPlaneList]
+	*gentype.ClientWithListAndApply[*rkecattleiov1.RKEControlPlane, *rkecattleiov1.RKEControlPlaneList, *applyconfigurationrkecattleiov1.RKEControlPlaneApplyConfiguration]
 }
 
 // newRKEControlPlanes returns a RKEControlPlanes
 func newRKEControlPlanes(c *RkeV1Client, namespace string) *rKEControlPlanes {
 	return &rKEControlPlanes{
-		gentype.NewClientWithList[*rkecattleiov1.RKEControlPlane, *rkecattleiov1.RKEControlPlaneList](
+		gentype.NewClientWithListAndApply[*rkecattleiov1.RKEControlPlane, *rkecattleiov1.RKEControlPlaneList, *applyconfigurationrkecattleiov1.RKEControlPlaneApplyConfiguration](
 			"rkecontrolplanes",
 			c.RESTClient(),
 			scheme.ParameterCodec,

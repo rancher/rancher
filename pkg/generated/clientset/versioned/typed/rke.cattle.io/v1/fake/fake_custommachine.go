@@ -20,19 +20,20 @@ package fake
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	rkecattleiov1 "github.com/rancher/rancher/pkg/generated/applyconfiguration/rke.cattle.io/v1"
+	typedrkecattleiov1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
 // fakeCustomMachines implements CustomMachineInterface
 type fakeCustomMachines struct {
-	*gentype.FakeClientWithList[*v1.CustomMachine, *v1.CustomMachineList]
+	*gentype.FakeClientWithListAndApply[*v1.CustomMachine, *v1.CustomMachineList, *rkecattleiov1.CustomMachineApplyConfiguration]
 	Fake *FakeRkeV1
 }
 
-func newFakeCustomMachines(fake *FakeRkeV1, namespace string) rkecattleiov1.CustomMachineInterface {
+func newFakeCustomMachines(fake *FakeRkeV1, namespace string) typedrkecattleiov1.CustomMachineInterface {
 	return &fakeCustomMachines{
-		gentype.NewFakeClientWithList[*v1.CustomMachine, *v1.CustomMachineList](
+		gentype.NewFakeClientWithListAndApply[*v1.CustomMachine, *v1.CustomMachineList, *rkecattleiov1.CustomMachineApplyConfiguration](
 			fake.Fake,
 			namespace,
 			v1.SchemeGroupVersion.WithResource("custommachines"),
