@@ -60,6 +60,14 @@ func (b *EncryptionKeyRotationStatusApplyConfiguration) WithLastUpdated(value v1
 	return b
 }
 
+// WithTerminatedAt sets the TerminatedAt field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TerminatedAt field is set to the value of the last call.
+func (b *EncryptionKeyRotationStatusApplyConfiguration) WithTerminatedAt(value v1.Time) *EncryptionKeyRotationStatusApplyConfiguration {
+	b.OperationStatusApplyConfiguration.TerminatedAt = &value
+	return b
+}
+
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
