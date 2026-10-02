@@ -15,7 +15,7 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
-// operationCRDs are the three operation types which share OperationSpec, and so share the
+// operationCRDs are the four operation types which share OperationSpec, and so share the
 // root-level rule guarding spec.cancel.
 var operationCRDs = []string{
 	"etcdsnapshotsaves.operation.cattle.io",
@@ -114,9 +114,9 @@ func TestOperationCancelValidation(t *testing.T) {
 			rejected: true,
 		},
 		{
-			name:     "cancel set once aborted",
-			old:      op(false, phase("Aborted")),
-			updated:  op(true, phase("Aborted")),
+			name:     "cancel set once rejected",
+			old:      op(false, phase("Rejected")),
+			updated:  op(true, phase("Rejected")),
 			rejected: true,
 		},
 		{
