@@ -28,10 +28,8 @@ FROM registry.suse.com/bci/golang:1.27.1
 ARG RUNTIME_HOST_ARCH
 ENV HOST_ARCH=${RUNTIME_HOST_ARCH} ARCH=${RUNTIME_HOST_ARCH}
 ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.5
-ENV CATTLE_K3S_VERSION=v1.37.0+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 ENV HELM_UNITTEST_VERSION=1.1.2
-# k3d ci version
-ENV K3D_VERSION=v5.9.0
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.16
@@ -44,13 +42,16 @@ RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
 RUN git config -f /etc/gitconfig --add safe.directory /go/src/github.com/rancher/rancher
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
+
+RUN zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key
+
 RUN if [ "${ARCH}" != "s390x" ]; then \
-        curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
+        zypper in -y -r pkgs k3d; \
     fi
 
-ENV GOLANGCI_LINT=v2.13.2
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/${GOLANGCI_LINT}/install.sh | sh -s "${GOLANGCI_LINT}"; \
+        zypper in -y -r pkgs golangci-lint; \
     fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.

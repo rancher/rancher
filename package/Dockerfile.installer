@@ -9,38 +9,12 @@ ARG BUILDARCH
 ARG VERSION
 ENV CHART_VERSION=${VERSION}
 
-# set up helm 4
-# renovate: datasource=github-release-attachments depName=helm/helm
-ENV HELM_VERSION=v4.3.0
-ENV HELM_CHECKSUM_amd64=86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb
-ENV HELM_CHECKSUM_arm64=31c5794dd55c66a51e6b7d2e2ac7a114ae8b1de41ff1d9ba51748ac973b06a08
+RUN zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key
 
-RUN if [ "${BUILDARCH}" = "amd64" ]; then \
-        HELM_CHECKSUM="${HELM_CHECKSUM_amd64}"; \
-    elif [ "${BUILDARCH}" = "arm64" ]; then \
-        HELM_CHECKSUM="${HELM_CHECKSUM_arm64}"; \
-    fi; \
-    wget "https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz" -O /tmp/helm.tar.gz && \
-    echo "${HELM_CHECKSUM}  /tmp/helm.tar.gz" | sha256sum -c - && \
-    tar -xzf /tmp/helm.tar.gz --strip-components=1 -C /usr/bin && \
-    chown root:root /usr/bin/helm && \
-    chmod +x /usr/bin/helm && \
-    rm -f /tmp/helm.tar.gz
+RUN zypper in -y -r pkgs helm4 yq
 
-# renovate: datasource=github-release-attachments depName=mikefarah/yq
-ENV YQ_VERSION=v4.53.6
-ENV YQ_CHECKSUM_amd64=38b907b21b1b04327fb9481c595331d925a67c6ee1aabd0ef419d0b7d12dfb3d
-ENV YQ_CHECKSUM_arm64=d5e7531273d45c5d4b7abb4a1597c47a0fecb5d6b081dfa755064b38ffcc34f4
-
-RUN if [ "${BUILDARCH}" = "amd64" ]; then \
-        YQ_CHECKSUM="${YQ_CHECKSUM_amd64}"; \
-    elif [ "${BUILDARCH}" = "arm64" ]; then \
-        YQ_CHECKSUM="${YQ_CHECKSUM_arm64}"; \
-    fi; \
-    wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O /tmp/yq.tar.gz && \
-    echo "${YQ_CHECKSUM}  /tmp/yq.tar.gz" | sha256sum -c - && \
-    tar xzf /tmp/yq.tar.gz && mv yq_linux_${BUILDARCH} /usr/bin/yq && \
-    rm -f /tmp/yq.tar.gz
+RUN ln -s /usr/bin/helm4 /usr/bin/helm
 
 WORKDIR /src
 COPY .git/ /src/.git/

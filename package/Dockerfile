@@ -60,9 +60,14 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
-      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat openssl && \
-    zypper --installroot /chroot clean -a && \
+      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat openssl
+RUN RUN zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
+    zypper --installroot /chroot -n in -r pkgs kubectl-1.37
+RUN zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+# The symbolic link target has no /chroot prefix.
+RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 
 
 FROM final AS builder
@@ -493,22 +498,6 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/mount --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
-
-ARG ARCH
-ENV KUBECTL_VERSION=v1.37.1
-ENV KUBECTL_CHECKSUM_amd64=65691ff77eb6fa44c908b77a1082c9f092c3b9733b5cefabec0d1104890e21a8
-ENV KUBECTL_CHECKSUM_arm64=ff749f4b78d9c4f1ec87307df9b50119ed819e2094aa9810cb9acffc3286c8c7
-
-RUN case "${ARCH}" in \
-        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
-        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
-    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
-    sha256sum -c kubectl.sha256 && \
-    rm kubectl.sha256 && \
-    chmod +x /usr/bin/kubectl
 
 LABEL io.cattle.agent=true
 
