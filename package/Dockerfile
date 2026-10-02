@@ -60,7 +60,7 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
-      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat openssl && \
+      sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
 
