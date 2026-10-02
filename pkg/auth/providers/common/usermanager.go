@@ -371,16 +371,16 @@ func (m *userManager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribut
 }
 
 func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
-	return m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, false, userExtraInfo, loginTime...)
+	return m.userAttributeCreateOrUpdate(userID, provider, groupPrincipals, true, userExtraInfo, loginTime...)
 }
 
 // UserAttributeCreateOrUpdateNoGroups creates or updates the user's attributes for a write that carries no group memberships.
 // With SCIM enabled for the provider, the stored groups are kept. Otherwise they are replaced with an empty list.
 func (m *userManager) UserAttributeCreateOrUpdateNoGroups(userID, provider string, userExtraInfo map[string][]string, loginTime ...time.Time) error {
-	return m.userAttributeCreateOrUpdate(userID, provider, nil, true, userExtraInfo, loginTime...)
+	return m.userAttributeCreateOrUpdate(userID, provider, nil, false, userExtraInfo, loginTime...)
 }
 
-func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, noGroups bool, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, withGroups bool, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
@@ -401,7 +401,7 @@ func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, group
 		// Keep the stored keys this write doesn't set, such as SCIM's externalid and email.
 		userExtraInfo = MergeUserExtraAttributes(attribs.ExtraByProvider[provider], userExtraInfo)
 	}
-	keepGroups := noGroups && scimEnabled
+	replaceGroups := withGroups || !scimEnabled
 
 	var shouldUpdate bool
 
@@ -410,7 +410,7 @@ func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, group
 		shouldUpdate = true
 	}
 
-	if m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals, keepGroups) {
+	if m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals, replaceGroups) {
 		shouldUpdate = true
 	}
 	if len(loginTime) > 0 && !loginTime[0].IsZero() {
@@ -420,10 +420,13 @@ func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, group
 		shouldUpdate = true
 	}
 
-	if !keepGroups {
+	_, stored := attribs.GroupPrincipals[provider]
+	switch {
+	case replaceGroups:
 		attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
-	} else if _, ok := attribs.GroupPrincipals[provider]; !ok {
-		// Readers fall back to the token's groups when the entry is missing.
+	case stored:
+		// Keep the stored groups.
+	default:
 		attribs.GroupPrincipals[provider] = v3.Principals{}
 	}
 	attribs.ExtraByProvider[provider] = userExtraInfo
@@ -447,13 +450,17 @@ func (m *userManager) userAttributeCreateOrUpdate(userID, provider string, group
 	return nil
 }
 
-func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal, keepGroups bool) bool {
-	if keepGroups {
-		// A missing entry is written as an empty one.
-		if _, ok := attribs.GroupPrincipals[provider]; !ok {
+func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal, replaceGroups bool) bool {
+	_, stored := attribs.GroupPrincipals[provider]
+	switch {
+	case replaceGroups:
+		if groupPrincipalsChanged(attribs.GroupPrincipals[provider].Items, groupPrincipals) {
 			return true
 		}
-	} else if groupPrincipalsChanged(attribs.GroupPrincipals[provider].Items, groupPrincipals) {
+	case stored:
+		// Kept groups don't change.
+	default:
+		// A missing entry is written as an empty one.
 		return true
 	}
 
