@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/shepherd/extensions/kubeconfig"
 	"github.com/rancher/shepherd/pkg/api/steve/catalog/types"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"helm.sh/helm/v4/pkg/repo/v1"
@@ -468,18 +469,22 @@ func (w *RancherManagedChartsTest) uninstallApp(namespace, chartName string) {
 
 // pollUntilDownloaded Polls until the ClusterRepo of the given name has been downloaded (by comparing prevDownloadTime against the current DownloadTime)
 func (w *RancherManagedChartsTest) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) error {
+	var r *rv1.ClusterRepo
 	err := kwait.Poll(PollInterval, time.Minute, func() (done bool, err error) {
-		clusterRepo, err := w.catalogClient.ClusterRepos().Get(context.TODO(), ClusterRepoName, metav1.GetOptions{})
+		r, err = w.catalogClient.ClusterRepos().Get(context.TODO(), ClusterRepoName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		w.Require().NoError(err)
-		if clusterRepo.Name != ClusterRepoName {
+		if r.Name != ClusterRepoName {
 			return false, nil
 		}
 
-		return clusterRepo.Status.DownloadTime != prevDownloadTime, nil
+		return r.Status.DownloadTime != prevDownloadTime, nil
 	})
+	if err != nil {
+		logrus.Errorf("Error while downloading ClusterRepo %s from catalog: %v. \n CR: \n %v", ClusterRepoName, err, r)
+	}
 	return err
 }
 
