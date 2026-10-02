@@ -85,6 +85,9 @@ type stubAdapter struct {
 	// installVersion, when set, is the Kubernetes version InstallInstruction installs. Empty means
 	// this cluster type does not manage its distro version.
 	installVersion string
+
+	// leader is the secret FindOrElectLeader serves.
+	leader *corev1.Secret
 }
 
 func (a *stubAdapter) EtcdSnapshotNamespace() string {
@@ -171,7 +174,7 @@ func (a *stubAdapter) KubectlPath(_ *corev1.Secret) (string, error) {
 }
 func (a *stubAdapter) KubeconfigPath(_ *corev1.Secret) string { return a.kubeconfigPath }
 func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret, error) {
-	return nil, nil
+	return a.leader, nil
 }
 
 // The six methods below complete the ops.Adapter contract for the stub. They are not exercised

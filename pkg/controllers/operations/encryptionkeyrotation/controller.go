@@ -704,7 +704,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 
 	if planStatus.Failure() {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: rotate-keys plan failed to execute on leader %s", s.op.Namespace, s.op.Name, leader.Name)
-		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("encryption key rotation plan failed for leader %s/%s", leader.Namespace, leader.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("encryption key rotation plan failed for leader %s/%s", leader.Namespace, leader.Name)))
 		return status, nil
 	}
 
@@ -928,7 +928,7 @@ func (h *handler) reconcileRestartNode(
 
 	if planStatus.Failure() {
 		logrus.Errorf("[encryptionkeyrotation] %s/%s: restart plan failed for %s", s.op.Namespace, s.op.Name, secret.Name)
-		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s; please perform an etcd restore", secret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("restart failed for %s; please perform an etcd restore", secret.Name)))
 		return status, false, nil
 	}
 

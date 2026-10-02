@@ -890,7 +890,12 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 				logrus.Errorf("[etcdsnapshotrestore] %s/%s: aborting operation: preflight check failed for %s/%s",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-				status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name))
+				message := fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name)
+				if planStatus.Canceled {
+					// Nothing was learned about the token, so do not claim it is missing.
+					message = ops.PlanFailureMessage(planStatus, fmt.Sprintf("preflight check did not complete for %s/%s", secret.Namespace, secret.Name))
+				}
+				status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, message)
 
 				return status, nil
 			}
@@ -1234,7 +1239,7 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: shutdown failed for %s/%s",
 				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("shutdown failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("shutdown failed for %s/%s", secret.Namespace, secret.Name)))
 
 			return status, nil
 		}
@@ -1344,7 +1349,7 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: etcd restore failed for %s/%s",
 			s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("etcd restore failed for %s/%s", secret.Namespace, secret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("etcd restore failed for %s/%s", secret.Namespace, secret.Name)))
 
 		return status, nil
 	}
@@ -1523,7 +1528,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
 				s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
 
-			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name)))
 
 			return status, nil
 		}
@@ -1549,9 +1554,9 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 
 	if planStatus.Failure() {
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: pod cleanup failed for %s/%s",
-			s.op.Namespace, s.op.Name, etcdSecret.Namespace, etcdSecret.Name)
+			s.op.Namespace, s.op.Name, controlPlaneSecret.Namespace, controlPlaneSecret.Name)
 
-		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", etcdSecret.Namespace, etcdSecret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("post-restore pod cleanup failed for %s/%s", controlPlaneSecret.Namespace, controlPlaneSecret.Name)))
 
 		return status, nil
 	}
@@ -1647,7 +1652,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: restart failed for %s/%s",
 				s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
-			status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name))
+			status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("restart failed for %s/%s", secret.Namespace, secret.Name)))
 
 			return status, nil
 		}
@@ -2021,7 +2026,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		logrus.Errorf("[etcdsnapshotrestore] %s/%s: marking operation as failed: node cleanup failed for %s/%s",
 			s.op.Namespace, s.op.Name, initSecret.Namespace, initSecret.Name)
 
-		status.MarkFailed(opv1alpha1.PlanFailedReason, fmt.Sprintf("post-restore node cleanup failed for %s/%s", initSecret.Namespace, initSecret.Name))
+		status.MarkFailed(opv1alpha1.PlanFailedReason, ops.PlanFailureMessage(planStatus, fmt.Sprintf("post-restore node cleanup failed for %s/%s", initSecret.Namespace, initSecret.Name)))
 
 		return status, nil
 	}
