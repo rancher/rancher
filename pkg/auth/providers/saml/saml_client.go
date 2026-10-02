@@ -355,6 +355,16 @@ func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[stri
 	return userPrincipal, groupPrincipals, nil
 }
 
+// updateUserAttribute stores the login's extra attributes and groups.
+// With an empty groupsField the IdP sends no groups, so the write carries none.
+func (s *Provider) updateUserAttribute(config *apiv3.SamlConfig, userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime time.Time) error {
+	if config.GroupsField == "" {
+		return s.userMGR.UserAttributeCreateOrUpdateNoGroups(userID, provider, userExtraInfo, loginTime)
+	}
+
+	return s.userMGR.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo, loginTime)
+}
+
 // FinalizeSamlLogout processes the logout obtained by the POST to /saml/slo from IdP
 func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
@@ -568,7 +578,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	loginTime := time.Now()
 	userExtraInfo := s.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return s.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
+		return s.updateUserAttribute(config, user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
 	}); err != nil {
 		log.Errorf("SAML: Failed creating or updating userAttribute with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)

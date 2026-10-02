@@ -15,9 +15,11 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/user/mocks"
 	dsig "github.com/russellhaering/goxmldsig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestGetUserIdFromRelayState(t *testing.T) {
@@ -380,6 +382,76 @@ func TestCheckAssertionTimeConditions(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestUpdateUserAttribute(t *testing.T) {
+	const (
+		userID   = "u-abcdef"
+		provider = "okta"
+	)
+
+	userExtraInfo := map[string][]string{
+		"principalid": {"okta_user://alice"},
+		"username":    {"alice"},
+	}
+	loginTime := time.Now()
+
+	tests := map[string]struct {
+		groupsField string
+		samlData    map[string][]string
+		wantGroups  []string
+		noGroups    bool
+	}{
+		"empty groupsField writes no groups": {
+			samlData: map[string][]string{"uid": {"alice"}, "groups": {"g1"}},
+			noGroups: true,
+		},
+		"groupsField set writes the response's groups": {
+			groupsField: "groups",
+			samlData:    map[string][]string{"uid": {"alice"}, "groups": {"g1", "g2"}},
+			wantGroups:  []string{"okta_group://g1", "okta_group://g2"},
+		},
+		"groupsField set writes an empty list when the attribute is absent": {
+			groupsField: "groups",
+			samlData:    map[string][]string{"uid": {"alice"}},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			userMGR := mocks.NewMockManager(ctrl)
+			if tc.noGroups {
+				userMGR.EXPECT().UserAttributeCreateOrUpdateNoGroups(userID, provider, userExtraInfo, loginTime).Return(nil)
+			} else {
+				userMGR.EXPECT().UserAttributeCreateOrUpdate(userID, provider, gomock.Len(len(tc.wantGroups)), userExtraInfo, loginTime).
+					DoAndReturn(func(_, _ string, groupPrincipals []apiv3.Principal, _ map[string][]string, _ ...time.Time) error {
+						var gotGroups []string
+						for _, group := range groupPrincipals {
+							gotGroups = append(gotGroups, group.Name)
+						}
+						assert.Equal(t, tc.wantGroups, gotGroups)
+						return nil
+					})
+			}
+
+			s := &Provider{
+				name:      provider,
+				userType:  provider + "_user",
+				groupType: provider + "_group",
+				userMGR:   userMGR,
+			}
+			config := &apiv3.SamlConfig{UIDField: "uid", GroupsField: tc.groupsField}
+
+			_, groupPrincipals, err := s.getSamlPrincipals(config, tc.samlData)
+			require.NoError(t, err)
+
+			err = s.updateUserAttribute(config, userID, provider, groupPrincipals, userExtraInfo, loginTime)
+			require.NoError(t, err)
 		})
 	}
 }

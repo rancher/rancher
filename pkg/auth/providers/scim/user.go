@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 
@@ -245,6 +246,8 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	principalName := userPrincipalName(provider, uid)
+
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to list users: %s", err)
@@ -286,6 +289,11 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 			eid := first(attr.ExtraByProvider[provider]["externalid"])
 			if strings.EqualFold(eid, payload.ExternalID) {
 				if user.GetEnabled() {
+					// A user who logged in keeps externalid.
+					// When that user holds the payload's principal, EnsureUser below returns them, so this isn't a conflict.
+					if attr.LastLogin != nil && slices.Contains(user.PrincipalIDs, principalName) {
+						continue
+					}
 					writeError(w, NewError(http.StatusConflict, fmt.Sprintf("Active user with externalId %s already exists", payload.ExternalID)))
 					return
 				}
@@ -299,7 +307,6 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	principalName := userPrincipalName(provider, uid)
 	displayName := payload.DisplayName
 	if displayName == "" {
 		displayName = payload.UserName
@@ -311,11 +318,12 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groupPrincipals := []v3.Principal{}
 	extras := map[string][]string{
 		"username":    {payload.UserName},
 		"externalid":  {payload.ExternalID},
 		"principalid": {principalName},
+		// email is always written, so the merge with the stored keys doesn't keep an email the payload no longer has.
+		"email": {""},
 	}
 
 	var primaryEmail string
@@ -327,7 +335,8 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = s.userMGR.UserAttributeCreateOrUpdate(user.Name, provider, groupPrincipals, extras)
+	// SCIM writes groups only through the group endpoints, so the groups login stored are kept.
+	err = s.userMGR.UserAttributeCreateOrUpdateNoGroups(user.Name, provider, extras)
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to ensure user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
