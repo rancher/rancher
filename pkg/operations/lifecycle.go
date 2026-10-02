@@ -53,9 +53,9 @@ func CancelForDeletion(status *opv1alpha1.OperationStatus) (opv1alpha1.Operation
 // canceled until it is resumed.
 //
 // This records the decision; it does not carry it out. Stopping the work already dispatched is
-// CancelDispatchedPlans, which the Canceled phase's terminal handler runs before it releases the
-// beacon — a plan sitting in a machine-plan secret belongs to the agent, and moving the phase alone
-// would leave it running while the next operation acquired the beacon.
+// CancelDispatchedPlans, which the Canceled and Failed phases' terminal handlers run before they
+// release the beacon — a plan sitting in a machine-plan secret belongs to the agent, and moving the
+// phase alone would leave it running while the next operation acquired the beacon.
 func CancelForRequest(spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) (opv1alpha1.OperationPhase, bool) {
 	previous := status.Phase
 
@@ -230,7 +230,7 @@ func SetWaitingForDelegate(cond condition.Cond, status *opv1alpha1.OperationStat
 func SetWaitingForPlan[S ~string](status *opv1alpha1.OperationStatus, step S, results []planapi.PlanStatus) {
 	opv1alpha1.InProgressCondition.True(status)
 	opv1alpha1.InProgressCondition.Reason(status, opv1alpha1.WaitingForPlanAppliedReason)
-	opv1alpha1.InProgressCondition.Message(status, fmt.Sprintf("Waiting in step %s: %s", step, planapi.Message(results)))
+	opv1alpha1.InProgressCondition.Message(status, fmt.Sprintf("Waiting in step %s: %s", step, PlansMessage(results)))
 }
 
 // SetWaitingForSinglePlan is SetWaitingForPlan for the steps which walk nodes one at a time, where
@@ -238,5 +238,5 @@ func SetWaitingForPlan[S ~string](status *opv1alpha1.OperationStatus, step S, re
 func SetWaitingForSinglePlan(status *opv1alpha1.OperationStatus, planStatus *planapi.PlanStatus) {
 	opv1alpha1.InProgressCondition.True(status)
 	opv1alpha1.InProgressCondition.Reason(status, opv1alpha1.WaitingForPlanAppliedReason)
-	opv1alpha1.InProgressCondition.Message(status, planapi.Message([]planapi.PlanStatus{*planStatus}))
+	opv1alpha1.InProgressCondition.Message(status, PlansMessage([]planapi.PlanStatus{*planStatus}))
 }

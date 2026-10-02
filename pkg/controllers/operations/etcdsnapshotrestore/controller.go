@@ -622,6 +622,17 @@ func (s *scope) idempotencyValue() string {
 	return string(s.op.UID)
 }
 
+// restartIdempotencyValue is the idempotency value of a cluster restart pass. The two passes must
+// use distinct values. Both wrap the same `systemctl restart` under the same identifier, and the
+// agent starts every pending plan at attempt 1, so with the same value the idempotent script would
+// find the final pass's restart already recorded as run by the initial pass, and skip it.
+func (s *scope) restartIdempotencyValue(initialPass bool) string {
+	if initialPass {
+		return s.idempotencyValue() + "/initial"
+	}
+	return s.idempotencyValue() + "/final"
+}
+
 // handleHook pushes the delegate named by the operation's hook label for prefix onto the beacon, and
 // reports whether there was one — in which case the caller stops where it is and waits.
 func (h *handler) handleHook(s *scope, prefix string) (bool, error) {
@@ -864,8 +875,6 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 		return status, err
 	}
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-
 	hash := ""
 	if snapshot != nil && snapshot.Annotations != nil && snapshot.Annotations[capr.SnapshotTokenHashAnnotation] != "" {
 		hash = snapshot.Annotations[capr.SnapshotTokenHashAnnotation]
@@ -879,7 +888,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			if err != nil {
 				return status, err
 			}
-			planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+			planStatus, err := h.store.AssignPlan(secret, nodePlan, s.ownerKey, 1, 1)
 			if err != nil {
 				return status, err
 			}
@@ -891,7 +900,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
 				message := fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name)
-				if planStatus.Canceled {
+				if planStatus.State == plan.PlanStateCanceled {
 					// Nothing was learned about the token, so do not claim it is missing.
 					message = ops.PlanFailureMessage(planStatus, fmt.Sprintf("preflight check did not complete for %s/%s", secret.Namespace, secret.Name))
 				}
@@ -1221,14 +1230,12 @@ func (h *handler) reconcileShutdown(s *scope, status opv1alpha1.ETCDSnapshotRest
 	concurrency := len(secrets)
 	results := make([]plan.PlanStatus, 0, concurrency)
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-
 	for _, secret := range secrets {
 		nodePlan, err := buildShutdownPlan(s, secret)
 		if err != nil {
 			return status, err
 		}
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, s.ownerKey, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1333,14 +1340,12 @@ func (h *handler) reconcileRestore(s *scope, status opv1alpha1.ETCDSnapshotResto
 		return status, nil
 	}
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-
 	nodePlan, err := buildRestorePlan(s, secret, snapshot, snapshotName)
 	if err != nil {
 		return status, err
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+	planStatus, err := h.store.AssignPlan(secret, nodePlan, s.ownerKey, 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1449,7 +1454,6 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 
 	provisioningDir := s.adapter.ProvisioningDataDirectory(etcdSecret)
 	value := s.idempotencyValue()
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 	waitScriptPath := etcdRestoreScriptPath(s, etcdSecret, waitForPodListScriptName)
 
 	instructions := []plan.OneTimeInstruction{
@@ -1519,7 +1523,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 			},
 		}
 
-		planStatus, err := h.store.AssignPlan(etcdSecret, ops.WithOperationEnv(etcdNodePlan, opEnv), 1, 1)
+		planStatus, err := h.store.AssignPlan(etcdSecret, etcdNodePlan, s.ownerKey, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1547,7 +1551,7 @@ func (h *handler) reconcilePostRestorePodCleanup(s *scope, status opv1alpha1.ETC
 		})
 	}
 
-	planStatus, err := h.store.AssignPlan(controlPlaneSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+	planStatus, err := h.store.AssignPlan(controlPlaneSecret, nodePlan, s.ownerKey, 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -1602,15 +1606,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		return status, nil
 	}
 
-	// The two restart phases must use distinct values; otherwise the second phase would skip the
-	// restart as already-reconciled.
-	value := s.idempotencyValue()
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-	if nextStep != "" {
-		value = value + "/initial"
-	} else {
-		value = value + "/final"
-	}
+	value := s.restartIdempotencyValue(nextStep != "")
 
 	if err = s.adapter.PauseCluster(false); err != nil {
 		return status, err
@@ -1641,7 +1637,7 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 			return status, err
 		}
 
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+		planStatus, err := h.store.AssignPlan(secret, nodePlan, s.ownerKey, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -1693,7 +1689,9 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 // instructions of every other step: the idempotent script gates on the agent's attempt number and, on
 // an attempt it considers already reconciled, prints a message instead of running the command. With
 // SaveOutput that message would land in the applied output in place of the hash. A check must run on
-// every attempt, so it relies on the operation environment for plan uniqueness instead.
+// every attempt, so it relies on the Store running every new assignment afresh instead: the plan is
+// identical from one restore to the next, but each is assigned by a different writer (see
+// plan.PlanWriterAnnotation).
 func buildPreflightPlan(s *scope, secret *corev1.Secret) (*plan.Plan, error) {
 	dataDir, err := s.adapter.DistroDataDirectory(secret)
 	if err != nil {
@@ -2015,9 +2013,7 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 		return status, nil
 	}
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
-
-	planStatus, err := h.store.AssignPlan(initSecret, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+	planStatus, err := h.store.AssignPlan(initSecret, nodePlan, s.ownerKey, 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -2088,8 +2084,8 @@ type terminalPhase struct {
 // An operation which no longer holds the beacon has none of that left to do: see
 // beaconOptional. It terminates without the beacon being written to at all, which is what
 // keeps an operation that lost its claim from reaching into whichever one holds it now.
-// beforeRelease still runs for it: what it does is scoped to the plans this operation
-// itself dispatched, so it cannot disturb the operation that holds the beacon now either.
+// beforeRelease still runs for it, so anything it does that writes to the cluster has to check
+// the claim itself, as cancelDispatchedPlans does.
 func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus, phase terminalPhase) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
 
@@ -2155,15 +2151,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
-
-		// Cancellation has to reach the cluster and not just the operation's status: a plan already
-		// handed to an agent is the agent's to run, and the beacon is about to be released to
-		// whichever operation is next in line. Canceling those plans while this operation is still
-		// the authorized writer is what stops the two overlapping.
-		beforeRelease: func(s *scope) error {
-			_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op)
-			return err
-		},
+		beforeRelease:  h.cancelDispatchedPlans,
 	})
 }
 
@@ -2174,7 +2162,25 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreSt
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
 		beaconOptional: true,
+
+		// A failed operation stops what it started too: a plan it dispatched may still be running when
+		// the failure is decided, such as on the other nodes of a step that failed on one of them.
+		beforeRelease: h.cancelDispatchedPlans,
 	})
+}
+
+// cancelDispatchedPlans asks the agents to stop the plans this operation dispatched which are still
+// running, before the beacon is released to whichever operation is next in line.
+//
+// An operation's terminal outcome has to reach the cluster and not just its status: a plan already
+// handed to an agent is the agent's to run, so releasing the beacon on the strength of the status
+// alone would let the next operation start while this one's instructions were still executing.
+// Canceling those plans while this operation is still the authorized writer is what stops the two
+// overlapping. An operation that no longer holds the beacon writes nothing; see
+// ops.CancelDispatchedPlans.
+func (h *handler) cancelDispatchedPlans(s *scope) error {
+	_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op, s.ownerKey, s.beacon)
+	return err
 }
 
 // handleSucceeded handles the Succeeded terminal phase. Its hook gates the beacon release that

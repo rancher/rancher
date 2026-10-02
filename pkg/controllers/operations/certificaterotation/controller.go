@@ -667,7 +667,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 	// Tie plan content to this operation and step so the system-agent reruns rotated plans
 	// instead of reusing stale applied output. Applied only when a plan is assigned, below.
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 
 	for _, target := range targets {
 		secret := target.secret
@@ -754,7 +753,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 		// AssignPlan updates this machine-plan secret and returns the agent's latest
 		// applied status for the same plan. A later reconcile continues from that status.
-		planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(&nodePlan, opEnv), 1, 1)
+		planStatus, err := h.store.AssignPlan(secret, &nodePlan, s.ownerKey, 1, 1)
 		if err != nil {
 			return status, err
 		}
@@ -764,7 +763,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 				"certificate rotation plan failed for %s/%s; verify the runtime service is healthy before starting another disruptive operation",
 				secret.Namespace, secret.Name,
 			))
-			if detail := plan.Message([]plan.PlanStatus{*planStatus}); detail != "" {
+			if detail := ops.PlansMessage([]plan.PlanStatus{*planStatus}); detail != "" {
 				message += ": " + detail
 			}
 
@@ -852,9 +851,9 @@ type terminalPhase struct {
 //
 // An operation which no longer holds the beacon has none of that left to do: see beaconOptional. It
 // terminates without the beacon being written to at all, which is what keeps an operation that lost
-// its claim from reaching into whichever one holds it now. beforeRelease still runs for it: what it
-// does is scoped to the plans this operation itself dispatched, so it cannot disturb the operation
-// that holds the beacon now either.
+// its claim from reaching into whichever one holds it now. beforeRelease still runs for it, so
+// anything it does that writes to the cluster has to check the claim itself, as
+// cancelDispatchedPlans does.
 //
 // Unpausing the cluster is deliberately not part of this. Only a rotation which rotated every node
 // has left the cluster in a state fit to hand back to the provisioner, so reconcileRotate does it
@@ -925,15 +924,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.CertificateRotation
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
-
-		// Cancellation has to reach the cluster and not just the operation's status: a plan already
-		// handed to an agent is the agent's to run, and the beacon is about to be released to
-		// whichever operation is next in line. Canceling those plans while this operation is still
-		// the authorized writer is what stops the two overlapping.
-		beforeRelease: func(s *scope) error {
-			_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op)
-			return err
-		},
+		beforeRelease:  h.cancelDispatchedPlans,
 	})
 }
 
@@ -944,7 +935,25 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.CertificateRotationSt
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
 		beaconOptional: true,
+
+		// A failed operation stops what it started too: a plan it dispatched may still be running when
+		// the failure is decided, such as on the other nodes of a step that failed on one of them.
+		beforeRelease: h.cancelDispatchedPlans,
 	})
+}
+
+// cancelDispatchedPlans asks the agents to stop the plans this operation dispatched which are still
+// running, before the beacon is released to whichever operation is next in line.
+//
+// An operation's terminal outcome has to reach the cluster and not just its status: a plan already
+// handed to an agent is the agent's to run, so releasing the beacon on the strength of the status
+// alone would let the next operation start while this one's instructions were still executing.
+// Canceling those plans while this operation is still the authorized writer is what stops the two
+// overlapping. An operation that no longer holds the beacon writes nothing; see
+// ops.CancelDispatchedPlans.
+func (h *handler) cancelDispatchedPlans(s *scope) error {
+	_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op, s.ownerKey, s.beacon)
+	return err
 }
 
 // handleSucceeded handles the Succeeded terminal phase. On the owner path it also nudges the parent

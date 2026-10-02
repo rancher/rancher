@@ -730,60 +730,6 @@ func TestBuildShutdownPlan_DataDirectoryErrorPropagates(t *testing.T) {
 	}
 }
 
-// TestAssignedPlansAreOperationScoped covers the property every plan this controller assigns depends
-// on: the system-agent only re-runs a plan whose serialized content changed, and AssignPlan only
-// writes a plan whose bytes differ from the one already on the secret. Two operations doing the same
-// work must therefore serialize differently, or the second is reported as already applied — its
-// instructions never run and its output is the first operation's. Reconciles of one operation must
-// serialize identically, or the plan would churn and re-trigger its instructions.
-func TestAssignedPlansAreOperationScoped(t *testing.T) {
-	t.Parallel()
-
-	secret := makePlanSecret("init", "node-init", map[string]string{
-		capr.EtcdRoleLabel:         "true",
-		capr.ControlPlaneRoleLabel: "true",
-	})
-
-	builders := map[string]struct {
-		build func(*scope) (*planapi.Plan, error)
-		step  opv1alpha1.ETCDSnapshotRestoreStep
-	}{
-		"preflight": {
-			build: func(s *scope) (*planapi.Plan, error) { return buildPreflightPlan(s, secret) },
-			step:  opv1alpha1.ETCDSnapshotRestoreStepPreflight,
-		},
-		"shutdown": {
-			build: func(s *scope) (*planapi.Plan, error) { return buildShutdownPlan(s, secret) },
-			step:  opv1alpha1.ETCDSnapshotRestoreStepShutdown,
-		},
-	}
-
-	for name, b := range builders {
-		t.Run(name, func(t *testing.T) {
-			marshal := func(uid types.UID) string {
-				s := newTestScope(defaultAdapter(), uid)
-				p, err := b.build(s)
-				if err != nil {
-					t.Fatal(err)
-				}
-				p = ops.WithOperationEnv(p, ops.OperationEnv(ControllerOwnerKey, s.op, b.step))
-				data, err := json.Marshal(p)
-				if err != nil {
-					t.Fatal(err)
-				}
-				return string(data)
-			}
-
-			if marshal("restore-uid-1") == marshal("restore-uid-2") {
-				t.Error("plans for two operations serialize identically, so the second would be reported as already applied")
-			}
-			if marshal("restore-uid-1") != marshal("restore-uid-1") {
-				t.Error("plans for one operation must serialize identically across reconciles")
-			}
-		})
-	}
-}
-
 // newOp is the canonical operation fixture. Its ClusterRef points at testClusterGVK so the tests
 // that drive OnChange end to end resolve through newOnChangeHandler's fake dynamic resolver; tests
 // that stop before scope resolution (paused, terminal handlers) simply never consult it.
@@ -3127,19 +3073,24 @@ func TestHandleCanceled_CancelsDispatchedPlansBeforeReleasingBeacon(t *testing.T
 	assert.Equal(t, "true", secrets.updates[0].Annotations[planapi.PlanCanceledAnnotation])
 }
 
-// withDispatchedPlan returns a copy of secret holding a plan this operation dispatched, i.e. one
-// stamped with the operation environment the way the step reconcilers assign it.
+// withDispatchedPlan returns a copy of secret holding a plan this operation dispatched and the agent
+// is still running.
 func withDispatchedPlan(t *testing.T, secret *corev1.Secret, op *opv1alpha1.ETCDSnapshotRestore) *corev1.Secret {
 	t.Helper()
 
 	nodePlan := &planapi.Plan{OneTimeInstructions: []planapi.OneTimeInstruction{{Name: "work", Command: "rke2"}}}
-	data, err := json.Marshal(ops.WithOperationEnv(nodePlan, ops.OperationEnv(ControllerOwnerKey, op, opv1alpha1.ETCDSnapshotRestoreStepRestore)))
+	data, err := json.Marshal(nodePlan)
 	require.NoError(t, err)
 
 	out := secret.DeepCopy()
 	if out.Data == nil {
 		out.Data = map[string][]byte{}
 	}
+	if out.Annotations == nil {
+		out.Annotations = map[string]string{}
+	}
 	out.Data[planapi.PlanDataKey] = data
+	out.Data[planapi.PlanStateKey] = []byte(planapi.PlanStateInProgress)
+	out.Annotations[planapi.PlanWriterAnnotation] = ops.BeaconOwnerKey(OperationKind, op)
 	return out
 }

@@ -654,7 +654,6 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 		return status, err
 	}
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 	runtime := s.adapter.RuntimeCommand()
 
 	nodePlan := &plan.Plan{
@@ -666,8 +665,8 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 				Args:       []string{"-c", rotateKeysScript(runtime)},
 				SaveOutput: true,
 			},
-			// 2. Poll until secrets-encrypt status responds; gates planStatus.Applied until
-			// the encryption server is reachable after key reload.
+			// 2. Poll until secrets-encrypt status responds; holds the plan back from succeeding
+			// until the encryption server is reachable after key reload.
 			{
 				Name:    waitForStatusInstructionName,
 				Command: "/bin/sh",
@@ -697,7 +696,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	// Use finite failure threshold so a plan that can't execute
 	// is marked Failed rather than retried forever. The wrapper always exits 0, so a
 	// real apply failure here means the wrapper itself couldn't run.
-	planStatus, err := h.store.AssignPlan(leader, ops.WithOperationEnv(nodePlan, opEnv), 1, 1)
+	planStatus, err := h.store.AssignPlan(leader, nodePlan, s.ownerKey, 1, 1)
 	if err != nil {
 		return status, err
 	}
@@ -816,7 +815,6 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 		return status, nil
 	}
 
-	opEnv := ops.OperationEnv(ControllerOwnerKey, s.op, status.Step)
 	serverUnit := s.adapter.ServerUnit()
 	runtime := s.adapter.RuntimeCommand()
 
@@ -827,7 +825,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 	// reencrypt_finished while hashes still differ across servers.
 	for i, secret := range secrets {
 		requireHashMatch := i == len(secrets)-1
-		status, done, err := h.reconcileRestartNode(s, status, secret, opEnv, serverUnit, runtime, requireHashMatch)
+		status, done, err := h.reconcileRestartNode(s, status, secret, serverUnit, runtime, requireHashMatch)
 		if err != nil {
 			return status, err
 		}
@@ -870,7 +868,6 @@ func (h *handler) reconcileRestartNode(
 	s *scope,
 	status opv1alpha1.EncryptionKeyRotationStatus,
 	secret *corev1.Secret,
-	opEnv []string,
 	serverUnit string,
 	runtime string,
 	requireHashMatch bool,
@@ -921,7 +918,7 @@ func (h *handler) reconcileRestartNode(
 		}
 	}
 
-	planStatus, err := h.store.AssignPlan(secret, ops.WithOperationEnv(nodePlan, opEnv), 5, 5)
+	planStatus, err := h.store.AssignPlan(secret, nodePlan, s.ownerKey, 5, 5)
 	if err != nil {
 		return status, false, err
 	}
@@ -1003,8 +1000,8 @@ type terminalPhase struct {
 // An operation which no longer holds the beacon has none of that left to do: see
 // beaconOptional. It terminates without the beacon being written to at all, which is what
 // keeps an operation that lost its claim from reaching into whichever one holds it now.
-// beforeRelease still runs for it: what it does is scoped to the plans this operation
-// itself dispatched, so it cannot disturb the operation that holds the beacon now either.
+// beforeRelease still runs for it, so anything it does that writes to the cluster has to check
+// the claim itself, as cancelDispatchedPlans does.
 func (h *handler) handleTerminal(s *scope, status opv1alpha1.EncryptionKeyRotationStatus, phase terminalPhase) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
 
@@ -1071,15 +1068,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.EncryptionKeyRotati
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
 		beaconOptional: true,
-
-		// Cancellation has to reach the cluster and not just the operation's status: a plan already
-		// handed to an agent is the agent's to run, and the beacon is about to be released to
-		// whichever operation is next in line. Canceling those plans while this operation is still
-		// the authorized writer is what stops the two overlapping.
-		beforeRelease: func(s *scope) error {
-			_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op)
-			return err
-		},
+		beforeRelease:  h.cancelDispatchedPlans,
 	})
 }
 
@@ -1090,7 +1079,25 @@ func (h *handler) handleFailed(s *scope, status opv1alpha1.EncryptionKeyRotation
 	return h.handleTerminal(s, status, terminalPhase{
 		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
 		beaconOptional: true,
+
+		// A failed operation stops what it started too: a plan it dispatched may still be running when
+		// the failure is decided, such as on the other nodes of a step that failed on one of them.
+		beforeRelease: h.cancelDispatchedPlans,
 	})
+}
+
+// cancelDispatchedPlans asks the agents to stop the plans this operation dispatched which are still
+// running, before the beacon is released to whichever operation is next in line.
+//
+// An operation's terminal outcome has to reach the cluster and not just its status: a plan already
+// handed to an agent is the agent's to run, so releasing the beacon on the strength of the status
+// alone would let the next operation start while this one's instructions were still executing.
+// Canceling those plans while this operation is still the authorized writer is what stops the two
+// overlapping. An operation that no longer holds the beacon writes nothing; see
+// ops.CancelDispatchedPlans.
+func (h *handler) cancelDispatchedPlans(s *scope) error {
+	_, err := ops.CancelDispatchedPlans(h.store, h.secrets, s.clusterObj, s.namespace, s.op, s.ownerKey, s.beacon)
+	return err
 }
 
 // handleSucceeded handles the Succeeded terminal phase. Its hook fires before unpausing and

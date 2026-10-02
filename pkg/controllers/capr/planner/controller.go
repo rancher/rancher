@@ -25,7 +25,8 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-const PlannerOwnerKey = "planner"
+// PlannerOwnerKey is the key the planner holds a cluster's beacon under while it plans the cluster.
+const PlannerOwnerKey = caprplanner.BeaconOwnerKey
 
 var (
 	capiScalingUpCondition   = condition.Cond("ScalingUp")
