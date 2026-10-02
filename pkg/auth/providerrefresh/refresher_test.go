@@ -504,6 +504,7 @@ func TestRefreshAttributes(t *testing.T) {
 					disabledErr: tt.providerDisabledError,
 				},
 				saml.ShibbolethName: &mockShibbolethProvider{},
+				"unconfigured":      &mockLocalProvider{},
 			})
 
 			ctrl := gomock.NewController(t)
@@ -542,6 +543,7 @@ func TestRefreshAttributes(t *testing.T) {
 			}).AnyTimes()
 
 			r := &refresher{
+				authConfigs: newFakeAuthConfigs(local.Name, saml.ShibbolethName),
 				tokenLister: &fakes.TokenListerMock{
 					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
 						return tt.tokens, nil
@@ -855,6 +857,7 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 
 	var tokenDeleteCalled, tokenUpdateCalled bool
 	r := &refresher{
+		authConfigs: newFakeAuthConfigs(providerName),
 		tokenLister: &fakes.TokenListerMock{
 			ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
 				return []*apiv3.Token{loginToken}, nil
@@ -1110,6 +1113,7 @@ func TestRefreshAttributesNoPerUserSecrets(t *testing.T) {
 	tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 
 	r := &refresher{
+		authConfigs: newFakeAuthConfigs(providerName),
 		tokenLister: &fakes.TokenListerMock{
 			ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
 				return []*apiv3.Token{loginToken}, nil
@@ -1170,7 +1174,62 @@ func (p *mockRefetchErrorProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
+func newFakeAuthConfigs(providerNames ...string) *fakes.AuthConfigInterfaceMock {
+	return &fakes.AuthConfigInterfaceMock{
+		ListFunc: func(_ metav1.ListOptions) (*apiv3.AuthConfigList, error) {
+			configs := &apiv3.AuthConfigList{}
+			for _, providerName := range providerNames {
+				configs.Items = append(configs.Items, apiv3.AuthConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: providerName},
+				})
+			}
+			return configs, nil
+		},
+	}
+}
+
 func TestRefreshAttributesEarlyErrors(t *testing.T) {
+	t.Run("auth config list error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return([]*corev1.Secret{}, nil)
+
+		listErr := errors.New("auth config list failed")
+		r := &refresher{
+			tokenLister: &fakes.TokenListerMock{
+				ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
+					return nil, nil
+				},
+			},
+			extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
+				exttokens.NewTimeHandler(),
+				exttokens.NewHashHandler(),
+				exttokens.NewAuthHandler()),
+			userLister: &fakes.UserListerMock{
+				GetFunc: func(_, _ string) (*apiv3.User, error) {
+					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
+				},
+			},
+			authConfigs: &fakes.AuthConfigInterfaceMock{
+				ListFunc: func(_ metav1.ListOptions) (*apiv3.AuthConfigList, error) {
+					return nil, listErr
+				},
+			},
+		}
+
+		got, err := r.refreshAttributes(&apiv3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+		})
+		assert.Nil(t, got)
+		assert.ErrorContains(t, err, "error listing auth configs")
+		assert.ErrorIs(t, err, listErr)
+	})
+
 	t.Run("user lister error", func(t *testing.T) {
 		r := &refresher{
 			userLister: &fakes.UserListerMock{
@@ -1195,6 +1254,7 @@ func TestRefreshAttributesEarlyErrors(t *testing.T) {
 
 	t.Run("token lister error", func(t *testing.T) {
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) {
 					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
@@ -1228,6 +1288,7 @@ func TestRefreshAttributesEarlyErrors(t *testing.T) {
 		scache.EXPECT().List("cattle-tokens", gomock.Any()).Return(nil, fmt.Errorf("cache error")).AnyTimes()
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) {
 					return &apiv3.User{ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"}}, nil
@@ -1302,6 +1363,7 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		}
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1372,6 +1434,7 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 		}
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1450,6 +1513,7 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 
 		var tokenDeleteCalled bool
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1519,6 +1583,7 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 
 		var tokenDeleteCalled, tokenUpdateCalled bool
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1609,6 +1674,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1669,6 +1735,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName, local.Name),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1717,6 +1784,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1769,6 +1837,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		}).AnyTimes()
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1821,6 +1890,7 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1920,6 +1990,7 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},
@@ -1972,6 +2043,7 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 		})
 
 		r := &refresher{
+			authConfigs: newFakeAuthConfigs(providerName),
 			userLister: &fakes.UserListerMock{
 				GetFunc: func(_, _ string) (*apiv3.User, error) { return user, nil },
 			},

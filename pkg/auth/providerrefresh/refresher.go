@@ -277,7 +277,11 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 		assign(&token)
 	}
 
-	for _, providerName := range providers.ProviderNames() {
+	providerNames, err := r.configuredProviderNames()
+	if err != nil {
+		return nil, err
+	}
+	for _, providerName := range providerNames {
 		canAccess, errConfirming, err := r.refreshProvider(attribs, providerName, user, loginTokens, derivedTokens, errorConfirmingLogins)
 		if err != nil {
 			return nil, err
@@ -441,6 +445,19 @@ func (r *refresher) refreshGroupPrincipals(
 	// Blank their principal so login tokens get cleaned up.
 	updatedPrincipalID = ""
 	return nil, canRefresh, errConfirming, updatedPrincipalID, nil
+}
+
+func (r *refresher) configuredProviderNames() ([]string, error) {
+	authConfigs, err := r.authConfigs.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing auth configs: %w", err)
+	}
+
+	providerNames := make([]string, 0, len(authConfigs.Items))
+	for _, authConfig := range authConfigs.Items {
+		providerNames = append(providerNames, authConfig.Name)
+	}
+	return providerNames, nil
 }
 
 func GetPrincipalIDForProvider(providerName string, user *apiv3.User) string {
