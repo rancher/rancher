@@ -139,14 +139,24 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		provClustersCache:  scaledContext.Wrangler.Provisioning.Cluster().Cache(),
 	}
 
-	return &httputil.ReverseProxy{
+	reverseProxy := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			if err := p.proxy(req); err != nil {
 				logrus.Infof("Failed to proxy: %v", err)
 			}
 		},
 		ModifyResponse: setModifiedHeaders,
-	}, nil
+	}
+
+	return stripInheritedCSP(reverseProxy), nil
+}
+
+// stripInheritedCSP drops the inherited Content-Security-Policy so that the one setModifiedHeaders sets is the only one sent.
+func stripInheritedCSP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Del(CSP)
+		next.ServeHTTP(rw, req)
+	})
 }
 
 func setModifiedHeaders(res *http.Response) error {
