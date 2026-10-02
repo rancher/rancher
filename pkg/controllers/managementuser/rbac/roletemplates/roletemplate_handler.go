@@ -7,8 +7,10 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,11 +24,13 @@ const (
 func newRoleTemplateHandler(uc *config.UserContext) *roleTemplateHandler {
 	return &roleTemplateHandler{
 		crController: uc.RBACw.ClusterRole(),
+		clusterName:  uc.ClusterName,
 	}
 }
 
 type roleTemplateHandler struct {
 	crController crbacv1.ClusterRoleController
+	clusterName  string
 }
 
 // OnChange ensures that the following Cluster Roles exist:
@@ -83,6 +87,8 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 	for _, currentCR := range currentCRs.Items {
 		if _, ok := desiredCRNames[currentCR.Name]; !ok {
 			// This ClusterRole is not part of the desired Cluster Role list, delete it
+			logrus.Tracef("[cluster-roletemplate-change-handler] installUUID=%s cluster=%s: clusterRole %q no longer desired for roleTemplate %q, deleting",
+				settings.InstallUUID.Get(), rth.clusterName, currentCR.Name, rt.Name)
 			if err := rbac.DeleteResource(currentCR.Name, rth.crController); err != nil {
 				return fmt.Errorf("failed to delete cluster role %s: %w", currentCR.Name, err)
 			}
@@ -91,6 +97,8 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 
 	// Make sure the desired Cluster Roles exist and have the right contents
 	for _, cr := range desiredCRs {
+		logrus.Tracef("[cluster-roletemplate-change-handler] installUUID=%s cluster=%s: ensuring clusterRole %q exists for roleTemplate %q",
+			settings.InstallUUID.Get(), rth.clusterName, cr.Name, rt.Name)
 		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
 			return fmt.Errorf("failed to create or update cluster role %s: %w", cr.Name, err)
 		}
