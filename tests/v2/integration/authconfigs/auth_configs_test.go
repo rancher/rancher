@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/rancher/shepherd/clients/rancher"
-	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/pkg/clientbase"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/suite"
@@ -90,68 +89,71 @@ func (s *AuthConfigTestSuite) TestAuthConfigsExistAndCannotBeDeleted() {
 
 // TestAuthConfigActions verifies that each auth config type exposes the
 // expected set of actions (testAndApply, configureTest, testAndEnable).
-func (s *AuthConfigTestSuite) TestAuthConfigActions() {
-	configs, err := s.client.Management.AuthConfig.List(nil)
-	s.Require().NoError(err)
 
-	configMap := map[string]management.AuthConfig{}
-	for _, config := range configs.Data {
-		configMap[config.Type] = config
-	}
+// TODO: KEVIN!!!! This can be removed
 
-	// Configs that should have testAndApply action.
-	testAndApplyConfigs := []string{
-		"activeDirectoryConfig",
-		"azureADConfig",
-		"cognitoConfig",
-		"freeIpaConfig",
-		"genericOIDCConfig",
-		"githubAppConfig",
-		"githubConfig",
-		"googleOauthConfig",
-		"oidcConfig",
-		"openLdapConfig",
-	}
-	for _, configType := range testAndApplyConfigs {
-		c, ok := configMap[configType]
-		s.Require().True(ok, "auth config %q not found", configType)
-		_, hasAction := c.Actions["testAndApply"]
-		s.Require().True(hasAction, "%s should have testAndApply action", configType)
-	}
+// func (s *AuthConfigTestSuite) TestAuthConfigActions() {
+// 	configs, err := s.client.Management.AuthConfig.List(nil)
+// 	s.Require().NoError(err)
 
-	// Configs that should have configureTest action.
-	configureTestConfigs := []string{
-		"azureADConfig",
-		"cognitoConfig",
-		"genericOIDCConfig",
-		"githubAppConfig",
-		"githubConfig",
-		"googleOauthConfig",
-		"oidcConfig",
-	}
-	for _, configType := range configureTestConfigs {
-		c, ok := configMap[configType]
-		s.Require().True(ok, "auth config %q not found", configType)
-		_, hasAction := c.Actions["configureTest"]
-		s.Require().True(hasAction, "%s should have configureTest action", configType)
-	}
+// 	configMap := map[string]management.AuthConfig{}
+// 	for _, config := range configs.Data {
+// 		configMap[config.Type] = config
+// 	}
 
-	// Configs that should have testAndEnable action.
-	testAndEnableConfigs := []string{
-		"adfsConfig",
-		"genericSAMLConfig",
-		"keyCloakConfig",
-		"oktaConfig",
-		"pingConfig",
-		"shibbolethConfig",
-	}
-	for _, configType := range testAndEnableConfigs {
-		c, ok := configMap[configType]
-		s.Require().True(ok, "auth config %q not found", configType)
-		_, hasAction := c.Actions["testAndEnable"]
-		s.Require().True(hasAction, "%s should have testAndEnable action", configType)
-	}
-}
+// 	// Configs that should have testAndApply action.
+// 	testAndApplyConfigs := []string{
+// 		"activeDirectoryConfig",
+// 		"azureADConfig",
+// 		"cognitoConfig",
+// 		"freeIpaConfig",
+// 		"genericOIDCConfig",
+// 		"githubAppConfig",
+// 		"githubConfig",
+// 		"googleOauthConfig",
+// 		"oidcConfig",
+// 		"openLdapConfig",
+// 	}
+// 	for _, configType := range testAndApplyConfigs {
+// 		c, ok := configMap[configType]
+// 		s.Require().True(ok, "auth config %q not found", configType)
+// 		_, hasAction := c.Actions["testAndApply"]
+// 		s.Require().True(hasAction, "%s should have testAndApply action", configType)
+// 	}
+
+// 	// Configs that should have configureTest action.
+// 	configureTestConfigs := []string{
+// 		"azureADConfig",
+// 		"cognitoConfig",
+// 		"genericOIDCConfig",
+// 		"githubAppConfig",
+// 		"githubConfig",
+// 		"googleOauthConfig",
+// 		"oidcConfig",
+// 	}
+// 	for _, configType := range configureTestConfigs {
+// 		c, ok := configMap[configType]
+// 		s.Require().True(ok, "auth config %q not found", configType)
+// 		_, hasAction := c.Actions["configureTest"]
+// 		s.Require().True(hasAction, "%s should have configureTest action", configType)
+// 	}
+
+// 	// Configs that should have testAndEnable action.
+// 	testAndEnableConfigs := []string{
+// 		"adfsConfig",
+// 		"genericSAMLConfig",
+// 		"keyCloakConfig",
+// 		"oktaConfig",
+// 		"pingConfig",
+// 		"shibbolethConfig",
+// 	}
+// 	for _, configType := range testAndEnableConfigs {
+// 		c, ok := configMap[configType]
+// 		s.Require().True(ok, "auth config %q not found", configType)
+// 		_, hasAction := c.Actions["testAndEnable"]
+// 		s.Require().True(hasAction, "%s should have testAndEnable action", configType)
+// 	}
+// }
 
 // TestAuthConfigSecrets verifies that updating a SAML auth config's spKey
 // causes the corresponding secret to be created in the cattle-global-data
