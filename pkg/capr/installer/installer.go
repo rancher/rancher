@@ -78,8 +78,11 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 	if err != nil {
 		return nil, err
 	}
+
+	provided := providedEnvVars(envVars)
+
 	binaryURL := ""
-	if settings.SystemAgentVersion.Get() != "" {
+	if settings.SystemAgentVersion.Get() != "" && !provided["CATTLE_AGENT_BINARY_BASE_URL"] {
 		if settings.ServerURL.Get() != "" {
 			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
 		} else if defaultHost != "" {
@@ -92,21 +95,17 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
 		ca = systemtemplate.InternalCAChecksum()
 	}
-	if ca != "" {
+	if ca != "" && !provided["CATTLE_CA_CHECKSUM"] {
 		ca = "CATTLE_CA_CHECKSUM=\"" + ca + "\""
+	} else {
+		ca = ""
 	}
 	if token != "" {
 		token = "CATTLE_ROLE_NONE=true\nCATTLE_TOKEN=\"" + token + "\""
 	}
 
 	// Merge the env vars with the AgentTLSModeStrict
-	found := false
-	for _, ev := range envVars {
-		if ev.Name == "STRICT_VERIFY" {
-			found = true // The user has specified `STRICT_VERIFY`, we should not attempt to overwrite it.
-		}
-	}
-	if !found {
+	if !provided["STRICT_VERIFY"] {
 		if settings.AgentTLSMode.Get() == settings.AgentTLSModeStrict {
 			envVars = append(envVars, corev1.EnvVar{
 				Name:  "STRICT_VERIFY",
@@ -132,7 +131,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 		envVarBuf.WriteString(fmt.Sprintf("export %s=%s\n", envVar.Name, escapeShellValue(envVar.Value)))
 	}
 	server := ""
-	if settings.ServerURL.Get() != "" {
+	if settings.ServerURL.Get() != "" && !provided["CATTLE_SERVER"] {
 		server = fmt.Sprintf("CATTLE_SERVER=%s", settings.ServerURL.Get())
 	}
 	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
@@ -146,6 +145,20 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 `, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
 }
 
+// providedEnvVars returns the set of env-var names with non-empty values supplied by the caller.
+// It is used to honor user-supplied agentEnvVars (e.g. CATTLE_SERVER, CATTLE_AGENT_BINARY_BASE_URL,
+// CATTLE_CA_CHECKSUM, STRICT_VERIFY) over values otherwise derived from global Rancher settings.
+func providedEnvVars(envVars []corev1.EnvVar) map[string]bool {
+	provided := make(map[string]bool, len(envVars))
+	for _, ev := range envVars {
+		if ev.Value == "" {
+			continue
+		}
+		provided[ev.Name] = true
+	}
+	return provided
+}
+
 func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, dataDir string) ([]byte, error) {
 	data, err := installScript(
 		settings.WinsAgentInstallScript,
@@ -154,8 +167,10 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		return nil, err
 	}
 
+	provided := providedEnvVars(envVars)
+
 	binaryURL := ""
-	if settings.WinsAgentVersion.Get() != "" {
+	if settings.WinsAgentVersion.Get() != "" && !provided["CATTLE_AGENT_BINARY_BASE_URL"] {
 		if settings.ServerURL.Get() != "" {
 			binaryURL = capr.FormatWindowsEnvVar(corev1.EnvVar{
 				Name:  "CATTLE_AGENT_BINARY_BASE_URL",
@@ -185,11 +200,13 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		ca = systemtemplate.InternalCAChecksum()
 	}
 
-	if ca != "" {
+	if ca != "" && !provided["CATTLE_CA_CHECKSUM"] {
 		ca = capr.FormatWindowsEnvVar(corev1.EnvVar{
 			Name:  "CATTLE_CA_CHECKSUM",
 			Value: ca,
 		}, false)
+	} else {
+		ca = ""
 	}
 
 	var tokenEnvVar, cattleRoleNone string
@@ -212,7 +229,7 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		envVarBuf.WriteString(capr.FormatWindowsEnvVar(envVar, false) + "\n")
 	}
 	server := ""
-	if settings.ServerURL.Get() != "" {
+	if settings.ServerURL.Get() != "" && !provided["CATTLE_SERVER"] {
 		server = capr.FormatWindowsEnvVar(corev1.EnvVar{
 			Name:  "CATTLE_SERVER",
 			Value: settings.ServerURL.Get(),
