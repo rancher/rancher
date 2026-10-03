@@ -3,6 +3,7 @@ package autoscaler
 import (
 	"fmt"
 
+	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -1261,4 +1262,181 @@ func (s *autoscalerSuite) TestCleanupRBAC_EdgeCase_PartialCleanupSuccess() {
 
 	// Assert the result - should succeed even when some resources don't exist
 	s.NoError(err, "Expected no error when some resources don't exist but others are cleaned up successfully")
+}
+
+// Test cases for ext token support (issue #55242)
+
+// TestEnsureUserToken_ExtTokenExists_KubeconfigExists verifies that when an ext
+// token already exists for the autoscaler user and the persisted kubeconfig
+// secret is present, ensureUserToken skips creating a legacy token and returns
+// an empty string so the caller reuses the existing kubeconfig secret.
+func (s *autoscalerSuite) TestEnsureUserToken_ExtTokenExists_KubeconfigExists() {
+	testCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+	username := "test-user"
+
+	// No legacy token.
+	s.tokenCache.EXPECT().Get(username).Return(nil, errors.NewNotFound(v3.Resource("token"), "token"))
+	// Ext token present.
+	s.extTokenStore.listForUserFn = func(u string) (*extv1.TokenList, error) {
+		s.Require().Equal(username, u)
+		return &extv1.TokenList{Items: []extv1.Token{{ObjectMeta: metav1.ObjectMeta{Name: "token-abc123"}}}}, nil
+	}
+	// Kubeconfig secret already present.
+	s.secretCache.EXPECT().Get(testCluster.Namespace, kubeconfigSecretName(testCluster)).Return(&corev1.Secret{}, nil)
+
+	result, err := s.h.ensureUserToken(testCluster, username)
+	s.Require().NoError(err)
+	s.Require().Empty(result, "empty result signals the caller to reuse the existing kubeconfig secret")
+}
+
+// TestEnsureUserToken_ExtTokenExists_KubeconfigMissing verifies that when an
+// ext token exists for the user but the kubeconfig secret is missing (an
+// unrecoverable state for the hashed ext token), ensureUserToken falls through
+// to legacy token creation so the controller can self-heal.
+func (s *autoscalerSuite) TestEnsureUserToken_ExtTokenExists_KubeconfigMissing() {
+	testCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+	username := "test-user"
+
+	s.tokenCache.EXPECT().Get(username).Return(nil, errors.NewNotFound(v3.Resource("token"), "token"))
+	s.extTokenStore.listForUserFn = func(u string) (*extv1.TokenList, error) {
+		return &extv1.TokenList{Items: []extv1.Token{{ObjectMeta: metav1.ObjectMeta{Name: "token-abc123"}}}}, nil
+	}
+	s.secretCache.EXPECT().Get(testCluster.Namespace, kubeconfigSecretName(testCluster)).Return(nil, errors.NewNotFound(schema.GroupResource{Resource: "secrets"}, "s"))
+	s.tokenClient.EXPECT().Create(gomock.AssignableToTypeOf(&v3.Token{})).DoAndReturn(func(token *v3.Token) (*v3.Token, error) {
+		return token, nil
+	})
+
+	result, err := s.h.ensureUserToken(testCluster, username)
+	s.Require().NoError(err)
+	s.Require().Contains(result, username+":", "legacy token creation should still happen when kubeconfig is missing")
+}
+
+// TestEnsureUserToken_ExtTokenListError verifies that a hard failure from the
+// ext token store is propagated to the caller.
+func (s *autoscalerSuite) TestEnsureUserToken_ExtTokenListError() {
+	testCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+	username := "test-user"
+
+	s.tokenCache.EXPECT().Get(username).Return(nil, errors.NewNotFound(v3.Resource("token"), "token"))
+	s.extTokenStore.listForUserFn = func(u string) (*extv1.TokenList, error) {
+		return nil, fmt.Errorf("boom")
+	}
+
+	result, err := s.h.ensureUserToken(testCluster, username)
+	s.Require().Error(err)
+	s.Require().Empty(result)
+	s.Require().Contains(err.Error(), "failed to list ext tokens")
+}
+
+// TestCleanupRBAC_DeletesExtTokens verifies that cleanupRBAC deletes every
+// ext token owned by the autoscaler user alongside the legacy token.
+func (s *autoscalerSuite) TestCleanupRBAC_DeletesExtTokens() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	s.userCache.EXPECT().Get(userName).Return(&v3.User{}, nil)
+	s.userClient.EXPECT().Delete(userName, gomock.Any()).Return(nil)
+
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(&v3.GlobalRole{}, nil)
+	s.globalRoleClient.EXPECT().Delete(globalRoleName, gomock.Any()).Return(nil)
+
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(&v3.GlobalRoleBinding{}, nil)
+	s.globalRoleBindingClient.EXPECT().Delete(globalRoleBindingName, gomock.Any()).Return(nil)
+
+	s.tokenCache.EXPECT().Get(userName).Return(&v3.Token{}, nil)
+	s.tokenClient.EXPECT().Delete(userName, gomock.Any()).Return(nil)
+
+	// Two ext tokens for this user - both must be deleted.
+	s.extTokenStore.listForUserFn = func(u string) (*extv1.TokenList, error) {
+		s.Require().Equal(userName, u)
+		return &extv1.TokenList{Items: []extv1.Token{
+			{ObjectMeta: metav1.ObjectMeta{Name: "token-aaa"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "token-bbb"}},
+		}}, nil
+	}
+
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(&corev1.Secret{}, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, secretName, gomock.Any()).Return(nil)
+
+	err := s.h.cleanupRBAC(cluster)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]string{"token-aaa", "token-bbb"}, s.extTokenStore.deleteCalls)
+}
+
+// TestCleanupRBAC_ExtTokenDeleteNotFoundTolerated verifies that a NotFound
+// error from the ext token store during Delete is silently tolerated, matching
+// the behaviour of the legacy delete path.
+func (s *autoscalerSuite) TestCleanupRBAC_ExtTokenDeleteNotFoundTolerated() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+	userName := autoscalerUserName(cluster)
+
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(v3.Resource("user"), userName))
+	s.globalRoleCache.EXPECT().Get(globalRoleName(cluster)).Return(nil, errors.NewNotFound(v3.Resource("globalrole"), ""))
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName(cluster)).Return(nil, errors.NewNotFound(v3.Resource("globalrolebinding"), ""))
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(v3.Resource("token"), userName))
+	s.extTokenStore.listForUserFn = func(u string) (*extv1.TokenList, error) {
+		return &extv1.TokenList{Items: []extv1.Token{{ObjectMeta: metav1.ObjectMeta{Name: "token-ghost"}}}}, nil
+	}
+	s.extTokenStore.deleteFn = func(name string, _ *metav1.DeleteOptions) error {
+		return errors.NewNotFound(schema.GroupResource{Resource: "tokens"}, name)
+	}
+	s.secretCache.EXPECT().Get(cluster.Namespace, kubeconfigSecretName(cluster)).Return(nil, errors.NewNotFound(schema.GroupResource{Resource: "secrets"}, ""))
+
+	err := s.h.cleanupRBAC(cluster)
+	s.Require().NoError(err, "NotFound from ext token delete should be tolerated")
+}
+
+// TestCleanupRBAC_ExtTokenListError verifies that a list error from the ext
+// token store is surfaced as part of the aggregated error, without aborting
+// the rest of the cleanup.
+func (s *autoscalerSuite) TestCleanupRBAC_ExtTokenListError() {
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+	userName := autoscalerUserName(cluster)
+
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(v3.Resource("user"), userName))
+	s.globalRoleCache.EXPECT().Get(globalRoleName(cluster)).Return(nil, errors.NewNotFound(v3.Resource("globalrole"), ""))
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName(cluster)).Return(nil, errors.NewNotFound(v3.Resource("globalrolebinding"), ""))
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(v3.Resource("token"), userName))
+	s.extTokenStore.listForUserFn = func(u string) (*extv1.TokenList, error) {
+		return nil, fmt.Errorf("ext list failure")
+	}
+	// Secret cleanup still proceeds.
+	s.secretCache.EXPECT().Get(cluster.Namespace, kubeconfigSecretName(cluster)).Return(nil, errors.NewNotFound(schema.GroupResource{Resource: "secrets"}, ""))
+
+	err := s.h.cleanupRBAC(cluster)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "failed to list ext tokens")
 }
