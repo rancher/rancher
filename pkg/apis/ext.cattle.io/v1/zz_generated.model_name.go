@@ -22,6 +22,26 @@ limitations under the License.
 package v1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CloudCredential) OpenAPIModelName() string {
+	return "ext.cattle.io.v1.CloudCredential"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CloudCredentialList) OpenAPIModelName() string {
+	return "ext.cattle.io.v1.CloudCredentialList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CloudCredentialSpec) OpenAPIModelName() string {
+	return "ext.cattle.io.v1.CloudCredentialSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CloudCredentialStatus) OpenAPIModelName() string {
+	return "ext.cattle.io.v1.CloudCredentialStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in GroupMembershipRefreshRequest) OpenAPIModelName() string {
 	return "ext.cattle.io.v1.GroupMembershipRefreshRequest"
 }
