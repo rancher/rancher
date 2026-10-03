@@ -17,6 +17,47 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+func TestLegacyClusterAutoscalerSettingValues(t *testing.T) {
+	tests := map[string]struct {
+		value      string
+		chartMatch bool
+		imageMatch bool
+	}{
+		"registry host": {
+			value:      "registry.example.com/rancher/appco-kubernetes-cluster-autoscaler",
+			imageMatch: true,
+		},
+		"registry port": {
+			value:      "registry.example.com:5000/rancher/appco-kubernetes-cluster-autoscaler",
+			imageMatch: true,
+		},
+		"chart repository": {
+			value:      "oci://registry.example.com/rancher/charts/appco-kubernetes-cluster-autoscaler",
+			chartMatch: true,
+		},
+		"custom repository": {
+			value: "oci://registry.example.com/custom/cluster-autoscaler",
+		},
+		"tagged image": {
+			value: "registry.example.com/rancher/appco-kubernetes-cluster-autoscaler:v1",
+		},
+		"extra path": {
+			value: "registry.example.com/rancher/appco-kubernetes-cluster-autoscaler/extra",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := legacyClusterAutoscalerChartRepositoryRegexp.MatchString(test.value); got != test.chartMatch {
+				t.Fatalf("chart match = %v, want %v", got, test.chartMatch)
+			}
+			if got := legacyClusterAutoscalerImageRegexp.MatchString(test.value); got != test.imageMatch {
+				t.Fatalf("image match = %v, want %v", got, test.imageMatch)
+			}
+		})
+	}
+}
+
 func TestForceUpgradeLogout(t *testing.T) {
 
 	const (
@@ -227,7 +268,7 @@ func TestForceUpgradeLogout(t *testing.T) {
 type extDeletionStub struct {
 	count int
 	t     *testing.T
-	err error
+	err   error
 }
 
 func (e *extDeletionStub) DeleteCollection(options *metav1.ListOptions) error {
