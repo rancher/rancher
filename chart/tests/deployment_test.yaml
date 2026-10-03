@@ -225,28 +225,19 @@ tests:
   - contains:
       path: spec.template.spec.containers[0].volumeMounts
       content:
-        mountPath: /usr/share/rancher/ui/assets/images/logos
-        name: custom-logos
-        subPath: ember
-  - contains:
-      path: spec.template.spec.containers[0].volumeMounts
-      content:
         mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
         name: custom-logos
         subPath: vue
+  - notContains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        mountPath: /usr/share/rancher/ui/assets/images/logos
 - it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeSubpaths.* blank
   set:
     customLogos.enabled: true
     customLogos.volumeKind: persistentVolumeClaim
-    customLogos.volumeSubpaths.emberUi: ""
     customLogos.volumeSubpaths.vueUi: ""
   asserts:
-  - contains:
-      path: spec.template.spec.containers[0].volumeMounts
-      content:
-        mountPath: /usr/share/rancher/ui/assets/images/logos
-        name: custom-logos
-        subPath: ember
   - contains:
       path: spec.template.spec.containers[0].volumeMounts
       content:
@@ -257,22 +248,15 @@ tests:
   set:
     customLogos.enabled: true
     customLogos.volumeKind: persistentVolumeClaim
-    customLogos.volumeSubpaths.emberUi: test_ember
     customLogos.volumeSubpaths.vueUi: test_vue
   asserts:
-  - contains:
-      path: spec.template.spec.containers[0].volumeMounts
-      content:
-        mountPath: /usr/share/rancher/ui/assets/images/logos
-        name: custom-logos
-        subPath: test_ember
   - contains:
       path: spec.template.spec.containers[0].volumeMounts
       content:
         mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
         name: custom-logos
         subPath: test_vue
-- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeName
+- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=configMap and customLogos.volumeName
   set:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
@@ -281,49 +265,33 @@ tests:
   - contains:
       path: spec.template.spec.containers[0].volumeMounts
       content:
-        mountPath: /usr/share/rancher/ui/assets/images/logos
-        name: custom-logos
-        subPath: ember
-  - contains:
-      path: spec.template.spec.containers[0].volumeMounts
-      content:
         mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
         name: custom-logos
         subPath: vue
-- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeName and customLogos.volumeSubpaths.* blank
+  - notContains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        mountPath: /usr/share/rancher/ui/assets/images/logos
+- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=configMap and customLogos.volumeName and customLogos.volumeSubpaths.* blank
   set:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
     customLogos.volumeName: existing-configMap
-    customLogos.volumeSubpaths.emberUi: ""
     customLogos.volumeSubpaths.vueUi: ""
   asserts:
   - contains:
       path: spec.template.spec.containers[0].volumeMounts
       content:
-        mountPath: /usr/share/rancher/ui/assets/images/logos
-        name: custom-logos
-        subPath: ember
-  - contains:
-      path: spec.template.spec.containers[0].volumeMounts
-      content:
         mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
         name: custom-logos
         subPath: vue
-- it: should mount custom-logos volume with specified subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeName
+- it: should mount custom-logos volume with specified subpaths if customLogos.enabled and customLogos.volumeKind=configMap and customLogos.volumeName
   set:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
     customLogos.volumeName: existing-configMap
-    customLogos.volumeSubpaths.emberUi: test_ember
     customLogos.volumeSubpaths.vueUi: test_vue
   asserts:
-  - contains:
-      path: spec.template.spec.containers[0].volumeMounts
-      content:
-        mountPath: /usr/share/rancher/ui/assets/images/logos
-        name: custom-logos
-        subPath: test_ember
   - contains:
       path: spec.template.spec.containers[0].volumeMounts
       content:
