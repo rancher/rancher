@@ -355,7 +355,6 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 		features.RKE2.Name():                           false,
 		features.ProvisioningV2.Name():                 false,
 		features.Turtles.Name():                        false,
-		features.ProvisioningPreBootstrap.Name():       capr.PreBootstrap(cluster),
 		features.ManagedSystemUpgradeController.Name(): enableMSUC,
 	}
 }
@@ -372,7 +371,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            settings.ServerURL.Get(),
-		IsPreBootstrap: capr.PreBootstrap(cluster),
+		IsPreBootstrap: capr.ShouldPreBootstrap(cluster),
 		Cluster:        cluster,
 		AgentFeatures:  GetDesiredFeatures(cluster),
 		Taints:         taints,

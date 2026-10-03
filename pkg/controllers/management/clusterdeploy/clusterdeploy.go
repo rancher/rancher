@@ -707,7 +707,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 		Namespace:      cluster.Name,
 		Token:          token,
 		URL:            url,
-		IsPreBootstrap: capr.PreBootstrap(cluster),
+		IsPreBootstrap: capr.ShouldPreBootstrap(cluster),
 		Cluster:        cluster,
 		AgentFeatures:  features,
 		Taints:         taints,

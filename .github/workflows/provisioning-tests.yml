@@ -37,7 +37,7 @@ jobs:
         run: |
           set -eo pipefail
 
-          # On a PR, diff against the base (target) SHA 
+          # On a PR, diff against the base (target) SHA
           if [ "$EVENT_NAME" = "pull_request" ]; then
             export DIFF_BASE="$BASE_SHA"
           elif [ -z "$EXPLICIT_SCOPES" ]; then
@@ -188,12 +188,12 @@ jobs:
         shell: bash
         run: |
           echo "Provisioning Test Summary"
-          echo "--------------------------------"        
+          echo "--------------------------------"
           if [[ "${SETUP_MATRIX_RESULT}" != "success" && "${SETUP_MATRIX_RESULT}" != "skipped" ]]; then
             echo "Failed to setup test matrix."
             exit 1
           fi
-          
+
           if [[ "${PROVISIONING_TESTS_RESULT}" != "success" && "${PROVISIONING_TESTS_RESULT}" != "skipped" ]]; then
             echo "Some provisioning tests failed. Please check the logs for details."
             exit 1
