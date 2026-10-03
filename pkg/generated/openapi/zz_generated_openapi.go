@@ -423,6 +423,13 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"defaultContextType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DefaultContextType specifies which context endpoint to use as the default in the generated kubeconfig. Valid values are \"ace\" (default) and \"proxy\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
