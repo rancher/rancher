@@ -10,6 +10,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/client-go/kubernetes"
 )
@@ -138,4 +139,12 @@ func (s *DeferredServer) K8sClient(clusterName string) (kubernetes.Interface, er
 		return nil, err
 	}
 	return clusterContext.K8sClient, nil
+}
+
+func (s *DeferredServer) UserContext(clusterName string) (*config.UserContext, error) {
+	mcm := s.getMCM()
+	if mcm == nil || mcm.clusterManager == nil {
+		return nil, fmt.Errorf("no cluster manager")
+	}
+	return mcm.clusterManager.UserContext(clusterName)
 }
