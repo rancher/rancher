@@ -149,6 +149,10 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		if !userOwnedBy(provider, user) {
+			continue
+		}
+
 		userName := first(attr.ExtraByProvider[provider]["username"])
 		externalID := first(attr.ExtraByProvider[provider]["externalid"])
 
@@ -213,7 +217,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 //   - 200 when re-provisioning a previously deactivated user (matched by externalId)
 //   - 201 on success
 //   - 400 for invalid requests
-//   - 409 if the user already exists.
+//   - 409 if the user already exists or the principal belongs to a user the provider doesn't own.
 //
 // Note: The requested state of the active attribute is deliberately ignored - true is implied.
 // For IdP-driven provisioning, active acts as a lifecycle signal:
@@ -255,6 +259,21 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// EnsureUser returns the user who holds the principal, so a holder that isn't owned is refused
+	// before anything is written.
+	for _, user := range list {
+		if !slices.Contains(user.PrincipalIDs, principalName) {
+			continue
+		}
+
+		if !userOwnedBy(provider, user) {
+			logrus.Debugf("scim::CreateUser: user %s holds %s and isn't owned by provider %s", user.Name, principalName, provider)
+			writeError(w, notManagedConflict(user.Name))
+			return
+		}
+		break
+	}
+
 	type reprovisionMatch struct {
 		user *v3.User
 		attr *v3.UserAttribute
@@ -271,6 +290,10 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 			logrus.Errorf("scim::CreateUser: failed to get user attributes for %s: %s", user.Name, err)
 			writeError(w, NewInternalError())
 			return
+		}
+
+		if !userOwnedBy(provider, user) {
+			continue
 		}
 
 		userName := first(attr.ExtraByProvider[provider]["username"])
@@ -315,6 +338,13 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to ensure user %s: %s", principalName, err)
 		writeError(w, NewInternalError())
+		return
+	}
+
+	// The holder of the principal may have changed since the check above.
+	if !userOwnedBy(provider, user) {
+		logrus.Debugf("scim::CreateUser: user %s holds %s and isn't owned by provider %s", user.Name, principalName, provider)
+		writeError(w, notManagedConflict(user.Name))
 		return
 	}
 
@@ -441,14 +471,14 @@ func (s *SCIMServer) reprovisionUser(w http.ResponseWriter, r *http.Request, pro
 // Returns:
 //   - 200 on success
 //   - 400 for invalid requests
-//   - 404 if the user is not found or is a system user.
+//   - 404 if the user is not found, is a system user or isn't owned by the provider.
 func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::GetUser: query %s", r.URL)
 
 	provider := r.PathValue("provider")
 	id := r.PathValue("id")
 
-	user, err := s.userCache.Get(id)
+	user, err := s.getOwnedUser(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
@@ -523,6 +553,10 @@ func (s *SCIMServer) checkUserConflict(provider, userName, externalID, excludeUs
 			return NewInternalError()
 		}
 
+		if !userOwnedBy(provider, u) {
+			continue
+		}
+
 		if userName != "" && strings.EqualFold(first(attr.ExtraByProvider[provider]["username"]), userName) {
 			return NewError(http.StatusConflict, fmt.Sprintf("User with username %s already exists", userName))
 		}
@@ -539,8 +573,7 @@ func (s *SCIMServer) checkUserConflict(provider, userName, externalID, excludeUs
 // Returns:
 //   - 200 on success
 //   - 400 for invalid requests
-//   - 404 if the user is not found or is a system user
-//   - 409 if attempting to deprovision the default admin user.
+//   - 404 if the user is not found, is a system user or isn't owned by the provider.
 func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::UpdateUser: url %s", r.URL)
 
@@ -560,7 +593,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.userCache.Get(id)
+	user, err := s.getOwnedUser(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
@@ -680,14 +713,13 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // DeleteUser permanently deletes a user by ID.
 // Returns:
 //   - 204 on successful deletion
-//   - 404 if the user is not found or is a system user
-//   - 409 if attempting to delete the default admin user.
+//   - 404 if the user is not found, is a system user or isn't owned by the provider.
 func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::DeleteUser: url %s", r.URL)
-	// provider := r.PathValue("provider")
+	provider := r.PathValue("provider")
 	id := r.PathValue("id")
 
-	user, err := s.userCache.Get(id)
+	user, err := s.getOwnedUser(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
@@ -724,15 +756,14 @@ func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
 // Returns:
 //   - 200 on success
 //   - 400 for invalid requests
-//   - 404 if the user is not found or is a system user
-//   - 409 if attempting to deprovision the default admin user.
+//   - 404 if the user is not found, is a system user or isn't owned by the provider.
 func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::PatchUser: url %s", r.URL)
 
 	provider := r.PathValue("provider")
 	id := r.PathValue("id")
 
-	user, err := s.userCache.Get(id)
+	user, err := s.getOwnedUser(provider, id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
