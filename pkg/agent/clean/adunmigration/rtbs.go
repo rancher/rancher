@@ -82,9 +82,9 @@ func identifyPRTBs(workunits *[]migrateUserWorkUnit, prtbList *v3.ProjectRoleTem
 func identifyGRBs(workunits *[]migrateUserWorkUnit, grbList *v3.GlobalRoleBindingList) {
 	duplicateLocalWorkUnitsByName := map[string]int{}
 
-	for _, workunit := range *workunits {
+	for i, workunit := range *workunits {
 		for j := range workunit.duplicateUsers {
-			duplicateLocalWorkUnitsByName[workunit.duplicateUsers[j].Name] = j
+			duplicateLocalWorkUnitsByName[workunit.duplicateUsers[j].Name] = i
 		}
 	}
 
