@@ -44,7 +44,7 @@ runs:
         HELM_VERSION=$(grep -m1 'ENV HELM_VERSION=' package/Dockerfile.installer | cut -d '=' -f2)
         HELM_CHECKSUM_amd64=$(grep -m1 'ENV HELM_CHECKSUM_amd64=' package/Dockerfile.installer | cut -d '=' -f2)
         HELM_CHECKSUM_arm64=$(grep -m1 'ENV HELM_CHECKSUM_arm64=' package/Dockerfile.installer | cut -d '=' -f2)
-        GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
+        GO_VERSION=$(egrep -m1 '/go(lang)?:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
         HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.runtime | cut -d '=' -f2)
         CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
 
