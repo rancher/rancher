@@ -10,9 +10,7 @@ import (
 	capiv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-var (
-	errUnsupportedClusterType = fmt.Errorf("unsupported cluster type")
-)
+var errUnsupportedClusterType = fmt.Errorf("unsupported cluster type")
 
 func init() {
 	RegisterAdapter(capiv1beta2.GroupVersion.WithKind("Cluster"), func(clients *wrangler.CAPIContext, ustr *unstructured.Unstructured) (Adapter, error) {
@@ -36,7 +34,8 @@ func init() {
 // resolve the mgmt-side snapshot namespace independently of the CAPI Cluster's namespace.
 func capiClusterAdapter(clients *wrangler.CAPIContext, cluster *capiv1beta2.Cluster, mgmtClusterName string) (Adapter, error) {
 	if cluster.Spec.ControlPlaneRef.APIGroup == controlplanev1beta2.GroupVersion.Group && cluster.Spec.ControlPlaneRef.Kind == "RKE2ControlPlane" {
-		obj, err := clients.Dynamic.Get(controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlane"), cluster.Namespace, cluster.Name)
+		cpName := cluster.Spec.ControlPlaneRef.Name
+		obj, err := clients.Dynamic.Get(controlplanev1beta2.GroupVersion.WithKind("RKE2ControlPlane"), cluster.Namespace, cpName)
 		if err != nil {
 			return nil, err
 		}
@@ -46,12 +45,12 @@ func capiClusterAdapter(clients *wrangler.CAPIContext, cluster *capiv1beta2.Clus
 		// directly (mirrors how CAPRAdapter holds a typed *rkev1.RKEControlPlane).
 		cpUstr, ok := obj.(*unstructured.Unstructured)
 		if !ok {
-			return nil, fmt.Errorf("expected *unstructured.Unstructured for RKE2ControlPlane %s/%s, got %T", cluster.Namespace, cluster.Name, obj)
+			return nil, fmt.Errorf("expected *unstructured.Unstructured for RKE2ControlPlane %s/%s, got %T", cluster.Namespace, cpName, obj)
 		}
 
 		controlPlane := &controlplanev1beta2.RKE2ControlPlane{}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(cpUstr.Object, controlPlane); err != nil {
-			return nil, fmt.Errorf("converting RKE2ControlPlane %s/%s from unstructured: %w", cluster.Namespace, cluster.Name, err)
+			return nil, fmt.Errorf("converting RKE2ControlPlane %s/%s from unstructured: %w", cluster.Namespace, cpName, err)
 		}
 
 		return &CAPRKE2Adapter{
