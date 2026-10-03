@@ -173,20 +173,6 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
-	// If the auth provider is specified make sure it exists and enabled.
-	if token.GetAuthProvider() != "" {
-		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider())
-		if err != nil {
-			return nil, errors.Wrapf(ErrMustAuthenticate,
-				"error checking if provider %s is disabled: %v",
-				token.GetAuthProvider(), err)
-		}
-		if disabled {
-			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled",
-				token.GetAuthProvider())
-		}
-	}
-
 	attribs, err := a.userAttributeLister.Get("", token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, errors.Wrapf(ErrMustAuthenticate,
@@ -197,6 +183,21 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	if err != nil {
 		return nil, errors.Wrapf(ErrMustAuthenticate,
 			"failed to retrieve user %s: %v", token.GetUserID(), err)
+	}
+
+	// System tokens are not tied to an auth provider configuration. Their
+	// system:// principals cannot be used to determine a provider config name.
+	if token.GetAuthProvider() != "" && !authUser.IsSystem() {
+		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider())
+		if err != nil {
+			return nil, errors.Wrapf(ErrMustAuthenticate,
+				"error checking if provider %s is disabled: %v",
+				token.GetAuthProvider(), err)
+		}
+		if disabled {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled",
+				token.GetAuthProvider())
+		}
 	}
 
 	if authUser.Enabled != nil && !*authUser.Enabled {

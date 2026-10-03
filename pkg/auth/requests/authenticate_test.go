@@ -455,6 +455,28 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		assert.False(t, userRefresher.called)
 	})
 
+	t.Run("system users are not rejected by disabled auth providers", func(t *testing.T) {
+		oldPrincipalIDs := user.PrincipalIDs
+		oldUserPrincipal := token.UserPrincipal
+		oldDisabled := fakeProvider.disabled
+		defer func() {
+			user.PrincipalIDs = oldPrincipalIDs
+			token.UserPrincipal = oldUserPrincipal
+			fakeProvider.disabled = oldDisabled
+		}()
+
+		user.PrincipalIDs = []string{"system://provisioning/fleet-local/local"}
+		token.UserPrincipal.Name = user.PrincipalIDs[0]
+		fakeProvider.disabled = true
+		userRefresher.reset()
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.IsAuthed)
+		assert.False(t, userRefresher.called)
+	})
+
 	t.Run("don't check provider if not specified in the token", func(t *testing.T) {
 		oldTokenAuthProvider := token.AuthProvider
 		defer func() { token.AuthProvider = oldTokenAuthProvider }()
