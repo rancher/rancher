@@ -41,6 +41,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	clusterCreateRole := rb.addRole("Create Clusters", "clusters-create")
 	clusterCreateRole.addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
+		addRule().apiGroups("turtles-capi.cattle.io").resources("capiproviders").verbs("get", "list").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
