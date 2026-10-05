@@ -19,7 +19,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 )
 
 const cognitoGroupsClaim = "cognito:groups"
@@ -68,8 +67,14 @@ func (o *OpenIDCProvider) ConfigureTest(request *types.APIContext) error {
 		SetPKCEVerifier(request.Request, request.Response, pkceVerifier)
 	}
 
+	values := &orderedValues{}
+	scopeValue, ok := input[client.GenericOIDCConfigFieldScopes]
+	if ok {
+		values.Add("scope", scopeValue.(string))
+	}
+
 	data := map[string]any{
-		"redirectUrl": GetOIDCRedirectionURL(input, pkceVerifier, &orderedValues{}),
+		"redirectUrl": GetOIDCRedirectionURL(input, pkceVerifier, values),
 		"type":        "OIDCTestOutput",
 	}
 
@@ -95,7 +100,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	// set a default value for GroupSearchEnabled
 	// in case user input is nil for some reasons.
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
-		oidcConfig.GroupSearchEnabled = ptr.To(false)
+		oidcConfig.GroupSearchEnabled = new(false)
 	}
 	// we need to set cognito:groups as GroupsClaim in order to be able to fetch groups from aws cognito
 	if oidcConfig.Type == client.CognitoConfigType {
