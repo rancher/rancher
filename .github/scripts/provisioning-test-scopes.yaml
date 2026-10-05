@@ -54,9 +54,14 @@
 explicit:
   - name: nightly
     meta:
+      # Changes to the 'branches' list do not need to be
+      # backported, as the scheduled task which needs it
+      # can only run against the default branch.
       branches:
         - main
         # - release/v2.15 uncomment once the nightly workflow has been backported
+    # Unlike 'branches', specific test cases do need to be backported if they are intended
+    # to run nightly against a specific release line.
     tests:
       - { dist: k3s,  regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
       - { dist: rke2, regex: '^Test_Imported_Operation_(SetE_Imported|SetD_.*LifecycleHook).*$' }
