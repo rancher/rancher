@@ -319,32 +319,79 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 }
 
 func TestCreateClusterRole(t *testing.T) {
-	ctrl := gomock.NewController(t)
-
 	assert.NoError(t, settings.InstallUUID.Set("test-install-uuid"))
 
-	rt := &v3.RoleTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: "rt-test"},
-		Rules: []v1.PolicyRule{
-			{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+	rules := []v1.PolicyRule{
+		{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+	}
+	rt := &v3.RoleTemplate{ObjectMeta: metav1.ObjectMeta{Name: "rt-test"}, Rules: rules}
+	alreadyExists := errors.NewAlreadyExists(v1.Resource("clusterroles"), "rt-test")
+	clusterRoleWith := func(annotations map[string]string) *v1.ClusterRole {
+		return &v1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "rt-test", Annotations: annotations},
+			Rules:      rules,
+		}
+	}
+	ownAnnotations := map[string]string{
+		clusterRoleOwner:            "rt-test",
+		clusterRoleOwnerInstallUUID: "test-install-uuid",
+	}
+
+	tests := map[string]struct {
+		setup   func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList])
+		wantErr bool
+	}{
+		"created": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(clusterRoleWith(ownAnnotations))
+			},
+		},
+		"already exists, owned without install-uuid: backfilled": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, alreadyExists)
+				mock.EXPECT().Get("rt-test", gomock.Any()).Return(clusterRoleWith(map[string]string{clusterRoleOwner: "rt-test"}), nil)
+				mock.EXPECT().Update(clusterRoleWith(ownAnnotations))
+			},
+		},
+		"already exists, foreign install-uuid: not updated": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, alreadyExists)
+				mock.EXPECT().Get("rt-test", gomock.Any()).Return(clusterRoleWith(map[string]string{
+					clusterRoleOwner:            "rt-test",
+					clusterRoleOwnerInstallUUID: "foreign-install-uuid",
+				}), nil)
+			},
+		},
+		"already exists, get fails: error": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, alreadyExists)
+				mock.EXPECT().Get("rt-test", gomock.Any()).Return(nil, fmt.Errorf("boom"))
+			},
+			wantErr: true,
+		},
+		"create fails: error": {
+			setup: func(mock *wfakes.MockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList]) {
+				mock.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("boom"))
+			},
+			wantErr: true,
 		},
 	}
 
-	mock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-	mock.EXPECT().Create(&v1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "rt-test",
-			Annotations: map[string]string{
-				clusterRoleOwner:            "rt-test",
-				clusterRoleOwnerInstallUUID: "test-install-uuid",
-			},
-		},
-		Rules: rt.Rules,
-	})
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			test.setup(mock)
 
-	m := manager{clusterRoles: mock}
-	err := m.createClusterRole(rt)
-	assert.NoError(t, err)
+			m := manager{clusterRoles: mock}
+			err := m.createClusterRole(rt)
+			if test.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestCompareAndUpdateClusterRoleInstallUUIDBackfill(t *testing.T) {

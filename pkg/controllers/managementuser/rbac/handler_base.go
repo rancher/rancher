@@ -308,7 +308,15 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 		},
 		Rules: rt.Rules,
 	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if apierrors.IsAlreadyExists(err) {
+		// The cache was stale. Reconcile the existing object so rules and the install-uuid get synced now.
+		existing, err := m.clusterRoles.Get(rt.Name, metav1.GetOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "error getting clusterRole %v", rt.Name)
+		}
+		return m.compareAndUpdateClusterRole(existing, rt)
+	}
+	if err != nil {
 		return errors.Wrapf(err, "couldn't create clusterRole %v", rt.Name)
 	}
 	return nil
