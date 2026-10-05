@@ -66,10 +66,10 @@ func TestOutcomeConditionFor(t *testing.T) {
 			wantSummary: "Operation failed",
 		},
 		{
-			name:        "aborted",
+			name:        "rejected",
 			phase:       OperationPhaseRejected,
 			wantCond:    RejectedCondition,
-			wantSummary: "Operation aborted",
+			wantSummary: "Operation rejected",
 		},
 		{
 			name:        "canceled",
@@ -130,10 +130,10 @@ func TestMarkOutcome(t *testing.T) {
 			wantMsg:    "the operative detail",
 		},
 		{
-			name:       "aborted",
+			name:       "rejected",
 			mark:       func(s *OperationStatus) { s.MarkRejected(PreflightCheckFailedReason, "the operative detail") },
 			wantPhase:  OperationPhaseRejected,
-			wantCond:   "Aborted",
+			wantCond:   "Rejected",
 			wantReason: PreflightCheckFailedReason,
 			wantMsg:    "the operative detail",
 		},

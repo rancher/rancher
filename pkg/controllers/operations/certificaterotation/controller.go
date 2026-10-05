@@ -27,19 +27,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// ControllerOwnerKey is the shared operation-type key for certificate rotation coordination.
-const ControllerOwnerKey = "certificate-rotation"
+const (
+	// ControllerOwnerKey is the shared operation-type key for certificate rotation coordination.
+	ControllerOwnerKey = "certificate-rotation"
 
-// OperationKind is this operation's kind, as it appears in the beacon claims the controller writes.
-// See ops.BeaconOwnerKey.
-const OperationKind = "CertificateRotation"
+	// OperationKind is this operation's kind, as it appears in the beacon claims the controller writes.
+	// See ops.BeaconOwnerKey.
+	OperationKind = "CertificateRotation"
 
-const Finalizer = "certificaterotation.operation.cattle.io"
+	Finalizer = "certificaterotation.operation.cattle.io"
 
-// RotateStepHookLabelPrefix gates the Rotate step, before reconcileRotate pauses the cluster and
-// assigns the rotation plan to each node in turn. It fires before PauseCluster so a delegate
-// observes the cluster in its pre-pause state.
-const RotateStepHookLabelPrefix = "rotate.step.hook.operation.cattle.io/"
+	// RotateStepHookLabelPrefix gates the Rotate step, before reconcileRotate pauses the cluster and
+	// assigns the rotation plan to each node in turn. It fires before PauseCluster so a delegate
+	// observes the cluster in its pre-pause state.
+	RotateStepHookLabelPrefix = "rotate.step.hook.operation.cattle.io/"
+)
 
 // stepHookPrefixFor returns the step-hook label prefix for the given rotation step, or "" for an
 // unknown / empty step. Used by handleInProgress to decide whether beacon-authorization loss is
