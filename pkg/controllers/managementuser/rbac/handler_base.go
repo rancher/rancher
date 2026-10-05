@@ -268,6 +268,13 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 }
 
 func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, rt *v3.RoleTemplate) error {
+	installUUID := settings.InstallUUID.Get()
+	if ownerInstallUUID, ok := clusterRole.Annotations[clusterRoleOwnerInstallUUID]; ok && ownerInstallUUID != installUUID {
+		logrus.Tracef("installUUID=%s cluster=%s: clusterRole %v is owned by a different Rancher install (installUUID=%s), skipping update",
+			installUUID, m.clusterName, clusterRole.Name, ownerInstallUUID)
+		return nil
+	}
+
 	// Backfill the install UUID on owned ClusterRoles created before it was introduced. Never overwrite
 	// an existing value, so that installs sharing a cluster can't fight over ownership.
 	_, owned := clusterRole.Annotations[clusterRoleOwner]
@@ -280,10 +287,10 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 	clusterRole = clusterRole.DeepCopy()
 	clusterRole.Rules = rt.Rules
 	if needsStamp {
-		clusterRole.Annotations[clusterRoleOwnerInstallUUID] = settings.InstallUUID.Get()
+		clusterRole.Annotations[clusterRoleOwnerInstallUUID] = installUUID
 	}
 	logrus.Tracef("installUUID=%s cluster=%s: Updating clusterRole %v.",
-		settings.InstallUUID.Get(), m.clusterName, clusterRole.Name)
+		installUUID, m.clusterName, clusterRole.Name)
 	logrus.Infof("cluster=%s: Updating clusterRole %v because of rules or owner install-uuid difference with roleTemplate %v (%v).",
 		m.clusterName, clusterRole.Name, rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Update(clusterRole)
