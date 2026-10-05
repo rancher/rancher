@@ -7,6 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -15,30 +16,31 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
+// OnMgmtClusterRemove asks for the provisioning cluster that created a management cluster to be deleted
+// when the management cluster is deleted on its own, since the provisioning cluster would otherwise create
+// it again. It doesn't wait: the provisioning cluster removes the management cluster it created, see
+// removeManagementClusterFinalizer, and a provisioning cluster created by the management cluster is
+// removed by removeProvisioningClusterFinalizer.
 func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	provisioningClusters, err := h.clusterCache.GetByIndex(ByCluster, cluster.Name)
+	namespace, name, ok := util.CreatedByProvisioningCluster(cluster)
+	if !ok {
+		return cluster, nil
+	}
+	provCluster, err := h.clusterCache.Get(namespace, name)
+	if apierrors.IsNotFound(err) {
+		return cluster, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-
-	var legacyCluster bool
-	for _, provisioningCluster := range provisioningClusters {
-		legacyCluster = legacyCluster || h.isLegacyCluster(provisioningCluster)
-		if err := h.clusters.Delete(provisioningCluster.Namespace, provisioningCluster.Name, nil); err != nil {
-			return nil, err
-		}
-	}
-
-	if len(provisioningClusters) == 0 || legacyCluster {
-		// If any of the provisioning clusters are legacy clusters (i.e. RKE1 clusters) then we don't wait for the
-		// provisioning clusters to be deleted because the provisioning cluster is waiting for the management cluster to delete.
+	if provCluster.DeletionTimestamp != nil || provCluster.Status.ClusterName != cluster.Name {
 		return cluster, nil
 	}
-
-	h.mgmtClusters.EnqueueAfter(cluster.Name, 5*time.Second)
-	// generic.ErrSkip will mark the cluster object as reconciled, but won't remove the finalizer.
-	// The finalizer should be removed after the provisioning cluster is gone.
-	return cluster, generic.ErrSkip
+	uid := provCluster.UID
+	if err := h.clusters.Delete(provCluster.Namespace, provCluster.Name, &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsConflict(err) {
+		return nil, err
+	}
+	return cluster, nil
 }
 
 func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, error) {
@@ -68,26 +70,23 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 				if !apierrors.IsNotFound(err) {
 					return "", err
 				}
-			} else if cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
-				// We only delete the management cluster if its FleetWorkspaceName matches the provisioning cluster's
-				// namespace. The reason: if there's a mismatch, we know that the provisioning cluster needs to be migrated
-				// because the user moved the Fleet cluster (and provisioning cluster, by extension) to another
-				// FleetWorkspace. Ultimately, the aforementioned cluster objects are re-created in another namespace.
-				err := h.mgmtClusters.Delete(cluster.Status.ClusterName, nil)
-				if err != nil && !apierrors.IsNotFound(err) {
-					return "", err
-				}
-
-				if h.isLegacyCluster(cluster) {
-					// If this is a legacy cluster (i.e. RKE1 cluster) then we should wait to remove the provisioning cluster until the v3.Cluster is gone.
-					_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
-					if !apierrors.IsNotFound(err) {
-						return fmt.Sprintf("waiting for cluster [%s] to delete", cluster.Status.ClusterName), nil
-					}
-				} else {
-					if err = h.updateFeatureLockedValue(false); err != nil {
+			} else if util.CreatedBy(cluster, util.ManagementClusterGVK, "", mgmtCluster.Name) {
+				// This provisioning cluster was created by its management cluster, which would create it
+				// again: ask for the management cluster to be deleted too. It removes this provisioning
+				// cluster itself, see removeProvisioningClusterFinalizer, so there's nothing to wait for.
+				if mgmtCluster.DeletionTimestamp == nil {
+					uid := mgmtCluster.UID
+					err := h.mgmtClusters.Delete(mgmtCluster.Name, &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}})
+					if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsConflict(err) {
 						return "", err
 					}
+				}
+			} else if cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
+				// The management cluster this provisioning cluster created is removed once the CAPI cluster and
+				// machines below are gone, see removeManagementClusterFinalizer. A management cluster in another
+				// fleet workspace means the provisioning cluster is being migrated and is left alone.
+				if err = h.updateFeatureLockedValue(false); err != nil {
+					return "", err
 				}
 			}
 		}

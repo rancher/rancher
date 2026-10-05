@@ -3,8 +3,11 @@ package clustergc
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rancher/norman/lifecycle"
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -144,4 +147,18 @@ func (mockDynamicResourceInterface) Watch(ctx context.Context, opts metav1.ListO
 
 func (mockDynamicResourceInterface) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
+}
+
+func TestRemoveWaitsForTheUserControllersToStop(t *testing.T) {
+	// The user controllers add the finalizers back for as long as they run, so cleaning up before they
+	// stop would leave finalizers nothing removes.
+	var requeued []string
+	gc := &gcLifecycle{enqueueAfter: func(_, name string, _ time.Duration) { requeued = append(requeued, name) }}
+	cluster := &apisv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}}
+
+	obj, err := gc.Remove(cluster)
+
+	assert.ErrorIs(t, err, generic.ErrSkip, "the finalizer should be kept")
+	assert.Same(t, cluster, obj)
+	assert.Equal(t, []string{"c-m-test"}, requeued)
 }

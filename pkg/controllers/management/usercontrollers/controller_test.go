@@ -6,9 +6,12 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -109,4 +112,33 @@ func TestRemoveLeavesTheObjectItWasGivenUnchanged(t *testing.T) {
 	_, _ = lifecycle.Remove(given)
 
 	assert.Equal(t, before, given)
+}
+
+func TestRemoveKeepsTheTunnelWhileTheCreatingProvisioningClusterRemovesItsMachines(t *testing.T) {
+	// Deleted on its own, a management cluster created by a provisioning cluster must stay connected
+	// until the provisioning cluster's machines, drained through its tunnel, are gone.
+	cluster := newRemoveTestCluster()
+	cluster.Annotations = map[string]string{
+		apply.LabelGVK:       util.ProvisioningClusterGVK,
+		apply.LabelNamespace: "fleet-default",
+		apply.LabelName:      "foo",
+	}
+	lifecycle, env := newRemoveTestEnv(cluster.DeepCopy())
+	finalizers := []string{util.ProvisioningClusterRemoveFinalizer}
+	lifecycle.getProvisioningCluster = func(namespace, name string) (*provv1.Cluster, error) {
+		return &provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name, Finalizers: finalizers}}, nil
+	}
+
+	_, err := lifecycle.Remove(cluster)
+
+	assert.ErrorIs(t, err, generic.ErrSkip)
+	assert.Empty(t, env.clusters.UpdateStatusCalls(), "the agent uninstall must not be scheduled yet")
+	assert.Len(t, env.controller.EnqueueAfterCalls(), 1)
+
+	// Once the machines are gone, removal goes ahead.
+	finalizers = nil
+	_, err = lifecycle.Remove(cluster)
+
+	assert.ErrorIs(t, err, generic.ErrSkip, "it now waits for the user controllers to stop")
+	assert.True(t, v32.ClusterConditionAgentUninstallScheduled.IsTrue(env.stored))
 }

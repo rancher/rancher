@@ -8,6 +8,7 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
@@ -72,20 +73,22 @@ and de-registering k8s controllers, on cluster.remove
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
 	clusterClient := management.Management.Clusters("")
 	lifecycle := &ClusterLifecycleCleanup{
-		Manager:  manager,
-		mgmtCore: management.Core,
-		clusters: clusterClient,
-		ctx:      ctx,
+		Manager:                manager,
+		mgmtCore:               management.Core,
+		clusters:               clusterClient,
+		getProvisioningCluster: management.Wrangler.Provisioning.Cluster().Cache().Get,
+		ctx:                    ctx,
 	}
 
 	clusterClient.AddLifecycle(ctx, "cluster-agent-controller-cleanup", lifecycle)
 }
 
 type ClusterLifecycleCleanup struct {
-	Manager  *clustermanager.Manager
-	mgmtCore corev1.Interface
-	clusters v3.ClusterInterface
-	ctx      context.Context
+	Manager                *clustermanager.Manager
+	mgmtCore               corev1.Interface
+	clusters               v3.ClusterInterface
+	getProvisioningCluster func(namespace, name string) (*provv1.Cluster, error)
+	ctx                    context.Context
 }
 
 func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error) {
@@ -99,6 +102,21 @@ func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error
 func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error) {
 	if obj == nil {
 		return obj, nil
+	}
+
+	// A management cluster created by a provisioning cluster keeps its tunnel until the provisioning
+	// cluster's machines, which are drained through it, are gone. This only waits when the management
+	// cluster is deleted on its own: a provisioning cluster deletes it once they are gone.
+	if !util.ConditionConcluded(obj, v32.ClusterConditionAgentUninstallScheduled) && c.getProvisioningCluster != nil {
+		pending, err := util.ProvisioningInfrastructurePending(obj, c.getProvisioningCluster)
+		if err != nil {
+			return obj, err
+		}
+		if pending {
+			logrus.Debugf("[cluster-cleanup] waiting for the machines of the provisioning cluster that created cluster [%s] to be removed", obj.Name)
+			c.clusters.Controller().EnqueueAfter("", obj.Name, userControllersStoppedRequeue)
+			return obj, generic.ErrSkip
+		}
 	}
 
 	if !util.ConditionConcluded(obj, v32.ClusterConditionAgentUninstallScheduled) {

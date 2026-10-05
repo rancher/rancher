@@ -171,6 +171,9 @@ func TestController_generateProvisioningClusterFromLegacyCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := handler{}
+			// The management cluster already carries the finalizer it needs before creating its
+			// provisioning cluster; adding it is covered by the creator tests.
+			tt.cluster.Finalizers = append(tt.cluster.Finalizers, removeProvisioningClusterFinalizer)
 
 			obj, _, err := h.generateProvisioningClusterFromLegacyCluster(tt.cluster, tt.cluster.Status)
 
