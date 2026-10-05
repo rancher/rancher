@@ -346,3 +346,63 @@ func TestCreateClusterRole(t *testing.T) {
 	err := m.createClusterRole(rt)
 	assert.NoError(t, err)
 }
+
+func TestCompareAndUpdateClusterRoleInstallUUIDBackfill(t *testing.T) {
+	assert.NoError(t, settings.InstallUUID.Set("own-install-uuid"))
+
+	rules := []v1.PolicyRule{
+		{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+	}
+	rt := &v3.RoleTemplate{ObjectMeta: metav1.ObjectMeta{Name: "rt-test"}, Rules: rules}
+
+	tests := map[string]struct {
+		annotations    map[string]string
+		expectedUpdate map[string]string
+	}{
+		"owned, no install-uuid: backfilled": {
+			annotations: map[string]string{clusterRoleOwner: "rt-test"},
+			expectedUpdate: map[string]string{
+				clusterRoleOwner:            "rt-test",
+				clusterRoleOwnerInstallUUID: "own-install-uuid",
+			},
+		},
+		"owned, own install-uuid: no update": {
+			annotations: map[string]string{
+				clusterRoleOwner:            "rt-test",
+				clusterRoleOwnerInstallUUID: "own-install-uuid",
+			},
+		},
+		"owned, foreign install-uuid: not overwritten": {
+			annotations: map[string]string{
+				clusterRoleOwner:            "rt-test",
+				clusterRoleOwnerInstallUUID: "foreign-install-uuid",
+			},
+		},
+		"not owned: not stamped": {
+			annotations: map[string]string{},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			if test.expectedUpdate != nil {
+				mock.EXPECT().Update(&v1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: "rt-test", Annotations: test.expectedUpdate},
+					Rules:      rules,
+				})
+			}
+
+			cr := &v1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{Name: "rt-test", Annotations: test.annotations},
+				Rules:      rules,
+			}
+			m := manager{clusterRoles: mock}
+			assert.NoError(t, m.compareAndUpdateClusterRole(cr, rt))
+			if test.expectedUpdate == nil {
+				assert.Equal(t, test.annotations, cr.Annotations, "input must not be mutated")
+			}
+		})
+	}
+}

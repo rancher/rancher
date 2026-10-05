@@ -34,15 +34,15 @@ import (
 )
 
 const (
-	rtbOwnerLabel                    = "authz.cluster.cattle.io/rtb-owner-updated"
-	rtbOwnerLabelLegacy              = "authz.cluster.cattle.io/rtb-owner"
-	clusterRoleOwner                 = "authz.cluster.cattle.io/clusterrole-owner"
+	rtbOwnerLabel       = "authz.cluster.cattle.io/rtb-owner-updated"
+	rtbOwnerLabelLegacy = "authz.cluster.cattle.io/rtb-owner"
+	clusterRoleOwner    = "authz.cluster.cattle.io/clusterrole-owner"
 	// clusterRoleOwnerInstallUUID records which Rancher install created a RoleTemplate-owned ClusterRole.
 	// In a nested Rancher setup, the same physical cluster can be managed as a downstream cluster by one
 	// Rancher install while also being the local cluster of another. Without this, the local install's
 	// orphan ClusterRole sweep (cluster-clusterrole-sync) can delete ClusterRoles it did not create, because
 	// the owning RoleTemplate legitimately only exists in the other install's management plane.
-	clusterRoleOwnerInstallUUID = "authz.cluster.cattle.io/clusterrole-owner-install-uuid"
+	clusterRoleOwnerInstallUUID      = "authz.cluster.cattle.io/clusterrole-owner-install-uuid"
 	projectIDAnnotation              = "field.cattle.io/projectId"
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
@@ -268,14 +268,23 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 }
 
 func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, rt *v3.RoleTemplate) error {
-	if equality.Semantic.DeepEqual(clusterRole.Rules, rt.Rules) {
+	// Backfill the install UUID on owned ClusterRoles created before it was introduced. Never overwrite
+	// an existing value, so that installs sharing a cluster can't fight over ownership.
+	_, owned := clusterRole.Annotations[clusterRoleOwner]
+	_, stamped := clusterRole.Annotations[clusterRoleOwnerInstallUUID]
+	needsStamp := owned && !stamped
+
+	if !needsStamp && equality.Semantic.DeepEqual(clusterRole.Rules, rt.Rules) {
 		return nil
 	}
 	clusterRole = clusterRole.DeepCopy()
 	clusterRole.Rules = rt.Rules
-	logrus.Tracef("installUUID=%s cluster=%sG: Updating clusterRole %v.",
+	if needsStamp {
+		clusterRole.Annotations[clusterRoleOwnerInstallUUID] = settings.InstallUUID.Get()
+	}
+	logrus.Tracef("installUUID=%s cluster=%s: Updating clusterRole %v.",
 		settings.InstallUUID.Get(), m.clusterName, clusterRole.Name)
-	logrus.Infof("cluster=%s: Updating clusterRole %v because of rules difference with roleTemplate %v (%v).",
+	logrus.Infof("cluster=%s: Updating clusterRole %v because of rules or owner install-uuid difference with roleTemplate %v (%v).",
 		m.clusterName, clusterRole.Name, rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Update(clusterRole)
 	if err != nil {
