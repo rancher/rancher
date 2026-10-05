@@ -666,8 +666,8 @@ github.com/rancher/remotedialer-proxy v0.9.0-rc.3 h1:YtP4bmG6+sBNBVRvtu9KMBkVRjV
 github.com/rancher/remotedialer-proxy v0.9.0-rc.3/go.mod h1:C+kl4ExG3TbaPsllDTYilJxAWAxNtI1c9hV1PsJ3sSI=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20261002144048-2ae83452a53e h1:ShGqWPk+5wkQXZfCLKsc+2atQm4Y75wTEBFmwFg9K90=
-github.com/rancher/shepherd v0.0.0-20261002144048-2ae83452a53e/go.mod h1:fKpwRL07dBLvMIzWAsB+2CPYmlPEs+7Ua23r5sXTq1M=
+github.com/rancher/shepherd v0.0.0-20260929081636-5298a4c7decf h1:V0DREOcYCAHltBppBqOEJ/ZUrDGXKbj803kgMjPU2S0=
+github.com/rancher/shepherd v0.0.0-20260929081636-5298a4c7decf/go.mod h1:fKpwRL07dBLvMIzWAsB+2CPYmlPEs+7Ua23r5sXTq1M=
 github.com/rancher/steve v0.10.7 h1:iJoo+j8myFbLlrhIJu/pkkU2uZxb55miFjs1qCOFi6A=
 github.com/rancher/steve v0.10.7/go.mod h1:UsWUvPw/rn97IjGAuyvKphCDCM7fDvAnIdljV+wUafk=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260923180507-96eced818739 h1:iR2J3X7UWSWqeiItNZdttbUOAEAhU6WL2lgQkDqHGZE=
