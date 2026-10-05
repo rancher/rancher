@@ -243,3 +243,23 @@ func TestClassifyStartError(t *testing.T) {
 		})
 	}
 }
+
+func TestStartAllowed(t *testing.T) {
+	now := metav1.Now()
+	removing := func(uninstall string) *apimgmtv3.Cluster {
+		c := &apimgmtv3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", DeletionTimestamp: &now}}
+		if uninstall != "" {
+			apimgmtv3.ClusterConditionAgentUninstallScheduled.SetStatus(c, uninstall)
+		}
+		return c
+	}
+
+	assert.True(t, startAllowed(newTestCluster("c-m-test", "uid-1"), true), "controllers of a live cluster")
+	assert.True(t, startAllowed(newTestCluster("c-m-test", "uid-1"), false), "clients of a live cluster")
+
+	assert.False(t, startAllowed(removing(""), true), "controllers are never started for a cluster being removed")
+	assert.True(t, startAllowed(removing(""), false), "clients are available while the removal still cleans up through the downstream cluster")
+	assert.True(t, startAllowed(removing("Unknown"), false))
+	assert.False(t, startAllowed(removing("True"), false), "not once the agent uninstall is recorded")
+	assert.False(t, startAllowed(removing("False"), false), "not once the agent uninstall gave up either")
+}

@@ -440,7 +440,8 @@ func NormalizeCluster(cluster *v3.Cluster, isImportedCluster bool) (runtime.Obje
 }
 
 func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil {
+	// A cluster being removed isn't registered again; its namespace, where the token goes, is going away.
+	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
 	_, err := h.clusterTokenCache.Get(cluster.Name, "default-token")

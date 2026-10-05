@@ -11,7 +11,6 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -72,12 +71,20 @@ and de-registering k8s controllers, on cluster.remove
 */
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, manager *clustermanager.Manager) {
 	clusterClient := management.Management.Clusters("")
+	mgmt := management.Wrangler.Mgmt
 	lifecycle := &ClusterLifecycleCleanup{
 		Manager:                manager,
 		mgmtCore:               management.Core,
 		clusters:               clusterClient,
 		getProvisioningCluster: management.Wrangler.Provisioning.Cluster().Cache().Get,
-		ctx:                    ctx,
+		roleTemplateBindings: &roleTemplateBindings{
+			crtbs:        mgmt.ClusterRoleTemplateBinding(),
+			crtbCache:    mgmt.ClusterRoleTemplateBinding().Cache(),
+			prtbs:        mgmt.ProjectRoleTemplateBinding(),
+			prtbCache:    mgmt.ProjectRoleTemplateBinding().Cache(),
+			projectCache: mgmt.Project().Cache(),
+		},
+		ctx: ctx,
 	}
 
 	clusterClient.AddLifecycle(ctx, "cluster-agent-controller-cleanup", lifecycle)
@@ -88,6 +95,7 @@ type ClusterLifecycleCleanup struct {
 	mgmtCore               corev1.Interface
 	clusters               v3.ClusterInterface
 	getProvisioningCluster func(namespace, name string) (*provv1.Cluster, error)
+	roleTemplateBindings   *roleTemplateBindings
 	ctx                    context.Context
 }
 
@@ -95,13 +103,30 @@ func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error
 	return nil, nil
 }
 
-// Remove uninstalls the Rancher agent from the downstream cluster where that is needed, then holds the
-// cluster until the replica that owns it reports its user controllers stopped. Every replica stops its
+// Remove removes the cluster's role template bindings while the downstream cluster can be reached, then
+// uninstalls the Rancher agent from the downstream cluster where that is needed, then holds the cluster
+// until the replica that owns it reports its user controllers stopped. Every replica stops its
 // own controllers for the cluster once the agent uninstall has been recorded, see the
 // user-controllers-controller.
 func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error) {
 	if obj == nil {
 		return obj, nil
+	}
+
+	// First remove what the cluster's role template bindings grant in the downstream cluster, while it can
+	// still be reached through the cluster agent.
+	if !util.ConditionConcluded(obj, v32.ClusterConditionRoleTemplateBindingsRemoved) && c.roleTemplateBindings != nil {
+		removal, err := c.roleTemplateBindings.removeRoleTemplateBindings(obj)
+		if err != nil {
+			return obj, fmt.Errorf("[cluster-cleanup] removing role template bindings of cluster [%s]: %w", obj.Name, err)
+		}
+		if err := util.SetCondition(c.clusters, obj, v32.ClusterConditionRoleTemplateBindingsRemoved, removal.status, removal.reason, removal.message); err != nil {
+			return obj, fmt.Errorf("[cluster-cleanup] recording role template binding removal for cluster [%s]: %w", obj.Name, err)
+		}
+		if !removal.concluded {
+			c.clusters.Controller().EnqueueAfter("", obj.Name, userControllersStoppedRequeue)
+			return obj, generic.ErrSkip
+		}
 	}
 
 	// A management cluster created by a provisioning cluster keeps its tunnel until the provisioning
@@ -146,15 +171,7 @@ func (c *ClusterLifecycleCleanup) scheduleAgentUninstall(obj *v3.Cluster) (coreV
 	switch {
 	case obj.Name == "local" && obj.Spec.Internal:
 		uninstall = c.cleanupLocalCluster
-	case obj.Status.Driver == v32.ClusterDriverK3s ||
-		obj.Status.Driver == v32.ClusterDriverK3os ||
-		obj.Status.Driver == v32.ClusterDriverRke2 ||
-		obj.Status.Driver == v32.ClusterDriverRancherD ||
-		(obj.Status.Driver == v32.ClusterDriverImported && !imported.IsAdministratedByProvisioningCluster(obj)) ||
-		(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
-		(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
-		(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) ||
-		(obj.Status.AliStatus.UpstreamSpec != nil && obj.Status.AliStatus.UpstreamSpec.Imported):
+	case util.DownstreamCleanupRequired(obj):
 		uninstall = c.cleanupImportedCluster
 	default:
 		return coreV1.ConditionTrue, reasonNotRequired, "the agent is not uninstalled from this type of cluster"

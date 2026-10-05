@@ -151,7 +151,7 @@ func (m *Manager) markNotReady(cluster *apimgmtv3.Cluster, reason string, cause 
 }
 
 func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) (*record, error) {
-	if cluster.DeletionTimestamp != nil {
+	if !startAllowed(cluster, controllers) {
 		return nil, nil
 	}
 	obj, ok := m.controllers.Load(cluster.UID)
@@ -204,6 +204,20 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 		r.owner = clusterOwner
 	}
 	return nil
+}
+
+// startAllowed reports whether a record may be started for cluster. Nothing is started for a cluster being
+// removed, except clients without controllers until its agent uninstall has been recorded: until then, its
+// removal still cleans up through the downstream cluster, for instance what its role template bindings
+// granted there.
+func startAllowed(cluster *apimgmtv3.Cluster, controllers bool) bool {
+	if cluster.DeletionTimestamp == nil {
+		return true
+	}
+	if controllers {
+		return false
+	}
+	return !apimgmtv3.ClusterConditionAgentUninstallScheduled.IsTrue(cluster) && !apimgmtv3.ClusterConditionAgentUninstallScheduled.IsFalse(cluster)
 }
 
 // handleStartFailure reports err, a failure to start the controllers of r, on the cluster r was built

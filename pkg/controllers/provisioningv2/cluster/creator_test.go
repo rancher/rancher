@@ -307,3 +307,15 @@ func TestOnMgmtClusterRemoveLeavesOtherProvisioningClustersAlone(t *testing.T) {
 	require.NoError(t, err)
 	assert.Same(t, mgmtCluster, obj)
 }
+
+func TestCreateTokenSkipsAClusterBeingRemoved(t *testing.T) {
+	// The handler has no token clients: creating a token for the cluster would fail the test.
+	h := &handler{}
+	cluster := &v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test"}}
+	deleting(&cluster.ObjectMeta)
+
+	obj, err := h.createToken("", cluster)
+
+	require.NoError(t, err)
+	assert.Same(t, cluster, obj)
+}

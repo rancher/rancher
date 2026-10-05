@@ -71,6 +71,10 @@ const (
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
 	ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
 	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
+	// ClusterConditionRoleTemplateBindingsRemoved is set during cluster removal once the cluster's
+	// ClusterRoleTemplateBindings and ProjectRoleTemplateBindings are gone, and with them what they granted in
+	// the downstream cluster, or when that isn't needed. It is False if they were not all gone in time.
+	ClusterConditionRoleTemplateBindingsRemoved condition.Cond = "RoleTemplateBindingsRemoved"
 	// ClusterConditionAgentUninstallScheduled is set during cluster removal once the job that uninstalls
 	// the Rancher agent from the downstream cluster has been created, or was not needed. It is False if
 	// the job could not be created.
