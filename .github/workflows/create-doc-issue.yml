@@ -18,7 +18,7 @@ jobs:
       - name: Check org membership
         id: membership
         env:
-          GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.CREATE_DOCS_PAT }}
         run: |
           set -euo pipefail
 
@@ -31,7 +31,7 @@ jobs:
       - name: Create doc issue
         if: steps.membership.outputs.is_member == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.CREATE_DOCS_PAT }}
           ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}
           ORIGINAL_ISSUE_URL: ${{ github.event.issue.html_url }}
           ORIGINAL_TITLE: ${{ github.event.issue.title }}
