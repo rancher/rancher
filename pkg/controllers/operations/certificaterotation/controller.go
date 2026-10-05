@@ -424,7 +424,7 @@ func (h *handler) resolveScope(op *opv1alpha1.CertificateRotation, status opv1al
 		default:
 			logrus.Errorf("[certificaterotation] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
 
-			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("beacon %s/%s not found", namespace, beaconName))
+			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("Beacon %s/%s not found", namespace, beaconName))
 			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
 			return nil, status, nil
@@ -556,8 +556,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		logrus.Errorf("[certificaterotation] %s/%s: beacon reassigned, aborting", s.op.Namespace, s.op.Name)
-		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
+		logrus.Errorf("[certificaterotation] %s/%s: beacon reassigned, failing", s.op.Namespace, s.op.Name)
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon reassigned, failing")
 
 		return status, nil
 	}
@@ -586,8 +586,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		logrus.Errorf("[certificaterotation] %s/%s: beacon lost, aborting", s.op.Namespace, s.op.Name)
-		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon acquired by another controller, aborting")
+		logrus.Errorf("[certificaterotation] %s/%s: beacon lost, failing", s.op.Namespace, s.op.Name)
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, failing")
 
 		return status, nil
 	}
@@ -625,13 +625,13 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
-		logrus.Errorf("[certificaterotation] %s/%s: aborting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
 	}
 
 	if len(candidates) == 0 {
-		logrus.Errorf("[certificaterotation] %s/%s: aborting operation: no eligible machine-plan secrets found", s.op.Namespace, s.op.Name)
+		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: no eligible machine-plan secrets found", s.op.Namespace, s.op.Name)
 		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, "no eligible machine-plan secrets found")
 		return status, nil
 	}

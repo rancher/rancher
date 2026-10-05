@@ -426,7 +426,7 @@ func (h *handler) resolveScope(op *opv1alpha1.EncryptionKeyRotation, status opv1
 		default:
 			logrus.Errorf("[encryptionkeyrotation] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
 
-			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("beacon %s/%s not found", namespace, beaconName))
+			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("Beacon %s/%s not found", namespace, beaconName))
 			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
 			return nil, status, nil
@@ -566,7 +566,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
+		logrus.Errorf("[encryptionkeyrotation] %s/%s: beacon reassigned, failing", s.op.Namespace, s.op.Name)
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon reassigned, failing")
 
 		return status, nil
 	}
@@ -597,7 +598,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon acquired by another controller, aborting")
+		logrus.Errorf("[encryptionkeyrotation] %s/%s: beacon lost, failing", s.op.Namespace, s.op.Name)
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, failing")
 
 		return status, nil
 	}

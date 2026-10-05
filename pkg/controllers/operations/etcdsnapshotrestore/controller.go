@@ -561,7 +561,7 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 		default:
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
 
-			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("beacon %s/%s not found", namespace, beaconName))
+			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("Beacon %s/%s not found", namespace, beaconName))
 			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
 			return nil, status, nil
@@ -769,7 +769,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		status.MarkFailed(opv1alpha1.BeaconLostReason, "beacon reassigned, aborting")
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: beacon reassigned, failing", s.op.Namespace, s.op.Name)
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon reassigned, failing")
 
 		return status, nil
 	}
@@ -800,7 +801,8 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.ETCDSnapshotResto
 			ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
 			return status, nil
 		}
-		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, aborting")
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: beacon lost, failing", s.op.Namespace, s.op.Name)
+		status.MarkFailed(opv1alpha1.BeaconLostReason, "Beacon acquired by another controller, failing")
 
 		return status, nil
 	}
@@ -857,7 +859,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 	if plan.IsTransient(err) {
 		return status, err
 	} else if err != nil {
-		logrus.Errorf("[etcdsnapshotrestore] %s/%s: aborting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
+		logrus.Errorf("[etcdsnapshotrestore] %s/%s: rejecting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
 
 		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
 		return status, nil
@@ -896,7 +898,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 			results = append(results, *planStatus)
 
 			if planStatus.Failure() {
-				logrus.Errorf("[etcdsnapshotrestore] %s/%s: aborting operation: preflight check failed for %s/%s",
+				logrus.Errorf("[etcdsnapshotrestore] %s/%s: rejecting operation: preflight check failed for %s/%s",
 					s.op.Namespace, s.op.Name, secret.Namespace, secret.Name)
 
 				message := fmt.Sprintf("could not find server token for %s/%s", secret.Namespace, secret.Name)

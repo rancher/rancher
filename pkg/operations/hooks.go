@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"sort"
 	"strings"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
@@ -40,17 +41,45 @@ func HasActiveLifecycleHook(obj metav1.Object) bool {
 // An empty prefix returns nothing rather than matching every label: a phase with no hook at all must
 // not be reported as having a delegate.
 func LifecycleHookDelegate(obj metav1.Object, prefix string) (string, string) {
-	if obj == nil || prefix == "" {
+	hooks := hooksForPrefix(obj, prefix)
+	if len(hooks) == 0 {
 		return "", ""
 	}
+	return hooks[0].Id, hooks[0].Delegate
+}
 
+type Hook struct {
+	Id       string
+	Delegate string
+}
+
+// hooksForPrefix returns all hooks for an operation, sorted lexicographically by the ID, and then the delegate.
+func hooksForPrefix(obj metav1.Object, prefix string) []Hook {
+	if obj == nil || prefix == "" {
+		return nil
+	}
+
+	hooks := []Hook{}
 	for k, v := range obj.GetLabels() {
 		if after, ok := strings.CutPrefix(k, prefix); ok {
-			return after, v
+			if after == "" {
+				continue
+			}
+			hooks = append(hooks, Hook{
+				Id:       after,
+				Delegate: v,
+			})
 		}
 	}
 
-	return "", ""
+	sort.Slice(hooks, func(i, j int) bool {
+		if hooks[i].Id == hooks[j].Id {
+			return hooks[i].Delegate < hooks[j].Delegate
+		}
+		return hooks[i].Id < hooks[j].Id
+	})
+
+	return hooks
 }
 
 // TerminalHookDelegate returns the delegate the operation's terminal phase hook is still waiting on,
@@ -96,15 +125,8 @@ func TerminateAbandoningHooks(op metav1.Object, status *opv1alpha1.OperationStat
 // currently sit at the top of the beacon's delegate chain: the delegate the step hook pushed is
 // there instead. An empty prefix returns false (no label match).
 func HasStepHookLabel(obj metav1.Object, stepPrefix string) bool {
-	if obj == nil || stepPrefix == "" {
-		return false
-	}
-	for k := range obj.GetLabels() {
-		if strings.HasPrefix(k, stepPrefix) {
-			return true
-		}
-	}
-	return false
+	hooks := hooksForPrefix(obj, stepPrefix)
+	return len(hooks) > 0
 }
 
 // DelegateForHook pushes the delegate named by obj's lifecycle-hook label for prefix onto the

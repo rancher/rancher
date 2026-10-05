@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -176,6 +177,113 @@ func TestHasStepHookLabel(t *testing.T) {
 
 	if HasStepHookLabel(nil, prefix) {
 		t.Fatal("HasStepHookLabel(nil) = true, want false")
+	}
+}
+
+func TestHooksForPrefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		obj    metav1.Object
+		prefix string
+		want   []Hook
+	}{
+		{
+			name:   "nil object",
+			obj:    nil,
+			prefix: "",
+			want:   nil,
+		},
+		{
+			name:   "empty",
+			obj:    &metav1.ObjectMeta{},
+			prefix: "",
+			want:   nil,
+		},
+		{
+			name:   "non-empty",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}},
+			prefix: "",
+			want:   nil,
+		},
+		{
+			name:   "different prefix",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}},
+			prefix: "baz",
+			want:   []Hook{},
+		},
+		{
+			name:   "matching prefix",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}},
+			prefix: "fo",
+			want: []Hook{
+				{
+					Id:       "o",
+					Delegate: "bar",
+				},
+			},
+		},
+		{
+			name:   "exact prefix",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}},
+			prefix: "foo",
+			want:   []Hook{},
+		},
+		{
+			name:   "on exact one non-exact prefix",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo": "bar", "foo2": "bar2"}},
+			prefix: "foo",
+			want: []Hook{
+				{
+					Id:       "2",
+					Delegate: "bar2",
+				},
+			},
+		},
+		{
+			name:   "multiple matching prefix",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo1": "bar1", "foo2": "bar2"}},
+			prefix: "foo",
+			want: []Hook{
+				{
+					Id:       "1",
+					Delegate: "bar1",
+				},
+				{
+					Id:       "2",
+					Delegate: "bar2",
+				},
+			},
+		},
+		{
+			name:   "multiple matching prefix in order",
+			obj:    &metav1.ObjectMeta{Labels: map[string]string{"foo/a": "bar", "foo/b": "foo", "foo/c": "baz"}},
+			prefix: "foo/",
+			want: []Hook{
+				{
+					Id:       "a",
+					Delegate: "bar",
+				},
+				{
+					Id:       "b",
+					Delegate: "foo",
+				},
+				{
+					Id:       "c",
+					Delegate: "baz",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := hooksForPrefix(tt.obj, tt.prefix)
+			assert.Equal(t, tt.want, result)
+		})
 	}
 }
 
