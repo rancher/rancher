@@ -60,7 +60,7 @@ func TestConfigureTest(t *testing.T) {
 		expectedRedirectURL string
 	}{
 		{
-			name: "etup of Generic Provider",
+			name: "Setup of Generic Provider",
 			authConfig: map[string]any{
 				"accessMode":                "unrestricted",
 				"authEndpoint":              "https://oidc.example.com/realms/testing/protocol/openid-connect/auth",
