@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -44,6 +45,11 @@ func (c *rtSync) sync(key string, obj *wranglerv3.RoleTemplate) (runtime.Object,
 	if obj == nil || obj.DeletionTimestamp != nil || features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
+
+	if len(obj.ClusterScopedRules) != 0 {
+		logrus.Infof("The roletemplate-aggregation feature must be enabled to set ClusterScopedRules. Ignoring ClusterScopedRules for roleTemplate: %s", obj.Name)
+	}
+
 	// check if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster
 	prtbs, err := c.m.prtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, c.m.workload.ClusterName+"-"+obj.Name)
 	if err != nil {
