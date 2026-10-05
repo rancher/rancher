@@ -444,6 +444,7 @@ func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*re
 	if err != nil {
 		return nil, err
 	}
+	clusterContext.ClusterUID = cluster.UID
 
 	s := &record{
 		cluster:    clusterContext,
@@ -557,7 +558,12 @@ func (m *Manager) UserContextFromClusterReconnecting(cluster *apimgmtv3.Cluster,
 		logrus.Debugf("could not get kubeconfig for cluster %s", cluster.Name)
 		return nil, nil
 	}
-	return config.NewUserContext(m.ScaledContext, *kubeConfig, cluster.Name)
+	clusterContext, err := config.NewUserContext(m.ScaledContext, *kubeConfig, cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+	clusterContext.ClusterUID = cluster.UID
+	return clusterContext, nil
 }
 
 func (m *Manager) record(apiContext *types.APIContext, storageContext types.StorageContext) (*record, error) {

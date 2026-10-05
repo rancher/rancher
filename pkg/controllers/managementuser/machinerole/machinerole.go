@@ -18,11 +18,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 type handler struct {
 	clusterName      string
+	clusterUID       types.UID
 	nodes            corecontrollers.NodeClient
 	secretCache      corecontrollers.SecretCache
 	clusterCache     mgmtcontrollers.ClusterCache
@@ -34,6 +36,7 @@ type handler struct {
 func Register(ctx context.Context, userCtx *config.UserContext, capiCtx *wrangler.CAPIContext) {
 	h := handler{
 		clusterName:      userCtx.ClusterName,
+		clusterUID:       userCtx.ClusterUID,
 		nodes:            userCtx.Corew.Node(),
 		secretCache:      userCtx.Management.Wrangler.Core.Secret().Cache(),
 		clusterCache:     userCtx.Management.Wrangler.Mgmt.Cluster().Cache(),
@@ -53,6 +56,10 @@ func (h *handler) ImportedLabelSync(_ string, node *corev1.Node) (*corev1.Node, 
 	cluster, err := h.clusterCache.Get(h.clusterName)
 	if err != nil {
 		return node, err
+	}
+	if !config.MatchesClusterUID(h.clusterUID, cluster) {
+		// A cluster created again under the same name is not this controller's.
+		return node, nil
 	}
 
 	if cluster.Status.Driver != apimgmtv3.ClusterDriverK3s && cluster.Status.Driver != apimgmtv3.ClusterDriverRke2 {

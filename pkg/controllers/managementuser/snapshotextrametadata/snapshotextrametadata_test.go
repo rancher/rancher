@@ -1027,3 +1027,37 @@ func TestOnControlPlaneChange(t *testing.T) {
 		assert.Nil(t, out)
 	})
 }
+
+// A cluster removed and created again under the same name is not the one this controller was started for: its
+// configmap must not be written with the old cluster's clients.
+func TestSkipsAClusterCreatedAgainUnderTheSameName(t *testing.T) {
+	t.Parallel()
+
+	t.Run("on a management cluster change", func(t *testing.T) {
+		t.Parallel()
+
+		h, _, _, _ := newTestHandler(t, nil)
+		h.clusterUID = "uid-old"
+		cluster := mgmtCluster()
+		cluster.UID = "uid-new"
+
+		out, err := h.onChange("", cluster)
+		require.NoError(t, err)
+		assert.Same(t, cluster, out)
+	})
+
+	t.Run("on a CAPI cluster change", func(t *testing.T) {
+		t.Parallel()
+
+		h, mgmtClusters, _, _ := newTriggerHandler(t, nil)
+		h.clusterUID = "uid-old"
+		cluster := turtlesMgmtCluster()
+		cluster.UID = "uid-new"
+		mgmtClusters.EXPECT().Get(clusterName).Return(cluster, nil)
+
+		in := capiCluster(controlplanev1beta2.GroupVersion.Group, rke2ControlPlaneCP)
+		out, err := h.onCAPIClusterChange("", in)
+		require.NoError(t, err)
+		assert.Same(t, in, out)
+	})
+}

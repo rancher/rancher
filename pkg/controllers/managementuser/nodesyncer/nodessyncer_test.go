@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -210,4 +211,19 @@ func TestDetermineNodeRole(t *testing.T) {
 		determineNodeRoles(tt.node)
 		assert.EqualValues(t, tt.expectedNode, tt.node)
 	}
+}
+
+func TestReconcileAllSkipsAClusterCreatedAgainUnderTheSameName(t *testing.T) {
+	mockClusterLister := new(MockClusterLister)
+	defer mockClusterLister.AssertExpectations(t)
+	mockClusterLister.On("Get", "", "c-m-test").Return(&v3.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "c-m-test", UID: "uid-new"}}, nil)
+
+	// No node or machine listers: the machines of the new cluster must not be touched.
+	syncer := nodesSyncer{
+		clusterNamespace: "c-m-test",
+		clusterUID:       "uid-old",
+		clusterLister:    mockClusterLister,
+	}
+
+	assert.NoError(t, syncer.reconcileAll())
 }

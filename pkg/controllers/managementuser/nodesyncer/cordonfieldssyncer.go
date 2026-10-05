@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/kubectl"
 	nodehelper "github.com/rancher/rancher/pkg/node"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -225,6 +226,9 @@ func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, string, error) {
 	cluster, err := d.clusterLister.Get("", d.clusterName)
 	if err != nil {
 		return nil, "", err
+	}
+	if !config.MatchesClusterUID(d.clusterUID, cluster) {
+		return nil, "", fmt.Errorf("cluster %s was created again since this controller started", d.clusterName)
 	}
 	user, err := d.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {

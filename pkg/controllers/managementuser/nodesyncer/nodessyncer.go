@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -59,6 +60,7 @@ type nodesSyncer struct {
 	nodeLister           corew.NodeCache
 	nodeClient           corew.NodeClient
 	clusterNamespace     string
+	clusterUID           types.UID
 	clusterLister        v3.ClusterLister
 	provClusterCache     provcontrollers.ClusterCache
 	capiClusterCache     capicontrollers.ClusterCache
@@ -71,6 +73,7 @@ type nodeDrain struct {
 	userClient           v3.UserInterface
 	kubeConfigGetter     common.KubeConfigGetter
 	clusterName          string
+	clusterUID           types.UID
 	systemAccountManager *systemaccount.Manager
 	clusterLister        v3.ClusterLister
 	machines             v3.NodeInterface
@@ -82,6 +85,7 @@ type nodeDrain struct {
 func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.CAPIContext, kubeConfigGetter common.KubeConfigGetter) {
 	m := &nodesSyncer{
 		clusterNamespace:     cluster.ClusterName,
+		clusterUID:           cluster.ClusterUID,
 		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
 		machineLister:        cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
 		nodeLister:           cluster.Corew.Node().Cache(),
@@ -111,6 +115,7 @@ func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.C
 		userClient:           cluster.Management.Management.Users(""),
 		kubeConfigGetter:     kubeConfigGetter,
 		clusterName:          cluster.ClusterName,
+		clusterUID:           cluster.ClusterUID,
 		systemAccountManager: systemaccount.NewManager(cluster.Management),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
@@ -146,6 +151,10 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (*corev1.Node, error) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if !config.MatchesClusterUID(n.nodesSyncer.clusterUID, cluster) {
+		// A cluster created again under the same name is not this controller's.
+		return nil, nil
 	}
 
 	var (
@@ -258,6 +267,19 @@ func (m *nodesSyncer) sync(key string, _ *apimgmtv3.Node) (runtime.Object, error
 }
 
 func (m *nodesSyncer) reconcileAll() error {
+	// The machines of a cluster created again under the same name are not this controller's.
+	if m.clusterUID != "" {
+		cluster, err := m.clusterLister.Get("", m.clusterNamespace)
+		if apierrors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if !config.MatchesClusterUID(m.clusterUID, cluster) {
+			return nil
+		}
+	}
+
 	// skip reconcile if we are restoring from backup,
 	// this is needed to avoid adding/deleting replaced nodes that might be in the
 	// snapshots before the cluster restore/reconcile is complete
