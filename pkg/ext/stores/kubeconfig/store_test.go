@@ -516,6 +516,7 @@ func TestStoreCreate(t *testing.T) {
 			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
+			shouldExecGetToken:  func() bool { return false },
 		}
 		for _, opt := range opts {
 			opt(store)
@@ -686,6 +687,7 @@ func TestStoreCreate(t *testing.T) {
 			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
+			shouldExecGetToken:  func() bool { return false },
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -768,6 +770,7 @@ func TestStoreCreate(t *testing.T) {
 			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
+			shouldExecGetToken:  func() bool { return false },
 		}
 
 		ctx := userContext(adminID, authTokenID)
@@ -880,6 +883,7 @@ func TestStoreCreate(t *testing.T) {
 			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: func() bool { return false },
+			shouldExecGetToken:  func() bool { return false },
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -914,6 +918,185 @@ func TestStoreCreate(t *testing.T) {
 		assert.Contains(t, downstream2Exec.Args, "--server=rancher.example.com")
 		assert.Contains(t, downstream2Exec.Args, "--user=downstream2")
 		assert.Contains(t, downstream2Exec.Args, "--cluster="+downstream2)
+	})
+	t.Run("exec command with the get-token setting", func(t *testing.T) {
+		newTokenStore := func(token accessor.TokenAccessor) tokenFetcher {
+			return &fakeTokenStore{
+				fetchFunc: func(tokenID string) (accessor.TokenAccessor, error) {
+					if tokenID != authTokenID {
+						return nil, apierrors.NewNotFound(gvr.GroupResource(), tokenID)
+					}
+					return token, nil
+				},
+			}
+		}
+		githubToken := newTokenStore(&v3.Token{
+			ObjectMeta:   metav1.ObjectMeta{Name: authTokenID},
+			UserID:       "u-tokenuser", // The user id must come from the request user, not the token.
+			AuthProvider: "github",
+		})
+		openldapExtToken := newTokenStore(&ext.Token{
+			ObjectMeta: metav1.ObjectMeta{Name: authTokenID},
+			Spec: ext.TokenSpec{
+				UserID:        "u-tokenuser",
+				UserPrincipal: ext.TokenPrincipal{Name: "openldap_user://cn=user", Provider: "openldap"},
+			},
+		})
+
+		server := "--server=rancher.example.com"
+		getToken := func(args ...string) []string {
+			return append([]string{"auth", "get-token", server}, args...)
+		}
+
+		tests := []struct {
+			name           string
+			execGetToken   bool
+			generateToken  bool
+			dryRun         bool
+			excludeDefault bool
+			tokenStore     tokenFetcher
+
+			wantTokens      bool
+			wantRancherArgs []string
+			wantACEArgs     []string
+		}{
+			{
+				name:            "token command with setting off",
+				tokenStore:      githubToken,
+				wantRancherArgs: []string{"token", server, "--user=" + defaultClusterName},
+				wantACEArgs:     []string{"token", server, "--user=downstream2", "--cluster=" + downstream2},
+			},
+			{
+				name:            "get-token command",
+				execGetToken:    true,
+				tokenStore:      githubToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=github"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=github"),
+			},
+			{
+				name:            "get-token command without default entry",
+				execGetToken:    true,
+				excludeDefault:  true,
+				tokenStore:      githubToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=github"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=github"),
+			},
+			{
+				name:            "get-token command with ext request token",
+				execGetToken:    true,
+				tokenStore:      openldapExtToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=openldap"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=openldap"),
+			},
+			{
+				name:            "get-token command without auth provider",
+				execGetToken:    true,
+				tokenStore:      tokenStore,
+				wantRancherArgs: getToken("--user-id=" + userID),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID),
+			},
+			{
+				name:            "get-token command on dry run with token generation",
+				execGetToken:    true,
+				generateToken:   true,
+				dryRun:          true,
+				tokenStore:      githubToken,
+				wantRancherArgs: getToken("--user-id="+userID, "--auth-provider=github"),
+				wantACEArgs:     getToken("--cluster="+downstream2, "--user-id="+userID, "--auth-provider=github"),
+			},
+			{
+				name:          "embedded tokens with setting on",
+				execGetToken:  true,
+				generateToken: true,
+				tokenStore:    githubToken,
+				wantTokens:    true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap := obj.DeepCopy()
+					configMap.CreationTimestamp = metav1.Now()
+					configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+					return configMap, nil
+				}).AnyTimes()
+				configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					return obj.DeepCopy(), nil
+				}).AnyTimes()
+
+				tokenManager := &fakeTokenManager{}
+				store := newStore(configMapClient, tt.tokenStore, tokenManager, func(s *Store) {
+					s.shouldGenerateToken = func() bool { return tt.generateToken }
+					s.shouldExecGetToken = func() bool { return tt.execGetToken }
+				})
+
+				kubeconfig := &ext.Kubeconfig{
+					Spec: ext.KubeconfigSpec{
+						Clusters:       []string{downstream1, downstream2},
+						CurrentContext: downstream1,
+					},
+				}
+				if tt.excludeDefault {
+					kubeconfig.Spec.IncludeDefaultEntry = new(bool)
+				}
+				createOptions := &metav1.CreateOptions{}
+				if tt.dryRun {
+					createOptions.DryRun = []string{metav1.DryRunAll}
+				}
+
+				obj, err := store.Create(userContext(userID, authTokenID), kubeconfig, nil, createOptions)
+				require.NoError(t, err)
+				require.IsType(t, &ext.Kubeconfig{}, obj)
+
+				config, err := clientcmd.Load([]byte(obj.(*ext.Kubeconfig).Status.Value))
+				require.NoError(t, err)
+
+				wantContexts := map[string]string{
+					"downstream1":    defaultClusterName,
+					"downstream2":    "downstream2",
+					"downstream2-cp": "downstream2",
+				}
+				if !tt.excludeDefault {
+					wantContexts[defaultClusterName] = defaultClusterName
+				}
+				require.Len(t, config.Contexts, len(wantContexts))
+				for name, authInfo := range wantContexts {
+					require.Contains(t, config.Contexts, name)
+					assert.Equal(t, authInfo, config.Contexts[name].AuthInfo, name)
+				}
+
+				require.Len(t, config.AuthInfos, 2)
+				rancherUser := config.AuthInfos[defaultClusterName]
+				require.NotNil(t, rancherUser)
+				aceUser := config.AuthInfos["downstream2"]
+				require.NotNil(t, aceUser)
+
+				if tt.wantTokens {
+					require.Len(t, tokenManager.sharedTokenKeys, 1)
+					assert.Equal(t, tokenManager.sharedTokenKeys[0], rancherUser.Token)
+					assert.Nil(t, rancherUser.Exec)
+					require.Len(t, tokenManager.clusterTokenKeys, 1)
+					assert.Equal(t, tokenManager.clusterTokenKeys[0], aceUser.Token)
+					assert.Nil(t, aceUser.Exec)
+					return
+				}
+
+				assert.Empty(t, tokenManager.sharedTokenKeys)
+				assert.Empty(t, tokenManager.clusterTokenKeys)
+
+				assert.Empty(t, rancherUser.Token)
+				require.NotNil(t, rancherUser.Exec)
+				assert.Equal(t, "rancher", rancherUser.Exec.Command)
+				assert.Equal(t, tt.wantRancherArgs, rancherUser.Exec.Args)
+
+				assert.Empty(t, aceUser.Token)
+				require.NotNil(t, aceUser.Exec)
+				assert.Equal(t, "rancher", aceUser.Exec.Command)
+				assert.Equal(t, tt.wantACEArgs, aceUser.Exec.Args)
+			})
+		}
 	})
 	t.Run("all clusters specified", func(t *testing.T) {
 		clusterAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -961,6 +1144,7 @@ func TestStoreCreate(t *testing.T) {
 			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
+			shouldExecGetToken:  func() bool { return false },
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -1062,6 +1246,7 @@ func TestStoreCreate(t *testing.T) {
 			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
+			shouldExecGetToken:  func() bool { return false },
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -1680,6 +1865,7 @@ func TestStoreCreate(t *testing.T) {
 			getMaxTTL:           getMaxTTL,
 			getServerURL:        getServerURL,
 			shouldGenerateToken: shouldGenerateToken,
+			shouldExecGetToken:  func() bool { return false },
 		}
 
 		ctx := userContext(adminID, authTokenID)
