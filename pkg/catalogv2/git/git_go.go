@@ -191,6 +191,7 @@ func (g *gitGo) httpClientWithCreds() (*http.Client, error) {
 	transport.Proxy = http.ProxyFromEnvironment
 
 	client := &http.Client{
+		Timeout:   2 * time.Minute,
 		Transport: transport,
 	}
 
