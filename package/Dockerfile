@@ -61,8 +61,13 @@ RUN zypper --installroot /chroot -n in --no-recommends \
 FROM chroot-builder AS chroot-builder-agent
 RUN zypper --installroot /chroot -n in --no-recommends \
       sed grep jq git-core hostname iproute2 less bash-completion bind-utils acl sysstat && \
+    zypper ar -f https://rpm.rancher.io/pkgs/prime pkgs && \
+    rpm --root /chroot --import https://raw.githubusercontent.com/rancher/rancher/refs/heads/main/rancher-rpm-pkgs.key && \
+    zypper --installroot /chroot -n in -r pkgs kubectl-1.37 && \
     zypper --installroot /chroot clean -a && \
     rm -rf /chroot/var/cache/zypp/* /chroot/var/log/zypp/* /chroot/tmp/* /chroot/var/tmp/* /chroot/usr/share/doc/packages/*
+# The symbolic link target has no /chroot prefix.
+RUN ln -s /usr/bin/kubectl-1.37 /chroot/usr/bin/kubectl
 
 
 FROM final AS builder
@@ -125,7 +130,7 @@ ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher146-rc.5
 ENV CATTLE_MACHINE_CHECKSUM_amd64=d03da9fd21ba70af33d9fa9402f8a32664122dbb39d6ffe52a83c5551ef7b1a5
 ENV CATTLE_MACHINE_CHECKSUM_arm64=d496b5a49a1036c355f9683ab3825d552ac7dfa2199f1b4281cb9761719df9d3
-ENV CATTLE_K3S_VERSION=v1.37.0+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.7.1
 ENV CATTLE_ETCD_CHECKSUM_amd64=e8cd3fa8064c98137c5dbd78b76f969417ace84efb83c481041d7a52ffdd8fb9
@@ -359,7 +364,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.37.0+k3s1
+ENV CATTLE_K3S_VERSION=v1.37.1+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -493,22 +498,6 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/mount --version && \
     /usr/bin/umount --version && \
     /usr/bin/nsenter --version
-
-ARG ARCH
-ENV KUBECTL_VERSION=v1.37.1
-ENV KUBECTL_CHECKSUM_amd64=65691ff77eb6fa44c908b77a1082c9f092c3b9733b5cefabec0d1104890e21a8
-ENV KUBECTL_CHECKSUM_arm64=ff749f4b78d9c4f1ec87307df9b50119ed819e2094aa9810cb9acffc3286c8c7
-
-RUN case "${ARCH}" in \
-        amd64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_amd64}" ;; \
-        arm64) KUBECTL_CHECKSUM="${KUBECTL_CHECKSUM_arm64}" ;; \
-        *) echo "Unsupported: ${ARCH}"; exit 1 ;; \
-    esac && \
-    curl -fsSL "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" > /usr/bin/kubectl && \
-    printf "%s  %s\n" "${KUBECTL_CHECKSUM}" "/usr/bin/kubectl" > kubectl.sha256 && \
-    sha256sum -c kubectl.sha256 && \
-    rm kubectl.sha256 && \
-    chmod +x /usr/bin/kubectl
 
 LABEL io.cattle.agent=true
 
