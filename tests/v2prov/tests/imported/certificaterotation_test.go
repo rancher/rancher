@@ -333,9 +333,9 @@ func shellQuote(value string) string {
 }
 
 // Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook validates that a
-// delegate registered on the Rotate step hook and the Succeeded phase hook actually pauses the
-// operation at each hook point, and that the operation still completes after each hook is
-// advanced.
+// delegate registered on the Preflight and Rotate step hooks and the Succeeded phase hook actually
+// pauses the operation at each hook point, and that the operation still completes after each hook
+// is advanced.
 func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *testing.T) {
 	cs, err := clients.New()
 	if err != nil {
@@ -355,16 +355,23 @@ func Test_Imported_Operation_SetD_ImportedCertificateRotationLifecycleHook(t *te
 		hookName     = "v2prov-e2e-test"
 		delegateName = "v2prov-e2e-test-delegate"
 	)
+	preflightHookKey := certificaterotation.PreflightStepHookLabelPrefix + hookName
 	rotateHookKey := certificaterotation.RotateStepHookLabelPrefix + hookName
 	succeededHookKey := opv1alpha1.SucceededPhaseHookLabelPrefix + hookName
 
-	// Gate both the Rotate step and Succeeded phase.
+	// Gate the Preflight and Rotate steps and the Succeeded phase.
 	op := CreateCertificateRotationOp(t, cs, fx.ns.Name, fx.clusterRef, WithCertificateRotationLabels(map[string]string{
+		preflightHookKey: delegateName,
 		rotateHookKey:    delegateName,
 		succeededHookKey: delegateName,
 	}))
 
 	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
+
+	// Preflight's hook fires before the checks and the pause, so the cluster is unchanged here.
+	WaitForCertificateRotationHookPause(t, cs, op, beaconNS, beaconName, preflightHookKey, delegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.CertificateRotationStepPreflight)
+	AdvancePastCertificateRotationHook(t, cs, op, beaconNS, beaconName, preflightHookKey, delegateName)
 
 	WaitForCertificateRotationHookPause(t, cs, op, beaconNS, beaconName, rotateHookKey, delegateName,
 		opv1alpha1.OperationPhaseInProgress, opv1alpha1.CertificateRotationStepRotate)

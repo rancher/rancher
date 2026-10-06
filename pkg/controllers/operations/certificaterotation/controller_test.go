@@ -14,6 +14,7 @@ import (
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	plancontrollers "github.com/rancher/rancher/pkg/plan/generated/controllers/plan.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -710,10 +711,36 @@ func certificateRotationSecret(labels map[string]string) *corev1.Secret {
 	return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Labels: labels}}
 }
 
-// --- reconcileRotate preflight -----------------------------------------------------------------
+// --- preflight ---------------------------------------------------------------------------------
 
-func TestReconcileRotate_UnsupportedServiceFailsBeforePlanAssignment(t *testing.T) {
+// A requested service no node's distro has can never be rotated. Preflight turns the request away
+// before anything on the cluster is changed, which makes it a rejection and leaves the cluster
+// unpaused. Rotate checks again, since it works from the nodes as they are now, but by then the
+// cluster is paused, so the same finding is a failure. Either way no plan is assigned.
+func TestUnsupportedServiceStopsBeforePlanAssignment(t *testing.T) {
 	t.Parallel()
+
+	for _, tc := range []struct {
+		step      opv1alpha1.CertificateRotationStep
+		reconcile func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error)
+		phase     opv1alpha1.OperationPhase
+		outcome   condition.Cond
+	}{
+		{opv1alpha1.CertificateRotationStepPreflight, (*handler).reconcilePreflight, opv1alpha1.OperationPhaseRejected, opv1alpha1.RejectedCondition},
+		{opv1alpha1.CertificateRotationStepRotate, (*handler).reconcileRotate, opv1alpha1.OperationPhaseFailed, opv1alpha1.FailedCondition},
+	} {
+		t.Run(string(tc.step), func(t *testing.T) {
+			t.Parallel()
+			testUnsupportedServiceStopsBeforePlanAssignment(t, tc.step, tc.reconcile, tc.phase, tc.outcome)
+		})
+	}
+}
+
+func testUnsupportedServiceStopsBeforePlanAssignment(t *testing.T, step opv1alpha1.CertificateRotationStep,
+	reconcile func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error),
+	phase opv1alpha1.OperationPhase, outcome condition.Cond,
+) {
+	t.Helper()
 
 	cluster := &unstructured.Unstructured{}
 	cluster.SetName("test")
@@ -744,7 +771,7 @@ func TestReconcileRotate_UnsupportedServiceFailsBeforePlanAssignment(t *testing.
 		return &corev1.SecretList{Items: []corev1.Secret{*controlPlaneSecret}}, nil
 	}).AnyTimes()
 
-	// h.store is deliberately left nil. Preflight must fail and return before reaching
+	// h.store is deliberately left nil. The check must stop the operation before it reaches
 	// AssignPlan, so an accidental call into the nil store fails the test immediately
 	// rather than silently succeeding.
 	h := &handler{secrets: secrets}
@@ -767,18 +794,16 @@ func TestReconcileRotate_UnsupportedServiceFailsBeforePlanAssignment(t *testing.
 
 	status := opv1alpha1.CertificateRotationStatus{}
 	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
-	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
+	status.SetStep(step)
 
 	adapter := s.adapter.(*stubAdapter)
 
-	got, err := h.reconcileRotate(s, status)
+	got, err := reconcile(h, s, status)
 	require.NoError(t, err)
-	// The operation called its own work off before dispatching any, which is Aborted rather than
-	// Failed: nothing was attempted and lost.
-	assert.Equal(t, opv1alpha1.OperationPhaseRejected, got.Phase)
-	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, opv1alpha1.RejectedCondition.GetReason(&got))
-	assert.Contains(t, opv1alpha1.RejectedCondition.GetMessage(&got), "rke2-server")
-	assert.Empty(t, adapter.pauseCalls, "a request rejected before any plan is assigned must not pause the cluster")
+	assert.Equal(t, phase, got.Phase)
+	assert.Equal(t, opv1alpha1.PreflightCheckFailedReason, outcome.GetReason(&got))
+	assert.Contains(t, outcome.GetMessage(&got), "rke2-server")
+	assert.Empty(t, adapter.pauseCalls, "the check comes before any pause is asserted")
 }
 
 func TestReconcileRotate_DataDirectoryErrorReturnsBeforePlanAssignment(t *testing.T) {

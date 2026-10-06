@@ -37,9 +37,13 @@ const (
 
 	Finalizer = "certificaterotation.operation.cattle.io"
 
-	// RotateStepHookLabelPrefix gates the Rotate step, before reconcileRotate pauses the cluster and
-	// assigns the rotation plan to each node in turn. It fires before PauseCluster so a delegate
-	// observes the cluster in its pre-pause state.
+	// PreflightStepHookLabelPrefix gates the Preflight step, before reconcilePreflight checks the
+	// rotation can proceed and pauses the cluster. A delegate observes the cluster in its pre-pause
+	// state, and stopping the operation here leaves nothing to repair.
+	PreflightStepHookLabelPrefix = "preflight.step.hook.operation.cattle.io/"
+
+	// RotateStepHookLabelPrefix gates the Rotate step, after the cluster has been paused and before
+	// reconcileRotate assigns the rotation plan to each node in turn.
 	RotateStepHookLabelPrefix = "rotate.step.hook.operation.cattle.io/"
 )
 
@@ -47,7 +51,10 @@ const (
 // unknown / empty step. Used by handleInProgress to decide whether beacon-authorization loss is
 // explained by an active step-scoped delegation vs a genuine loss.
 func stepHookPrefixFor(step opv1alpha1.CertificateRotationStep) string {
-	if step == opv1alpha1.CertificateRotationStepRotate {
+	switch step {
+	case opv1alpha1.CertificateRotationStepPreflight:
+		return PreflightStepHookLabelPrefix
+	case opv1alpha1.CertificateRotationStepRotate:
 		return RotateStepHookLabelPrefix
 	}
 	return ""
@@ -530,10 +537,10 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.CertificateRotationS
 		return status, nil
 	}
 
-	logrus.Infof("[certificaterotation] %s/%s: transitioning to rotate", s.op.Namespace, s.op.Name)
+	logrus.Infof("[certificaterotation] %s/%s: transitioning to preflight", s.op.Namespace, s.op.Name)
 
 	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
-	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
+	status.SetStep(opv1alpha1.CertificateRotationStepPreflight)
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
@@ -592,23 +599,29 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.CertificateRotati
 		return status, nil
 	}
 
-	if s.op.Status.Step == opv1alpha1.CertificateRotationStepRotate {
+	switch s.op.Status.Step {
+	case opv1alpha1.CertificateRotationStepPreflight:
+		return h.reconcilePreflight(s, status)
+	case opv1alpha1.CertificateRotationStepRotate:
 		return h.reconcileRotate(s, status)
 	}
 
-	status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [%q] is unknown, expected: [%q]", status.Step, opv1alpha1.CertificateRotationStepRotate))
+	status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [%q] is unknown, expected one of: [%q, %q]",
+		status.Step, opv1alpha1.CertificateRotationStepPreflight, opv1alpha1.CertificateRotationStepRotate))
 
 	return status, nil
 }
 
-// reconcileRotate pauses normal cluster reconciliation, assigns a rotation plan to one target at
-// a time in disruption-safe order, and waits for that target to recover before advancing.
-func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
-	logrus.Debugf("[certificaterotation] %s/%s: handling certificate rotation", s.op.Namespace, s.op.Name)
+// reconcilePreflight checks the rotation can proceed before anything on the cluster is changed, and
+// pauses the cluster on the way out. The pause is the operation's point of no return: a rotation
+// stopped while still in this step leaves nothing to repair, which is why every check that can turn
+// the request away happens here, and why the pause comes last.
+func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
+	logrus.Debugf("[certificaterotation] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
 
-	// Run the step hook before pausing the cluster so a delegate sees the normal
-	// pre-rotation state. Reconciliation resumes here after the delegate clears.
-	delegated, err := h.handleHook(s, RotateStepHookLabelPrefix)
+	// Run the step hook before the checks and the pause so a delegate sees the normal pre-rotation
+	// state. Reconciliation resumes here after the delegate clears.
+	delegated, err := h.handleHook(s, PreflightStepHookLabelPrefix)
 	if err != nil {
 		return status, err
 	} else if delegated {
@@ -616,6 +629,32 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		return status, nil
 	}
 
+	if _, problem, err := h.rotationTargets(s); err != nil {
+		return status, err
+	} else if problem != "" {
+		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: %s", s.op.Namespace, s.op.Name, problem)
+		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, problem)
+		return status, nil
+	}
+
+	// Everything above can reject the request without having touched the cluster, so the pause waits
+	// until the operation is committed to dispatching work: a rotation turned away for a service this
+	// distro does not have must not leave the cluster paused behind it.
+	if err := s.adapter.PauseCluster(true); err != nil {
+		return status, err
+	}
+
+	logrus.Infof("[certificaterotation] %s/%s: transitioning to rotate", s.op.Namespace, s.op.Name)
+
+	status.SetStep(opv1alpha1.CertificateRotationStepRotate)
+	return status, nil
+}
+
+// rotationTargets collects the nodes to rotate, in disruption-safe order, each with the services to
+// rotate on it. problem is set, and targets nil, when the request cannot be carried out: there is
+// nothing to rotate, or it asks for a service no node's distro has. An error is returned only for a
+// failure that may pass on retry.
+func (h *handler) rotationTargets(s *scope) (targets []rotationTarget, problem string, err error) {
 	// Collect every registered machine-plan secret in the collector's safe role order. The
 	// requested-service filter runs afterwards so the whole node set is available to decide
 	// which services the cluster's distro can actually rotate.
@@ -623,34 +662,26 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		WithSorter(plan.DefaultSorter()).
 		Collect()
 	if plan.IsTransient(err) {
-		return status, err
+		return nil, "", err
 	} else if err != nil {
-		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: encountered terminal error collecting machine-plan secrets: %v", s.op.Namespace, s.op.Name, err)
-		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err))
-		return status, nil
+		return nil, fmt.Sprintf("encountered terminal error collecting machine-plan secrets: %v", err), nil
 	}
 
 	if len(candidates) == 0 {
-		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: no eligible machine-plan secrets found", s.op.Namespace, s.op.Name)
-		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, "no eligible machine-plan secrets found")
-		return status, nil
+		return nil, "no eligible machine-plan secrets found", nil
 	}
 
-	// A service no node's distro exposes can never be rotated. Reject the request here, before
-	// any node receives a plan, instead of returning an error that would retry forever.
+	// A service no node's distro exposes can never be rotated. Reject the request before any node
+	// receives a plan, instead of returning an error that would retry forever.
 	requested := s.op.Spec.Args.Services
 	if unsupported := unsupportedServices(s.adapter, requested, candidates); len(unsupported) > 0 {
-		logrus.Errorf("[certificaterotation] %s/%s: requested services are not available on this %s cluster: %s",
-			s.op.Namespace, s.op.Name, s.adapter.RuntimeCommand(), strings.Join(unsupported, ", "))
-		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason,
-			fmt.Sprintf("requested services are not available on this %s cluster: %s", s.adapter.RuntimeCommand(), strings.Join(unsupported, ", ")))
-		return status, nil
+		return nil, fmt.Sprintf("requested services are not available on this %s cluster: %s", s.adapter.RuntimeCommand(), strings.Join(unsupported, ", ")), nil
 	}
 
 	// Narrow the requested services to each candidate's own node once, keeping only the nodes
 	// that have at least one applicable service. An empty request applies to every node and
 	// keeps the "rotate everything" runtime behavior via a nil per-node service slice.
-	targets := make([]rotationTarget, 0, len(candidates))
+	targets = make([]rotationTarget, 0, len(candidates))
 	for _, secret := range candidates {
 		nodeServices := servicesForNode(s.adapter, requested, secret)
 		if len(requested) > 0 && len(nodeServices) == 0 {
@@ -659,16 +690,39 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 		targets = append(targets, rotationTarget{secret: secret, nodeServices: nodeServices})
 	}
 
-	// Everything above can reject the request without having touched the cluster, so the pause
-	// waits until the operation is committed to dispatching work: a rotation turned away for a
-	// service this distro does not have must not leave the cluster paused behind it. PauseCluster is
-	// idempotent, so the reconciles that follow re-assert it.
+	return targets, "", nil
+}
+
+// reconcileRotate assigns a rotation plan to one target at a time in disruption-safe order, and
+// waits for that target to recover before advancing. The cluster was paused on leaving Preflight.
+func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
+	logrus.Debugf("[certificaterotation] %s/%s: handling certificate rotation", s.op.Namespace, s.op.Name)
+
+	delegated, err := h.handleHook(s, RotateStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
+		return status, nil
+	}
+
+	// The checks Preflight passed are made again, since every reconcile works from the nodes as they
+	// are now. Failing them here is a failure rather than a rejection: the cluster is already paused,
+	// and Rejected is only for an operation that has changed nothing.
+	targets, problem, err := h.rotationTargets(s)
+	if err != nil {
+		return status, err
+	} else if problem != "" {
+		logrus.Errorf("[certificaterotation] %s/%s: marking operation as failed: %s", s.op.Namespace, s.op.Name, problem)
+		status.MarkFailed(opv1alpha1.PreflightCheckFailedReason, problem)
+		return status, nil
+	}
+
+	// PauseCluster is idempotent, so re-asserting it on every reconcile keeps the cluster paused for
+	// as long as the rotation runs.
 	if err := s.adapter.PauseCluster(true); err != nil {
 		return status, err
 	}
-
-	// Tie plan content to this operation and step so the system-agent reruns rotated plans
-	// instead of reusing stale applied output. Applied only when a plan is assigned, below.
 
 	for _, target := range targets {
 		secret := target.secret

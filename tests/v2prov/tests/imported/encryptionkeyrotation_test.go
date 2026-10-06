@@ -143,6 +143,7 @@ func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook(t *
 		hookName     = "v2prov-e2e-test"
 		delegateName = "v2prov-e2e-test-delegate"
 	)
+	preflightHookKey := encryptionkeyrotation.PreflightStepHookLabelPrefix + hookName
 	rotateHookKey := encryptionkeyrotation.RotateStepHookLabelPrefix + hookName
 	restartHookKey := encryptionkeyrotation.RestartStepHookLabelPrefix + hookName
 	succeededHookKey := opv1alpha1.SucceededPhaseHookLabelPrefix + hookName
@@ -151,6 +152,7 @@ func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook(t *
 	// interfere — the controller only consults the relevant prefix when it enters that
 	// phase/step.
 	op := CreateEncryptionKeyRotationOp(t, cs, fx.ns.Name, fx.clusterRef, WithEncryptionKeyRotationLabels(map[string]string{
+		preflightHookKey: delegateName,
 		rotateHookKey:    delegateName,
 		restartHookKey:   delegateName,
 		succeededHookKey: delegateName,
@@ -160,15 +162,21 @@ func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook(t *
 	// mgmt clusters use namespace == name.
 	beaconNS, beaconName := fx.mgmtCluster.Name, fx.mgmtCluster.Name
 
-	// Checkpoint 1: Rotate step. The controller has elected a control-plane leader and is about
-	// to (but has not yet) paused the cluster + assigned the rotate-keys plan. The hook fires
-	// before PauseCluster so a delegate sees the cluster in its unpaused state.
-	cp := WaitForEncryptionKeyRotationHookPause(t, cs, op, beaconNS, beaconName, rotateHookKey, delegateName,
+	// Checkpoint 1: Preflight step. Nothing on the cluster has changed yet: the hook fires before the
+	// controller elects a leader and pauses the cluster, so a delegate sees the cluster unpaused.
+	cp := WaitForEncryptionKeyRotationHookPause(t, cs, op, beaconNS, beaconName, preflightHookKey, delegateName,
+		opv1alpha1.OperationPhaseInProgress, opv1alpha1.EncryptionKeyRotationStepPreflight)
+	t.Logf("paused at Preflight step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
+	AdvancePastEncryptionKeyRotationHook(t, cs, op, beaconNS, beaconName, preflightHookKey, delegateName)
+
+	// Checkpoint 2: Rotate step. The cluster was paused on leaving Preflight, and the controller has
+	// not yet assigned the rotate-keys plan to the leader.
+	cp = WaitForEncryptionKeyRotationHookPause(t, cs, op, beaconNS, beaconName, rotateHookKey, delegateName,
 		opv1alpha1.OperationPhaseInProgress, opv1alpha1.EncryptionKeyRotationStepRotate)
 	t.Logf("paused at Rotate step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
 	AdvancePastEncryptionKeyRotationHook(t, cs, op, beaconNS, beaconName, rotateHookKey, delegateName)
 
-	// Checkpoint 2: Restart step. By the time the controller reaches this, rotate-keys has run
+	// Checkpoint 3: Restart step. By the time the controller reaches this, rotate-keys has run
 	// to reencrypt_finished on the leader (otherwise the controller would not have transitioned
 	// to Restart). Restart hook runs before the per-node restart loop starts.
 	cp = WaitForEncryptionKeyRotationHookPause(t, cs, op, beaconNS, beaconName, restartHookKey, delegateName,
@@ -176,7 +184,7 @@ func Test_Imported_Operation_SetD_ImportedEncryptionKeyRotationLifecycleHook(t *
 	t.Logf("paused at Restart step: phase=%s step=%s delegates=%v", cp.Op.Status.Phase, cp.Op.Status.Step, cp.Beacon.Status.Delegates)
 	AdvancePastEncryptionKeyRotationHook(t, cs, op, beaconNS, beaconName, restartHookKey, delegateName)
 
-	// Checkpoint 3: Succeeded phase. Rotation + all restarts have completed. The hook gates the
+	// Checkpoint 4: Succeeded phase. Rotation + all restarts have completed. The hook gates the
 	// cluster-unpause + beacon-release cleanup.
 	cp = WaitForEncryptionKeyRotationHookPause(t, cs, op, beaconNS, beaconName, succeededHookKey, delegateName,
 		opv1alpha1.OperationPhaseSucceeded, "")

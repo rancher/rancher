@@ -14,6 +14,11 @@ type EncryptionKeyRotationSpec struct {
 type EncryptionKeyRotationStep string
 
 const (
+	// EncryptionKeyRotationStepPreflight indicates the step is checking that the rotation can proceed,
+	// before anything on the cluster is changed. The cluster is paused as the operation leaves this
+	// step, which is its point of no return: stopped before it, the rotation leaves nothing to repair.
+	EncryptionKeyRotationStepPreflight EncryptionKeyRotationStep = "Preflight"
+
 	// EncryptionKeyRotationStepRotate indicates the step is to rotate the encryption keys
 	// by running the secrets-encrypt rotate-keys command on the elected control-plane leader.
 	EncryptionKeyRotationStepRotate EncryptionKeyRotationStep = "Rotate"
@@ -30,7 +35,7 @@ type EncryptionKeyRotationStatus struct {
 
 	// Step is the current step of the operation.
 	// Step is typically only valid during the InProgress phase.
-	// +kubebuilder:validation:Enum=Rotate;Restart
+	// +kubebuilder:validation:Enum=Preflight;Rotate;Restart
 	// +optional
 	Step EncryptionKeyRotationStep `json:"step,omitempty"`
 }

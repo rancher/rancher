@@ -28,6 +28,12 @@ type CertificateRotationSpec struct {
 type CertificateRotationStep string
 
 const (
+	// CertificateRotationStepPreflight indicates the step is checking that the rotation can proceed
+	// (that the cluster has nodes to rotate, and the services requested exist on them) before anything
+	// on the cluster is changed. The cluster is paused as the operation leaves this step, which is its
+	// point of no return: stopped before it, the rotation leaves nothing to repair.
+	CertificateRotationStepPreflight CertificateRotationStep = "Preflight"
+
 	// CertificateRotationStepRotate indicates the step is rotating certificates.
 	CertificateRotationStepRotate CertificateRotationStep = "Rotate"
 )
@@ -39,7 +45,7 @@ type CertificateRotationStatus struct {
 
 	// Step is the current step of the operation.
 	// Step is typically only valid during the InProgress phase.
-	// +kubebuilder:validation:Enum=Rotate
+	// +kubebuilder:validation:Enum=Preflight;Rotate
 	// +optional
 	Step CertificateRotationStep `json:"step,omitempty"`
 }

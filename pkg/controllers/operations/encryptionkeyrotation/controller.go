@@ -44,9 +44,13 @@ const Finalizer = "encryptionkeyrotation.operation.cattle.io"
 // rotation step and follows the shared label semantics documented on planv1alpha1's phase-hook
 // label constants.
 const (
-	// RotateStepHookLabelPrefix gates the Rotate step, before reconcileRotate pauses the CAPI
-	// cluster and assigns the rotate-keys plan to the elected control-plane leader. Fires before
-	// PauseCluster so a delegate observes the cluster in its pre-pause state.
+	// PreflightStepHookLabelPrefix gates the Preflight step, before reconcilePreflight elects the
+	// control-plane leader and pauses the cluster. A delegate observes the cluster in its pre-pause
+	// state, and stopping the operation here leaves nothing to repair.
+	PreflightStepHookLabelPrefix = "preflight.step.hook.operation.cattle.io/"
+
+	// RotateStepHookLabelPrefix gates the Rotate step, after the cluster has been paused and before
+	// reconcileRotate assigns the rotate-keys plan to the elected control-plane leader.
 	RotateStepHookLabelPrefix = "rotate.step.hook.operation.cattle.io/"
 
 	// RestartStepHookLabelPrefix gates the Restart step, before reconcileRestart begins walking
@@ -59,6 +63,8 @@ const (
 // explained by an active step-scoped delegation vs a genuine loss.
 func stepHookPrefixFor(step opv1alpha1.EncryptionKeyRotationStep) string {
 	switch step {
+	case opv1alpha1.EncryptionKeyRotationStepPreflight:
+		return PreflightStepHookLabelPrefix
 	case opv1alpha1.EncryptionKeyRotationStepRotate:
 		return RotateStepHookLabelPrefix
 	case opv1alpha1.EncryptionKeyRotationStepRestart:
@@ -543,10 +549,10 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.EncryptionKeyRotatio
 		return status, nil
 	}
 
-	logrus.Infof("[encryptionkeyrotation] %s/%s: transitioning to rotate", s.op.Namespace, s.op.Name)
+	logrus.Infof("[encryptionkeyrotation] %s/%s: transitioning to preflight", s.op.Namespace, s.op.Name)
 
 	status.SetPhase(opv1alpha1.OperationPhaseInProgress)
-	status.SetStep(opv1alpha1.EncryptionKeyRotationStepRotate)
+	status.SetStep(opv1alpha1.EncryptionKeyRotationStepPreflight)
 
 	opv1alpha1.InProgressCondition.True(&status)
 	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.InProgressReason)
@@ -605,25 +611,69 @@ func (h *handler) handleInProgress(s *scope, status opv1alpha1.EncryptionKeyRota
 	}
 
 	switch s.op.Status.Step {
+	case opv1alpha1.EncryptionKeyRotationStepPreflight:
+		return h.reconcilePreflight(s, status)
 	case opv1alpha1.EncryptionKeyRotationStepRotate:
 		return h.reconcileRotate(s, status)
 	case opv1alpha1.EncryptionKeyRotationStepRestart:
 		return h.reconcileRestart(s, status)
 	}
 
-	status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [%q] is unknown, expected one of: [%q, %q]",
-		status.Step, opv1alpha1.EncryptionKeyRotationStepRotate, opv1alpha1.EncryptionKeyRotationStepRestart))
+	status.MarkFailed(opv1alpha1.UnknownStepReason, fmt.Sprintf("current step [%q] is unknown, expected one of: [%q, %q, %q]",
+		status.Step, opv1alpha1.EncryptionKeyRotationStepPreflight, opv1alpha1.EncryptionKeyRotationStepRotate, opv1alpha1.EncryptionKeyRotationStepRestart))
 
 	return status, nil
 }
 
+// reconcilePreflight checks the rotation can proceed before anything on the cluster is changed, and
+// pauses the cluster on the way out. The pause is the operation's point of no return: a rotation
+// stopped while still in this step leaves nothing to repair.
+func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
+	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling preflight", s.op.Namespace, s.op.Name)
+
+	// Hook check before the pause so a delegate can inspect or modify the cluster's pre-pause state.
+	delegated, err := h.handleHook(s, PreflightStepHookLabelPrefix)
+	if err != nil {
+		return status, err
+	} else if delegated {
+		ops.SetWaitingForDelegate(opv1alpha1.InProgressCondition, &status.OperationStatus, s.beacon)
+		return status, nil
+	}
+
+	// The rotation needs a control-plane leader to run rotate-keys on. Electing one changes nothing
+	// on the cluster, so the rotation waits for one here, before it is committed.
+	if leader, err := s.adapter.FindOrElectLeader(ControllerOwnerKey, ops.IsControlPlane); err != nil {
+		return status, err
+	} else if leader == nil {
+		return waitForLeader(s, status), nil
+	}
+
+	// Pause the cluster while the rotation runs, so unrelated activity does not race with it.
+	if err := s.adapter.PauseCluster(true); err != nil {
+		return status, err
+	}
+
+	logrus.Infof("[encryptionkeyrotation] %s/%s: transitioning to rotate", s.op.Namespace, s.op.Name)
+
+	status.SetStep(opv1alpha1.EncryptionKeyRotationStepRotate)
+	return status, nil
+}
+
+// waitForLeader reports that the rotation is waiting for a suitable control-plane leader.
+func waitForLeader(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) opv1alpha1.EncryptionKeyRotationStatus {
+	logrus.Debugf("[encryptionkeyrotation] %s/%s: no suitable control-plane leader found yet, will retry", s.op.Namespace, s.op.Name)
+	opv1alpha1.InProgressCondition.True(&status)
+	opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForSuitableLeaderReason)
+	opv1alpha1.InProgressCondition.Message(&status, "waiting for a suitable control-plane leader for encryption key rotation")
+	return status
+}
+
 // reconcileRotate runs `secrets-encrypt rotate-keys` on the elected leader and
-// stays in Rotate until status reports `reencrypt_finished` on that node.
+// stays in Rotate until status reports `reencrypt_finished` on that node. The cluster was paused on
+// leaving Preflight.
 func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	logrus.Debugf("[encryptionkeyrotation] %s/%s: handling secrets-encrypt rotate-keys", s.op.Namespace, s.op.Name)
 
-	// Hook check before PauseCluster so a delegate can inspect or modify the cluster's pre-pause
-	// state. PauseCluster is idempotent so re-entering after the hook clears just no-ops.
 	delegated, err := h.handleHook(s, RotateStepHookLabelPrefix)
 	if err != nil {
 		return status, err
@@ -638,15 +688,11 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 	}
 
 	if leader == nil {
-		logrus.Debugf("[encryptionkeyrotation] %s/%s: no suitable control-plane leader found yet, will retry", s.op.Namespace, s.op.Name)
-		opv1alpha1.InProgressCondition.True(&status)
-		opv1alpha1.InProgressCondition.Reason(&status, opv1alpha1.WaitingForSuitableLeaderReason)
-		opv1alpha1.InProgressCondition.Message(&status, "waiting for a suitable control-plane leader for encryption key rotation")
-		return status, nil
+		return waitForLeader(s, status), nil
 	}
 
-	// Pause the CAPI cluster while rotate-keys is active so unrelated activity
-	// does not race with the encryption-key rotation plan.
+	// PauseCluster is idempotent, so re-asserting it on every reconcile keeps the cluster paused for
+	// as long as the rotation runs.
 	if err := s.adapter.PauseCluster(true); err != nil {
 		return status, err
 	}
