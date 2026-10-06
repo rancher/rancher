@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -623,11 +624,13 @@ func TestBeaconRefForSecret(t *testing.T) {
 		wantOK        bool
 	}{
 		// An imported cluster's secrets and beacon are in the namespace named after the cluster.
-		{name: "imported", secret: secret("c-m-abc", map[string]string{labelClusterName: "c-m-abc"}), wantNamespace: "c-m-abc", wantName: "c-m-abc", wantOK: true},
-		// A CAPR or CAPRKE2 cluster's are in its control plane's namespace, under the cluster's name.
-		{name: "capr", secret: secret("fleet-default", map[string]string{labelClusterName: "prod"}), wantNamespace: "fleet-default", wantName: "prod", wantOK: true},
+		{name: "imported", secret: secret("c-m-abc", map[string]string{planv1alpha1.ClusterLifecycleNameLabel: "c-m-abc"}), wantNamespace: "c-m-abc", wantName: "c-m-abc", wantOK: true},
+		// A CAPR or CAPRKE2 cluster's are in its CAPI cluster's namespace, under the cluster's name.
+		{name: "capr", secret: secret("fleet-default", map[string]string{planv1alpha1.ClusterLifecycleNameLabel: "prod"}), wantNamespace: "fleet-default", wantName: "prod", wantOK: true},
+		// The lifecycle label is the one read; the label the collector selects by is not consulted.
+		{name: "only rke.cattle.io/cluster-name", secret: secret("fleet-default", map[string]string{labelClusterName: "prod"})},
 		{name: "no cluster name", secret: secret("fleet-default", map[string]string{"other": "label"})},
-		{name: "empty cluster name", secret: secret("fleet-default", map[string]string{labelClusterName: ""})},
+		{name: "empty cluster name", secret: secret("fleet-default", map[string]string{planv1alpha1.ClusterLifecycleNameLabel: ""})},
 		{name: "no labels", secret: secret("fleet-default", nil)},
 		{name: "nil secret"},
 	}
