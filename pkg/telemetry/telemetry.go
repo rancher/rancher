@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -324,12 +325,13 @@ func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	var wg sync.WaitGroup
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(20)
 
 	for _, cl := range clusters {
-		wg.Go(func() {
+		g.Go(func() error {
 			if isNVIDIAPresent.Load() {
-				return
+				return nil
 			}
 
 			k8s, _ := t.multiClusterManager.K8sClient(cl.Name)
@@ -347,10 +349,11 @@ func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 					isNVIDIAPresent.Store(true)
 				}
 			}
+			return nil
 		})
 	}
 
-	wg.Wait()
+	g.Wait()
 
 	v := isNVIDIAPresent.Load()
 	t.nvidiaCache.value = v
