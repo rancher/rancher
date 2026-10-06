@@ -77,6 +77,8 @@ func TestReconcilePreflight_PausesAndMovesToRotate(t *testing.T) {
 	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, got.Phase)
 	assert.Equal(t, opv1alpha1.EncryptionKeyRotationStepRotate, got.Step)
 	assert.Equal(t, []bool{true}, adapter.pauseCalls, "the cluster is paused on leaving Preflight")
+	assert.Equal(t, []ops.WhitelistChange{ops.WhitelistRestores}, adapter.whitelistCalls,
+		"pausing is the point of no return, so only a restore may run on the cluster from here")
 	assert.Empty(t, secrets.updates, "no plan is assigned in Preflight")
 }
 

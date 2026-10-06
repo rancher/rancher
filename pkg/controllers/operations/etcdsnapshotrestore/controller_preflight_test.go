@@ -5,6 +5,7 @@ import (
 
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
+	ops "github.com/rancher/rancher/pkg/operations"
 	planapi "github.com/rancher/rancher/pkg/plan"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -50,6 +51,8 @@ func TestReconcilePreflight_PassesLabeledSecrets(t *testing.T) {
 	assert.Equal(t, opv1alpha1.OperationPhaseInProgress, got.Phase)
 	assert.Equal(t, opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig, got.Step)
 	assert.Equal(t, []bool{true}, adapter.pauseCalls, "the cluster is paused on leaving Preflight")
+	assert.Equal(t, []ops.WhitelistChange{ops.WhitelistRestores}, adapter.whitelistCalls,
+		"pausing is the point of no return, so only a restore may run on the cluster from here")
 }
 
 // A machine-plan secret whose lifecycle labels don't tie it to the operation's cluster can't be fenced

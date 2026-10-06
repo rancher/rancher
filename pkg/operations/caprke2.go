@@ -610,15 +610,20 @@ func (a *CAPRKE2Adapter) KubeconfigPath(_ *corev1.Secret) string {
 
 // PauseCluster toggles Spec.Paused on the CAPI Cluster that owns this RKE2ControlPlane. CAPI's
 // Cluster name matches the RKE2ControlPlane name by convention. Mirrors CAPRAdapter.PauseCluster.
-func (a *CAPRKE2Adapter) PauseCluster(pause bool) error {
+func (a *CAPRKE2Adapter) PauseCluster(pause bool, whitelist WhitelistChange) error {
 	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
 	if err != nil {
 		return err
 	}
-	if ptr.Equal(cluster.Spec.Paused, &pause) {
+	cluster = cluster.DeepCopy()
+
+	pauseChanged := !ptr.Equal(cluster.Spec.Paused, &pause)
+	var whitelistChanged bool
+	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+	if !pauseChanged && !whitelistChanged {
 		return nil
 	}
-	cluster = cluster.DeepCopy()
+
 	cluster.Spec.Paused = &pause
 	_, err = a.clients.CAPI.Cluster().Update(cluster)
 	return err

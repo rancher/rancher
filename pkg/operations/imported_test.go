@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -1523,13 +1524,17 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 	t.Parallel()
 
 	const anno = importedclusterversionmanagement.VersionManagementPausedAnno
+	const whitelisted = opv1alpha1.WhitelistedAnnotation
+	const restores = opv1alpha1.ETCDSnapshotRestoreResource
 
 	tests := []struct {
-		name        string
-		annotations map[string]string
-		pause       bool
-		wantUpdate  bool
-		wantPaused  bool
+		name          string
+		annotations   map[string]string
+		pause         bool
+		whitelist     WhitelistChange
+		wantUpdate    bool
+		wantPaused    bool
+		wantWhitelist string
 	}{
 		{
 			name:       "pausing an unannotated cluster",
@@ -1574,6 +1579,65 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 			wantUpdate:  true,
 			wantPaused:  false,
 		},
+		// The whitelist is written in the same update as the pause, so a cluster can never be left
+		// paused by an operation without also recording that only a restore can repair it.
+		{
+			name:          "pausing whitelists restores in the same write",
+			pause:         true,
+			whitelist:     WhitelistRestores,
+			wantUpdate:    true,
+			wantPaused:    true,
+			wantWhitelist: restores,
+		},
+		{
+			name:          "whitelisting an already paused cluster still writes",
+			annotations:   map[string]string{anno: "true"},
+			pause:         true,
+			whitelist:     WhitelistRestores,
+			wantUpdate:    true,
+			wantPaused:    true,
+			wantWhitelist: restores,
+		},
+		{
+			name:          "a paused, whitelisted cluster does not write",
+			annotations:   map[string]string{anno: "true", whitelisted: restores},
+			pause:         true,
+			whitelist:     WhitelistRestores,
+			wantPaused:    true,
+			wantWhitelist: restores,
+		},
+		{
+			name:          "whitelisting appends to existing entries",
+			annotations:   map[string]string{whitelisted: "other.example.io"},
+			pause:         true,
+			whitelist:     WhitelistRestores,
+			wantUpdate:    true,
+			wantPaused:    true,
+			wantWhitelist: "other.example.io," + restores,
+		},
+		{
+			name:        "unpausing clears the whitelist in the same write",
+			annotations: map[string]string{anno: "true", whitelisted: restores},
+			pause:       false,
+			whitelist:   WhitelistCleared,
+			wantUpdate:  true,
+		},
+		{
+			name:        "clearing the whitelist of an unpaused cluster still writes",
+			annotations: map[string]string{whitelisted: restores},
+			pause:       false,
+			whitelist:   WhitelistCleared,
+			wantUpdate:  true,
+		},
+		{
+			// The restore unpauses the cluster for its restart but keeps the whitelist until it succeeds.
+			name:          "unpausing can leave the whitelist",
+			annotations:   map[string]string{anno: "true", whitelisted: restores},
+			pause:         false,
+			whitelist:     WhitelistUnchanged,
+			wantUpdate:    true,
+			wantWhitelist: restores,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1582,7 +1646,7 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 
 			adapter, clusters := newPauseAdapter(newPauseCluster(tt.annotations))
 
-			require.NoError(t, adapter.PauseCluster(tt.pause))
+			require.NoError(t, adapter.PauseCluster(tt.pause, tt.whitelist))
 
 			if tt.wantUpdate {
 				require.Len(t, clusters.updates, 1, "expected exactly one write")
@@ -1596,6 +1660,11 @@ func TestImportedAdapter_PauseCluster(t *testing.T) {
 
 			if !tt.wantPaused && tt.wantUpdate {
 				assert.NotContains(t, latest.Annotations, anno, "unpausing must remove the annotation, not blank it")
+			}
+			if tt.wantWhitelist == "" {
+				assert.NotContains(t, latest.Annotations, whitelisted, "a cleared whitelist is removed, not blanked")
+			} else {
+				assert.Equal(t, tt.wantWhitelist, latest.Annotations[whitelisted])
 			}
 			if tt.annotations[importedclusterversionmanagement.VersionManagementAnno] != "" {
 				assert.Equal(t, "true", latest.Annotations[importedclusterversionmanagement.VersionManagementAnno],
@@ -1612,6 +1681,6 @@ func TestImportedAdapter_PauseCluster_GetError(t *testing.T) {
 	clusters.getErr = errors.New("apiserver is down")
 
 	// The restore must not proceed believing it paused the cluster.
-	assert.ErrorContains(t, adapter.PauseCluster(true), "apiserver is down")
+	assert.ErrorContains(t, adapter.PauseCluster(true, WhitelistRestores), "apiserver is down")
 	assert.Empty(t, clusters.updates)
 }

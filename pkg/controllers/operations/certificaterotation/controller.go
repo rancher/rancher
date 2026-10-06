@@ -650,7 +650,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.CertificateRota
 	// Everything above can reject the request without having touched the cluster, so the pause waits
 	// until the operation is committed to dispatching work: a rotation turned away for a service this
 	// distro does not have must not leave the cluster paused behind it.
-	if err := s.adapter.PauseCluster(true); err != nil {
+	if err := s.adapter.PauseCluster(true, ops.WhitelistRestores); err != nil {
 		return status, err
 	}
 
@@ -730,7 +730,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 
 	// PauseCluster is idempotent, so re-asserting it on every reconcile keeps the cluster paused for
 	// as long as the rotation runs.
-	if err := s.adapter.PauseCluster(true); err != nil {
+	if err := s.adapter.PauseCluster(true, ops.WhitelistRestores); err != nil {
 		return status, err
 	}
 
@@ -863,7 +863,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.CertificateRotatio
 func (h *handler) finishRotation(s *scope, status opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error) {
 	// Unpause before asserting the outcome: a rotation reported successful while its cluster is
 	// still paused would look finished and leave the cluster frozen.
-	if err := s.adapter.PauseCluster(false); err != nil {
+	if err := s.adapter.PauseCluster(false, ops.WhitelistCleared); err != nil {
 		return status, err
 	}
 

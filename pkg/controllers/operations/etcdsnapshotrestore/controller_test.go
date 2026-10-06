@@ -89,8 +89,9 @@ type stubAdapter struct {
 	// leader is the secret FindOrElectLeader serves.
 	leader *corev1.Secret
 
-	// pauseCalls records every PauseCluster call, in order.
-	pauseCalls []bool
+	// pauseCalls and whitelistCalls record every PauseCluster call, in order.
+	pauseCalls     []bool
+	whitelistCalls []ops.WhitelistChange
 }
 
 func (a *stubAdapter) EtcdSnapshotNamespace() string {
@@ -107,8 +108,9 @@ func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) {
 
 func (a *stubAdapter) BeaconRef() (string, string)    { return "test-namespace", "test-cluster" }
 func (a *stubAdapter) WaitForRegister() (bool, error) { return a.waitForRegisterOK, nil }
-func (a *stubAdapter) PauseCluster(paused bool) error {
+func (a *stubAdapter) PauseCluster(paused bool, whitelist ops.WhitelistChange) error {
 	a.pauseCalls = append(a.pauseCalls, paused)
+	a.whitelistCalls = append(a.whitelistCalls, whitelist)
 	return nil
 }
 func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }

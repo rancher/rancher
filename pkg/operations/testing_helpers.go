@@ -44,6 +44,38 @@ func (s *stubSecretController) List(namespace string, opts metav1.ListOptions) (
 type stubCAPIInterface struct {
 	capicontrollers.Interface
 	machineCache generic.CacheInterface[*capi.Machine]
+	clusters     *stubCAPIClusterController
+}
+
+func (s *stubCAPIInterface) Cluster() capicontrollers.ClusterController {
+	return s.clusters
+}
+
+// stubCAPIClusterController serves one CAPI Cluster through its cache, and records every Update,
+// which it also makes the cluster the cache serves from then on.
+type stubCAPIClusterController struct {
+	capicontrollers.ClusterController
+	cluster *capi.Cluster
+	updates []*capi.Cluster
+}
+
+func (s *stubCAPIClusterController) Cache() generic.CacheInterface[*capi.Cluster] {
+	return &stubCAPIClusterCache{controller: s}
+}
+
+func (s *stubCAPIClusterController) Update(cluster *capi.Cluster) (*capi.Cluster, error) {
+	s.updates = append(s.updates, cluster.DeepCopy())
+	s.cluster = cluster.DeepCopy()
+	return cluster, nil
+}
+
+type stubCAPIClusterCache struct {
+	generic.CacheInterface[*capi.Cluster]
+	controller *stubCAPIClusterController
+}
+
+func (c *stubCAPIClusterCache) Get(_, _ string) (*capi.Cluster, error) {
+	return c.controller.cluster.DeepCopy(), nil
 }
 
 func (s *stubCAPIInterface) Machine() capicontrollers.MachineController {

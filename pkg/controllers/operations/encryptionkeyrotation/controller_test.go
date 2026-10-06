@@ -37,6 +37,7 @@ type stubAdapter struct {
 	waitForRegisterOK  bool
 	waitForRegisterErr error
 	pauseCalls         []bool
+	whitelistCalls     []ops.WhitelistChange
 	pauseErr           error
 
 	// leader is the secret FindOrElectLeader serves.
@@ -106,11 +107,12 @@ func (a *stubAdapter) FindOrElectLeader(_ string, _ ops.Filter) (*corev1.Secret,
 	return a.leader, nil
 }
 
-func (a *stubAdapter) PauseCluster(paused bool) error {
+func (a *stubAdapter) PauseCluster(paused bool, whitelist ops.WhitelistChange) error {
 	if a.pauseErr != nil {
 		return a.pauseErr
 	}
 	a.pauseCalls = append(a.pauseCalls, paused)
+	a.whitelistCalls = append(a.whitelistCalls, whitelist)
 	return nil
 }
 
@@ -1941,6 +1943,9 @@ func TestFinishRotation(t *testing.T) {
 	}
 	if len(adapter.pauseCalls) != 1 || adapter.pauseCalls[0] {
 		t.Fatalf("expected exactly one PauseCluster(false), got %v", adapter.pauseCalls)
+	}
+	if len(adapter.whitelistCalls) != 1 || adapter.whitelistCalls[0] != ops.WhitelistCleared {
+		t.Fatalf("a rotation that succeeded must lift the whitelist with the pause, got %v", adapter.whitelistCalls)
 	}
 	if status.Phase != opv1alpha1.OperationPhaseSucceeded {
 		t.Fatalf("expected phase Succeeded, got %q", status.Phase)

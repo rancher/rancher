@@ -732,15 +732,20 @@ func (a *CAPRAdapter) KubeconfigPath(_ *corev1.Secret) string {
 	return "/etc/rancher/rke2/rke2.yaml"
 }
 
-func (a *CAPRAdapter) PauseCluster(pause bool) error {
+func (a *CAPRAdapter) PauseCluster(pause bool, whitelist WhitelistChange) error {
 	cluster, err := a.clients.CAPI.Cluster().Cache().Get(a.controlPlane.Namespace, a.controlPlane.Name)
 	if err != nil {
 		return err
 	}
-	if ptr.Equal(cluster.Spec.Paused, &pause) {
+	cluster = cluster.DeepCopy()
+
+	pauseChanged := !ptr.Equal(cluster.Spec.Paused, &pause)
+	var whitelistChanged bool
+	cluster.Annotations, whitelistChanged = ApplyWhitelistChange(cluster.Annotations, whitelist)
+	if !pauseChanged && !whitelistChanged {
 		return nil
 	}
-	cluster = cluster.DeepCopy()
+
 	cluster.Spec.Paused = &pause
 	_, err = a.clients.CAPI.Cluster().Update(cluster)
 	return err

@@ -66,8 +66,8 @@ func (a *stubAdapter) InstallInstruction(_ *corev1.Secret, _ string) (planapi.On
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }
-func (a *stubAdapter) PauseCluster(_ bool) error { return nil }
-func (a *stubAdapter) RuntimeCommand() string    { return a.runtimeCommand }
+func (a *stubAdapter) PauseCluster(_ bool, _ ops.WhitelistChange) error { return nil }
+func (a *stubAdapter) RuntimeCommand() string                           { return a.runtimeCommand }
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 	return a.dataDir, nil
 }

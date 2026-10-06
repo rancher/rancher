@@ -977,7 +977,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.ETCDSnapshotRes
 		return status, nil
 	}
 
-	if err = s.adapter.PauseCluster(true); err != nil {
+	if err = s.adapter.PauseCluster(true, ops.WhitelistRestores); err != nil {
 		return status, err
 	}
 
@@ -1620,7 +1620,10 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 
 	value := s.restartIdempotencyValue(nextStep != "")
 
-	if err = s.adapter.PauseCluster(false); err != nil {
+	// The cluster has to reconcile its restarted nodes, so it is unpaused for the restart. Its
+	// whitelist stays until the restore has succeeded: a restore stopped from here on still leaves a
+	// cluster only another restore can repair.
+	if err = s.adapter.PauseCluster(false, ops.WhitelistUnchanged); err != nil {
 		return status, err
 	}
 
@@ -1685,6 +1688,12 @@ func (h *handler) reconcileRestartCluster(s *scope, status opv1alpha1.ETCDSnapsh
 		logrus.Infof("[etcdsnapshotrestore] %s/%s: transitioning to %s", s.op.Namespace, s.op.Name, nextStep)
 		status.SetStep(nextStep)
 		return status, nil
+	}
+
+	// The restore has repaired the cluster, so any operation may run on it again, whichever operation
+	// left it requiring a restore. The cluster was already unpaused for the restart.
+	if err = s.adapter.PauseCluster(false, ops.WhitelistCleared); err != nil {
+		return status, err
 	}
 
 	logrus.Infof("[etcdsnapshotrestore] %s/%s: marking as success", s.op.Namespace, s.op.Name)

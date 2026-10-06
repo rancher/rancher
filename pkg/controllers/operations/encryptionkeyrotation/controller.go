@@ -659,7 +659,7 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.EncryptionKeyRo
 	}
 
 	// Pause the cluster while the rotation runs, so unrelated activity does not race with it.
-	if err := s.adapter.PauseCluster(true); err != nil {
+	if err := s.adapter.PauseCluster(true, ops.WhitelistRestores); err != nil {
 		return status, err
 	}
 
@@ -703,7 +703,7 @@ func (h *handler) reconcileRotate(s *scope, status opv1alpha1.EncryptionKeyRotat
 
 	// PauseCluster is idempotent, so re-asserting it on every reconcile keeps the cluster paused for
 	// as long as the rotation runs.
-	if err := s.adapter.PauseCluster(true); err != nil {
+	if err := s.adapter.PauseCluster(true, ops.WhitelistRestores); err != nil {
 		return status, err
 	}
 
@@ -907,7 +907,7 @@ func (h *handler) reconcileRestart(s *scope, status opv1alpha1.EncryptionKeyRota
 func (h *handler) finishRotation(s *scope, status opv1alpha1.EncryptionKeyRotationStatus) (opv1alpha1.EncryptionKeyRotationStatus, error) {
 	// Unpause before asserting the outcome: a rotation reported successful while its cluster is
 	// still paused would look finished and leave the cluster frozen.
-	if err := s.adapter.PauseCluster(false); err != nil {
+	if err := s.adapter.PauseCluster(false, ops.WhitelistCleared); err != nil {
 		return status, err
 	}
 

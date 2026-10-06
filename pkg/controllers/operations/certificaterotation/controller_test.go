@@ -43,6 +43,7 @@ type stubAdapter struct {
 	settingsCalls     []string
 	dataDirErr        error
 	pauseCalls        []bool
+	whitelistCalls    []ops.WhitelistChange
 }
 
 func (a *stubAdapter) RuntimeCommand() string { return a.runtime }
@@ -87,8 +88,9 @@ func (a *stubAdapter) BeaconRef() (string, string)                        { retu
 func (a *stubAdapter) EtcdSnapshotNamespace() string                      { return "" }
 func (a *stubAdapter) ClusterObject() (*unstructured.Unstructured, error) { return nil, nil }
 func (a *stubAdapter) WaitForRegister() (bool, error)                     { return true, nil }
-func (a *stubAdapter) PauseCluster(paused bool) error {
+func (a *stubAdapter) PauseCluster(paused bool, whitelist ops.WhitelistChange) error {
 	a.pauseCalls = append(a.pauseCalls, paused)
+	a.whitelistCalls = append(a.whitelistCalls, whitelist)
 	return nil
 }
 func (a *stubAdapter) ServerUnit() string { return a.runtime }
@@ -1396,6 +1398,7 @@ func TestFinishRotation(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []bool{false}, adapter.pauseCalls, "exactly one unpause")
+	assert.Equal(t, []ops.WhitelistChange{ops.WhitelistCleared}, adapter.whitelistCalls, "a rotation that succeeded lifts the whitelist with the pause")
 	assert.Equal(t, opv1alpha1.OperationPhaseSucceeded, status.Phase)
 	assert.Equal(t, "True", opv1alpha1.SucceededCondition.GetStatus(&status))
 }
