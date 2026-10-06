@@ -55,7 +55,7 @@ func TestOperationCancelValidation(t *testing.T) {
 	op := func(cancel bool, status map[string]interface{}) map[string]interface{} {
 		obj := map[string]interface{}{
 			"spec": map[string]interface{}{
-				"clusterRef": map[string]interface{}{"name": "test"},
+				"clusterRef": validClusterRef(),
 				"cancel":     cancel,
 			},
 		}
@@ -157,6 +157,78 @@ func TestOperationCancelValidation(t *testing.T) {
 						return
 					}
 					assert.Empty(t, errs, "the update should have been accepted")
+				})
+			}
+		})
+	}
+}
+
+// validClusterRef is a clusterRef which passes the rules on that field, for tests about other fields.
+func validClusterRef() map[string]interface{} {
+	return map[string]interface{}{"apiVersion": "management.cattle.io/v3", "kind": "Cluster", "name": "test"}
+}
+
+// TestOperationClusterRefValidation covers the rules on spec.clusterRef: it must name an apiVersion,
+// kind and name, which are what the cluster is resolved and authorized from, and it cannot change once
+// set, since everything that serializes operations on a cluster is keyed by it.
+func TestOperationClusterRefValidation(t *testing.T) {
+	t.Parallel()
+
+	op := func(clusterRef map[string]interface{}) map[string]interface{} {
+		return map[string]interface{}{"spec": map[string]interface{}{"clusterRef": clusterRef}}
+	}
+	with := func(changes map[string]interface{}) map[string]interface{} {
+		ref := validClusterRef()
+		for k, v := range changes {
+			if v == nil {
+				delete(ref, k)
+				continue
+			}
+			ref[k] = v
+		}
+		return ref
+	}
+
+	cases := []struct {
+		name     string
+		old      map[string]interface{}
+		updated  map[string]interface{}
+		rejected bool
+	}{
+		{name: "created with a complete reference", updated: op(validClusterRef())},
+		{name: "created with a namespace", updated: op(with(map[string]interface{}{"namespace": "fleet-default"}))},
+		{name: "created without an apiVersion", updated: op(with(map[string]interface{}{"apiVersion": nil})), rejected: true},
+		{name: "created with an empty apiVersion", updated: op(with(map[string]interface{}{"apiVersion": ""})), rejected: true},
+		{name: "created without a kind", updated: op(with(map[string]interface{}{"kind": nil})), rejected: true},
+		{name: "created with an empty kind", updated: op(with(map[string]interface{}{"kind": ""})), rejected: true},
+		{name: "created without a name", updated: op(with(map[string]interface{}{"name": nil})), rejected: true},
+		{name: "created with an empty name", updated: op(with(map[string]interface{}{"name": ""})), rejected: true},
+		{name: "updated without changing it", old: op(validClusterRef()), updated: op(validClusterRef())},
+		{name: "updated to another cluster", old: op(validClusterRef()), updated: op(with(map[string]interface{}{"name": "other"})), rejected: true},
+		{name: "updated to another kind", old: op(validClusterRef()), updated: op(with(map[string]interface{}{"kind": "Other"})), rejected: true},
+		{name: "updated to another apiVersion", old: op(validClusterRef()), updated: op(with(map[string]interface{}{"apiVersion": "cluster.x-k8s.io/v1beta2"})), rejected: true},
+		{name: "updated to add a namespace", old: op(validClusterRef()), updated: op(with(map[string]interface{}{"namespace": "fleet-default"})), rejected: true},
+	}
+
+	for _, name := range operationCRDs {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			validator := rootValidator(t, name)
+
+			for _, tc := range cases {
+				t.Run(tc.name, func(t *testing.T) {
+					var old interface{}
+					if tc.old != nil {
+						old = tc.old
+					}
+					errs, _ := validator.Validate(context.Background(), field.NewPath(""), nil, tc.updated, old, celconfig.RuntimeCELCostBudget)
+
+					if tc.rejected {
+						assert.NotEmpty(t, errs, "should have been rejected")
+						return
+					}
+					assert.Empty(t, errs, "should have been accepted")
 				})
 			}
 		})

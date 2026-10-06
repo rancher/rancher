@@ -30,6 +30,9 @@ import (
 // acceptable.
 type OperationSpecApplyConfiguration struct {
 	// ClusterRef is a reference to the Cluster this operation is associated with.
+	// It must name the cluster's apiVersion, kind and name, since the cluster is resolved, and access
+	// to it checked, from those. It cannot be changed once set: everything the operation does, and
+	// everything that serializes operations on a cluster, is keyed by it.
 	ClusterRef *v1.ObjectReference `json:"clusterRef,omitempty"`
 	// Paused indicates whether the operation is paused.
 	// When paused, the operation will halt execution.

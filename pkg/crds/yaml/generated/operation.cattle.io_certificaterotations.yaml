@@ -112,8 +112,11 @@ spec:
                 - message: cancel cannot be unset once true
                   rule: self || !oldSelf
               clusterRef:
-                description: ClusterRef is a reference to the Cluster this operation
-                  is associated with.
+                description: |-
+                  ClusterRef is a reference to the Cluster this operation is associated with.
+                  It must name the cluster's apiVersion, kind and name, since the cluster is resolved, and access
+                  to it checked, from those. It cannot be changed once set: everything the operation does, and
+                  everything that serializes operations on a cluster, is keyed by it.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -155,6 +158,12 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: clusterRef must specify apiVersion, kind and name
+                  rule: has(self.apiVersion) && self.apiVersion != '' && has(self.kind)
+                    && self.kind != '' && has(self.name) && self.name != ''
+                - message: clusterRef cannot be changed once set
+                  rule: self == oldSelf
               paused:
                 description: |-
                   Paused indicates whether the operation is paused.

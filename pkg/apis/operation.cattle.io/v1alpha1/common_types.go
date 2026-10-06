@@ -13,6 +13,11 @@ import (
 // acceptable.
 type OperationSpec struct {
 	// ClusterRef is a reference to the Cluster this operation is associated with.
+	// It must name the cluster's apiVersion, kind and name, since the cluster is resolved, and access
+	// to it checked, from those. It cannot be changed once set: everything the operation does, and
+	// everything that serializes operations on a cluster, is keyed by it.
+	// +kubebuilder:validation:XValidation:rule="has(self.apiVersion) && self.apiVersion != '' && has(self.kind) && self.kind != '' && has(self.name) && self.name != ''",message="clusterRef must specify apiVersion, kind and name"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterRef cannot be changed once set"
 	// +required
 	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
 
