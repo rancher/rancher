@@ -461,6 +461,9 @@ func TestCompareAndUpdateClusterRoleInstallUUIDBackfill(t *testing.T) {
 		"not owned: not stamped": {
 			annotations: map[string]string{},
 		},
+		"not owned: not stamped, nil map": {
+			annotations: nil,
+		},
 	}
 
 	for name, test := range tests {
