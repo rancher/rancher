@@ -29,6 +29,7 @@ jobs:
               echo "is_member=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Create doc issue
+        id: create
         if: steps.membership.outputs.is_member == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.CREATE_DOCS_PAT }}
@@ -65,5 +66,47 @@ jobs:
               --body "${BODY}" \
               ${additional_cmd[@]+"${additional_cmd[@]}"})
 
+          echo "new_issue_url=${NEW_ISSUE_URL}" >> "$GITHUB_OUTPUT"
+
           gh issue comment -R "${GITHUB_REPOSITORY}" "${ORIGINAL_ISSUE_NUMBER}" \
               --body "Created doc issue: ${NEW_ISSUE_URL}${MILESTONE_NOTE}"
+      - name: Add doc issue to the original issue's projects
+        if: steps.membership.outputs.is_member == 'true' && steps.create.outputs.new_issue_url != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.CREATE_DOCS_PAT }}
+          ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}
+          NEW_ISSUE_URL: ${{ steps.create.outputs.new_issue_url }}
+        run: |
+          set -euo pipefail
+
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
+          REPO="${GITHUB_REPOSITORY#*/}"
+
+          # Projects (v2) the original issue belongs to
+          PROJECTS=$(gh api graphql \
+            -f query='query($owner:String!,$repo:String!,$number:Int!){
+              repository(owner:$owner,name:$repo){
+                issue(number:$number){
+                  projectItems(first:20){
+                    nodes{
+                      project{
+                        number
+                        owner{ ... on Organization{ login } ... on User{ login } }
+                      }
+                    }
+                  }
+                }
+              }
+            }' \
+            -f owner="${OWNER}" -f repo="${REPO}" -F number="${ORIGINAL_ISSUE_NUMBER}" \
+            --jq '.data.repository.issue.projectItems.nodes[] | "\(.project.owner.login) \(.project.number)"')
+
+          if [ -z "${PROJECTS}" ]; then
+              echo "Original issue is not in any project; nothing to add." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+          fi
+
+          while read -r PROJECT_OWNER PROJECT_NUMBER; do
+              [ -z "${PROJECT_NUMBER}" ] && continue
+              gh project item-add "${PROJECT_NUMBER}" --owner "${PROJECT_OWNER}" --url "${NEW_ISSUE_URL}"
+          done <<< "${PROJECTS}"
