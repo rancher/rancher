@@ -965,6 +965,9 @@ func (a *ImportedAdapter) PauseCluster(pause bool, whitelist WhitelistChange) er
 		if err != nil {
 			return err
 		}
+		if heldByWhitelist(cluster.Annotations, pause, whitelist) {
+			return nil
+		}
 		cluster = cluster.DeepCopy()
 
 		var pauseChanged bool

@@ -224,7 +224,8 @@ type Adapter interface {
 	//
 	// Writing the two together is what keeps a cluster from being left paused by an operation without
 	// also recording that only a restore can repair it: an operation pauses the cluster at its point of
-	// no return. See opv1alpha1.WhitelistedAnnotation.
+	// no return. See opv1alpha1.WhitelistedAnnotation. WhitelistKeepsPause makes an unpause of a
+	// whitelisted cluster write nothing, decided against the same read of the cluster as the write.
 	PauseCluster(pause bool, whitelist WhitelistChange) error
 
 	// RuntimeCommand returns the command used to interact with the distro CLI (RKe2/K3s).

@@ -2186,12 +2186,15 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 		terminated bool
 		// labels the operation carries, for the cases where a lifecycle hook is still owed one.
 		labels map[string]string
+		// step the operation is in, if not the default one past its point of no return.
+		step opv1alpha1.EncryptionKeyRotationStep
 
-		wantErr             bool
-		wantPhase           opv1alpha1.OperationPhase
-		wantReason          string
-		wantTerminated      bool
-		wantFinalizedReason string
+		wantErr              bool
+		wantPhase            opv1alpha1.OperationPhase
+		wantReason           string
+		wantTerminated       bool
+		wantFinalizedReason  string
+		wantFinalizedMessage string
 	}{
 		{
 			// Aborted called its own work off, so there is nothing a beacon would have wound down.
@@ -2251,6 +2254,18 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantPhase:           opv1alpha1.OperationPhaseCanceled,
 			wantTerminated:      true,
 			wantFinalizedReason: opv1alpha1.HookAbandonedReason,
+			step:                opv1alpha1.EncryptionKeyRotationStepPreflight,
+		},
+		{
+			// Past its point of no return the operation also left the cluster requiring a restore,
+			// which is what Finalized reports, with the abandoned hook added to it.
+			name:                 "canceled past the point of no return with an owed hook abandons it",
+			phase:                opv1alpha1.OperationPhaseCanceled,
+			labels:               map[string]string{opv1alpha1.CanceledPhaseHookLabelPrefix + "verify": "delegate-a"},
+			wantPhase:            opv1alpha1.OperationPhaseCanceled,
+			wantTerminated:       true,
+			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
+			wantFinalizedMessage: "lifecycle hooks were abandoned",
 		},
 		{
 			// Same for the Failed-phase hook of an operation the missing beacon has just failed.
@@ -2261,6 +2276,17 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantReason:          opv1alpha1.BeaconLostReason,
 			wantTerminated:      true,
 			wantFinalizedReason: opv1alpha1.HookAbandonedReason,
+			step:                opv1alpha1.EncryptionKeyRotationStepPreflight,
+		},
+		{
+			name:                 "in progress past the point of no return with an owed failed hook abandons it",
+			phase:                opv1alpha1.OperationPhaseInProgress,
+			labels:               map[string]string{opv1alpha1.FailedPhaseHookLabelPrefix + "verify": "delegate-a"},
+			wantPhase:            opv1alpha1.OperationPhaseFailed,
+			wantReason:           opv1alpha1.BeaconLostReason,
+			wantTerminated:       true,
+			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
+			wantFinalizedMessage: "lifecycle hooks were abandoned",
 		},
 	}
 
@@ -2270,7 +2296,11 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			op.Spec.TTL = 0
 			op.Labels = tc.labels
 
-			initial := opv1alpha1.EncryptionKeyRotationStatus{Step: opv1alpha1.EncryptionKeyRotationStepRestart}
+			step := opv1alpha1.EncryptionKeyRotationStepRestart
+			if tc.step != "" {
+				step = tc.step
+			}
+			initial := opv1alpha1.EncryptionKeyRotationStatus{Step: step}
 			initial.SetPhase(tc.phase)
 			if tc.terminated {
 				initial.SetTerminated()
@@ -2301,6 +2331,9 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			if terminated := !status.TerminatedAt.IsZero(); terminated != tc.wantTerminated {
 				t.Fatalf("terminated = %v, want %v: termination is recorded only when nothing can still be owed",
 					terminated, tc.wantTerminated)
+			}
+			if got := opv1alpha1.FinalizedCondition.GetMessage(&status); !strings.Contains(got, tc.wantFinalizedMessage) {
+				t.Fatalf("finalized message = %q, want it to contain %q", got, tc.wantFinalizedMessage)
 			}
 			if tc.wantFinalizedReason != "" {
 				if got := opv1alpha1.FinalizedCondition.GetReason(&status); got != tc.wantFinalizedReason {

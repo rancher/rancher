@@ -2146,7 +2146,8 @@ func TestOnChange_DeletionWaitsForTerminalHook(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, status.TerminatedAt.IsZero(), "the beacon has been released, so termination is recorded")
 	assert.Equal(t, "True", opv1alpha1.FinalizedCondition.GetStatus(&status), "the delegate is gone, so the wait must resolve")
-	assert.Equal(t, opv1alpha1.FinishedReason, opv1alpha1.FinalizedCondition.GetReason(&status))
+	assert.Equal(t, opv1alpha1.RestoreRequiredReason, opv1alpha1.FinalizedCondition.GetReason(&status),
+		"canceled mid-restore, the operation left the cluster requiring a restore")
 	assert.Equal(t, opv1alpha1.OperationDeletedReason, opv1alpha1.CanceledCondition.GetReason(&status),
 		"the outcome reason must still be the one recorded at cancellation")
 	assert.NotEmpty(t, beacons.statusUpdates)
@@ -2839,12 +2840,15 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 		terminated bool
 		// labels the operation carries, for the cases where a lifecycle hook is still owed one.
 		labels map[string]string
+		// step the operation is in, if not the default one past its point of no return.
+		step opv1alpha1.ETCDSnapshotRestoreStep
 
-		wantErr             bool
-		wantPhase           opv1alpha1.OperationPhase
-		wantReason          string
-		wantTerminated      bool
-		wantFinalizedReason string
+		wantErr              bool
+		wantPhase            opv1alpha1.OperationPhase
+		wantReason           string
+		wantTerminated       bool
+		wantFinalizedReason  string
+		wantFinalizedMessage string
 	}{
 		{
 			// Aborted called its own work off, so there is nothing a beacon would have wound down.
@@ -2904,6 +2908,18 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantPhase:           opv1alpha1.OperationPhaseCanceled,
 			wantTerminated:      true,
 			wantFinalizedReason: opv1alpha1.HookAbandonedReason,
+			step:                opv1alpha1.ETCDSnapshotRestoreStepPreflight,
+		},
+		{
+			// Past its point of no return the operation also left the cluster requiring a restore,
+			// which is what Finalized reports, with the abandoned hook added to it.
+			name:                 "canceled past the point of no return with an owed hook abandons it",
+			phase:                opv1alpha1.OperationPhaseCanceled,
+			labels:               map[string]string{opv1alpha1.CanceledPhaseHookLabelPrefix + "verify": "delegate-a"},
+			wantPhase:            opv1alpha1.OperationPhaseCanceled,
+			wantTerminated:       true,
+			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
+			wantFinalizedMessage: "lifecycle hooks were abandoned",
 		},
 		{
 			// Same for the Failed-phase hook of an operation the missing beacon has just failed.
@@ -2914,6 +2930,17 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			wantReason:          opv1alpha1.BeaconLostReason,
 			wantTerminated:      true,
 			wantFinalizedReason: opv1alpha1.HookAbandonedReason,
+			step:                opv1alpha1.ETCDSnapshotRestoreStepPreflight,
+		},
+		{
+			name:                 "in progress past the point of no return with an owed failed hook abandons it",
+			phase:                opv1alpha1.OperationPhaseInProgress,
+			labels:               map[string]string{opv1alpha1.FailedPhaseHookLabelPrefix + "verify": "delegate-a"},
+			wantPhase:            opv1alpha1.OperationPhaseFailed,
+			wantReason:           opv1alpha1.BeaconLostReason,
+			wantTerminated:       true,
+			wantFinalizedReason:  opv1alpha1.RestoreRequiredReason,
+			wantFinalizedMessage: "lifecycle hooks were abandoned",
 		},
 	}
 
@@ -2925,7 +2952,11 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			op.Spec.TTL = 0
 			op.Labels = tc.labels
 
-			initial := opv1alpha1.ETCDSnapshotRestoreStatus{Step: opv1alpha1.ETCDSnapshotRestoreStepRestore}
+			step := opv1alpha1.ETCDSnapshotRestoreStepRestore
+			if tc.step != "" {
+				step = tc.step
+			}
+			initial := opv1alpha1.ETCDSnapshotRestoreStatus{Step: step}
 			initial.SetPhase(tc.phase)
 			if tc.terminated {
 				initial.SetTerminated()
@@ -2950,6 +2981,9 @@ func TestOnChange_MissingBeaconDisposition(t *testing.T) {
 			}
 			assert.Equal(t, tc.wantTerminated, !status.TerminatedAt.IsZero(),
 				"termination is recorded only when nothing can still be owed")
+			if tc.wantFinalizedMessage != "" {
+				assert.Contains(t, opv1alpha1.FinalizedCondition.GetMessage(&status), tc.wantFinalizedMessage)
+			}
 			if tc.wantFinalizedReason != "" {
 				assert.Equal(t, tc.wantFinalizedReason, opv1alpha1.FinalizedCondition.GetReason(&status),
 					"an abandoned hook must be reported rather than left looking like a clean finish")

@@ -204,6 +204,20 @@ func UpdateStatus(op metav1.Object, spec *opv1alpha1.OperationSpec, status *opv1
 
 	opv1alpha1.FinalizedCondition.True(status)
 
+	// An operation that left its cluster requiring a restore said so as it terminated (see
+	// MarkRestoreRequired), and nothing later would know to say it again, so the note is kept. It is
+	// what an observer most needs to know about the cluster, so an abandoned hook is added to it rather
+	// than taking its place.
+	if opv1alpha1.FinalizedCondition.GetReason(status) == opv1alpha1.RestoreRequiredReason {
+		message := fmt.Sprintf("%s; %s", summary, restoreRequiredNote)
+		if HasActiveLifecycleHook(op) {
+			message += "; lifecycle hooks were abandoned, no beacon remained to delegate them on"
+		}
+		opv1alpha1.FinalizedCondition.Message(status, message)
+
+		return
+	}
+
 	// A hook label outliving termination is a hook that was abandoned rather than one that was
 	// satisfied: the only way to get here with one still set is for the beacon it would have been
 	// delegated on to have gone away first. Say so, rather than reporting the operation as having

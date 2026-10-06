@@ -73,6 +73,8 @@ func TestCAPIAdapters_PauseCluster(t *testing.T) {
 		{name: "unpausing clears the whitelist in the same write", paused: ptr.To(true), annotations: map[string]string{whitelisted: restores}, pause: false, whitelist: WhitelistCleared, wantUpdate: true},
 		{name: "unpausing can leave the whitelist", paused: ptr.To(true), annotations: map[string]string{whitelisted: restores}, pause: false, whitelist: WhitelistUnchanged, wantUpdate: true, wantWhitelist: restores},
 		{name: "an unpaused cluster without a whitelist does not write", paused: ptr.To(false), pause: false, whitelist: WhitelistCleared},
+		{name: "WhitelistKeepsPause leaves a whitelisted cluster paused", paused: ptr.To(true), annotations: map[string]string{whitelisted: restores}, pause: false, whitelist: WhitelistKeepsPause},
+		{name: "WhitelistKeepsPause unpauses a cluster without a whitelist", paused: ptr.To(true), pause: false, whitelist: WhitelistKeepsPause, wantUpdate: true},
 	}
 
 	for kind, newAdapter := range adapters {

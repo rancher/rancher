@@ -737,6 +737,9 @@ func (a *CAPRAdapter) PauseCluster(pause bool, whitelist WhitelistChange) error 
 	if err != nil {
 		return err
 	}
+	if heldByWhitelist(cluster.Annotations, pause, whitelist) {
+		return nil
+	}
 	cluster = cluster.DeepCopy()
 
 	pauseChanged := !ptr.Equal(cluster.Spec.Paused, &pause)

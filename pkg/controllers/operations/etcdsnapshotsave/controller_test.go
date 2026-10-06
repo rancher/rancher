@@ -47,6 +47,8 @@ type stubAdapter struct {
 	waitForRegisterOK  bool
 	waitForRegisterErr error
 	probes             map[string]planapi.Probe
+	pauseCalls         []bool
+	whitelistCalls     []ops.WhitelistChange
 }
 
 func (a *stubAdapter) BeaconRef() (string, string)   { return "test-namespace", "test-cluster" }
@@ -66,8 +68,12 @@ func (a *stubAdapter) InstallInstruction(_ *corev1.Secret, _ string) (planapi.On
 func (a *stubAdapter) WaitForRegister() (bool, error) {
 	return a.waitForRegisterOK, a.waitForRegisterErr
 }
-func (a *stubAdapter) PauseCluster(_ bool, _ ops.WhitelistChange) error { return nil }
-func (a *stubAdapter) RuntimeCommand() string                           { return a.runtimeCommand }
+func (a *stubAdapter) PauseCluster(paused bool, whitelist ops.WhitelistChange) error {
+	a.pauseCalls = append(a.pauseCalls, paused)
+	a.whitelistCalls = append(a.whitelistCalls, whitelist)
+	return nil
+}
+func (a *stubAdapter) RuntimeCommand() string { return a.runtimeCommand }
 func (a *stubAdapter) DistroDataDirectory(_ *corev1.Secret) (string, error) {
 	return a.dataDir, nil
 }

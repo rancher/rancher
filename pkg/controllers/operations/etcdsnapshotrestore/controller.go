@@ -520,6 +520,12 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 			status.Phase == opv1alpha1.OperationPhaseCanceled:
 			logrus.Infof("[etcdsnapshotrestore] %s/%s: beacon %s/%s is gone, nothing to release", op.Namespace, op.Name, namespace, beaconName)
 
+			// The cluster is still settled as the phase requires: it is the cluster object that is
+			// written, not anything the beacon guards.
+			if err := ops.SettleCluster(a, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+				return nil, status, err
+			}
+
 			// The hook goes the same way as the beacon: with no chain left to delegate it on,
 			// nothing could satisfy it, so it is abandoned rather than waited on.
 			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
@@ -562,6 +568,9 @@ func (h *handler) resolveScope(op *opv1alpha1.ETCDSnapshotRestore, status opv1al
 			logrus.Errorf("[etcdsnapshotrestore] %s/%s: beacon %s/%s is gone mid-operation, failing", op.Namespace, op.Name, namespace, beaconName)
 
 			status.MarkFailed(opv1alpha1.BeaconLostReason, fmt.Sprintf("Beacon %s/%s not found", namespace, beaconName))
+			if err := ops.SettleCluster(a, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
+				return nil, status, err
+			}
 			ops.TerminateAbandoningHooks(op, &status.OperationStatus)
 
 			return nil, status, nil
@@ -2062,6 +2071,14 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 	return status, nil
 }
 
+// pastPointOfNoReturn reports whether the operation got past the step that pauses the cluster,
+// judged by its phase and step, which a terminal phase leaves in place: an operation that never left
+// Pending has no step, and one stopped in Preflight had not yet paused the cluster. See
+// ops.SettleCluster.
+func pastPointOfNoReturn(status opv1alpha1.ETCDSnapshotRestoreStatus) bool {
+	return status.Step != "" && status.Step != opv1alpha1.ETCDSnapshotRestoreStepPreflight
+}
+
 // terminalPhase describes what is specific to one terminal phase: the lifecycle hook that can defer
 // its completion, and any work to run once the beacon is released.
 type terminalPhase struct {
@@ -2083,9 +2100,10 @@ type terminalPhase struct {
 // deleting. A terminal phase handler that returns early therefore cannot forget to withhold it.
 //
 // Every terminal phase runs the same teardown, in this order: the phase's lifecycle hook, stopping
-// the plans the operation dispatched that are still running (stopDispatchedPlans), releasing the
-// beacon, and recording termination. Which phase it is changes only which hook applies and what
-// happens once the beacon is released (onRelease).
+// the plans the operation dispatched that are still running (stopDispatchedPlans), leaving the
+// cluster paused and whitelisted, or not, as the phase requires (ops.SettleCluster), releasing the
+// beacon, and recording termination. Which phase it is changes which hook applies, what the cluster
+// is left as, and what happens once the beacon is released (onRelease).
 //
 // An operation which no longer holds the beacon runs the same teardown, writing nothing it no longer
 // has the right to. Its hook is abandoned, since there is no authority left to delegate and pushing a
@@ -2121,6 +2139,12 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 	// operation stays unterminated, and the next reconcile checks again.
 	done, err := h.stopDispatchedPlans(s, &status.OperationStatus)
 	if err != nil || !done {
+		return status, err
+	}
+
+	// Leave the cluster as the phase requires before the beacon passes on, so the next operation finds
+	// it paused and whitelisted if this one stopped part-way through.
+	if err = ops.SettleCluster(s.adapter, &status.OperationStatus, pastPointOfNoReturn(status)); err != nil {
 		return status, err
 	}
 

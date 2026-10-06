@@ -58,7 +58,8 @@ var (
 
 	// FinalizedCondition reports that the controller is done with the operation and nothing about it
 	// will change again: it reached a terminal phase, its terminal phase hook has been satisfied,
-	// any cluster it paused has been unpaused, and its beacon has been released. It is the summary
+	// any cluster it paused has been unpaused (or left paused for a restore, which it reports with
+	// RestoreRequiredReason), and its beacon has been released. It is the summary
 	// of the outcome conditions above, so an observer which does not care how the operation turned
 	// out can wait on this one condition instead of racing several.
 	FinalizedCondition = condition.Cond("Finalized")
@@ -160,6 +161,11 @@ const (
 	// CancelRequestedReason surfaces when an operation was canceled because OperationSpec.Cancel
 	// was set, by the user or by another controller that needed the operation to stop.
 	CancelRequestedReason = "CancelRequested"
+
+	// RestoreRequiredReason surfaces on Finalized when the operation stopped after its point of no
+	// return, and so left its cluster paused and whitelisted (see WhitelistedAnnotation): only an etcd
+	// snapshot restore may run on the cluster until one has succeeded.
+	RestoreRequiredReason = "RestoreRequired"
 
 	// CancellationDeclinedReason surfaces on the Canceled condition when OperationSpec.Cancel was
 	// set on an operation which had already reached a terminal phase. Cancellation stops work in

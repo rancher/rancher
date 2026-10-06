@@ -20,7 +20,19 @@ const (
 	// WhitelistCleared removes the whitelist. Operations unpause the cluster with it once they have
 	// succeeded, which leaves the cluster in a known-good state.
 	WhitelistCleared
+
+	// WhitelistKeepsPause leaves the whitelist as it is, and makes an unpause leave a whitelisted
+	// cluster as it is. A rejected operation unpauses the cluster with it: being rejected before its
+	// point of no return, it has nothing of its own to undo, and a cluster that carries a whitelist
+	// was paused by whichever operation added it, and has to stay that way until a restore repairs it.
+	WhitelistKeepsPause
 )
+
+// heldByWhitelist reports whether the cluster carrying annotations is to be left exactly as it is
+// rather than given the requested pause: an unpause with WhitelistKeepsPause, of a whitelisted cluster.
+func heldByWhitelist(annotations map[string]string, pause bool, change WhitelistChange) bool {
+	return !pause && change == WhitelistKeepsPause && opv1alpha1.HasWhitelist(annotations)
+}
 
 // ApplyWhitelistChange applies change to a cluster's annotations, and returns the annotations to go on
 // using (initialized if the change needs to write to a nil map) and whether they changed.
