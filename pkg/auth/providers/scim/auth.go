@@ -166,7 +166,7 @@ func (a *tokenAuthenticator) isDisabledProviderFromResource(provider string) (bo
 	}
 	u, ok := authConfigObj.(runtime.Unstructured)
 	if !ok {
-		return false, fmt.Errorf("failed to parse AuthConfig %s: %w", provider, err)
+		return false, fmt.Errorf("failed to parse AuthConfig %s", provider)
 	}
 
 	// We could use .enabled from the unstructured content but instead this

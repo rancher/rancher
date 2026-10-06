@@ -268,6 +268,30 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
 	})
 
+	t.Run("groups only include the token's auth provider", func(t *testing.T) {
+		oldGroupPrincipals := userAttribute.GroupPrincipals
+		defer func() {
+			userAttribute.GroupPrincipals = oldGroupPrincipals
+		}()
+		userAttribute.GroupPrincipals = map[string]apiv3.Principals{
+			fakeProvider.name: oldGroupPrincipals[fakeProvider.name],
+			"other": {
+				Items: []apiv3.Principal{{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "other_group://98765",
+					},
+					PrincipalType: "group",
+					Provider:      "other",
+				}},
+			},
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
+		assert.NotContains(t, resp.Groups, "other_group://98765")
+	})
+
 	t.Run("subsecond lastUsedAt updates are throttled", func(t *testing.T) {
 		oldTokenLastUsedAt := token.LastUsedAt
 		defer func() {

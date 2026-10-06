@@ -213,9 +213,10 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	if attribs != nil {
 		authp := token.GetAuthProvider()
 		for provider, gps := range attribs.GroupPrincipals {
-			if provider == authp {
-				hitProvider = true
+			if provider != authp {
+				continue
 			}
+			hitProvider = true
 			for _, principal := range gps.Items {
 				name := strings.TrimPrefix(principal.Name, "local://")
 				groups = append(groups, name)
