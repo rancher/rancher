@@ -87,6 +87,18 @@ const (
 	OperationPhaseCanceled OperationPhase = "Canceled"
 )
 
+// IsTerminal returns true if the phase is one from which an operation will not transition again: it
+// succeeded, failed, was rejected or was canceled. An operation in a terminal phase may still be
+// finishing its terminal handling; see OperationStatus.IsTerminated.
+func (p OperationPhase) IsTerminal() bool {
+	switch p {
+	case OperationPhaseSucceeded, OperationPhaseFailed, OperationPhaseRejected, OperationPhaseCanceled:
+		return true
+	}
+
+	return false
+}
+
 // OperationStatus defines the observed state of an operation.
 type OperationStatus struct {
 	// Conditions represent the latest available observations of an operation's current state.
@@ -209,4 +221,11 @@ func (s *OperationStatus) SetTerminated() {
 		return
 	}
 	s.TerminatedAt = metav1.Now()
+}
+
+// IsTerminated returns true once the controller has recorded that terminal handling completed (see
+// TerminatedAt). Until then an operation is still in progress, even in a terminal phase: it may still
+// hold its cluster's beacon while it stops the plans it dispatched or waits on a lifecycle hook.
+func (s *OperationStatus) IsTerminated() bool {
+	return !s.TerminatedAt.IsZero()
 }

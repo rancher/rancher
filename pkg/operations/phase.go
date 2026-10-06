@@ -11,10 +11,7 @@ import (
 // etcdsnapshotsave/etcdsnapshotrestore controllers use this to decide when to release the beacon
 // and when to respect the TTL for automatic deletion.
 func IsTerminal(phase opv1alpha1.OperationPhase) bool {
-	return phase == opv1alpha1.OperationPhaseSucceeded ||
-		phase == opv1alpha1.OperationPhaseFailed ||
-		phase == opv1alpha1.OperationPhaseRejected ||
-		phase == opv1alpha1.OperationPhaseCanceled
+	return phase.IsTerminal()
 }
 
 // IsTerminated returns true when the controller has recorded that terminal handling for the
@@ -25,7 +22,7 @@ func IsTerminal(phase opv1alpha1.OperationPhase) bool {
 // still be waiting on a delegate to finish the terminal phase hook, in which case its beacon is
 // still held on its behalf. Deleting an operation in that window cancels it.
 func IsTerminated(status *opv1alpha1.OperationStatus) bool {
-	return !status.TerminatedAt.IsZero()
+	return status.IsTerminated()
 }
 
 // TerminalPhaseHookPrefix returns the lifecycle-hook label prefix whose delegate can defer the
