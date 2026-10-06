@@ -10,6 +10,7 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -43,7 +44,7 @@ var GVK = ext.SchemeGroupVersion.WithKind(kind)
 
 type PasswordUpdater interface {
 	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
-	UpdatePassword(userId string, newPassword string) error
+	SetPassword(user *v3.User, newPassword string) error
 }
 
 // +k8s:openapi-gen=false
@@ -134,12 +135,18 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("password must be at least %d characters", minLength))
 	}
 
-	user, err := s.userCache.Get(req.Spec.UserID)
+	user, err := s.getUser(req.Spec.UserID)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("user %s not found", req.Spec.UserID))
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("can't get user %s: %w", req.Spec.UserID, err))
+	}
+
+	// Local login resolves the user by username, so a password is only usable
+	// on a user that has one.
+	if user.Username == "" {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("user %s has no username and cannot log in locally", req.Spec.UserID))
 	}
 
 	// Password must not be the same as the username.
@@ -161,9 +168,8 @@ func (s *Store) Create(
 	// Checking the current password is only required if the user doesn't have permissions on update on users and update
 	// secrets in the cattle-local-user-passwords namespace.
 	if canUpdateAnyPassword {
-		err := s.pwdUpdater.UpdatePassword(req.Spec.UserID, req.Spec.NewPassword)
-		if err != nil {
-			return nil, apierrors.NewUnauthorized(fmt.Sprintf("error checking permissions %s", err.Error()))
+		if err := s.pwdUpdater.SetPassword(user, req.Spec.NewPassword); err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error updating password: %w", err))
 		}
 
 		if user.MustChangePassword {
@@ -224,6 +230,18 @@ func (s *Store) Create(
 	}
 
 	return req, apierrors.NewUnauthorized("not authorized to update password")
+}
+
+// getUser returns the user from the cache, falling back to the API when the
+// cache does not have it yet. A password is often set right after the user is
+// created, before the cache has caught up.
+func (s *Store) getUser(name string) (*v3.User, error) {
+	user, err := s.userCache.Get(name)
+	if !apierrors.IsNotFound(err) {
+		return user, err
+	}
+
+	return s.userClient.Get(name, metav1.GetOptions{})
 }
 
 // canUpdateAnyPassword verifies the user can update users and secrets in the cattle-local-user-passwords namespace.

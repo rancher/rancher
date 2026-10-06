@@ -13,7 +13,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/urfave/cli"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -83,14 +82,8 @@ func resetPassword() {
 			return fmt.Errorf("couldn't start wrangler cache for secrets %w", err)
 		}
 		pwdCreator := pbkdf2.New(wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret())
-		if err := pwdCreator.UpdatePassword(admin.Name, string(pass)); err != nil {
-			if apierrors.IsNotFound(err) {
-				if err := pwdCreator.CreatePassword(&admin, string(pass)); err != nil {
-					return fmt.Errorf("couldn't create password %w", err)
-				}
-			} else {
-				return fmt.Errorf("couldn't update password %w", err)
-			}
+		if err := pwdCreator.SetPassword(&admin, string(pass)); err != nil {
+			return fmt.Errorf("couldn't set password %w", err)
 		}
 		fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
 
