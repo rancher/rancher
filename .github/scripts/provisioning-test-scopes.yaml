@@ -151,7 +151,6 @@ scopes:
             - 'github.com/rancher/norman'
       - path: '^build.yaml'
         substrings:
-          - 'turtlesVersion:'
           - 'fleetVersion:'
           - 'webhookVersion:'
       - path: "^pkg/settings/setting.go"
@@ -221,6 +220,9 @@ scopes:
       - { dist: k3s,  regex: '^Test_PreBootstrap_.*$', features: 'provisioningprebootstrap=true', cpus: 8 }
 
 full:
+  - path: '^build.yaml'
+    substrings:
+      - 'turtlesVersion:'
   - path: '^go.mod$'
     substrings:
       - 'github.com/rancher/cluster-api-provider-rke2'
