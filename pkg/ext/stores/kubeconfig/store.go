@@ -1819,6 +1819,11 @@ func (s *Store) Update(
 	if !reflect.DeepEqual(oldKubeconfig.Spec.IncludeDefaultEntry, newKubeconfig.Spec.IncludeDefaultEntry) {
 		return nil, false, apierrors.NewBadRequest("spec.includeDefaultEntry is immutable")
 	}
+	if newKubeconfig.Spec.CurrentContextType == "" {
+		// The field is defaulted on create. Treat a value omitted by a client
+		// that isn't aware of it, e.g. an older one, as unchanged.
+		newKubeconfig.Spec.CurrentContextType = oldKubeconfig.Spec.CurrentContextType
+	}
 	if oldKubeconfig.Spec.CurrentContextType != newKubeconfig.Spec.CurrentContextType {
 		return nil, false, apierrors.NewBadRequest("spec.currentContextType is immutable")
 	}

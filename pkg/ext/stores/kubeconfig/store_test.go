@@ -3536,6 +3536,47 @@ func TestStoreUpdate(t *testing.T) {
 			assert.ErrorContains(t, err, "spec.currentContextType is immutable")
 		})
 	})
+	t.Run("omitted spec.currentContextType is preserved", func(t *testing.T) {
+		storedConfigMap := oldConfigMap.DeepCopy()
+		storedConfigMap.Data[CurrentContextTypeField] = ext.KubeconfigCurrentContextTypeACE
+
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+			return storedConfigMap.DeepCopy(), nil
+		})
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			assert.Equal(t, ext.KubeconfigCurrentContextTypeACE, configMap.Data[CurrentContextTypeField])
+			assert.Equal(t, "updated", configMap.Data[DescriptionField])
+			return configMap.DeepCopy(), nil
+		})
+
+		store := &Store{
+			authorizer:      commonAuthorizer,
+			configMapClient: configMapClient,
+			userCache:       userCache,
+			tokenMgr:        tokenManager,
+		}
+
+		updateValidation := func(ctx context.Context, obj, old runtime.Object) error { return nil }
+
+		ctx := userContext(userID, "")
+
+		oldKubeconfig, err := store.fromConfigMap(storedConfigMap)
+		require.NoError(t, err)
+
+		update := oldKubeconfig.DeepCopy()
+		update.Spec.Description = "updated"
+		update.Spec.CurrentContextType = "" // E.g. a client that isn't aware of the field.
+		objInfo := &fakeUpdatedObjectInfo{obj: update}
+
+		obj, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, &metav1.UpdateOptions{})
+		require.NoError(t, err)
+		assert.False(t, isCreated)
+
+		newKubeconfig := obj.(*ext.Kubeconfig)
+		assert.Equal(t, ext.KubeconfigCurrentContextTypeACE, newKubeconfig.Spec.CurrentContextType)
+		assert.Equal(t, "updated", newKubeconfig.Spec.Description)
+	})
 	t.Run("dryRun", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
 		configMapClient.EXPECT().Get(namespace, kubeconfigID, gomock.Any()).DoAndReturn(func(namespace, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
