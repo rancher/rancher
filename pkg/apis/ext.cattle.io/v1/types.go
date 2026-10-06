@@ -287,7 +287,25 @@ type KubeconfigSpec struct {
 	// When false, the entry is omitted.
 	// +optional
 	IncludeDefaultEntry *bool `json:"includeDefaultEntry,omitempty"`
+	// CurrentContextType controls which context of the current context cluster is set as
+	// the current-context in the generated kubeconfig when the cluster has the
+	// Authorized Cluster Endpoint (ACE) enabled. It has no effect for clusters without ACE.
+	// Valid values are "ace" and "proxy".
+	// "ace" uses the ACE context: the FQDN if set, otherwise the first ready control plane node,
+	// falling back to the Rancher-proxied context if no control plane node is ready.
+	// "proxy" uses the context that points to the cluster via the Rancher server proxy.
+	// If omitted, the default is provided by the `kubeconfig-default-current-context-type` setting.
+	// +optional
+	CurrentContextType string `json:"currentContextType,omitempty"`
 }
+
+// Valid values for [KubeconfigSpec.CurrentContextType].
+const (
+	// KubeconfigCurrentContextTypeACE sets the current-context to the Authorized Cluster Endpoint (ACE) context.
+	KubeconfigCurrentContextTypeACE = "ace"
+	// KubeconfigCurrentContextTypeProxy sets the current-context to the Rancher-proxied context.
+	KubeconfigCurrentContextTypeProxy = "proxy"
+)
 
 // KubeconfigStatus defines the most recently observed status of the Kubeconfig.
 type KubeconfigStatus struct {

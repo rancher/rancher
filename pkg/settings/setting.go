@@ -266,6 +266,12 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
+	// KubeconfigDefaultCurrentContextType is the default type of the current-context of kubeconfigs
+	// generated with the ext.cattle.io Kubeconfig API for clusters with the Authorized Cluster Endpoint (ACE) enabled.
+	// It is used when spec.currentContextType is not specified. Valid values are "ace" and "proxy".
+	// "ace" sets the current-context to the ACE context, "proxy" to the Rancher-proxied context.
+	KubeconfigDefaultCurrentContextType = NewSetting("kubeconfig-default-current-context-type", "ace")
+
 	// PartnerChartDefaultBranch represents the default branch for the partner charts repo.
 	PartnerChartDefaultBranch = NewSetting("partner-chart-default-branch", buildconfig.PartnerChartDefaultBranch)
 

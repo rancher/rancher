@@ -74,6 +74,7 @@ const (
 const (
 	ClustersField            = "clusters"
 	CurrentContextField      = "current-context"
+	CurrentContextTypeField  = "current-context-type"
 	DescriptionField         = "description"
 	TTLField                 = "ttl"
 	IncludeDefaultEntryField = "include-default-entry"
@@ -143,7 +144,9 @@ type Store struct {
 	getMaxTTL           func() (int64, error)
 	getServerURL        func() string
 	shouldGenerateToken func() bool
-	tableConverter      rest.TableConvertor
+	// getDefaultCurrentContextType returns the value of the kubeconfig-default-current-context-type setting.
+	getDefaultCurrentContextType func() string
+	tableConverter               rest.TableConvertor
 }
 
 // New creates a new instance of [Store].
@@ -168,6 +171,7 @@ func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authoriz
 		shouldGenerateToken: func() bool {
 			return strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
 		},
+		getDefaultCurrentContextType: settings.KubeconfigDefaultCurrentContextType.Get,
 		tableConverter: printerstorage.TableConvertor{
 			TableGenerator: printers.NewTableGenerator().With(printHandler),
 		},
@@ -414,6 +418,15 @@ func (s *Store) Create(
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid currentContext %s", kubeconfig.Spec.CurrentContext))
 	}
 
+	currentContextType, err := s.resolveCurrentContextType(kubeconfig.Spec.CurrentContextType)
+	if err != nil {
+		return nil, err
+	}
+	kubeconfig.Spec.CurrentContextType = currentContextType
+	// Whether the current context of an ACE cluster should point to the ACE endpoint
+	// rather than to the Rancher proxy.
+	useACECurrentContext := currentContextType == ext.KubeconfigCurrentContextTypeACE
+
 	includeDefault := includeDefaultEntry(&kubeconfig.Spec)
 
 	needsSharedToken := includeDefault
@@ -644,7 +657,7 @@ func (s *Store) Create(
 						User:    clusterName,
 					})
 
-					if currentContext == cluster.Name {
+					if useACECurrentContext && currentContext == cluster.Name {
 						data.CurrentContext = fqdnName
 					}
 
@@ -684,7 +697,7 @@ func (s *Store) Create(
 						User:    clusterName,
 					})
 
-					if !isCurrentContextSet && currentContext == cluster.Name && v3node.IsMachineReady(node) {
+					if useACECurrentContext && !isCurrentContextSet && currentContext == cluster.Name && v3node.IsMachineReady(node) {
 						data.CurrentContext = nodeName // Set the current context to the first ready control plane node.
 						isCurrentContextSet = true
 					}
@@ -800,6 +813,10 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 
 	if kubeconfig.Spec.IncludeDefaultEntry != nil {
 		configMap.Data[IncludeDefaultEntryField] = strconv.FormatBool(*kubeconfig.Spec.IncludeDefaultEntry)
+	}
+
+	if kubeconfig.Spec.CurrentContextType != "" {
+		configMap.Data[CurrentContextTypeField] = kubeconfig.Spec.CurrentContextType
 	}
 
 	// Note: Value should never be persisted!
@@ -981,8 +998,9 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 	kubeconfig := &ext.Kubeconfig{
 		ObjectMeta: *configMap.ObjectMeta.DeepCopy(),
 		Spec: ext.KubeconfigSpec{
-			Description:    configMap.Data[DescriptionField],
-			CurrentContext: configMap.Data[CurrentContextField],
+			Description:        configMap.Data[DescriptionField],
+			CurrentContext:     configMap.Data[CurrentContextField],
+			CurrentContextType: configMap.Data[CurrentContextTypeField],
 		},
 	}
 	kubeconfig.Namespace = ""            // Kubeconfig is not namespaced.
@@ -1045,6 +1063,31 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 
 func includeDefaultEntry(spec *ext.KubeconfigSpec) bool {
 	return spec.IncludeDefaultEntry == nil || *spec.IncludeDefaultEntry
+}
+
+// resolveCurrentContextType validates the requested current context type and returns it.
+// If it is not specified, the default provided by the kubeconfig-default-current-context-type setting is returned.
+// An invalid setting value falls back to [ext.KubeconfigCurrentContextTypeACE].
+func (s *Store) resolveCurrentContextType(requested string) (string, error) {
+	switch requested {
+	case ext.KubeconfigCurrentContextTypeACE, ext.KubeconfigCurrentContextTypeProxy:
+		return requested, nil
+	case "": // Use the default.
+	default:
+		return "", apierrors.NewBadRequest(fmt.Sprintf("invalid spec.currentContextType %q, must be one of: %s, %s",
+			requested, ext.KubeconfigCurrentContextTypeACE, ext.KubeconfigCurrentContextTypeProxy))
+	}
+
+	switch value := strings.ToLower(strings.TrimSpace(s.getDefaultCurrentContextType())); value {
+	case ext.KubeconfigCurrentContextTypeACE, ext.KubeconfigCurrentContextTypeProxy:
+		return value, nil
+	case "":
+		return ext.KubeconfigCurrentContextTypeACE, nil
+	default:
+		logrus.Warnf("kubeconfig: invalid value %q of setting %s, using %q instead",
+			value, settings.KubeconfigDefaultCurrentContextType.Name, ext.KubeconfigCurrentContextTypeACE)
+		return ext.KubeconfigCurrentContextTypeACE, nil
+	}
 }
 
 // first returns the first element of a slice of strings, or an empty string if the slice is empty.
@@ -1776,6 +1819,9 @@ func (s *Store) Update(
 	if !reflect.DeepEqual(oldKubeconfig.Spec.IncludeDefaultEntry, newKubeconfig.Spec.IncludeDefaultEntry) {
 		return nil, false, apierrors.NewBadRequest("spec.includeDefaultEntry is immutable")
 	}
+	if oldKubeconfig.Spec.CurrentContextType != newKubeconfig.Spec.CurrentContextType {
+		return nil, false, apierrors.NewBadRequest("spec.currentContextType is immutable")
+	}
 
 	newKubeconfig.UID = oldKubeconfig.UID // Make sure UID is preserved.
 
@@ -1880,8 +1926,10 @@ var (
 	pathKConfigDescriptionField         = fieldpath.MakePathOrDie("spec", "description")
 	pathKConfigTTLField                 = fieldpath.MakePathOrDie("spec", "ttl")
 	pathKConfigIncludeDefaultEntryField = fieldpath.MakePathOrDie("spec", "includeDefaultEntry")
+	pathKConfigCurrentContextTypeField  = fieldpath.MakePathOrDie("spec", "currentContextType")
 
 	pathCMIncludeDefaultEntryField = fieldpath.MakePathOrDie("data", "include-default-entry")
+	pathCMCurrentContextTypeField  = fieldpath.MakePathOrDie("data", "current-context-type")
 
 	mapFromConfigMap = extcommon.MapSpec{
 		pathCMData.String():                     nil,
@@ -1890,6 +1938,7 @@ var (
 		pathCMDescriptionField.String():         pathKConfigDescriptionField,
 		pathCMTTLField.String():                 pathKConfigTTLField,
 		pathCMIncludeDefaultEntryField.String(): pathKConfigIncludeDefaultEntryField,
+		pathCMCurrentContextTypeField.String():  pathKConfigCurrentContextTypeField,
 		pathCMStatusConditionsField.String():    nil,
 		pathCMStatusSummaryField.String():       nil,
 		pathCMStatusTokensField.String():        nil,
@@ -1902,5 +1951,6 @@ var (
 		pathKConfigDescriptionField.String():         pathCMDescriptionField,
 		pathKConfigTTLField.String():                 pathCMTTLField,
 		pathKConfigIncludeDefaultEntryField.String(): pathCMIncludeDefaultEntryField,
+		pathKConfigCurrentContextTypeField.String():  pathCMCurrentContextTypeField,
 	}
 )

@@ -423,6 +423,13 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"currentContextType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CurrentContextType controls which context of the current context cluster is set as the current-context in the generated kubeconfig when the cluster has the Authorized Cluster Endpoint (ACE) enabled. It has no effect for clusters without ACE. Valid values are \"ace\" and \"proxy\". \"ace\" uses the ACE context: the FQDN if set, otherwise the first ready control plane node, falling back to the Rancher-proxied context if no control plane node is ready. \"proxy\" uses the context that points to the cluster via the Rancher server proxy. If omitted, the default is provided by the `kubeconfig-default-current-context-type` setting.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

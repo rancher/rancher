@@ -494,6 +494,7 @@ func TestStoreCreate(t *testing.T) {
 		return millis, nil
 	}
 	shouldGenerateToken := func() bool { return true }
+	getDefaultCurrentContextType := func() string { return ext.KubeconfigCurrentContextTypeACE }
 	options := &metav1.CreateOptions{}
 	tokenManager := &fakeTokenManager{}
 
@@ -502,20 +503,21 @@ func TestStoreCreate(t *testing.T) {
 	// opts function gets to change anything else.
 	newStore := func(configMapClient v1.ConfigMapClient, tokenStore tokenFetcher, tokenMgr tokenCreator, opts ...func(*Store)) *Store {
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAllAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenMgr,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:                   true,
+			authorizer:                   allowAllAuthorizer,
+			nsCache:                      nsCache,
+			configMapClient:              configMapClient,
+			userCache:                    userCache,
+			tokenStore:                   tokenStore,
+			clusterCache:                 clusterCache,
+			nodeCache:                    nodeCache,
+			tokenMgr:                     tokenMgr,
+			getCACert:                    func() string { return rancherCACert },
+			getDefaultTTL:                getDefaultTTL,
+			getMaxTTL:                    getMaxTTL,
+			getServerURL:                 getServerURL,
+			shouldGenerateToken:          shouldGenerateToken,
+			getDefaultCurrentContextType: getDefaultCurrentContextType,
 		}
 		for _, opt := range opts {
 			opt(store)
@@ -591,6 +593,8 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, strconv.FormatInt(maxTTLSeconds, 10), configMap.Data[TTLField])
 		assert.Equal(t, kubeconfig.Spec.Description, configMap.Data[DescriptionField])
 		assert.Equal(t, created.Spec.CurrentContext, configMap.Data[CurrentContextField]) // Check against the created Kubeconfig instance.
+		assert.Equal(t, ext.KubeconfigCurrentContextTypeACE, created.Spec.CurrentContextType)
+		assert.Equal(t, created.Spec.CurrentContextType, configMap.Data[CurrentContextTypeField])
 		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
 		require.NoError(t, err)
 		assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
@@ -673,19 +677,20 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          commonAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:                   true,
+			authorizer:                   commonAuthorizer,
+			nsCache:                      nsCache,
+			configMapClient:              configMapClient,
+			userCache:                    userCache,
+			tokenStore:                   tokenStore,
+			clusterCache:                 clusterCache,
+			tokenMgr:                     tokenManager,
+			getCACert:                    func() string { return "" },
+			getDefaultTTL:                getDefaultTTL,
+			getMaxTTL:                    getMaxTTL,
+			getServerURL:                 getServerURL,
+			shouldGenerateToken:          shouldGenerateToken,
+			getDefaultCurrentContextType: getDefaultCurrentContextType,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -756,18 +761,19 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          commonAuthorizer,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:                   true,
+			authorizer:                   commonAuthorizer,
+			userCache:                    userCache,
+			tokenStore:                   tokenStore,
+			clusterCache:                 clusterCache,
+			nodeCache:                    nodeCache,
+			tokenMgr:                     tokenManager,
+			getCACert:                    func() string { return "" },
+			getDefaultTTL:                getDefaultTTL,
+			getMaxTTL:                    getMaxTTL,
+			getServerURL:                 getServerURL,
+			shouldGenerateToken:          shouldGenerateToken,
+			getDefaultCurrentContextType: getDefaultCurrentContextType,
 		}
 
 		ctx := userContext(adminID, authTokenID)
@@ -866,20 +872,21 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{}
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          allowAllAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: func() bool { return false },
+			mcmEnabled:                   true,
+			authorizer:                   allowAllAuthorizer,
+			nsCache:                      nsCache,
+			configMapClient:              configMapClient,
+			userCache:                    userCache,
+			tokenStore:                   tokenStore,
+			clusterCache:                 clusterCache,
+			nodeCache:                    nodeCache,
+			tokenMgr:                     tokenManager,
+			getCACert:                    func() string { return rancherCACert },
+			getDefaultTTL:                getDefaultTTL,
+			getMaxTTL:                    getMaxTTL,
+			getServerURL:                 getServerURL,
+			shouldGenerateToken:          func() bool { return false },
+			getDefaultCurrentContextType: getDefaultCurrentContextType,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -948,19 +955,20 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          clusterAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:                   true,
+			authorizer:                   clusterAuthorizer,
+			nsCache:                      nsCache,
+			configMapClient:              configMapClient,
+			userCache:                    userCache,
+			tokenStore:                   tokenStore,
+			clusterCache:                 clusterCache,
+			tokenMgr:                     tokenManager,
+			getCACert:                    func() string { return "" },
+			getDefaultTTL:                getDefaultTTL,
+			getMaxTTL:                    getMaxTTL,
+			getServerURL:                 getServerURL,
+			shouldGenerateToken:          shouldGenerateToken,
+			getDefaultCurrentContextType: getDefaultCurrentContextType,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -1050,18 +1058,19 @@ func TestStoreCreate(t *testing.T) {
 		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
-			authorizer:          allowAllAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return rancherCACert },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			authorizer:                   allowAllAuthorizer,
+			nsCache:                      nsCache,
+			configMapClient:              configMapClient,
+			userCache:                    userCache,
+			tokenStore:                   tokenStore,
+			clusterCache:                 clusterCache,
+			tokenMgr:                     tokenManager,
+			getCACert:                    func() string { return rancherCACert },
+			getDefaultTTL:                getDefaultTTL,
+			getMaxTTL:                    getMaxTTL,
+			getServerURL:                 getServerURL,
+			shouldGenerateToken:          shouldGenerateToken,
+			getDefaultCurrentContextType: getDefaultCurrentContextType,
 		}
 
 		ctx := userContext(userID, authTokenID)
@@ -1565,6 +1574,237 @@ func TestStoreCreate(t *testing.T) {
 		assert.Contains(t, config.Contexts, "downstream2-cp1")
 		assert.Contains(t, config.Contexts, "downstream2-cp2")
 	})
+	t.Run("current context type for a node based ACE cluster", func(t *testing.T) {
+		tests := []struct {
+			desc                   string
+			currentContextType     string
+			defaultContextType     string
+			wantCurrentContext     string
+			wantCurrentContextType string
+		}{
+			{
+				desc:                   "default from the setting is ace",
+				defaultContextType:     ext.KubeconfigCurrentContextTypeACE,
+				wantCurrentContext:     "downstream2-cp",
+				wantCurrentContextType: ext.KubeconfigCurrentContextTypeACE,
+			},
+			{
+				desc:                   "default from the setting is proxy",
+				defaultContextType:     ext.KubeconfigCurrentContextTypeProxy,
+				wantCurrentContext:     "downstream2",
+				wantCurrentContextType: ext.KubeconfigCurrentContextTypeProxy,
+			},
+			{
+				desc:                   "ace overrides the setting",
+				currentContextType:     ext.KubeconfigCurrentContextTypeACE,
+				defaultContextType:     ext.KubeconfigCurrentContextTypeProxy,
+				wantCurrentContext:     "downstream2-cp",
+				wantCurrentContextType: ext.KubeconfigCurrentContextTypeACE,
+			},
+			{
+				desc:                   "proxy overrides the setting",
+				currentContextType:     ext.KubeconfigCurrentContextTypeProxy,
+				defaultContextType:     ext.KubeconfigCurrentContextTypeACE,
+				wantCurrentContext:     "downstream2",
+				wantCurrentContextType: ext.KubeconfigCurrentContextTypeProxy,
+			},
+			{
+				desc:                   "invalid setting falls back to ace",
+				defaultContextType:     "foo",
+				wantCurrentContext:     "downstream2-cp",
+				wantCurrentContextType: ext.KubeconfigCurrentContextTypeACE,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				var configMap *corev1.ConfigMap
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap = obj.DeepCopy()
+					configMap.CreationTimestamp = metav1.NewTime(time.Now())
+					configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+					return configMap, nil
+				}).Times(1)
+				configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap = obj.DeepCopy()
+					return configMap, nil
+				}).Times(1)
+
+				store := newStore(configMapClient, tokenStore, &fakeTokenManager{}, func(s *Store) {
+					s.getDefaultCurrentContextType = func() string { return tt.defaultContextType }
+				})
+
+				ctx := userContext(userID, authTokenID)
+				kubeconfig := &ext.Kubeconfig{
+					Spec: ext.KubeconfigSpec{
+						Clusters:           []string{downstream1, downstream2},
+						CurrentContext:     downstream2,
+						CurrentContextType: tt.currentContextType,
+					},
+				}
+
+				obj, err := store.Create(ctx, kubeconfig, nil, options)
+				require.NoError(t, err)
+
+				created := obj.(*ext.Kubeconfig)
+				assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+				assert.Equal(t, tt.wantCurrentContextType, created.Spec.CurrentContextType)
+				require.NotNil(t, configMap)
+				assert.Equal(t, tt.wantCurrentContextType, configMap.Data[CurrentContextTypeField])
+
+				config, err := clientcmd.Load([]byte(created.Status.Value))
+				require.NoError(t, err)
+
+				assert.Equal(t, tt.wantCurrentContext, config.CurrentContext)
+				// Both the proxy and the ACE contexts are always present.
+				assert.Contains(t, config.Contexts, "downstream2")
+				assert.Contains(t, config.Contexts, "downstream2-cp")
+			})
+		}
+	})
+	t.Run("current context type for a FQDN based ACE cluster", func(t *testing.T) {
+		downstream3 := "c-m-l5kq2x8d" // ACE enabled with FQDN.
+		downstream3Cluster := &v3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: downstream3},
+			Spec: v3.ClusterSpec{
+				DisplayName: "downstream3",
+				ClusterSpecBase: v3.ClusterSpecBase{
+					LocalClusterAuthEndpoint: v3.LocalClusterAuthEndpoint{
+						Enabled: true,
+						FQDN:    "downstream3.example.com",
+					},
+				},
+			},
+		}
+
+		tests := []struct {
+			desc               string
+			currentContextType string
+			wantCurrentContext string
+		}{
+			{
+				desc:               "ace",
+				currentContextType: ext.KubeconfigCurrentContextTypeACE,
+				wantCurrentContext: "downstream3-fqdn",
+			},
+			{
+				desc:               "proxy",
+				currentContextType: ext.KubeconfigCurrentContextTypeProxy,
+				wantCurrentContext: "downstream3",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+				configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					configMap := obj.DeepCopy()
+					configMap.CreationTimestamp = metav1.NewTime(time.Now())
+					configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+					return configMap, nil
+				}).Times(1)
+				configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+					return obj.DeepCopy(), nil
+				}).Times(1)
+
+				clusterCache := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+				clusterCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.Cluster, error) {
+					switch name {
+					case "local":
+						return localCluster.DeepCopy(), nil
+					case downstream3:
+						return downstream3Cluster.DeepCopy(), nil
+					default:
+						return nil, apierrors.NewNotFound(gvr.GroupResource(), name)
+					}
+				}).AnyTimes()
+
+				// Nodes are not listed for a cluster with the FQDN set.
+				nodeCache := fake.NewMockCacheInterface[*v3.Node](ctrl)
+
+				store := newStore(configMapClient, tokenStore, &fakeTokenManager{}, func(s *Store) {
+					s.clusterCache = clusterCache
+					s.nodeCache = nodeCache
+				})
+
+				ctx := userContext(userID, authTokenID)
+				kubeconfig := &ext.Kubeconfig{
+					Spec: ext.KubeconfigSpec{
+						Clusters:           []string{downstream3},
+						CurrentContextType: tt.currentContextType,
+					},
+				}
+
+				obj, err := store.Create(ctx, kubeconfig, nil, options)
+				require.NoError(t, err)
+
+				created := obj.(*ext.Kubeconfig)
+				assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+				assert.Equal(t, tt.currentContextType, created.Spec.CurrentContextType)
+
+				config, err := clientcmd.Load([]byte(created.Status.Value))
+				require.NoError(t, err)
+
+				assert.Equal(t, tt.wantCurrentContext, config.CurrentContext)
+				assert.Contains(t, config.Contexts, "downstream3")
+				assert.Contains(t, config.Contexts, "downstream3-fqdn")
+			})
+		}
+	})
+	t.Run("current context type has no effect for a non-ACE cluster", func(t *testing.T) {
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+		configMapClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			configMap := obj.DeepCopy()
+			configMap.CreationTimestamp = metav1.NewTime(time.Now())
+			configMap.Name = names.SimpleNameGenerator.GenerateName(configMap.GenerateName)
+			return configMap, nil
+		}).Times(1)
+		configMapClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+			return obj.DeepCopy(), nil
+		}).Times(1)
+
+		store := newStore(configMapClient, tokenStore, &fakeTokenManager{})
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:           []string{downstream1},
+				CurrentContextType: ext.KubeconfigCurrentContextTypeACE,
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.NoError(t, err)
+
+		created := obj.(*ext.Kubeconfig)
+		assert.Equal(t, StatusSummaryComplete, created.Status.Summary)
+
+		config, err := clientcmd.Load([]byte(created.Status.Value))
+		require.NoError(t, err)
+
+		assert.Equal(t, "downstream1", config.CurrentContext)
+	})
+	t.Run("invalid current context type", func(t *testing.T) {
+		// No calls to the configmap client are expected.
+		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+
+		store := newStore(configMapClient, tokenStore, &fakeTokenManager{})
+
+		ctx := userContext(userID, authTokenID)
+		kubeconfig := &ext.Kubeconfig{
+			Spec: ext.KubeconfigSpec{
+				Clusters:           []string{downstream2},
+				CurrentContextType: "foo",
+			},
+		}
+
+		obj, err := store.Create(ctx, kubeconfig, nil, options)
+		require.Error(t, err)
+		assert.Nil(t, obj)
+		assert.True(t, apierrors.IsBadRequest(err))
+		assert.ErrorContains(t, err, "invalid spec.currentContextType")
+	})
 	t.Run("exclude default entry with mixed clusters", func(t *testing.T) {
 		var configMap *corev1.ConfigMap
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -1666,20 +1906,21 @@ func TestStoreCreate(t *testing.T) {
 		}).Times(1)
 
 		store := &Store{
-			mcmEnabled:          true,
-			authorizer:          commonAuthorizer,
-			nsCache:             nsCache,
-			configMapClient:     configMapClient,
-			userCache:           userCache,
-			tokenStore:          tokenStore,
-			clusterCache:        clusterCache,
-			nodeCache:           nodeCache,
-			tokenMgr:            tokenManager,
-			getCACert:           func() string { return "" },
-			getDefaultTTL:       getDefaultTTL,
-			getMaxTTL:           getMaxTTL,
-			getServerURL:        getServerURL,
-			shouldGenerateToken: shouldGenerateToken,
+			mcmEnabled:                   true,
+			authorizer:                   commonAuthorizer,
+			nsCache:                      nsCache,
+			configMapClient:              configMapClient,
+			userCache:                    userCache,
+			tokenStore:                   tokenStore,
+			clusterCache:                 clusterCache,
+			nodeCache:                    nodeCache,
+			tokenMgr:                     tokenManager,
+			getCACert:                    func() string { return "" },
+			getDefaultTTL:                getDefaultTTL,
+			getMaxTTL:                    getMaxTTL,
+			getServerURL:                 getServerURL,
+			shouldGenerateToken:          shouldGenerateToken,
+			getDefaultCurrentContextType: getDefaultCurrentContextType,
 		}
 
 		ctx := userContext(adminID, authTokenID)
@@ -2287,6 +2528,7 @@ func TestStoreGet(t *testing.T) {
 		pathCMCurrentContextField,
 		pathCMDescriptionField,
 		pathCMTTLField,
+		pathCMCurrentContextTypeField,
 		pathCMStatusConditionsField,
 		pathCMStatusSummaryField,
 		pathCMStatusTokensField,
@@ -2332,10 +2574,11 @@ func TestStoreGet(t *testing.T) {
 			},
 		},
 		Data: map[string]string{
-			TTLField:            strconv.FormatInt(defaultTTL, 10),
-			DescriptionField:    "test",
-			CurrentContextField: "c-m-tbgzfbgf",
-			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+			TTLField:                strconv.FormatInt(defaultTTL, 10),
+			DescriptionField:        "test",
+			CurrentContextField:     "c-m-tbgzfbgf",
+			CurrentContextTypeField: ext.KubeconfigCurrentContextTypeProxy,
+			ClustersField:           `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
 		},
 	}
 
@@ -2344,6 +2587,7 @@ func TestStoreGet(t *testing.T) {
 		pathKConfigCurrentContextField,
 		pathKConfigDescriptionField,
 		pathKConfigTTLField,
+		pathKConfigCurrentContextTypeField,
 		fieldpath.MakePathOrDie("metadata"),
 		fieldpath.MakePathOrDie("type"),
 	).ToJSON()
@@ -2404,6 +2648,7 @@ func TestStoreGet(t *testing.T) {
 		assert.Equal(t, defaultTTL, kubeconfig.Spec.TTL)
 		assert.Equal(t, configMap.Data[DescriptionField], kubeconfig.Spec.Description)
 		assert.Equal(t, configMap.Data[CurrentContextField], kubeconfig.Spec.CurrentContext)
+		assert.Equal(t, ext.KubeconfigCurrentContextTypeProxy, kubeconfig.Spec.CurrentContextType)
 
 		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
 		require.NoError(t, err)
@@ -3277,6 +3522,18 @@ func TestStoreUpdate(t *testing.T) {
 			assert.Nil(t, kubeconfig)
 			assert.False(t, isCreated)
 			assert.True(t, apierrors.IsBadRequest(err))
+		})
+		t.Run("spec.currentContextType", func(t *testing.T) {
+			newKubeconfig := oldKubeconfig.DeepCopy()
+			newKubeconfig.Spec.CurrentContextType = ext.KubeconfigCurrentContextTypeProxy
+			objInfo := &fakeUpdatedObjectInfo{obj: newKubeconfig}
+
+			kubeconfig, isCreated, err := store.Update(ctx, kubeconfigID, objInfo, nil, updateValidation, false, options)
+			require.Error(t, err)
+			assert.Nil(t, kubeconfig)
+			assert.False(t, isCreated)
+			assert.True(t, apierrors.IsBadRequest(err))
+			assert.ErrorContains(t, err, "spec.currentContextType is immutable")
 		})
 	})
 	t.Run("dryRun", func(t *testing.T) {
@@ -4772,4 +5029,86 @@ func TestIncludeDefaultEntryConfigMapRoundTrip(t *testing.T) {
 		require.NotNil(t, result.Spec.IncludeDefaultEntry)
 		assert.True(t, *result.Spec.IncludeDefaultEntry)
 	})
+}
+
+func TestCurrentContextTypeConfigMapRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	store := &Store{}
+
+	t.Run("empty round-trips as empty", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL: 3600,
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.NotContains(t, cm.Data, CurrentContextTypeField)
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		assert.Empty(t, result.Spec.CurrentContextType)
+	})
+	t.Run("value round-trips", func(t *testing.T) {
+		kc := &ext.Kubeconfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Spec: ext.KubeconfigSpec{
+				TTL:                3600,
+				CurrentContextType: ext.KubeconfigCurrentContextTypeProxy,
+			},
+		}
+
+		cm, err := store.toConfigMap(kc)
+		require.NoError(t, err)
+		assert.Equal(t, ext.KubeconfigCurrentContextTypeProxy, cm.Data[CurrentContextTypeField])
+
+		result, err := store.fromConfigMap(cm)
+		require.NoError(t, err)
+		assert.Equal(t, ext.KubeconfigCurrentContextTypeProxy, result.Spec.CurrentContextType)
+	})
+}
+
+func TestResolveCurrentContextType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		desc         string
+		requested    string
+		settingValue string
+		want         string
+		wantErr      bool
+	}{
+		{desc: "ace requested", requested: "ace", settingValue: "proxy", want: "ace"},
+		{desc: "proxy requested", requested: "proxy", settingValue: "ace", want: "proxy"},
+		{desc: "default ace", settingValue: "ace", want: "ace"},
+		{desc: "default proxy", settingValue: "proxy", want: "proxy"},
+		{desc: "default is normalized", settingValue: " Proxy ", want: "proxy"},
+		{desc: "empty default falls back to ace", settingValue: "", want: "ace"},
+		{desc: "invalid default falls back to ace", settingValue: "foo", want: "ace"},
+		{desc: "invalid value requested", requested: "foo", settingValue: "ace", wantErr: true},
+		{desc: "requested value is case sensitive", requested: "Proxy", settingValue: "ace", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			t.Parallel()
+
+			store := &Store{
+				getDefaultCurrentContextType: func() string { return tt.settingValue },
+			}
+
+			got, err := store.resolveCurrentContextType(tt.requested)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.True(t, apierrors.IsBadRequest(err))
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
