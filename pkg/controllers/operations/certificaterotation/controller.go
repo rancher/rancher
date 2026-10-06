@@ -93,6 +93,10 @@ type scope struct {
 	beacon     *planv1alpha1.Beacon
 	clusterObj *unstructured.Unstructured
 	adapter    ops.Adapter
+
+	// clusterAnnotations are those of the object op.Spec.ClusterRef names, which is where the
+	// cluster's operation whitelist is kept (opv1alpha1.WhitelistedAnnotation).
+	clusterAnnotations map[string]string
 }
 
 // Register wires the CertificateRotation status handler.
@@ -451,12 +455,13 @@ func (h *handler) resolveScope(op *opv1alpha1.CertificateRotation, status opv1al
 	}
 
 	return &scope{
-		ownerKey:   ops.BeaconOwnerKey(OperationKind, op),
-		op:         op,
-		namespace:  namespace,
-		beacon:     beacon,
-		clusterObj: clusterObj,
-		adapter:    adapter,
+		ownerKey:           ops.BeaconOwnerKey(OperationKind, op),
+		op:                 op,
+		namespace:          namespace,
+		beacon:             beacon,
+		clusterObj:         clusterObj,
+		adapter:            adapter,
+		clusterAnnotations: ustr.GetAnnotations(),
 	}, status, nil
 }
 
@@ -518,6 +523,16 @@ func (h *handler) handlePending(s *scope, status opv1alpha1.CertificateRotationS
 			return status, err
 		}
 		if acquired == nil {
+			// Another operation holding the beacon was created close enough to this one that both
+			// were admitted. It acquired the beacon first, so it is the one that runs; this one is
+			// rejected rather than left waiting behind it, having touched nothing on the cluster.
+			if holder, ok := ops.ConflictingOperation(s.beacon, s.ownerKey); ok {
+				message := ops.ConflictingOperationMessage(holder)
+				logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: %s", s.op.Namespace, s.op.Name, message)
+				status.MarkRejected(opv1alpha1.ConflictingOperationReason, message)
+				return status, nil
+			}
+
 			opv1alpha1.PendingCondition.True(&status)
 			opv1alpha1.PendingCondition.Reason(&status, opv1alpha1.WaitingForBeaconReason)
 			opv1alpha1.PendingCondition.Message(&status, "waiting for beacon acquisition")
@@ -643,6 +658,14 @@ func (h *handler) reconcilePreflight(s *scope, status opv1alpha1.CertificateRota
 	} else if problem != "" {
 		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: %s", s.op.Namespace, s.op.Name, problem)
 		status.MarkRejected(opv1alpha1.PreflightCheckFailedReason, problem)
+		return status, nil
+	}
+
+	// The operation webhook reads a cache, so an operation can be admitted on a cluster an earlier one
+	// has just left requiring a restore. It is checked again here, holding the beacon.
+	if problem := ops.WhitelistProblem(s.op.Spec.ClusterRef, s.clusterAnnotations, opv1alpha1.CertificateRotationResource); problem != "" {
+		logrus.Errorf("[certificaterotation] %s/%s: rejecting operation: %s", s.op.Namespace, s.op.Name, problem)
+		status.MarkRejected(opv1alpha1.NotWhitelistedReason, problem)
 		return status, nil
 	}
 

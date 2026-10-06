@@ -148,3 +148,39 @@ func TestStepHookPrefixFor(t *testing.T) {
 		Labels: map[string]string{PreflightStepHookLabelPrefix + "x": "delegate"},
 	}}, stepHookPrefixFor(opv1alpha1.CertificateRotationStepPreflight)))
 }
+
+// The operation webhook reads a cache, so a rotation can be admitted on a cluster an earlier
+// operation has just left requiring a restore. Preflight turns it away before anything is changed, and
+// lets it through once the whitelist names it.
+func TestReconcilePreflight_HonorsTheWhitelist(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		whitelist    string
+		wantRejected bool
+	}{
+		"a whitelist for restores": {whitelist: opv1alpha1.ETCDSnapshotRestoreResource, wantRejected: true},
+		"a whitelist naming it":    {whitelist: opv1alpha1.ETCDSnapshotRestoreResource + "," + opv1alpha1.CertificateRotationResource},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			adapter := &stubAdapter{runtime: capr.RuntimeRKE2}
+			s, secrets := preflightScope(adapter)
+			s.clusterAnnotations = map[string]string{opv1alpha1.WhitelistedAnnotation: tc.whitelist}
+			h := &handler{secrets: secrets}
+
+			got, err := h.reconcilePreflight(s, preflightStatus())
+			require.NoError(t, err)
+			if !tc.wantRejected {
+				assert.Equal(t, opv1alpha1.CertificateRotationStepRotate, got.Step)
+				return
+			}
+			assert.Equal(t, opv1alpha1.OperationPhaseRejected, got.Phase)
+			assert.Equal(t, opv1alpha1.NotWhitelistedReason, opv1alpha1.RejectedCondition.GetReason(&got))
+			assert.Contains(t, opv1alpha1.RejectedCondition.GetMessage(&got), "only permits "+opv1alpha1.ETCDSnapshotRestoreResource)
+			assert.Empty(t, adapter.pauseCalls, "nothing on the cluster is changed")
+			assert.Empty(t, secrets.updates)
+		})
+	}
+}

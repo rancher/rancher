@@ -72,7 +72,9 @@ func RunETCDSnapshotSaveOperationTest(t *testing.T, clients *clients.Clients, na
 		if op.Status.Phase == opv1alpha1.OperationPhaseFailed {
 			return false, fmt.Errorf("etcd snapshot create operation failed at step %q", op.Status.Step)
 		}
-		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded, nil
+		// Terminated, not just Succeeded: the beacon is released on the reconcile after the outcome is
+		// recorded, and an operation created before then is rejected as conflicting with this one.
+		return op.Status.Phase == opv1alpha1.OperationPhaseSucceeded && !op.Status.TerminatedAt.IsZero(), nil
 	})
 	if err != nil {
 		handleError(t, clients, clusterRef.Name, err)
@@ -242,6 +244,10 @@ func WaitForSnapshotSaveSucceeded(t *testing.T, clients *clients.Clients, op *op
 		// Once Succeeded and the delegate chain is drained, the owning controller's next reconcile
 		// will release the beacon. We treat "delegate chain empty" as the success signal.
 		if len(beacon.Status.Delegates) > 0 {
+			return false, nil
+		}
+		// The next operation may only be created once this one has released the beacon.
+		if got.Status.TerminatedAt.IsZero() {
 			return false, nil
 		}
 		latestOp = got

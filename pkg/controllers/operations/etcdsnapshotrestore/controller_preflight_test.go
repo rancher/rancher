@@ -71,3 +71,44 @@ func TestReconcilePreflight_RejectsMislabeledSecrets(t *testing.T) {
 	assert.Empty(t, adapter.pauseCalls)
 	assert.Empty(t, secrets.updates, "nothing is assigned")
 }
+
+// A restore is what a whitelisted cluster is waiting for, so one passes Preflight on it. A whitelist
+// that doesn't name restores (one an admin wrote, say) turns it away like any other operation.
+func TestReconcilePreflight_HonorsTheWhitelist(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		whitelist    string
+		wantRejected bool
+	}{
+		"a whitelist for restores":        {whitelist: opv1alpha1.ETCDSnapshotRestoreResource},
+		"a whitelist not naming restores": {whitelist: opv1alpha1.ETCDSnapshotSaveResource, wantRejected: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			op := newOp()
+			s := newScope(op, newBeacon(testOwnerKey, true))
+			s.clusterAnnotations = map[string]string{opv1alpha1.WhitelistedAnnotation: tc.whitelist}
+			adapter := s.adapter.(*stubAdapter)
+			secrets := &fakePlanSecrets{items: []*corev1.Secret{labeledEtcdSecret(op)}}
+			h := &handler{secrets: secrets, store: planapi.NewStore(secrets), etcdsnapshots: &stubSnapshotClient{notFound: true}}
+
+			status := opv1alpha1.ETCDSnapshotRestoreStatus{}
+			status.SetPhase(opv1alpha1.OperationPhaseInProgress)
+			status.SetStep(opv1alpha1.ETCDSnapshotRestoreStepPreflight)
+
+			got, err := h.reconcilePreflight(s, status)
+			require.NoError(t, err)
+			if !tc.wantRejected {
+				assert.Equal(t, opv1alpha1.ETCDSnapshotRestoreStepRestoreClusterConfig, got.Step)
+				assert.Equal(t, []bool{true}, adapter.pauseCalls)
+				return
+			}
+			assert.Equal(t, opv1alpha1.OperationPhaseRejected, got.Phase)
+			assert.Equal(t, opv1alpha1.NotWhitelistedReason, opv1alpha1.RejectedCondition.GetReason(&got))
+			assert.Empty(t, adapter.pauseCalls, "nothing on the cluster is changed")
+			assert.Empty(t, secrets.updates, "nothing is assigned")
+		})
+	}
+}

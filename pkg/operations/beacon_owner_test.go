@@ -303,3 +303,49 @@ func TestReleaseBeaconIfHeld(t *testing.T) {
 		assert.Empty(t, beacons.statusUpdates)
 	})
 }
+
+// An operation still Pending is rejected only for a beacon another operation holds: a holder that
+// isn't an operation is waited on as before, and an operation the holder has put on its delegate chain
+// is being driven on its behalf rather than conflicting with it.
+func TestConflictingOperation(t *testing.T) {
+	t.Parallel()
+
+	mine := BeaconOwnerKey("CertificateRotation", op("fleet-default", "rotate", "uid-1"))
+	other := BeaconOwnerKey("ETCDSnapshotSave", op("fleet-default", "nightly", "uid-2"))
+	beacon := func(owner string, delegates ...string) *planv1alpha1.Beacon {
+		return &planv1alpha1.Beacon{Status: planv1alpha1.BeaconStatus{Active: true, Owner: owner, Delegates: delegates}}
+	}
+
+	for name, tc := range map[string]struct {
+		beacon *planv1alpha1.Beacon
+		want   *BeaconOwner
+	}{
+		"no beacon":                       {},
+		"an unheld beacon":                {beacon: beacon("")},
+		"a beacon this operation holds":   {beacon: beacon(mine)},
+		"a beacon a handler holds":        {beacon: beacon("rke2-etcd-snapshot")},
+		"a malformed operation claim":     {beacon: beacon("operation.cattle.io/ETCDSnapshotSave/fleet-default/nightly")},
+		"another operation's beacon":      {beacon: beacon(other), want: &BeaconOwner{Kind: "ETCDSnapshotSave", Namespace: "fleet-default", Name: "nightly", UID: "uid-2"}},
+		"another operation delegating it": {beacon: beacon(other, mine)},
+		"another operation's, delegated elsewhere": {
+			beacon: beacon(other, "some-delegate"),
+			want:   &BeaconOwner{Kind: "ETCDSnapshotSave", Namespace: "fleet-default", Name: "nightly", UID: "uid-2"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := ConflictingOperation(tc.beacon, mine)
+			if tc.want == nil {
+				assert.False(t, ok)
+				return
+			}
+			assert.True(t, ok)
+			assert.Equal(t, *tc.want, got)
+		})
+	}
+
+	message := ConflictingOperationMessage(BeaconOwner{Kind: "ETCDSnapshotSave", Namespace: "fleet-default", Name: "nightly", UID: "uid-2"})
+	assert.Contains(t, message, "ETCDSnapshotSave fleet-default/nightly is already running on the cluster")
+	assert.NotContains(t, message, "uid-2", "the operation is named the way a user refers to it")
+}

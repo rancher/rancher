@@ -16,6 +16,15 @@ const (
 
 	// ETCDSnapshotRestoreResource names ETCDSnapshotRestore in WhitelistedAnnotation.
 	ETCDSnapshotRestoreResource = "etcdsnapshotrestores.operation.cattle.io"
+
+	// ETCDSnapshotSaveResource names ETCDSnapshotSave in WhitelistedAnnotation.
+	ETCDSnapshotSaveResource = "etcdsnapshotsaves.operation.cattle.io"
+
+	// EncryptionKeyRotationResource names EncryptionKeyRotation in WhitelistedAnnotation.
+	EncryptionKeyRotationResource = "encryptionkeyrotations.operation.cattle.io"
+
+	// CertificateRotationResource names CertificateRotation in WhitelistedAnnotation.
+	CertificateRotationResource = "certificaterotations.operation.cattle.io"
 )
 
 // WhitelistEntries returns the entries of a WhitelistedAnnotation value: its comma-separated items,

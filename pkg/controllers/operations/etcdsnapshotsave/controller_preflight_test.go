@@ -62,3 +62,22 @@ func TestReconcilePreflight_RejectsMislabeledSecrets(t *testing.T) {
 	assert.Contains(t, opv1alpha1.RejectedCondition.GetMessage(&got), "fleet-default/etcd-1")
 	assert.Contains(t, opv1alpha1.RejectedCondition.GetMessage(&got), planv1alpha1.MachineLifecycleKindLabel)
 }
+
+// The operation webhook reads a cache, so a save can be admitted on a cluster an earlier operation
+// has just left requiring a restore. Preflight turns it away before anything is assigned.
+func TestReconcilePreflight_RejectsAWhitelistedCluster(t *testing.T) {
+	t.Parallel()
+
+	op := preflightOp()
+	secrets := &fakePlanSecrets{items: []*corev1.Secret{labeledSecret(op)}}
+	h := &handler{secrets: secrets}
+	s := newScope(op, nil, defaultAdapter())
+	s.clusterAnnotations = map[string]string{opv1alpha1.WhitelistedAnnotation: opv1alpha1.ETCDSnapshotRestoreResource}
+
+	got, err := h.reconcilePreflight(s, opv1alpha1.ETCDSnapshotSaveStatus{Step: opv1alpha1.ETCDSnapshotSaveStepPreflight})
+	require.NoError(t, err)
+	assert.Equal(t, opv1alpha1.OperationPhaseRejected, got.Phase)
+	assert.Equal(t, opv1alpha1.NotWhitelistedReason, opv1alpha1.RejectedCondition.GetReason(&got))
+	assert.Contains(t, opv1alpha1.RejectedCondition.GetMessage(&got), "Cluster fleet-default/test only permits "+opv1alpha1.ETCDSnapshotRestoreResource)
+	assert.Empty(t, secrets.updates, "nothing is assigned")
+}

@@ -162,6 +162,18 @@ const (
 	// was set, by the user or by another controller that needed the operation to stop.
 	CancelRequestedReason = "CancelRequested"
 
+	// ConflictingOperationReason surfaces on Rejected when the operation found its cluster's beacon
+	// held by another operation while it was Pending. Only one operation may run on a cluster at a
+	// time, and the one that acquired the beacon first is the one that runs: the other is rejected
+	// rather than queued, having touched nothing on the cluster.
+	ConflictingOperationReason = "ConflictingOperation"
+
+	// NotWhitelistedReason surfaces on Rejected when the operation's cluster carries a whitelist
+	// (WhitelistedAnnotation) which does not list the operation's resource. An earlier operation was
+	// stopped after pausing the cluster, and until a restore has repaired it only the listed
+	// operations may run on it.
+	NotWhitelistedReason = "NotWhitelisted"
+
 	// RestoreRequiredReason surfaces on Finalized when the operation stopped after its point of no
 	// return, and so left its cluster paused and whitelisted (see WhitelistedAnnotation): only an etcd
 	// snapshot restore may run on the cluster until one has succeeded.

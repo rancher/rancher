@@ -1,6 +1,8 @@
 package operations
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 
 	planv1alpha1 "github.com/rancher/rancher/pkg/plan/api/plan.cattle.io/v1alpha1"
@@ -137,4 +139,31 @@ func ReclaimSupersededBeacon(beacon *planv1alpha1.Beacon, beacons plancontroller
 	beacon.Status.Delegates = nil
 
 	return beacons.UpdateStatus(beacon)
+}
+
+// ConflictingOperation reports the other operation holding beacon, if it is held by one: a claim
+// written with BeaconOwnerKey for an operation other than ownerKey's, which hasn't put ownerKey on its
+// delegate chain. A beacon held by anything that isn't an operation (a handler, a hook delegate) is
+// not reported, and is waited on as before.
+//
+// An operation still Pending that finds one is rejected rather than queued (see
+// ConflictingOperationMessage): only one operation may run on a cluster at a time, and the operation
+// webhook turns away a create while another is in progress, so finding one means two were created
+// close enough together that both were admitted. The one that acquired the beacon first is the one
+// that runs.
+func ConflictingOperation(beacon *planv1alpha1.Beacon, ownerKey string) (BeaconOwner, bool) {
+	if beacon == nil || beacon.Status.Owner == "" || beacon.Status.Owner == ownerKey {
+		return BeaconOwner{}, false
+	}
+	if slices.Contains(beacon.Status.Delegates, ownerKey) {
+		return BeaconOwner{}, false
+	}
+	return ParseBeaconOwner(beacon.Status.Owner)
+}
+
+// ConflictingOperationMessage describes the operation ConflictingOperation found, for an operation
+// rejected because of it.
+func ConflictingOperationMessage(holder BeaconOwner) string {
+	return fmt.Sprintf("%s %s/%s is already running on the cluster; only one operation may run on a cluster at a time, so wait for it to finish or cancel it, then create this operation again",
+		holder.Kind, holder.Namespace, holder.Name)
 }

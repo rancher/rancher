@@ -1,7 +1,11 @@
 package operations
 
 import (
+	"fmt"
+	"strings"
+
 	opv1alpha1 "github.com/rancher/rancher/pkg/apis/operation.cattle.io/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // WhitelistChange is what Adapter.PauseCluster does to the cluster's operation whitelist
@@ -56,4 +60,30 @@ func ApplyWhitelistChange(annotations map[string]string, change WhitelistChange)
 		return annotations, true
 	}
 	return annotations, false
+}
+
+// WhitelistProblem returns why an operation of the given resource ("<plural>.<group>") may not run on
+// the cluster clusterRef names, whose object carries annotations, or "" if it may.
+//
+// The operation webhook turns away a create the cluster's whitelist doesn't allow, but it reads a
+// cache, so an operation created just as an earlier one stopped part-way through can still be
+// admitted. Every operation checks again in its preflight, holding the beacon, before it changes
+// anything: only the beacon's holder adds a whitelist, so the answer doesn't change under it. That
+// is also what lets a rotation remove the whitelist when it succeeds, since it only ever finds one it
+// added itself.
+func WhitelistProblem(clusterRef *corev1.ObjectReference, annotations map[string]string, resource string) string {
+	if opv1alpha1.Whitelisted(annotations, resource) {
+		return ""
+	}
+
+	cluster := "the cluster"
+	if clusterRef != nil {
+		name := clusterRef.Name
+		if clusterRef.Namespace != "" {
+			name = clusterRef.Namespace + "/" + name
+		}
+		cluster = fmt.Sprintf("%s %s", clusterRef.Kind, name)
+	}
+	return fmt.Sprintf("%s only permits %s: an earlier operation was stopped after pausing it, and the cluster requires an etcd snapshot restore",
+		cluster, strings.Join(opv1alpha1.WhitelistEntries(annotations[opv1alpha1.WhitelistedAnnotation]), ", "))
 }

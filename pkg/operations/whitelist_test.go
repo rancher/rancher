@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -103,4 +104,36 @@ func TestCAPIAdapters_PauseCluster(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestWhitelistProblem(t *testing.T) {
+	const whitelisted = opv1alpha1.WhitelistedAnnotation
+	const restores = opv1alpha1.ETCDSnapshotRestoreResource
+	ref := &corev1.ObjectReference{APIVersion: "cluster.x-k8s.io/v1beta2", Kind: "Cluster", Namespace: "fleet-default", Name: "c"}
+
+	for name, tc := range map[string]struct {
+		annotations map[string]string
+		resource    string
+		want        string
+	}{
+		"no whitelist":              {resource: opv1alpha1.ETCDSnapshotSaveResource},
+		"an empty whitelist":        {annotations: map[string]string{whitelisted: " "}, resource: opv1alpha1.ETCDSnapshotSaveResource},
+		"a listed resource":         {annotations: map[string]string{whitelisted: restores}, resource: restores},
+		"one of several, spaced":    {annotations: map[string]string{whitelisted: "a.example.io, " + restores}, resource: restores},
+		"a save on a whitelist":     {annotations: map[string]string{whitelisted: restores}, resource: opv1alpha1.ETCDSnapshotSaveResource, want: "Cluster fleet-default/c only permits " + restores},
+		"a rotation on a whitelist": {annotations: map[string]string{whitelisted: "a.example.io," + restores}, resource: opv1alpha1.CertificateRotationResource, want: "Cluster fleet-default/c only permits a.example.io, " + restores},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := WhitelistProblem(ref, tc.annotations, tc.resource)
+			if tc.want == "" {
+				assert.Empty(t, got)
+				return
+			}
+			assert.Contains(t, got, tc.want)
+			assert.Contains(t, got, "requires an etcd snapshot restore")
+		})
+	}
+
+	assert.Contains(t, WhitelistProblem(&corev1.ObjectReference{Kind: "Cluster", Name: "c-abc"}, map[string]string{whitelisted: restores}, opv1alpha1.ETCDSnapshotSaveResource),
+		"Cluster c-abc only permits", "a cluster-scoped clusterRef is named without a namespace")
 }
