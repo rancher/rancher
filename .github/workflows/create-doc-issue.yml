@@ -54,7 +54,7 @@ jobs:
           declare -a additional_cmd=()
           MILESTONE_NOTE=""
           if [ -n "${ORIGINAL_MILESTONE}" ]; then
-              if gh api "repos/${TARGET_REPO}/milestones" --paginate | jq -se --arg MILESTONE "${ORIGINAL_MILESTONE}" 'add | any(.title == $MILESTONE)' > /dev/null; then
+              if gh api "repos/${TARGET_REPO}/milestones?state=all" --paginate | jq -se --arg MILESTONE "${ORIGINAL_MILESTONE}" 'add | any(.title == $MILESTONE)' > /dev/null; then
                   additional_cmd+=("--milestone" "${ORIGINAL_MILESTONE}")
               else
                   MILESTONE_NOTE=" (milestone \`${ORIGINAL_MILESTONE}\` does not exist in ${TARGET_REPO}, so none was set)"
