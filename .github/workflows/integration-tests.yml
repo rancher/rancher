@@ -20,8 +20,8 @@ jobs:
       - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
-      K3D_VERSION: v5.8.3
-      K3D_BIN_HASH_AMD64: "dbaa79a76ace7f4ca230a1ff41dc7d8a5036a8ad0309e9c54f9bf3836dbe853e"
+      K3D_VERSION: v5.9.0
+      K3D_BIN_HASH_AMD64: "06d8f25bc3a971c4eb29e0ff08429b180402db0f4dec838c9eac427e296800a0"
     permissions:
       contents: read
     steps:
