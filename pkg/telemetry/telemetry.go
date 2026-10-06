@@ -272,17 +272,33 @@ type TelemetryGatherer struct {
 	nodeCache           v3ctrl.NodeCache
 	clusterCache        v3ctrl.ClusterCache
 	multiClusterManager wrangler.MultiClusterManager
+	nvidiaCache         *nvidiaCache
+}
+
+type nvidiaCache struct {
+	mu        sync.Mutex
+	value     bool
+	expiresAt time.Time
+	ttl       time.Duration
+}
+
+func NewNVIDIACache() *nvidiaCache {
+	return &nvidiaCache{
+		ttl: 10 * time.Minute,
+	}
 }
 
 func NewTelemetryGatherer(
 	clusterCache v3ctrl.ClusterCache,
 	nodeCache v3ctrl.NodeCache,
 	multiClusterManager wrangler.MultiClusterManager,
+	nvidiaCache *nvidiaCache,
 ) TelemetryGatherer {
 	return TelemetryGatherer{
 		clusterCache:        clusterCache,
 		nodeCache:           nodeCache,
 		multiClusterManager: multiClusterManager,
+		nvidiaCache:         nvidiaCache,
 	}
 }
 
@@ -295,6 +311,13 @@ func (t *TelemetryGatherer) visitWithInitInfo(info initcond.InitInfo) {
 }
 
 func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
+	t.nvidiaCache.mu.Lock()
+	defer t.nvidiaCache.mu.Unlock()
+
+	if time.Now().Before(t.nvidiaCache.expiresAt) {
+		return t.nvidiaCache.value
+	}
+
 	var isNVIDIAPresent atomic.Bool
 	isNVIDIAPresent.Store(false)
 
@@ -328,7 +351,11 @@ func (t *TelemetryGatherer) isNVIDIAPresent(clusters []*v3.Cluster) bool {
 	}
 
 	wg.Wait()
-	return isNVIDIAPresent.Load()
+
+	v := isNVIDIAPresent.Load()
+	t.nvidiaCache.value = v
+	t.nvidiaCache.expiresAt = time.Now().Add(t.nvidiaCache.ttl)
+	return v
 }
 
 func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, error) {

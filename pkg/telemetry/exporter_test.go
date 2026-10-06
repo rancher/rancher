@@ -58,7 +58,7 @@ func TestTelemetryManager(t *testing.T) {
 	nodeCache.EXPECT().List(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(_ string, _ any) ([]*v3.Node, error) {
 		return []*v3.Node{}, nil
 	})
-	telG := NewTelemetryGatherer(clusterCache, nodeCache, wrangler.Context{}.MultiClusterManager)
+	telG := NewTelemetryGatherer(clusterCache, nodeCache, wrangler.Context{}.MultiClusterManager, NewNVIDIACache())
 
 	manager := NewTelemetryExporterManager(telG, time.Millisecond)
 	assert.NotNil(manager)

@@ -382,6 +382,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			wranglerContext.Mgmt.Cluster().Cache(),
 			wranglerContext.Mgmt.Node().Cache(),
 			wranglerContext.MultiClusterManager,
+			telemetry.NewNVIDIACache(),
 		)
 		telemetryManager = telemetry.NewTelemetryExporterManager(telG, time.Second*10)
 	}
