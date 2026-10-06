@@ -1740,19 +1740,15 @@ func TestOnChange_PausedBlocksCancel(t *testing.T) {
 	assert.Empty(t, controller.updates, "a paused operation is not finalized, so it takes no finalizer")
 }
 
-// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers every outcome an operation can
-// reach without holding the beacon — Failed after losing it, Aborted after being overtaken,
-// Canceled by whoever wanted it next. In all three the operation still finishes, and the beacon
-// (now someone else's) is left exactly as it is: not cleared, and not carrying the phase hook's
-// delegate, which is the write that would otherwise reach into another controller's operation.
+// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers an operation reaching any terminal
+// phase without holding the beacon, which is treated no differently from any other way of ending:
+// the operation still finishes, its hook is abandoned rather than delegated, and the beacon (now
+// someone else's) is left exactly as it is, not cleared and not carrying the phase hook's delegate,
+// which is the write that would otherwise reach into another controller's operation.
 func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 	t.Parallel()
 
 	for name, tc := range terminalHandlers {
-		if name == "succeeded" {
-			continue
-		}
-
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1773,25 +1769,6 @@ func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 			assert.Empty(t, beacons.updates)
 		})
 	}
-}
-
-// Succeeded is deliberately excluded: an operation cannot have finished its work without holding
-// the beacon throughout, so a missing claim there is an anomaly rather than a state to paper over
-// by declaring the operation finished.
-func TestHandleSucceeded_WithoutBeaconClaimStillHonorsItsHook(t *testing.T) {
-	t.Parallel()
-
-	op := newOp()
-	op.Labels = map[string]string{opv1alpha1.SucceededPhaseHookLabelPrefix + "cleanup": "delegate-a"}
-
-	beacons := &fakeBeaconClient{}
-	h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
-	s := newScope(op, newBeacon("another-controller", true), defaultAdapter())
-
-	got, err := h.handleSucceeded(s, opv1alpha1.ETCDSnapshotSaveStatus{})
-	assert.NoError(t, err)
-	assert.True(t, got.TerminatedAt.IsZero(), "the hook is still owed an answer, so handling is not complete")
-	assert.NotEmpty(t, beacons.statusUpdates, "the hook's delegate is pushed as usual")
 }
 
 // TestHandleTerminal_WithoutBeaconClaimReleasesForDeletion ties the rule to why it matters: an

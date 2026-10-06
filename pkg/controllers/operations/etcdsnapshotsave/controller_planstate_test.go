@@ -224,15 +224,19 @@ func TestConsecutiveStepsAssignDistinctPlans(t *testing.T) {
 	}
 }
 
-// Both terminal outcomes that leave work behind stop it before the beacon is released, but only the
-// work that is still running: a plan that already finished has nothing left to stop. The beacon is
-// held until the agents report the running plans stopped, or until the wait for them times out.
+// Every terminal phase stops what the operation left running before the beacon is released, but only
+// the work that is still running: a plan that already finished has nothing left to stop. The beacon
+// is held until the agents report the running plans stopped, or until the wait for them times out.
+// Plans can be left running whatever the phase, such as on the other nodes of a step that ended on
+// one of them, so no phase is exempt.
 func TestTerminalPhasesCancelActivePlans(t *testing.T) {
 	t.Parallel()
 
 	for phase, handle := range map[opv1alpha1.OperationPhase]func(*handler, *scope, opv1alpha1.ETCDSnapshotSaveStatus) (opv1alpha1.ETCDSnapshotSaveStatus, error){
-		opv1alpha1.OperationPhaseCanceled: (*handler).handleCanceled,
-		opv1alpha1.OperationPhaseFailed:   (*handler).handleFailed,
+		opv1alpha1.OperationPhaseCanceled:  (*handler).handleCanceled,
+		opv1alpha1.OperationPhaseFailed:    (*handler).handleFailed,
+		opv1alpha1.OperationPhaseRejected:  (*handler).handleRejected,
+		opv1alpha1.OperationPhaseSucceeded: (*handler).handleSucceeded,
 	} {
 		t.Run(string(phase), func(t *testing.T) {
 			t.Parallel()

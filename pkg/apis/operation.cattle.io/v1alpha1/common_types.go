@@ -86,9 +86,9 @@ const (
 	OperationPhaseRejected OperationPhase = "Rejected"
 
 	// OperationPhaseCanceled indicates the operation was called off from outside: the user set
-	// Cancel, another controller needed it to stop, or it was deleted before its terminal handling
-	// completed. The work it had already dispatched is no longer tracked by anything, so it can be
-	// reported neither as succeeded nor as failed.
+	// Cancel, or it was deleted before its terminal handling completed. The work it had already
+	// dispatched is stopped rather than finished, so it can be reported neither as succeeded nor as
+	// failed.
 	OperationPhaseCanceled OperationPhase = "Canceled"
 )
 

@@ -2043,31 +2043,10 @@ func (h *handler) reconcilePostRestoreNodeCleanup(s *scope, status opv1alpha1.ET
 	return status, nil
 }
 
-// terminalPhase describes what is specific to one terminal phase: the condition it reports through,
-// the lifecycle hook that can defer its completion, and any work to run once the beacon is back.
+// terminalPhase describes what is specific to one terminal phase: the lifecycle hook that can defer
+// its completion, and any work to run once the beacon is released.
 type terminalPhase struct {
 	hook string
-
-	// beaconOptional marks a phase an operation can reach without holding the beacon, which is
-	// every outcome but success:
-	//
-	//   - Failed, which handleInProgress reaches precisely because the beacon was lost;
-	//   - Rejected, where the operation called its own work off and may since have been overtaken;
-	//   - Canceled, driven from outside the operation and often by whoever wants the beacon next.
-	//
-	// For those a missing claim is an expected outcome rather than a failure, so the phase's hook
-	// is passed over — without a claim there is no authority to delegate — and the beacon is left
-	// untouched. Succeeded is deliberately not one of them: an operation cannot have finished its
-	// work without holding the beacon throughout, so a missing claim there is an anomaly rather
-	// than a state to paper over.
-	beaconOptional bool
-
-	// beforeRelease, when set, runs after the phase's hook has been satisfied and before the beacon
-	// is released, for work that has to happen while this operation is still the one authorized to
-	// write to the cluster's machine-plan secrets. It may record progress on status. Returning false,
-	// or an error, leaves the beacon held and the operation un-terminated, so the next reconcile
-	// tries again: false is for work that is under way, an error for work that could not be done.
-	beforeRelease func(s *scope, status *opv1alpha1.OperationStatus) (bool, error)
 
 	// onRelease, when set, runs after the beacon has been released. owning reports whether this
 	// operation was the beacon's primary owner rather than a delegate acting on its behalf.
@@ -2084,20 +2063,22 @@ type terminalPhase struct {
 // what makes the operation eligible for TTL collection and lets a deleted operation finish
 // deleting. A terminal phase handler that returns early therefore cannot forget to withhold it.
 //
-// An operation which no longer holds the beacon has none of that left to do: see
-// beaconOptional. It terminates without the beacon being written to at all, which is what
-// keeps an operation that lost its claim from reaching into whichever one holds it now.
-// beforeRelease still runs for it, so anything it does that writes to the cluster has to check
-// the claim itself, as stopDispatchedPlans does.
+// Every terminal phase runs the same teardown, in this order: the phase's lifecycle hook, stopping
+// the plans the operation dispatched that are still running (stopDispatchedPlans), releasing the
+// beacon, and recording termination. Which phase it is changes only which hook applies and what
+// happens once the beacon is released (onRelease).
+//
+// An operation which no longer holds the beacon runs the same teardown, writing nothing it no longer
+// has the right to. Its hook is abandoned, since there is no authority left to delegate and pushing a
+// delegate onto a beacon somebody else holds would be reaching into their operation.
+// stopDispatchedPlans and the release are no-ops without a claim, so the operation still terminates,
+// which is what lets it be collected, or lets a deleted one retire its finalizer. Losing the beacon is
+// not otherwise special: whatever phase the operation ended in, it is handled the same way.
 func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus, phase terminalPhase) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	logrus.Debugf("[etcdsnapshotrestore] %s/%s: handling operation %s", s.op.Namespace, s.op.Name, status.Phase)
 
-	// A phase whose beacon claim is optional passes over its hook once that claim is gone: there is
-	// no authority left to delegate, and pushing a delegate onto a beacon another controller now
-	// holds would be reaching into its operation. Everything after the hook is either a no-op
-	// without a claim (releaseBeacon) or owed regardless of one, so the operation still terminates
-	// (which is what lets it be collected, or lets a deleted one retire its finalizer).
-	honorHook := !phase.beaconOptional || plan.HoldsBeacon(s.beacon, s.ownerKey)
+	// Without a claim on the beacon there is no authority to delegate the hook on, so it is abandoned.
+	honorHook := plan.HoldsBeacon(s.beacon, s.ownerKey)
 
 	if honorHook {
 		delegated, err := h.handleHook(s, phase.hook)
@@ -2112,14 +2093,16 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 			return status, nil
 		}
 	} else {
-		logrus.Debugf("[etcdsnapshotrestore] %s/%s: %s with no claim on the beacon, leaving it untouched", s.op.Namespace, s.op.Name, status.Phase)
+		logrus.Debugf("[etcdsnapshotrestore] %s/%s: %s with no claim on the beacon, abandoning its hook", s.op.Namespace, s.op.Name, status.Phase)
 	}
 
-	if phase.beforeRelease != nil {
-		done, err := phase.beforeRelease(s, &status.OperationStatus)
-		if err != nil || !done {
-			return status, err
-		}
+	// Stop what the operation started before the beacon passes to whichever operation is next: an
+	// operation can end with plans still running whatever phase it ended in, such as on the other nodes
+	// of a step that failed on one of them. Until they have stopped, the beacon is held and the
+	// operation stays unterminated, and the next reconcile checks again.
+	done, err := h.stopDispatchedPlans(s, &status.OperationStatus)
+	if err != nil || !done {
+		return status, err
 	}
 
 	owning, err := plan.ReleaseBeaconIfHeld(s.beacon, h.beacons, s.ownerKey)
@@ -2141,21 +2124,17 @@ func (h *handler) handleTerminal(s *scope, status opv1alpha1.ETCDSnapshotRestore
 // runs first so a delegate can observe why the operation stopped.
 func (h *handler) handleRejected(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           opv1alpha1.RejectedPhaseHookLabelPrefix,
-		beaconOptional: true,
+		hook: opv1alpha1.RejectedPhaseHookLabelPrefix,
 	})
 }
 
-// handleCanceled handles the Canceled terminal phase, which is reached when an external controller
-// cancels the operation, or it is deleted before its terminal handling completed. The Canceled-phase
-// hook runs first so delegates can react to the cancellation. Mirrors save's handleCanceled — what
-// separates cancellation from the other outcomes is that it comes from outside the operation, where
-// Failed means the work was attempted and lost and Rejected means the operation called it off.
+// handleCanceled handles the Canceled terminal phase, reached when spec.Cancel was set or the operation
+// was deleted before its terminal handling completed. What separates cancellation from the other
+// outcomes is that it comes from outside the operation, where Failed means the work was attempted and
+// lost and Rejected means the operation called it off itself.
 func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           opv1alpha1.CanceledPhaseHookLabelPrefix,
-		beaconOptional: true,
-		beforeRelease:  h.stopDispatchedPlans,
+		hook: opv1alpha1.CanceledPhaseHookLabelPrefix,
 	})
 }
 
@@ -2164,12 +2143,7 @@ func (h *handler) handleCanceled(s *scope, status opv1alpha1.ETCDSnapshotRestore
 // leftover scripts on nodes) can hold the beacon before the next operation acquires it.
 func (h *handler) handleFailed(s *scope, status opv1alpha1.ETCDSnapshotRestoreStatus) (opv1alpha1.ETCDSnapshotRestoreStatus, error) {
 	return h.handleTerminal(s, status, terminalPhase{
-		hook:           opv1alpha1.FailedPhaseHookLabelPrefix,
-		beaconOptional: true,
-
-		// A failed operation stops what it started too: a plan it dispatched may still be running when
-		// the failure is decided, such as on the other nodes of a step that failed on one of them.
-		beforeRelease: h.stopDispatchedPlans,
+		hook: opv1alpha1.FailedPhaseHookLabelPrefix,
 	})
 }
 

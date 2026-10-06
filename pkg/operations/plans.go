@@ -48,7 +48,7 @@ var stopClock = time.Now
 // reports true.
 //
 // This is what makes an operation's terminal outcome mean something on the cluster rather than only
-// in its status. Marking the operation Canceled or Failed stops the controller dispatching anything
+// in its status. Reaching a terminal phase stops the controller dispatching anything
 // further, but a plan already sitting in a machine-plan secret is the agent's to run, and it will
 // keep running it — so an operation that released the beacon on the strength of its status alone
 // would let the next operation start while the previous one's instructions were still executing.

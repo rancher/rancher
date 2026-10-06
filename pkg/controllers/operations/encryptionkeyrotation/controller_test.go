@@ -1130,18 +1130,15 @@ func TestHandleTerminal_RecordsTermination(t *testing.T) {
 	}
 }
 
-// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers every outcome an operation can
-// reach without holding the beacon — Failed after losing it, Aborted after being overtaken,
-// Canceled by whoever wanted it next. In all three the operation still finishes, and the beacon
-// (now someone else's) is left exactly as it is. The cluster stays paused: a rotation which did not
-// restart every node has left it mid-rotation, and unpausing is reconcileRestart's job alone.
-// Succeeded is excluded: it cannot be reached without holding the beacon throughout.
+// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers an operation reaching any terminal
+// phase without holding the beacon, which is treated no differently from any other way of ending:
+// the operation still finishes, its hook is abandoned rather than delegated, and the beacon (now
+// someone else's) is left exactly as it is, not cleared and not carrying the phase hook's delegate,
+// which is the write that would otherwise reach into another controller's operation.
+// The cluster stays paused: a rotation which did not restart every node has left it mid-rotation,
+// and unpausing is reconcileRestart's job alone.
 func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
 	for name, tc := range terminalHandlers {
-		if name == "succeeded" {
-			continue
-		}
-
 		t.Run(name, func(t *testing.T) {
 			op := newOp()
 			op.Labels = map[string]string{tc.hook + "cleanup": "delegate-a"}

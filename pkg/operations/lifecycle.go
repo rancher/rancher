@@ -53,8 +53,8 @@ func CancelForDeletion(status *opv1alpha1.OperationStatus) (opv1alpha1.Operation
 // canceled until it is resumed.
 //
 // This records the decision; it does not carry it out. Stopping the work already dispatched is
-// StopDispatchedPlans, which the Canceled and Failed phases' terminal handlers run before they
-// release the beacon — a plan sitting in a machine-plan secret belongs to the agent, and moving the
+// StopDispatchedPlans, which every terminal phase's handler runs before it releases the
+// beacon — a plan sitting in a machine-plan secret belongs to the agent, and moving the
 // phase alone would leave it running while the next operation acquired the beacon.
 func CancelForRequest(spec *opv1alpha1.OperationSpec, status *opv1alpha1.OperationStatus) (opv1alpha1.OperationPhase, bool) {
 	previous := status.Phase

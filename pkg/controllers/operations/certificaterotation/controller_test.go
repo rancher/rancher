@@ -1464,3 +1464,37 @@ func TestHandleCanceled_HoldsBeaconUntilDispatchedPlansStop(t *testing.T) {
 	assert.Equal(t, []string{"cancel-plan/node-a", "beacon-write"}, events, "the beacon is released once the plan has stopped")
 	assert.Empty(t, beacons.beacon.Status.Owner, "the beacon is handed back afterwards")
 }
+
+// TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched covers a rotation reaching any terminal phase
+// without holding the beacon, which is treated no differently from any other way of ending: the
+// operation still finishes, its hook is abandoned rather than delegated, and the beacon (now someone
+// else's) is left exactly as it is, not cleared and not carrying the phase hook's delegate.
+func TestHandleTerminal_WithoutBeaconClaimLeavesItUntouched(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		handle func(*handler, *scope, opv1alpha1.CertificateRotationStatus) (opv1alpha1.CertificateRotationStatus, error)
+		hook   string
+	}{
+		"succeeded": {(*handler).handleSucceeded, opv1alpha1.SucceededPhaseHookLabelPrefix},
+		"failed":    {(*handler).handleFailed, opv1alpha1.FailedPhaseHookLabelPrefix},
+		"rejected":  {(*handler).handleRejected, opv1alpha1.RejectedPhaseHookLabelPrefix},
+		"canceled":  {(*handler).handleCanceled, opv1alpha1.CanceledPhaseHookLabelPrefix},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			s := terminalScope(&stubAdapter{})
+			s.op.Labels = map[string]string{tc.hook + "cleanup": "delegate-a"}
+			s.beacon.Status.Owner = "another-controller"
+			beacons := &fakeBeaconClient{beacon: s.beacon}
+			h := &handler{beacons: beacons, dynamic: &fakeDynamic{}}
+
+			got, err := tc.handle(h, s, opv1alpha1.CertificateRotationStatus{})
+			require.NoError(t, err)
+			assert.False(t, got.TerminatedAt.IsZero(), "with no beacon to release, terminal handling is trivially complete")
+			assert.Empty(t, beacons.statusUpdates, "a beacon held by another controller must not be modified")
+			assert.Empty(t, beacons.updates)
+		})
+	}
+}
